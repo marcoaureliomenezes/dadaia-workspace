@@ -42,9 +42,9 @@ def _build_specs(tmp_path: Path) -> tuple[Path, Path]:
     return specs, src
 
 
-def _write_item(specs: Path, slug: str, frontmatter: str) -> None:
+def _write_item(specs: Path, slug: str, frontmatter: str, *, status: str = "idea") -> None:
     (specs / "backlog" / f"{slug}.md").write_text(
-        f"---\nstatus: idea\n{frontmatter}---\n\n# {slug}\n", encoding="utf-8"
+        f"---\nstatus: {status}\n{frontmatter}---\n\n# {slug}\n", encoding="utf-8"
     )
 
 
@@ -144,3 +144,52 @@ def test_stale_noop_when_no_ledger(tmp_path: Path) -> None:
     _write_item(specs, "live-feature", _VALID_INTENT_WIDGET)
     findings = _run(specs, src)
     assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings)
+
+
+def test_terminal_status_with_version_suffix_is_valid_and_not_stale(tmp_path: Path) -> None:
+    specs, src = _build_specs(tmp_path)
+    _write_item(
+        specs,
+        "shipped-feature",
+        _VALID_INTENT_WIDGET,
+        status="DELIVERED — v0.1.40",
+    )
+    archive = specs / "_archive" / "v0.1.40"
+    archive.mkdir(parents=True)
+    (archive / "consumed_backlog.json").write_text(
+        json.dumps(
+            {"release": "v0.1.40", "consumed": [{"slug": "shipped-feature", "shipped_anchors": []}]}
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _run(specs, src)
+
+    assert not any(f.code is BacklogDoctorCode.BL_SCHEMA for f in findings)
+    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings)
+
+
+def test_active_consumed_item_with_moved_anchor_is_schema_exempt(tmp_path: Path) -> None:
+    specs, src = _build_specs(tmp_path)
+    release_dir = specs / "releases" / "v0.1.40" / "alpha-1"
+    release_dir.mkdir(parents=True)
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: v0.1.40\nsegment: alpha-1\nphase: IMPLEMENTATION\n",
+        encoding="utf-8",
+    )
+    (release_dir / "SPEC.md").write_text(
+        "**Status:** Aprovado\n**Release ID:** v0.1.40\n**Consumes:** moved-anchor\n",
+        encoding="utf-8",
+    )
+    _write_item(
+        specs,
+        "moved-anchor",
+        "intents:\n  - subject: { kind: code, ref: pkg/m.py#OldMovedSymbol }\n    change: hoist symbol\n",
+        status="candidate",
+    )
+
+    findings = _run(specs, src)
+
+    assert not any(f.code is BacklogDoctorCode.BL_SCHEMA for f in findings), [
+        f.to_dict() for f in findings
+    ]

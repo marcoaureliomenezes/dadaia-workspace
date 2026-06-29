@@ -1,6 +1,6 @@
 ---
 name: backlog-doctor-blocks-consumed-item-refactor-commit
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 surface: pre-commit backlog doctor (BL-SCHEMA) / features.backlog.subject_registry
@@ -49,3 +49,10 @@ edited by the implementer purely to unblock — flagged in the Wave A handoff.
 **Notes:** Self-hosting dadaia-workspace source repo, branch feature/v0.1.30. The
 backlog file is ADDITIVE class so editing it was permitted by the SDD gate; the friction
 is the per-commit BL-SCHEMA enforcement colliding with the consume-on-release lifecycle.
+
+## Resolution
+
+Closed in v0.1.40 alpha-1 T5. `backlog doctor` now reads the active release
+`**Consumes:**` declaration during IMPLEMENTATION/CLOSURE and exempts those consumed
+slugs from unresolved subject-anchor BL-SCHEMA findings. Malformed intents, missing
+intents, duplicate/conflict checks, and non-consumed stale anchors remain enforced.

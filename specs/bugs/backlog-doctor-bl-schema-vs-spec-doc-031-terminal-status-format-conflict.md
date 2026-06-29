@@ -1,6 +1,6 @@
 ---
 name: backlog-doctor-bl-schema-vs-spec-doc-031-terminal-status-format-conflict
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-26
 surface: features/backlog/doctor.py (BL-SCHEMA _KNOWN_STATUSES) vs features/specs/doctor.py (SPEC-DOC-031)
@@ -47,3 +47,10 @@ SPEC-DOC-031 remains a non-blocking WARN (same advisory class already present on
 SPEC-DOC-031 example token is `—` (U+2014). `_KNOWN_STATUSES` is documented as
 "kept permissive" — the permissiveness should extend to the SPEC-DOC-031 terminal
 form so the two checks are reconcilable.
+
+## Resolution
+
+Closed in v0.1.40 alpha-1 T5. `backlog doctor` now validates the leading lifecycle
+token before a whitespace-delimited dash suffix, so `DELIVERED — vX.Y.Z` and
+`DELIVERED - vX.Y.Z` satisfy BL-SCHEMA while preserving hyphenated bare tokens such as
+`in-progress`. ADR-11 terminal tokens also participate in BL-STALE terminal handling.

@@ -46,8 +46,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T5 - Align backlog terminal status and consume-aware doctor behavior
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/backlog/doctor.py`, `dadaia_workspace/features/specs/doctor.py`, backlog consume/ledger helpers, tests, picked backlog-doctor bug files, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** ADR-11 terminal statuses with version suffix pass both doctors; active release consumed backlog anchor movement does not block implementation commits solely due stale pre-refactor anchors; non-consumed stale anchors still fail.
-- **Validation:** Focused backlog/specs doctor tests and `dadaia backlog doctor`.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/test_backlog_doctor.py -q` -> `8 passed`; `ruff check --no-cache` on touched backlog doctor/test files -> `All checks passed!`; `mypy --strict dadaia_workspace/features/backlog/doctor.py` -> `Success`; `dadaia backlog doctor --specs-dir specs` -> `clean`; `dadaia specs doctor --specs-dir specs` -> `0 errors, 17 known warnings`.

@@ -19,6 +19,7 @@ no subprocess. The CLI (``cli/commands/newartifacts.py``) and the pre-commit/CI 
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -41,7 +42,9 @@ __all__ = [
 ]
 
 #: Backlog statuses that are terminal — a stale check only flags non-terminal survivors.
-_TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
+_TERMINAL_STATUSES = frozenset(
+    {"delivered", "superseded", "resolved", "consumed", "deferred", "rejected", "done", "closed"}
+)
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
 #: informal — see ``release-governance``). ``None``/empty is the only invalid case here.
@@ -52,12 +55,21 @@ _KNOWN_STATUSES = frozenset(
         "picked",
         "in-progress",
         "delivered",
+        "superseded",
+        "resolved",
+        "consumed",
         "rejected",
         "deferred",
         "done",
         "closed",
         "open",
     }
+)
+
+_STATUS_SUFFIX_RE = re.compile(r"\s+(?:—|–|-)\s+")
+_ACTIVE_KV_RE = re.compile(r"^\s*([A-Za-z_]+)\s*:\s*(.+?)\s*$")
+_CONSUMES_RE = re.compile(
+    r"^\s*(?:\*\*)?Consumes\s*:?(?:\*\*)?\s*:?\s*(.+)$", re.IGNORECASE
 )
 
 
@@ -100,6 +112,7 @@ class DoctorContext:
     items: list[BacklogItem]
     registry: Registry
     consumed: dict[str, set[str]]
+    active_consumed: set[str] = field(default_factory=set)
     #: slug -> (anchor_changes, unresolved-messages), bound once.
     bound: dict[str, tuple[dict[str, str], list[str]]] = field(default_factory=dict)
 
@@ -133,7 +146,8 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                     slug=item.slug,
                 )
             )
-        if item.status is not None and item.status.lower() not in _KNOWN_STATUSES:
+        status_token = _status_token(item.status)
+        if status_token is not None and status_token not in _KNOWN_STATUSES:
             findings.append(
                 Finding(
                     BacklogDoctorCode.BL_SCHEMA,
@@ -143,6 +157,8 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                 )
             )
         _, unresolved = ctx.bound[item.slug]
+        if item.slug in ctx.active_consumed:
+            continue
         for message in unresolved:
             findings.append(
                 Finding(BacklogDoctorCode.BL_SCHEMA, Severity.ERROR, message, slug=item.slug)
@@ -192,9 +208,8 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
     if not ctx.consumed:  # no archived ledger → no-op (acceptance §3.7.6).
         return findings
     for item in ctx.items:
-        if item.slug in ctx.consumed and (
-            item.status is None or item.status.lower() not in _TERMINAL_STATUSES
-        ):
+        status_token = _status_token(item.status)
+        if item.slug in ctx.consumed and status_token not in _TERMINAL_STATUSES:
             findings.append(
                 Finding(
                     BacklogDoctorCode.BL_STALE,
@@ -205,6 +220,62 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
                 )
             )
     return findings
+
+
+def _status_token(status: str | None) -> str | None:
+    """Return the canonical leading token from a backlog status line.
+
+    ADR-11 terminal statuses allow evidence/version suffixes such as
+    ``DELIVERED — v0.1.40`` or ``SUPERSEDED - replacement-slug``. BL-SCHEMA validates
+    the lifecycle token, not the suffix; hyphenated bare tokens like ``in-progress``
+    remain intact because suffix splitting requires whitespace around the dash.
+    """
+    if status is None:
+        return None
+    value = status.strip().lower()
+    if not value:
+        return None
+    return _STATUS_SUFFIX_RE.split(value, maxsplit=1)[0].strip()
+
+
+def _read_active_consumed_slugs(specs_dir: Path) -> set[str]:
+    """Return slugs declared in active ``**Consumes:**`` during implementation/closure.
+
+    A consumed backlog item's subject anchors can legitimately go stale while the active
+    release is moving the implementation they pointed at. The release-definition producer
+    already validates the declaration; this helper only prevents the per-commit doctor
+    from blocking that consuming implementation before closure dispositions the item.
+    """
+    active = specs_dir / "releases" / "ACTIVE.md"
+    if not active.is_file():
+        return set()
+
+    data: dict[str, str] = {}
+    for line in active.read_text(encoding="utf-8").splitlines():
+        match = _ACTIVE_KV_RE.match(line)
+        if match is not None:
+            data[match.group(1).lower()] = match.group(2).strip()
+
+    if data.get("phase", "").upper() not in {"IMPLEMENTATION", "CLOSURE"}:
+        return set()
+    release_id = data.get("release")
+    if not release_id or release_id == "none":
+        return set()
+
+    segment = data.get("segment")
+    spec_path = specs_dir / "releases" / release_id
+    if segment:
+        spec_path /= segment
+    spec_path /= "SPEC.md"
+    if not spec_path.is_file():
+        return set()
+
+    for line in spec_path.read_text(encoding="utf-8").splitlines():
+        match = _CONSUMES_RE.match(line)
+        if match is None:
+            continue
+        return {slug.strip() for slug in match.group(1).split(",") if slug.strip()}
+    return set()
 
 
 #: A single parameterized registry of checks (SPEC §3.8 #8 — no copy-paste fan-out).
@@ -246,7 +317,12 @@ def run_backlog_doctor(
     items = load_backlog_items(specs_dir / "backlog")
     consumed = read_consumed(archive_root)
 
-    ctx = DoctorContext(items=items, registry=registry, consumed=consumed)
+    ctx = DoctorContext(
+        items=items,
+        registry=registry,
+        consumed=consumed,
+        active_consumed=_read_active_consumed_slugs(specs_dir),
+    )
     for item in items:
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
