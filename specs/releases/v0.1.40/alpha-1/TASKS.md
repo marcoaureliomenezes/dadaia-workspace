@@ -22,11 +22,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T2 - Add JSONL bug-event telemetry and CLI
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/bugs/**`, `dadaia_workspace/cli/commands/**`, `dadaia_workspace/public/schemas/**`, `dadaia_workspace/public/rules/bug-registration-guardrail.md`, migration/specs upgrade surfaces, bug/backlog memory as needed, tests, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia bugs append|status|stats` work against append-only hourly JSONL; schema and event-coherence validation ship; Markdown bug migration path archives converted sources under `specs/bugs/_archive/`; existing bug-report workflow compatibility is preserved.
-- **Validation:** Unit/integration tests for append/status/stats/coherence/rotation/migration.
+- **Validation:** `pytest -p no:cacheprovider tests/unit/features/bugs/test_events.py tests/integration/cli/test_cli_bugs.py -q` -> `4 passed`; `ruff check --no-cache` on touched bug telemetry files -> `All checks passed!`; `mypy --strict dadaia_workspace/features/bugs dadaia_workspace/cli/commands/bugs.py` -> `Success`; `dadaia public stage` + module-entry `dadaia public install --target all` + `dadaia public doctor` -> public-privacy/model/workflow checks OK.
 
 ### T3 - Add audit-disposition law
 

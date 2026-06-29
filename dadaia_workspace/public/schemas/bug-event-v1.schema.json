@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dadaia.dev/bug-event-v1.schema.json",
+  "title": "dadaia bug event v1",
+  "type": "object",
+  "required": ["bug_id", "event", "ts", "reported_by"],
+  "additionalProperties": true,
+  "properties": {
+    "bug_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "event": {
+      "type": "string",
+      "enum": ["reported", "resolved", "superseded", "deferred", "rejected", "archived"]
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "Z$"
+    },
+    "reported_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -19,7 +19,8 @@ quirk.)
 
 ## Workflow-first registration
 
-Use the runnable bug-report workflow whenever the CLI is available:
+Use the runnable bug-report workflow whenever the CLI is available. The workflow is the
+default; direct file authoring is the exception:
 
 ```bash
 dadaia lifecycle bug report --context <ctx> --release-id <release> \
@@ -31,6 +32,24 @@ The workflow owns intake, dedupe, additive bug write, and its terminal Python ga
 Direct Markdown bug files are an emergency fallback only when the bug-report workflow
 itself is unavailable or is the component being debugged. When using the fallback, record
 that workflow failure in the bug notes.
+
+## Event telemetry
+
+Bug telemetry is append-only JSONL. The canonical event stream lives under
+`specs/bugs/<YYYYMMDDTHH>Z.jsonl` and is managed by:
+
+```bash
+dadaia bugs append <bug-id> reported --reported-by <agent-or-session> ...
+dadaia bugs append <bug-id> resolved --reported-by <agent-or-session> --release <release>
+dadaia bugs status [bug-id]
+dadaia bugs stats
+```
+
+Events use schema `bug-event-v1`: required `bug_id`, `event`, `ts`, `reported_by`;
+event types are `reported`, `resolved`, `superseded`, `deferred`, `rejected`, and
+`archived`. Non-`reported` events require a prior `reported` event for the same bug.
+During the alpha transition, Markdown bug files remain supported for compatibility and
+can be migrated with `dadaia bugs migrate-md --apply`.
 
 ## Fallback location
 

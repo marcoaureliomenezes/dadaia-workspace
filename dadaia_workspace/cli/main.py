@@ -6,6 +6,7 @@ import typer
 
 from dadaia_workspace.cli.commands import (
     academy,
+    bugs,
     ci,
     clean,
     context,
@@ -66,6 +67,7 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(release_app, name="release")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(bug_app, name="bug")
+app.add_typer(bugs.app, name="bugs")
 
 
 def _safe_app() -> None:
