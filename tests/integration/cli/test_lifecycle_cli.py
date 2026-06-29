@@ -10,7 +10,14 @@ from typer.testing import CliRunner
 
 import dadaia_workspace.container as container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
+    AgentRunStatus,
+    LifecycleRunStatus,
+)
+from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -108,6 +115,51 @@ def test_lifecycle_status_no_args_uses_bounded_run_store_not_hygiene_scan(
         "running": 0,
         "status": "OK",
     }
+
+
+def test_successful_single_step_review_persists_completed_run_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    approving_runtime = FakeAgentRuntime(
+        result=AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary="approved",
+            artifact_refs=(".dadaia/handoff/dadaia-workspace/security.handoff.json",),
+            structured_output={"verdict": "APPROVED"},
+        ),
+    )
+
+    def build_phase_workflow(*args: object, **kwargs: object) -> LifecyclePhaseWorkflow:
+        return LifecyclePhaseWorkflow(
+            runtime=approving_runtime,
+            run_store=container.build_lifecycle_run_store(workspace),
+        )
+
+    monkeypatch.setattr(container, "build_lifecycle_phase_workflow", build_phase_workflow)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "review",
+            "security",
+            "--release-id",
+            "v9.9.9",
+            "--run-id",
+            "security-review-completes",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = container.build_lifecycle_run_store(workspace).load("security-review-completes")
+    assert run is not None
+    assert run.status is LifecycleRunStatus.COMPLETED
+    assert run.blocked is None
 
 
 def test_lifecycle_usage_error_uses_typer_exit_code() -> None:

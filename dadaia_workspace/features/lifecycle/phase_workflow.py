@@ -11,7 +11,7 @@ the harness is selectable/mixable per step purely by which adapter is injected.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
@@ -134,13 +134,18 @@ class LifecyclePhaseWorkflow:
                 is_review=review,
             ),
         )
-        self._run_store.save(decision.run)
+        persisted_run = (
+            replace(decision.run, status=LifecycleRunStatus.COMPLETED)
+            if decision.run.blocked is None
+            else decision.run
+        )
+        self._run_store.save(persisted_run)
         # `decision.accepted` is True even for a (legal) transition INTO BLOCKED;
         # the gate's pass/fail signal is whether the run carries a blocked state.
         return PhaseWorkflowResult(
             run_id=run_id,
-            accepted=decision.run.blocked is None,
-            phase=decision.run.phase,
+            accepted=persisted_run.blocked is None,
+            phase=persisted_run.phase,
             runtime_kind=self._runtime.runtime_kind(),
-            blocked=decision.run.blocked,
+            blocked=persisted_run.blocked,
         )
