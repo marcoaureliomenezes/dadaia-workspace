@@ -38,14 +38,15 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T4 - Fix bug-report workflow default writer fidelity
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/bug_report.py`, `dadaia_workspace/cli/commands/lifecycle.py`, related tests
 - **Acceptance:** `dadaia lifecycle bug report` preserves summary, repro, expected, and actual fields in the emitted bug markdown when using the default/fake path.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_bug_report_workflow.py -q` -> `1 passed`; `mypy --strict` on `container.py` -> `Success`.
 
 ### T5 - Validate PI workflow hardening and update dispositions
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `specs/bugs/*.md`, `specs/releases/v0.1.37/alpha-1/CLOSURE.md`, `specs/releases/ACTIVE.md`
 - **Acceptance:** Focused deterministic tests pass, PI-relevant workflow evidence is recorded, selected bug records carry resolution notes, and remaining PI residuals are explicitly left open.
