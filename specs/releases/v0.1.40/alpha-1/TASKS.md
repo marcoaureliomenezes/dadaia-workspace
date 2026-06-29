@@ -30,11 +30,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T3 - Add audit-disposition law
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/audit.py`, audit fragments/rules, specs doctor/audit validation surfaces, tests, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** Audit findings require explicit disposition before archive; incomplete/invalid disposition is detected; audit archive to `specs/audits/_archive/` is allowed only after disposition-complete approval.
-- **Validation:** Focused audit workflow/doctor tests.
+- **Validation:** `pytest -p no:cacheprovider tests/unit/features/specs/test_audit_dispositions.py -q` -> `5 passed`; `ruff check --no-cache` on touched doctor/test files -> `All checks passed!`; `mypy --strict dadaia_workspace/features/specs/doctor.py` -> `Success`; `dadaia specs doctor --specs-dir specs` -> `0 errors, 17 known warnings`; `dadaia public stage` + module-entry `dadaia public install --target all` + `dadaia public doctor` -> public-privacy/model/workflow checks OK.
 
 ### T4 - Make workflow-first lifecycle canonical
 

@@ -221,7 +221,8 @@ _LINT_SCRIPT: Path = (
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SPEC-DOC-031 / SPEC-DOC-032 — closure-disposition canon (T-011-10, bug B1, ADR-6/ADR-11)
+# SPEC-DOC-031 / SPEC-DOC-032 / SPEC-DOC-033 — closure/audit-disposition canon
+# (T-011-10, bug B1, ADR-6/ADR-11; v0.1.40 audit lifecycle)
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ADR-11 single-source status-token vocabulary.
@@ -237,11 +238,27 @@ _BACKLOG_NONTERMINAL_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
 # WARNs on anything else (legacy Fixed/resolved/Rejected tokens, etc.).
 _BUG_STATUS_CANON: frozenset[str] = frozenset({"open", "closed"})
 
+# Audit finding dispositions: terminal lifecycle tokens shared with backlog closure.
+# These are intentionally not route labels like "bug" or "backlog"; routing is evidence
+# attached to the disposition, while the disposition records lifecycle state.
+_AUDIT_DISPOSITION_CANON: frozenset[str] = frozenset(
+    {"fixed", "superseded", "deferred", "rejected"}
+)
+
 # Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
 _BACKLOG_STATUS_RE = re.compile(r"^\s*(?:\*\*)?status\*?\*?\s*:?\*?\*?\s*(.+)$", re.IGNORECASE)
 
 # Match a bug frontmatter ``status:`` line (frontmatter is leading YAML-like lines).
 _BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
+
+# Match audit finding IDs and disposition lines in markdown/YAML-ish handoffs.
+_AUDIT_FINDING_ID_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?finding_id\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE
+)
+_AUDIT_DISPOSITION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?disposition\s*:\s*([A-Za-z][A-Za-z_-]*)",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 # Aggregate / free-form backlog files that are not per-slug backlog entries.
 _BACKLOG_AGGREGATE_FILES: frozenset[str] = frozenset({"candidates.md", "ideas.md", "README.md"})
@@ -557,6 +574,7 @@ class SpecsDoctor:
         # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
         issues.extend(self._check_consumed_backlog_disposition())  # SPEC-DOC-031
         issues.extend(self._check_bug_status_canon())  # SPEC-DOC-032
+        issues.extend(self._check_audit_dispositions())  # SPEC-DOC-033
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -1544,6 +1562,67 @@ class SpecsDoctor:
                         "frontmatter field (SPEC-DOC-032, WARNING)."
                     ),
                     path=str(bug_file),
+                )
+            )
+        return issues
+
+    def _check_audit_dispositions(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-033: require canonical dispositions for audit findings.
+
+        An audit handoff/report that names explicit ``finding_id:`` values must give each
+        finding a terminal disposition token from the shared canon
+        {fixed, superseded, deferred, rejected}. Live audit files get a WARNING when the
+        disposition is missing so in-progress audits can still be triaged. Archived audit
+        files get an ERROR: archived findings must be disposition-complete.
+        """
+        audits_dir = self.specs_dir / "audits"
+        if not audits_dir.is_dir():
+            return []
+
+        issues: list[SpecsDoctorIssue] = []
+        for audit_file in sorted(audits_dir.rglob("*.md")):
+            rel = audit_file.relative_to(self.specs_dir).as_posix()
+            text = audit_file.read_text(encoding="utf-8")
+            finding_count = len(_AUDIT_FINDING_ID_RE.findall(text))
+            if finding_count == 0:
+                continue
+
+            archived = "_archive" in audit_file.relative_to(audits_dir).parts
+            dispositions = [
+                match.group(1).strip().lower() for match in _AUDIT_DISPOSITION_RE.finditer(text)
+            ]
+            invalid = sorted({token for token in dispositions if token not in _AUDIT_DISPOSITION_CANON})
+            if invalid:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"{rel} uses non-canonical audit disposition token(s) "
+                            f"{', '.join(invalid)}. Use one of: "
+                            f"{', '.join(sorted(_AUDIT_DISPOSITION_CANON))}."
+                        ),
+                        path=str(audit_file),
+                    )
+                )
+                continue
+
+            if len(dispositions) >= finding_count:
+                continue
+
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-033",
+                    severity=Severity.ERROR if archived else Severity.WARNING,
+                    description=(
+                        f"{rel} contains {finding_count} finding_id entr"
+                        f"{'y' if finding_count == 1 else 'ies'} but only "
+                        f"{len(dispositions)} canonical disposition line"
+                        f"{'' if len(dispositions) == 1 else 's'}. Each finding needs "
+                        "disposition: fixed|superseded|deferred|rejected plus route/evidence "
+                        "before the audit is archived."
+                    ),
+                    path=str(audit_file),
                 )
             )
         return issues
