@@ -427,9 +427,7 @@ def test_pi_recovers_written_handoff_when_final_message_omits_artifact_refs(
             json.dumps(
                 {
                     "type": "message_end",
-                    "message": {
-                        "content": "Wrote the security handoff but omitted artifact refs."
-                    },
+                    "message": {"content": "Wrote the security handoff but omitted artifact refs."},
                 }
             )
             + "\n"

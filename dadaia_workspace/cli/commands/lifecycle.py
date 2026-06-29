@@ -177,9 +177,7 @@ def status(
             }
         )
         return
-    typer.echo(
-        f"OK runs={len(runs)} running={running} blocked={blocked} completed={completed}"
-    )
+    typer.echo(f"OK runs={len(runs)} running={running} blocked={blocked} completed={completed}")
 
 
 @app.command()
