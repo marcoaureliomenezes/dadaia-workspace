@@ -978,6 +978,7 @@ def _phase_step_prompt(
     target_phase: LifecyclePhase,
     *,
     commit_sha: str | None = None,
+    artifact_dir: str | None = None,
 ) -> str:
     """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
 
@@ -1005,9 +1006,38 @@ def _phase_step_prompt(
             "Emit a handoff with an artifact_ref pointing at the handoff document (the "
             "artifact you produced). Do not self-verdict — create steps are not verdict-gated."
         )
+    artifact_instruction = ""
+    if artifact_dir:
+        artifact_instruction = (
+            " Review the release artifacts from this concrete directory: "
+            f"`{artifact_dir}`."
+        )
     return (
-        f"Run the {label} step for release {release_id} in context {context}. {output_instruction}"
+        f"Run the {label} step for release {release_id} in context {context}."
+        f"{artifact_instruction} {output_instruction}"
     )
+
+
+def _release_artifact_dir_hint(workspace_root: Path, *, context: str, release_id: str) -> str:
+    """Return the concrete release artifact dir, segment-aware when ACTIVE.md matches."""
+    specs_dir = workspace_root / "repos" / context / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    active = specs_dir / "releases" / "ACTIVE.md"
+    segment: str | None = None
+    active_release: str | None = None
+    if active.is_file():
+        for line in active.read_text(encoding="utf-8").splitlines():
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            if key.strip() == "release":
+                active_release = value.strip()
+            elif key.strip() == "segment":
+                segment = value.strip() or None
+    if active_release == release_id and segment:
+        return f"specs/releases/{release_id}/{segment}"
+    return f"specs/releases/{release_id}"
 
 
 def _run_phase_step(
@@ -1041,6 +1071,9 @@ def _run_phase_step(
         workspace_root, runtime_kind=kind, model=resolved_model
     )
     commit_sha = _current_context_commit_sha(workspace_root, context)
+    artifact_dir = _release_artifact_dir_hint(
+        workspace_root, context=context, release_id=release_id
+    )
     scope = PromptScope(
         role=role,
         context=context,
@@ -1052,6 +1085,7 @@ def _run_phase_step(
             context,
             target_phase,
             commit_sha=commit_sha,
+            artifact_dir=artifact_dir,
         ),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),

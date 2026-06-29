@@ -167,12 +167,44 @@ def test_phase_step_prompt_is_step_kind_aware() -> None:
     from dadaia_workspace.cli.commands.lifecycle import _phase_step_prompt
     from dadaia_workspace.core.models.lifecycle import LifecyclePhase
 
-    review = _phase_step_prompt("review qa", "v0.1.99", "ctx", LifecyclePhase.QA_REVIEW)
-    create = _phase_step_prompt("implement", "v0.1.99", "ctx", LifecyclePhase.IMPLEMENTATION)
+    review = _phase_step_prompt(
+        "review qa",
+        "v0.1.99",
+        "ctx",
+        LifecyclePhase.QA_REVIEW,
+        artifact_dir="specs/releases/v0.1.99/alpha-1",
+    )
+    create = _phase_step_prompt(
+        "implement",
+        "v0.1.99",
+        "ctx",
+        LifecyclePhase.IMPLEMENTATION,
+    )
     close = _phase_step_prompt("close", "v0.1.99", "ctx", LifecyclePhase.CLOSURE)
 
     assert "verdict is APPROVED or REJECTED" in review
     assert "Do not self-verdict" not in review
+    assert "specs/releases/v0.1.99/alpha-1" in review
     for prompt in (create, close):
         assert "Do not self-verdict" in prompt
         assert "is APPROVED or REJECTED" not in prompt
+
+
+def test_release_artifact_dir_hint_uses_active_segment(tmp_path: Path) -> None:
+    from dadaia_workspace.cli.commands.lifecycle import _release_artifact_dir_hint
+
+    specs = tmp_path / "repos" / "ctx" / "specs" / "releases"
+    specs.mkdir(parents=True)
+    (specs / "ACTIVE.md").write_text(
+        "release: v0.1.99\nsegment: alpha-1\nphase: IMPLEMENTATION\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        _release_artifact_dir_hint(tmp_path, context="ctx", release_id="v0.1.99")
+        == "specs/releases/v0.1.99/alpha-1"
+    )
+    assert (
+        _release_artifact_dir_hint(tmp_path, context="ctx", release_id="v0.2.0")
+        == "specs/releases/v0.2.0"
+    )
