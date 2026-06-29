@@ -22,14 +22,15 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T2 - Add headless prompt budgeting for release definition
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `dadaia_workspace/features/lifecycle/**`, related tests
 - **Acceptance:** Oversized bug/backlog catalogs do not produce raw Codex/PI input-limit errors during `spec_create`; the workflow either summarizes context or blocks early with an actionable lifecycle error.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py -q` -> `12 passed`; `mypy --strict` on `release_definition.py` -> `Success`.
 
 ### T3 - Fix lifecycle status no-arg behavior
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`, lifecycle status helpers, related tests
 - **Acceptance:** `dadaia lifecycle status` with no args exits promptly with bounded status or a clear usage error and no CPU spin.
