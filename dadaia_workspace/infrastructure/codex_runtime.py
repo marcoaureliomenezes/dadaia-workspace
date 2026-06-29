@@ -130,12 +130,12 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         self,
         config: CodexExecConfig,
         *,
-        runner: Runner = subprocess.run,
+        runner: Runner | None = None,
         environ: Mapping[str, str] | None = None,
         git: _GitDiffPort | None = None,
     ) -> None:
         self._config = config
-        self._runner = runner
+        self._runner = runner or subprocess.run
         self._environ = environ if environ is not None else os.environ
         self._git = git
         # Wire the mixin seams to this adapter's config.
