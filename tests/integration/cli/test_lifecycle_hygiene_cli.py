@@ -41,7 +41,7 @@ def _json_output(output: str) -> dict[str, object]:
     return payload
 
 
-def test_lifecycle_status_json_reports_hygiene_counters(
+def test_lifecycle_status_json_reports_bounded_run_counters(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -52,10 +52,13 @@ def test_lifecycle_status_json_reports_hygiene_counters(
 
     assert result.exit_code == 0, result.output
     payload = _json_output(result.output)
-    assert payload["status"] == "OK"
-    counters = payload["counters"]
-    assert isinstance(counters, dict)
-    assert isinstance(counters["cleanup_candidate_count"], int)
+    assert payload == {
+        "blocked": 0,
+        "completed": 0,
+        "run_count": 0,
+        "running": 0,
+        "status": "OK",
+    }
 
 
 def test_lifecycle_preflight_json_returns_blocked_without_codex(
