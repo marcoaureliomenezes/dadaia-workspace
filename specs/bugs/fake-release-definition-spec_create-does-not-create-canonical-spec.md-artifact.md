@@ -1,6 +1,6 @@
 ---
 name: fake-release-definition-spec_create-does-not-create-canonical-spec.md-artifact
-status: Open
+status: Closed
 severity: "HIGH"
 surface: lifecycle bug report workflow
 session_id: null
@@ -25,3 +25,16 @@ Fake release-definition remains a deterministic workflow driver and creates the 
 ## Actual
 
 Workflow returned BLOCKED at spec_create: spec_create missing canonical release artifact SPEC.md.
+
+## Resolution
+
+Fixed in v0.1.40 alpha-1 T1. Production `FakeAgentRuntime` now materializes a
+deterministic Markdown artifact when a workflow create step explicitly allows a canonical
+`SPEC.md`, `PLAN.md`, or `TASKS.md` path, and returns the artifact ref plus SHA-256 hash.
+The canonical artifact gate remains strict: handoff-only create success still blocks.
+
+Validation:
+
+- `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py::test_cli_fake_runtime_writes_canonical_create_artifacts tests/integration/cli/test_release_definition_workflow.py::test_handoff_only_spec_create_blocks_at_spec_create tests/integration/cli/test_release_definition_workflow.py::test_full_sequence_reaches_commit_gate_and_advances -q` -> `3 passed`.
+- `ruff check --no-cache dadaia_workspace/infrastructure/fake_runtime.py tests/integration/cli/test_release_definition_workflow.py` -> `All checks passed!`.
+- `mypy --strict dadaia_workspace/infrastructure/fake_runtime.py` -> `Success`.
