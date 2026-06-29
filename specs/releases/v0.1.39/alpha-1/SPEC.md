@@ -32,6 +32,7 @@ as a picked bug and uses this manually authored SPEC/PLAN/TASKS as the fallback 
 |------|------|-----------------------------|
 | `specs/backlog/sdd-governance-v2-agents-lifecycle.md` | backlog | Partially consumed: specs archive taxonomy/gate-class slice ships; JSONL bug-events and audit-disposition law remain explicit residuals. |
 | `specs/bugs/release-definition-spec-create-overselects-context-budget.md` | bug | Fixed in this release. |
+| `specs/bugs/lifecycle-review-commands-miss-active-segment-artifacts.md` | bug | Fixed in this release. |
 
 ## Requirements
 
@@ -89,6 +90,17 @@ Acceptance:
 - `sdd-governance-v2-agents-lifecycle` remains non-terminal with shipped taxonomy notes
   and explicit residual sections for JSONL bug-events and audit-disposition law.
 
+### R5 - Single-step lifecycle review prompts identify active segment artifacts
+
+Review and closure workers MUST be told the concrete active release artifact directory
+when the requested release is segmented in `ACTIVE.md`.
+
+Acceptance:
+
+- A QA review prompt for active `release: v0.1.39`, `segment: alpha-1` references
+  `specs/releases/v0.1.39/alpha-1/`.
+- A QA workflow rerun no longer rejects because it searched only the flat release path.
+
 ## Out of Scope
 
 - JSONL bug-event CLI/schema/migration.
@@ -102,3 +114,4 @@ Acceptance:
 |--------|--------------|
 | `sdd-governance-v2-agents-lifecycle` taxonomy pillar | R2, R3, R4 |
 | `release-definition-spec-create-overselects-context-budget` | R1 |
+| `lifecycle-review-commands-miss-active-segment-artifacts` | R5 |

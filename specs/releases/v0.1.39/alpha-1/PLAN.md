@@ -28,9 +28,15 @@ release-definition workflow path that blocked while defining this release.
 
 3. Update SDD artifacts.
    - Close the picked workflow bug if fixed.
+   - Close the segmented review prompt bug if fixed.
    - Rewrite the backlog item to preserve only JSONL bug-events and audit-disposition
      residuals after taxonomy ships.
    - Run specs doctor and focused tests before closure.
+
+4. Repair segmented review prompt guidance.
+   - Resolve the active release segment from `ACTIVE.md`.
+   - Include the concrete artifact directory in single-step lifecycle worker prompts.
+   - Cover the prompt helper with a CLI skeleton regression.
 
 ## Validation
 
