@@ -30,14 +30,15 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T3 - Fix lifecycle status no-arg behavior
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`, lifecycle status helpers, related tests
 - **Acceptance:** `dadaia lifecycle status` with no args exits promptly with bounded status or a clear usage error and no CPU spin.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_cli.py -q` -> `13 passed`; `timeout 10 dadaia lifecycle status --json` returned `status=OK`.
 
 ### T4 - Fix bug-report workflow default writer fidelity
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/bug_report.py`, `dadaia_workspace/cli/commands/lifecycle.py`, related tests
 - **Acceptance:** `dadaia lifecycle bug report` preserves summary, repro, expected, and actual fields in the emitted bug markdown when using the default/fake path.
