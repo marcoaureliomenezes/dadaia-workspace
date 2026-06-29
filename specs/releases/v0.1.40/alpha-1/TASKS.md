@@ -38,7 +38,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T4 - Make workflow-first lifecycle canonical
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/public/rules/**`, `dadaia_workspace/public/skills/**`, relevant memory atoms in CLOSURE, tests/public doctor coverage, picked workflow-first bug file, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** Governing public surfaces state that dadaia-workflows are the default for supported lifecycle phases and manual fallback requires a registered workflow bug; public doctor remains green.
