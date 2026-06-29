@@ -93,9 +93,10 @@ class _KindReportingFake:
         artifact_ref = _write_create_artifact(request)
         if artifact_ref is None:
             return self.result
-        content_hash = self.reported_content_hash or hashlib.sha256(
-            (Path.cwd() / artifact_ref).read_bytes()
-        ).hexdigest()
+        content_hash = (
+            self.reported_content_hash
+            or hashlib.sha256((Path.cwd() / artifact_ref).read_bytes()).hexdigest()
+        )
         return AgentRunResult(
             status=self.result.status,
             summary=self.result.summary,
