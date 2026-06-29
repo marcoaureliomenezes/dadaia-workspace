@@ -2,7 +2,7 @@
 slug: context-management
 title: context-management
 category: product
-tldr: multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa.
+tldr: multi-context ALIVE/DEAD; bind marker; TTL+PID lease; dead() limpa objetos git read-only normais.
 summary: multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind`
   (--mode opcional, default read) persiste contexto/modo/pid no session record
   CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker
@@ -20,7 +20,8 @@ summary: multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context
   probe-gated (holder com pid vivo nunca é reclaimed); bind records renovados por
   heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via
   origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
-  files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2);
+  files sem --commit, roda secret scan antes do push, e usa rmtree com retry chmod
+  para remover objetos git user-owned read-only normais; dadaia migrate (v1→v2);
   scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory
   product add.
 tags:
@@ -30,8 +31,8 @@ tags:
 - locking
 agent_tier: self-pull
 token_estimate: 2700
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+last_updated: '2026-06-29'
+release_origin: v0.1.38
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -170,7 +171,7 @@ Doctor TREE-1..7 enforça e repara esta árvore: `dadaia specs doctor` em worksp
   3. `dadaia context list` — mostra todos com state (ALIVE/DEAD), repo slug, datas.
   4. `dadaia context bind my-project --mode implementation --release my-release-v1` — persiste o session record (contexto, modo, release, pid). O lease é adquirido inline no primeiro write MUTATING.
   5. `dadaia context release` — solta o(s) lease(s) que a sessão segura (predicados eval/default flow acima) e remove o session record, liberando o contexto para outro agente.
-  6. `dadaia context dead my-project` — remove o repo do disco (rmtree), marca DEAD. Bloqueado se TTL-lease HELD para o context. **Review gate:** com arquivos untracked e sem `--commit`, `dead()` recusa e não faz push; com `--commit`, um secret scan (privacy engine) roda sobre o conteúdo staged e bloqueia o push em qualquer finding.
+  6. `dadaia context dead my-project` — remove o repo do disco (rmtree com retry chmod para objetos git user-owned read-only normais), marca DEAD. Bloqueado se TTL-lease HELD para o context. **Review gate:** com arquivos untracked e sem `--commit`, `dead()` recusa e não faz push; com `--commit`, um secret scan (privacy engine) roda sobre o conteúdo staged e bloqueia o push em qualquer finding.
 
 O hook `python -m dadaia_workspace.hooks.ctx_inject` executa no SessionStart/UserPromptSubmit. A injeção é **bind-driven**: sessão unbound recebe apenas o preflight genérico + lista de contexts ALIVE (sem context memory); após `dadaia context bind X`, o próximo prompt injeta a memory de X (tech-stack + catalog) uma vez por sessão lógica; re-bind para Y re-injeta Y. Para ADDITIVE writes (reports, handoffs, bugs, backlog, audits), o bind não é necessário — o gate permite esses paths sem lease.
 
