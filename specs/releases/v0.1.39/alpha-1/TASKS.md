@@ -14,11 +14,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Bound release-definition selected scope
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/context_selector.py`, `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `tests/integration/cli/test_release_definition_workflow.py`, `specs/bugs/release-definition-spec-create-overselects-context-budget.md`, `specs/releases/v0.1.39/alpha-1/**`
 - **Acceptance:** `spec_create` injects only operator-selected backlog/bug/audit items; the scoped v0.1.39 release-definition workflow no longer blocks on prompt size.
-- **Validation:** pending.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py::test_release_definition_spec_create_injects_only_selected_scope -q` -> `1 passed`; adjacent release-definition checks -> `2 passed`; `ruff check --no-cache` on changed files -> `All checks passed!`; `mypy --strict` on changed selector/container -> `Success`.
 
 ### T2 - Freeze per-class specs archive taxonomy
 

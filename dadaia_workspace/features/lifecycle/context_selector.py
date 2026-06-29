@@ -200,8 +200,18 @@ class _FileRef:
 class ContextSelector:
     """Resolve named dynamic inputs into bounded, auditable content."""
 
-    def __init__(self, context: SpecContext) -> None:
+    def __init__(
+        self,
+        context: SpecContext,
+        *,
+        selected_backlog_slugs: tuple[str, ...] = (),
+        selected_bug_slugs: tuple[str, ...] = (),
+        selected_audit_refs: tuple[str, ...] = (),
+    ) -> None:
         self._ctx = context
+        self._selected_backlog_slugs = frozenset(selected_backlog_slugs)
+        self._selected_bug_slugs = frozenset(selected_bug_slugs)
+        self._selected_audit_refs = frozenset(selected_audit_refs)
 
     @property
     def spec_context(self) -> SpecContext:
@@ -326,6 +336,24 @@ class ContextSelector:
                 continue
             refs.append(_FileRef(path=path, ref=self._specs_ref(path)))
         return tuple(refs)
+
+    @staticmethod
+    def _filter_by_stem(refs: tuple[_FileRef, ...], selected: frozenset[str]) -> tuple[_FileRef, ...]:
+        if not selected:
+            return refs
+        return tuple(fref for fref in refs if fref.path.stem in selected)
+
+    def _filter_audits(self, refs: tuple[_FileRef, ...]) -> tuple[_FileRef, ...]:
+        if not self._selected_audit_refs:
+            return refs
+        selected = self._selected_audit_refs
+        return tuple(
+            fref
+            for fref in refs
+            if fref.ref in selected
+            or fref.path.parent.name in selected
+            or fref.path.stem in selected
+        )
 
     def _release_artifact(
         self, name: str, policy: MaxContextPolicy, filename: str
@@ -470,7 +498,10 @@ class ContextSelector:
         return self._ctx.specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
 
     def sel_selected_backlog_items(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._backlog_refs(open_only=False))
+        refs = self._filter_by_stem(
+            self._backlog_refs(open_only=False), self._selected_backlog_slugs
+        )
+        return self._render(name, policy, refs)
 
     def _bug_refs(self, *, open_only: bool) -> tuple[_FileRef, ...]:
         refs = self._dir_files("bugs")
@@ -488,7 +519,8 @@ class ContextSelector:
         return self._render(name, policy, self._bug_refs(open_only=True))
 
     def sel_selected_bugs(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._bug_refs(open_only=False))
+        refs = self._filter_by_stem(self._bug_refs(open_only=False), self._selected_bug_slugs)
+        return self._render(name, policy, refs)
 
     def _audit_refs(self) -> tuple[_FileRef, ...]:
         directory = self._ctx.specs_dir / "audits"
@@ -503,7 +535,7 @@ class ContextSelector:
         return self._render(name, policy, self._audit_refs())
 
     def sel_selected_audit_findings(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._audit_refs())
+        return self._render(name, policy, self._filter_audits(self._audit_refs()))
 
     # ---- release artifacts --------------------------------------------
 

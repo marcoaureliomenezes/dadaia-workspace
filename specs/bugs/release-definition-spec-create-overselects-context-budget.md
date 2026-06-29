@@ -1,11 +1,12 @@
 ---
 name: release-definition-spec-create-overselects-context-budget
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-29
 surface: lifecycle release_definition context selector
 session_id: codex-2026-06-29-v0139
 release: v0.1.39
+resolved: 2026-06-29
 ---
 
 # Release-definition `spec_create` over-selects context and exceeds headless prompt budget
@@ -55,3 +56,17 @@ unavailable or blocked.
 backlog release definition does not include the entire live backlog/bug corpus. Add
 regression coverage that `spec_create` context refs are limited to the selected backlog,
 upstream release-scope handoff, and explicitly required review inputs.
+
+## Resolution - v0.1.39 alpha-1
+
+`ContextSelector` now accepts explicit selected backlog, bug, and audit identifiers. The
+release-definition composition root threads `ReleaseDefinitionScopeInput` into the
+selector, so `spec_create` receives exactly the operator-picked items while `release_scope`
+keeps its broad discovery context.
+
+Regression:
+
+```bash
+.dadaia/.venv/bin/python -m pytest -p no:cacheprovider \
+  repos/dadaia-workspace/tests/integration/cli/test_release_definition_workflow.py::test_release_definition_spec_create_injects_only_selected_scope -q
+```

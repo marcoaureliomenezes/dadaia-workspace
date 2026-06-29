@@ -304,6 +304,61 @@ def test_cli_fake_runtime_writes_canonical_create_artifacts(
     assert (workspace / "specs" / "releases" / _RELEASE / "TASKS.md").is_file()
 
 
+def test_release_definition_spec_create_injects_only_selected_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    _install_fake_factory(monkeypatch)
+    backlog = workspace / "specs" / "backlog"
+    bugs = workspace / "specs" / "bugs"
+    backlog.mkdir(parents=True, exist_ok=True)
+    bugs.mkdir(parents=True, exist_ok=True)
+    (backlog / "picked-scope.md").write_text(
+        "---\nname: picked-scope\nstatus: candidate\n---\n# Picked\n",
+        encoding="utf-8",
+    )
+    (backlog / "not-picked.md").write_text(
+        "---\nname: not-picked\nstatus: candidate\n---\n# Not picked\n",
+        encoding="utf-8",
+    )
+    (bugs / "picked-bug.md").write_text(
+        "---\nname: picked-bug\nstatus: Open\n---\n# Picked bug\n",
+        encoding="utf-8",
+    )
+    (bugs / "not-picked-bug.md").write_text(
+        "---\nname: not-picked-bug\nstatus: Open\n---\n# Not picked bug\n",
+        encoding="utf-8",
+    )
+
+    result = _define(
+        [
+            "--harness",
+            "fake",
+            "--run-id",
+            "selected-scope",
+            "--backlog",
+            "picked-scope",
+            "--bug",
+            "picked-bug",
+        ]
+    )
+
+    assert result.exit_code == 0, result.output
+    run_payload = json.loads(
+        (workspace / ".dadaia" / "states" / "lifecycle" / "selected-scope.json").read_text()
+    )
+    run = run_payload["run"]
+    spec_create = next(
+        item for item in run["injected_context"] if item["step"] == "spec_create"
+    )
+    refs = set(spec_create["refs"])
+    assert "specs/backlog/picked-scope.md" in refs
+    assert "specs/bugs/picked-bug.md" in refs
+    assert "specs/backlog/not-picked.md" not in refs
+    assert "specs/bugs/not-picked-bug.md" not in refs
+
+
 def test_release_definition_uses_python_hash_when_worker_reports_wrong_hash(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

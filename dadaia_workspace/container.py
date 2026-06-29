@@ -1014,8 +1014,12 @@ def build_release_definition_workflow(
         # Self-hosting library repo: specs live at the workspace-root tree.
         specs_dir = workspace_root / "specs"
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    scoped_input = scope_input or ReleaseDefinitionScopeInput()
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir),
+        selected_backlog_slugs=scoped_input.backlog_slugs,
+        selected_bug_slugs=scoped_input.bug_slugs,
+        selected_audit_refs=scoped_input.audit_refs,
     )
     return ReleaseDefinitionWorkflow(
         context=context,
@@ -1027,7 +1031,7 @@ def build_release_definition_workflow(
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
-        scope_input=scope_input or ReleaseDefinitionScopeInput(),
+        scope_input=scoped_input,
         step_models=step_models,
     )
 
