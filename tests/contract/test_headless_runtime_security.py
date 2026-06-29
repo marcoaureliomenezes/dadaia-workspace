@@ -445,3 +445,50 @@ def test_pi_recovers_written_handoff_when_final_message_omits_artifact_refs(
     assert result.structured_output["verdict"] == "APPROVED"
     assert result.structured_output["verdict_reason"] == "No blockers."
     assert result.structured_output["commit_sha"] == "abc123"
+
+
+def test_pi_recovers_written_handoff_when_final_message_has_verdict_without_artifacts(
+    tmp_path: Path,
+) -> None:
+    handoff_dir = tmp_path / ".dadaia" / "handoff" / "dadaia-workspace"
+    handoff_dir.mkdir(parents=True)
+    handoff_path = handoff_dir / "security.handoff.json"
+    handoff = {
+        "schema_version": "handoff-v1.1",
+        "agent": "security-reviewer",
+        "context": "dadaia-workspace",
+        "release_id": "v0.1.34",
+        "verdict": "APPROVED",
+        "verdict_reason": "No blockers.",
+        "metrics": {
+            "commit_sha": "abc123",
+            "artifact_ref": ".dadaia/handoff/dadaia-workspace/security.handoff.json",
+        },
+        "artifact": {"type": "other"},
+    }
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        handoff_path.write_text(json.dumps(handoff), encoding="utf-8")
+        message = {
+            "schema": "agent-run-result-v1",
+            "status": "SUCCEEDED",
+            "structured_output": {"verdict": "APPROVED"},
+        }
+        stdout = (
+            json.dumps({"type": "message_end", "message": {"content": json.dumps(message)}}) + "\n"
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    result = pi_runtime.PiHeadlessAdapter(
+        pi_runtime.PiHeadlessConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.PI_HEADLESS))
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/security.handoff.json",)
+    assert result.structured_output["verdict"] == "APPROVED"
+    assert result.structured_output["verdict_reason"] == "No blockers."
+    assert result.structured_output["commit_sha"] == "abc123"

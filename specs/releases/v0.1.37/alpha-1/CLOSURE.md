@@ -43,6 +43,7 @@ All tasks in `TASKS.md` are `[x] DONE`.
 | Public projection doctor | `.dadaia/.venv/bin/dadaia public doctor` | `[ok] public-privacy`; `[ok] model-resolution`; `[ok] ai-surface`; `[ok] workflow-policy` |
 | Repo hygiene scan | `find repos/dadaia-workspace -type d \( -name .dadaia -o -name .venv -o -name .pytest_cache -o -name .mypy_cache -o -name .hypothesis -o -name .ruff_cache -o -name test-results -o -name playwright-report -o -name coverage \) -print` | no output |
 | Review prompt exact-SHA regression | `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider repos/dadaia-workspace/tests/integration/cli/test_lifecycle_cli.py -q` | `15 passed`; covers full 40-character `metrics.commit_sha` instruction for review workers |
+| PI handoff recovery regression | `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider repos/dadaia-workspace/tests/contract/test_headless_runtime_security.py -q` | `15 passed`; covers verdict-present / artifact-ref-missing recovery from written handoff |
 
 ## Dispositions
 
@@ -55,6 +56,7 @@ All tasks in `TASKS.md` are `[x] DONE`.
 | `specs/bugs/lifecycle-review-success-leaves-run-state-running.md` | bug | `Closed` | Single-step phase workflow persists accepted runs as `COMPLETED` |
 | `specs/bugs/pi-headless-does-not-recover-written-handoff-without-artifact-refs.md` | bug | `Closed` | PI recovers newly written matching handoff evidence |
 | `specs/bugs/pi-security-review-handoff-can-emit-short-commit-sha-and-miss-pre-push-exact-sha-gate.md` | bug | `Closed` | Review prompt now supplies the exact 40-character HEAD SHA and forbids abbreviation |
+| `specs/bugs/pi-handoff-recovery-skips-valid-handoff-when-final-message-has-verdict-but-no-artifact_refs.md` | bug | `Closed` | PI handoff recovery now runs when either artifact refs or verdict are missing |
 
 ## Backlog returns
 

@@ -318,7 +318,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         started_at: float,
     ) -> AgentRunResult:
         """Recover a valid handoff written to disk when PI's final message is prose."""
-        if result.artifact_refs or result.structured_output.get("verdict"):
+        if result.artifact_refs and result.structured_output.get("verdict"):
             return result
         handoff = self._latest_written_handoff(request, started_at=started_at)
         if handoff is None:
