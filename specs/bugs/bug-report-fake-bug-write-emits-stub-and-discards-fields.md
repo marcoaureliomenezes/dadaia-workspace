@@ -1,8 +1,10 @@
 ---
 name: bug-report-fake-bug-write-emits-stub-and-discards-fields
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-28
+resolved: 2026-06-29
+release: v0.1.37
 surface: dadaia lifecycle bug report (bug_report workflow, fake runtime bug_write step)
 session_id: sess_8cdf6cce
 ---
@@ -77,3 +79,20 @@ workflow-first registration path and can give false confidence.
 
 **Notes:** Discovered while registering the PI release-definition blocking bugs under the
 operator's "report any workflow/PI issue as a detailed bug" guardrail. No secrets included.
+
+## Resolution
+
+Closed in `v0.1.37/alpha-1`.
+
+Root cause: the composed fake bug-report runtime wrote a canned markdown record from
+`request.task_id` and never received or read the structured `BugReportInput` built by the
+CLI. The workflow could therefore report `status: OK` while dropping the operator's
+summary, repro, expected, actual, details, and severity fields.
+
+Fix: the bug-report runtime factory now receives the `BugReportInput` and the fake writer
+materializes a real additive bug markdown record from those operator-provided fields.
+
+Validation:
+
+- `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_bug_report_workflow.py -q` -> `1 passed`.
+- Included in focused v0.1.37 deterministic suite -> `41 passed`.

@@ -1,8 +1,10 @@
 ---
 name: pi-security-review-worker-recurses-into-lifecycle-command
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-29
+resolved: 2026-06-29
+release: v0.1.37
 surface: lifecycle review security / PI_HEADLESS worker prompt-tool behavior
 session_id: codex-goal-v0.1.36-push
 ---
@@ -69,3 +71,28 @@ should be picked into the next PI workflow-hardening release.
 
 **Bug-report workflow note:** Direct Markdown fallback used because
 `bug-report-fake-bug-write-emits-stub-and-discards-fields` is still open.
+
+## Resolution
+
+Closed in `v0.1.37/alpha-1`.
+
+Root cause was twofold:
+
+- lifecycle worker prompts did not state the Layer-2 worker boundary, so a command-shaped
+  review task could be interpreted as permission to invoke another `dadaia lifecycle`
+  workflow;
+- PI review requests received the full configured tool set (`read,write,edit,bash`), so a
+  review worker had enough shell capability to spawn the recursive lifecycle command.
+
+Fix:
+
+- `LifecyclePromptBuilder` now injects a shared worker-boundary guard into every worker
+  prompt, explicitly forbidding nested `dadaia lifecycle ...` execution and requiring the
+  current step's result object instead.
+- `PiHeadlessAdapter` now narrows review-like requests to `read,write` tools, removing
+  `bash` and `edit` while preserving handoff writing.
+
+Validation:
+
+- `pytest -p no:cacheprovider tests/contract/test_lifecycle_prompt_scope.py tests/contract/test_headless_runtime_security.py -q` -> `15 passed`.
+- Included in focused v0.1.37 deterministic suite -> `41 passed`.

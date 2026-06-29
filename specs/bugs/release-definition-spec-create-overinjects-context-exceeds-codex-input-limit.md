@@ -1,8 +1,10 @@
 ---
 name: release-definition-spec-create-overinjects-context-exceeds-codex-input-limit
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-29
+resolved: 2026-06-29
+release: v0.1.37
 surface: lifecycle release define / spec_create / CodexExecAdapter context injection
 session_id: codex-goal-v0.1.36-push
 ---
@@ -65,3 +67,22 @@ SPEC repair or a narrower retry.
 
 **Bug-report workflow note:** Direct Markdown fallback used because
 `bug-report-fake-bug-write-emits-stub-and-discards-fields` is still open.
+
+## Resolution
+
+Closed in `v0.1.37/alpha-1`.
+
+Root cause: release-definition model steps assembled the full worker prompt and launched the
+headless runtime without a transport-aware prompt budget. When the selected context grew,
+`codex exec` rejected the request with its raw `input_too_large` transport error.
+
+Fix: `ReleaseDefinitionWorkflow` now checks the fully assembled worker prompt before
+starting the runtime. Prompts over the headless budget block inside the lifecycle workflow
+with a structured `BlockedState` naming the step and prompt character count, instead of
+spawning Codex/PI and surfacing a raw transport failure.
+
+Validation:
+
+- Oversized prompt regression in `tests/integration/cli/test_release_definition_workflow.py`.
+- `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py -q` -> `12 passed`.
+- Included in focused v0.1.37 deterministic suite -> `41 passed`.

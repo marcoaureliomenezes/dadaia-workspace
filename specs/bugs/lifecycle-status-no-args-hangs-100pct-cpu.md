@@ -1,8 +1,10 @@
 ---
 name: lifecycle-status-no-args-hangs-100pct-cpu
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-28
+resolved: 2026-06-29
+release: v0.1.37
 surface: dadaia lifecycle status (CLI)
 session_id: sess_8cdf6cce
 ---
@@ -37,3 +39,22 @@ but there is no state corruption and other lifecycle inspection commands
 while grounding the lifecycle state before running release-definition on PI. Registered via
 direct-Markdown fallback (the `bug report` workflow's default `--harness fake` writes a
 stub — see `bug-report-fake-bug-write-emits-stub-and-discards-fields`). No secrets included.
+
+## Resolution
+
+Closed in `v0.1.37/alpha-1`.
+
+Root cause: the top-level `dadaia lifecycle status` command was wired to the lifecycle
+hygiene cleanup status path, which performs cleanup/handoff-oriented scanning. That made
+the no-arg lifecycle status command much heavier than a status read should be and could
+hang on large/stale runtime state.
+
+Fix: top-level `lifecycle status` now reads the persisted lifecycle run store and reports
+bounded run counters (`run_count`, `running`, `blocked`, `completed`). The heavier cleanup
+scan remains available under `dadaia lifecycle hygiene status`.
+
+Validation:
+
+- `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_cli.py -q` -> `13 passed`.
+- `timeout 10 .dadaia/.venv/bin/dadaia lifecycle status --json` returned `status=OK` in the live workspace.
+- Included in focused v0.1.37 deterministic suite -> `41 passed`.
