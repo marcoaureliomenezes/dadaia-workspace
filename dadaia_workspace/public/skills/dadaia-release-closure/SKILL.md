@@ -9,6 +9,10 @@ applyTo: "specs/releases/*/CLOSURE.md"
 > **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the closure
 > sequence and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
 > skill is reference / manual-operator guidance only.
+>
+> **Default action:** run the closure workflow first. Use this template/protocol directly
+> only inside workflow-executed closure work or after registering a workflow bug that
+> explains why the workflow could not close the release.
 
 ## When to invoke
 

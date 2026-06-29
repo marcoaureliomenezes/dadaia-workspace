@@ -12,6 +12,10 @@ applyTo: ".dadaia/handoff/**"
 > **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution and dispatch
 > sequencing are owned by the dadaia-workflows (`dadaia lifecycle`), whose Python
 > orchestrator owns the sequence. This skill is reference / manual-operator guidance only.
+>
+> **Default action:** when the operator prompt maps to a supported lifecycle workflow,
+> the project-manager starts that workflow first. The manual dispatch references below
+> are for workflow worker context, unsupported requests, or registered workflow fallback.
 
 This is the public default orchestration skill. It must stay generic: no
 operator-private project names, hostnames, IPs, customer names, private repo

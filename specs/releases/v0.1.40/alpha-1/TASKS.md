@@ -38,11 +38,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T4 - Make workflow-first lifecycle canonical
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/public/rules/**`, `dadaia_workspace/public/skills/**`, relevant memory atoms in CLOSURE, tests/public doctor coverage, picked workflow-first bug file, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** Governing public surfaces state that dadaia-workflows are the default for supported lifecycle phases and manual fallback requires a registered workflow bug; public doctor remains green.
-- **Validation:** Public doctor and contract/search checks for workflow-first language.
+- **Validation:** `rg` contract check confirms workflow-first/default-action/fallback language across root AGENTS source, release/workspace rules, and lifecycle skills; `dadaia specs doctor --specs-dir specs` -> `0 errors, 17 known warnings`; `dadaia public stage` + module-entry `dadaia public install --target all` + `dadaia public doctor` -> public-privacy/model/ai-surface/workflow-policy checks OK.
 
 ### T5 - Align backlog terminal status and consume-aware doctor behavior
 

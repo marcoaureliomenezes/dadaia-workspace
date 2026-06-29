@@ -12,6 +12,10 @@ applyTo: ".dadaia/reports/**"
 > **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the audit
 > workflow and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
 > skill is reference / manual-operator guidance only.
+>
+> **Default action:** run the audit lifecycle workflow first for operator audit prompts.
+> Use the manual drift protocol below only inside workflow worker context or after a
+> registered workflow bug justifies fallback.
 
 ## Memory Atom Inventory
 

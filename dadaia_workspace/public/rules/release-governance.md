@@ -10,6 +10,21 @@ This rule is always active. It governs how reported bugs and backlog items becom
 releases, and how releases mature and are reviewed. Full detail: the
 `dadaia-release-definition` skill and ADR-1..4 of release v0.1.5.
 
+## Workflow-first lifecycle
+
+For every supported development lifecycle phase, the **dadaia-workflow is the
+default execution path**. When an operator prompt means release definition,
+implementation, review, audit, bug reporting, closure, or shipping, start from the
+corresponding `dadaia lifecycle ...` workflow and let its Python body assemble prompts,
+select context, call workers, and advance gates. Manual spec/code/report editing is the
+exception.
+
+Manual fallback is allowed only when the relevant workflow is unavailable, broken, or is
+the component currently being debugged. Before falling back, register a workflow bug
+with `dadaia lifecycle bug report`; if the bug-report workflow itself is broken, write
+the additive fallback bug and say that the bug-report workflow failed. The fallback
+commit or release note must name the bug and the workflow command that failed.
+
 ## Bug & backlog → release
 
 - **`product-engineer` picks** the bug + backlog set, **dispatched by

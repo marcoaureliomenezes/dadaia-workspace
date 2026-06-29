@@ -15,6 +15,11 @@ applyTo: "specs/**/TASKS.md"
 > per-phase lifecycle sequence are owned by the dadaia-workflows (`dadaia lifecycle`),
 > whose Python gates own task-state transitions. This skill is reference / manual-operator
 > guidance for the human-auditable marker discipline only.
+>
+> **Default action:** when the operator asks for implementation/review/closure work that
+> maps to a supported lifecycle phase, run the matching `dadaia lifecycle ...` workflow
+> first. Use the marker mechanics below directly only inside that workflow's worker
+> context or after a registered workflow bug justifies manual fallback.
 
 ## The 3-marker contract
 

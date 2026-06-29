@@ -13,6 +13,10 @@ applyTo: "specs/backlog/**"
 > and advances Python-validated gates. This skill is reference / manual-operator guidance
 > only; it does not enforce the sequence. See **`dadaia panel` → Agentic →
 > dadaia-workflows** for the live workflow description.
+>
+> **Default action:** run `dadaia lifecycle release define ...` first. Use the manual
+> protocol below only inside that workflow's worker context or after registering a
+> workflow bug that explains why the runnable workflow could not be used.
 
 ## When to invoke
 

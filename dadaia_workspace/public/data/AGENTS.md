@@ -225,13 +225,19 @@ deterministic gate constrains **what** may be written (path-class, lease, phase,
 not **how** the change was produced. (`Aprovado`, `Em revisão`, and `Draft` are the
 canonical SDD status tokens — do not translate or change them.)
 
-**Ordered lifecycle is owned by the dadaia-workflows, not by this file.** The ordered
-ritual — reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition →
-implementation → review → closure sequence — is executed by the **dadaia-workflows**
-(the `dadaia lifecycle` verbs: `release define`, the implementation pipeline, `close`,
-…). Each is a Python workflow body that assembles fragment-scoped per-step prompts,
-selects dynamic context, calls worker agents, and advances **Python-validated gates**.
-Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
+**Ordered lifecycle is workflow-first.** The ordered ritual — reading
+SPEC/PLAN/TASKS, reserving a task, the per-phase definition → implementation → review →
+closure sequence — is executed by the **dadaia-workflows** by default (the
+`dadaia lifecycle` verbs: `release define`, the implementation pipeline, `close`, …).
+Each is a Python workflow body that assembles fragment-scoped per-step prompts, selects
+dynamic context, calls worker agents, and advances **Python-validated gates**. When an
+operator prompt means a supported lifecycle phase, start from the matching
+`dadaia lifecycle ...` command. Manual execution is an exception only when the workflow
+is unavailable, broken, or is itself being debugged; register a workflow bug first (or an
+additive fallback bug if the bug-report workflow is the broken component) and name that
+bug in the fallback work.
+
+Layer-1 agents are **required to prefer** those workflows; the disk/commit boundary is
 **safety-gate-enforced** by the deterministic gate and git chokepoints described above
 (write-scope, lease, and phase) — there is no procedural check that a given workflow verb
 was actually run. For the full per-workflow description — purpose, ordered steps,

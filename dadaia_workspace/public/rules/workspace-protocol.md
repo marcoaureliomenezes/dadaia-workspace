@@ -83,6 +83,13 @@ workspace has *no* ALIVE context at all should you tell the operator there is no
 to work on.
 
 ## 3. Task lifecycle
+
+**Workflow-first default.** If the operator prompt maps to a supported lifecycle phase,
+run the matching `dadaia lifecycle ...` workflow first. The workflow owns ordered
+definition/implementation/review/closure mechanics. The steps below are the manual
+discipline to follow only inside workflow-executed work or after a registered workflow
+bug justifies fallback.
+
 1. Read ACTIVE.md → confirm release + phase.
 2. Read SPEC.md, PLAN.md, TASKS.md — all must have `**Status:** Aprovado`.
 3. Reserve your task: flip `[ ]` → `[-]`.
