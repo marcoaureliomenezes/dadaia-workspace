@@ -30,8 +30,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T3 - Segment-aware single-step lifecycle prompts
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`, `tests/integration/cli/test_lifecycle_command_skeletons.py`, `specs/bugs/lifecycle-review-commands-miss-active-segment-artifacts.md`, `specs/releases/v0.1.39/alpha-1/**`
 - **Acceptance:** QA/security/code/close prompts name the concrete active segment artifact dir when `ACTIVE.md` has a matching segment; QA workflow no longer rejects due flat-path lookup.
-- **Validation:** pending.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_command_skeletons.py::test_phase_step_prompt_is_step_kind_aware tests/integration/cli/test_lifecycle_command_skeletons.py::test_release_artifact_dir_hint_uses_active_segment -q` -> `2 passed`; `ruff check --no-cache` on changed CLI/test files -> `All checks passed!`; `mypy --strict dadaia_workspace/cli/commands/lifecycle.py` -> `Success`; PI QA rerun `v0139-qa-pi-1306ff32` resolved the original flat-path failure and reached this T3 task state.
