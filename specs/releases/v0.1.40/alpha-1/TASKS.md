@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Repair release-definition create artifacts
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `dadaia_workspace/infrastructure/fake_runtime.py`, `dadaia_workspace/public/lifecycle_fragments/release_definition/*.md`, `tests/integration/cli/test_release_definition_workflow.py`, picked release-definition bug files, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia lifecycle release define --harness fake` writes canonical `SPEC.md`, `PLAN.md`, and `TASKS.md`; handoff-only create success still blocks; PI/Codex missing-artifact failures remain explicit workflow bugs.
