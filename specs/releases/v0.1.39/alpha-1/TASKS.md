@@ -22,7 +22,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T2 - Freeze per-class specs archive taxonomy
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, scaffold/doctor source for canonical specs tree, related tests, `specs/backlog/sdd-governance-v2-agents-lifecycle.md`, `specs/releases/v0.1.39/alpha-1/**`
 - **Acceptance:** `specs/backlog/_archive/**`, `specs/audits/_archive/**`, and `specs/bugs/_archive/**` classify as FROZEN and are known by scaffold/doctor.
