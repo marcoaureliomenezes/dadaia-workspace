@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Guard Layer-2 workers against recursive lifecycle commands
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/**`, `dadaia_workspace/public/lifecycle_fragments/**`, `dadaia_workspace/infrastructure/pi_runtime.py`, related tests
 - **Acceptance:** PI/headless workflow workers cannot validly satisfy a lifecycle step by invoking `dadaia lifecycle ...`; regression coverage proves a recursive attempt is rejected or prevented.
