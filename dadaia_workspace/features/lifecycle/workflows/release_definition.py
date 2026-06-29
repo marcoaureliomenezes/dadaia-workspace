@@ -263,6 +263,7 @@ class ReleaseDefinitionWorkflow:
         run_store: LifecycleRunStore,
         runtime_factory: RuntimeFactory,
         context_selector: ContextSelector,
+        run_cwd: Path | None = None,
         default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
         fragment_loader: FragmentLoader | None = None,
         prefix: PromptPrefix | None = None,
@@ -277,6 +278,7 @@ class ReleaseDefinitionWorkflow:
         self._run_store = run_store
         self._runtime_factory = runtime_factory
         self._selector = context_selector
+        self._run_cwd = run_cwd
         self._default_kind = default_runtime_kind
         self._loader = fragment_loader or FragmentLoader()
         self._prefix = prefix
@@ -785,9 +787,9 @@ class ReleaseDefinitionWorkflow:
         return None
 
     def _specs_relative(self, path: Path) -> str:
-        specs_dir = self._selector.specs_dir
+        base = self._run_cwd or self._selector.specs_dir.parent
         try:
-            return path.relative_to(specs_dir.parent).as_posix()
+            return path.relative_to(base).as_posix()
         except ValueError:
             return path.as_posix()
 

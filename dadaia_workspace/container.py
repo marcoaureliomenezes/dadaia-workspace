@@ -1029,6 +1029,7 @@ def build_release_definition_workflow(
             context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
         ),
         context_selector=selector,
+        run_cwd=run_cwd,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         scope_input=scoped_input,

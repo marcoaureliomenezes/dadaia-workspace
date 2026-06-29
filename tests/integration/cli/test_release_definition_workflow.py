@@ -304,6 +304,23 @@ def test_cli_fake_runtime_writes_canonical_create_artifacts(
     assert (workspace / "specs" / "releases" / _RELEASE / "TASKS.md").is_file()
 
 
+def test_cli_fake_runtime_writes_canonical_create_artifacts_in_repo_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    repo_specs = workspace / "repos" / _CONTEXT / "specs"
+    repo_specs.mkdir(parents=True)
+    monkeypatch.chdir(workspace)
+
+    result = _define(["--harness", "fake"])
+
+    assert result.exit_code == 0, result.output
+    assert (repo_specs / "releases" / _RELEASE / "SPEC.md").is_file()
+    assert (repo_specs / "releases" / _RELEASE / "PLAN.md").is_file()
+    assert (repo_specs / "releases" / _RELEASE / "TASKS.md").is_file()
+    assert not (workspace / "specs" / "releases" / _RELEASE / "SPEC.md").exists()
+
+
 def test_release_definition_spec_create_injects_only_selected_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

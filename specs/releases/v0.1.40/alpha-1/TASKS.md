@@ -14,11 +14,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Repair release-definition create artifacts
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `dadaia_workspace/infrastructure/fake_runtime.py`, `dadaia_workspace/public/lifecycle_fragments/release_definition/*.md`, `tests/integration/cli/test_release_definition_workflow.py`, picked release-definition bug files, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia lifecycle release define --harness fake` writes canonical `SPEC.md`, `PLAN.md`, and `TASKS.md`; handoff-only create success still blocks; PI/Codex missing-artifact failures remain explicit workflow bugs.
-- **Validation:** Focused release-definition workflow tests and one live CLI fake smoke.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_release_definition_workflow.py::test_cli_fake_runtime_writes_canonical_create_artifacts tests/integration/cli/test_release_definition_workflow.py::test_cli_fake_runtime_writes_canonical_create_artifacts_in_repo_context tests/integration/cli/test_release_definition_workflow.py::test_handoff_only_spec_create_blocks_at_spec_create tests/integration/cli/test_release_definition_workflow.py::test_full_sequence_reaches_commit_gate_and_advances -q` -> `4 passed`; `ruff check --no-cache` on touched files -> `All checks passed!`; `mypy --strict` on touched production modules -> `Success`.
 
 ### T2 - Add JSONL bug-event telemetry and CLI
 
