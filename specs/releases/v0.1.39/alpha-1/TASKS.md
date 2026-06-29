@@ -14,7 +14,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Bound release-definition selected scope
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/context_selector.py`, `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `tests/integration/cli/test_release_definition_workflow.py`, `specs/bugs/release-definition-spec-create-overselects-context-budget.md`, `specs/releases/v0.1.39/alpha-1/**`
 - **Acceptance:** `spec_create` injects only operator-selected backlog/bug/audit items; the scoped v0.1.39 release-definition workflow no longer blocks on prompt size.
