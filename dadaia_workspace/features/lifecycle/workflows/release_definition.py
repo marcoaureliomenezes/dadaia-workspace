@@ -82,6 +82,8 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
 )
 
+HEADLESS_WORKER_PROMPT_CHAR_BUDGET = 900_000
+
 
 @dataclass(frozen=True)
 class ReleaseStep:
@@ -388,6 +390,27 @@ class ReleaseDefinitionWorkflow:
         built = self._prompt_builder.build(
             scope, runtime=runtime.runtime_kind(), prefix=self._prefix
         )
+        budget_block = self._prompt_budget_block(step, built.request.prompt)
+        if budget_block is not None:
+            run = self._with_step_outcome(run, step.label, budget_block)
+            run = record_prompt_composition(
+                run,
+                step.label,
+                prefix_hash=built.prefix_hash,
+                model=scope.model_profile,
+                runtime_kind=kind.value,
+                output_schema=fragment.output_schema,
+                gate_result=GateVerdict.REJECTED.value,
+            )
+            return run, ReleaseStepResult(
+                label=step.label,
+                accepted=False,
+                is_gate=step.is_review,
+                fragment_id=step.fragment_id,
+                prompt_text=built.prompt_text,
+                runtime_kind=kind,
+                blocked=budget_block,
+            )
         worker_started_at = datetime.now(UTC).isoformat()
         run = replace(
             run,
@@ -453,6 +476,24 @@ class ReleaseDefinitionWorkflow:
             blocked=blocked,
         )
         return run, result
+
+    @staticmethod
+    def _prompt_budget_block(step: ReleaseStep, prompt: str) -> BlockedState | None:
+        prompt_chars = len(prompt)
+        if prompt_chars <= HEADLESS_WORKER_PROMPT_CHAR_BUDGET:
+            return None
+        return BlockedState(
+            reason=(
+                "worker prompt exceeds headless runtime budget before launch "
+                f"({prompt_chars} > {HEADLESS_WORKER_PROMPT_CHAR_BUDGET} chars)"
+            ),
+            blocked_at_step=step.label,
+            detail={
+                "prompt_chars": str(prompt_chars),
+                "max_chars": str(HEADLESS_WORKER_PROMPT_CHAR_BUDGET),
+                "step": step.label,
+            },
+        )
 
     @staticmethod
     def _with_step_outcome(

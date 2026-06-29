@@ -46,6 +46,10 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
+from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
+from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+    HEADLESS_WORKER_PROMPT_CHAR_BUDGET,
+)
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -258,6 +262,32 @@ def test_full_sequence_reaches_commit_gate_and_advances(
     assert commit_gate["label"] == "definition_commit_gate"
     assert commit_gate["is_gate"] is True
     assert commit_gate["accepted"] is True
+
+
+def test_release_definition_blocks_oversized_worker_prompt_before_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    _install_fake_factory(monkeypatch)
+    workflow = container.build_release_definition_workflow(
+        workspace,
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        default_runtime_kind=AgentRuntimeKind.FAKE,
+        prefix=PromptPrefix(
+            text="x" * (HEADLESS_WORKER_PROMPT_CHAR_BUDGET + 1),
+            content_hash="oversized",
+        ),
+    )
+
+    outcome = workflow.run("oversized-prompt")
+
+    assert outcome.completed is False
+    assert outcome.blocked is not None
+    assert outcome.blocked.blocked_at_step == "release_scope"
+    assert "worker prompt exceeds headless runtime budget" in outcome.blocked.reason
+    assert outcome.blocked.detail["max_chars"] == str(HEADLESS_WORKER_PROMPT_CHAR_BUDGET)
 
 
 def test_cli_fake_runtime_writes_canonical_create_artifacts(
