@@ -22,7 +22,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T2 - Add JSONL bug-event telemetry and CLI
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/bugs/**`, `dadaia_workspace/cli/commands/**`, `dadaia_workspace/public/schemas/**`, `dadaia_workspace/public/rules/bug-registration-guardrail.md`, migration/specs upgrade surfaces, bug/backlog memory as needed, tests, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia bugs append|status|stats` work against append-only hourly JSONL; schema and event-coherence validation ship; Markdown bug migration path archives converted sources under `specs/bugs/_archive/`; existing bug-report workflow compatibility is preserved.
