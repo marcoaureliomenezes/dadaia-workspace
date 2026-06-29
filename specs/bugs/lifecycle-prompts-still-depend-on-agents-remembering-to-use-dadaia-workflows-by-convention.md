@@ -3,6 +3,7 @@ name: lifecycle-prompts-still-depend-on-agents-remembering-to-use-dadaia-workflo
 status: Open
 severity: "HIGH"
 surface: lifecycle bug report workflow
+session_id: null
 ---
 
 # Lifecycle prompts still depend on agents remembering to use dadaia-workflows by convention
@@ -24,4 +25,3 @@ Agentic instructions and release governance state that dadaia-workflows are the 
 ## Actual
 
 The workflow-first expectation is present in some skills, but not sufficiently canonical across the governing memory/rules/agentic surfaces, so operators still need to repeat it.
-

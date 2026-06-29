@@ -3,6 +3,7 @@ name: pi-release-definition-spec_create-still-blocks-with-missing-artifact-evide
 status: Open
 severity: "HIGH"
 surface: lifecycle bug report workflow
+session_id: null
 ---
 
 # PI release-definition spec_create still blocks with missing artifact evidence
@@ -24,4 +25,3 @@ PI spec_create emits canonical SPEC artifact evidence or a recoverable matching 
 ## Actual
 
 Workflow returned BLOCKED at spec_create: agent result missing artifact evidence.
-

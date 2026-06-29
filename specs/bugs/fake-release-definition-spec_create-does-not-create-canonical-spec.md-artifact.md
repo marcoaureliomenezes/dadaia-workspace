@@ -3,6 +3,7 @@ name: fake-release-definition-spec_create-does-not-create-canonical-spec.md-arti
 status: Open
 severity: "HIGH"
 surface: lifecycle bug report workflow
+session_id: null
 ---
 
 # Fake release-definition spec_create does not create canonical SPEC.md artifact
@@ -24,4 +25,3 @@ Fake release-definition remains a deterministic workflow driver and creates the 
 ## Actual
 
 Workflow returned BLOCKED at spec_create: spec_create missing canonical release artifact SPEC.md.
-

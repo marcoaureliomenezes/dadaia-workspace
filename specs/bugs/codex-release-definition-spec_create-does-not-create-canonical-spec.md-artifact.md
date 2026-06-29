@@ -3,6 +3,7 @@ name: codex-release-definition-spec_create-does-not-create-canonical-spec.md-art
 status: Open
 severity: "HIGH"
 surface: lifecycle bug report workflow
+session_id: null
 ---
 
 # Codex release-definition spec_create does not create canonical SPEC.md artifact
@@ -24,4 +25,3 @@ Codex spec_create writes canonical SPEC.md artifact evidence or the workflow pro
 ## Actual
 
 Workflow returned BLOCKED at spec_create: spec_create missing canonical release artifact SPEC.md.
-
