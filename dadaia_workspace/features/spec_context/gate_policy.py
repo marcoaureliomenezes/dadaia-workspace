@@ -55,6 +55,11 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
+_SPECS_CLASS_ARCHIVE_PREFIXES: tuple[str, ...] = (
+    "specs/backlog/_archive/",
+    "specs/bugs/_archive/",
+    "specs/audits/_archive/",
+)
 _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = (
     ".dadaia/reports/",
     ".dadaia/handoff/",
@@ -140,13 +145,16 @@ def _classify_specs_relative(spec_rel: str) -> PathClass | None:
     ``specs/`` class prefix matched — the caller decides the no-match verdict (MUTATING
     for in-repo, the release/protected/ungated tail for workspace-root paths).
     """
-    for prefix in _SPECS_ADDITIVE_PREFIXES:
+    for prefix in _SPECS_CLASS_ARCHIVE_PREFIXES:
         if spec_rel.startswith(prefix):
-            return PathClass.ADDITIVE
+            return PathClass.FROZEN
     if spec_rel.startswith(_MEMORY_PREFIX):
         return PathClass.MEMORY
     if spec_rel.startswith(_FROZEN_PREFIX):
         return PathClass.FROZEN
+    for prefix in _SPECS_ADDITIVE_PREFIXES:
+        if spec_rel.startswith(prefix):
+            return PathClass.ADDITIVE
     return None
 
 

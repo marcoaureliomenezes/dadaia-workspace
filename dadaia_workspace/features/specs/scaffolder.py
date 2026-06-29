@@ -184,6 +184,9 @@ def scaffold(
     _touch(specs_dir / "_archive" / "releases" / ".gitkeep")
     _touch(specs_dir / "_archive" / "legacy-features" / ".gitkeep")
     _touch(specs_dir / "assets" / ".gitkeep")
+    _touch(specs_dir / "audits" / "_archive" / ".gitkeep")
+    _touch(specs_dir / "backlog" / "_archive" / ".gitkeep")
+    _touch(specs_dir / "bugs" / "_archive" / ".gitkeep")
 
     return result
 

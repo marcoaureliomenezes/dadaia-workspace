@@ -47,11 +47,17 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
     shutil.copytree(_SCAFFOLD_SRC, specs_dir)
 
     # ---- Assertion 1: v2 mandatory directories ----
-    for dirname in ("backlog", "bugs", "releases"):
+    for dirname in ("audits", "backlog", "bugs", "releases"):
         d = specs_dir / dirname
         assert d.exists(), f"specs/{dirname}/ must exist after copytree-from-scaffold"
         assert d.is_dir(), f"specs/{dirname} must be a directory"
-        assert (d / "README.md").exists(), f"specs/{dirname}/README.md must exist"
+        if dirname != "audits":
+            assert (d / "README.md").exists(), f"specs/{dirname}/README.md must exist"
+            assert (d / ".gitkeep").exists(), f"specs/{dirname}/.gitkeep must exist"
+    for dirname in ("audits/_archive", "backlog/_archive", "bugs/_archive"):
+        d = specs_dir / dirname
+        assert d.exists(), f"specs/{dirname}/ must exist after copytree-from-scaffold"
+        assert d.is_dir(), f"specs/{dirname} must be a directory"
         assert (d / ".gitkeep").exists(), f"specs/{dirname}/.gitkeep must exist"
 
     # ---- Assertion 2: born-markdown memory atoms exist and have frontmatter ----

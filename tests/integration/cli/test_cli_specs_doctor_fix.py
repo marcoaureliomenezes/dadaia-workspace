@@ -55,13 +55,16 @@ def _make_minimal_specs(root: Path) -> Path:
 
 
 def test_doctor_fix_creates_missing_dirs(tmp_path: Path) -> None:
-    """--fix creates missing backlog/ and bugs/ directories with README.md + .gitkeep."""
+    """--fix creates missing lifecycle dirs and nested archive dirs."""
     specs = _make_minimal_specs(tmp_path)
     import shutil
 
     backlog = specs / "backlog"
     if backlog.exists():
         shutil.rmtree(backlog)
+    bugs_archive = specs / "bugs" / "_archive"
+    if bugs_archive.exists():
+        shutil.rmtree(bugs_archive)
 
     result = _runner.invoke(
         app,
@@ -70,6 +73,9 @@ def test_doctor_fix_creates_missing_dirs(tmp_path: Path) -> None:
     assert backlog.exists(), f"backlog/ must be created; output:\n{result.output}"
     assert (backlog / "README.md").exists(), "backlog/README.md must be created"
     assert (backlog / ".gitkeep").exists(), "backlog/.gitkeep must be created"
+    assert bugs_archive.exists(), f"bugs/_archive/ must be created; output:\n{result.output}"
+    assert (bugs_archive / ".gitkeep").exists(), "bugs/_archive/.gitkeep must be created"
+    assert not (bugs_archive / "README.md").exists(), "nested archive dirs do not need README.md"
     assert result.exit_code == 0, f"Expected exit 0; got {result.exit_code}:\n{result.output}"
 
 

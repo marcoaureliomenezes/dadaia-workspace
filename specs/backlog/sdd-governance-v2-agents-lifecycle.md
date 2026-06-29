@@ -2,23 +2,22 @@
 name: sdd-governance-v2-agents-lifecycle
 status: candidate
 intents:
-  - subject: { kind: code, ref: "dadaia_workspace/features/spec_context/gate_policy.py#classify_path" }
-    change: "specs taxonomy: classify specs/backlog/_archive, specs/audits/_archive, specs/bugs/_archive as FROZEN for file-write tools (archive moves via git mv)"
   - subject: { kind: cli, ref: "bug new" }
     change: "event-sourced JSONL bug telemetry: add `dadaia bugs append|status|stats` over append-only specs/bugs/<ts>.jsonl with a shipped event schema + migration from *.md"
   - subject: { kind: catalog, ref: "sdd-bug-backlog-governance" }
     change: "audit-disposition law: first release after an audit dispositions every finding (fixed|superseded|deferred/rejected); archive to audits/_archive only when fully dispositioned"
 ---
 
-# EPIC — SDD Governance v2 (residual): roster/taxonomy + JSONL bug-events + audit-disposition law
+# EPIC — SDD Governance v2 (residual): JSONL bug-events + audit-disposition law
 
 **ID:** FEAT-GOV-V2-01
 **Reported:** 2026-06-12 (operator long-prompt + grill `fc45dd8c`).
 **Owner:** project-manager (curates) → product-engineer (release definition after grill).
 **Status:** OPEN — PARTIALLY CONSUMED. v0.1.15 shipped the Codex deterministic lifecycle
 foundation slice. Later releases also shipped adjacent backlog-consumption and
-audit-workflow machinery. The remaining release scope is limited to the governance-v2
-pillars below, with delivered pieces called out so they are not reimplemented.
+audit-workflow machinery. v0.1.39 alpha-1 shipped the specs taxonomy/archive gate-class
+slice. The remaining release scope is limited to the JSONL bug-events and
+audit-disposition pillars below.
 
 > **Scope correction (2026-06-26):** OpenCode was removed entirely in v0.1.24 (both
 > layers). All OpenCode-enforcement / OpenCode-projection-parity scope is **dead** and has
@@ -28,17 +27,14 @@ pillars below, with delivered pieces called out so they are not reimplemented.
 
 ## 1. Thesis (residual)
 
-Three governance pillars remain open after v0.1.15:
+Two governance pillars remain open after v0.1.39 alpha-1:
 
-1. a canonical **specs taxonomy** with archive flows + path-class gate changes for every
-   artifact class (`specs/backlog/_archive/`, `specs/audits/_archive/`,
-   `specs/bugs/_archive/` classified FROZEN; `specs/_archive/**` is already FROZEN);
-2. append-only **event-sourced bug telemetry** (JSONL);
-3. an **audit-disposition law** (disposition-complete, not solve-all).
+1. append-only **event-sourced bug telemetry** (JSONL);
+2. an **audit-disposition law** (disposition-complete, not solve-all).
 
 The roster/lifecycle-ladder work this entry once carried has been overtaken by the
-two-layer shift (v0.1.15 gate ladder + v0.1.24 Python lifecycle); only the taxonomy,
-bug-events, and audit-disposition pillars are genuinely residual.
+two-layer shift (v0.1.15 gate ladder + v0.1.24 Python lifecycle); only bug-events and
+audit-disposition are genuinely residual.
 
 ## 2. Bugs: event-sourced JSONL
 
@@ -56,20 +52,23 @@ bug-events, and audit-disposition pillars are genuinely residual.
 - **Law:** rewrite the `bug-registration-guardrail` rule format section for JSONL events;
   registration stays ADDITIVE for every agent.
 
-## 3. Specs taxonomy + archive gate classes
+## 3. Specs taxonomy + archive gate classes — shipped in v0.1.39 alpha-1
 
-- Create `specs/backlog/_archive/`, `specs/audits/_archive/`, `specs/bugs/_archive/`
-  (workspace + scaffold + consumer-onboarding paths), or explicitly reject per-class
-  archives in favor of the current central `specs/_archive/` model.
-- Gate (`features/spec_context/gate_policy.py`): classify the three per-class `_archive`
-  dirs as **FROZEN** for file-write tools if the per-class archive model is accepted.
-  Archive moves happen via `git mv` outside the gate envelope.
+- `specs/backlog/_archive/`, `specs/audits/_archive/`, `specs/bugs/_archive/` are the
+  accepted per-class archive directories for backlog, audit, and bug records.
+- Gate (`features/spec_context/gate_policy.py`) classifies the three per-class `_archive`
+  dirs as **FROZEN** for file-write tools. Archive moves happen via `git mv` outside the
+  gate envelope.
 - Backlog archive flow: current production behavior removes consumed backlog entries via
   the `consumed_backlog` ledger and durable copy under `specs/_archive/<release>/`.
-  Do not replace this unless the release explicitly migrates the closure contract.
-- Doctor: `_archive` dirs exist per accepted class; consumed-backlog checks stay aligned
-  with the shipped ledger model; add audit-without-disposition detection if the audit law
-  is accepted.
+  v0.1.39 did not replace this closure contract.
+- Doctor/scaffold: `_archive` dirs exist per accepted class; consumed-backlog checks stay
+  aligned with the shipped ledger model.
+
+Evidence: `specs/releases/v0.1.39/alpha-1/` and implementation commit for
+`dadaia_workspace/features/spec_context/gate_policy.py`,
+`dadaia_workspace/features/specs/doctor.py`, and
+`dadaia_workspace/features/specs/scaffolder.py`.
 
 ## 4. Audit-disposition law
 

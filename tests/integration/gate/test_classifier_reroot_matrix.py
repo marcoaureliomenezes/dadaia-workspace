@@ -78,6 +78,9 @@ _PIPELINE_ROWS: tuple[tuple[str, str, str, Decision, bool], ...] = (
     ("additive_bugs_no_lease", "specs/bugs/x.md", "SPEC", Decision.ALLOW, True),
     ("additive_audits_no_lease", "specs/audits/d/a.md", "SPEC", Decision.ALLOW, True),
     ("additive_backlog_no_lease", "specs/backlog/x.md", "SPEC", Decision.ALLOW, True),
+    ("frozen_bugs_archive", "specs/bugs/_archive/x.md", "SPEC", Decision.BLOCK, True),
+    ("frozen_audits_archive", "specs/audits/_archive/x.md", "SPEC", Decision.BLOCK, True),
+    ("frozen_backlog_archive", "specs/backlog/_archive/x.md", "SPEC", Decision.BLOCK, True),
     # MEMORY in-repo — the phase rule (dead :137-143) is now live.
     ("memory_block_outside_phase", "specs/memory/a.md", "SPEC", Decision.BLOCK, True),
     ("memory_allow_definition", "specs/memory/a.md", "DEFINITION", Decision.ALLOW, True),
@@ -126,6 +129,19 @@ def test_in_repo_frozen_block_branch_is_live(tmp_path: Path) -> None:
     block, msg = _evaluate(tmp_path, slug, f"repos/{slug}/specs/_archive/x.md")
     assert block == Decision.BLOCK
     assert "RULE B" in msg and "frozen" in msg
+
+
+def test_per_class_archive_prefixes_are_frozen_before_additive(tmp_path: Path) -> None:
+    """Per-class archives sit under additive dirs but must classify FROZEN first."""
+    slug = _DEFAULT_SLUG
+    for ctx_rel in (
+        "specs/backlog/_archive/item.md",
+        "specs/bugs/_archive/bug.md",
+        "specs/audits/_archive/audit.md",
+    ):
+        block, msg = _evaluate(tmp_path, slug, f"repos/{slug}/{ctx_rel}")
+        assert block == Decision.BLOCK
+        assert "RULE B" in msg
 
 
 # ---------------------------------------------------------------------------

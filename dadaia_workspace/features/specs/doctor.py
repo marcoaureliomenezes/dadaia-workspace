@@ -30,7 +30,7 @@ TREE invariants (spec-context-tree-v2):
   TREE-1. specs/foundation/ exists → WARN-ONLY (migration: dadaia migrate tree-v2)
   TREE-2. specs/SPEC.md at tree root → WARN-ONLY (migration: dadaia migrate tree-v2)
   TREE-3. memory/architecture.md | tech-stack.md | quality-assurance.md | product/index.md absent → WARNING
-  TREE-4. backlog/ | bugs/ | releases/ absent → AUTO-FIX (create dir + README.md + .gitkeep)
+  TREE-4. audits/ | backlog/ | bugs/ | releases/ and accepted per-class _archive dirs absent → AUTO-FIX
   TREE-5. specs/AGENTS.md absent or hash differs from canonical template → WARN-ONLY (drift)
   TREE-5M. specs/memory/AGENTS.md absent → WARN-ONLY (projected later by ai-engineer WS-2)
   TREE-6. releases/<id>/ missing mandatory SDD artifact for its phase → NO AUTO-FIX
@@ -191,9 +191,17 @@ _TREE3_MEMORY_FILES: tuple[str, ...] = (
     "product/index.md",
 )
 
-# TREE-4: directories that must exist.  Value = README.md content source file (relative
-# to the scaffold source dir embedded in the package).
-_TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
+# TREE-4: directories that must exist. Nested per-class archives intentionally carry
+# .gitkeep only; top-level lifecycle dirs keep README.md from the scaffold source.
+_TREE4_REQUIRED_DIRS = (
+    "audits",
+    "audits/_archive",
+    "backlog",
+    "backlog/_archive",
+    "bugs",
+    "bugs/_archive",
+    "releases",
+)
 
 # TREE-6: mandatory artifacts per phase bucket.
 # For the ACTIVE release, if phase is IMPLEMENTATION or CLOSURE, all three must exist.
@@ -1966,7 +1974,7 @@ class SpecsDoctor:
         return issues
 
     def _check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
-        """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
+        """TREE-4: canonical lifecycle dirs must exist under specs/.
 
         When a directory is absent the issue is emitted as fixable=True.
         The fix creates the dir, writes README.md (content copied from the
@@ -1974,20 +1982,20 @@ class SpecsDoctor:
         output of ``scaffold()``.
         """
         issues: list[SpecsDoctorIssue] = []
-        for dirname in _TREE4_REQUIRED_DIRS:
-            target = self.specs_dir / dirname
+        for rel_dir in _TREE4_REQUIRED_DIRS:
+            target = self.specs_dir / rel_dir
             if target.exists():
                 continue
             fixable = (
                 self._scaffold_dir is not None
-                and (self._scaffold_dir / dirname / "README.md").exists()
+                and (self._scaffold_dir / rel_dir).exists()
             )
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-4",
                     severity=Severity.WARNING,
                     description=(
-                        f"specs/{dirname}/ is missing — required spec tree directory. "
+                        f"specs/{rel_dir}/ is missing — required spec tree directory. "
                         + (
                             "Auto-fix available (run doctor --fix)."
                             if fixable
@@ -2004,16 +2012,16 @@ class SpecsDoctor:
         """Create the missing directory with README.md and .gitkeep."""
         assert issue.code == "TREE-4"
         target = Path(issue.path)  # type: ignore[arg-type]
-        dirname = target.name
+        rel_dir = target.relative_to(self.specs_dir)
         target.mkdir(parents=True, exist_ok=True)
         # README.md — copy from scaffold source
         readme_content = ""
         if self._scaffold_dir is not None:
-            src_readme = self._scaffold_dir / dirname / "README.md"
+            src_readme = self._scaffold_dir / rel_dir / "README.md"
             if src_readme.exists():
                 readme_content = src_readme.read_text(encoding="utf-8")
         readme = target / "README.md"
-        if not readme.exists():
+        if readme_content and not readme.exists():
             readme.write_text(readme_content, encoding="utf-8")
         # .gitkeep
         gitkeep = target / ".gitkeep"

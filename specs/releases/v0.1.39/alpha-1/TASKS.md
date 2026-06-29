@@ -22,8 +22,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T2 - Freeze per-class specs archive taxonomy
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, scaffold/doctor source for canonical specs tree, related tests, `specs/backlog/sdd-governance-v2-agents-lifecycle.md`, `specs/releases/v0.1.39/alpha-1/**`
 - **Acceptance:** `specs/backlog/_archive/**`, `specs/audits/_archive/**`, and `specs/bugs/_archive/**` classify as FROZEN and are known by scaffold/doctor.
-- **Validation:** pending.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/gate/test_classifier_reroot_matrix.py::test_full_pipeline_in_repo_matrix tests/integration/gate/test_classifier_reroot_matrix.py::test_per_class_archive_prefixes_are_frozen_before_additive -q` -> `25 passed`; scaffold/doctor focused tests -> `2 passed`; `ruff check --no-cache` on changed files -> `All checks passed!`; `mypy --strict` on changed taxonomy/scaffold files -> `Success`; `dadaia specs doctor --fix --specs-dir repos/dadaia-workspace/specs` -> `0 errors, 17 warnings`.
