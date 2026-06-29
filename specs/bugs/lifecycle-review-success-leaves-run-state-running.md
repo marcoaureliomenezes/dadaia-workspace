@@ -1,8 +1,10 @@
 ---
 name: lifecycle-review-success-leaves-run-state-running
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-29
+resolved: 2026-06-29
+release: v0.1.37
 surface: lifecycle review security / LifecycleRunStore
 session_id: codex-goal-v0.1.37-pi-smoke
 ---
@@ -64,3 +66,19 @@ same-phase review commands.
 **Impact:** Operators debugging PI workflow runs see stale running review records even
 after successful completion. This weakens the status improvements in v0.1.37 and should be
 fixed before declaring PI workflow execution smooth.
+
+## Resolution
+
+Closed in `v0.1.37/alpha-1`.
+
+Root cause: `LifecycleStateMachine.transition()` returns accepted non-blocked transitions
+with `LifecycleRunStatus.RUNNING`, and multi-step workflows normalize terminal status
+themselves. `LifecyclePhaseWorkflow`, the single-step review path, persisted the accepted
+transition directly and never normalized the command run to `COMPLETED`.
+
+Fix: `LifecyclePhaseWorkflow.run()` now persists accepted single-step command runs with
+`status=COMPLETED` while preserving blocked runs as `BLOCKED`.
+
+Validation:
+
+- `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_cli.py -q` -> `14 passed`.

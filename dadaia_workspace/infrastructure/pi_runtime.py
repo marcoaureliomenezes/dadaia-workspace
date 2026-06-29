@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -108,6 +109,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             )
 
         args = self._command(request)
+        started_at = time.time()
         try:
             proc = self._runner(
                 args,
@@ -141,6 +143,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                     error=self._redact((proc.stderr or proc.stdout or "").strip()),
                 )
             return result
+        result = self._with_written_handoff_result(request, result, started_at=started_at)
         return self._with_changed_paths(result)
 
     def _command(self, request: AgentRunRequest) -> list[str]:
@@ -292,7 +295,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
 
     def _structured_from_verdict(self, payload: dict[str, object]) -> dict[str, str]:
         structured: dict[str, str] = {}
-        for key in ("verdict", "commit_sha", "task_group"):
+        for key in ("verdict", "verdict_reason", "commit_sha", "task_group"):
             value = payload.get(key)
             if value is not None:
                 structured[key] = self._redact(str(value))
@@ -300,4 +303,70 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if isinstance(extra, dict):
             for key, value in extra.items():
                 structured[str(key)] = self._redact(str(value))
+        metrics = payload.get("metrics")
+        if isinstance(metrics, dict):
+            commit_sha = metrics.get("commit_sha")
+            if commit_sha is not None and "commit_sha" not in structured:
+                structured["commit_sha"] = self._redact(str(commit_sha))
         return structured
+
+    def _with_written_handoff_result(
+        self,
+        request: AgentRunRequest,
+        result: AgentRunResult,
+        *,
+        started_at: float,
+    ) -> AgentRunResult:
+        """Recover a valid handoff written to disk when PI's final message is prose."""
+        if result.artifact_refs or result.structured_output.get("verdict"):
+            return result
+        handoff = self._latest_written_handoff(request, started_at=started_at)
+        if handoff is None:
+            return result
+        ref, payload = handoff
+        return AgentRunResult(
+            status=result.status,
+            summary=result.summary,
+            artifact_refs=(ref,),
+            structured_output=self._structured_from_verdict(payload),
+            error=result.error,
+        )
+
+    def _latest_written_handoff(
+        self,
+        request: AgentRunRequest,
+        *,
+        started_at: float,
+    ) -> tuple[str, dict[str, object]] | None:
+        handoff_dir = self._config.cwd / ".dadaia" / "handoff" / request.context
+        if not handoff_dir.is_dir():
+            return None
+        matches: list[tuple[float, str, dict[str, object]]] = []
+        for path in handoff_dir.glob("*.handoff.json"):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            if stat.st_mtime < started_at - 1:
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("agent") != request.role:
+                continue
+            if payload.get("context") != request.context:
+                continue
+            if payload.get("release_id") != request.release_id:
+                continue
+            try:
+                rel = path.resolve().relative_to(self._config.cwd.resolve()).as_posix()
+            except ValueError:
+                continue
+            matches.append((stat.st_mtime, rel, payload))
+        if not matches:
+            return None
+        _mtime, rel, payload = max(matches, key=lambda item: item[0])
+        return rel, payload
