@@ -219,3 +219,31 @@ def test_dead_clean_tree_unchanged_real_git(tmp_path: Path, workspace_root: Path
     ctx = service.dead("proj")
     assert ctx.state == ContextState.DEAD
     assert not repo.exists()
+
+
+def test_dead_removes_repo_with_standard_readonly_git_objects(
+    tmp_path: Path, workspace_root: Path
+) -> None:
+    """Normal loose git objects are read-only but removable by owner via directory writes."""
+    remote = _bare_remote(tmp_path)
+    repo = workspace_root / "repos" / "proj-repo"
+    _clone_with_initial_commit(remote, repo)
+    readonly_objects = [
+        path
+        for path in (repo / ".git" / "objects").rglob("*")
+        if path.is_file() and not path.is_symlink() and not path.stat().st_mode & stat.S_IWUSR
+    ]
+    assert readonly_objects
+
+    store = FakeContextStore()
+    service = SpecContextService(
+        context_store=store,
+        git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+    )
+    _alive_ctx(store, "proj-repo")
+
+    ctx = service.dead("proj")
+
+    assert ctx.state == ContextState.DEAD
+    assert not repo.exists()

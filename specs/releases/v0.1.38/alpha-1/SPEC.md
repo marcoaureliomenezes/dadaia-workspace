@@ -36,6 +36,7 @@ only one remaining intent:
 | Artifact | Role |
 |----------|------|
 | `specs/backlog/pi-agent-fourth-harness.md` | Consumed backlog item, residual WS-PI-5 only. |
+| `specs/bugs/context-dead-nonwritable-guard-rejects-standard-git-objects.md` | Picked blocking bug discovered during real WS-PI-5 execution. |
 | `repos/dadaia-pi-workspace/README.md` | Deprecation pointer to commit in the standalone repo before DEAD-marking. |
 | `.dadaia/states/spec_contexts.json` via `dadaia context` CLI | Context state authority for ALIVE/DEAD. |
 

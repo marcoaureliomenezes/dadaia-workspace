@@ -4,6 +4,7 @@ import contextlib
 import logging
 import re
 import shutil
+import stat
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -57,6 +58,15 @@ class DeadSecretFoundError(DadaiaError):
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+def _chmod_and_retry_remove(function: object, path: str, _excinfo: BaseException) -> None:
+    """Let dead() remove user-owned read-only git objects created by normal git writes."""
+    if not callable(function):
+        raise _excinfo
+    target = Path(path)
+    target.chmod(target.stat().st_mode | stat.S_IWUSR)
+    function(path)
 
 
 # --------------------------------------------------------------------- secret scan
@@ -557,7 +567,6 @@ class SpecContextService:
         # Git sync + rmtree under Lock 2 (OUTSIDE Lock 1)
         if repo_path.exists():
             import contextlib
-            import os
 
             with context_lock(self._workspace_root, ctx.repo_slug):
                 with contextlib.suppress(Exception):
@@ -579,20 +588,7 @@ class SpecContextService:
                                 f"Git push failed for context '{name}' at '{repo_path}'. "
                                 "Resolve the issue and retry dead()."
                             ) from exc
-                # Detect non-writable files before calling rmtree
-                non_writable = [
-                    str(f)
-                    for f in repo_path.rglob("*")
-                    if f.is_file() and not os.access(f, os.W_OK)
-                ]
-                if non_writable:
-                    sample = non_writable[:3]
-                    raise GitSyncError(
-                        f"Cannot remove '{repo_path}': {len(non_writable)} non-writable "
-                        f"file(s) found (e.g. {sample}). "
-                        f"Run: sudo chown -R $USER '{repo_path}'"
-                    )
-                shutil.rmtree(repo_path)
+                shutil.rmtree(repo_path, onexc=_chmod_and_retry_remove)
 
         # Lock 1: load → mutate → dump (JSON write only)
         with workspace_lock(self._workspace_root):
