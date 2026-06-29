@@ -30,7 +30,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T3 - Add audit-disposition law
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/audit.py`, audit fragments/rules, specs doctor/audit validation surfaces, tests, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** Audit findings require explicit disposition before archive; incomplete/invalid disposition is detected; audit archive to `specs/audits/_archive/` is allowed only after disposition-complete approval.
