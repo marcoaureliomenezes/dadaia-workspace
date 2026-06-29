@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
@@ -947,8 +948,36 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
+def _current_context_commit_sha(workspace_root: Path, context: str) -> str | None:
+    """Return the full HEAD SHA for the context repo when it is locally discoverable."""
+    candidates = (workspace_root / "repos" / context, workspace_root)
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=candidate,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        sha = result.stdout.strip()
+        if (
+            result.returncode == 0
+            and len(sha) == 40
+            and all(char in "0123456789abcdef" for char in sha)
+        ):
+            return sha
+    return None
+
+
 def _phase_step_prompt(
-    label: str, release_id: str, context: str, target_phase: LifecyclePhase
+    label: str,
+    release_id: str,
+    context: str,
+    target_phase: LifecyclePhase,
+    *,
+    commit_sha: str | None = None,
 ) -> str:
     """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
 
@@ -960,9 +989,16 @@ def _phase_step_prompt(
     the Drift-1 incoherence this release eliminates.
     """
     if is_review_phase(target_phase):
+        commit_instruction = ""
+        if commit_sha:
+            commit_instruction = (
+                " Set metrics.commit_sha to this exact 40-character commit SHA: "
+                f"{commit_sha}. Do not abbreviate it."
+            )
         output_instruction = (
             "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
             "artifact_ref pointing at the handoff document."
+            f"{commit_instruction}"
         )
     else:
         output_instruction = (
@@ -1004,12 +1040,19 @@ def _run_phase_step(
     workflow = container.build_lifecycle_phase_workflow(
         workspace_root, runtime_kind=kind, model=resolved_model
     )
+    commit_sha = _current_context_commit_sha(workspace_root, context)
     scope = PromptScope(
         role=role,
         context=context,
         release_id=release_id,
         task_id=run_id,
-        prompt=_phase_step_prompt(label, release_id, context, target_phase),
+        prompt=_phase_step_prompt(
+            label,
+            release_id,
+            context,
+            target_phase,
+            commit_sha=commit_sha,
+        ),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )

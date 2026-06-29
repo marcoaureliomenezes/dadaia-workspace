@@ -9,10 +9,12 @@ import pytest
 from typer.testing import CliRunner
 
 import dadaia_workspace.container as container
+from dadaia_workspace.cli.commands.lifecycle import _phase_step_prompt
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRunStatus,
+    LifecyclePhase,
     LifecycleRunStatus,
 )
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
@@ -160,6 +162,22 @@ def test_successful_single_step_review_persists_completed_run_state(
     assert run is not None
     assert run.status is LifecycleRunStatus.COMPLETED
     assert run.blocked is None
+
+
+def test_review_phase_prompt_requires_exact_full_commit_sha() -> None:
+    sha = "d9f1d81c686f4aea5a60d16722d72b86457b7896"
+
+    prompt = _phase_step_prompt(
+        "security",
+        "v9.9.9",
+        "dadaia-workspace",
+        LifecyclePhase.SECURITY_REVIEW,
+        commit_sha=sha,
+    )
+
+    assert "metrics.commit_sha" in prompt
+    assert sha in prompt
+    assert "Do not abbreviate it" in prompt
 
 
 def test_lifecycle_usage_error_uses_typer_exit_code() -> None:
