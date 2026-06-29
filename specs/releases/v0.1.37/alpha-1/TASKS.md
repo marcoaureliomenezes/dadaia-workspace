@@ -46,7 +46,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T5 - Validate PI workflow hardening and update dispositions
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `specs/bugs/*.md`, `specs/releases/v0.1.37/alpha-1/CLOSURE.md`, `specs/releases/ACTIVE.md`
 - **Acceptance:** Focused deterministic tests pass, PI-relevant workflow evidence is recorded, selected bug records carry resolution notes, and remaining PI residuals are explicitly left open.
+- **Validation:** Focused deterministic suite -> `43 passed`; real PI security-review smoke `v0137-security-pi-smoke-6bce104a` -> `accepted: true`, runtime `pi_headless`, persisted run `status: completed`; specs doctor -> `0 errors, 18 warnings`; public doctor -> ok; repo hygiene scan -> no output.
