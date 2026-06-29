@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+import dadaia_workspace.container as container
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -82,6 +84,30 @@ def test_lifecycle_status_uses_ok_exit_code(
 
     assert result.exit_code == 0, result.output
     assert "OK" in result.output
+
+
+def test_lifecycle_status_no_args_uses_bounded_run_store_not_hygiene_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    def fail_hygiene(*args: object, **kwargs: object) -> object:
+        raise AssertionError("top-level lifecycle status must not run hygiene scan")
+
+    monkeypatch.setattr(container, "build_lifecycle_hygiene_service", fail_hygiene)
+
+    result = _runner.invoke(app, ["lifecycle", "status", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload == {
+        "blocked": 0,
+        "completed": 0,
+        "run_count": 0,
+        "running": 0,
+        "status": "OK",
+    }
 
 
 def test_lifecycle_usage_error_uses_typer_exit_code() -> None:

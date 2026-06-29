@@ -162,17 +162,24 @@ def status(
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
-    service = container.build_lifecycle_hygiene_service(workspace_root)
-    counters = service.status()
+    runs = container.build_lifecycle_run_store(workspace_root).list_runs()
+    running = sum(1 for run in runs if run.status.value == "running")
+    blocked = sum(1 for run in runs if run.status.value == "blocked" or run.blocked is not None)
+    completed = sum(1 for run in runs if run.status.value == "completed")
     if json_output:
         _emit_json(
             {
                 "status": LifecycleCommandStatus.OK.value,
-                "counters": counters.to_dict(),
+                "run_count": len(runs),
+                "running": running,
+                "blocked": blocked,
+                "completed": completed,
             }
         )
         return
-    typer.echo(f"OK cleanup_candidates={counters.cleanup_candidate_count}")
+    typer.echo(
+        f"OK runs={len(runs)} running={running} blocked={blocked} completed={completed}"
+    )
 
 
 @app.command()
