@@ -338,7 +338,9 @@ class ContextSelector:
         return tuple(refs)
 
     @staticmethod
-    def _filter_by_stem(refs: tuple[_FileRef, ...], selected: frozenset[str]) -> tuple[_FileRef, ...]:
+    def _filter_by_stem(
+        refs: tuple[_FileRef, ...], selected: frozenset[str]
+    ) -> tuple[_FileRef, ...]:
         if not selected:
             return refs
         return tuple(fref for fref in refs if fref.path.stem in selected)

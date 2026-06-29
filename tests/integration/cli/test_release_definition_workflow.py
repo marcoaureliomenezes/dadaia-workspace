@@ -349,9 +349,7 @@ def test_release_definition_spec_create_injects_only_selected_scope(
         (workspace / ".dadaia" / "states" / "lifecycle" / "selected-scope.json").read_text()
     )
     run = run_payload["run"]
-    spec_create = next(
-        item for item in run["injected_context"] if item["step"] == "spec_create"
-    )
+    spec_create = next(item for item in run["injected_context"] if item["step"] == "spec_create")
     refs = set(spec_create["refs"])
     assert "specs/backlog/picked-scope.md" in refs
     assert "specs/bugs/picked-bug.md" in refs

@@ -1986,10 +1986,7 @@ class SpecsDoctor:
             target = self.specs_dir / rel_dir
             if target.exists():
                 continue
-            fixable = (
-                self._scaffold_dir is not None
-                and (self._scaffold_dir / rel_dir).exists()
-            )
+            fixable = self._scaffold_dir is not None and (self._scaffold_dir / rel_dir).exists()
             issues.append(
                 SpecsDoctorIssue(
                     code="TREE-4",

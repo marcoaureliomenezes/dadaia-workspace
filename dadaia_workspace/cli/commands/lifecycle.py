@@ -1009,8 +1009,7 @@ def _phase_step_prompt(
     artifact_instruction = ""
     if artifact_dir:
         artifact_instruction = (
-            " Review the release artifacts from this concrete directory: "
-            f"`{artifact_dir}`."
+            f" Review the release artifacts from this concrete directory: `{artifact_dir}`."
         )
     return (
         f"Run the {label} step for release {release_id} in context {context}."
