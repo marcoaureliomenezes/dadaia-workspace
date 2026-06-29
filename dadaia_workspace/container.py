@@ -1037,9 +1037,11 @@ def _bug_report_runtime_factory(
     context: str,
     run_cwd: Path,
     model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
+    bug_input: "BugReportInput",
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the bug-report workflow."""
     import hashlib
+    import json
     import re
     from dataclasses import dataclass
 
@@ -1076,6 +1078,16 @@ def _bug_report_runtime_factory(
             slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-").lower()
             return slug or "bug-report"
 
+        @staticmethod
+        def _frontmatter_string(value: str) -> str:
+            return json.dumps(value.strip())
+
+        @staticmethod
+        def _section(title: str, value: str | None) -> str:
+            if value is None or not value.strip():
+                return ""
+            return f"## {title}\n\n{value.strip()}\n\n"
+
         def _write_bug_file(self, request: AgentRunRequest) -> str | None:
             bug_roots = [
                 path.removesuffix("/**")
@@ -1087,16 +1099,22 @@ def _bug_report_runtime_factory(
                 if root.startswith("repos/") and not base.parent.is_dir():
                     continue
                 base.mkdir(parents=True, exist_ok=True)
-                slug = self._slug(request.task_id or "bug-report")
+                slug = self._slug(bug_input.summary)
+                severity = (bug_input.severity or "MEDIUM").strip().upper()
                 ref = f"{root}/{slug}.md"
                 (run_cwd / ref).write_text(
                     "---\n"
                     f"name: {slug}\n"
                     "status: Open\n"
-                    "severity: LOW\n"
-                    "surface: fake bug-report workflow\n"
+                    f"severity: {self._frontmatter_string(severity)}\n"
+                    "surface: lifecycle bug report workflow\n"
                     "---\n\n"
-                    "**Symptom:** Fake bug-report workflow record.\n",
+                    f"# {bug_input.summary.strip()}\n\n"
+                    f"**Symptom:** {bug_input.summary.strip()}\n\n"
+                    f"{self._section('Details', bug_input.details)}"
+                    f"{self._section('Repro', bug_input.repro)}"
+                    f"{self._section('Expected', bug_input.expected)}"
+                    f"{self._section('Actual', bug_input.actual)}",
                     encoding="utf-8",
                 )
                 return ref
@@ -1147,7 +1165,10 @@ def build_bug_report_workflow(
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
         runtime_factory=_bug_report_runtime_factory(
-            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
+            context=context,
+            run_cwd=run_cwd,
+            model_by_kind=model_by_kind,
+            bug_input=bug_input or BugReportInput(summary="unspecified bug report"),
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,

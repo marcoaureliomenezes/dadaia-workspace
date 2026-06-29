@@ -63,4 +63,9 @@ def test_bug_report_workflow_is_runnable_from_lifecycle_cli(tmp_path: Path, monk
     ]
     written = sorted((workspace / "specs" / "bugs").glob("*.md"))
     assert len(written) == 1
-    assert "Fake bug-report workflow record" in written[0].read_text(encoding="utf-8")
+    content = written[0].read_text(encoding="utf-8")
+    assert "Lifecycle bug-report command was not runnable." in content
+    assert "dadaia lifecycle bug --help" in content
+    assert "A runnable bug-report workflow command exists." in content
+    assert "Only the policy/catalog entry existed." in content
+    assert "Fake bug-report workflow record" not in content
