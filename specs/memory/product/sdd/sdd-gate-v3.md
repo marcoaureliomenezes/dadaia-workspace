@@ -9,7 +9,7 @@ summary: >-
   policies em ordem fixa root-whitelist → venv-guard → SDD gate, first-block-wins,
   cada policy fail-open (PROTECTED é o único caminho fail-closed). O classificador SDD
   é context-relative (ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block,
-  MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto); apply_patch multi-file
+  incl. specs/_archive/** e os _archive per-class de backlog/bugs/audits, MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto); apply_patch multi-file
   classifica TODOS os headers (veredito mais restritivo vence); READ é non-acquiring.
   O PostToolUse renova heartbeat via by-session index (sem full scan) e roda o
   reconciler advisory (nunca bloqueia). (2) Chokepoints git: pre-commit lease gate
@@ -25,8 +25,8 @@ tags:
 - chokepoints
 agent_tier: self-pull
 token_estimate: 3140
-last_updated: '2026-06-25'
-release_origin: v0.1.21
+last_updated: '2026-06-29'
+release_origin: v0.1.39
 ---
 
 Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, entrypoint único) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + reconciler advisory) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (instalados via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). Os módulos `sdd_gate` e `root_whitelist` são thin policy modules consumidos por `pre_gate` (`evaluate_payload()`); seus `main()` legados ficam mantidos por uma release.
@@ -64,9 +64,9 @@ mais restritivo vence — um arquivo FROZEN/PROTECTED/bloqueado bloqueia o patch
 | Classe | Paths | Decisão |
 |--------|-------|---------|
 | PROTECTED | `.dadaia/sessions/**` (workspace-root) | Block sempre — único caminho fail-closed (SEC-01); avaliado primeiro |
-| ADDITIVE | `specs/backlog/**`, `specs/bugs/**`, `specs/audits/**` (root **e** in-repo); `.dadaia/reports/**`, `.dadaia/handoff/**`, `.dadaia/tmp/**` (root) | Allow — zero leitura/escrita de lease |
+| ADDITIVE | `specs/backlog/**`, `specs/bugs/**`, `specs/audits/**` exceto `_archive/**` (root **e** in-repo); `.dadaia/reports/**`, `.dadaia/handoff/**`, `.dadaia/tmp/**` (root) | Allow — zero leitura/escrita de lease |
 | MEMORY | `specs/memory/**` (root **e** in-repo) | Allow apenas em fase DEFINITION ou CLOSURE; block caso contrário |
-| FROZEN | `specs/_archive/**` (root **e** in-repo) | Block sempre |
+| FROZEN | `specs/_archive/**`, `specs/backlog/_archive/**`, `specs/bugs/_archive/**`, `specs/audits/_archive/**` (root **e** in-repo) | Block sempre |
 | MUTATING | `specs/releases/**`, production tree, e todo in-repo path sem classe | READ-mode ⇒ block non-acquiring; senão acquire do lease (O_EXCL CAS + pid veto); block em live-lease conflict |
 | UNGATED | Demais paths workspace-root (ex. fora de specs/.dadaia) | Allow |
 
@@ -112,7 +112,9 @@ não verifica `**Status:** Aprovado`, não verifica markers `[-]`, e não valida
 
 **Regras da policy SDD:**
 - **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. O gate classifica apenas por **path**, nunca por formato/extensão.
-- **RULE B (archive read-only):** `specs/_archive/**` → block sempre — inclusive in-repo.
+- **RULE B (archive read-only):** `specs/_archive/**` e os per-class archives
+  `specs/backlog/_archive/**`, `specs/bugs/_archive/**`,
+  `specs/audits/_archive/**` → block sempre — inclusive in-repo.
 - **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record keyed pelo sid harness-native → modo do **incumbent do contexto** (`sessions/runtime/<ctx>.ptr`, atualizado pelo `bind`; ignorado se um lease vivo nomeia outro sid, anti-downgrade guard) → default `IMPLEMENTATION`.
 - **PROTECTED (SEC-01):** `.dadaia/sessions/**` é CLI-owned; block incondicional protege o `.ptr` de forgery.
 
