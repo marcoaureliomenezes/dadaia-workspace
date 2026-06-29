@@ -37,38 +37,25 @@ def _payload(output: str) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    ("command", "expected_reason"),
+    ("command", "expected_phase"),
     (
-        # Review-phase verbs (target QA/SECURITY/CODE_REVIEW) run as REVIEW steps under the
-        # v0.1.31 review-only gate: the bare FAKE worker emits no verdict → block on the
-        # verdict requirement. ``implement`` targets QA_REVIEW, so it is a review step too.
-        (["lifecycle", "implement"], "agent result missing APPROVED verdict"),
-        (["lifecycle", "review", "qa"], "agent result missing APPROVED verdict"),
-        (["lifecycle", "review", "security"], "agent result missing APPROVED verdict"),
-        (["lifecycle", "review", "code"], "agent result missing APPROVED verdict"),
-        # ``close`` targets CLOSURE — a NON-review (create) phase. Under the review-only
-        # gate it is no longer verdict-gated; the bare FAKE worker yields empty
-        # ``artifact_refs``, so it blocks on the still-active artifact-evidence check
-        # instead. The block proves the engine path ran — just not via the verdict gate.
-        (["lifecycle", "close"], "agent result missing artifact evidence"),
+        (["lifecycle", "implement"], "qa_review"),
+        (["lifecycle", "review", "qa"], "qa_review"),
+        (["lifecycle", "review", "security"], "security_review"),
+        (["lifecycle", "review", "code"], "code_review"),
     ),
 )
-def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
+def test_review_phase_verbs_advance_on_fake_harness(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     command: list[str],
-    expected_reason: str,
+    expected_phase: str,
 ) -> None:
-    """Every generic single-step lifecycle verb drives the engine (no `unavailable_workflow`).
+    """Review-phase single-step verbs drive the engine and pass on FAKE.
 
-    With the FAKE harness the bare worker emits neither an APPROVED verdict nor artifact
-    evidence, so the real typed gate blocks every verb — proving the engine path executed
-    end-to-end on a selectable harness. Under the v0.1.31 **review-only** gate the *reason*
-    differs by step kind: a review-phase verb (implement, review qa/security/code) blocks on
-    the verdict requirement, while a create-phase verb (close → CLOSURE) is not verdict-gated
-    and blocks on the artifact-evidence check instead. Either way it is a real engine
-    ``BlockedState``, never an ``unavailable_workflow`` stub. (``release define`` and
-    ``backlog define`` are the fragment-driven multi-step workflows — covered separately.)
+    The deterministic FAKE runtime materializes an in-scope review handoff with
+    ``verdict=APPROVED`` when the prompt is explicitly a review step. That keeps CLI smoke
+    reviewable without live providers while still exercising the real typed gate.
     """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
@@ -78,14 +65,43 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
         [*command, "--release-id", "multiharness-engine-v0116", "--harness", "fake", "--json"],
     )
 
+    assert result.exit_code == 0, result.output
+    payload = _payload(result.output)
+    assert payload["status"] == "OK"
+    assert payload["runtime"] == "fake"
+    assert payload["accepted"] is True
+    assert payload["phase"] == expected_phase
+    assert payload["blocked"] is None
+
+
+def test_create_phase_close_still_blocks_on_fake_without_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FAKE approval is review-scoped; create/no-op steps still need artifact evidence."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "close",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
     assert result.exit_code == 3, result.output
     payload = _payload(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["runtime"] == "fake"
-    assert payload["accepted"] is False
     blocked = payload["blocked"]
     assert isinstance(blocked, dict)
-    assert blocked["reason"] == expected_reason
+    assert blocked["reason"] == "agent result missing artifact evidence"
 
 
 def test_release_define_runs_fragment_driven_sequence_on_fake(

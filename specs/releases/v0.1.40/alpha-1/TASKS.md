@@ -54,8 +54,8 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T6 - Fix fake lifecycle review verdicts
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** product-engineer
 - **Write set:** `dadaia_workspace/infrastructure/fake_runtime.py`, lifecycle CLI/skeleton tests as needed, picked fake-review bug file, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia lifecycle review qa --harness fake --json` emits an APPROVED review handoff and advances instead of blocking on missing verdict; fake create/no-op behavior remains scoped and deterministic.
-- **Validation:** Focused lifecycle CLI tests plus the failing command.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_command_skeletons.py -q` -> `9 passed`; `ruff check --no-cache` on touched runtime/test files -> `All checks passed!`; `mypy --strict dadaia_workspace/infrastructure/fake_runtime.py` -> `Success`; `dadaia lifecycle review qa --release-id v0.1.40 --run-id v0140-alpha1-qa-fixed --harness fake --json` -> `status=OK`, `phase=qa_review`.
