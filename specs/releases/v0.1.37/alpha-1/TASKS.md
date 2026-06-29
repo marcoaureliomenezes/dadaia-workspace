@@ -14,14 +14,15 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ### T1 - Guard Layer-2 workers against recursive lifecycle commands
 
-- **Status:** [-] IN PROGRESS
+- **Status:** [x] DONE
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/**`, `dadaia_workspace/public/lifecycle_fragments/**`, `dadaia_workspace/infrastructure/pi_runtime.py`, related tests
 - **Acceptance:** PI/headless workflow workers cannot validly satisfy a lifecycle step by invoking `dadaia lifecycle ...`; regression coverage proves a recursive attempt is rejected or prevented.
+- **Validation:** `pytest -p no:cacheprovider tests/contract/test_lifecycle_prompt_scope.py tests/contract/test_headless_runtime_security.py -q` -> `15 passed`; `mypy --strict` on touched production files -> `Success`.
 
 ### T2 - Add headless prompt budgeting for release definition
 
-- **Status:** [ ] OPEN
+- **Status:** [-] IN PROGRESS
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/workflows/release_definition.py`, `dadaia_workspace/features/lifecycle/**`, related tests
 - **Acceptance:** Oversized bug/backlog catalogs do not produce raw Codex/PI input-limit errors during `spec_create`; the workflow either summarizes context or blocks early with an actionable lifecycle error.
