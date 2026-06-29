@@ -271,6 +271,62 @@ def test_pi_command_qualifies_model_and_threads_thinking(tmp_path: Path) -> None
     assert captured[captured.index("--thinking") + 1] == "medium"
 
 
+def test_pi_review_requests_do_not_get_bash_or_edit_tools(tmp_path: Path) -> None:
+    captured: list[str] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.extend(str(part) for part in argv)
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="stop before worker")
+
+    result = pi_runtime.PiHeadlessAdapter(
+        pi_runtime.PiHeadlessConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.PI_HEADLESS))
+
+    assert result.status is AgentRunStatus.FAILED
+    tools = captured[captured.index("--tools") + 1].split(",")
+    assert tools == ["read", "write"]
+    assert "bash" not in tools
+    assert "edit" not in tools
+
+
+def test_pi_create_requests_keep_full_configured_tool_set(tmp_path: Path) -> None:
+    captured: list[str] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.extend(str(part) for part in argv)
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="stop before worker")
+
+    request = AgentRunRequest(
+        role="product-engineer",
+        prompt="Create the scoped release artifact.",
+        runtime=AgentRuntimeKind.PI_HEADLESS,
+        context="dadaia-workspace",
+        release_id="v0.1.37",
+        allowed_paths=("specs/releases/v0.1.37/alpha-1/SPEC.md",),
+        expected_schema="agent-run-result-v1",
+    )
+
+    result = pi_runtime.PiHeadlessAdapter(
+        pi_runtime.PiHeadlessConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(request)
+
+    assert result.status is AgentRunStatus.FAILED
+    assert captured[captured.index("--tools") + 1].split(",") == [
+        "read",
+        "write",
+        "edit",
+        "bash",
+    ]
+
+
 def test_codex_handoff_final_payload_surfaces_review_verdict(tmp_path: Path) -> None:
     handoff = {
         "schema_version": "handoff-v1.1",

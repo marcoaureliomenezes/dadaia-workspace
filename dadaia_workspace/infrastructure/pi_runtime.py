@@ -67,6 +67,7 @@ class PiHeadlessConfig:
     timeout_seconds: int = 900
     env_allowlist: tuple[str, ...] = _DEFAULT_ENV_ALLOWLIST
     tools: tuple[str, ...] = ("read", "write", "edit", "bash")
+    review_tools: tuple[str, ...] = ("read", "write")
 
 
 class PiHeadlessAdapter(SubprocessAdapterMixin):
@@ -162,7 +163,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             "--mode",
             "json",
             "--tools",
-            ",".join(self._config.tools),
+            ",".join(self._tools_for_request(request)),
         ]
         model = self._resolve_model(request)
         if model is not None:
@@ -182,6 +183,23 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
+
+    def _tools_for_request(self, request: AgentRunRequest) -> tuple[str, ...]:
+        if self._is_review_request(request):
+            return self._config.review_tools
+        return self._config.tools
+
+    @staticmethod
+    def _is_review_request(request: AgentRunRequest) -> bool:
+        review_roles = {
+            "code-reviewer",
+            "project-auditor",
+            "qa-engineer",
+            "security-reviewer",
+            "software-architect",
+        }
+        role = request.role.strip().lower()
+        return role in review_roles or role.endswith("-reviewer")
 
     def _resolve_thinking(self, request: AgentRunRequest) -> str | None:
         if request.resolved_model is not None:

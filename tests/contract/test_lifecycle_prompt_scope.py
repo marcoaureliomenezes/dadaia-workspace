@@ -42,3 +42,22 @@ def test_prompt_contract_excludes_whole_workspace_context() -> None:
     }
     assert built.request.allowed_paths == tuple(payload["write_scope"]["allowed_paths"])
     assert built.request.forbidden_paths == tuple(payload["write_scope"]["forbidden_paths"])
+
+
+def test_lifecycle_worker_prompt_forbids_nested_lifecycle_invocation() -> None:
+    built = LifecyclePromptBuilder().build(
+        PromptScope(
+            role="security-reviewer",
+            context="dadaia-workspace",
+            release_id="v0.1.37",
+            task_id="T-037-1",
+            prompt="Review the scoped change.",
+            allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
+            required_evidence=(GateEvidenceKind.HANDOFF,),
+        )
+    )
+
+    assert "You are already running as a bounded Layer-2 worker" in built.request.prompt
+    assert "Do not invoke `dadaia lifecycle ...`" in built.request.prompt
+    payload = json.loads(built.prompt_text)
+    assert "Do not invoke `dadaia lifecycle ...`" in payload["instructions"]

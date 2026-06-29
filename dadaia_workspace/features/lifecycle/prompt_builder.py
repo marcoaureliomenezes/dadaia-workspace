@@ -44,6 +44,13 @@ class FragmentBundle:
 #: ``expected_schema`` wiring is needed.
 _TRANSPORT_SCHEMA_ID = "agent-run-result-v1"
 
+_WORKER_RECURSION_GUARD = """## Worker boundary
+You are already running as a bounded Layer-2 worker inside a `dadaia lifecycle` workflow.
+Do not invoke `dadaia lifecycle ...`, `.dadaia/.venv/bin/dadaia lifecycle ...`, or any
+nested workflow command from this worker. Complete this step directly and emit the required
+result object. If the requested step appears to require launching another lifecycle
+workflow, return a blocked/rejected result explaining that recursion is not allowed."""
+
 
 def _required_output_section(*, is_review: bool) -> str:
     """The step-kind-aware "## Required output" instruction (v0.1.32 / L1·L2·L3 / D-1·D-2·D-3).
@@ -185,7 +192,8 @@ class LifecyclePromptBuilder:
         self._validate_scope(scope)
         # The cacheable prefix leads the worker prompt verbatim; the per-step scope is the
         # variable suffix. Identical prefix bytes across steps => provider cache hit.
-        worker_prompt = scope.prompt if prefix is None else f"{prefix.text}\n\n{scope.prompt}"
+        guarded_prompt = f"{_WORKER_RECURSION_GUARD}\n\n{scope.prompt}"
+        worker_prompt = guarded_prompt if prefix is None else f"{prefix.text}\n\n{guarded_prompt}"
         request = AgentRunRequest(
             role=scope.role,
             prompt=worker_prompt,
@@ -215,7 +223,7 @@ class LifecyclePromptBuilder:
             "context": scope.context,
             "release_id": scope.release_id,
             "task_id": scope.task_id,
-            "instructions": scope.prompt,
+            "instructions": f"{_WORKER_RECURSION_GUARD}\n\n{scope.prompt}",
             "write_scope": {
                 "allowed_paths": list(scope.allowed_paths),
                 "forbidden_paths": list(scope.forbidden_paths),
