@@ -19,7 +19,7 @@ tags:
 - backlog
 agent_tier: self-pull
 token_estimate: 13000
-last_updated: '2026-06-27'
+last_updated: '2026-06-30'
 release_origin: v0.1.32
 ---
 
@@ -152,7 +152,11 @@ live-lease conflict.
 - **Liveness = TTL com PID veto** (`core/lock_liveness.is_stale`): `LEASE_TTL_SECONDS =
   120` é o piso de reclaimability, mas quando o record carrega `pid` e o probe injetado
   reporta o processo holder **vivo**, um record TTL-expirado é tratado como live —
-  `acquire` estrangeiro **bloqueia** em vez de TAKEOVER (no-steal). O `pid` gravado é o
+  `acquire` estrangeiro **bloqueia** em vez de TAKEOVER (no-steal). **Reclaim
+  release-aware (v0.1.43):** o pid-veto vale **apenas** para um lease pinado à release
+  ACTIVE viva — um lease pinado a uma release não-ACTIVE/arquivada é reclaimável mesmo
+  com holder-pid vivo (tanto o verdict de liveness quanto `dadaia lock steal`), de modo
+  que um lease órfão de release arquivada não pode mais deadlockar a próxima release. O `pid` gravado é o
   do **processo harness de vida longa**, resolvido pelo hook
   (`hooks/sdd_gate._resolve_holder_pid`: `harness_pid`/`parent_pid`/`ppid` do payload
   stdin, senão `os.getppid()`) e threaded até `lease.acquire` — nunca o pid do
