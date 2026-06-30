@@ -20,7 +20,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-1 — Coverage: author + wire the two review-gate fragments
 
-- [ ] **T-43-1 — Author `implementation.security_review` + wire `pipeline.review_security`.**
+- [-] **T-43-1 — Author `implementation.security_review` + wire `pipeline.review_security`.**
   Owner: ai-engineer.
   Write set: `dadaia_workspace/public/lifecycle_fragments/implementation/security-review.md`
   (NEW); `dadaia_workspace/features/lifecycle/pipeline.py` (`implementation_ladder`,
@@ -39,7 +39,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   (static wiring alone is insufficient because the FAKE adapter ignores the prompt).
   Parallel: with T-43-2, T-43-6.
 
-- [ ] **T-43-2 — Author `implementation.code_review` + wire `pipeline.review_code`.**
+- [-] **T-43-2 — Author `implementation.code_review` + wire `pipeline.review_code`.**
   Owner: ai-engineer.
   Write set: `dadaia_workspace/public/lifecycle_fragments/implementation/code-review.md`
   (NEW); `dadaia_workspace/features/lifecycle/pipeline.py` (`review_code` step ~:543);
@@ -104,7 +104,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   (returns `None`) caller is unaffected.
   Parallel: with T-43-1, T-43-2 (distinct file).
 
-- [ ] **T-43-6 — Add the conflict_scan downgrade-only model-consult sub-step in `backlog_definition`.**
+- [-] **T-43-6 — Add the conflict_scan downgrade-only model-consult sub-step in `backlog_definition`.**
   Owner: software-engineer (non-trivial Python) — ai-engineer pairs on fragment frontmatter.
   Write set: `dadaia_workspace/features/lifecycle/workflows/backlog_definition.py`
   (new sub-step feeding the existing `downgrade` seam at `_run_existing_review` ~:354);
