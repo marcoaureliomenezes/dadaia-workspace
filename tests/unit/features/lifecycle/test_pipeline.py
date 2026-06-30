@@ -260,9 +260,18 @@ def test_implementation_ladder_attaches_fragment_bundles_to_two_steps() -> None:
     )
     # The QA review step runs on the qa-review fragment.
     assert by_label["review_qa"].fragment_id == "implementation.qa_review"
-    # The remaining steps keep the generic path (full migration is out of scope).
-    assert by_label["review_security"].fragment_id is None
-    assert by_label["review_code"].fragment_id is None
+    # v0.1.43: the security + code review steps now run on their own gate fragments,
+    # each citing the shared anti-slop + output-handoff disciplines.
+    assert by_label["review_security"].fragment_id == "implementation.security_review"
+    assert by_label["review_security"].shared_fragment_ids == (
+        "shared.anti_slop",
+        "shared.output_handoff",
+    )
+    assert by_label["review_code"].fragment_id == "implementation.code_review"
+    assert by_label["review_code"].shared_fragment_ids == (
+        "shared.anti_slop",
+        "shared.output_handoff",
+    )
 
 
 def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
@@ -291,10 +300,10 @@ def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
     assert "Run the review_qa step" not in qa_prompt
     assert "qa-review-verdict-v1" in qa_prompt
 
-    # A non-migrated step keeps the generic suffix.
+    # v0.1.43: the security review step is now fragment-sourced, not generic.
     security_prompt = by_label["review_security"].prompt
-    assert "Run the review_security step" in security_prompt
-    assert "fragment:" not in security_prompt
+    assert "fragment:implementation.security_review" in security_prompt
+    assert "Run the review_security step" not in security_prompt
 
 
 # ---------------------------------------------------------------------------

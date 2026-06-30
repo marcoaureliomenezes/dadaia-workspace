@@ -17,7 +17,9 @@ object; do not produce free-form commentary in its place.
 
 ## What the result must carry
 
-Emit one transport-envelope object. Every result carries these fields:
+The workflow's required-output instruction already names the one object to emit and its
+transport `schema`; this fragment specifies the fields that object must carry. Every
+result carries these fields:
 
 | Field | Meaning |
 |---|---|

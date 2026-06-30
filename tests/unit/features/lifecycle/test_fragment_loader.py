@@ -158,16 +158,18 @@ def test_fragment_counts() -> None:
     assert len(loader.list_fragments(workflow="release_definition")) == 8
 
 
-def test_implementation_dir_ships_its_three_authored_fragments() -> None:
-    # T-24-11: the implementation workflow now ships three authored step fragments
-    # backing the pipeline's implementation + QA-review steps. It is no longer a
-    # README-only deferred stub dir.
+def test_implementation_dir_ships_its_authored_fragments() -> None:
+    # The implementation workflow ships five authored step fragments backing the
+    # pipeline's implement + QA / security / code review steps. v0.1.43 added the
+    # security-review and code-review gate fragments. No README-only deferred stub.
     loader = FragmentLoader()
     ids = {f.id for f in loader.list_fragments(workflow="implementation")}
     assert ids == {
         "implementation.implement_tdd",
         "implementation.self_verify",
         "implementation.qa_review",
+        "implementation.security_review",
+        "implementation.code_review",
     }
 
 

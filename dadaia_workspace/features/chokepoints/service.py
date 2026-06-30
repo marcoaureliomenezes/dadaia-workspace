@@ -204,6 +204,11 @@ def pre_commit_decision(
     # (2) No lease, or stale-dead lease ⇒ allow. ``is_stale`` returns True for an absent or
     # corrupt record and for a TTL-expired record whose holder pid is dead/absent; a live
     # foreign holder (pid-veto) is NOT stale and falls through to the identity checks.
+    # T-43-10 NOTE: ``active_release`` is intentionally left default (``None``, legacy
+    # release-agnostic behavior) here. This is a pure decision function with injected seams and
+    # no ACTIVE.md read; the archived-release deadlock is broken at its root by the MUTATING
+    # acquire + ``lock steal`` paths (which reclaim the archived lease on the first write/steal),
+    # after which this record's holder identity is the new session and the commit path self-heals.
     if is_stale(record, clock=lambda: clock, pid_probe=pid_probe):
         return Decision(allowed=True, message=f"[pre-commit] no live lease on '{ctx}'; allow.")
 
