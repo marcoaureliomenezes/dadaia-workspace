@@ -199,7 +199,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## Closing — reprojection + gate
 
-- [ ] **T-43-9 — Reproject the instance and run the full doctor/CI gate.**
+- [x] **T-43-9 — Reproject the instance and run the full doctor/CI gate.**
   Owner: ai-engineer (commands surfaced to operator / devops-engineer; PE does not run CLI).
   Write set: none (regenerates projected `.claude/`, `.codex/`, `.agents/`, `.pi/` assets).
   Preconditions: T-43-1..T-43-8, T-43-6b, T-43-10 done.
