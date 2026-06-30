@@ -199,7 +199,7 @@ class BacklogDefinitionResult:
 _SEQUENCE: tuple[BacklogStep, ...] = (
     BacklogStep(
         label="intake_grill",
-        role="project-manager",
+        role="product-engineer",
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.intake_grill",
         shared_fragment_ids=("shared.grill_questionnaire",),
@@ -219,7 +219,7 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
     BacklogStep(label="reconcile_decision", role="python", kind=BacklogStepKind.RECONCILE),
     BacklogStep(
         label="conflict_resolution_grill",
-        role="project-manager",
+        role="product-engineer",
         kind=BacklogStepKind.CONFLICT_GRILL,
         fragment_id="backlog_definition.conflict_resolution_grill",
         shared_fragment_ids=("shared.grill_questionnaire",),

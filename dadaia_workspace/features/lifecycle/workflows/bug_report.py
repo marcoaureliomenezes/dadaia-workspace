@@ -9,7 +9,7 @@ its fragment bundle + the dynamically selected context (bounded by ``max_context
 
 The sequence is:
 
-1. ``bug_intake`` (project-manager) — normalizes a reported symptom into the bug-record
+1. ``bug_intake`` (project-auditor) — normalizes a reported symptom into the bug-record
    fields (symptom / repro / expected-vs-actual / severity), redaction-clean. Produces
    ``bug-intake-handoff-v1``.
 2. ``dedupe`` (product-engineer, **review**) — decides new-vs-duplicate against tracked
@@ -132,7 +132,7 @@ class BugReportResult:
 _SEQUENCE: tuple[BugReportStep, ...] = (
     BugReportStep(
         label="bug_intake",
-        role="project-manager",
+        role="project-auditor",
         fragment_id="bug_report.bug_intake",
         shared_fragment_ids=("shared.output_handoff",),
         produces="bug-intake-handoff-v1",

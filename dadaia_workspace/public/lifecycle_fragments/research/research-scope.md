@@ -1,6 +1,6 @@
 ---
 id: research.research_scope
-role: project-manager
+role: product-engineer
 workflow: research
 step: research_scope
 static_inputs: []

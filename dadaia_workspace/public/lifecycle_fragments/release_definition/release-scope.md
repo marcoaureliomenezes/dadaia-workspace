@@ -1,6 +1,6 @@
 ---
 id: release_definition.release_scope
-role: project-manager
+role: product-engineer
 workflow: release_definition
 step: release_scope
 static_inputs: []
@@ -11,10 +11,9 @@ max_context_policy: summary
 
 # Release scope — pick the set this release will address
 
-You are the coordinator for the release-definition workflow. Your step turns the
-pool of open work — bugs, audit findings, candidate backlog items — into a defined,
-grilled scope that the SPEC step will build from. You select and bound; you do not
-write the SPEC.
+This step turns the pool of open work — bugs, audit findings, candidate backlog
+items — into a defined, grilled scope that the SPEC step will build from. You select
+and bound; you do not write the SPEC.
 
 ## Inputs you reason over
 

@@ -129,3 +129,26 @@ def test_build_threads_resolved_model_into_request() -> None:
     )
     built = LifecyclePromptBuilder().build(scope)
     assert built.request.resolved_model == resolved
+
+
+def test_build_threads_persona_into_request() -> None:
+    # T-44-4: PromptScope.persona flows DIRECTLY into AgentRunRequest.persona (QA advisory —
+    # not only transitively via the envelope).
+    mandate = "You are acting as the software-engineer. Implement with tests."
+    scope = PromptScope(
+        role="software-engineer",
+        context="dadaia-workspace",
+        release_id="v0.1.44",
+        task_id="run:implement",
+        prompt="implement",
+        allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
+        persona=mandate,
+    )
+    built = LifecyclePromptBuilder().build(scope)
+    assert built.request.persona == mandate
+
+
+def test_build_persona_defaults_to_none() -> None:
+    # A scope with no persona threads ``None`` — the byte-stable persona-less path.
+    built = LifecyclePromptBuilder().build(_scope())
+    assert built.request.persona is None

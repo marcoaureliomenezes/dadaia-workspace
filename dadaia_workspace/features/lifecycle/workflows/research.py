@@ -9,11 +9,11 @@ its fragment bundle + the dynamically selected context (bounded by ``max_context
 
 The sequence is:
 
-1. ``research_scope`` (project-manager) — frames the research question, the decision it
+1. ``research_scope`` (product-engineer) — frames the research question, the decision it
    informs, the evidence bar, and the bounded surfaces. Produces ``research-scope-handoff-v1``.
 2. ``investigate`` (software-architect) — gathers evidence within the bounded scope.
    Consumes ``research_scope``; produces ``research-findings-handoff-v1``.
-3. ``synthesis`` (project-manager) — turns the evidence into a recommended next step
+3. ``synthesis`` (product-engineer) — turns the evidence into a recommended next step
    (backlog / release action / justified no-action). Consumes ``investigate``; produces
    ``research-findings-handoff-v1``.
 4. ``research_synthesis_gate`` (python, no model) — the terminal Python gate; completes the
@@ -121,7 +121,7 @@ class ResearchResult:
 _SEQUENCE: tuple[ResearchStep, ...] = (
     ResearchStep(
         label="research_scope",
-        role="project-manager",
+        role="product-engineer",
         fragment_id="research.research_scope",
         shared_fragment_ids=("shared.grill_questionnaire",),
         produces="research-scope-handoff-v1",
@@ -136,7 +136,7 @@ _SEQUENCE: tuple[ResearchStep, ...] = (
     ),
     ResearchStep(
         label="synthesis",
-        role="project-manager",
+        role="product-engineer",
         fragment_id="research.synthesis",
         shared_fragment_ids=("shared.output_handoff",),
         produces="research-findings-handoff-v1",

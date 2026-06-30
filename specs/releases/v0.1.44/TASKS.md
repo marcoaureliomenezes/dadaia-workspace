@@ -14,7 +14,7 @@
 
 ## AC-1 — Persona library + PersonaLoader
 
-### [ ] T-44-1 — Shared FrontmatterDocLoader base (loader DRY)
+### [x] T-44-1 — Shared FrontmatterDocLoader base (loader DRY)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/_frontmatter_doc.py` (new base:
   `_split_frontmatter` + str/list key-validation loop + `_FORBIDDEN_TOKENS` /
@@ -27,7 +27,7 @@
   `FragmentLoader` is refactored onto it with existing fragment-loader tests green and no
   behavior change.
 
-### [ ] T-44-2 — Author the 8 persona atoms
+### [x] T-44-2 — Author the 8 persona atoms
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/personas/{ai-engineer,code-reviewer,product-engineer,project-auditor,qa-engineer,security-reviewer,software-architect,software-engineer}.md`
 - **Precondition:** T-44-1 (token list finalized)
@@ -35,7 +35,7 @@
   harness_universal}` semantically aligned to `public/agents/<role>.md`, zero forbidden
   harness tokens, no `project-manager` atom. Cross-reference `source_agent` set.
 
-### [ ] T-44-3 — PersonaLoader + validation + lint + dangling-ref guard
+### [x] T-44-3 — PersonaLoader + validation + lint + dangling-ref guard
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/personas/loader.py`,
   `dadaia_workspace/features/lifecycle/personas/__init__.py`,
@@ -50,7 +50,7 @@
 
 ## AC-2 — Persona injection seam
 
-### [ ] T-44-4 — Add `persona` field to PromptScope + AgentRunRequest
+### [x] T-44-4 — Add `persona` field to PromptScope + AgentRunRequest
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/prompt_builder.py`,
   `dadaia_workspace/core/models/lifecycle.py`, `tests/.../test_prompt_builder.py`
@@ -61,7 +61,7 @@
   `scope.persona → request.persona` (QA advisory — not only transitive); mypy --strict
   green.
 
-### [ ] T-44-5 — Emit persona as operative directive in build_prompt_envelope (byte-stable)
+### [x] T-44-5 — Emit persona as operative directive in build_prompt_envelope (byte-stable)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/headless_adapter_base.py`,
   `tests/.../test_prompt_envelope.py`
@@ -72,7 +72,7 @@
   byte-identical to the prior output (regression test asserts byte-equality); a test
   asserts the **directive** text (not just the mandate body) is present.
 
-### [ ] T-44-6 — Resolve role→persona in pipeline._scope (single + multi-role + shared)
+### [x] T-44-6 — Resolve role→persona in pipeline._scope (single + multi-role + shared)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py`,
   `tests/.../test_pipeline_persona.py`
@@ -84,7 +84,7 @@
 
 ## AC-3 — Fragment role reassignment (D-1)
 
-### [ ] T-44-7 — Reassign the 7 PM-role fragments
+### [x] T-44-7 — Reassign the 7 PM-role fragments
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/lifecycle_fragments/release_definition/release-scope.md`,
   `.../backlog_definition/intake_grill.md`, `.../backlog_definition/conflict_resolution_grill.md`,
@@ -94,7 +94,7 @@
 - **Done:** scope/grill/synthesis → `product-engineer`; `audit/triage` + `bug-intake` →
   `project-auditor`; no non-`shared` fragment retains `role: project-manager`.
 
-### [ ] T-44-8 — Update worker-step catalog/pipeline role bindings
+### [x] T-44-8 — Update worker-step catalog/pipeline role bindings
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/` (workflow catalog/pipeline
   construction naming a `project-manager` worker step), `tests/.../`
@@ -105,7 +105,7 @@
 
 ## AC-4 — Fragment/persona optimization audit + anti-regression guardrail
 
-### [ ] T-44-9 — Anti-regression: every RESOLVED pipeline-step role → non-PM persona
+### [x] T-44-9 — Anti-regression: every RESOLVED pipeline-step role → non-PM persona
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/specs_doctor/` (or the doctor rule home) +
   `tests/.../test_persona_resolution_guardrail.py`
@@ -119,7 +119,7 @@
   fixtures live under **tmp/fixture roots** (`tmp_path` / `.dadaia/tmp/`), NOT under
   `public/lifecycle_fragments/`, so pass-on-current-tree + `public doctor` stay clean.
 
-### [ ] T-44-10 — Fragment/persona optimization pass
+### [x] T-44-10 — Fragment/persona optimization pass
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/lifecycle_fragments/**` (only fragments the
   audit flags)
@@ -131,7 +131,7 @@
 
 ## AC-5 — pi model openness
 
-### [ ] T-44-11 — Layer-2-native model allowlist (REGISTRY untouched)
+### [x] T-44-11 — Layer-2-native model allowlist (REGISTRY untouched)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/harness_models.py`, `tests/.../test_harness_models.py`
 - **Precondition:** none
@@ -143,7 +143,7 @@
   `None`; **no fabricated registry pricing row**). Tests: `REGISTRY` is unchanged and
   `codex_tier_views()` resolves without `ValueError`; exact id set recorded for CLOSURE.
 
-### [ ] T-44-12 — Extend pi catalog + relax invariant to allowlist union
+### [x] T-44-12 — Extend pi catalog + relax invariant to allowlist union
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/harness_models.py`, `tests/.../test_harness_models.py`
 - **Precondition:** T-44-11
@@ -153,7 +153,7 @@
   OpenRouter ids accepted via the union, a `claude-*` id still raises, an id outside the
   union raises.
 
-### [ ] T-44-13 — Allowlist-validated operator-overlay pi registration
+### [x] T-44-13 — Allowlist-validated operator-overlay pi registration
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/json_local_model_profile_store.py`,
   `tests/.../test_local_model_profile_store.py`
@@ -162,7 +162,7 @@
   LAYER2_EXTRA_MODEL_IDS` is rejected; a union-present pi id is accepted; existing
   `harness == pi` constraint preserved; tests cover both paths.
 
-### [ ] T-44-14 — Verify pi_runtime passthrough
+### [x] T-44-14 — Verify pi_runtime passthrough
 - **Owner:** software-engineer
 - **Write set:** `tests/.../test_pi_runtime.py` (expected no source edit)
 - **Precondition:** T-44-12
@@ -172,7 +172,7 @@
 
 ## AC-6 — Anti-regression guardrails + docs
 
-### [ ] T-44-15 — Doc edits (live source + public): GPT-only → allowlist; persona entity; scoped doc-lint
+### [x] T-44-15 — Doc edits (live source + public): GPT-only → allowlist; persona entity; scoped doc-lint
 - **Owner:** ai-engineer (+ software-engineer for the doc-lint test)
 - **Write set:** `dadaia_workspace/core/harness_models.py` (module docstring),
   `dadaia_workspace/features/lifecycle/policy_doctor.py` (line ~269 docstring),
@@ -188,7 +188,7 @@
   EXCLUDING `specs/_archive/` and the v0.1.44 spec text** (so it is satisfiable) and is
   green. MEMORY atoms are out of this task's scope (see T-44-18).
 
-### [ ] T-44-16 — Constitution / ADR-B amendment (operator-confirmed)
+### [x] T-44-16 — Constitution / ADR-B amendment (operator-confirmed)
 - **Owner:** product-engineer
 - **Write set:** `specs/constitution.md` (and/or the ADR-B reference)
 - **Precondition:** explicit operator confirmation (R1)
@@ -204,7 +204,7 @@
   allowlist-validated (no `claude-*`) reality; memory stays atomic (no changelog); written
   by product-engineer only (NOT ai-engineer); `dadaia specs doctor` clean.
 
-### [ ] T-44-17 — Propagate lib-originated assets + full validation
+### [x] T-44-17 — Propagate lib-originated assets + full validation
 - **Owner:** software-engineer
 - **Write set:** (no source files — runs `dadaia public stage && install --target all &&
   public doctor`; surfaced to operator/PM since PE has no Bash)

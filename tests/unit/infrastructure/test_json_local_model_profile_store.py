@@ -188,6 +188,37 @@ def test_save_uses_atomic_write_no_temp_leftover(tmp_path: Path) -> None:
     assert leftovers == []
 
 
+def test_allowlisted_openrouter_model_id_accepted(tmp_path: Path) -> None:
+    # AC-5 (v0.1.44): an operator pi profile naming an allowlisted OpenRouter id loads.
+    good = _valid_profile()
+    good["model_id"] = "kimi-2.7"
+    store = _write(_workspace(tmp_path), _valid_store([good]))
+    profiles = store.load()
+    assert len(profiles) == 1
+    assert profiles[0].model_id == "kimi-2.7"
+
+
+def test_model_id_outside_allowlist_union_rejected(tmp_path: Path) -> None:
+    # AC-5: an id present in neither the registry nor the Layer-2 allowlist fails closed.
+    bad = _valid_profile()
+    bad["model_id"] = "totally-unknown-9.9"
+    store = _write(_workspace(tmp_path), _valid_store([bad]))
+    with pytest.raises(LocalModelProfileStoreError) as exc:
+        store.load()
+    message = str(exc.value)
+    assert "totally-unknown-9.9" in message
+    assert "allowlist" in message.lower()
+
+
+def test_claude_model_id_rejected_by_allowlist(tmp_path: Path) -> None:
+    # AC-5: claude is never in the Layer-2 union, so a claude-* model_id is rejected.
+    bad = _valid_profile()
+    bad["model_id"] = "claude-opus-4-8"
+    store = _write(_workspace(tmp_path), _valid_store([bad]))
+    with pytest.raises(LocalModelProfileStoreError):
+        store.load()
+
+
 def test_store_filename_is_not_a_packaged_public_asset() -> None:
     # L8 never-projected guarantee: the local-store filename does not appear anywhere under
     # the public/ source tree (it is workspace-local state, never a staged/projected asset).

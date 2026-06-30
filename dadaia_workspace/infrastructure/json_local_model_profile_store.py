@@ -31,6 +31,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from dadaia_workspace.core.harness_models import known_layer2_model_ids
 from dadaia_workspace.core.models.workflow_execution import WorkflowModelProfile
 from dadaia_workspace.core.protocols.local_model_profile_store import (
     LocalModelProfileStoreError,
@@ -217,6 +218,17 @@ class JsonLocalModelProfileStore:
             raise LocalModelProfileStoreError(
                 f"{where} (id {profile_id!r}) names harness {harness!r}; operator-added "
                 f"profiles must declare harness {_OPERATOR_HARNESS!r} this release (L1)"
+            )
+        # AC-5 (v0.1.44): an operator pi profile may only name a model id in the Layer-2
+        # allowlist (registry codex_ids | LAYER2_EXTRA_MODEL_IDS) — the SAME union the
+        # catalog invariant validates against. An id outside it (incl. any ``claude-*``,
+        # which is never in the union) is rejected before the first model call.
+        model_id = str(entry["model_id"])
+        if model_id not in known_layer2_model_ids():
+            raise LocalModelProfileStoreError(
+                f"{where} (id {profile_id!r}) names model_id {model_id!r}, which is not in "
+                "the Layer-2 allowlist (registry codex_ids | LAYER2_EXTRA_MODEL_IDS); an "
+                "operator pi profile must name an allowlist-validated model id"
             )
         # ``source`` is forced to a stable, inspectable provenance marker so a merged
         # operator profile is always distinguishable from a built-in (never spoofable as

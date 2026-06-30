@@ -453,6 +453,27 @@ chokepoints. A Ring-1 boundary for the headless worker runtimes is deferred. The
 clause of §4 applies to both layers: no projection or doctor line may claim enforcement a
 runtime does not perform.
 
+**Layer-2 worker-model selection law.** **Layer-2 worker models are
+registry-validated, not GPT-only.** A Layer-2 (codex/pi) catalog or operator-overlay
+model id must be a **known id** — present in the model registry's known codex ids OR in
+the curated Layer-2 allowlist (`LAYER2_EXTRA_MODEL_IDS`, e.g. OpenRouter `kimi-2.7`). The
+hard safety bound is **RETAINED**: a Layer-2 model id may **NEVER** be a `claude-*` id —
+claude is never a Layer-2 worker (cost decision). pi may additionally register validated
+model ids via the operator-overlay store without a code change. This law **widens** the
+prior bound; it removes no safety guarantee.
+
+> **Amendment (2026-06-30, v0.1.44 — persona subsystem + pi model openness).** This
+> supersedes the earlier "GPT-only at Layer 2" decision (ADR-B of the archived v0.1.24
+> release, mirrored as "GPT-only by construction" in `core/harness_models.py`). The
+> Layer-2 worker-model set is no longer GPT-only: a codex/pi catalog or operator-overlay
+> model id is accepted iff it is present in `_known_codex_ids() | LAYER2_EXTRA_MODEL_IDS`
+> (the registry codex ids plus the curated Layer-2-native allowlist, e.g. OpenRouter
+> `kimi-2.7`), and is rejected if it is a `claude-*` id. The no-`claude-*` safety bound is
+> explicitly **retained**, so the law only widens the allowed set and never weakens the
+> guarantee that claude is never a Layer-2 worker. The model registry
+> (`core/model_registry.py:REGISTRY`) is **not** extended to carry these ids — they live
+> in the Layer-2-native allowlist — so the codex tier views and pricing table stay honest.
+
 ## 9. Coordinator + Sub-Agent Architecture
 
 project-manager is the lease coordinator for a release. When a release enters its

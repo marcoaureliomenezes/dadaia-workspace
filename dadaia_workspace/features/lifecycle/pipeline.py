@@ -49,6 +49,7 @@ from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
     FragmentLoader,
 )
+from dadaia_workspace.features.lifecycle.personas.loader import PersonaLoader
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     FragmentBundle,
     LifecyclePromptBuilder,
@@ -148,6 +149,7 @@ class LifecyclePipeline:
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         fragment_loader: FragmentLoader | None = None,
+        persona_loader: PersonaLoader | None = None,
         context_selector: ContextSelector | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
@@ -180,6 +182,11 @@ class LifecyclePipeline:
         # (the fragment body + cited shared bodies + output schema), only without the
         # dynamically resolved file context.
         self._fragment_loader = fragment_loader or FragmentLoader()
+        # The persona library (v0.1.44 / AC-2). A step's ``role`` is resolved to its
+        # Layer-2 persona mandate here and threaded into the scope so the worker envelope
+        # carries an operative directive to act per that mandate. ``role: shared`` and any
+        # role with no persona atom resolve to ``None`` (no persona block).
+        self._persona_loader = persona_loader or PersonaLoader()
         self._context_selector = context_selector
 
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
@@ -390,7 +397,33 @@ class LifecyclePipeline:
             required_evidence=(GateEvidenceKind.HANDOFF,),
             model_profile=step.model_profile,
             resolved_model=step.resolved_model,
+            persona=self._resolve_persona(step.role),
         )
+
+    def _resolve_persona(self, role: str) -> str | None:
+        """Resolve a step's ``role`` to its Layer-2 persona mandate(s) (AC-2).
+
+        ``role`` is comma-split (a multi-role step such as ``plan_review`` names
+        ``"qa-engineer, software-architect"``); each named role is resolved through the
+        persona loader. ``role == "shared"`` and any role with no persona atom resolve to
+        ``None`` for that name. The result is:
+
+        * ``None`` when no named role resolves to a persona (a ``shared`` / unmapped step —
+          no persona block, keeping the envelope byte-identical);
+        * the single mandate body when exactly one role resolves;
+        * each resolving role's mandate, clearly delimited by a role header, when several
+          do (the multi-role set — the envelope carries every named persona's mandate).
+        """
+        resolved: list[tuple[str, str]] = []
+        for name in (part.strip() for part in role.split(",")):
+            persona = self._persona_loader.load_optional(name)
+            if persona is not None:
+                resolved.append((name, persona.body))
+        if not resolved:
+            return None
+        if len(resolved) == 1:
+            return resolved[0][1]
+        return "\n\n".join(f"### Persona — {name}\n{body}" for name, body in resolved)
 
     def _generic_prompt(self, step: PipelineStep) -> str:
         """Generic (no-fragment) step prompt — step-kind-aware (v0.1.32 / C6 / L2 / A4b).

@@ -4,20 +4,24 @@ The operator's two-layer model (v0.1.24 ADR-B) makes the Layer-2 worker model a
 **discrete choice on the CLI call**, not a tier abstraction. Each Layer-2 harness
 exposes an ordered, finite set of ``(model_id, reasoning_effort)`` options:
 
-- **pi → 3 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex, medium)``
+- **pi → 4 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex, medium)``,
+  ``(kimi-2.7, high)``
 - **codex → 2 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, medium)``
 
-**GPT-only invariant (ADR-B).** PI runs on the operator's *Codex* subscription, so
-PI's Layer-2 models are GPT / codex model ids — never Claude ids. Both Layer-2
-catalogs are therefore GPT-only **by construction**: no ``claude-*`` id (including the
-region-restricted ``claude-fable-5``) can ever appear at Layer 2. Layer-1 Claude (the
+**Allowlist-validated invariant (ADR-B, opened v0.1.44).** PI runs on the operator's
+*Codex* subscription but its model set is **allowlist-validated**, not GPT-only: a
+curated set of Layer-2-native OpenRouter worker ids (:data:`LAYER2_EXTRA_MODEL_IDS`,
+e.g. ``kimi-2.7``) is permitted alongside the registry codex ids. The retained safety
+bound is **no ``claude-*`` id** (including the region-restricted ``claude-fable-5``)
+can ever appear at Layer 2 — claude is never a Layer-2 worker. Layer-1 Claude (the
 ``CLAUDE_SDK`` adapter) is unaffected — this catalog governs Layer-2 worker selection
 only.
 
 **Single source of truth, no second drifting table.** Every model id named here MUST
-exist as a ``codex_id`` in :data:`model_registry.REGISTRY`. The catalog is validated
-against the registry at import time (:func:`_assert_ids_known`), so a registry id
-rename surfaces here loudly instead of silently drifting. The catalog itself is
+be in :func:`known_layer2_model_ids` — the registry ``codex_id`` set UNION the curated
+Layer-2-native allowlist. The catalog is validated against that union at import time
+(:func:`_assert_ids_known`), so a registry id rename, or an OpenRouter id missing from
+the allowlist, surfaces here loudly instead of silently drifting. The catalog itself is
 explicit *data* keyed by harness (parameterized below) — confirming or changing a
 model is a one-line data edit, NOT a tier-derivation change.
 
@@ -43,9 +47,10 @@ CODEX_HARNESS = "codex"
 class HarnessModelOption:
     """One discrete Layer-2 model choice: a ``(model_id, reasoning_effort)`` pair.
 
-    ``model_id`` is a GPT/codex id (never ``claude-*`` — see module docstring) that
-    MUST exist as a ``codex_id`` in :data:`model_registry.REGISTRY`. ``effort`` is the
-    Codex reasoning-effort axis the worker runs at.
+    ``model_id`` is an allowlist-validated Layer-2 worker id (never ``claude-*`` — see
+    module docstring) that MUST be in :func:`known_layer2_model_ids` (a registry
+    ``codex_id`` or a curated OpenRouter id). ``effort`` is the Codex reasoning-effort
+    axis the worker runs at.
     """
 
     model_id: str
@@ -53,16 +58,21 @@ class HarnessModelOption:
 
 
 # ---------------------------------------------------------------------------
-# THE CATALOG — explicit GPT-only data keyed by harness (ADR-B, operator 2026-06-26).
+# THE CATALOG — explicit allowlist-validated data keyed by harness (ADR-B,
+# operator 2026-06-26; opened to a curated OpenRouter set v0.1.44 / AC-5).
 #
 # Order is presentation order (most → least capable). Parameterized as data so a
 # future id/effort change is a single data edit, NOT a tier-derivation change.
+# Every id must be in :func:`known_layer2_model_ids` and must never be ``claude-*``.
+# The pi catalog includes the curated OpenRouter option(s); the codex catalog is
+# unchanged (codex runs only on registry codex ids).
 # ---------------------------------------------------------------------------
 _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
     PI_HARNESS: (
         HarnessModelOption("gpt-5.5", "high"),
         HarnessModelOption("gpt-5.5", "low"),
         HarnessModelOption("gpt-5.3-codex", "medium"),
+        HarnessModelOption("kimi-2.7", "high"),
     ),
     CODEX_HARNESS: (
         HarnessModelOption("gpt-5.5", "high"),
@@ -71,34 +81,72 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Layer-2-native worker-model allowlist (v0.1.44 / AC-5, R6).
+#
+# pi's model set is opened from registry-codex-ids-only to registry-codex-ids
+# PLUS a small, curated, Layer-2-native allowlist of OpenRouter worker-model ids.
+# These ids are NOT inserted into ``model_registry.REGISTRY``: that table is keyed
+# ``claude_id → codex_id`` and feeds THREE derived views including
+# ``codex_tier_views()`` / ``_codex_id_for_tier()`` on the codex runtime hot path —
+# a synthetic-alias entry would collide a tier (``len > 1`` → ``ValueError``) and
+# fabricate a pricing row. The allowlist is therefore a Layer-2-native set kept here.
+#
+# Pricing stays honest: these ids carry no registry pricing row, so
+# ``telemetry.pricing.compute_cost`` returns ``None`` ("unknown" — never fabricated)
+# for them. Membership is named and explicit — no wildcard.
+# ---------------------------------------------------------------------------
+LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"kimi-2.7"})
+
+
 def _known_codex_ids() -> frozenset[str]:
     """The set of ``codex_id`` strings the registry recognises."""
     return frozenset(entry.codex_id for entry in REGISTRY)
 
 
+def known_layer2_model_ids() -> frozenset[str]:
+    """The full set of model ids a Layer-2 worker selection may name.
+
+    The single source of truth for Layer-2 model-id membership: the registry
+    ``codex_id`` set UNION the Layer-2-native allowlist
+    (:data:`LAYER2_EXTRA_MODEL_IDS`). Both the catalog invariant
+    (:func:`_assert_ids_known`) and the operator-overlay store validate against
+    this one public helper, so neither leaks the private ``_known_codex_ids``
+    across the layer boundary nor drifts from the other.
+    """
+    return _known_codex_ids() | LAYER2_EXTRA_MODEL_IDS
+
+
 def _assert_ids_known() -> None:
-    """Fail loudly at import if any catalog id is not a registry ``codex_id``.
+    """Fail loudly at import if any catalog id is outside the Layer-2 allowlist.
 
     This is the no-second-drifting-table guard: the catalog may only name model ids
-    that the single registry already carries. A registry rename that orphans a
-    catalog id raises here rather than drifting silently.
+    that :func:`known_layer2_model_ids` carries (registry ``codex_id``s UNION the
+    curated Layer-2-native allowlist). A registry rename that orphans a catalog id,
+    or an OpenRouter id absent from the allowlist, raises here rather than drifting
+    silently.
+
+    The catalog is **allowlist-validated**, not GPT-only: a curated OpenRouter id is
+    accepted, but a ``claude-*`` id is **never** a Layer-2 worker id and still raises
+    (the no-``claude-*`` safety bound is retained).
 
     Raises:
-        ValueError: if a catalog ``model_id`` is absent from the registry, or if any
-            ``model_id`` is a ``claude-*`` id (the GPT-only invariant).
+        ValueError: if a catalog ``model_id`` is a ``claude-*`` id, or is absent from
+            :func:`known_layer2_model_ids`.
     """
-    known = _known_codex_ids()
+    known = known_layer2_model_ids()
     for harness, options in _CATALOG.items():
         for option in options:
             if option.model_id.startswith("claude-"):
                 raise ValueError(
                     f"Layer-2 catalog for {harness!r} names a Claude id "
-                    f"{option.model_id!r}; Layer-2 is GPT-only (ADR-B)"
+                    f"{option.model_id!r}; claude is never a Layer-2 worker id (ADR-B)"
                 )
             if option.model_id not in known:
                 raise ValueError(
                     f"Layer-2 catalog for {harness!r} names {option.model_id!r}, "
-                    "which is not a codex_id in model_registry.REGISTRY"
+                    "which is not in the allowlist (registry codex_ids | "
+                    "LAYER2_EXTRA_MODEL_IDS)"
                 )
 
 

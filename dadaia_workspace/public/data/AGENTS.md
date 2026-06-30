@@ -219,6 +219,16 @@ implementation → review → closure sequence — is executed by the **dadaia-w
 (the `dadaia lifecycle` verbs: `release define`, the implementation pipeline, `close`,
 …). Each is a Python workflow body that assembles fragment-scoped per-step prompts,
 selects dynamic context, calls worker agents, and advances **Python-validated gates**.
+Each model-driven worker step prompt is assembled from its **fragment**
+(`public/lifecycle_fragments/<workflow>/<step>.md` — the step-specific instruction:
+inputs, the exact task, output schema) **plus** its **persona**. A persona
+(`public/personas/<role>.md`) is the Layer-2 (codex/pi) equivalent of a Claude
+sub-agent: the role's behavioral mandate, injected into the step prompt alongside the
+fragment as an operative directive, resolved from the step's `role`. The persona roster
+is the **8 non-PM core roles** (`ai-engineer`, `code-reviewer`, `product-engineer`,
+`project-auditor`, `qa-engineer`, `security-reviewer`, `software-architect`,
+`software-engineer`); `project-manager` is the Layer-1 orchestrator, not a Layer-2
+persona, so it has no persona atom.
 Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
 **safety-gate-enforced** by the deterministic gate and git chokepoints described above
 (write-scope, lease, and phase) — there is no procedural check that a given workflow verb

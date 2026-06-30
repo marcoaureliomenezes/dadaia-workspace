@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.lifecycle.policy_doctor import (
     PolicyDoctorCode,
     Severity,
@@ -405,6 +407,36 @@ def test_overlay_harness_unknown_workflow_is_error(tmp_path: Path) -> None:
     findings = run_policy_doctor(workspace_root=workspace)
     msg = " ".join(f.message for f in findings if f.code is PolicyDoctorCode.WMP_OVERLAY)
     assert "ghost" in msg
+
+
+def test_persona_resolution_clean_tree_no_persona_findings(tmp_path: Path) -> None:
+    """WMP-PERSONA (AC-4): the shipped catalog produces zero persona-resolution findings."""
+    workspace = _workspace(tmp_path)
+    findings = run_policy_doctor(workspace_root=workspace)
+    persona = [f for f in findings if f.code is PolicyDoctorCode.WMP_PERSONA]
+    assert persona == [], [f.to_dict() for f in persona]
+
+
+def test_doctor_surfaces_persona_resolution_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A model-driven step whose role resolves to project-manager / no persona atom is
+    surfaced by the aggregated doctor as a WMP-PERSONA ERROR (AC-4 anti-regression)."""
+    from dadaia_workspace.features.lifecycle import persona_doctor
+
+    monkeypatch.setattr(
+        persona_doctor,
+        "model_driven_step_roles",
+        lambda: {"ghost.pm_step": "project-manager", "ghost.dangling": "no-such-persona"},
+    )
+    workspace = _workspace(tmp_path)
+    findings = run_policy_doctor(workspace_root=workspace)  # must not raise
+    persona = [f for f in findings if f.code is PolicyDoctorCode.WMP_PERSONA]
+    assert len(persona) == 2, [f.to_dict() for f in findings]
+    assert all(f.severity is Severity.ERROR for f in persona)
+    joined = " ".join(f.message for f in persona)
+    assert "project-manager" in joined
+    assert "no-such-persona" in joined
 
 
 def test_completed_catalog_with_closure_passes_all_wmp(tmp_path: Path) -> None:

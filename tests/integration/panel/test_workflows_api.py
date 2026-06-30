@@ -141,6 +141,7 @@ class TestDadaiaWorkflowDetailAdditive:
             "gpt-5.5:high",
             "gpt-5.5:low",
             "gpt-5.3-codex:medium",
+            "kimi-2.7:high",
         ]
         assert worker["model_options"]["codex"] == ["gpt-5.5:high", "gpt-5.5:medium"]
 

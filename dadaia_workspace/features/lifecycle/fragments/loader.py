@@ -24,13 +24,26 @@ fragments and are skipped by discovery and validation.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.features.lifecycle._frontmatter_doc import (
+    FrontmatterDocLoader,
+    forbidden_token_in,
+)
+
+__all__ = [
+    "Fragment",
+    "FragmentError",
+    "FragmentLoader",
+    "FragmentNotFoundError",
+    "FragmentValidationError",
+    "forbidden_token_in",
+    "list_fragments",
+    "load_fragment",
+    "validate_all",
+]
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -53,8 +66,10 @@ class FragmentValidationError(FragmentError):
 # Constants
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_DELIM = "---"
 _STUB_NAME = "_README.md"
+
+# Re-exported for back-compat: ``forbidden_token_in`` now lives in the shared
+# ``_frontmatter_doc`` base and is imported above.
 
 #: The 8 required frontmatter keys (SPEC WS-3 / epic §5), in declaration order.
 _REQUIRED_KEYS: tuple[str, ...] = (
@@ -73,27 +88,6 @@ _STR_KEYS = frozenset({"id", "role", "workflow", "step", "output_schema", "max_c
 
 #: Keys whose value must be a ``list`` of ``str``.
 _LIST_KEYS = frozenset({"static_inputs", "dynamic_inputs"})
-
-#: Case-insensitive harness-specific tokens forbidden in a universal fragment body.
-#: Each entry is a literal substring matched case-insensitively against the body.
-_FORBIDDEN_TOKENS: tuple[str, ...] = (
-    "read tool",
-    "write tool",
-    "edit tool",
-    "bash tool",
-    "codex exec",
-    "pi --mode",
-    "pi --model",
-    "claude code",
-    "claude-code",
-    ".claude/",
-    ".codex/",
-    ".opencode/",
-    "--output-last-message",
-    "message_end",
-    "apply_patch",
-    "--ignore-user-config",
-)
 
 
 @dataclass(frozen=True)
@@ -127,8 +121,15 @@ def _default_root() -> Path:
     return package_root / "public" / "lifecycle_fragments"
 
 
-class FragmentLoader:
+class FragmentLoader(FrontmatterDocLoader):
     """Load + validate fragments from the projected/packaged location."""
+
+    _NOUN = "fragment"
+    _NOUN_PLURAL = "fragments"
+    _ERROR = FragmentValidationError
+    _REQUIRED_KEYS = _REQUIRED_KEYS
+    _STR_KEYS = _STR_KEYS
+    _LIST_KEYS = _LIST_KEYS
 
     def __init__(self, root: Path | None = None) -> None:
         self._root = root if root is not None else _default_root()
@@ -208,73 +209,6 @@ class FragmentLoader:
             path=path,
         )
 
-    @staticmethod
-    def _split_frontmatter(text: str, path: Path) -> tuple[dict[str, object], str]:
-        lines = text.splitlines()
-        if not lines or lines[0].strip() != _FRONTMATTER_DELIM:
-            raise FragmentValidationError(
-                f"{path}: fragment is missing the opening YAML frontmatter delimiter '---'"
-            )
-        buffer: list[str] = []
-        body_start: int | None = None
-        for index, line in enumerate(lines[1:], start=1):
-            if line.strip() == _FRONTMATTER_DELIM:
-                body_start = index + 1
-                break
-            buffer.append(line)
-        if body_start is None:
-            raise FragmentValidationError(
-                f"{path}: fragment frontmatter is not closed by a second '---' line"
-            )
-        try:
-            parsed = yaml.safe_load("\n".join(buffer))
-        except yaml.YAMLError as exc:
-            raise FragmentValidationError(f"{path}: invalid YAML frontmatter: {exc}") from exc
-        if not isinstance(parsed, dict):
-            raise FragmentValidationError(
-                f"{path}: fragment frontmatter must be a YAML mapping, got {type(parsed).__name__}"
-            )
-        body = "\n".join(lines[body_start:]).strip()
-        return parsed, body
-
-    @staticmethod
-    def _validate_metadata(meta: dict[str, object], path: Path) -> None:
-        missing = [key for key in _REQUIRED_KEYS if key not in meta]
-        if missing:
-            raise FragmentValidationError(
-                f"{path}: fragment metadata is missing required key(s): {', '.join(missing)}"
-            )
-        for key in _STR_KEYS:
-            value = meta[key]
-            if not isinstance(value, str) or not value.strip():
-                raise FragmentValidationError(
-                    f"{path}: fragment metadata key '{key}' must be a non-empty string, "
-                    f"got {type(value).__name__}"
-                )
-        for key in _LIST_KEYS:
-            value = meta[key]
-            if not isinstance(value, list):
-                raise FragmentValidationError(
-                    f"{path}: fragment metadata key '{key}' must be a list, "
-                    f"got {type(value).__name__}"
-                )
-            for item in value:
-                if not isinstance(item, str):
-                    raise FragmentValidationError(
-                        f"{path}: fragment metadata key '{key}' must contain only strings, "
-                        f"found {type(item).__name__}"
-                    )
-
-    @staticmethod
-    def _lint_body(body: str, path: Path) -> None:
-        haystack = body.lower()
-        for token in _FORBIDDEN_TOKENS:
-            if token in haystack:
-                raise FragmentValidationError(
-                    f"{path}: fragment body contains harness-specific token '{token}' — "
-                    "fragments must read identically across PI, Codex, and Claude workers"
-                )
-
 
 # Module-level convenience: a default loader bound to the packaged fragment root.
 _DEFAULT_LOADER = FragmentLoader()
@@ -293,12 +227,3 @@ def list_fragments(workflow: str | None = None) -> list[Fragment]:
 def validate_all() -> list[Fragment]:
     """Validate every fragment under the default (packaged) fragment root."""
     return _DEFAULT_LOADER.validate_all()
-
-
-_HARNESS_TOKEN_RE = re.compile("|".join(re.escape(t) for t in _FORBIDDEN_TOKENS), re.IGNORECASE)
-
-
-def forbidden_token_in(text: str) -> str | None:
-    """Return the first forbidden harness-specific token found in *text*, else None."""
-    match = _HARNESS_TOKEN_RE.search(text)
-    return match.group(0) if match else None

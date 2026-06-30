@@ -1,6 +1,6 @@
 ---
 id: backlog_definition.conflict_resolution_grill
-role: project-manager
+role: product-engineer
 workflow: backlog_definition
 step: conflict_resolution_grill
 static_inputs: []

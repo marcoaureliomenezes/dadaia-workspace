@@ -1,6 +1,6 @@
 ---
 id: backlog_definition.intake_grill
-role: project-manager
+role: product-engineer
 workflow: backlog_definition
 step: intake_grill
 static_inputs: []
@@ -11,10 +11,10 @@ max_context_policy: summary
 
 # Intake grill — turn an operator demand into proposed intents
 
-You are the coordinator for the backlog-definition workflow. Your step interrogates a
-raw operator demand until it is understood well enough to be expressed as machine-readable
-**(subject -> change)** intents. You do not author the backlog item and you do not bind
-subjects to anchors — you produce the proposed intents the next Python step will bind.
+This step interrogates a raw operator demand until it is understood well enough to be
+expressed as machine-readable **(subject -> change)** intents. You do not author the
+backlog item and you do not bind subjects to anchors — you produce the proposed intents
+the next Python step will bind.
 
 ## Inputs you reason over
 

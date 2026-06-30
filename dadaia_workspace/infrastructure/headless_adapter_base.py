@@ -233,6 +233,17 @@ class ChangedPathsMixin:
         )
 
 
+#: Preamble that turns a persona mandate into an OPERATIVE DIRECTIVE (v0.1.44 / AC-2). The
+#: persona body is not an inert sibling key — this lead text explicitly directs the worker
+#: to ACT PER the mandate for the whole step, so a Layer-2 worker assumes the role behind
+#: its ``role:`` token instead of merely being told which role it is.
+_PERSONA_DIRECTIVE_PREAMBLE = (
+    "OPERATIVE DIRECTIVE — act per the following role mandate for the entire step. "
+    "It is binding: adopt this role's posture, decisions, and outputs as your own; do not "
+    "treat it as background reference.\n\n"
+)
+
+
 def build_prompt_envelope(request: AgentRunRequest) -> str:
     """Build the deterministic JSON prompt envelope handed to a headless worker.
 
@@ -240,22 +251,27 @@ def build_prompt_envelope(request: AgentRunRequest) -> str:
     ``allowed_paths``, ``forbidden_paths``, ``expected_schema``,
     ``required_evidence``. Emitted with ``indent=2, sort_keys=True`` so the
     on-the-wire payload is byte-stable (the prior per-adapter behaviour).
+
+    When ``request.persona`` is present, an additional ``persona`` field carries the
+    resolved mandate **wrapped in an operative directive** (:data:`_PERSONA_DIRECTIVE_PREAMBLE`)
+    instructing the worker to act per the mandate — not an inert sibling key. The key is
+    emitted **only when present** (R5): a persona-less request produces the exact byte
+    sequence it did before this field existed.
     """
-    return json.dumps(
-        {
-            "role": request.role,
-            "prompt": request.prompt,
-            "context": request.context,
-            "release_id": request.release_id,
-            "task_id": request.task_id,
-            "allowed_paths": list(request.allowed_paths),
-            "forbidden_paths": list(request.forbidden_paths),
-            "expected_schema": request.expected_schema,
-            "required_evidence": [kind.value for kind in request.required_evidence],
-        },
-        indent=2,
-        sort_keys=True,
-    )
+    payload: dict[str, object] = {
+        "role": request.role,
+        "prompt": request.prompt,
+        "context": request.context,
+        "release_id": request.release_id,
+        "task_id": request.task_id,
+        "allowed_paths": list(request.allowed_paths),
+        "forbidden_paths": list(request.forbidden_paths),
+        "expected_schema": request.expected_schema,
+        "required_evidence": [kind.value for kind in request.required_evidence],
+    }
+    if request.persona:
+        payload["persona"] = _PERSONA_DIRECTIVE_PREAMBLE + request.persona
+    return json.dumps(payload, indent=2, sort_keys=True)
 
 
 def filter_env(environ: Mapping[str, str], allowlist: tuple[str, ...]) -> dict[str, str]:

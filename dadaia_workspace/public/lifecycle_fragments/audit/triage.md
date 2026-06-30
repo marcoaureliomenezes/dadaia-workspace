@@ -1,6 +1,6 @@
 ---
 id: audit.triage
-role: project-manager
+role: project-auditor
 workflow: audit
 step: triage
 static_inputs: []

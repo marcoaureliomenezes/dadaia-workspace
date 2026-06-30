@@ -32,6 +32,7 @@ _COPY_DIRS = (
     "runtime",
     "workflows",
     "lifecycle_fragments",
+    "personas",
     "pi",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
