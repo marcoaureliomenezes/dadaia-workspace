@@ -34,6 +34,7 @@ from enum import StrEnum
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
     GateEvidenceKind,
@@ -86,6 +87,26 @@ __all__ = [
     "ProposedIntent",
     "_SEQUENCE",
 ]
+
+
+def _parse_downgrade_verdict(raw: str | None) -> Verdict | None:
+    """Map a model's verdict string to a *safe* downgrade ``Verdict`` (WS-3 wrapper).
+
+    Returns a :class:`Verdict` **only** for a parsed ``OVERLAP``/``SUPERSEDES`` (the compatible
+    -merge verdicts ``conflict_scan`` may emit). Anything else — ``DIVERGENT_CONFLICT``,
+    ``UNRELATED``, ``DUPLICATE``, ``DEPENDS_ON``, garbage, empty, or ``None`` — maps to ``None``
+    so the classifier keeps the fail-closed ``DIVERGENT_CONFLICT``. Deliberately stricter than
+    the classifier clamp (T-43-6b): the consult can never upgrade an UNRELATED or mask a
+    conflict, and the two guards are independent (defence-in-depth).
+    """
+    if not raw:
+        return None
+    normalized = raw.strip().lower()
+    if normalized == Verdict.OVERLAP.value:
+        return Verdict.OVERLAP
+    if normalized == Verdict.SUPERSEDES.value:
+        return Verdict.SUPERSEDES
+    return None
 
 
 class BacklogStepKind(StrEnum):
@@ -185,7 +206,15 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
     ),
     BacklogStep(label="subject_bind", role="python", kind=BacklogStepKind.SUBJECT_BIND),
     BacklogStep(
-        label="existing_backlog_review", role="python", kind=BacklogStepKind.EXISTING_REVIEW
+        label="existing_backlog_review",
+        role="python",
+        kind=BacklogStepKind.EXISTING_REVIEW,
+        # Python owns the conflict boundary; this fragment is consulted ONLY on the
+        # shared-anchor differing-change branch (via the `downgrade` seam) and may narrow
+        # DIVERGENT_CONFLICT -> OVERLAP/SUPERSEDES on proven-compatible evidence — never
+        # upgrade, never mask (T-43-6; classifier clamp T-43-6b is the boundary guard). The
+        # citation also makes `conflict_scan` a non-orphan fragment (WS-5 orphan check).
+        fragment_id="backlog_definition.conflict_scan",
     ),
     BacklogStep(label="reconcile_decision", role="python", kind=BacklogStepKind.RECONCILE),
     BacklogStep(
@@ -200,7 +229,9 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
         role="product-engineer",
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.backlog_authoring",
-        shared_fragment_ids=("shared.output_handoff",),
+        # T-43-3 anti_slop citation done here (this file is software-engineer's for T-43-6;
+        # wiring it inline avoids a write race with the release_definition.py T-43-3 work).
+        shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
     ),
     BacklogStep(label="backlog_review_gate", role="python", kind=BacklogStepKind.REVIEW_GATE),
 )
@@ -348,8 +379,86 @@ class BacklogDefinitionWorkflow:
                 resume_token=run.idempotency_key,
             )
             return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
-        overlap = classify(bound_new, demand.existing, downgrade=self._downgrade)
+        downgrade = self._resolve_downgrade(step, run.run_id)
+        overlap = classify(bound_new, demand.existing, downgrade=downgrade)
         return overlap, self._still_running(run, step.label), self._ok_sr(step)
+
+    # -- conflict_scan downgrade-only model consult (T-43-6, SPEC §3 WS-3) ---
+
+    def _resolve_downgrade(self, step: BacklogStep, run_id: str) -> Downgrade:
+        """Pick the ``downgrade`` seam ``classify`` consults on the differing-change branch.
+
+        Precedence, fail-closed by default:
+
+        * an explicitly injected ``downgrade`` (operator/test override) always wins;
+        * else, the default offline/``FAKE`` path keeps :func:`no_downgrade` — no model call,
+          a shared-anchor differing-change pair stays ``DIVERGENT_CONFLICT`` (existing
+          behavior, existing tests unchanged);
+        * else (a real model runtime is wired AND the step names ``conflict_scan``), return
+          the model-backed consult. ``classify`` calls it ONLY on the differing-change branch,
+          so the worker is consulted on exactly the shared-anchor differing-change pairs.
+        """
+        if self._downgrade is not no_downgrade:
+            return self._downgrade
+        if step.fragment_id is None or self._default_kind is AgentRuntimeKind.FAKE:
+            return no_downgrade
+        return self._conflict_scan_downgrade(step, run_id)
+
+    def _conflict_scan_downgrade(self, step: BacklogStep, run_id: str) -> Downgrade:
+        """Return a model-backed ``downgrade`` callable that consults ``conflict_scan``.
+
+        The returned callable runs the worker on the ``conflict_scan`` fragment for the one
+        differing shared anchor and maps **only** a parsed ``OVERLAP``/``SUPERSEDES`` verdict
+        to a :class:`Verdict`; anything else or unparseable -> ``None`` (the WS-3 wrapper).
+        Combined with the classifier clamp (T-43-6b) this is defence-in-depth: the consult can
+        narrow a conflict's name but can never upgrade an ``UNRELATED`` or mask a conflict.
+        """
+        assert step.fragment_id is not None
+        fragment = self._loader.load_fragment(step.fragment_id)
+        shared = tuple(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids)
+
+        def _downgrade(new_change: str, existing_change: str) -> Verdict | None:
+            result = self._run_consult_worker(
+                step, fragment, shared, run_id, new_change, existing_change
+            )
+            return _parse_downgrade_verdict(result.structured_output.get("verdict"))
+
+        return _downgrade
+
+    def _run_consult_worker(
+        self,
+        step: BacklogStep,
+        fragment: Fragment,
+        shared: tuple[Fragment, ...],
+        run_id: str,
+        new_change: str,
+        existing_change: str,
+    ) -> AgentRunResult:
+        """Build the ``conflict_scan`` prompt for one differing pair and run the worker once.
+
+        Reuses the same context-selection + suffix + prompt-builder machinery as
+        :meth:`_run_model_step`; it calls the runtime port directly (not the gate runner)
+        because a downgrade adjudication extracts a content verdict, not an APPROVED/REJECTED
+        gate decision — there is no artifact to gate on.
+        """
+        audit = self._select_context(step, fragment)
+        pair_context = (
+            f"### conflict_pair\n- new change: {new_change}\n- existing change: {existing_change}"
+        )
+        rendered = self._render_selection(audit)
+        selected = f"{rendered}\n\n{pair_context}" if rendered else pair_context
+        suffix = build_fragment_suffix(
+            self._fragment_bundle(step, fragment, shared),
+            selected_context=selected,
+            is_review=False,
+        )
+        kind = step.runtime_kind or self._default_kind
+        runtime = self._runtime_factory(kind)
+        scope = self._scope(step, run_id, suffix)
+        built = self._prompt_builder.build(
+            scope, runtime=runtime.runtime_kind(), prefix=self._prefix
+        )
+        return runtime.run(built.request)
 
     # -- Python step 3: reconcile_decision ------------------------------
 

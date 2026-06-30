@@ -105,8 +105,11 @@ class JsonLifecycleRunStore:
     def _reject_repo_tree_root(self) -> None:
         if self._is_initialized_workspace_root(self._workspace_root):
             return
+        temp_root = Path(tempfile.gettempdir()).resolve()
         has_workspace_marker = False
         for path in (self._workspace_root, *self._workspace_root.parents):
+            if path == temp_root:
+                break
             if path.joinpath(".git").exists():
                 raise LifecycleRunStoreError(
                     "refusing to create lifecycle state inside a repository tree",

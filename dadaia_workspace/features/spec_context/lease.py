@@ -553,7 +553,14 @@ def acquire(
                 return "RENEWED", rec
 
             # --- Foreign / absent: stale ⇒ takeover, live (TTL or pid-veto) ⇒ yield ---
-            if rec is None or is_stale(rec, clock=clock, pid_probe=pid_probe):
+            # ``active_release=release`` (T-43-10): the release this session is acquiring FOR is
+            # the context's live ACTIVE release. A foreign lease pinned to a *different*
+            # (closed/archived) release is reclaimable despite a live holder pid, so an archived
+            # -release lease can no longer deadlock the next release. A foreign lease on the SAME
+            # release keeps the pid-veto (a genuinely-active holder is never stolen).
+            if rec is None or is_stale(
+                rec, clock=clock, pid_probe=pid_probe, active_release=release
+            ):
                 # A takeover transfers holder identity: drop the stale holder's index
                 # entry for this ctx, then claim it for the new session — same CAS.
                 stale_holder = str(rec.get("session_id", "")) if rec else ""
@@ -729,6 +736,7 @@ def steal(
     permission_setter: FilePermissionSetter | None = None,
     pid_probe: PidProbe | None = None,
     pid: int | None = None,
+    active_release: str | None = None,
 ) -> tuple[bool, dict[str, object] | None]:
     """Reclaim a *stale* lease for ``session_id`` via the same O_EXCL CAS as acquire.
 
@@ -736,12 +744,20 @@ def steal(
     TTL-expired-but-pid-alive holder when ``pid_probe`` is wired (WS-R2 FR-R2-03: no
     stealing a genuinely-running session). Returns ``(True, new_record)`` on success.
     The CAS prevents a double-steal race.
+
+    ``active_release`` (T-43-10): the context's live ACTIVE release. When provided, a lease
+    pinned to a *different* (closed/archived) release is reclaimable despite a live holder pid
+    — ``lock steal`` can break an archived-release deadlock. A lease on the live ACTIVE release
+    keeps the pid-veto (no false steal of a genuinely-active session). ``None`` ⇒ legacy
+    release-agnostic behavior.
     """
     _validate(ctx, field="context")
     _validate(session_id, field="session_id")
     holder_pid = os.getpid() if pid is None else pid
     rec = read_record(workspace, ctx)
-    if rec is not None and not is_stale(rec, clock=clock, pid_probe=pid_probe):
+    if rec is not None and not is_stale(
+        rec, clock=clock, pid_probe=pid_probe, active_release=active_release
+    ):
         return False, rec
 
     sentinel = _sentinel_path(workspace, ctx, permission_setter)
@@ -760,7 +776,9 @@ def steal(
             continue
         try:
             rec2 = read_record(workspace, ctx)
-            if rec2 is not None and not is_stale(rec2, clock=clock, pid_probe=pid_probe):
+            if rec2 is not None and not is_stale(
+                rec2, clock=clock, pid_probe=pid_probe, active_release=active_release
+            ):
                 return False, rec2  # became live during the race
             release_id = str(rec2.get("release", "")) if rec2 else ""
             mode = str(rec2.get("mode", "")) if rec2 else ""

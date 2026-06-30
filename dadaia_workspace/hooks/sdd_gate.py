@@ -133,6 +133,7 @@ def _resolve_mode(
     session_id: str,
     ctx: str = "",
     pid_probe: lease.PidProbe | None = None,
+    active_release: str | None = None,
 ) -> str:
     """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04 + NF-2 fix). First hit wins:
 
@@ -178,14 +179,20 @@ def _resolve_mode(
         if (
             incumbent_sid
             and incumbent_mode
-            and not _incumbent_is_stale(workspace, ctx, str(incumbent_sid), pid_probe)
+            and not _incumbent_is_stale(
+                workspace, ctx, str(incumbent_sid), pid_probe, active_release
+            )
         ):
             return str(incumbent_mode)
     return _DEFAULT_MODE
 
 
 def _incumbent_is_stale(
-    workspace: Path, ctx: str, incumbent_sid: str, pid_probe: lease.PidProbe | None
+    workspace: Path,
+    ctx: str,
+    incumbent_sid: str,
+    pid_probe: lease.PidProbe | None,
+    active_release: str | None = None,
 ) -> bool:
     """True if a **live** lease record names a session OTHER than the incumbent pointer.
 
@@ -208,8 +215,10 @@ def _incumbent_is_stale(
     if not holder_sid or str(holder_sid) == incumbent_sid:
         return False
     # A divergent holder defeats the incumbent only when it is genuinely LIVE (TTL-fresh, or
-    # TTL-stale but its pid is still alive). A dead/TTL-stale leftover does not.
-    return not lock_liveness.is_stale(holder, pid_probe=pid_probe)
+    # TTL-stale but its pid is still alive). A dead/TTL-stale leftover does not. ``active_release``
+    # (T-43-10): a holder pinned to a closed/archived release is semantically dead and never
+    # defeats the incumbent, regardless of its pid liveness.
+    return not lock_liveness.is_stale(holder, pid_probe=pid_probe, active_release=active_release)
 
 
 def _active_field(specs_dir: Path, field: str) -> str:
@@ -271,7 +280,11 @@ def _evaluate_target(
     # record → context-incumbent record → default. Passing ``ctx`` enables the incumbent
     # fallback so a default `dadaia context bind --mode read` (which mints a sid the harness
     # never reports) still binds the CONTEXT and is honored without any env var.
-    mode = _resolve_mode(workspace, session_id, ctx, pid_probe)
+    # ``active_release`` (T-43-10): a lease pinned to a non-ACTIVE (closed/archived) release is
+    # treated as reclaimable in the liveness verdict. ``release`` here is ACTIVE.md's release
+    # (``"none"`` when archived), so any release-pinned stale holder on a different release is
+    # no longer a live incumbent that downgrades this session's mode.
+    mode = _resolve_mode(workspace, session_id, ctx, pid_probe, active_release=release)
 
     # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
     # NOTE: a READ-bound session that *does* resolve a context is still blocked below by

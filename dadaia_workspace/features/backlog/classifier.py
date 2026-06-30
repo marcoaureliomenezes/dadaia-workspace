@@ -81,6 +81,17 @@ def no_downgrade(_new_change: str, _existing_change: str) -> Verdict | None:
     return None
 
 
+#: The ONLY verdicts a ``downgrade`` callable may use to narrow a fail-closed
+#: ``DIVERGENT_CONFLICT``. The clamp accepts a downgrade verdict only if it is in this set;
+#: any other value (``UNRELATED``, ``DUPLICATE``, ``DIVERGENT_CONFLICT`` itself, garbage, or
+#: ``None``) keeps the pair ``DIVERGENT_CONFLICT``. This is the boundary guard that prevents a
+#: wired-in model from *masking* a real conflict — the model can narrow the conflict's name
+#: but can never erase it (SPEC §3 WS-3 boundary clamp; CRITICAL fail-open fix).
+_ALLOWED_DOWNGRADE_VERDICTS: frozenset[Verdict] = frozenset(
+    {Verdict.OVERLAP, Verdict.SUPERSEDES, Verdict.DEPENDS_ON}
+)
+
+
 def _classify_pair(
     new: BoundItem,
     existing: BoundItem,
@@ -102,10 +113,13 @@ def _classify_pair(
         )
 
     # (3) At least one shared anchor differs → fail-closed DIVERGENT_CONFLICT by default.
-    # The model downgrade seam may override ONLY this branch, and only with an explicit verdict.
+    # The model downgrade seam may override ONLY this branch, and only with a verdict in the
+    # clamp set {OVERLAP, SUPERSEDES, DEPENDS_ON}. Any other value the callable returns
+    # (UNRELATED, DUPLICATE, DIVERGENT_CONFLICT, garbage, or None) is rejected here and the
+    # pair stays DIVERGENT_CONFLICT — a model can narrow the conflict's name, never erase it.
     first = differing[0]
     downgraded = downgrade(new.anchor_changes[first], existing.anchor_changes[first])
-    if downgraded is not None and downgraded is not Verdict.DIVERGENT_CONFLICT:
+    if downgraded in _ALLOWED_DOWNGRADE_VERDICTS:
         return Classification(
             other_slug=existing.slug, verdict=downgraded, shared_anchors=tuple(shared)
         )

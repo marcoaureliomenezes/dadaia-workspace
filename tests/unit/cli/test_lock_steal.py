@@ -45,6 +45,16 @@ def _seed_stale_record(ws: Path, *, pid: int | None) -> None:
     if pid is not None:
         rec["pid"] = pid
     lease._record_path(ws, CTX).write_text(json.dumps(rec), encoding="utf-8")
+    # T-43-10: `lock steal` is release-aware — a lease pinned to a release that is NOT the
+    # context's ACTIVE release is reclaimable regardless of holder-pid liveness. These tests
+    # isolate the *holder-liveness* (pid-veto / TTL) behavior, so the lease must be the
+    # ACTIVE-release lease; otherwise it is an orphaned/archived lease that always reclaims
+    # (that release-awareness path is covered by tests/unit/core/test_lock_liveness_release_aware.py).
+    active = ws / "specs" / "releases"
+    active.mkdir(parents=True, exist_ok=True)
+    (active / "ACTIVE.md").write_text(
+        "release: v0.1.11\nsegment: alpha-1\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
 
 
 def _patch_workspace_and_probe(monkeypatch: pytest.MonkeyPatch, ws: Path, *, alive: bool) -> None:
