@@ -91,7 +91,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-3 — classifier clamp + conflict_scan downgrade-only model consult
 
-- [-] **T-43-6b — Clamp `_classify_pair` to accept only safe downgrade verdicts (CRITICAL).**
+- [x] **T-43-6b — Clamp `_classify_pair` to accept only safe downgrade verdicts (CRITICAL).**
   Owner: software-engineer.
   Write set: `dadaia_workspace/features/backlog/classifier.py` (`_classify_pair`, ~:107-111);
   `tests/...` (classifier clamp test).
