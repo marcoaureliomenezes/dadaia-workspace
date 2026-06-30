@@ -162,7 +162,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-5 — Regression guardrail
 
-- [ ] **T-43-8 — Add the no-generic-prompt + no-orphan + per-step shared-fragment guardrail.**
+- [x] **T-43-8 — Add the no-generic-prompt + no-orphan + per-step shared-fragment guardrail.**
   Owner: software-engineer (test) — ai-engineer if implemented as a doctor check.
   Write set: `tests/...` (new test module) and/or a `specs doctor`/`public doctor` AI-surface
   check in `dadaia_workspace/`.
@@ -181,7 +181,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-6 — Fix the archived-release lease pid-veto deadlock (HIGH bug)
 
-- [-] **T-43-10 — Make lease reclaim release-aware (fix `lease-pid-veto-ignores-archived-release`).**
+- [x] **T-43-10 — Make lease reclaim release-aware (fix `lease-pid-veto-ignores-archived-release`).**
   Owner: software-engineer.
   Write set: `dadaia_workspace/core/lock_liveness.py` (liveness verdict);
   `dadaia_workspace/hooks/sdd_gate.py` (lease check consuming the verdict); the `dadaia lock

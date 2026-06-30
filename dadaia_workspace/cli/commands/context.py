@@ -446,6 +446,10 @@ def bind(
                 and not lock_liveness.is_stale(
                     live_holder,
                     pid_probe=container._build_pid_probe(),
+                    # T-43-10: a holder pinned to a non-ACTIVE (closed/archived) release is
+                    # semantically dead and must not count as a live incumbent during a bind to
+                    # the new ``release``; it is reclaimable regardless of its pid liveness.
+                    active_release=release,
                 )
             )
             holder_is_caller_owned = holder_is_live and _holder_pid_is_caller_owned(
