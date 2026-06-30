@@ -13,9 +13,9 @@ max_context_policy: exact-files-only
 
 You implement exactly the `task_group` reserved for this step, against the
 `spec_criteria` it must satisfy and the `plan_slice` that governs how. You write the
-behavior and the test that proves it — nothing wider. The write-scope and anti-slop
-disciplines and the output-handoff contract apply as referenced fragments; this step
-adds the test-first procedure on top of them.
+behavior and the test that proves it — nothing wider. The cited write-scope, anti-slop,
+and output-handoff fragments carry the disciplines this step builds the test-first
+procedure on top of.
 
 ## Inputs you reason over
 
@@ -29,28 +29,24 @@ adds the test-first procedure on top of them.
 ## The test-first loop
 
 1. **Write the test first, where feasible.** Add a targeted, initially-failing test
-   that pins the behavior from `spec_criteria`. Run it and confirm it fails for the
-   right reason — a test that passes before the code exists proves nothing. Where a
-   true failing-first test is impractical (e.g. a pure config or wiring change), state
-   why in the result and substitute the tightest verification available.
+   that pins the behavior from `spec_criteria`, and confirm it fails for the right
+   reason — a test that passes before the code exists proves nothing. Where a true
+   failing-first test is impractical (e.g. a pure config or wiring change), state why in
+   the result and substitute the tightest verification available.
 2. **Write the minimal code to pass.** Add only enough production code to turn the
-   failing test green. No speculative abstraction, no feature the criteria did not ask
+   failing test green — no speculative abstraction, no feature the criteria did not ask
    for.
-3. **Run the tests and record the commands.** Execute the relevant test (and the
-   surrounding suite the change can affect) and capture the exact commands and their
-   results as evidence — claims without recorded commands do not count.
+3. **Run the tests and record the commands.** Execute the relevant test plus the
+   surrounding suite the change can affect, and capture the exact commands and results
+   as evidence — claims without recorded commands do not count.
 4. **Repeat per criterion** until every acceptance criterion in `spec_criteria` for
    this `task_group` has a passing test.
 
 ## Discipline
 
-- Stay strictly inside the declared write set. If passing the criteria genuinely needs
-  a path outside it, stop and report the write set is too narrow — do not widen it by
-  editing out of scope.
-- No unrelated refactor, rename, or reformat — even inside the write set. The diff must
-  contain only the change this task asks for.
-- The task marker stays `[-]` (reserved). Never flip it to `[x]` on the strength of
-  your own run; done is a downstream gate decision made from review evidence.
+- Keep the diff minimal and single-purpose — no unrelated refactor, rename, or reformat.
+  The write-set boundary and the task-marker discipline are the cited `shared.write_scope`
+  fragment's canonical contract; follow it, do not restate it.
 
 ## Output
 

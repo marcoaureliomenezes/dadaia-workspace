@@ -122,7 +122,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-4 — Rewrites / token-economy trims
 
-- [ ] **T-43-7a — (Conditional) drop double-injected `static_inputs` from 4 release-def fragments.**
+- [x] **T-43-7a — (Conditional) drop double-injected `static_inputs` from 4 release-def fragments.**
   Owner: ai-engineer.
   Write set: `public/lifecycle_fragments/release_definition/{spec-create,plan-create,
   spec-review-architecture,plan-review}.md`.
@@ -133,8 +133,18 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   Done: only confirmed-duplicate `static_inputs` removed and replaced by a cite-by-name in the
   body; any non-duplicated input — and any case where the production base prefix is `None` —
   preserved (AC-7); fragments still load with 8 keys.
+  **Resolution (KEPT — double-injection NOT confirmed):** the production CLI path
+  (`cli/commands/lifecycle.py::release_define`, ~:594) calls
+  `build_release_definition_workflow` with **no** `prefix` argument, so the base
+  `PromptPrefix` defaults to `None` (`container.py:984`). In `ReleaseDefinitionWorkflow.run`
+  the prefix is built by `_prefix_with_static_inputs` (`release_definition.py:798`) starting
+  from that `None` base, so the fragments' `static_inputs` (`constitution.md`,
+  `architecture.md`) are the **sole deterministic carrier** of that content — there is no
+  base prefix already carrying them, hence no double-injection. Dropping them would remove
+  constitution/architecture from the prompt entirely. Per AC-7 the inputs are **preserved
+  unchanged**; no fragment edited.
 
-- [ ] **T-43-7b — Trim `implementation.implement_tdd` (~440 → ~370 words).**
+- [x] **T-43-7b — Trim `implementation.implement_tdd` (~440 → ~370 words).**
   Owner: ai-engineer.
   Write set: `public/lifecycle_fragments/implementation/implement-tdd.md`.
   Preconditions: none.
@@ -142,7 +152,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   word count ~370; still passes lint.
   Parallel: with T-43-7c.
 
-- [ ] **T-43-7c — De-dup the schema-id sentence in `shared.output_handoff`.**
+- [x] **T-43-7c — De-dup the schema-id sentence in `shared.output_handoff`.**
   Owner: ai-engineer.
   Write set: `public/lifecycle_fragments/shared/output-handoff.md`.
   Preconditions: none.

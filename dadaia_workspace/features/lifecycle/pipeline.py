@@ -529,7 +529,9 @@ def implementation_ladder(
             model_profile=effort,
             is_review=True,
             # WS-6: the QA review step is the second fragment-driven pipeline step.
+            # WS-2b (v0.1.43): cite the shared output-handoff verdict contract.
             fragment_id="implementation.qa_review",
+            shared_fragment_ids=("shared.output_handoff",),
         ),
         PipelineStep(
             label="review_security",
@@ -539,6 +541,11 @@ def implementation_ladder(
             runtime_kind=default_kind,
             model_profile=effort,
             is_review=True,
+            # WS-1a: the security review step runs on the fragment library — an OWASP-style
+            # rubric over the change diff. This step mechanically gates every push, so it
+            # must never fall back to the generic placeholder.
+            fragment_id="implementation.security_review",
+            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
         ),
         PipelineStep(
             label="review_code",
@@ -548,6 +555,10 @@ def implementation_ladder(
             runtime_kind=default_kind,
             model_profile=effort,
             is_review=True,
+            # WS-1b: the code review step runs on the fragment library — a correctness /
+            # code-quality rubric over the change diff.
+            fragment_id="implementation.code_review",
+            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
         ),
     )
 
