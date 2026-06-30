@@ -38,6 +38,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     SubprocessAdapterMixin,
     _GitDiffPort,
     normalize_artifact_refs,
+    workspace_state_root,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -338,7 +339,8 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         *,
         started_at: float,
     ) -> tuple[str, dict[str, object]] | None:
-        handoff_dir = self._config.cwd / ".dadaia" / "handoff" / request.context
+        workspace = workspace_state_root(self._config.cwd)
+        handoff_dir = workspace / ".dadaia" / "handoff" / request.context
         if not handoff_dir.is_dir():
             return None
         matches: list[tuple[float, str, dict[str, object]]] = []
@@ -362,7 +364,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             if payload.get("release_id") != request.release_id:
                 continue
             try:
-                rel = path.resolve().relative_to(self._config.cwd.resolve()).as_posix()
+                rel = path.resolve().relative_to(workspace.resolve()).as_posix()
             except ValueError:
                 continue
             matches.append((stat.st_mtime, rel, payload))

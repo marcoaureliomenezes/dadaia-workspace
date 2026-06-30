@@ -81,3 +81,21 @@ def test_doctor_clears_coherent_lease_session_created_by_production_writers(
 
     issues = _doctor(workspace).check()
     assert [i.to_dict() for i in issues if i.code == "SPEC-DOC-029"] == []
+
+
+def test_doctor_clears_harness_uuid_lock_with_cli_session_bind(
+    workspace: Path,
+) -> None:
+    """Harness UUID lock holder + CLI sess_* incumbent for same context is not forgery."""
+    harness_sid = "f4f75564-4c92-4ad0-9ce3-93d0411db60c"
+    cli_sid = "sess_0bac2bc0"
+    lease.acquire(workspace, _CTX, harness_sid, "rel-1", "implementation")
+    session_identity.set_incumbent(workspace, _CTX, cli_sid)
+    session_identity.write_session(
+        workspace,
+        cli_sid,
+        {"session_id": cli_sid, "context": _CTX, "mode": "BOUND_IMPLEMENTATION"},
+    )
+
+    issues = _doctor(workspace).check()
+    assert [i.to_dict() for i in issues if i.code == "SPEC-DOC-029"] == []

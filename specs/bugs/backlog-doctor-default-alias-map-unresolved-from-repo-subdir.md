@@ -1,6 +1,6 @@
 ---
 name: backlog-doctor-default-alias-map-unresolved-from-repo-subdir
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-26
 surface: dadaia backlog doctor (CLI default --alias-map resolution) / features/backlog
@@ -60,3 +60,28 @@ landed with this false error present). The damage is a misleading standalone
 fix: make `_resolve_backlog_roots` walk up to the workspace root (the dir that
 contains `.dadaia/`) for the default alias-map, mirroring how the pre-commit
 chokepoint resolves it.
+
+## Resolution
+
+Fixed in v0.1.40 alpha-1 T7.
+
+Root cause: default alias-map resolution accepted the first ancestor containing any
+`.dadaia/` directory. A repo-local or partial `.dadaia/` could therefore shadow the
+true workspace root and make `backlog doctor` ignore the operator alias map that exists
+at `<workspace>/.dadaia/states/backlog_subject_aliases.txt`.
+
+Fix:
+
+- `cli.commands.newartifacts._default_alias_map_path()` now resolves through
+  `core.workspace_resolver.resolve_workspace_root()`, which requires the initialized
+  workspace sentinel and skips partial repo-local `.dadaia` directories.
+- `features.lifecycle.context_selector.ContextSelector._alias_map_path()` now uses the
+  same initialized workspace resolver, preventing release/backlog workflow prompt
+  selection from seeing a different alias map than `backlog doctor`.
+
+Evidence:
+
+- Added `test_default_backlog_alias_map_resolves_workspace_root_from_repo_specs`.
+- `dadaia backlog doctor --specs-dir specs` from `repos/dadaia-workspace/` now reports
+  `backlog doctor: clean.` without an explicit `--alias-map`.
+- Focused 66-test validation run passed.

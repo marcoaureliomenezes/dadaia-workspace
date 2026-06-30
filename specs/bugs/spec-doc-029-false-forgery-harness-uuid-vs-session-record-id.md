@@ -1,6 +1,6 @@
 ---
 name: spec-doc-029-false-forgery-harness-uuid-vs-session-record-id
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-13
 session_id: f4f75564-4c92-4ad0-9ce3-93d0411db60c

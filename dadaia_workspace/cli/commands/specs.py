@@ -50,20 +50,25 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return _shared_resolve_specs_dir(specs_dir)
 
 
-def _resolve_workspace_state_dir() -> Path | None:
+def _resolve_workspace_state_dir(specs_dir: Path) -> Path | None:
     """Best-effort resolution of the workspace ``.dadaia/`` directory.
 
     Returns the workspace-root ``.dadaia/`` (holding ``states/ctx_locks/`` +
     ``sessions/``) so the doctor's SPEC-DOC-029 lease↔session coherence backstop can run.
-    Returns ``None`` when no workspace root resolves from the cwd (the backstop then stays
-    the documented no-op).
+    Returns ``None`` when no workspace root resolves from the cwd, or when an explicit
+    specs tree is outside that workspace (the backstop then stays the documented no-op).
     """
     from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 
     try:
-        return resolve_workspace_root() / ".dadaia"
+        workspace_root = resolve_workspace_root()
     except WorkspaceNotInitializedError:
         return None
+    try:
+        specs_dir.resolve().relative_to(workspace_root)
+    except ValueError:
+        return None
+    return workspace_root / ".dadaia"
 
 
 def _build_pid_probe() -> lease.PidProbe | None:
@@ -140,7 +145,7 @@ def doctor(
     # actually runs from the CLI (lease/session stores live at the WORKSPACE root, outside
     # the specs tree). Best-effort: if no workspace root resolves (e.g. a bare --specs-dir
     # in CI), the backstop stays a documented no-op.
-    workspace_state_dir = _resolve_workspace_state_dir()
+    workspace_state_dir = _resolve_workspace_state_dir(target)
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,

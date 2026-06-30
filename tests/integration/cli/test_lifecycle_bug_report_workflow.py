@@ -69,3 +69,7 @@ def test_bug_report_workflow_is_runnable_from_lifecycle_cli(tmp_path: Path, monk
     assert "A runnable bug-report workflow command exists." in content
     assert "Only the policy/catalog entry existed." in content
     assert "Fake bug-report workflow record" not in content
+    assert "session_id: null" in content
+
+    doctor = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(workspace / "specs")])
+    assert "TREE-7" not in doctor.output

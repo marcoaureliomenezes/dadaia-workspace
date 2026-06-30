@@ -46,6 +46,25 @@ _SECRET_NAME_PARTS = ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 _FENCED_JSON = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
 
 
+def workspace_state_root(cwd: Path) -> Path:
+    """Return the workspace root that owns runtime `.dadaia/` state for *cwd*.
+
+    Headless workers often run with ``cwd`` inside ``repos/<slug>``. Runtime artifacts
+    such as handoffs must still land in the containing workspace root, never in a
+    repo-local ``.dadaia``. Accept only a real workspace marker
+    (``.dadaia/states/spec_contexts.json``) or the older initialized-shape
+    ``.dadaia`` + ``repos`` pair; otherwise fall back to ``cwd`` for hermetic tests.
+    """
+    current = cwd.resolve()
+    for candidate in (current, *current.parents):
+        dadaia = candidate / ".dadaia"
+        if not dadaia.is_dir():
+            continue
+        if (dadaia / "states" / "spec_contexts.json").is_file() or (candidate / "repos").is_dir():
+            return candidate
+    return current
+
+
 class ResultMatch(enum.Enum):
     """Which acceptance path classified a parsed dict as the step's result object.
 

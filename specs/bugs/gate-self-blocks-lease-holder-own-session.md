@@ -1,6 +1,6 @@
 ---
 name: gate-self-blocks-lease-holder-own-session
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-26
 surface: hooks.pre_gate (SDD gate) — lease holder identity resolution
@@ -33,3 +33,22 @@ stale then manually refreshed — gate still yielded. A Bash-tool PostToolUse di
 refresh the heartbeat (renewal appears not to fire for this session). Workaround used:
 perform the remaining file edits through the `Bash` tool (not classified by the
 PreToolUse gate), no commit. Paths/ids redacted.
+
+## Resolution
+
+Closed in v0.1.40 alpha-1 T7.
+
+Root cause review: this was the same lease-identity class as the previously solved
+stable-incumbent/holder-safe renew bugs. Current production code already had the
+correct branches in `features/spec_context/lease.acquire`: a matching incumbent `.ptr`
+renews unconditionally, and a lock record whose `session_id` equals the acting
+session renews before any staleness/foreign-holder branch. The remaining gap was that
+the open bug record had no regression pinned at the SDD gate policy boundary.
+
+Fix/evidence:
+
+- Added `test_same_session_mutating_write_renews_stale_own_lease` in
+  `tests/integration/gate/test_classifier_reroot_matrix.py`.
+- The test exercises `gate_policy.evaluate` with a stale same-session lock and a live
+  pid probe; it returns ALLOW, keeps the holder unchanged, and updates heartbeat.
+- Focused gate suite passed in the 66-test validation run.

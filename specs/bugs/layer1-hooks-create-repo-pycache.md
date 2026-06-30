@@ -1,6 +1,6 @@
 ---
 name: layer1-hooks-create-repo-pycache
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-29
 surface: Layer-1 hooks / dadaia CLI execution environment

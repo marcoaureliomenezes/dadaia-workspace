@@ -197,7 +197,9 @@ def _validate_coherence(events: list[dict[str, object]], event: dict[str, object
     if event["event"] == "reported":
         return
     bug_id = event["bug_id"]
-    if not any(existing["bug_id"] == bug_id and existing["event"] == "reported" for existing in events):
+    if not any(
+        existing["bug_id"] == bug_id and existing["event"] == "reported" for existing in events
+    ):
         raise ValueError(f"{event['event']} event for {bug_id} requires a prior reported event")
 
 

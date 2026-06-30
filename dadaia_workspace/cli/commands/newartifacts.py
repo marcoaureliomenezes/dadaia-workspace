@@ -15,8 +15,10 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
     bug_new,
@@ -43,11 +45,13 @@ def _resolve_backlog_roots(
 
 
 def _default_alias_map_path(specs_dir: Path) -> Path:
-    """Walk up from ``specs_dir`` to the workspace root and target the alias-map file."""
-    here = specs_dir.resolve()
-    for parent in (here, *here.parents):
-        if (parent / ".dadaia").is_dir():
-            return parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+    """Walk up from ``specs_dir`` to the initialized workspace root alias map."""
+    try:
+        workspace_root = resolve_workspace_root(specs_dir)
+    except WorkspaceNotInitializedError:
+        workspace_root = None
+    if workspace_root is not None:
+        return workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt"
     # No workspace found above specs_dir: fall back to a sibling of specs_dir (still injected).
     return specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
 
@@ -210,6 +214,7 @@ def backlog_subjects_cmd(
     binds to a canonical anchor (or UNRESOLVED/AMBIGUOUS + an alias-map suggestion) and exits
     non-zero on a HALT, so the backfill author sees real anchors before authoring intents.
     """
+    from dadaia_workspace.cli.main import app as cli_app
     from dadaia_workspace.features.backlog.preview import list_anchors, resolve_one
     from dadaia_workspace.features.backlog.subject_registry import BindStatus, build_registry
 
@@ -225,6 +230,7 @@ def backlog_subjects_cmd(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=target,
+        cli_app=cli_app,
     )
 
     if resolve is not None:
@@ -272,6 +278,7 @@ def backlog_doctor_cmd(
     rejects a hand-written divergent twin even though ``specs/backlog/`` is gitignored +
     ADDITIVE. ``--explain`` additionally prints how each item's subjects resolved.
     """
+    from dadaia_workspace.cli.main import app as cli_app
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
 
     target = _resolve_specs_dir(specs_dir)
@@ -291,6 +298,7 @@ def backlog_doctor_cmd(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         archive_root=archive_root,
+        cli_app=cli_app,
     )
 
     errors = [f for f in findings if f.severity is Severity.ERROR]
@@ -309,6 +317,7 @@ def backlog_doctor_cmd(
 
 def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
     """Print how each backlog item's subjects bind to canonical anchors (read-only)."""
+    from dadaia_workspace.cli.main import app as cli_app
     from dadaia_workspace.features.backlog.preview import (
         bound_anchor_changes,
         load_backlog_items,
@@ -320,6 +329,7 @@ def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_p
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=specs_dir,
+        cli_app=cli_app,
     )
     for item in load_backlog_items(specs_dir / "backlog"):
         anchor_changes, unresolved = bound_anchor_changes(item, registry)

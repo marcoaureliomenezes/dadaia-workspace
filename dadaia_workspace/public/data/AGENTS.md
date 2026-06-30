@@ -272,10 +272,10 @@ next handoff target is human, under:
 .dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
 ```
 
-Validate it:
+Validate the matching handoff JSON:
 
 ```bash
-dadaia reports validate <path>
+dadaia reports validate <handoff-json-path>
 ```
 
 `dadaia panel` reads context state, reports, handoffs, servers, workflows, and
@@ -302,6 +302,6 @@ dadaia context show --json
 dadaia specs doctor
 dadaia public doctor
 dadaia server list
-dadaia reports validate <path>
+dadaia reports validate <handoff-json-path>
 dadaia panel
 ```

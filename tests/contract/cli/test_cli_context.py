@@ -687,3 +687,73 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
         "upstream tracking must be set after git push -u; "
         f"got stderr: {has_upstream.stderr.strip()!r}"
     )
+
+
+def test_push_uses_explicit_upstream_ref_when_branch_names_differ(tmp_path: Path) -> None:
+    """Regression: local branch `feature` tracking `origin/development` must push."""
+    bare = tmp_path / "bare.git"
+    bare.mkdir()
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+
+    local = tmp_path / "local"
+    local.mkdir()
+    subprocess.run(["git", "init", str(local)], capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(["git", "checkout", "-b", "feature"], cwd=local, capture_output=True, check=True)
+    (local / "README.md").write_text("one", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=local, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "one"], cwd=local, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare)],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "-u", "origin", "HEAD:development"],
+        cwd=local,
+        capture_output=True,
+        check=True,
+    )
+
+    upstream = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        cwd=local,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert upstream.stdout.strip() == "origin/development"
+    assert subprocess.run(["git", "push"], cwd=local, capture_output=True).returncode != 0
+
+    (local / "README.md").write_text("two", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=local, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "two"], cwd=local, capture_output=True, check=True)
+    pushed_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=local,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    GitSubprocessClient().push(local)
+
+    remote_head = subprocess.run(
+        ["git", "--git-dir", str(bare), "rev-parse", "development"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert remote_head == pushed_head

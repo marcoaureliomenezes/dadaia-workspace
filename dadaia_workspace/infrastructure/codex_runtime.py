@@ -33,6 +33,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     SubprocessAdapterMixin,
     _GitDiffPort,
     normalize_artifact_refs,
+    workspace_state_root,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -60,21 +61,6 @@ def _as_codex_effort(effort: str) -> CodexEffort:
             f"valid: {', '.join(sorted(_VALID_CODEX_EFFORTS))}"
         )
     return effort  # type: ignore[return-value]
-
-
-def _workspace_state_root(cwd: Path) -> Path:
-    """Return the workspace root whose `.dadaia/tmp` may hold runtime state.
-
-    Lifecycle callers usually pass the dadaia workspace root as cwd. Tests and direct
-    adapter probes may pass a throwaway fixture. Walk upward so a repo cwd resolves to the
-    containing workspace instead of creating a forbidden repo-local `.dadaia/` directory.
-    """
-    current = cwd.resolve()
-    for candidate in (current, *current.parents):
-        marker = candidate / ".dadaia"
-        if marker.is_dir() and (candidate / "repos").is_dir():
-            return candidate
-    return current
 
 
 def _copy_codex_runtime_file(src: Path, dest: Path) -> None:
@@ -147,7 +133,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         if not self._config.isolate_home:
             return env
 
-        root = _workspace_state_root(self._config.cwd)
+        root = workspace_state_root(self._config.cwd)
         runtime_root = root / ".dadaia" / "tmp" / "codex-runtime"
         home = runtime_root / "home"
         codex_home = runtime_root / "codex-home"
@@ -381,7 +367,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         *,
         started_at: float,
     ) -> tuple[str, dict[str, object]] | None:
-        workspace = _workspace_state_root(self._config.cwd)
+        workspace = workspace_state_root(self._config.cwd)
         handoff_dir = workspace / ".dadaia" / "handoff" / request.context
         if not handoff_dir.is_dir():
             return None

@@ -1,6 +1,6 @@
 ---
 name: lifecycle-run-store-rejects-temp-workspace-when-temp-root-has-git
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 surface: lifecycle run store / CI preflight pytest temp workspaces
@@ -34,3 +34,21 @@ state.
 **Acceptance:** Stop the repository-ancestor scan at the resolved system temp root. Keep
 rejecting `.git/` directories below that boundary so repo-local `.dadaia` state remains
 blocked.
+
+## Resolution
+
+Closed in v0.1.40 alpha-1 T7.
+
+Root cause review: `JsonLifecycleRunStore._reject_repo_tree_root()` in the current tree
+already stops the ancestor scan at `Path(tempfile.gettempdir()).resolve()` before testing
+that temp root for `.git`. The root cause had therefore been fixed in implementation but
+the bug record remained open and unpinned by a focused regression.
+
+Fix/evidence:
+
+- Added `tests/unit/features/lifecycle/test_json_lifecycle_run_store.py`.
+- `test_run_store_allows_temp_workspace_under_ambient_temp_git` proves an ambient
+  temp-root `.git` no longer rejects a standalone temp workspace.
+- `test_run_store_still_rejects_repo_local_dadaia_below_temp_root` proves the guard still
+  rejects a real repository ancestor below the temp boundary.
+- Focused 66-test validation run passed.

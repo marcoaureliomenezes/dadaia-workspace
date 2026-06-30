@@ -115,13 +115,19 @@ class GitSubprocessClient:
     def push(self, path: Path) -> None:
         # Bug 4 fix: detect whether an upstream tracking branch is configured.
         # If not, use ``git push -u origin <branch>`` to set it on first push.
-        tracking = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
+        tracking = _run(
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=path
+        )
         if tracking.returncode != 0:
             # No upstream tracking branch — set it during push
             branch = self.current_branch(path)
             result = _run(["git", "push", "-u", "origin", branch], cwd=path)
         else:
-            result = _run(["git", "push"], cwd=path)
+            upstream = tracking.stdout.strip()
+            remote, _, upstream_branch = upstream.partition("/")
+            if not remote or not upstream_branch:
+                raise GitSyncError(f"cannot parse upstream tracking branch {upstream!r} in {path}")
+            result = _run(["git", "push", remote, f"HEAD:{upstream_branch}"], cwd=path)
 
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")

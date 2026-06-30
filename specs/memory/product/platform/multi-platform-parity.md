@@ -2,7 +2,7 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: "Claude Code, Codex, and PI get honest runtime-specific projections from one public source (OpenCode removed in v0.1.24; 9 agents / 18 skills / 2 workflows)."
+tldr: "Claude Code, Codex, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 7 dadaia-workflows)."
 summary: Codex uses native config, shared and Codex-specific skills, interactive-only
   hook execution (codex exec never fires hooks — headless posture is chokepoints-only,
   per the §8 enforcement matrix), native Starlark .rules command policy with venv-path
@@ -15,7 +15,8 @@ summary: Codex uses native config, shared and Codex-specific skills, interactive
   projection/OPENCODE_RUN worker). PI (post-v0.1.18) projects a minimal `.pi/` surface
   and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate
   extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4). Public surface is
-  9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer,
+  9 core agents, 18 skills, and the 7 dadaia-workflows (see [[lifecycle-foundation]]).
+  Plugin stubs (frontend-engineer,
   design-specialist, devops-engineer) project as thin stubs with no behavior until the
   plugin is installed.
 tags:
@@ -75,7 +76,7 @@ must stay green.
 | Core agents | 9 | project-manager, project-auditor, product-engineer, software-engineer, qa-engineer, security-reviewer, code-reviewer, ai-engineer, software-architect |
 | Plugin stubs | 3 | frontend-engineer, design-specialist (plugin: frontend-design); devops-engineer (plugin: devops) |
 | Skills | 18 | Reduced from 22 in v0.1.9 (5 frontend/design skills → plugin) |
-| Workflows | 2 | release-ship, audit-fanout (7 stale workflows deleted in v0.1.9) |
+| dadaia-workflows | 7 | release_definition, backlog_definition, audit, research, bug_report, implementation pipeline, closure (see [[lifecycle-foundation]]) |
 | Rules | 8 | workspace-protocol, tmp-file-guardrail, plugin-scope, dadaia-workspace-dev-guardrail, harness-skill-scope, bug-registration-guardrail, backlog-ownership, release-governance |
 
 Agent personas for the following names do not exist in `dadaia_workspace/public/agents/`:

@@ -1,6 +1,6 @@
 ---
 name: subagent-handoff-resolves-dadaia-inside-repo-cwd
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-24
 surface: handoff emission / .dadaia root resolution when cwd is inside a repo
@@ -45,3 +45,31 @@ is not a root entry; the repo-cleanliness rule is discipline-only. Mitigations t
 release `multiharness-engine-v0116` alpha-3; handoff was relocated to the workspace-root
 `.dadaia/handoff/dadaia-workspace/` and the stray repo-internal `.dadaia/` removed. No
 operator-local paths/secrets in this record.
+
+## Resolution
+
+Fixed in v0.1.40 alpha-1 T7.
+
+Root cause: runtime artifact code still had multiple cwd-relative workspace-state
+resolvers. Codex had already gained a local helper after earlier Layer-2 fixes, but PI
+still recovered handoffs from `self._config.cwd / ".dadaia"`, and fake review/bug paths
+also wrote relative to `Path.cwd()`. That left the same root cause alive after related
+Codex bugs were marked closed.
+
+Fix:
+
+- Added `infrastructure.headless_adapter_base.workspace_state_root()` as the shared
+  resolver for Layer-2 runtime state. It walks upward to an initialized workspace marker
+  and skips partial repo-local `.dadaia` directories.
+- Replaced Codex's local helper with the shared helper.
+- Updated PI written-handoff recovery to read from the workspace-root `.dadaia/handoff`
+  and return workspace-relative refs.
+- Updated fake runtime handoff/bug/create artifact writes to resolve through the same
+  helper.
+
+Evidence:
+
+- Added PI and Codex contract tests that run from `repos/dadaia-workspace/` with a
+  misleading repo-local `.dadaia/`; both recover the workspace-root handoff and do not
+  create `repos/<slug>/.dadaia/handoff`.
+- Focused 66-test validation run passed.

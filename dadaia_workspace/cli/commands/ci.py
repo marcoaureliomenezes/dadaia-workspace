@@ -146,6 +146,7 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
     specs_dir = repo_root / "specs"
     if not (specs_dir / "backlog").is_dir():
         return
+    from dadaia_workspace.cli.main import app as cli_app
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
 
     # Code refs in committed intents are REPO-ROOT-relative (e.g.
@@ -161,6 +162,7 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=alias_map_path,
         archive_root=specs_dir / "_archive",
+        cli_app=cli_app,
     )
     errors = [f for f in findings if f.severity is Severity.ERROR]
     if errors:

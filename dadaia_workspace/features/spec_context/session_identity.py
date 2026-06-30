@@ -417,12 +417,26 @@ def coherence(
     """
     ptr = read_incumbent_ptr(workspace, ctx)
 
+    rec_context: str | None = None
     rec_id: str | None = None
     if ptr is not None:
         rec = read_session(workspace, ptr)
         if rec is not None:
             raw = rec.get("id") or rec.get("session_id")
             rec_id = str(raw) if raw else None
+            raw_context = rec.get("context")
+            rec_context = str(raw_context) if raw_context else None
+
+    if (
+        lock_holder
+        and ptr
+        and rec_id == ptr
+        and rec_context == ctx
+        and not lock_holder.startswith("sess_")
+        and ptr.startswith("sess_")
+        and read_session(workspace, lock_holder) is None
+    ):
+        return None
 
     present: list[tuple[str, str]] = []
     if lock_holder:

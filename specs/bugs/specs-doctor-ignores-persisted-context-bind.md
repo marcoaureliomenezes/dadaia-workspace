@@ -1,6 +1,6 @@
 ---
 name: specs-doctor-ignores-persisted-context-bind
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-25
 session_id: sess_32d185aa

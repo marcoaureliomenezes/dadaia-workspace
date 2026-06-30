@@ -228,6 +228,23 @@ def test_08_schema_staged_after_public_install(tmp_path: Path, monkeypatch) -> N
     assert result.exit_code == 0, result.output
 
 
+def test_09_html_report_path_gets_handoff_json_guidance(tmp_path: Path, monkeypatch) -> None:
+    """HTML report input is rejected with contract guidance, not raw JSON parse noise."""
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    html_report = tmp_path / ".dadaia" / "reports" / "ctx" / "qa" / "report.html"
+    html_report.parent.mkdir(parents=True, exist_ok=True)
+    html_report.write_text("<!doctype html><html><body>report</body></html>", encoding="utf-8")
+
+    result = _runner.invoke(app, ["reports", "validate", str(html_report)])
+
+    assert result.exit_code == 0, result.output
+    assert "HTML reports are not handoff JSON" in result.output
+    assert "artifact.content_hash" in result.output
+    assert "malformed JSON" not in result.output
+
+
 def test_09_schema_not_in_claude_schemas_dir(tmp_path: Path, monkeypatch) -> None:
     """Test 9: FR1/A1 enforcement — schema must NOT be projected to .claude/schemas/."""
     _init_workspace(tmp_path)

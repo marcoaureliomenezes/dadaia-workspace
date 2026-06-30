@@ -32,8 +32,10 @@ from jsonschema import ValidationError, validate
 sys.dont_write_bytecode = True
 
 # ---------------------------------------------------------------------------
-# Heading allowlist (union of Groups A + B + C from W0 decisions report)
-# Exact strings, case-sensitive.  See T-MMS-W0-01 for the enumeration.
+# Heading vocabulary retained for compatibility with existing tests and documentation.
+# Generic lint no longer warns on headings outside this set: consumer workspaces may use
+# their own domain vocabulary without editing library source. The enforced heading law is
+# limited to forbidden history/changelog headings plus duplicate headings.
 # ---------------------------------------------------------------------------
 
 # Group A — Standard product atom sections (used 14× each)
@@ -294,13 +296,6 @@ def lint_atom(
                 "violate the atomicity contract (specs/memory/AGENTS.md §3)."
             )
             continue
-
-        # Allowlist check
-        if heading not in HEADING_ALLOWLIST:
-            result.warn(
-                f"'## {heading}' is not in the curated allowlist — consider "
-                "normalising or adding it to the allowlist in lint-memory-atoms.py."
-            )
 
         # Duplicate check
         if heading in seen:

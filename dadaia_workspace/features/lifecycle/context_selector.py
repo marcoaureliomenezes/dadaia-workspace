@@ -40,8 +40,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.exceptions import DadaiaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.models.lifecycle import InjectedContext
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 _SelectorFn = Callable[["ContextSelector", str, "MaxContextPolicy"], "SelectionResult"]
 
@@ -493,10 +494,12 @@ class ContextSelector:
 
     def _alias_map_path(self) -> Path:
         """Resolve the operator alias-map path up from ``specs_dir`` (never cwd, SPEC §3.8)."""
-        here = self._ctx.specs_dir.resolve()
-        for parent in (here, *here.parents):
-            if (parent / ".dadaia").is_dir():
-                return parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+        try:
+            workspace_root = resolve_workspace_root(self._ctx.specs_dir)
+        except WorkspaceNotInitializedError:
+            workspace_root = None
+        if workspace_root is not None:
+            return workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt"
         return self._ctx.specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
 
     def sel_selected_backlog_items(self, name: str, policy: MaxContextPolicy) -> SelectionResult:

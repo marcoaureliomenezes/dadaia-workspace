@@ -74,11 +74,17 @@ def test_review_phase_verbs_advance_on_fake_harness(
     assert payload["blocked"] is None
 
 
-def test_create_phase_close_still_blocks_on_fake_without_artifact(
+def test_close_on_fake_emits_closure_artifact_and_advances(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """FAKE approval is review-scoped; create/no-op steps still need artifact evidence."""
+    """FAKE close writes a closure artifact so the create-step evidence gate passes (v0.1.42).
+
+    Regression for bug ``lifecycle-close-fake-harness-blocks-on-missing-artifact-evidence``:
+    the FAKE closure runtime now emits a deterministic closure handoff, so
+    ``lifecycle close --harness fake`` advances instead of blocking on
+    "agent result missing artifact evidence".
+    """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
@@ -95,13 +101,13 @@ def test_create_phase_close_still_blocks_on_fake_without_artifact(
         ],
     )
 
-    assert result.exit_code == 3, result.output
+    assert result.exit_code == 0, result.output
     payload = _payload(result.output)
-    assert payload["status"] == "BLOCKED"
+    assert payload["status"] == "OK"
     assert payload["runtime"] == "fake"
-    blocked = payload["blocked"]
-    assert isinstance(blocked, dict)
-    assert blocked["reason"] == "agent result missing artifact evidence"
+    assert payload["accepted"] is True
+    assert payload["phase"] == "closure"
+    assert payload["blocked"] is None
 
 
 def test_release_define_runs_fragment_driven_sequence_on_fake(

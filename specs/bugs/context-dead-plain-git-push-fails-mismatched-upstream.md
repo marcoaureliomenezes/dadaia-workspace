@@ -1,6 +1,6 @@
 ---
 name: context-dead-plain-git-push-fails-mismatched-upstream
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-14
 session_id: null

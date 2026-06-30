@@ -2,7 +2,7 @@
 slug: quality-assurance
 title: quality-assurance
 category: product
-tldr: 'Behavior-first quality schema; current suite budget is 1000-1500 tests.'
+tldr: 'Behavior-first quality schema; the suite is ~1424 collected tests (budget 1000-1500).'
 summary: >-
   The dadaia-workspace quality model is behavior-first. Tests are admitted only
   when they can fail for a meaningful regression in current product behavior,
@@ -18,8 +18,8 @@ tags:
   - test-architecture
 agent_tier: self-pull
 token_estimate: 1800
-last_updated: '2026-06-28'
-release_origin: v0.1.34
+last_updated: '2026-06-30'
+release_origin: v0.1.42
 ---
 
 ## Purpose
@@ -58,6 +58,12 @@ unless they own a current public contract or safety boundary.
 
 ## Layer Schema
 
+**A test's directory IS its layer marker.** `conftest.pytest_collection_modifyitems`
+auto-applies the layer marker (`unit`/`integration`/`contract`/`e2e`/`performance`) from
+the test's top-level `tests/<layer>/` directory — tests are not individually decorated, so
+a file placed in the wrong directory silently gets the wrong marker and CI profile. Place
+each test in the directory that names its layer.
+
 `tests/unit/**` is for compact public-service islands and pure rules that cannot be
 tested more clearly at a higher layer. Unit tests may use `tmp_path` and small fakes, but
 must not start real subprocesses, servers, browsers, public stage/install workflows, full
@@ -92,15 +98,16 @@ collection and must be deleted or promoted before release closure.
 
 ## Budgets
 
-The target suite size is **1000-1500 collected tests** for the source repo. The v0.1.34
-architecture keeps the suite centered on behavior layers; collected count after the
-collapse is expected to stay near 1350 tests. A healthy split is:
+The target suite size is **1000-1500 collected tests** for the source repo; the suite is
+behavior-layer-centered and currently collects **~1424** tests. A healthy split (current
+live counts in parentheses) is:
 
-- 450-650 unit tests for compact public-service islands and pure rules;
-- 100-150 contract tests;
-- 450-550 integration tests;
-- 70-100 E2E and browser journey tests;
-- opt-in performance tests outside the default count.
+- 450-650 unit tests for compact public-service islands and pure rules (currently ~622);
+- 100-170 contract tests (currently ~163);
+- 450-560 integration tests (currently ~555);
+- 70-100 Python E2E and browser journey tests (currently ~83); the Node/Playwright panel
+  journeys (~13 specs) run as a separate CI job (see Profiles);
+- opt-in performance tests outside the default count (currently 1).
 
 These are budgets, not quotas. Adding a test above budget requires either deleting lower
 value coverage or documenting why the new behavior is more important than the cost.
@@ -134,34 +141,34 @@ Performance validation is explicit:
 .dadaia/.venv/bin/python -m pytest -q -p no:cacheprovider -m performance tests/performance
 ```
 
-Coverage is a diagnostic, not the default local loop. Use coverage on curated
-unit/contract suites only; do not write padding tests to lift a percentage.
+**Coverage gate.** Coverage is a diagnostic for the local loop — but CI **hard-gates 80%**
+on the unit + contract suites (the contract-coverage job fails under `--cov-fail-under=80`).
+Use coverage on curated unit/contract suites; do not write padding tests to lift a percentage.
 
-## Retained Feature Coverage
+**CI topology.** Beyond the Python profiles above, CI runs: lint (`ruff`), `mypy --strict`,
+the unit / contract / integration / Python-E2E jobs, a **separate Node "E2E panel
+(Playwright)" job** (`npm run test:e2e`, ~13 specs, driving the real panel in a browser),
+and a **cross-platform matrix** (ubuntu + windows + macOS). Local pre-push runs lint +
+`pytest -m "not performance"`; it does not run the Node panel job.
 
-The retained suite evaluates features by the cheapest layer that proves product behavior:
+## Coverage by surface
+
+Each surface is covered at the cheapest layer that proves its product behavior:
 
 - **Spec Context Projects** — contract CLI tests, integration gate/classifier tests,
-  context CLI flows, and E2E lease/chokepoint journeys. Deleted private unit matrices for
-  lease states, hook path parsing, and doctor cleanup branches were duplicate
-  implementation-shape coverage.
-- **Panel** — integration panel route/API tests plus the panel E2E journey. Deleted unit
-  view-string tests, CSS/token assertions, and handler fragment checks duplicated route
-  and browser behavior while failing on private markup churn.
+  context CLI flows, and E2E lease/chokepoint journeys.
+- **Panel** — integration panel route/API tests plus the Playwright panel journey.
 - **dadaia-workflows/lifecycle** — integration lifecycle CLI/pipeline/workflow tests,
-  live harness contracts, and E2E lifecycle smoke. Deleted unit prompt/fragment/policy
-  micro-tests duplicated command-path and workflow behavior or pinned prompt assembly
-  internals.
+  live-harness contracts (opt-in), and E2E lifecycle smoke.
 - **Public projection and source hygiene** — contract and integration projection tests
-  remain. Deleted infrastructure public-assets helper matrices that retested private TOML,
-  hashing, and parsing helpers after the public install/doctor behavior was covered.
-- **Telemetry, reports, server registry, academy, workflows, backlog** — kept as smaller
-  unit or integration islands where they own a current service/API behavior; removed
-  low-level infrastructure and adapter permutations.
+  (privacy + drift).
+- **Telemetry, reports, server registry, academy, workflows, backlog** — smaller unit or
+  integration islands where each owns a current service/API behavior.
 
-Deleted tests are release evidence, not product truth. Reintroducing a removed file
-requires naming the current behavior boundary and explaining why a retained layer cannot
-catch the regression.
+Coverage favors the layer that catches a regression most cheaply; low-level
+implementation-shape matrices are not retained once the public behavior is covered at a
+higher layer. Reintroducing a removed test requires naming the current behavior boundary
+and explaining why a retained layer cannot catch the regression.
 
 ## No-Slop Law
 
@@ -196,12 +203,19 @@ Only add an E2E test when the failure truly required a journey-level signal.
 ## Runtime State Touched
 
 - `pyproject.toml` declares pytest markers and collection policy.
+- `tests/conftest.py` applies the **auto-marker-by-directory** hook and the suite safety
+  guards: `_no_real_venv` (blocks real venv/pip builds inside tests), the repo-root-write
+  guard, the snapshot guard (fails a test that writes the repo tree unexpectedly — which is
+  why parallel writers must not run pytest mid-edit), and `tests/tmp` retention control.
 - `tests/AGENTS.md` is the scoped operational rule for all test files.
 - `tests/contract/README.md` inventories public contracts and must not contradict the
   no-slop law.
+- `tests/e2e/` also hosts the Node/Playwright panel suite (`npm run test:e2e`); its
+  `node_modules/` is gitignored and never committed, and the job runs separately from the
+  Python pytest jobs.
 - `dadaia_workspace/features/ci_preflight/service.py` defines the local/pre-push gate.
-- `.github/workflows/*.yml` may run broader CI profiles, but local hooks must stay
-  deterministic and useful.
+- `.github/workflows/*.yml` runs the broader CI profiles (lint, mypy, the pytest jobs, the
+  Node panel job, and the cross-platform matrix); local hooks stay deterministic and useful.
 
 ## Dependencies
 

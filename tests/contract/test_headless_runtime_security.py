@@ -492,3 +492,86 @@ def test_pi_recovers_written_handoff_when_final_message_has_verdict_without_arti
     assert result.structured_output["verdict"] == "APPROVED"
     assert result.structured_output["verdict_reason"] == "No blockers."
     assert result.structured_output["commit_sha"] == "abc123"
+
+
+def test_pi_recovers_workspace_handoff_when_cwd_is_repo_subdir(tmp_path: Path) -> None:
+    workspace = tmp_path
+    repo = workspace / "repos" / "dadaia-workspace"
+    repo.mkdir(parents=True)
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (repo / ".dadaia").mkdir()
+    handoff_dir = workspace / ".dadaia" / "handoff" / "dadaia-workspace"
+    handoff_dir.mkdir(parents=True)
+    handoff_path = handoff_dir / "security.handoff.json"
+    handoff = {
+        "schema_version": "handoff-v1.1",
+        "agent": "security-reviewer",
+        "context": "dadaia-workspace",
+        "release_id": "v0.1.34",
+        "verdict": "APPROVED",
+        "metrics": {
+            "commit_sha": "abc123",
+            "artifact_ref": ".dadaia/handoff/dadaia-workspace/security.handoff.json",
+        },
+        "artifact": {"type": "other"},
+    }
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        handoff_path.write_text(json.dumps(handoff), encoding="utf-8")
+        stdout = json.dumps({"type": "message_end", "message": {"content": "done"}}) + "\n"
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    result = pi_runtime.PiHeadlessAdapter(
+        pi_runtime.PiHeadlessConfig(cwd=repo),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.PI_HEADLESS))
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/security.handoff.json",)
+    assert not (repo / ".dadaia" / "handoff").exists()
+
+
+def test_codex_recovers_workspace_handoff_when_cwd_is_repo_subdir(tmp_path: Path) -> None:
+    workspace = tmp_path
+    repo = workspace / "repos" / "dadaia-workspace"
+    repo.mkdir(parents=True)
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (repo / ".dadaia").mkdir()
+    handoff_dir = workspace / ".dadaia" / "handoff" / "dadaia-workspace"
+    handoff_dir.mkdir(parents=True)
+    handoff_path = handoff_dir / "security.handoff.json"
+    handoff = {
+        "schema_version": "handoff-v1.1",
+        "agent": "security-reviewer",
+        "context": "dadaia-workspace",
+        "release_id": "v0.1.34",
+        "verdict": "APPROVED",
+        "metrics": {
+            "commit_sha": "abc123",
+            "artifact_ref": ".dadaia/handoff/dadaia-workspace/security.handoff.json",
+        },
+        "artifact": {"type": "other"},
+    }
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        output_path = Path(argv[argv.index("--output-last-message") + 1])
+        handoff_path.write_text(json.dumps(handoff), encoding="utf-8")
+        output_path.write_text("done", encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    result = codex_runtime.CodexExecAdapter(
+        codex_runtime.CodexExecConfig(cwd=repo),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request(AgentRuntimeKind.CODEX_EXEC))
+
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/security.handoff.json",)
+    assert not (repo / ".dadaia" / "handoff").exists()

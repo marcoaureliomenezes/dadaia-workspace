@@ -30,7 +30,9 @@ from pathlib import Path
 OWNER_RELPATH = "dadaia_workspace/features/spec_context/session_identity.py"
 
 #: Idiom for the pointer namespace ``sessions/runtime/*.ptr`` — code that builds the
-#: runtime pointer directory. Ratchet-free: 0 hits allowed outside the owner.
+#: runtime pointer directory. 0 hits allowed outside the owner and the closed
+#: ``ALLOWED_POINTER_CONSUMERS`` allowlist (documented read-only core-layer readers that
+#: cannot import the features owner under constitution §6).
 POINTER_IDIOMS: tuple[str, ...] = (
     '"sessions" / "runtime"',
     '"runtime" / f"{',
@@ -66,6 +68,22 @@ ALLOWED_RECORD_CONSUMERS: tuple[AllowedConsumer, ...] = (
     ),
 )
 
+#: Modules permitted to construct a ``sessions/runtime/*.ptr`` pointer-namespace path
+#: despite not being the owner. Closed set — adding to it requires a deliberate edit +
+#: justification. The pointer namespace is more sensitive than session records (it carries
+#: the lease-incumbent identity), so the only permitted exception is a READ-ONLY reader.
+ALLOWED_POINTER_CONSUMERS: tuple[AllowedConsumer, ...] = (
+    AllowedConsumer(
+        relpath="dadaia_workspace/core/specs_resolver.py",
+        disposition=(
+            "core-layer READ-ONLY reader of the incumbent pointer "
+            "(resolve_bound_session_id / _latest_persisted_session_id); globs and reads "
+            "*.ptr, never writes the pointer namespace; cannot import the features owner "
+            "(constitution §6)"
+        ),
+    ),
+)
+
 ACTIVE_PRODUCT_ROOT = "dadaia_workspace"
 
 TEXT_SUFFIXES: frozenset[str] = frozenset({".py"})
@@ -82,12 +100,14 @@ def _iter_py_files(root: Path):  # type: ignore[no-untyped-def]
 
 
 def test_pointer_namespace_has_no_residue_outside_owner() -> None:
-    """FR-R3-01: only session_identity may construct sessions/runtime/*.ptr (0 residue)."""
+    """FR-R3-01: only session_identity (or a documented read-only consumer) may construct
+    sessions/runtime/*.ptr."""
     repo = _repo_root()
+    allowed = {c.relpath for c in ALLOWED_POINTER_CONSUMERS}
     failures: list[str] = []
     for path in _iter_py_files(repo / ACTIVE_PRODUCT_ROOT):
         relpath = path.relative_to(repo).as_posix()
-        if relpath == OWNER_RELPATH:
+        if relpath == OWNER_RELPATH or relpath in allowed:
             continue
         text = path.read_text(encoding="utf-8")
         for idiom in POINTER_IDIOMS:

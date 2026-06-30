@@ -21,13 +21,13 @@ CLI surface: `dadaia export [--output DIR] [--include-reports] [--exclude-mnt]` 
 
 ## Propósito
 
-Empacota e restaura o estado durável do workspace (state files, academy, rules, skills, opencode config) como `.tar.gz` portável. Secretos (`.env`), caches e `repos/` clonados são excluídos por padrão; reports HTML opt-in via flag.
+Empacota e restaura o estado durável do workspace (state files, academy, rules, skills) como `.tar.gz` portável. Secretos (`.env`), caches e `repos/` clonados são excluídos por padrão; reports HTML opt-in via flag.
 
 Restore patches absolute paths para a nova máquina, reativa contexts conforme estavam, e (a menos que `--skip-activate`) re-roda `workspace-init` para reconfigurar hooks.
 
 ## Fluxo de uso
 
-  1. `dadaia export` — gera `.dadaia/dist/workspace-<timestamp>.tar.gz` com state + academy + rules + skills + opencode config.
+  1. `dadaia export` — gera `.dadaia/dist/workspace-<timestamp>.tar.gz` com state + academy + rules + skills.
   2. Operador transporta o arquivo (scp, upload, etc.) para a nova máquina.
   3. Na nova máquina, em um diretório limpo: `dadaia import /path/to/archive.tar.gz`.
   4. Import extrai, faz patch de paths absolutos, restaura contexts e (default) executa init.
@@ -46,7 +46,7 @@ Workspace reprodutível em alguns segundos sem rebuild manual — todas as confi
 ## Estado runtime tocado
 
   * Export: cria `.dadaia/dist/<archive>.tar.gz`
-  * Import: extrai sobre workspace destino, sobrescreve `.dadaia/states/*`, `.dadaia/academy/`, `.claude/rules/`, `.agents/skills/`, `.opencode/`, opencode.json
+  * Import: extrai sobre workspace destino, sobrescreve `.dadaia/states/*`, `.dadaia/academy/`, `.claude/rules/`, `.agents/skills/`
   * Repos clonados NÃO viajam — re-clone via `dadaia context alive` após import
 
 

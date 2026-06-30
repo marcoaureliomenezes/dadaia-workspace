@@ -78,3 +78,30 @@ def test_cli_doctor_coherent_state_has_no_doc_029(
     result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
 
     assert "SPEC-DOC-029" not in result.output, result.output
+
+
+def test_cli_doctor_external_specs_dir_does_not_scan_live_workspace_locks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scoped --specs-dir outside cwd's workspace must not read that workspace's locks."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _make_workspace(workspace)
+    external = tmp_path / "external-specs"
+    result = scaffold(
+        specs_dir=external,
+        project_name="external",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == [], result.errors
+
+    ctx = "ctx-a"
+    lease.acquire(workspace, ctx, "sessS1", "rel-1", "implementation")
+    session_identity.set_incumbent(workspace, ctx, "sessS2")
+    session_identity.write_session(workspace, "sessS2", {"session_id": "sessS2"})
+
+    monkeypatch.chdir(workspace)
+    cli_result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(external)])
+
+    assert "SPEC-DOC-029" not in cli_result.output, cli_result.output

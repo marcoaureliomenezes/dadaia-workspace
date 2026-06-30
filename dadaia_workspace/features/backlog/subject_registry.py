@@ -376,14 +376,11 @@ def build_registry(
 ) -> Registry:
     """Build the canonical-subject registry from live truth (SPEC §3.2).
 
-    All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_app`` defaults to
-    the live ``dadaia`` Typer app; tests pass a small fixture app. Every call recomputes the
-    anchor set, so a symbol added/removed in source changes resolution with no stored file
-    (acceptance §3.7.5).
+    All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_app`` is also
+    injected by CLI-layer callers that need CLI anchors; feature-layer callers may leave it
+    unset and get an empty CLI-anchor set. Every call recomputes the anchor set, so a symbol
+    added/removed in source changes resolution with no stored file (acceptance §3.7.5).
     """
-    if cli_app is None:
-        from dadaia_workspace.cli.main import app as cli_app  # local import: avoid cycle
-
     anchors: dict[SubjectKind, set[str]] = {
         SubjectKind.CODE: _derive_code_anchors(source_root),
         SubjectKind.CLI: _derive_cli_anchors(cli_app),

@@ -2,10 +2,11 @@
 slug: agent-orchestration
 title: agent-orchestration
 category: product
-tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity."
+tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 7 dadaia-workflows; dispatcher purity."
 summary: Defines the public default 9-core agent topology with coordinator+sub-agent
   architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch),
-  ADDITIVE vs MUTATING activity classes, and the minimal 2-workflow set.
+  ADDITIVE vs MUTATING activity classes, and the 7 dadaia-workflows automation surface
+  (see [[lifecycle-foundation]]).
 tags:
 - orchestration
 - agents
@@ -101,15 +102,19 @@ there is no session handoff and no second lock.
 | ADDITIVE | Backlog def, bug filing, research, audit, review gates | None — concurrent |
 | MUTATING | Release definition (5), implementation (6), closure (8) | Single PM-held lease |
 
-### Workflows (2 default)
+### Workflows (the 7 dadaia-workflows)
 
-Two workflows ship by default (stale workflows deleted in v0.1.9):
+The product's automation surface is the **7 dadaia-workflows** — Python workflow bodies
+driven by `dadaia lifecycle`, each assembling fragment-scoped per-step prompts, selecting
+dynamic context, calling worker agents, and advancing Python-validated gates:
+`release_definition`, `backlog_definition`, `audit`, `research`, `bug_report`, the
+implementation `pipeline`, and `closure`. [[lifecycle-foundation]] is the canonical home
+for the engine, the governed catalog, and per-step harness/model selection.
 
-- `release-ship` — the deploy gate sequence (deterministic, non-judgment steps).
-- `audit-fanout` — fan-out pattern for project-auditor audit dispatches.
-
-Domain workflows such as game development, dashboard publication, or vendor-specific
-data pipelines are not part of the default public install.
+The legacy `*.workflow.md` reference docs (e.g. `release-ship`, `audit-fanout`) are
+**documentation only** — they do not auto-execute and are no longer the product's
+workflow surface. Domain workflows such as game development, dashboard publication, or
+vendor-specific data pipelines are not part of the default public install.
 
 ### Review checkpoint sequence (constitution §11)
 
@@ -129,8 +134,8 @@ Claude Code uses Claude-native agent/tool semantics with real Agent tool dispatc
 Codex custom agents are real configured delegates projected under `.codex/agents/*.toml`;
 they are not simulated with fake tool names or stale tool-discovery promises. Codex
 workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
-turn a workflow file into a runtime primitive by itself. OpenCode uses its own agent and
-plugin projection. **PI** (`@earendil-works/pi-coding-agent`), the fourth harness, is
+turn a workflow file into a runtime primitive by itself. **PI**
+(`@earendil-works/pi-coding-agent`), the third entry harness, is
 governed at Layer 1 via `AGENTS.md`/`CLAUDE.md` (read natively) plus its projected `.pi/`
 surface — and, post-v0.1.21 (WS-PI-4), a real pre-disk (Ring-1) SDD-gate extension
 (`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes a `tool_call` hook that can block a

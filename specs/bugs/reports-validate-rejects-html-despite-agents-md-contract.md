@@ -1,6 +1,6 @@
 ---
 name: reports-validate-rejects-html-despite-agents-md-contract
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-11
 surface: dadaia reports validate (CLI) vs root AGENTS.md "Reports and Panel" contract

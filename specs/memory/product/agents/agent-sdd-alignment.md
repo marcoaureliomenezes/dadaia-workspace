@@ -81,7 +81,7 @@ context, and task ownership.
 The same SDD rules apply to `dadaia_workspace/public/**`: public agents, skills,
 rules, workflows, hooks, and AGENTS.md sources are product behavior. Changes to
 that surface require release context and must remain generic, public-safe, and
-runtime-accurate for Claude Code, Codex, and OpenCode.
+runtime-accurate for Claude Code, Codex, and PI.
 
 `product-engineer` may write `specs/memory/**` only in DEFINITION and CLOSURE phases
 (constitution §13). No other agent may write memory atoms.

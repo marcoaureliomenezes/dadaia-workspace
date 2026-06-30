@@ -134,10 +134,10 @@ Invariantes de paridade (parity contract com os hooks bash anteriores):
 `workspace/service.py` reconhece tanto o caminho `.sh` antigo quanto o novo comando Python para
 evitar dupla-registro em workspaces migrados.
 
-OpenCode (`sdd-gate.ts` + `ctx-inject.ts`) chama os Python hooks via subprocess. Resolução do
-binário venv: `.dadaia/.venv/bin/python` → `.dadaia/.venv/Scripts/python.exe` → bare `python`.
-Propagação de env (`DADAIA_HOOK_OUTPUT`/`DADAIA_HOOK_EVENT`) via Bun cross-platform `.env()` API
-— governado em Windows.
+A extensão TS do PI (`.pi/extensions/dadaia-sdd-gate.ts`, post-trust Ring-1) delega ao
+`pre_gate` Python via subprocess. Resolução do binário venv cross-platform:
+`.dadaia/.venv/bin/python` → `.dadaia/.venv/Scripts/python.exe` → bare `python` — governado
+em Windows.
 
 `pre_push_ci.py` NÃO está no pacote. O hook `.sh` pre-push é retido (git-for-Windows ships bash).
 

@@ -1,6 +1,6 @@
 ---
 name: grill-and-oq-decisions-records-gitignored-not-version-controlled
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 surface: .gitignore (specs/releases/*/* allowlist), release-governance grill gate

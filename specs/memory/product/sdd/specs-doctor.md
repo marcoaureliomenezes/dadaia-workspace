@@ -23,7 +23,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1820
 last_updated: '2026-06-29'
-release_origin: v0.1.39
+release_origin: v0.1.41
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -65,7 +65,7 @@ SPEC-DOC-024| `ACTIVE.md phase` incoerente com os markers do TASKS.md ativo: fas
 SPEC-DOC-026| Release id duplicado entre `releases/` e `_archive/releases/` (recursivo)| ERROR (WARN se envolve dir legacy documentado)| Mata a ambiguidade de arqueologia de archive
 SPEC-DOC-027| Nome de release dir fora do canon `^v\d+\.\d+\.\d+$`| ERROR para release viva criada após o cutoff; silencioso para os dirs legacy pré-canon enumerados na allowlist documentada no source (sem renames de história arquivada); WARN para legacy fora da allowlist| Alinha com SPEC-DOC-016; enforcement forward intacto para dirs novos
 SPEC-DOC-028| Referência backtick path-like em `constitution.md` que não resolve no repo root| WARN| Só refs com `/`; no-op sem `repo_root` injetado
-SPEC-DOC-029| Coerência lease↔session em triagem de **3 estados**: (a) lease TTL-expirado com holder morto/unprobeable ⇒ WARN "stale lease from a dead session — safe to reclaim" nomeando a remediação (`dadaia doctor --fix` / `dadaia lock steal <ctx>`); (b) holder **vivo** + incoerência lease↔session genuína ⇒ ERR (única sede da linguagem de forgery); (c) coerente ⇒ silencioso| WARN (a) / ERROR (b)| Backstop D-2; liveness via `lease.is_held` (TTL piso + pid veto); pid-probe **composition-root-wired** (a CLI injeta via o seam do hook layer; default `None` ⇒ TTL-only); lê os records reais `<ctx>.lock.json` via `session_identity.coherence`; só roda com `workspace_state_dir` injetado
+SPEC-DOC-029| Coerência lease↔session em triagem de **3 estados**: (a) lease TTL-expirado com holder morto/unprobeable ⇒ WARN "stale lease from a dead session — safe to reclaim" nomeando a remediação (`dadaia doctor --fix` / `dadaia lock steal <ctx>`); (b) holder **vivo** + incoerência lease↔session genuína ⇒ ERR (única sede da linguagem de forgery); (c) coerente ⇒ silencioso| WARN (a) / ERROR (b)| Backstop D-2; liveness via `lease.is_held` (TTL piso + pid veto); pid-probe **composition-root-wired** (a CLI injeta via o seam do hook layer; default `None` ⇒ TTL-only); lê os records reais `<ctx>.lock.json` via `session_identity.coherence`; trata como coerente o par normal "holder UUID de harness + incumbent `sess_*` com session record do mesmo contexto"; só roda com `workspace_state_dir` injetado
 SPEC-DOC-030| Diretório novo em `specs/audits/` fora do canon `<YYYYMMDDTHHMMSSZ>-<sid8>` (exceto os 4 dirs grandfathered no §8 da constitution e `_archive/`)| WARN| Constitution §8 naming law (amendment 2026-06-10); enforcement forward-only
 SPEC-DOC-031| Entry em `specs/backlog/**` com status **não-terminal** ({OPEN, PICKED, CANDIDATE}, prefix match case-insensitive na Status line) cujo slug/ID aparece em CLOSURE/SPEC de release **arquivada**, fora de seções "Backlog returns"| WARN| Vocabulário ADR-11 (v0.1.11): terminal = {DELIVERED, SUPERSEDED, RESOLVED, CONSUMED, DEFERRED, REJECTED}, sufixos permitidos (`— vX.Y.Z`); falso-positivo conhecido: menções defer/supersede em CLOSUREs arquivadas — razão de ser WARN, não ERR
 SPEC-DOC-032| Arquivo em `specs/bugs/**` com `status:` fora do canon {`Open`, `Closed`}| WARN| Canon ADR-11; `superseded_by: <slug>` opcional no frontmatter; guarda regressões pós-normalização de 2026-06-10
@@ -76,7 +76,7 @@ Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta `--json` 
 
 Código| O que detecta| Severity| Notas
 ---|---|---|---
-LINT-1| Qualquer atom `.md` em `specs/memory/` ou `specs/memory/product/` falha validação de `lint-memory-atoms.py`| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
+LINT-1| Qualquer atom `.md` em `specs/memory/` ou `specs/memory/product/` falha validação de `lint-memory-atoms.py`| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden history/changelog headings, wikilink resolution. Domain-specific H2 headings are allowed; lint is generic across consumer vocabularies. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
 SPEC-DOC-002| Check #2: memory files existem como `.md`| ERROR| Agora requer `.md`, não `.html`; aceita headings `##` conforme allowlist
 SPEC-DOC-002L| Stray `.html` presentes sob `specs/memory/`| ERROR| Esses arquivos devem ser deletados; D-4 proíbe HTML commitado na pasta memory
 SPEC-DOC-008| Byte-identity do HTML commitado| —| **Removido** — não aplicável ao modelo MD-source (D-4: HTML é efêmero, renderizado in-memory)

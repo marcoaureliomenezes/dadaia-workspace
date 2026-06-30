@@ -1,6 +1,6 @@
 ---
 name: specs-doctor-does-not-resolve-persisted-bound-context
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-18
 surface: dadaia specs doctor / context resolution

@@ -11,23 +11,23 @@
 |------|-------|------|
 
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/. |
-| `agent-monitoring` | agent-monitoring | telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac... |
-| `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity. |
+| `agent-monitoring` | agent-monitoring | telemetria local stdlib-only (Claude/Codex/PI sessions) → abas Agents/Workflows do panel; allowlist gate preserva privacidade. |
+| `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 7 dadaia-workflows; dispatcher purity. |
 | `agent-sdd-alignment` | agent-sdd-alignment | 9-core agents aligned to constitution §7 lifecycle phases; sub-agent model; dispatcher purity; Markdown memory protocol. |
 | `ai-context-engineering` | ai-context-engineering | Deep ai-engineer skill covering token economy, instruction hierarchy, persona-consistency invariants, model-tier selection, and scope-drift detection. |
 | `ai-harness-claude-code` | ai-harness-claude-code | Deep ai-engineer skill for Claude Code: agentic loop, context hierarchy, rules, skills, hooks, subagents, tools, MCP, and composition decision tree. |
 | `ai-harness-codex` | ai-harness-codex | Deep ai-engineer Codex skill — AGENTS.md law, rules collision, trust model, live-verified hook facts. |
 | `harness-primitives` | harness-primitives | Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist. |
 | `academy` | academy | knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI. |
-| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots. |
+| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots. |
 | `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
 | `panel` | panel | superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ... |
 | `product-vision` | product-vision | Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md. |
 | `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
 | `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
-| `context-management` | context-management | multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa. |
+| `context-management` | context-management | multi-context ALIVE/DEAD; bind marker; TTL+PID lease; dead() limpa objetos git read-only normais. |
 | `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
-| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows). |
+| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 7 dadaia-workflows). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC, VENV-1. |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |
@@ -36,4 +36,4 @@
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push. |
 | `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto. |
 | `sdd-hotfix-track` | sdd-hotfix-track | SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog). |
-| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; --fix auto-repara TREE-4 (TREE-3 é warn-only). |
+| `specs-doctor` | specs-doctor | Valida invariantes estruturais SDD: SPEC-DOC 001..016 + ledger 024-032, TREE-1..7, LINT-1; TREE-4 cria dirs e _archive per-class. |

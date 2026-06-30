@@ -629,6 +629,15 @@ def test_codex_config_emits_skills_table(case: dict) -> None:  # type: ignore[ty
     )
 
 
+def test_codex_config_omits_stale_approved_commands_key() -> None:
+    """Codex config must not emit the removed/invalid approved_commands key."""
+    output = FileSystemPublicAssetManager()._codex_config(_NONEXISTENT_AGENTIC_DIR)  # noqa: SLF001
+
+    assert "approved_commands" not in output
+    parsed = tomllib.loads(output)
+    assert "approved_commands" not in parsed
+
+
 @pytest.mark.parametrize("case", _SKILLS_TABLE_CASES[1:], ids=["skills_appears_after_agents"])
 def test_codex_config_skills_paths_array_ordering(case: dict) -> None:  # type: ignore[type-arg]
     """T-PB-4 #2 — [skills] table appears AFTER the [agents.*] tables."""

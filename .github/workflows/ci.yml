@@ -85,6 +85,8 @@ jobs:
       - name: ruff check
         # Redirect ruff's cache outside the checkout (pyproject cache-dir removed in T-018-07).
         run: RUFF_CACHE_DIR="$RUNNER_TEMP/ruff" poetry run ruff check dadaia_workspace/ tests/
+      - name: import-linter
+        run: poetry run lint-imports
 
   typecheck:
     name: Typecheck (mypy --strict)

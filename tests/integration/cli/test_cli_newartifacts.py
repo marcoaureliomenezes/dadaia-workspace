@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.commands.newartifacts import _default_alias_map_path
 from dadaia_workspace.cli.main import app
 
 _runner = CliRunner()
@@ -140,6 +141,21 @@ class TestBacklogNew:
             ["backlog", "new", "cool-idea", "--specs-dir", str(tmp_path / "nope")],
         )
         assert result.exit_code != 0
+
+
+def test_default_backlog_alias_map_resolves_workspace_root_from_repo_specs(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path
+    specs = workspace / "repos" / "dadaia-workspace" / "specs"
+    specs.mkdir(parents=True)
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (specs.parent / ".dadaia").mkdir()
+
+    assert _default_alias_map_path(specs) == (
+        workspace / ".dadaia" / "states" / "backlog_subject_aliases.txt"
+    )
 
 
 # ── dadaia bug new ────────────────────────────────────────────────────────────

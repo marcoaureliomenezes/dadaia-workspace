@@ -1,6 +1,6 @@
 ---
 name: root-whitelist-misses-nested-new-toplevel-writes
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-26
 surface: hooks.root_whitelist (PreToolUse root-whitelist policy)

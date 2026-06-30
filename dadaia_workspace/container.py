@@ -1049,12 +1049,14 @@ def _bug_report_runtime_factory(
     import json
     import re
     from dataclasses import dataclass
+    from datetime import UTC, datetime
 
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
+    from dadaia_workspace.infrastructure.headless_adapter_base import workspace_state_root
 
     @dataclass(frozen=True)
     class BugReportFakeRuntime:
@@ -1070,7 +1072,9 @@ def _bug_report_runtime_factory(
                     artifact_refs=(f".dadaia/handoff/{context}/bug-report-step.handoff.json",),
                     structured_output={"verdict": "APPROVED"},
                 )
-            digest = hashlib.sha256((run_cwd / bug_ref).read_bytes()).hexdigest()
+            digest = hashlib.sha256(
+                (workspace_state_root(run_cwd) / bug_ref).read_bytes()
+            ).hexdigest()
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="fake bug-report worker: wrote bug record",
@@ -1100,19 +1104,23 @@ def _bug_report_runtime_factory(
                 if path.endswith("specs/bugs/**")
             ]
             for root in bug_roots:
-                base = run_cwd / root
+                workspace = workspace_state_root(run_cwd)
+                base = workspace / root
                 if root.startswith("repos/") and not base.parent.is_dir():
                     continue
                 base.mkdir(parents=True, exist_ok=True)
                 slug = self._slug(bug_input.summary)
                 severity = (bug_input.severity or "MEDIUM").strip().upper()
+                reported = datetime.now(tz=UTC).strftime("%Y-%m-%d")
                 ref = f"{root}/{slug}.md"
-                (run_cwd / ref).write_text(
+                (workspace / ref).write_text(
                     "---\n"
                     f"name: {slug}\n"
                     "status: Open\n"
                     f"severity: {self._frontmatter_string(severity)}\n"
+                    f"reported: {reported}\n"
                     "surface: lifecycle bug report workflow\n"
+                    "session_id: null\n"
                     "---\n\n"
                     f"# {bug_input.summary.strip()}\n\n"
                     f"**Symptom:** {bug_input.summary.strip()}\n\n"

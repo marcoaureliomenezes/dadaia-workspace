@@ -27,6 +27,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+from dadaia_workspace.core.specs_resolver import resolve_bound_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import lease as context_lease
 from dadaia_workspace.features.spec_context import session_identity
@@ -531,11 +532,11 @@ def release_cmd(
     sessions_dir = _sessions_dir(workspace_root)
 
     env_sid = os.environ.get("DADAIA_SESSION_ID")
-    cli_sid = session or env_sid
+    cli_sid = resolve_bound_session_id(session, workspace_root=workspace_root)
     if not cli_sid:
         err_console.print(
             "[red]Error:[/red] No active session. Pass --session <id> or set "
-            "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
+            "DADAIA_SESSION_ID, or run dadaia context bind first."
         )
         raise typer.Exit(1) from None
 

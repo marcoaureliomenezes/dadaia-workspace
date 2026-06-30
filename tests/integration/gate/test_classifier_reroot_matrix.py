@@ -240,3 +240,29 @@ def test_lease_theft_dual_session_foreign_mutating_still_blocks_live_holder(
     assert record is not None and record["session_id"] == holder
     for forbidden in ("bind --mode write", "relaunch", "lock steal"):
         assert forbidden not in message
+
+
+def test_same_session_mutating_write_renews_stale_own_lease(tmp_path: Path) -> None:
+    """Regression: the gate must never block a holder against its own session id."""
+    slug = "dadaia-workspace"
+    holder = "session-A-holder"
+    _seed_lease(tmp_path, slug, holder, BASE - timedelta(seconds=300))
+
+    decision, message = evaluate(
+        tmp_path,
+        f"repos/{slug}/specs/releases/v0.1.10/TASKS.md",
+        ctx=slug,
+        phase="SPEC",
+        session_id=holder,
+        release="v0.1.10",
+        mode="IMPLEMENTATION",
+        clock=fixed(BASE),
+        pid_probe=lambda _pid: True,
+    )
+
+    assert decision == Decision.ALLOW
+    assert message == ""
+    record = lease.read_record(tmp_path, slug)
+    assert record is not None
+    assert record["session_id"] == holder
+    assert record["heartbeat"] == BASE.isoformat()

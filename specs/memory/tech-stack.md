@@ -12,8 +12,8 @@ tags:
 - constraints
 agent_tier: inject
 token_estimate: 2350
-last_updated: '2026-06-29'
-release_origin: v0.1.37
+last_updated: '2026-06-30'
+release_origin: v0.1.42
 ---
 
 ## Linguagens
@@ -111,7 +111,7 @@ jsonschema| ^4| features/specs/| JSON Schema validation; now used for `memory-fr
 mistune| ~=3.0| features/panel/views/| Markdown → HTML render in-memory for the memory viewer (D-1, memory-markdown-source-v1). Pure-Python, zero transitive deps. Custom hooks: mermaid fence, `wikilink`, sanitiser.
 types-PyYAML| >=6| dev| Type stubs para mypy
 jinja2| ^3.1| features/specs/| Dependência **direta** de runtime: `features/specs/scaffolder.py` renderiza os templates de scaffold SDD via `SandboxedEnvironment`. NÃO é usada para memory rendering (memory atoms são `.md` renderizados por mistune).
-import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in CI `lint` job via `lint-imports`. Zero runtime impact.
+import-linter| latest| dev| Architecture contract enforcement; `setup.cfg` declares `features → infrastructure` import ban and `core → OS-primitive modules` ban; runs in local `dadaia ci preflight` and CI `lint` job via `lint-imports`. Zero runtime impact.
 
 **Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
 `dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
@@ -143,7 +143,7 @@ puro: zero I/O, zero OS primitive — por isso é testável e cross-platform.
   * NÃO adicionar dependências fora desta lista sem release aprovada que justifique.
   * NÃO usar libs com network em build/test (offline-first).
   * `claude-agent-sdk` é um **runtime extra OPCIONAL instalado pelo operador**, NÃO uma dependência travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e é lazy-imported apenas pelo `ClaudeSdkAdapter` quando o operador escolhe rodar um step no harness Claude SDK. O build e os testes permanecem offline-first sem ele.
-  * `pi` / `@earendil-works/pi-coding-agent` é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + `ANTHROPIC_API_KEY`), invocado como binário externo pelo `PiHeadlessAdapter` via subprocess — **NÃO** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e os testes são totalmente faked (offline-first preservado). A versão de `pi` live-verificada é **0.79.3** (provider openai-codex, gpt-5.5), confirmada em v0.1.31 pelo live seam (`DADAIA_E2E_REAL_WORKER=1`).
+  * `pi` / `@earendil-works/pi-coding-agent` é um **runtime CLI externo OPCIONAL instalado pelo operador** (Node + o binário `pi`; autentica via a **subscrição Codex do operador** em `~/.pi/agent/auth.json` — provider `openai-codex`/GPT, **NÃO** `ANTHROPIC_API_KEY`), invocado como binário externo pelo `PiHeadlessAdapter` via subprocess — **NÃO** uma dependência Python/Node travada/pinned: não entra em `poetry.lock`, não é importado em module-load, e os testes são totalmente faked (offline-first preservado). A versão de `pi` live-verificada é **0.79.3** (provider openai-codex, gpt-5.5), confirmada em v0.1.31 pelo live seam (`DADAIA_E2E_REAL_WORKER=1`).
   * NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em `features/orchestration/`.
   * NÃO chamar `os.system`/`subprocess` fora de `infrastructure/` — features usam protocols.
   * NÃO importar Python <3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).

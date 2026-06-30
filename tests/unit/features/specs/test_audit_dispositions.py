@@ -32,9 +32,7 @@ def test_archived_audit_finding_without_disposition_is_error(tmp_path: Path) -> 
 
     issues = _audit_disposition_issues(specs_dir)
 
-    assert [(issue.code, issue.severity) for issue in issues] == [
-        ("SPEC-DOC-033", Severity.ERROR)
-    ]
+    assert [(issue.code, issue.severity) for issue in issues] == [("SPEC-DOC-033", Severity.ERROR)]
 
 
 def test_audit_finding_rejects_legacy_disposition_tokens(tmp_path: Path) -> None:
@@ -48,9 +46,7 @@ def test_audit_finding_rejects_legacy_disposition_tokens(tmp_path: Path) -> None
 
     issues = _audit_disposition_issues(specs_dir)
 
-    assert [(issue.code, issue.severity) for issue in issues] == [
-        ("SPEC-DOC-033", Severity.ERROR)
-    ]
+    assert [(issue.code, issue.severity) for issue in issues] == [("SPEC-DOC-033", Severity.ERROR)]
     assert "accepted-risk" in issues[0].description
 
 

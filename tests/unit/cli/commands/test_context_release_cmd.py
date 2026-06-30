@@ -27,7 +27,7 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import context as context_cmd
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import lease, session_identity
 
 runner = CliRunner()
 
@@ -163,6 +163,27 @@ def test_release_without_lease_is_clean_noop(
     monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
 
     result = runner.invoke(context_cmd.app, ["release", "--session", cli_sid])
+
+    assert result.exit_code == 0, result.output
+    assert lease.read_record(ws, "ctxa") is None
+    assert not (context_cmd._sessions_dir(ws) / f"{cli_sid}.json").exists()
+
+
+def test_release_uses_persisted_bound_session_when_env_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No --session/env, but incumbent ptr names a CLI session ⇒ release succeeds."""
+    ws = tmp_path
+    holder_sid = "sess_harness"
+    cli_sid = "sess_cli04"
+    _seed_lease(ws, "ctxa", holder_sid, pid=9999)
+    _seed_session(ws, cli_sid, "ctxa")
+    session_identity.write_incumbent_ptr(ws, "ctxa", cli_sid)
+    _patch_workspace(monkeypatch, ws)
+    _patch_probes(monkeypatch, alive=False, ancestry=Ancestry.NOT_ANCESTOR)
+    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+
+    result = runner.invoke(context_cmd.app, ["release"])
 
     assert result.exit_code == 0, result.output
     assert lease.read_record(ws, "ctxa") is None

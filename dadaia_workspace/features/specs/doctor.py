@@ -575,6 +575,8 @@ class SpecsDoctor:
         issues.extend(self._check_consumed_backlog_disposition())  # SPEC-DOC-031
         issues.extend(self._check_bug_status_canon())  # SPEC-DOC-032
         issues.extend(self._check_audit_dispositions())  # SPEC-DOC-033
+        # v0.1.42 / T-E — recurrence guard for the constitution single-source rewrite
+        issues.extend(self._check_constitution_no_runtime_enumeration())  # SPEC-DOC-034
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -1301,6 +1303,74 @@ class SpecsDoctor:
             )
         return issues
 
+    # SPEC-DOC-034: the constitution must NOT hard-code the AgentRuntimeKind roster.
+    # The roster (which Layer-2 harnesses / runtime kinds exist) is product truth that
+    # lives in memory (``tech-stack.md#agent-runtimes``); the constitution may only CITE
+    # it. Enumerating concrete kind tokens (or a "N AgentRuntimeKinds" count) in the
+    # constitution is the duplicated-roster drift this check prevents (recurrence guard
+    # for the v0.1.42 single-source rewrite): when a kind is added/removed the
+    # constitution silently goes stale (e.g. the removed ``OPENCODE_RUN`` token).
+    #
+    # The token set includes the live members AND the retired ``OPENCODE_RUN`` so a stale
+    # enumeration that still names the removed kind is also caught.
+    _CONSTITUTION_RUNTIME_KIND_TOKENS: frozenset[str] = frozenset(
+        {"FAKE", "CODEX_EXEC", "CLAUDE_SDK", "PI_HEADLESS", "OPENCODE_RUN"}
+    )
+    #: A "N AgentRuntimeKinds" / "N runtime kinds" count phrase — a roster enumeration even
+    #: when it spells out no individual token.
+    _CONSTITUTION_KIND_COUNT_RE = re.compile(
+        r"\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+"
+        r"(?:AgentRuntimeKinds?|runtime\s+kinds?)\b",
+        re.IGNORECASE,
+    )
+
+    def _check_constitution_no_runtime_enumeration(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-034: constitution.md must cite — never enumerate — the runtime roster.
+
+        FAILS (ERROR) when ``constitution.md`` literally enumerates the harness/runtime
+        roster instead of citing memory, detected two ways:
+
+        * **two or more** distinct ``AgentRuntimeKind`` member tokens
+          (``FAKE``/``CODEX_EXEC``/``CLAUDE_SDK``/``PI_HEADLESS``/``OPENCODE_RUN``) appear
+          as whole words — a hard-coded kind list; or
+        * a count phrase like ``five AgentRuntimeKinds`` / ``four runtime kinds`` — a
+          roster-size enumeration.
+
+        A single incidental token mention does not trip the check (≥2 required), so prose
+        that cites one kind by name in passing stays GREEN. The roster's single home is
+        ``specs/memory/tech-stack.md`` (anchor ``agent-runtimes``); the constitution must
+        cite it rather than duplicate it.
+        """
+        constitution = self.specs_dir / "constitution.md"
+        if not constitution.exists():
+            return []
+        text = constitution.read_text(encoding="utf-8")
+        found_tokens = sorted(
+            token
+            for token in self._CONSTITUTION_RUNTIME_KIND_TOKENS
+            if re.search(rf"\b{re.escape(token)}\b", text)
+        )
+        count_phrase = self._CONSTITUTION_KIND_COUNT_RE.search(text)
+        if len(found_tokens) < 2 and count_phrase is None:
+            return []
+        if found_tokens:
+            evidence = f"enumerates AgentRuntimeKind tokens {', '.join(found_tokens)}"
+        else:
+            evidence = f"enumerates the roster size ('{count_phrase.group(0).strip()}')"  # type: ignore[union-attr]
+        return [
+            SpecsDoctorIssue(
+                code="SPEC-DOC-034",
+                severity=Severity.ERROR,
+                description=(
+                    f"constitution.md {evidence}. The runtime/harness roster is product "
+                    "truth that lives in memory — remove the enumeration and cite "
+                    "`specs/memory/tech-stack.md` (anchor `agent-runtimes`) instead "
+                    "(SPEC-DOC-034)."
+                ),
+                path=str(constitution),
+            )
+        ]
+
     def _check_lease_session_coherence(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-029 (D-2 backstop) — three-state triage (T-011-03, bug B3).
 
@@ -1591,7 +1661,9 @@ class SpecsDoctor:
             dispositions = [
                 match.group(1).strip().lower() for match in _AUDIT_DISPOSITION_RE.finditer(text)
             ]
-            invalid = sorted({token for token in dispositions if token not in _AUDIT_DISPOSITION_CANON})
+            invalid = sorted(
+                {token for token in dispositions if token not in _AUDIT_DISPOSITION_CANON}
+            )
             if invalid:
                 issues.append(
                     SpecsDoctorIssue(

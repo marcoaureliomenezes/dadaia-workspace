@@ -146,6 +146,7 @@ def test_all_five_checks_built_through_resolve_tool(tmp_path: Path) -> None:
     """
     venv_bin = tmp_path / "venv" / "bin"
     _make_exe(venv_bin, "python")
+    lint_imports = _make_exe(venv_bin, "lint-imports")
     ruff = _make_exe(venv_bin, "ruff")
     mypy = _make_exe(venv_bin, "mypy")
     pytest_exe = _make_exe(venv_bin, "pytest")
@@ -163,6 +164,7 @@ def test_all_five_checks_built_through_resolve_tool(tmp_path: Path) -> None:
     )
 
     by_name = {c.name: c.argv for c in full}
+    assert by_name["lint-imports"][0] == str(lint_imports)
     assert by_name["ruff format --check"][0] == str(ruff)
     assert by_name["ruff check"][0] == str(ruff)
     assert by_name["mypy --strict"][0] == str(mypy)
@@ -185,7 +187,7 @@ def test_preflight_works_with_poetry_off_path(tmp_path: Path) -> None:
     """
     venv_bin = tmp_path / "venv" / "bin"
     _make_exe(venv_bin, "python")
-    for tool in ("ruff", "mypy", "pytest"):
+    for tool in ("lint-imports", "ruff", "mypy", "pytest"):
         _make_exe(venv_bin, tool)
     python = venv_bin / "python"
 

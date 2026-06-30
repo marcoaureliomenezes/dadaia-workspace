@@ -59,3 +59,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 - **Write set:** `dadaia_workspace/infrastructure/fake_runtime.py`, lifecycle CLI/skeleton tests as needed, picked fake-review bug file, `specs/releases/v0.1.40/alpha-1/**`
 - **Acceptance:** `dadaia lifecycle review qa --harness fake --json` emits an APPROVED review handoff and advances instead of blocking on missing verdict; fake create/no-op behavior remains scoped and deterministic.
 - **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_command_skeletons.py -q` -> `9 passed`; `ruff check --no-cache` on touched runtime/test files -> `All checks passed!`; `mypy --strict dadaia_workspace/infrastructure/fake_runtime.py` -> `Success`; `dadaia lifecycle review qa --release-id v0.1.40 --run-id v0140-alpha1-qa-fixed --harness fake --json` -> `status=OK`, `phase=qa_review`.
+
+### T7 - Fix workflow and workspace root-cause bugs
+
+- **Status:** [x] DONE
+- **Owner:** product-engineer
+- **Write set:** `dadaia_workspace/features/lifecycle/**`, `dadaia_workspace/features/spec_context/**`, `dadaia_workspace/features/backlog/**`, `dadaia_workspace/hooks/**`, `dadaia_workspace/cli/commands/**`, handoff/workspace-root helpers, focused tests, picked bug files, `specs/releases/v0.1.40/alpha-1/**`
+- **Acceptance:** `dadaia lifecycle bug report` emits doctor-valid bug frontmatter; the SDD gate renews rather than self-blocks the incumbent/holder session; handoff/report/workflow helpers resolve the workspace root instead of creating repo-local `.dadaia/`; lifecycle run store accepts temp workspaces under ambient temp-root `.git` while still rejecting repo-local `.dadaia`; `dadaia backlog doctor` default alias-map resolution works from a repo subdir.
+- **Validation:** `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_bug_report_workflow.py tests/integration/gate/test_classifier_reroot_matrix.py tests/contract/test_headless_runtime_security.py tests/unit/features/lifecycle/test_json_lifecycle_run_store.py tests/integration/cli/test_cli_newartifacts.py -q` -> `66 passed`; `ruff check --no-cache` on touched source/test files -> `All checks passed!`; `mypy --strict` on touched production modules -> `Success`; `dadaia specs doctor --specs-dir specs` -> `0 errors, 17 known warnings`; `dadaia backlog doctor --specs-dir specs` -> `clean`.

@@ -1,6 +1,6 @@
 ---
 name: import-linter-contracts-red-but-not-ci-enforced
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-27
 surface: import-linter contracts / CI (.github) / dadaia ci preflight

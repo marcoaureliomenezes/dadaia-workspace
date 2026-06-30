@@ -1,6 +1,6 @@
 ---
 name: codex-config-emits-invalid-approved-commands
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-24
 surface: dadaia public install (codex target) — runtime_config.codex_config()

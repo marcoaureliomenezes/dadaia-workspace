@@ -29,7 +29,10 @@ additive by construction: a new file appears, nothing else changes.
 2. **Carry the normalized fields.** The record carries the symptom, repro,
    expected/actual, severity, surface, status `Open`, and the reported date from the
    intake step.
-3. **Stay redaction-clean.** No operator-local absolute path, IP, hostname, private
+3. **Write doctor-valid frontmatter.** The YAML frontmatter MUST include
+   `session_id: null` when the session id is unknown. Never omit `session_id:`;
+   `dadaia specs doctor` treats the field as required for every `specs/bugs/*.md`.
+4. **Stay redaction-clean.** No operator-local absolute path, IP, hostname, private
    repo name, or secret in the committed record.
 
 ## Output

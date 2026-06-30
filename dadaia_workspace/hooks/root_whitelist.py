@@ -7,8 +7,9 @@ The Law: the workspace root may contain ONLY these entries::
 
 Any other top-level entry is blocked. An operator exception list at
 ``.dadaia/states/root_exceptions.txt`` (one fnmatch glob per line) documents deliberate
-exceptions. The gate only fires on writes whose immediate parent IS the workspace root;
-writes under any subdirectory are allowed. Fails open on unparseable input.
+exceptions. The gate checks the first path component below the workspace root, so nested
+writes such as ``<root>/build/out.txt`` still block when they would create a forbidden
+root entry. Fails open on unparseable input.
 """
 
 from __future__ import annotations
@@ -108,15 +109,17 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
     if not fpath.is_absolute():
         fpath = workspace / fpath
 
-    # Only gate writes whose immediate parent is exactly the workspace root.
     try:
-        is_at_root = fpath.parent.resolve() == workspace.resolve()
+        relative = fpath.resolve().relative_to(workspace.resolve())
     except OSError:
         return None
-    if not is_at_root:
+    except ValueError:
         return None
 
-    basename = fpath.name
+    try:
+        basename = relative.parts[0]
+    except IndexError:
+        return None
     if basename in _WHITELIST:
         return None
     if _operator_exception(workspace, basename):

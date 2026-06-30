@@ -1,2 +1,1 @@
 """Bug telemetry feature package."""
-

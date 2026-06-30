@@ -221,6 +221,44 @@ def test_dead_clean_tree_unchanged_real_git(tmp_path: Path, workspace_root: Path
     assert not repo.exists()
 
 
+def test_dead_pushes_when_local_branch_tracks_different_upstream_name(
+    tmp_path: Path, workspace_root: Path
+) -> None:
+    """`dead()` must not fail on Git's local/upstream branch-name mismatch."""
+    remote = _bare_remote(tmp_path)
+    repo = workspace_root / "repos" / "proj-repo"
+    _clone_with_initial_commit(remote, repo)
+    _run(["git", "checkout", "-b", "feature"], cwd=repo)
+    _run(["git", "push", "-u", "origin", "HEAD:development"], cwd=repo)
+
+    upstream = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert upstream.stdout.strip() == "origin/development"
+    assert subprocess.run(["git", "push"], cwd=repo, capture_output=True).returncode != 0
+
+    (repo / "README.md").write_text("tracked update before dead\n", encoding="utf-8")
+    service, store = _make_service(workspace_root)
+    _alive_ctx(store, "proj-repo")
+
+    _make_tree_writable(repo)
+    ctx = service.dead("proj")
+
+    assert ctx.state == ContextState.DEAD
+    assert not repo.exists()
+    log = subprocess.run(
+        ["git", "--git-dir", str(remote), "log", "--oneline", "development"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "auto-sync before dead" in log.stdout
+
+
 def test_dead_removes_repo_with_standard_readonly_git_objects(
     tmp_path: Path, workspace_root: Path
 ) -> None:

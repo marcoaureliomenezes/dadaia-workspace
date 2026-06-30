@@ -1,6 +1,6 @@
 ---
 name: memory-heading-allowlist-not-consumer-extensible
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-11
 surface: dadaia_workspace/public/scripts/lint-memory-atoms.py (heading allowlist) / specs doctor memory lint

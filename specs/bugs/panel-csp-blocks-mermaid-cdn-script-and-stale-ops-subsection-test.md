@@ -1,6 +1,6 @@
 ---
 name: panel-csp-blocks-mermaid-cdn-script-and-stale-ops-subsection-test
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-06-26
 surface: features/panel (index.py inline mermaid script + CSP) / tests/e2e/panel (ops-tab OPS-02) / ci preflight scope
@@ -71,3 +71,16 @@ a styled `<pre>` plus the canonical server-rendered SVG. If true client-side
 mermaid rendering is later desired, it must be a **self-hosted** bundle served
 from `'self'` (no CDN) with its inline bootstrap hash added to the CSP allowlist —
 tracked separately, not in this hotfix.
+
+**v0.1.41 verification:** Focused panel Playwright slice passed against the current
+implementation and confirms the stale bug is closed: OPS-02 uses the current Agentic
+subsection order, OPS-06/E2E-GUARD-02/E2E-SRV-01 have no browser console failures, and
+E2E-TAB-04/E2E-TAB-06 confirm no CSP violations, external CDN scripts, Mermaid requests,
+or `window.mermaid`.
+
+```bash
+PANEL_TEST_PORT=3212 PANEL_WEB_SERVER_COMMAND="<venv>/python -m dadaia_workspace.cli.main panel --port 3212 --no-open" \
+  ./node_modules/.bin/playwright test panel/ops-tab.spec.ts panel/tab-navigation.spec.ts \
+  panel/response-guard.spec.ts panel/servers-tab.spec.ts -c panel/playwright.config.ts --reporter=list
+# 15 passed
+```

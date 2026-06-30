@@ -39,6 +39,12 @@ import re
 from collections.abc import Callable
 from typing import Protocol
 
+from dadaia_workspace.core.protocols.workflow_model_policy_store import (
+    DEFAULT_CONTEXT,
+    WorkflowModelPolicyOverlay,
+    WorkflowModelPolicyStoreError,
+    WorkflowModelPolicyStorePort,
+)
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
@@ -50,12 +56,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     WorkflowCatalog,
     WorkflowExecutionPolicyResolver,
-)
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    DEFAULT_CONTEXT,
-    JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
-    WorkflowModelPolicyStoreError,
 )
 
 
@@ -320,7 +320,7 @@ def render_api_workflow_fragment(
 
 
 def render_api_workflow_model_policy(
-    store: JsonWorkflowModelPolicyStore,
+    store: WorkflowModelPolicyStorePort,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """GET /api/workflow-model-policy?context=<ctx> — the persisted overlay.
 
@@ -458,7 +458,7 @@ def render_api_workflow_step_ledger(
 
 
 def render_put_workflow_model_policy(
-    store: JsonWorkflowModelPolicyStore,
+    store: WorkflowModelPolicyStorePort,
     resolver_factory: ResolverFactory,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """PUT /api/workflow-model-policy?context=<ctx> — validated, atomic overlay write.
@@ -493,7 +493,7 @@ def render_put_workflow_model_policy(
 
 
 def render_post_workflow_model_policy_validate(
-    store: JsonWorkflowModelPolicyStore,
+    store: WorkflowModelPolicyStorePort,
     resolver_factory: ResolverFactory,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """POST /api/workflow-model-policy/validate — dry-run validation, no write."""
@@ -514,7 +514,7 @@ def render_post_workflow_model_policy_validate(
 
 
 def _validate_policy_request(
-    store: JsonWorkflowModelPolicyStore,
+    store: WorkflowModelPolicyStorePort,
     resolver_factory: ResolverFactory,
     body: bytes,
     content_type: str,

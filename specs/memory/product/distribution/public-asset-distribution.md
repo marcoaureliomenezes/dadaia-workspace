@@ -2,7 +2,7 @@
 slug: public-asset-distribution
 title: public-asset-distribution
 category: product
-tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots.
+tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.
 summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
@@ -12,8 +12,8 @@ tags:
 - privacy
 agent_tier: self-pull
 token_estimate: 678
-last_updated: '2026-06-06'
-release_origin: v0.1.5
+last_updated: '2026-06-29'
+release_origin: v0.1.41
 ---
 
 ## Propósito
@@ -25,8 +25,8 @@ templates, scoped AGENTS.md files, and runtime adapters.
 The canonical source is `dadaia_workspace/public/<type>/`. `public stage` copies
 that source into `.dadaia/agentic/<type>/` with a manifest. `public install`
 projects staged assets into runtime-specific roots: `.claude/`, `.codex/`,
-`.opencode/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, and scoped
-runtime rule files.
+`.pi/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, and scoped
+runtime rule files. The install targets are `{agents, claude, codex, pi}`.
 
 ## Diferencial
 
@@ -69,7 +69,7 @@ domain-scoped AGENTS files are not overwritten.
 
 The `dadaia-workspace` source repo must stay free of root runtime projections
 and local harness files. Generated/local artefacts such as `.dadaia/`,
-`.agents/`, `.claude/`, `.codex/`, `.opencode/`, `CLAUDE.md`, `opencode.json`,
+`.agents/`, `.claude/`, `.codex/`, `.pi/`, `CLAUDE.md`,
 `Makefile`, root `playwright.config.ts`, `playwright-report/`, and
 `test-results/` are ignored and guarded by tests/CI.
 
@@ -82,7 +82,8 @@ Staged temp workspaces remain supported.
 - Claude Code: `.claude/agents`, `.claude/skills`, hooks, commands, rules.
 - Codex: `.codex/config.toml`, `.codex/hooks.json`, `.codex/skills`, reference
   workflows, and `AGENTS.md` context.
-- OpenCode: `.opencode/agents`, plugins/hooks, config, skills.
+- PI: `.pi/SYSTEM.md`, `.pi/settings.json`, `.pi/prompts/`, and the post-trust
+  `.pi/extensions/dadaia-sdd-gate.ts` Ring-1 extension.
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
 `public doctor` compares canonical source, staging, and projections across three
@@ -96,4 +97,5 @@ Codex hook projection writes the nested Codex hook schema under `.codex/hooks.js
 `DADAIA_HOOK_OUTPUT=codex-json` so the hook returns valid additional-context JSON.
 Forced Codex installs remove stale generated `.codex/agents/*.toml` and
 `.codex/workflows/*.workflow.md` files that no longer exist in canonical public
-assets.
+assets. Generated Codex config does not emit the stale `approved_commands` key;
+command policy lives in Codex rules/projections, not in an unsupported TOML field.

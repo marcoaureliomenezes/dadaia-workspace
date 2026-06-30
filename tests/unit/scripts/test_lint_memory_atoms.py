@@ -8,7 +8,7 @@ Coverage:
   - Forbidden '## Histórico' heading → ERROR (exit 1)
   - Broken [[wikilink]] → ERROR (exit 1)
   - Duplicate ## heading → ERROR (exit 1)
-  - Unknown (not-in-allowlist) ## heading → WARN (exit 2)
+  - Unknown consumer-specific ## heading → accepted
   - Token estimate drift > 20% → WARN (exit 2)
   - Token estimate within 20% → OK
   - slug != filename stem → ERROR (exit 1)
@@ -326,12 +326,12 @@ def test_duplicate_heading_errors(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test: unknown heading → WARN not ERROR
+# Test: unknown consumer heading accepted
 # ---------------------------------------------------------------------------
 
 
-def test_unknown_heading_warns_not_errors(tmp_path: Path) -> None:
-    """A ## heading not in the allowlist produces a WARN (not ERROR)."""
+def test_unknown_consumer_heading_is_accepted(tmp_path: Path) -> None:
+    """A consumer-specific ## heading is accepted by generic memory lint."""
     schema = _load_schema_real()
     md_path = _make_atom(
         tmp_path,
@@ -341,11 +341,8 @@ def test_unknown_heading_warns_not_errors(tmp_path: Path) -> None:
 
     result = lint_atom(md_path, tmp_path, schema)
 
-    assert not result.has_errors, f"Unknown heading should not ERROR. Got: {result.errors}"
-    assert result.has_warnings, "Unknown heading should produce a WARNING"
-    assert any("allowlist" in w.lower() or "unknown" in w.lower() for w in result.warnings), (
-        f"Warning should mention allowlist. Got: {result.warnings}"
-    )
+    assert not result.has_errors, f"Consumer heading should not ERROR. Got: {result.errors}"
+    assert not result.has_warnings, f"Consumer heading should not WARN. Got: {result.warnings}"
 
 
 def test_legitimate_canon_headings_in_allowlist() -> None:
@@ -393,10 +390,12 @@ def test_legitimate_canon_headings_in_allowlist() -> None:
 def test_exit_code_warn_only_is_two(tmp_path: Path) -> None:
     """_exit_code returns 2 when only warnings exist."""
     schema = _load_schema_real()
+    body = "## Propósito\n\n" + " ".join(["word"] * 100) + "\n"
     md_path = _make_atom(
         tmp_path,
         slug="test-atom",
-        body="## Propósito\n\nBody.\n\n## ZZZ Unknown Heading\n\nContent.\n",
+        frontmatter_overrides={"token_estimate": 1},
+        body=body,
     )
     results = [lint_atom(md_path, tmp_path, schema)]
     assert _exit_code(results) == 2

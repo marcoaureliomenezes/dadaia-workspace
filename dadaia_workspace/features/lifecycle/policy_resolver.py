@@ -43,13 +43,13 @@ from dadaia_workspace.core.models.workflow_execution import (
     WorkflowPolicySnapshot,
     WorkflowPolicyStepEntry,
 )
-from dadaia_workspace.features.lifecycle import model_profiles
-from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
-from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+from dadaia_workspace.core.protocols.workflow_model_policy_store import (
     DEFAULT_CONTEXT,
     WorkflowModelPolicyOverlay,
 )
+from dadaia_workspace.features.lifecycle import model_profiles
+from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
+from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 
 #: The precedence vocabulary recorded on every snapshot (descending precedence).
 _PRECEDENCE: tuple[str, ...] = (

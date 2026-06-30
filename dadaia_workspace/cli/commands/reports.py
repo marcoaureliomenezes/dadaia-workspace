@@ -13,6 +13,7 @@ from rich.console import Console
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import (
     HandoffSchemaError,
+    HandoffValidationError,
     NoActiveReleaseError,
     NoAgentSequenceError,
     WorkspaceNotInitializedError,
@@ -31,6 +32,12 @@ err_console = Console(stderr=True)
 
 # Maximum HTML file size (bytes) before flagging as oversized
 _OVERSIZED_THRESHOLD_BYTES = 30 * 1024  # 30 KB
+
+_HTML_VALIDATE_MESSAGE = (
+    "HTML reports are not handoff JSON. Validate the matching "
+    ".dadaia/handoff/<context>/*.handoff.json file; report integrity is checked "
+    "through artifact.path and artifact.content_hash."
+)
 
 
 def _parse_duration(value: str) -> _dt.timedelta:
@@ -346,6 +353,15 @@ def validate(
     has_v10_error = False
 
     for p in target_paths:
+        if p.suffix.lower() in {".html", ".htm"}:
+            results.append(
+                ValidationResult(
+                    path=p,
+                    valid=False,
+                    errors=(HandoffValidationError("$root", _HTML_VALIDATE_MESSAGE),),
+                )
+            )
+            continue
         try:
             raw = p.read_text(encoding="utf-8")
             doc = _json.loads(raw)

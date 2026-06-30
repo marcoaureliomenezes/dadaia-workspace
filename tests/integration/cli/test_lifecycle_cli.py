@@ -164,6 +164,48 @@ def test_successful_single_step_review_persists_completed_run_state(
     assert run.blocked is None
 
 
+def test_lifecycle_close_fake_harness_emits_evidence_and_advances(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression — bug ``lifecycle-close-fake-harness-blocks-on-missing-artifact-evidence``.
+
+    The close step is a create step (target phase CLOSURE), so without an emitted artifact
+    the default FAKE runtime fell through to a no-op result and the step blocked on
+    "agent result missing artifact evidence". The FAKE closure writer must now emit a
+    closure handoff so the evidence gate passes and ``lifecycle close --harness fake``
+    advances to CLOSURE. Runs against the REAL default ``FakeAgentRuntime`` (no injected
+    result) so it genuinely exercises the writer.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "close",
+            "--release-id",
+            "v9.9.9",
+            "--run-id",
+            "close-fake-advances",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = container.build_lifecycle_run_store(workspace).load("close-fake-advances")
+    assert run is not None
+    assert run.status is LifecycleRunStatus.COMPLETED
+    assert run.blocked is None
+    assert run.phase is LifecyclePhase.CLOSURE
+    closure_handoffs = list(
+        (workspace / ".dadaia" / "handoff" / "dadaia-workspace").glob("*-fake-closure.handoff.json")
+    )
+    assert closure_handoffs, "FAKE close step must write a closure handoff artifact"
+
+
 def test_review_phase_prompt_requires_exact_full_commit_sha() -> None:
     sha = "d9f1d81c686f4aea5a60d16722d72b86457b7896"
 

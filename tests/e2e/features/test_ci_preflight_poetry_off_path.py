@@ -41,7 +41,7 @@ def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
     """Build a fake venv bin dir with python + ruff/mypy/pytest stubs."""
     venv_bin = tmp_path / "fakevenv" / "bin"
     _stub_exe(venv_bin, "python")
-    for tool in ("ruff", "mypy", "pytest"):
+    for tool in ("lint-imports", "ruff", "mypy", "pytest"):
         _stub_exe(venv_bin, tool, exit_code=exit_code)
     return venv_bin
 
@@ -89,7 +89,7 @@ def test_preflight_reports_failure_from_resolved_tool(
     results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
 
     assert not all_passed(results)
-    # First check (ruff format --check) fails → fail-fast stops there.
+    # First check (lint-imports) fails → fail-fast stops there.
     assert results[0].passed is False
     assert results[0].exit_code == 1
 

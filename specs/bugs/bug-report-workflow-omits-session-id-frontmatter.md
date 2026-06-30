@@ -1,6 +1,6 @@
 ---
 name: bug-report-workflow-omits-session-id-frontmatter
-status: Open
+status: Closed
 severity: HIGH
 reported: 2026-06-29
 surface: lifecycle bug_report workflow / specs doctor TREE-7
@@ -28,3 +28,30 @@ the field was manually added.
 **Fallback note:** This bug was recorded by direct Markdown fallback because the
 `bug_report` workflow is the component being reported; using it again would create
 another invalid bug record needing manual repair.
+
+## Resolution
+
+Fixed in v0.1.40 alpha-1 T7.
+
+Root cause: the bug-report workflow had two writers/prompts for the same record
+contract. The public `bug_report.bug_write` fragment did not explicitly require
+`session_id:`, and the deterministic fake bug-report runtime in `container.py`
+materialized Markdown without `session_id: null`. The `FakeAgentRuntime` generic path
+also did not materialize bug records, so the workflow contract could pass without
+proving the file shape.
+
+Fix:
+
+- `container._bug_report_runtime_factory` now writes `reported:` and
+  `session_id: null` in fake bug records and resolves writes through the shared
+  workspace-state root.
+- `FakeAgentRuntime` now materializes in-scope bug records for bug-report fake runs.
+- `public/lifecycle_fragments/bug_report/bug-write.md` now states that `session_id:`
+  is mandatory and must be `null` when unknown.
+
+Evidence:
+
+- `pytest -p no:cacheprovider tests/integration/cli/test_lifecycle_bug_report_workflow.py ... -q`
+  included the TREE-7 regression and passed in the focused 66-test run.
+- `dadaia lifecycle bug report --harness fake --json` completed with status `OK` during
+  T7 validation; the temporary smoke bug was removed after verification.

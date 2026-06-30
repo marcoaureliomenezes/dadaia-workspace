@@ -142,9 +142,13 @@ def _lint_type_checks(
     ``poetry``-hardcoded — bug B2).
     """
     mypy_cache = resolve_mypy_cache_dir()
+    import_linter = _resolve_tool(
+        "lint-imports", python_executable=python_executable, dadaia_bin=dadaia_bin
+    )
     ruff = _resolve_tool("ruff", python_executable=python_executable, dadaia_bin=dadaia_bin)
     mypy = _resolve_tool("mypy", python_executable=python_executable, dadaia_bin=dadaia_bin)
     return (
+        Check("lint-imports", import_linter),
         Check(
             "ruff format --check",
             (*ruff, "format", "--check", "--no-cache", *_RUFF_PATHS),

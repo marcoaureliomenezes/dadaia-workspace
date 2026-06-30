@@ -24,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.ledger import read_consumed
@@ -33,6 +34,9 @@ from dadaia_workspace.features.backlog.preview import (
     load_backlog_items,
 )
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
+
+if TYPE_CHECKING:
+    import typer
 
 __all__ = [
     "BacklogDoctorCode",
@@ -68,9 +72,7 @@ _KNOWN_STATUSES = frozenset(
 
 _STATUS_SUFFIX_RE = re.compile(r"\s+(?:—|–|-)\s+")
 _ACTIVE_KV_RE = re.compile(r"^\s*([A-Za-z_]+)\s*:\s*(.+?)\s*$")
-_CONSUMES_RE = re.compile(
-    r"^\s*(?:\*\*)?Consumes\s*:?(?:\*\*)?\s*:?\s*(.+)$", re.IGNORECASE
-)
+_CONSUMES_RE = re.compile(r"^\s*(?:\*\*)?Consumes\s*:?(?:\*\*)?\s*:?\s*(.+)$", re.IGNORECASE)
 
 
 class BacklogDoctorCode(StrEnum):
@@ -300,6 +302,7 @@ def run_backlog_doctor(
     catalog_path: Path,
     alias_map_path: Path,
     archive_root: Path,
+    cli_app: typer.Typer | None = None,
 ) -> list[Finding]:
     """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog and return all findings.
 
@@ -313,6 +316,7 @@ def run_backlog_doctor(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=specs_dir,
+        cli_app=cli_app,
     )
     items = load_backlog_items(specs_dir / "backlog")
     consumed = read_consumed(archive_root)

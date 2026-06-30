@@ -32,7 +32,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 2700
 last_updated: '2026-06-29'
-release_origin: v0.1.38
+release_origin: v0.1.41
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -174,6 +174,8 @@ Doctor TREE-1..7 enforça e repara esta árvore: `dadaia specs doctor` em worksp
   6. `dadaia context dead my-project` — remove o repo do disco (rmtree com retry chmod para objetos git user-owned read-only normais), marca DEAD. Bloqueado se TTL-lease HELD para o context. **Review gate:** com arquivos untracked e sem `--commit`, `dead()` recusa e não faz push; com `--commit`, um secret scan (privacy engine) roda sobre o conteúdo staged e bloqueia o push em qualquer finding.
 
 O hook `python -m dadaia_workspace.hooks.ctx_inject` executa no SessionStart/UserPromptSubmit. A injeção é **bind-driven**: sessão unbound recebe apenas o preflight genérico + lista de contexts ALIVE (sem context memory); após `dadaia context bind X`, o próximo prompt injeta a memory de X (tech-stack + catalog) uma vez por sessão lógica; re-bind para Y re-injeta Y. Para ADDITIVE writes (reports, handoffs, bugs, backlog, audits), o bind não é necessário — o gate permite esses paths sem lease.
+
+Comandos specs/context que aceitam resolução implícita de contexto honram o bind persistido em disco: `dadaia specs doctor` resolve o Spec Context Project a partir do incumbent/session pointer quando `DADAIA_CONTEXT` não está exportado, e `dadaia context release` consegue liberar a sessão persistida sem exigir o fluxo legado `eval $(dadaia context bind --print-env ...)`. Env vars continuam sendo override explícito de operador, não pré-requisito.
 
 ## Trigger típico
 

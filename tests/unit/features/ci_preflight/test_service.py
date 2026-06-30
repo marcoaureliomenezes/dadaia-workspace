@@ -18,14 +18,14 @@ def _pass(argv: Sequence[str]) -> tuple[int, str]:
 
 def test_checks_for_full_has_lint_type_and_default_pytest_without_performance() -> None:
     names = [c.name for c in checks_for(quick=False)]
-    assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
+    assert names[:4] == ["lint-imports", "ruff format --check", "ruff check", "mypy --strict"]
     assert names[-1] == "pytest (no performance)"
     assert checks_for(quick=False)[-1].argv[-2:] == ("-m", "not performance")
 
 
 def test_checks_for_quick_swaps_in_no_e2e_or_performance_pytest() -> None:
     names = [c.name for c in checks_for(quick=True)]
-    assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
+    assert names[:4] == ["lint-imports", "ruff format --check", "ruff check", "mypy --strict"]
     assert names[-1] == "pytest (no e2e/performance)"
     assert "-m" in checks_for(quick=True)[-1].argv
     assert "not performance" in checks_for(quick=True)[-1].argv
@@ -33,7 +33,7 @@ def test_checks_for_quick_swaps_in_no_e2e_or_performance_pytest() -> None:
 
 def test_run_preflight_all_pass() -> None:
     results = run_preflight(checks_for(), _pass)
-    assert len(results) == 4
+    assert len(results) == 5
     assert all_passed(results)
     assert failed_names(results) == []
 
@@ -50,7 +50,7 @@ def test_fail_fast_stops_at_first_failure() -> None:
     assert len(results) == 2  # stopped right after the failing 2nd check
     assert len(calls) == 2  # later checks never ran
     assert not all_passed(results)
-    assert failed_names(results) == ["ruff check"]
+    assert failed_names(results) == ["ruff format --check"]  # 2nd check (lint-imports is 1st)
 
 
 def test_no_fail_fast_runs_every_check() -> None:
@@ -61,7 +61,7 @@ def test_no_fail_fast_runs_every_check() -> None:
 
     results = run_preflight(checks_for(), runner, fail_fast=False)
 
-    assert len(results) == 4
+    assert len(results) == 5
     assert not all_passed(results)
     assert failed_names(results) == ["mypy --strict"]
 

@@ -48,6 +48,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.protocols.workflow_model_policy_store import (
+    DEFAULT_CONTEXT,
+    WorkflowModelPolicyOverlay,
+    WorkflowModelPolicyStoreError,
+    WorkflowModelPolicyStorePort,
+)
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     FragmentError,
@@ -58,12 +64,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     WorkflowCatalog,
     WorkflowExecutionPolicyResolver,
-)
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    DEFAULT_CONTEXT,
-    JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
-    WorkflowModelPolicyStoreError,
 )
 
 #: Layer-2 harness names a profile / step may legitimately declare (LAW 1).
@@ -275,10 +275,11 @@ def _check_profile_registry() -> list[Finding]:
 def _check_overlay(
     workspace_root: Path,
     catalog: WorkflowCatalog,
-    store: JsonWorkflowModelPolicyStore | None,
+    store: WorkflowModelPolicyStorePort | None,
 ) -> list[Finding]:
     """WMP-6 + WMP-8: the persisted overlay resolves, or fails actionably (no crash)."""
-    store = store or JsonWorkflowModelPolicyStore(workspace_root)
+    if store is None:
+        return []
     try:
         overlay = store.load()
     except WorkflowModelPolicyStoreError as exc:
@@ -351,7 +352,7 @@ def run_policy_doctor(
     workspace_root: Path,
     catalog: WorkflowCatalog | None = None,
     loader: FragmentLoader | None = None,
-    store: JsonWorkflowModelPolicyStore | None = None,
+    store: WorkflowModelPolicyStorePort | None = None,
 ) -> list[Finding]:
     """Run every ``WMP-*`` governance check and return all findings.
 

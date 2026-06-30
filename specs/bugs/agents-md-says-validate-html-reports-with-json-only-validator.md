@@ -1,6 +1,6 @@
 ---
 name: agents-md-says-validate-html-reports-with-json-only-validator
-status: Open
+status: Closed
 severity: LOW
 reported: 2026-06-12
 surface: public/data/AGENTS.md (Reports and Panel section) vs `dadaia reports validate`
