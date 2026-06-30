@@ -58,7 +58,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-2 — Shared wiring (serialize T-43-3/4/5: same file)
 
-- [-] **T-43-3 — Wire `shared.anti_slop` to create + substantive review steps.**
+- [x] **T-43-3 — Wire `shared.anti_slop` to create + substantive review steps.**
   Owner: ai-engineer.
   Write set: `dadaia_workspace/features/lifecycle/workflows/release_definition.py` (`_SEQUENCE`);
   `dadaia_workspace/features/lifecycle/workflows/backlog_definition.py` (`backlog_author` step).
@@ -68,7 +68,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   `backlog_author` (backlog_definition); existing entries preserved, no duplicates.
   Serialize: with T-43-4, T-43-5 (shared `release_definition.py`).
 
-- [ ] **T-43-4 — Wire `shared.output_handoff` to verdict + audit/bug/research model steps.**
+- [x] **T-43-4 — Wire `shared.output_handoff` to verdict + audit/bug/research model steps.**
   Owner: ai-engineer.
   Write set: `release_definition.py` (`spec_arch_review`, `spec_qa_review`, `plan_review`,
   `tasks_implementability_review`); `pipeline.py` (`review_qa`, `review_security`,
@@ -80,7 +80,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
   `shared.output_handoff`; no duplicate citations.
   Serialize: with T-43-3, T-43-5.
 
-- [ ] **T-43-5 — Wire `shared.memory_selection` to spec/plan/tasks create + their reviews.**
+- [x] **T-43-5 — Wire `shared.memory_selection` to spec/plan/tasks create + their reviews.**
   Owner: ai-engineer.
   Write set: `release_definition.py` (`spec_create`, `plan_create`, `tasks_create`,
   `spec_arch_review`, `spec_qa_review`, `plan_review`, `tasks_implementability_review`).
@@ -171,7 +171,7 @@ across owners. T-43-6b (classifier clamp) **must land before** T-43-6 wires the 
 
 ## WS-6 — Fix the archived-release lease pid-veto deadlock (HIGH bug)
 
-- [ ] **T-43-10 — Make lease reclaim release-aware (fix `lease-pid-veto-ignores-archived-release`).**
+- [-] **T-43-10 — Make lease reclaim release-aware (fix `lease-pid-veto-ignores-archived-release`).**
   Owner: software-engineer.
   Write set: `dadaia_workspace/core/lock_liveness.py` (liveness verdict);
   `dadaia_workspace/hooks/sdd_gate.py` (lease check consuming the verdict); the `dadaia lock
