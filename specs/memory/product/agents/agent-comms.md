@@ -14,9 +14,9 @@ tags:
 - handoff
 - schema
 agent_tier: self-pull
-token_estimate: 1230
+token_estimate: 1200
 last_updated: '2026-07-01'
-release_origin: v0.1.4.3
+release_origin: v0.1.47
 ---
 
 CLI surface: `dadaia reports validate [PATHS...] [--all] [--release <id>] [--strict|--no-strict] [--json]` · `dadaia reports lint [DIR]` · `dadaia reports next [--context <ctx>] [--json]`
@@ -36,7 +36,7 @@ O contrato separa evidência humana de coordenação máquina: HTML reports são
   * **Canonical:** `dadaia_workspace/public/schemas/handoff-v1.schema.json` (JSON Schema Draft 2020-12, `$schema = "https://json-schema.org/draft/2020-12/schema"`).
   * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (gerado via `dadaia public stage`). É o path lógico que CLI + skill consomem em runtime.
   * **NÃO projetado** para `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — schema é consumido apenas pela CLI Python, não pelo runtime dos agentes. Decisão A1 economizou 3 duplicações.
-  * **Asset type novo:** `schemas` foi adicionado a `_COPY_DIRS` em `dadaia_workspace/infrastructure/public_assets.py`. Constitution L124 (originalmente target L106 da SPEC FR6) enumera os 10 tipos suportados: _rules, skills, commands, scripts, agents, templates, workflows, plugins, data, schemas_.
+  * **Asset type:** `schemas` é um dos asset types de `_COPY_DIRS` em `dadaia_workspace/infrastructure/public_assets_common.py`. A lista viva de asset types é documentada em [[public-asset-distribution]] (a constitution não enumera asset types).
 
 
 
@@ -109,9 +109,8 @@ Itens explicitamente deferidos em SPEC §"Out-of-scope" e promovidos como candid
 ## Referência
 
   * Release id: `agent-comms-v1` arquivada em `specs/_archive/releases/agent-comms-v1/` (SPEC + PLAN + TASKS + CLOSURE).
-  * Dependência: [[public-asset-distribution]] — chain `public/` → `.dadaia/agentic/` → projeções multi-tool propaga o novo asset type `schemas`.
-  * Constitution L17–28 (tech-stack) **não tocada** — NFR3 honra zero novas dependências de runtime (validator stdlib-only).
-  * Constitution L124 (originalmente L106 no SPEC FR6 — file growth shifted line) enumera os 10 asset types canônicos.
+  * Dependência: [[public-asset-distribution]] — chain `public/` → `.dadaia/agentic/` → projeções multi-tool propaga o asset type `schemas`.
+  * NFR3: zero novas dependências de runtime (validator stdlib-only).
   * ADR-006 (dual ownership de `public/agents/*.md`): SE owns frontmatter YAML, PE owns markdown body.
   * ADR-007 (procedure for constitution update in release): FR explícito + verification triple + operator confirmation via SPEC approval + doctor verde pós-patch.
   * Auditoria precedente que motivou a release: `.dadaia/reports/dadaia-workspace/software-architect/2026-05-15-orchestration-audit.md`.

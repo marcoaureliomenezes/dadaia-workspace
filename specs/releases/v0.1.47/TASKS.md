@@ -42,22 +42,22 @@ write sets are declared (PLAN write-set boundaries apply).
 
 ## W3 — Memory canon (owner: product-engineer)
 
-- [-] T-47-40 tech-stack.md: `#Agent runtimes` = roster single-source; PI auth fix;
+- [x] T-47-40 tech-stack.md: `#Agent runtimes` = roster single-source; PI auth fix;
   kimi-2.7; dep list (pytest-randomly, hypothesis); mermaid-CDN claim removed
-- [-] T-47-41 product-vision.md + harness-primitives.md de-stale (WS-B1)
-- [-] T-47-42 Projection/runtime atoms de-stale (WS-B2 set)
-- [-] T-47-43 architecture.md de-narrate + slim + extract-to-owners + stale-line fixes
+- [x] T-47-41 product-vision.md + harness-primitives.md de-stale (WS-B1)
+- [x] T-47-42 Projection/runtime atoms de-stale (WS-B2 set)
+- [x] T-47-43 architecture.md de-narrate + slim + extract-to-owners + stale-line fixes
   (WS-B7); kanban contradiction resolved to code truth; auth sections pass the
   no-bearer grep acceptance; import-linter CI claim reworded to deferred
-- [-] T-47-44 quality-assurance.md re-truing (WS-C; 5 governance jobs)
-- [-] T-47-45 v0.1.46 catch-up: sdd-bug-backlog-governance rewrite (JSONL store);
+- [x] T-47-44 quality-assurance.md re-truing (WS-C; 5 governance jobs)
+- [x] T-47-45 v0.1.46 catch-up: sdd-bug-backlog-governance rewrite (JSONL store);
   specs-doctor.md inventory; R-2 FROZEN rows in sdd-gate-v3 + architecture
-- [-] T-47-46 panel.md + agent-monitoring.md + brand-identity.md truth (no-auth reality,
+- [x] T-47-46 panel.md + agent-monitoring.md + brand-identity.md truth (no-auth reality,
   module lists, SQLite filename, token home); spec-context-project.md injection claim;
   workspace-doctor.md codes; platform atom nits; ACCEPT: no-bearer grep == 0 + positive
   loopback/Host-guard statement + import-linter-CI grep clean across memory
-- [-] T-47-47 NEW memory/product/harness/{claude-code,codex,pi}.md (grill D-5)
-- [-] T-47-48 dadaia-workflows atom (WS-B4) + §13 index.md (WS-B3) + catalog regenerate
+- [x] T-47-47 NEW memory/product/harness/{claude-code,codex,pi}.md (grill D-5)
+- [x] T-47-48 dadaia-workflows atom (WS-B4) + §13 index.md (WS-B3) + catalog regenerate
   (WS-B8, LAST)
 
 ## W4 — Fragments + personas (owner: ai-engineer)
@@ -76,7 +76,7 @@ write sets are declared (PLAN write-set boundaries apply).
 
 - [x] T-47-60 Deferral backlog entries (10 named in SPEC §W5, incl.
   lifecycle-verb-governance-uniformity + hygiene-and-dead-code-cleanup)
-- [-] T-47-61 Bug terminal events per SPEC §W5 state table (resolved set, 2 supersedes,
+- [x] T-47-61 Bug terminal events per SPEC §W5 state table (resolved set, 2 supersedes,
   7 deferred-with-backlog-ref, hollow-event backfill → resolved, mypy-cache repro →
   rejected-or-open)
 - [x] T-47-62 Audit archive sweep (15 dirs, disposition lines incl. this release's audit)

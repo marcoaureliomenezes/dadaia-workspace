@@ -2,13 +2,12 @@
 slug: quality-assurance
 title: quality-assurance
 category: product
-tldr: 'Five-layer pytest architecture, multi-job CI (10 quality + 4 governance), no-slop policy — design-of-record for implementers and qa-engineer.'
+tldr: 'Five-layer pytest architecture, multi-job CI (10 quality + 5 governance), no-slop policy — design-of-record for implementers and qa-engineer.'
 summary: >-
   Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with
-  machine-readable pytest markers, a CI split into 10 quality jobs (plus 4 governance
-  jobs) with explicit timeouts,
-  and a no-slop policy. This atom is the single source of truth for test design,
-  absorbing test-suite-architecture.md (v0.1.7).
+  machine-readable pytest markers, a CI split into 10 quality jobs (plus 5 governance
+  jobs) with explicit timeouts, conftest safety guards, a CI-only 80% coverage gate,
+  and a no-slop policy. This atom is the single source of truth for test design.
 tags:
   - testing
   - pytest
@@ -16,9 +15,9 @@ tags:
   - quality
   - test-architecture
 agent_tier: self-pull
-token_estimate: 1150
-last_updated: '2026-06-25'
-release_origin: v0.1.19
+token_estimate: 1250
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -29,10 +28,19 @@ schema/security contracts), `integration` (multi-component with real filesystem 
 CLI runner), `e2e` (named user journeys, browser or process-boundary), and `tmp`
 (one-off debugging reproductions, quarantined and excluded from default collection).
 
-Each layer has a machine-readable pytest marker declared in `pyproject.toml`. The
-default local invocation (`pytest`) does not run coverage; coverage is measured only
-in CI's dedicated `contract-coverage` job, keeping local runs fast and avoiding
-coverage inflation that hides weak contracts.
+Each layer has a machine-readable pytest marker declared in `pyproject.toml`; test
+order is randomized per run by `pytest-randomly` (flushes inter-test order
+dependencies). The default local invocation (`pytest`) does not run coverage; the
+**only** coverage gate is CI's dedicated `contract-coverage` job
+(`--cov-fail-under=80`, a hard gate; `COVERAGE_FILE` redirected to the runner temp
+dir), keeping local runs fast and avoiding coverage inflation that hides weak
+contracts.
+
+**Live scale (honest bracket):** the suite collects ≈ 4.3k tests (4,300–4,400 as of
+v0.1.47; grows with every release). Rough layer shape: unit is the large base,
+contract and integration are the mid hundreds each, e2e is the small top. Budgets are
+brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
+closure.
 
 ```mermaid
 flowchart TB
@@ -46,16 +54,16 @@ flowchart TB
         TM["tmp — one-off repro · quarantined · excluded from default collection"]
     end
     PYR --> CI
-    subgraph CI["CI — 10 quality jobs (+ 4 governance) · cada um com timeout + marker filter"]
+    subgraph CI["CI — 10 quality jobs (+ 5 governance) · cada um com timeout + marker filter"]
         direction LR
         J0["importability-smoke"]
-        J1["lint<br/>ruff + import-linter"]
+        J1["lint<br/>ruff format --check + ruff check"]
         J2["typecheck<br/>mypy --strict"]
         J3["unit-fast<br/>(+ unit-fast-cross)"]
         J4["contract-coverage<br/>(+ contract-coverage-cross)"]
         J5["integration"]
         J6["e2e-python"]
-        J7["e2e-panel<br/>(playwright)"]
+        J7["e2e-panel<br/>(playwright/node)"]
     end
 ```
 
@@ -84,12 +92,16 @@ normative vision §6.
    `@pytest.mark.slow`.
 3. Local fast path: `pytest -q -m "unit and not slow" tests/unit` — runs in under
    10 seconds without coverage instrumentation.
-4. CI runs 10 quality jobs: importability-smoke, lint, typecheck, unit-fast,
-   unit-fast-cross, contract-coverage, contract-coverage-cross, integration,
-   e2e-python, e2e-panel — each with an explicit timeout and a targeted marker
-   filter (the `-cross` jobs run the same markers on the Windows/macOS matrix). A
-   further 4 governance jobs (pr-title, repo-hygiene, hotfix-branch-name,
-   verdict-gate) gate PR shape and the security push verdict.
+4. CI runs 10 quality jobs: importability-smoke, lint (ruff only — import-linter
+   contracts are NOT wired into any CI job; backlog `import-boundary-enforcement`),
+   typecheck, unit-fast, unit-fast-cross, contract-coverage, contract-coverage-cross,
+   integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
+   marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;
+   e2e-panel is a Playwright/Node job: `npm ci` + `npx playwright install chromium` +
+   `npm run test:e2e` against a bootstrapped panel workspace). A further 5 governance
+   jobs (pr-title, repo-hygiene, backlog-doctor, hotfix-branch-name, verdict-gate)
+   gate PR shape, repo/backlog hygiene, and the security push verdict; a separate
+   secret-scan workflow runs gitleaks.
 5. One-off debugging reproductions go to `tests/tmp/` with an expiry note; they
    are never counted toward coverage or release closure and are excluded from
    default collection.
@@ -113,8 +125,9 @@ the no-slop policy (prevents re-accumulation).
 
 Files the test suite reads or writes at runtime:
 
-- `pyproject.toml` — pytest configuration, marker declarations, `norecursedirs`,
-  coverage data redirect to `/tmp/dadaia-ws-toolcache/coverage/.coverage`.
+- `pyproject.toml` — pytest configuration (`-p no:cacheprovider`), marker
+  declarations, `norecursedirs`, `tmp_path_retention_policy = "failed"`; coverage in
+  CI redirects its data file via the `COVERAGE_FILE` env (runner temp dir).
 - `tests/unit/**` — pure or near-pure fast tests; forbidden: CLI runner,
   subprocess, server threads, public stage/install, full workspace init, sleeps.
 - `tests/contract/**` — public CLI/API/schema/security/projection contracts;
@@ -128,9 +141,14 @@ Files the test suite reads or writes at runtime:
 - `.github/workflows/ci.yml` — 10 quality jobs (importability-smoke, lint,
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
-  plus 4 governance jobs (pr-title, repo-hygiene, hotfix-branch-name, verdict-gate).
-- `tests/conftest.py` — backstop guard preventing real venv creation inside test
-  runs; `tmp_path_retention_policy = "failed"`.
+  plus 5 governance jobs (pr-title, repo-hygiene, backlog-doctor,
+  hotfix-branch-name, verdict-gate). `secret-scan.yml` (gitleaks) is a separate
+  workflow.
+- `tests/conftest.py` — the safety guards: `_no_real_venv_in_tests` (autouse; blocks
+  real venv/pip provisioning inside tests — disk-exhaustion backstop),
+  `_repo_root_write_guard` (autouse per-test repo-root file-set snapshot diff), and a
+  session-level pre/post snapshot pollution guard (`pytest_sessionstart`/`finish`)
+  that catches cache/artifact leaks the per-test guard cannot.
 
 ## Dependências
 

@@ -20,9 +20,9 @@ tags:
 - hooks
 - security
 agent_tier: self-pull
-token_estimate: 1440
+token_estimate: 1400
 last_updated: '2026-07-01'
-release_origin: v0.1.14
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -82,14 +82,14 @@ Singleton `PLATFORM` é acessado via `from dadaia_workspace.core.platform import
 ## Contrato de resiliência — 3 tiers
 
 **TIER 1 — FAIL LOUD (controles de segurança; silent no-op proibido):**
-- `WindowsFilePermissionSetter.restrict_to_owner()` — aplica ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` ANTES de criar o token file. `icacls` com `shell=False`. Username via `getpass.getuser()`. Falha → `PlatformSecurityError` (nunca warn-and-continue). O panel NÃO inicia com token desprotegido.
+- `WindowsFilePermissionSetter.restrict_to_owner()` — aplica ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` ANTES de criar o arquivo protegido. `icacls` com `shell=False`. Username via `getpass.getuser()`. Falha → `PlatformSecurityError` (nunca warn-and-continue). (O consumidor original — o token de auth do panel — foi removido com o modelo no-auth do panel; o resíduo `panel.token` em telemetry é tracked no backlog `hygiene-and-dead-code-cleanup`.)
 - `WindowsFileLock.acquire()` — usa `msvcrt.locking` (stdlib). Se `msvcrt` ausente → `PlatformCapabilityError`. Silent no-op é proibido (cria falsa confiança de serialização).
 
 **TIER 2 — DEGRADE COM INFO LOG (features não-security):**
 - `/proc` scan → não-Linux retorna `[]` + INFO "orphan detection disabled". Panel mostra "Scan unavailable on this platform."
 - `signal.SIGTERM` no Windows → registra SIGINT only + INFO log.
 - `WindowsTelemetryRefreshLock` → always-acquire no-op + INFO log. Seguro porque SQLite WAL mode provê serialização própria de writes. Se WAL for desabilitado, este adapter deve ser revisado.
-- `WindowsFilePermissionSetter` em telemetry/lease dirs → Tier 2 (log INFO + continua). Apenas o token do panel auth é Tier 1.
+- `WindowsFilePermissionSetter` em telemetry/lease dirs → Tier 2 (log INFO + continua).
 - `os.chmod(db_path, 0o600)` em `features/telemetry/service.py` (1 site) — sem guard `PLATFORM.has_posix_chmod`; silent no-op no Windows. Tier-2 aceitável (telemetry DB não é credencial de segurança). Guard é follow-up de baixa prioridade.
 - `script.chmod(0o755)` em `infrastructure/public_assets.py` (1 site) — executability bit; sem guard; silent no-op no Windows. Tier-2 aceitável. Guard é follow-up de baixa prioridade.
 
@@ -119,8 +119,8 @@ Wiring PreToolUse: o harness registra **um único** entrypoint, o MERGED `pre_ga
 (`python -m dadaia_workspace.hooks.pre_gate`), que executa os estágios root-whitelist →
 venv-guard → SDD gate em sequência, first-block-wins. `sdd_gate.py` e `root_whitelist.py`
 permanecem como módulos de POLÍTICA expondo `evaluate_payload()`, consumido por `pre_gate`
-(o `main()` standalone de cada um é mantido por uma release, depois removido).
-`ctx_inject` e `sdd_post_gate` têm entrypoints próprios
+(os `main()` standalone legados ainda existem; remoção tracked no backlog
+`hygiene-and-dead-code-cleanup`). `ctx_inject` e `sdd_post_gate` têm entrypoints próprios
 (`if __name__ == '__main__': sys.exit(main())`).
 
 Invariantes de paridade (parity contract com os hooks bash anteriores):
@@ -130,9 +130,12 @@ Invariantes de paridade (parity contract com os hooks bash anteriores):
 - `sdd_post_gate.py` usa `os.replace` atomic renewal + `[A-Za-z0-9_-]` session-id strip.
 - Fail-open: qualquer erro não-PROTECTED → ALLOW. PROTECTED é o único fail-closed path.
 
-`runtime_config.py` emite o comando Python para `.claude/settings.json` e `.codex/hooks.json`.
-`workspace/service.py` reconhece tanto o caminho `.sh` antigo quanto o novo comando Python para
-evitar dupla-registro em workspaces migrados.
+`runtime_config.py` emite o comando Python para `.claude/settings.json`; para o Codex,
+emite **wrappers executáveis self-locating** em `.dadaia/hooks/codex-*` referenciados por
+`.codex/hooks.json` (Codex direct-execs strings de hook — o wrapper resolve o venv Python
+relativo ao próprio path, cross-platform). `workspace/service.py` reconhece tanto o
+caminho `.sh` antigo quanto o novo comando Python para evitar dupla-registro em
+workspaces migrados.
 
 PI (`.pi/extensions/dadaia-sdd-gate.ts`, post-trust Ring-1) chama os Python hooks via
 subprocess. Resolução do binário venv: `.dadaia/.venv/bin/python` →
@@ -153,9 +156,6 @@ O classificador PyPI foi ampliado de `POSIX :: Linux` para
 `contract-coverage` — todos hard-gated. Qualquer falha em Windows ou macOS bloqueia o merge.
 
 **Linux-only by design (nunca adicionar Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
-Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
-
-**Linux-only by design (nunca adicionar Win/macOS):** integration, e2e-python, e2e-panel.
 Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
 
 ## Estado runtime tocado

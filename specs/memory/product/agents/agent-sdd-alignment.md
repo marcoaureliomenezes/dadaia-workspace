@@ -12,9 +12,9 @@ tags:
 - memory
 - release-lifecycle
 agent_tier: self-pull
-token_estimate: 695
+token_estimate: 690
 last_updated: '2026-07-01'
-release_origin: v0.2.2
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -72,16 +72,17 @@ Markdown is the memory source. `specs/memory/**/*.html`, `.yaml`, and `.yml`
 are legacy/generated formats and must not be written as product memory.
 
 Implementation requires approved `SPEC.md`, `PLAN.md`, `TASKS.md`, and one reserved
-`[-]` task in `TASKS.md`. The SDD gate enforces memory phase rules (CLOSURE +
-DEFINITION for product-engineer), archive read-only rules, write allowlists, active
-context, and task ownership.
+`[-]` task in `TASKS.md`. The SDD gate mechanically enforces only path-class × lease ×
+phase × mode (memory writable in DEFINITION/CLOSURE; `_archive` read-only). Write
+allowlists, `[-]` markers, and `Aprovado` status are agent/PM discipline — no hook can
+verify persona identity ([[sdd-gate-v3]]).
 
 ## Estado runtime tocado
 
 The same SDD rules apply to `dadaia_workspace/public/**`: public agents, skills,
-rules, workflows, hooks, and AGENTS.md sources are product behavior. Changes to
-that surface require release context and must remain generic, public-safe, and
-runtime-accurate for Claude Code, Codex, and PI.
+rules, workflows, personas, lifecycle fragments, and AGENTS.md sources are product
+behavior. Changes to that surface require release context and must remain generic,
+public-safe, and runtime-accurate for Claude Code, Codex, and PI.
 
 `product-engineer` may write `specs/memory/**` only in DEFINITION and CLOSURE phases
 (constitution §13). No other agent may write memory atoms.

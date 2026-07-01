@@ -2,19 +2,19 @@
 slug: agent-orchestration
 title: agent-orchestration
 category: product
-tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity."
+tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; dispatcher purity; Layer-2 personas."
 summary: Defines the public default 9-core agent topology with coordinator+sub-agent
   architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch),
-  ADDITIVE vs MUTATING activity classes, and the minimal 2-workflow set.
+  ADDITIVE vs MUTATING activity classes, and the Layer-2 persona surface.
 tags:
 - orchestration
 - agents
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 1461
+token_estimate: 1430
 last_updated: '2026-07-01'
-release_origin: v0.1.21
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -94,7 +94,7 @@ implementation → review-closure. `product-engineer` and `software-engineer` ru
 PM sub-agents under that single lease. They never independently bind a session, so
 there is no session handoff and no second lock.
 
-### Layer-2 personas (v0.1.44) — the codex/pi equivalent of a Claude sub-agent
+### Layer-2 personas — the codex/pi equivalent of a Claude sub-agent
 
 The 9-core roster above is the **Claude Layer-1** sub-agent surface. The **persona** is its
 **Layer-2 counterpart**: a harness-universal role mandate that governs a codex/pi worker
@@ -117,12 +117,14 @@ See [[architecture]] "Two-layer agentic model" for the loader/dataclass detail.
 | ADDITIVE | Backlog def, bug filing, research, audit, review gates | None — concurrent |
 | MUTATING | Release definition (5), implementation (6), closure (8) | Single PM-held lease |
 
-### Workflows (2 default)
+### Workflow surfaces (two distinct things)
 
-Two workflows ship by default (stale workflows deleted in v0.1.9):
-
-- `release-ship` — the deploy gate sequence (deterministic, non-judgment steps).
-- `audit-fanout` — fan-out pattern for project-auditor audit dispatches.
+- **Layer-1 reference workflow docs (2):** `release-ship` and `audit-fanout` ship in
+  `public/workflows/` and project to `.claude/workflows/` / `.codex/workflows/`. They
+  are documentation — they never auto-execute.
+- **dadaia-workflows (7):** the executable Layer-2 lifecycle workflows live in the
+  engine's governed catalog — see [[dadaia-workflows]] for the roster and which verbs
+  are operator-invocable today.
 
 Domain workflows such as game development, dashboard publication, or vendor-specific
 data pipelines are not part of the default public install.
@@ -148,7 +150,7 @@ workflow Markdown is still documentation: it does not auto-execute, schedule fan
 turn a workflow file into a runtime primitive by itself. **PI**
 (`@earendil-works/pi-coding-agent`), the third harness, is
 governed at Layer 1 via `AGENTS.md`/`CLAUDE.md` (read natively) plus its projected `.pi/`
-surface — and, post-v0.1.21 (WS-PI-4), a real pre-disk (Ring-1) SDD-gate extension
+surface — including a real pre-disk (Ring-1) SDD-gate extension
 (`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes a `tool_call` hook that can block a
 write before it executes, and the extension delegates write/edit to the same Python
 `pre_gate` the other harnesses use (active once the operator trusts `.pi/`). At Layer 2 the
@@ -160,7 +162,7 @@ simulating success.
 ## Estado runtime tocado
 
 `ai-engineer` owns public AI entities under
-`dadaia_workspace/public/{agents,skills,rules,workflows,commands,hooks}/**`.
+`dadaia_workspace/public/{agents,skills,rules,workflows,personas,lifecycle_fragments}/**`.
 `software-engineer` owns implementation code and tests, not public agentic assets.
 `product-engineer` owns specs and memory according to SDD phase.
 

@@ -29,9 +29,9 @@ tags:
 - session
 - locking
 agent_tier: self-pull
-token_estimate: 2700
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 2750
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -83,20 +83,28 @@ dadaia context bind <name> [--mode read|implementation|review] [--release <id>]
 # --print-env: adicionalmente emite as linhas legacy `export DADAIA_*` (eval-compat)
 ```
 
-**Bind-driven context injection (DP-2):** `bind` é o ÚNICO trigger de injeção de
-context-memory. O marker standalone `.dadaia/states/bind_epoch/<ctx>` (NÃO um campo do
-`.ptr` — o `.ptr` é lease-incumbency) dobra como a fonte de descoberta de contexto do
-hook `ctx_inject`, cuja cadeia de resolução é: `DADAIA_CONTEXT` env → session record
-self-keyed (contexto bound) → **marker bind-epoch mais novo que o sentinel desta
-sessão** → preflight genérico apenas (preflight de dispatcher + lista de contexts
-ALIVE; SEM context memory). O first-ALIVE foi deletado da injeção (permanece válido só
-na resolução de lease-context do gate — outro trabalho). O hook re-injeta quando (a)
-não há sentinel para o sid, ou (b) um marker é mais novo que o mtime do sentinel —
-re-bind para outro contexto re-injeta; marker pré-existente nunca binda sessão fresca
-(sem sentinel ⇒ preflight genérico, que estampa o sentinel). Bind binda o CONTEXTO:
-pode re-injetar numa sessão paralela concorrente no próximo prompt (canon NF-2).
-Bind permanece non-blocking para trabalho ADDITIVE — o fluxo nunca para para exigir
-um bind.
+**Bind-driven context injection (DP-2) com atribuição de sessão:** `bind` é o ÚNICO
+trigger de injeção de context-memory. O marker standalone
+`.dadaia/states/bind_epoch/<ctx>` (NÃO um campo do `.ptr` — o `.ptr` é
+lease-incumbency) carrega como CONTEÚDO o **pid do harness de vida longa que bindou**
+(decimal; resolvido por ancestry do processo do CLI). A cadeia de resolução do hook
+`ctx_inject`: `DADAIA_CONTEXT` env → session record self-keyed (contexto bound) →
+**marker bind-epoch mais novo que o sentinel desta sessão E cujo pid gravado casa com
+o harness pid do hook** → preflight genérico apenas (preflight de dispatcher + lista
+de contexts ALIVE; SEM context memory). A atribuição por pid garante que o bind de uma
+sessão paralela nunca rouba a injeção desta; marker vazio/legado é não-atribuível ⇒
+ignorado para injeção (nunca o contexto de outra sessão). O first-ALIVE foi deletado
+da injeção (permanece válido só na resolução de lease-context do gate). O hook
+re-injeta quando (a) não há sentinel para o sid, ou (b) um marker atribuível a esta
+sessão é mais novo que o mtime do sentinel — re-bind para outro contexto re-injeta;
+marker pré-existente nunca binda sessão fresca (sem sentinel ⇒ preflight genérico, que
+estampa o sentinel). Bind permanece non-blocking para trabalho ADDITIVE — o fluxo
+nunca para para exigir um bind.
+
+**Resolução de specs_dir em shell bound (CLI):** `core/specs_resolver.py` resolve o
+`specs_dir` de comandos como `dadaia specs doctor`/`bugs`/`backlog` na ordem env →
+**bind persistido de uma sessão atribuível/viva** (o incumbent do contexto) → cwd —
+um shell de workspace bound resolve sem flag `--specs-dir`.
 
 Três camadas de lock garantem operações concorrentes seguras:
 
@@ -189,8 +197,8 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
   * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease com `pid` (criado inline no primeiro write MUTATING; TTL piso 120s via `kernel_tunables` + PID veto)
   * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index (escrito/removido na mesma transação CAS do lock record; renovação O(1) sem full scan)
-  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven)
-  * `.dadaia/sessions/<id>.json` — session record CLI-owned escrito por `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo) e pelo Kanban
+  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven; conteúdo = pid do harness que bindou, para atribuição de sessão)
+  * `.dadaia/sessions/<id>.json` — session record CLI-owned escrito por `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo)
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (escrito em acquire; I/O via `session_identity`)
   * `.dadaia/logs/lock-events.jsonl` — audit log append-only (eventos: acquire, release, steal, HEARTBEAT)
   * `repos/<repo_slug>/` — repo clonado durante `alive`, removido em `dead`

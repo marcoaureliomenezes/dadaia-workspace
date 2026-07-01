@@ -2,16 +2,15 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Bugs+backlog → releases with mandatory grill, bug disposition, lifecycle preflight, blocked/resume, semantic gates, and security-gated push.
+tldr: Event-sourced JSONL bug store + backlog-consistency engine + bug/backlog → release governance (grill, disposition, audit-disposition law, security-gated push).
 summary: >-
-  Governs bug/backlog → release (pick, subsumption, sanitize, mandatory grill),
-  o segment model alpha-N/rc-N (estrutura de folders, ADR-1..5), a cadência de
-  revisão atual: push gated mecanicamente por security-reviewer APPROVE
-  (metrics.commit_sha por sha pushed), lifecycle
-  foundation command surface for typed preflight/blocked/resume and semantic QA,
-  security, and code-review handoff validation, pre-push CI gate, and
-  backlog-ownership as a PM coordination convention (not gate-enforced;
-  backlog is ADDITIVE-allow).
+  Owns the bug + backlog governance mechanism: the event-sourced JSONL bug store
+  (bug-event-v1; dadaia bugs append|status|stats; reported + one terminal event),
+  the backlog-consistency engine (subject registry, fail-closed classifier,
+  backlog doctor BL-*, consumed_backlog ledger + removal-on-release), the
+  bug/backlog → release protocol (PM-dispatched pick, sanitize, mandatory grill,
+  bug-always-solved/supersession), the audit-disposition law, the alpha-N/rc-N
+  maturation model, and the mechanically gated push boundary.
 tags:
   - sdd
   - governance
@@ -21,181 +20,160 @@ tags:
   - alpha-rc-model
   - backlog-ownership
 agent_tier: self-pull
-token_estimate: 1470
-last_updated: '2026-06-20'
-release_origin: v0.1.15
+token_estimate: 1550
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
-Skill: `dadaia-release-definition` · Rule: `release-governance.md` (always-on) · Rule: `backlog-ownership.md` (always-on, D5) · ADRs: ADR-1..5 in `specs/releases/v0.1.5/SPEC.md §8`
+Skill: `dadaia-release-definition` · Rules: `release-governance.md`, `backlog-ownership.md`, `bug-registration-guardrail.md` (always-on)
 
 ## Propósito
 
-Define o ciclo completo de **como bugs e backlog viram releases** e **como releases
-maturam e são revisadas** no dadaia-workspace. O contrato canônico exige intake
-sanitizado, pick explícito, grill obrigatório antes da SPEC, release rastreável,
-gates semânticos por etapa e push bloqueado mecanicamente por security review.
+Define como **bugs são registrados e dispostos**, como o **backlog se mantém um SET
+consistente**, e como **bugs + backlog viram releases** que maturam e são revisadas.
+Três pilares: o bug event store, o backlog-consistency engine, e o protocolo
+bug/backlog → release com seus gates.
 
-A governança tem três pilares:
-1. **Bug/Backlog → Release** — protocolo formal para transformar itens dos ficheiros
-   `specs/bugs/` e `specs/backlog/` em uma release definida e rastreável.
-2. **Modelo de maturação** — o modelo `alpha-N → rc-N` que substitui o anti-padrão de
-   4-segmentos (`v0.1.4.1`, `v0.1.4.2`, …) por uma estrutura onde cada release cresce
-   dentro de um folder `v<M>.<m>.<p>/` com segmentos ordenados.
-3. **Backlog-ownership como convenção de coordenação** —
-   `project-manager` é o **curador/coordenador** do `specs/backlog/**`; os demais agentes
-   leem livremente e roteiam mudanças via PM por disciplina; `product-engineer` consome
-   backlog para criar release specs. **Não há gate** sobre backlog: `specs/backlog/**` é um
-   caminho ADDITIVE que sempre flui (como `bugs/` e `audits/`). O hook não usa persona como
-   autoridade para ownership porque nenhum harness consegue provar identidade de agente ao
-   gate de forma confiável; enforcement é por convenção e por workflows:
-   - Regra always-on `backlog-ownership.md` que declara a curadoria do PM (não-gate).
-   - **Única trava determinística do produto:** o lease single-session por Spec Context
-     (release-definition / implementation+review). Nenhum workflow é jamais lock-blocked por
-     ownership.
+## O que é
+
+### Bug event store (JSONL, event-sourced)
+
+Bugs são **eventos JSONL**, nunca arquivos Markdown com frontmatter de status. O store
+vive em `specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl` — arquivos append-only por janela de
+hora, com rotation ceiling por row-count — e é **git-tracked** (o `.gitignore` do
+source repo re-inclui `specs/bugs/*.jsonl`). Cada linha é um JSON validado contra
+**`bug-event-v1`** antes do append: em falha de validação nada é escrito e o comando
+sai non-zero.
+
+- **Registro:** `dadaia bugs append --bug-id <slug> --event reported --title …
+  --severity … --surface … --component … --context … --tag … --symptom … --repro …
+  --expected … --notes …` — o evento `reported` exige todos esses campos.
+- **Disposição (terminal):** um `bug_id` carrega **no máximo UM evento terminal** de
+  `{resolved, superseded, deferred, rejected}` (`resolved --release <id>`;
+  `superseded --superseded-by <slug>`; `deferred`/`rejected --reason <texto>`),
+  appendado pela release que o dispõe — nunca no registro. Um `reported` posterior
+  **reabre** o `bug_id` (limpa o terminal anterior; reopen legítimo não é
+  double-terminal).
+- **`archived` é anotação NÃO-terminal:** arquivar a fonte legada de um bug é um
+  `git mv` para `specs/bugs/_archive/` e **não emite evento**.
+- **Inspeção:** `dadaia bugs status` (bugs abertos) e `dadaia bugs stats` (agregados
+  por severity/status). `features/bugs/service.py` folda o stream em estado corrente
+  por `bug_id`.
+- **Redaction:** nenhum campo carrega paths absolutos do operador, IPs, hostnames ou
+  segredos; o `redact()` do store é backstop, não licença.
+- **Invariante mecânica:** SPEC-DOC-033 ([[specs-doctor]]) valida schema por linha,
+  rotation ceiling e coerência de eventos (terminal sem `reported` prévio ⇒ ERROR;
+  terminal duplo ⇒ ERROR).
+- **Coexistência:** `dadaia bug new` (scaffolder Markdown legado) ainda existe na
+  CLI, mas o caminho canônico de registro é `dadaia bugs append` — nenhum workflow
+  novo escreve bug como `.md`.
+
+### Backlog-consistency engine (`features/backlog/`)
+
+O backlog é um SET deduplicado, conflict-free e não-stale, enforçado mecanicamente:
+
+- **Schema de item:** frontmatter `intents[]`, cada intent `Subject{kind, ref} →
+  change`; `kind ∈ {code, api, cli, panel, doc, invariant, catalog}`; refs tipadas,
+  nunca free text (refs `code` são module-relative `path#symbol`; paths
+  operator-local/repo privado rejeitados).
+- **Registry canônico de subjects** (`subject_registry.py`): auto-derivado da árvore
+  viva a cada run (nunca um arquivo armazenado) — kinds `code`/`cli`/`catalog`/`doc`/
+  `invariant`; `panel`/`api` ligam apenas pela alias map do operador
+  (`.dadaia/states/backlog_subject_aliases.txt`). O modelo propõe um subject; Python
+  liga a um anchor e **HALTa** em unresolved/ambiguous (nunca silent NEW).
+- **Classifier fail-closed** (`classifier.py`): intersecção de anchors vazia ⇒
+  `UNRELATED` (sem modelo); mesmos anchors + mesma change ⇒ `DUPLICATE`; anchor
+  compartilhado + change divergente ⇒ **`DIVERGENT_CONFLICT`** por default — o modelo
+  só pode fazer downgrade com merge explícito provado-compatível.
+- **`dadaia backlog doctor`** (o enforcement real — backlog é gitignored + ADDITIVE,
+  então o gate de file-write não o classifica): BL-SCHEMA / BL-DUP / BL-CONFLICT /
+  BL-STALE, exit non-zero em violação. Roda em CI (job `backlog-doctor`) e no
+  pre-commit chokepoint **escopado**: BL-* bloqueia apenas commits cujos staged paths
+  intersectam `specs/backlog/**` — debt pré-existente não bloqueia commit não
+  relacionado; a varredura completa fica no CI.
+- **Removal-on-release (loop fechado):** a linha `**Consumes:** <slugs>` do SPEC →
+  post-step de `dadaia lifecycle release define` escreve o ledger
+  `specs/_archive/<release>/consumed_backlog.json` (fail-loud `ConsumesBindError` em
+  slug/anchor irresolvível; granularidade full-slug) → `dadaia lifecycle close` roda o
+  removal residual-aware (rewrite-down-to-residual default; full removal só a zero
+  residual, com cópia durável em `_archive/<release>/consumed-backlog/<slug>.md`
+  ANTES do unlink). BL-STALE casa por exact slug membership contra o ledger.
+
+### Ownership
+
+`project-manager` **cura** `specs/backlog/**`; `product-engineer` **lê** o backlog
+PM-curado para autorar SPEC/PLAN/TASKS e nunca cura. Não há gate de ownership —
+`specs/backlog/**` é ADDITIVE e sempre flui; a única trava determinística do produto é
+o lease single-session por Spec Context. Enforcement de consistência é o doctor acima.
 
 ## Fluxo de uso
 
-### Parte 1 — Bug/Backlog → Release (skill `dadaia-release-definition`)
+### Bug/Backlog → Release (skill `dadaia-release-definition`)
 
-1. **Dispatch.** `project-manager` despacha `product-engineer` para definir uma release
-   a partir de `specs/bugs/` (status `open`) + `specs/backlog/` (status
-   `candidate`/`idea`). PE nunca auto-inicia — precisa de dispatch de PM.
+1. **Dispatch.** PM despacha PE para definir uma release a partir dos bugs abertos
+   (`dadaia bugs status`) + backlog. PE nunca auto-inicia.
+2. **Sanitização.** Itens stale/inválidos recebem disposição explícita (backlog:
+   status terminal + archive move; bugs: evento `deferred`/`rejected` com reason).
+   Nunca deletar — arquivar.
+3. **Pick.** Bugs abertos e audits não-dispostos **outrank** backlog plano. Todo bug
+   picked é resolvido na release (**bug-always-solved**), a menos que um item de
+   backlog picked o supersede — então evento `superseded --superseded-by <slug>` + as
+   TASKS do item cobrem o aceite do bug. Nunca dropado silenciosamente.
+4. **Audit-disposition law:** todo audit gera exatamente UMA release de remediação que
+   dá disposição explícita a CADA finding (fixed / superseded / deferred-com-reason /
+   rejected-com-reason); o audit arquiva para `specs/audits/_archive/` só quando
+   totalmente disposto E a release aprovada (SPEC-DOC-036/038 são o backstop).
+5. **Grill obrigatório** (`dadaia-grill-me`) sobre o set picked ANTES da SPEC.
+6. **SPEC** como Draft → `Aprovado`. Ao fim da release, PE appenda os eventos
+   terminais dos bugs dispostos.
 
-2. **Sanitização.** PE revisa bugs e backlog; marca stale/inválidos como `deferred` ou
-   `rejected` com um campo `reason:` no frontmatter. **Nunca deleta** arquivos de bug
-   ou backlog.
+### Maturação e push boundary
 
-3. **Pick.** PE seleciona o conjunto de bugs + backlog para a release. Todo bug picked
-   **deve** ser resolvido na release — regra **bug-always-solved**.
-
-4. **Subsumption.** Exceção ao bug-always-solved: se um item de backlog picked oferece
-   uma solução mais completa que resolve o bug como subconjunto, o bug pode ser
-   **subsumed** pelo backlog item. Nesse caso:
-   - Campo `superseded_by: <backlog-slug>` no frontmatter do bug.
-   - Nota na SPEC indicando a subsumption.
-   - As TASKS do backlog item **devem cobrir** o critério de aceite do bug.
-   - O bug nunca é silenciosamente descartado.
-
-5. **Grill obrigatório.** Antes de escrever a SPEC, PE executa uma sessão
-   `dadaia-grill-me` sobre o conjunto picked. Sem esse grill, PM não avança a
-   release para SPEC.
-
-6. **SPEC.** PE escreve a SPEC como Draft, aguarda aprovação.
-
-```mermaid
-flowchart TD
-    PM[project-manager dispatch] --> PE[product-engineer]
-    PE --> SAN[Sanitize: deferred/rejected]
-    PE --> PICK[Pick: bugs + backlog]
-    PICK --> BAS{bug-always-solved?}
-    BAS -->|sim| KEEP[Bug resolvido na release]
-    BAS -->|backlog item subsume| SUB[superseded_by: frontmatter\n+ nota SPEC\n+ TASKS cobre aceite]
-    KEEP --> GRILL[dadaia-grill-me obrigatório]
-    SUB --> GRILL
-    GRILL --> SPEC[SPEC.md Draft]
-    SPEC --> APROV[Aguardar Aprovado]
-```
-
-### Parte 2 — Modelo de Maturação (ADR-1 / ADR-5)
-
-Uma release é um folder `v<M>.<m>.<p>/` que matura através de segmentos ordenados
-`alpha-1 → alpha-N → rc-1 → rc-N`. Cada segmento tem seus próprios
-`SPEC.md`, `PLAN.md`, `TASKS.md`, e `CLOSURE.md` dentro de
-`specs/releases/v<x>/<segment>/`.
-
-`specs/releases/ACTIVE.md` usa schema v2 com campo `segment:` opcional:
-
-```
-release: v0.2.0
-segment: alpha-1
-phase: IMPLEMENTATION
-```
-
-O campo `segment:` está ausente para releases flat (sem segmentos, compatibilidade
-retroativa).
-
-O scaffolder cria segmentos via:
-- `dadaia specs release open v<x>` → cria folder + `alpha-1` + atualiza ACTIVE.
-- `dadaia specs segment open <alpha-N|rc-N>` → abre próximo segmento.
-
-### Parte 3 — Cadência de revisão e lifecycle foundation
-
-Uma branch única `feature/{version}` por release (ex: `feature/v0.1.14`). Segmentos
-alpha **nunca** criam sub-branches.
-
-Cadência vigente:
-
-- **Commits** ficam review-unblocked (lease-only via o pre-commit lease gate) — o inner
-  loop TDD tem zero fricção; commits nunca são review-blocked.
-- **Push** é gated **mecanicamente**: o hook pre-push exige um handoff
-  `security-reviewer` com `"verdict": "APPROVED"` cujo `metrics.commit_sha` seja igual a
-  cada sha pushed (ref lines do stdin; APPROVE stale não passa; deleções/tag-only
-  passam) — ver [[sdd-gate-v3]].
-- **qa-per-task-group-commit** e **code-review-at-PR** são validados por semantic gates
-  em `features/lifecycle/gates.py`: os handoffs precisam casar agent, context,
-  release, verdict, commit/task group, age, artifact hash, and severity policy. O
-  chokepoint mecânico que bloqueia push continua sendo o pre-push security verdict
-  gate; QA/code-review são lifecycle gates consumidos pelos workflows Python.
-- **Blocked/resume:** quando Codex não pode executar uma ação externa (por exemplo
-  push com approvals disabled), `dadaia lifecycle preflight` retorna BLOCKED com
-  handoff válido, comando exato para o operador, e resume token.
-
-A autoridade de avanço de workflow fica em Python, não em texto livre do agente. A
-disciplina per-task de implementação (markers, testes, pre-push gate) permanece
-inalterada. Ver [[lifecycle-foundation]].
-
-### Parte 4 — Hotfix unification (ADR-2)
-
-Hotfixes são releases normais sob o mesmo modelo ADR-1. A distinção é que um
-hotfix tipicamente abre `alpha-1` e faz ship imediatamente dali (sem rc).
-
-O modelo canônico é o ADR-1 + ADR-2 documentado aqui. O atom [[sdd-hotfix-track]]
-permanece apenas como referência superseded.
-
-A reconciliação mecânica de `dadaia specs hotfix open` + SPEC-DOC-016 para o modelo
-de segmentos foi entregue por T-ENG-07.
-
-### Parte 5 — Pre-push CI gate (T-GATE-01; estendido em v0.1.14)
-
-Script `dadaia_workspace/public/scripts/pre-push-ci-gate.sh` instalado como git
-`pre-push` hook. Executa:
-- `ruff format --check`
-- `ruff check`
-- `mypy --strict`
-- `pytest` (caches fora do repo)
-- `dadaia ci push-gate-check` — o check mecânico de verdict de security (stdin ref
-  lines encaminhadas; ver Parte 3)
-
-Bloqueia `git push` em qualquer falha. O push boundary exige árvore validada antes de
-publicar histórico remoto.
+- Uma release é `v<M>.<m>.<p>` numa branch única `feature/{version}`, maturando por
+  segmentos `alpha-N → rc-N` (cada segmento com SPEC/PLAN/TASKS/CLOSURE quando usado;
+  `ACTIVE.md` carrega `segment:` opcional). Hotfix é uma release normal que ships do
+  `alpha-1` (PATCH ≥ 1; [[sdd-hotfix-track]] é referência superseded).
+- **Commits** nunca são review-blocked (só o pre-commit lease gate + backlog-doctor
+  escopado). **Push** é gated mecanicamente: o pre-push hook roda `dadaia ci
+  preflight` (ruff format/check, mypy --strict, pytest — excluindo
+  `tests/performance`) E o security-verdict check — um handoff `security-reviewer`
+  APPROVED com `metrics.commit_sha` igual a cada sha pushed ([[sdd-gate-v3]]).
+- **Gates semânticos** (`features/lifecycle/gates.py`) validam handoffs QA/security/
+  code-review por agent, context, release, verdict, hash, sha, age e severity — são
+  os gates que os dadaia-workflows consomem ([[lifecycle-foundation]]).
+- **Blocked/resume:** quando uma ação externa não pode executar, `dadaia lifecycle
+  preflight` retorna BLOCKED tipado com comando exato + resume token.
 
 ## Trigger típico
 
-Início de ciclo de planejamento de release: PM consulta `specs/bugs/` + `specs/backlog/`
-e despacha PE para definir a próxima release. Ou no encerramento de um `alpha-N` (PE
-avança para o próximo segmento). Ou quando um incidente em produção gera um novo bug
-que precisa de subsumption ou nova release.
+Registro de bug em qualquer sessão (ADDITIVE, sem lease, sem bind); início de ciclo de
+release (PM despacha PE); disposição de bugs/audits no fim de uma release; commit
+tocando `specs/backlog/**`.
 
 ## Diferencial
 
-Com esta governança: toda decisão de release tem dono explícito (PE, dispatch de PM),
-toda subsumption é rastreada, todo bug tem destino declarado, toda release nasce de
-grill, os gates semânticos validam evidência por etapa, e o modelo de segmentos mantém
-a maturação de release ordenada.
+Toda decisão de release tem dono explícito; todo bug tem destino declarado num stream
+auditável e validado por schema; o backlog não acumula duplicatas nem conflitos
+silenciosos; audits nunca viram leitura-e-esquecimento; e o push boundary é um gate
+mecânico, não uma convenção.
 
 ## Estado runtime tocado
 
-- Read: `specs/bugs/*.md` (frontmatter: status, superseded_by), `specs/backlog/*.md`,
-  `specs/releases/ACTIVE.md` (release + segment + phase), `specs/releases/<ver>/<seg>/TASKS.md`.
-- Write (CLOSURE phase only): `specs/memory/product/*.md` (product-engineer apenas).
-- Write (implementation): `specs/releases/v<x>/<seg>/{SPEC,PLAN,TASKS,CLOSURE}.md`,
-  `specs/releases/ACTIVE.md`, `specs/bugs/*.md` (frontmatter updates), `specs/backlog/*.md`.
-- Script runtime: `dadaia_workspace/public/scripts/pre-push-ci-gate.sh` (git pre-push hook).
+- `specs/bugs/*.jsonl` (git-tracked; append via `dadaia bugs append`) +
+  `specs/bugs/_archive/` (fontes legadas movidas por `git mv`).
+- `specs/backlog/**` (gitignored no source repo; ADDITIVE) +
+  `.dadaia/states/backlog_subject_aliases.txt`.
+- `specs/_archive/<release>/consumed_backlog.json` + `consumed-backlog/<slug>.md`.
+- `specs/releases/ACTIVE.md`, `specs/releases/<ver>/**`.
+- Git hooks: `pre-commit-lease-gate.sh` (+ backlog-doctor escopado),
+  `pre-push-ci-gate.sh` (preflight + verdict).
 
 ## Dependências
 
-- [[sdd-gate-v3]] — gate RULE A valida que `specs/memory/` só é escrito em fase DEFINITION/CLOSURE; markers `[-]` e aprovações são disciplina, não mecanismo do gate; `specs/backlog/**` é ADDITIVE e sempre flui; o pre-push security-verdict gate é o chokepoint mecânico do push boundary.
-- [[specs-doctor]] — valida estrutura de segmentos (T-ENG-05: SPEC-DOC-004 segment-aware; SPEC-DOC-016 replaced by segment-structure check).
-- [[public-asset-distribution]] — propaga `pre-push-ci-gate.sh`, skill `dadaia-release-definition`, rule `release-governance.md`, rule `backlog-ownership.md`, persona edits (`product-engineer.md`, `project-manager.md`) via `dadaia public install --target all`.
-- [[sdd-hotfix-track]] — superseded by ADR-2; mantido como histórico, não deletado.
-- [[agent-sdd-alignment]] — agents resolve active segment via navigator skill (T-ENG-09: `dadaia-workspace-spec-navigator` updated).
+- [[sdd-gate-v3]] — classes de path (bugs/backlog/audits ADDITIVE; `_archive` FROZEN
+  antes de ADDITIVE) e os chokepoints git.
+- [[specs-doctor]] — SPEC-DOC-033 (invariante do event store), 031/035 (disposição de
+  backlog), 036/038 (disposição/arquivamento de audits).
+- [[lifecycle-foundation]] / [[dadaia-workflows]] — os workflow bodies
+  (release_definition, backlog_definition, bug_report) que orientam este fluxo.
+- [[public-asset-distribution]] — propaga skill + rules + git-hook scripts.

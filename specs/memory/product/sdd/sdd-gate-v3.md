@@ -8,7 +8,8 @@ summary: >-
   merged — `dadaia_workspace.hooks.pre_gate` — que lê o stdin uma vez e avalia as
   policies em ordem fixa root-whitelist → venv-guard → SDD gate, first-block-wins,
   cada policy fail-open (PROTECTED é o único caminho fail-closed). O classificador SDD
-  é context-relative (ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block,
+  é context-relative (ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block —
+  incl. os _archive per-artifact matchados ANTES de ADDITIVE (R-2),
   MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto); apply_patch multi-file
   classifica TODOS os headers (veredito mais restritivo vence); READ é non-acquiring.
   O PostToolUse renova heartbeat via by-session index (sem full scan) e roda o
@@ -24,9 +25,9 @@ tags:
 - enforcement
 - chokepoints
 agent_tier: self-pull
-token_estimate: 3140
+token_estimate: 3250
 last_updated: '2026-07-01'
-release_origin: v0.1.21
+release_origin: v0.1.47
 ---
 
 Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, entrypoint único) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + reconciler advisory) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (instalados via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). Os módulos `sdd_gate` e `root_whitelist` são thin policy modules consumidos por `pre_gate` (`evaluate_payload()`); seus `main()` legados ficam mantidos por uma release.
@@ -40,8 +41,12 @@ entrypoint PreToolUse (`dadaia_workspace.hooks.pre_gate`) intercepta invocaçõe
 ferramentas em Claude Code e Codex interativo: lê o envelope stdin **uma vez**, e
 avalia as policies registradas em ordem fixa, **first-block-wins**:
 
-1. **root-whitelist** — bloqueia writes que criariam entrada nova no root do workspace
-   fora do whitelist canônico.
+1. **root-whitelist** — classifica pelo **primeiro componente do path relativo ao
+   root**: bloqueia qualquer write cujo primeiro componente criaria uma entrada nova
+   de top-level fora do whitelist canônico — inclusive writes ANINHADOS sob um novo
+   top-level não-whitelisted (ex. `foo/bar/baz.txt` bloqueia se `foo/` não existe e
+   não é whitelisted). Entradas existentes e globs de
+   `.dadaia/states/root_exceptions.txt` passam.
 2. **venv-guard** (somente eventos Bash) — check estreito de first-token: comandos
    `dadaia`, `pip`/`pip3` ou `python -m dadaia_workspace` não enraizados em
    `.dadaia/.venv/bin/` são bloqueados com o comando corrigido na mensagem.
@@ -64,6 +69,7 @@ mais restritivo vence — um arquivo FROZEN/PROTECTED/bloqueado bloqueia o patch
 | Classe | Paths | Decisão |
 |--------|-------|---------|
 | PROTECTED | `.dadaia/sessions/**` (workspace-root) | Block sempre — único caminho fail-closed (SEC-01); avaliado primeiro |
+| FROZEN (R-2: antes de ADDITIVE) | `specs/backlog/_archive/`, `specs/audits/_archive/`, `specs/bugs/_archive/` (root **e** in-repo; trailing `/` load-bearing) | Block sempre para file tools — os `_archive` per-artifact são matchados ANTES dos prefixes ADDITIVE (senão `specs/bugs/` engoliria `specs/bugs/_archive/` como ADDITIVE); moves de archive rodam via `git mv` (Bash), fora do envelope file-tool |
 | ADDITIVE | `specs/backlog/**`, `specs/bugs/**`, `specs/audits/**` (root **e** in-repo); `.dadaia/reports/**`, `.dadaia/handoff/**`, `.dadaia/tmp/**` (root) | Allow — zero leitura/escrita de lease |
 | MEMORY | `specs/memory/**` (root **e** in-repo) | Allow apenas em fase DEFINITION ou CLOSURE; block caso contrário |
 | FROZEN | `specs/_archive/**` (root **e** in-repo) | Block sempre |
@@ -118,6 +124,13 @@ não verifica `**Status:** Aprovado`, não verifica markers `[-]`, e não valida
 
 Fail-open permanece para crashes internos do hook e para MUTATING sem contexto
 resolvível; PROTECTED é a única classe fail-closed.
+
+**ctx-inject com atribuição de sessão:** o hook `ctx_inject` (mesmo pacote) honra um
+bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) apenas quando o **pid gravado no
+conteúdo do marker** — escrito por `dadaia context bind` com o pid do harness de vida
+longa — casa com o harness pid do próprio hook. Um bind de outra sessão nunca rouba a
+injeção desta; marker vazio/legado é não-atribuível ⇒ ignorado (preflight genérico,
+nunca o contexto de outra sessão). Mecânica de bind/injeção: [[context-management]].
 
 **Tunables e telemetria:** todas as constantes do kernel (lease TTL, GC TTLs, CAS
 retries, sentinel TTL, throttle do reconciler) vivem em `core/kernel_tunables.py`
@@ -239,7 +252,7 @@ Sem este kernel, agentes podem escrever em qualquer lugar a qualquer momento —
 ## Dependências
 
   * Depende de [[context-management]] (session record persistido por `dadaia context bind`; lease records criados pelo acquire inline; `context release` solta o lease).
-  * `core/kernel_tunables.py` — single home das constantes do kernel (import-linter: leaf).
+  * `core/kernel_tunables.py` — single home das constantes do kernel (leaf: não importa de nenhuma camada).
   * `features/spec_context/session_identity.py` — único owner dos pointers e session records que o gate e o post-gate consomem.
   * `infrastructure/process_probe_adapter.OsProcessProbe` (platform seam `has_os_kill_liveness`) — injetado pelo hook; fallback TTL-only quando indisponível.
   * Port `ProcessAncestry` (core protocol; adapters Linux `/proc` / macOS `ps` / Windows Toolhelp32 read-only, selecionados no composition root) — consumido pelo pre-commit lease gate e pelo `context release` default-flow.

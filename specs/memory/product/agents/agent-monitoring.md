@@ -2,49 +2,53 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: telemetria local stdlib-only (Claude/Codex/PI sessions) → abas Agents/Workflows do
-  panel; allowlist gate preserva privacidade.
-summary: telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite + PI session
-  jsonl (~/.pi/agent/sessions/); alimenta abas Agents e Workflows do panel; allowlist gate
-  hardcoded preserva privacidade por construção.
+tldr: telemetria local stdlib-only (Claude/Codex/PI sessions) → aba Sessions do panel
+  + /api/agents; allowlist gate preserva privacidade.
+summary: telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite
+  (~/.codex/state_5.sqlite) + PI session jsonl (~/.pi/agent/sessions/); alimenta a aba
+  Sessions do panel e os endpoints /api/agents e /api/sessions; allowlist gate
+  hardcoded preserva privacidade por construção; endpoints servidos sem credencial
+  atrás do bind loopback + Host allowlist do panel.
 tags:
 - monitoring
 - telemetry
 - sessions
 agent_tier: self-pull
-token_estimate: 1500
-last_updated: '2026-06-27'
-release_origin: memory-markdown-source-v1
+token_estimate: 1450
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
-CLI surface: integrado ao `dadaia panel` (abas Agents + Workflows) · Closure: agent-monitoring-v1 · 2026-05-17
+CLI surface: integrado ao `dadaia panel` (aba Sessions + endpoints `/api/agents`, `/api/sessions`)
 
 ## Propósito
 
-Telemetria local de agentes e workflows consumida exclusivamente de arquivos do operador (Claude Code `~/.claude/projects/*.jsonl` + Codex `~/.codex/sessions.sqlite`) — zero APIs remotas, zero dependências Node, zero `ccusage`. O módulo `features/telemetry/` (peer de `features/panel/`) materializa uma camada SQLite local (`~/.dadaia/state/telemetry/telemetry.sqlite`) com WAL + foreign keys + schema versionado via `PRAGMA user_version`, e expõe dois novos endpoints autenticados (`/api/agents`, `/api/workflows` + drill-down `/api/agents/{id}/sessions`) consumidos por duas novas abas do [[panel]].
+Telemetria local de agentes e workflows consumida exclusivamente de arquivos do operador (Claude Code `~/.claude/projects/*.jsonl` + Codex `~/.codex/state_5.sqlite`) — zero APIs remotas, zero dependências Node, zero `ccusage`. O módulo `features/telemetry/` (peer de `features/panel/`) materializa uma camada SQLite local (`~/.dadaia/state/telemetry/telemetry.sqlite`) com WAL + foreign keys + schema versionado via `PRAGMA user_version`, e expõe os endpoints `/api/agents` (+ drill-down `/api/agents/{id}/sessions`) e `/api/sessions` consumidos pela aba Sessions do [[panel]] — servidos **sem credencial**, atrás do bind loopback + Host allowlist do panel.
 
-**PI é o quarto runtime de telemetria (v0.1.30).** Além de Claude (jsonl) e Codex (sqlite), o `reader/pi.py` ingere metadata de sessão PI de `~/.pi/agent/sessions/` (jsonl por dir-slug) e o `PiRuntimeAdapter` (`ADAPTER_REGISTRY["pi"]`, `aggregator/runtimes.py`) faz enrichment + liveness por mtime de session-file, espelhando a postura Claude/Codex; custo é desconhecido para PI (sem per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, nunca fakeado. Invariant T1 mantido: o reader lê só linhas `session`/`model_change`/`thinking_level_change` (id, cwd, timestamp, modelId, provider) e **exclui a linha `message` inteira** (nenhum body/conteúdo), degradando idle em falha de IO/parse. PI sessions aparecem na aba Agents/Sessions quando existe um source local real (A12).
+**Os três runtimes de telemetria são `{claude, codex, pi}`.** O `reader/pi.py` ingere metadata de sessão PI de `~/.pi/agent/sessions/` (jsonl por dir-slug) e o `PiRuntimeAdapter` (`ADAPTER_REGISTRY["pi"]`, `aggregator/runtimes.py`) faz enrichment + liveness por mtime de session-file, espelhando a postura Claude/Codex; custo é desconhecido para PI (sem per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, nunca fakeado. Invariant T1: o reader lê só linhas `session`/`model_change`/`thinking_level_change` (id, cwd, timestamp, modelId, provider) e **exclui a linha `message` inteira** (nenhum body/conteúdo), degradando idle em falha de IO/parse. PI sessions aparecem na aba Sessions quando existe um source local real.
+
+**Limite conhecido:** o factory pragmatizado `store/schema.open_connection` (WAL + synchronous=NORMAL + foreign_keys) **existe mas não está wired** nos caminhos de conexão reais — o SQLite do panel corrompe sob Playwright concorrente (bug tracked; unificação no backlog `panel-runtime-reliability`).
 
 Resolve a invisibilidade dos custos e padrões de uso por agente: o operador roda em paralelo product-engineer / software-engineer / software-architect / 7 outros agentes especialistas e até a release `agent-monitoring-v1` não tinha forma de inspecionar quem consumiu quanto, por modelo, por Spec Context, por dia. A release entrega uma superfície numbers-only (D-AM-20) — sem thresholds, sem alerts, sem push — onde o operador inspeciona visualmente. Privacidade por construção: **nenhum endpoint serve conteúdo bruto de mensagens** — allowlist gate hardcoded no reader é a única porta para SQLite.
 
 ## Fluxo de uso
 
-  1. **Boot do panel** : `dadaia panel` faz boot do `TelemetryService` em modo "no-telemetry" se `PRAGMA integrity_check` falhar (devops T10 → SQLite renomeado para `telemetry.sqlite.corrupt.<ts>` + endpoints 503 com mensagem human-readable). Se OK, service registra Bearer token em `~/.dadaia/state/panel.token` (chmod 600) e fica pronto.
-  2. **Operador abre aba Agents** : `panel.js` faz `fetch('/api/agents', { headers: { Authorization: 'Bearer <token>' } })`. Service detecta cache miss (cache TTL 30s) ou cache hit. Em cache miss: chama `refresh()` que (a) adquire lock via `fcntl.flock` em `~/.dadaia/state/telemetry/telemetry.lock`; (b) reader factory escolhe Claude jsonl reader e/ou Codex sqlite reader; (c) ambos rodam com budget enforced (`MAX_BYTES_PER_FILE_PER_CYCLE`, `MAX_LINE_LENGTH`, `MAX_EVENTS_PER_CYCLE`); (d) allowlist gate filtra cada evento mantendo apenas keys aprovadas; (e) DAO insere events idempotentes via `event_id = sha1(sessionId||uuid)[:20]`; (f) aggregator queries com `cwd→spec_context` lookup em query time via `SpecContextService.list_all()`.
-  3. **UI Agents** : card grid (`repeat(auto-fill, minmax(360px, 1fr))`). Cada card: header (nome + modelo dominante + ícone placeholder), métricas (session_count, total_cost_usd ou "—" se `cost_known=false`, last_activity_at), breakdown por Spec Context Project com barras `%`, drill-down lazy via `/api/agents/{id}/sessions` on toggle (`aria-expanded`). SessionId truncado a 8 chars + `...` (devops T9 anti-enumeração). Banner amarelo (`var(--color-warning-bg)`) se `pricing_age_days > 90`.
-  4. **UI Workflows** : card grid (`repeat(auto-fill, minmax(280px, 1fr))`). Cada card: header + description + source_hint (`.claude/skills/` ou `.agents/skills/`). Chips clicáveis (`<button aria-label="Filtrar por agente: ...">`) navegam para Agents tab com hash filter `#agents?filter=<name>`. Sem cost numbers nesta aba (D-01 frontend).
-  5. **Sub-agents** : identidade vem do evento Claude `type=agent-name` (`agentName` field). `is_subagent` derivado de `isSidechain=1` + `sub_slug`. Sub-agents (e.g. software-architect, devops-engineer) aparecem como cards próprios separados do "claude (main)".
+  1. **Boot do panel** : `dadaia panel` faz boot do `TelemetryService` em modo "no-telemetry" se `PRAGMA integrity_check` falhar (SQLite renomeado para `telemetry.sqlite.corrupt.<ts>` + endpoints 503 com mensagem human-readable). Nenhum token é criado — as rotas são servidas sem credencial.
+  2. **Operador abre a aba Sessions** : `sessions.js` faz `fetch('/api/sessions?runtime=…')`. Service detecta cache miss (cache TTL 30s) ou cache hit. Em cache miss: chama `refresh()` que (a) adquire lock via `fcntl.flock` em `~/.dadaia/state/telemetry/telemetry.lock`; (b) reader factory escolhe os readers Claude jsonl / Codex sqlite / PI jsonl; (c) rodam com budget enforced (`MAX_BYTES_PER_FILE_PER_CYCLE`, `MAX_LINE_LENGTH`, `MAX_EVENTS_PER_CYCLE`); (d) allowlist gate filtra cada evento mantendo apenas keys aprovadas; (e) DAO insere events idempotentes via `event_id = sha1(sessionId||uuid)[:20]`; (f) aggregator queries com `cwd→spec_context` lookup em query time via `SpecContextService.list_all()`.
+  3. **Endpoints de agregação** : `/api/agents` (+ `/api/agents/{id}/sessions`) permanecem servidos para agregação por agente (não há aba dedicada Agents); SessionId truncado a 8 chars + `...` (anti-enumeração).
+  4. **Sub-agents** : identidade vem do evento Claude `type=agent-name` (`agentName` field). `is_subagent` derivado de `isSidechain=1` + `sub_slug`; aparecem separados do "claude (main)".
 
 
 
 ```mermaid
 flowchart LR
-    OP[operador] -->|tab Agents/Workflows| JS[panel.js fetch]
-    JS -->|GET /api/agents| H[PanelHandler + Bearer auth]
+    OP[operador] -->|tab Sessions| JS[sessions.js fetch]
+    JS -->|GET /api/sessions| H[PanelHandler - loopback + Host guard]
     H -->|PanelService.telemetry.*| SVC[TelemetryService]
     SVC -.cache miss.-> RFR[refresh: lock+read+filter+insert]
     RFR -->|reader factory| CR[reader/claude.py jsonl]
     RFR -->|reader factory| CX[reader/codex.py sqlite RO]
+    RFR -->|reader factory| PIr[reader/pi.py jsonl metadata]
     RFR -->|reader factory| WF[reader/workflows.py SKILL.md]
     CR -->|allowlist gate T1| ALW[reader/allowlist.py]
     CX -->|allowlist gate T1| ALW
@@ -66,11 +70,10 @@ Sem este módulo, `ccusage` (npm) era a única alternativa: dependência Node ex
 
 ## Estado runtime tocado
 
-  * **Read** : `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail com `byte_offset` checkpoint em `reader_state` + inode detection para rotação (devops T7); `~/.codex/sessions.sqlite` via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` com defensive column selection; `~/.pi/agent/sessions/` (PI session jsonl por dir-slug, metadata-only, T1 — v0.1.30); `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` para workflows.
+  * **Read** : `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail com `byte_offset` checkpoint em `reader_state` + inode detection para rotação; `~/.codex/state_5.sqlite` (default; env-overridable) via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` com defensive column selection; `~/.pi/agent/sessions/` (PI session jsonl por dir-slug, metadata-only, T1); `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` para workflows.
   * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) com schema `PRAGMA user_version=5`: 6 tables (`reader_state`, `sessions`, `agents`, `events`, `workflows`, `workflow_agents`) + 6 indices. WAL + synchronous=NORMAL + foreign_keys=ON. **NO** column de conteúdo (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — bloqueado por construção via allowlist gate.
-  * **Read+Write** : `~/.dadaia/state/panel.token` (chmod 600) — Bearer token gerado via `secrets.token_urlsafe(32)` em primeiro boot; constant-time compare na validação.
-  * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` evita refresh concorrente.
-  * **HTTP routes** : `GET /api/agents` (query params: `limit` default 50, `context` slug, `days` default 180), `GET /api/agents/{id}/sessions` (paginação), `GET /api/workflows`. Todas exigem `Authorization: Bearer <token>`; 401 sem header válido (sem body). CSP `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'` em HTML; `X-Content-Type-Options: nosniff` em JSON.
+  * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` evita refresh concorrente. (Não há arquivo de token: o panel é no-auth; um path residual `panel.token` em `service.py` é dead-code tracked no backlog `hygiene-and-dead-code-cleanup`.)
+  * **HTTP routes** : `GET /api/sessions?runtime=…`, `GET /api/sessions/<runtime>/<id>`, `GET /api/agents` (query params: `limit` default 50, `context` slug, `days` default 180), `GET /api/agents/{id}/sessions` (paginação), `GET /api/workflows`. Todas servidas **sem credencial** — guards: bind loopback + Host allowlist ([[panel]]). `X-Content-Type-Options: nosniff` em JSON.
   * **Retention** : 180d raw events em `events` + agregados perpétuos em `events_daily` (compactação por janela diária após 30d, cron interna lazy-on-request). Eventos > 180d são apagados de `events` mas mantidos em agregados.
   * **Guard** : `os.getuid() == 0` recusa start do TelemetryService (devops T6 — não lê `~/.claude/projects/` de outros usuários).
 

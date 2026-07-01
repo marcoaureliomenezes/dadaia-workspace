@@ -1,0 +1,70 @@
+---
+slug: harness-codex
+title: Harness — Codex
+category: product
+tldr: 'Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.'
+summary: Capability and scaffold truth for the Codex harness at both agentic layers —
+  interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, model
+  catalog, and what a Codex-only workspace installation contains.
+tags:
+- harness
+- codex
+- layer-1
+- layer-2
+- projection
+agent_tier: self-pull
+token_estimate: 450
+last_updated: '2026-07-01'
+release_origin: v0.1.47
+---
+
+## Propósito
+
+Codex is a **dual-layer** harness. Layer 1: the operator's `codex` TUI, governed by
+`AGENTS.md` read natively up-tree plus the `.codex/` projection. Layer 2: the
+`CODEX_EXEC` worker — `codex exec` driven headless by a dadaia-workflow, one-shot per
+step, bounded by Ring-2 (git-diff `changed_paths`) + the git chokepoints. In a Codex
+entry session, dadaia-workflows are the preferred execution path, defaulting the
+Layer-2 harness to `codex` unless the operator overrides to `pi`.
+
+## Fluxo de uso
+
+1. Operator launches `codex` at the workspace root; `AGENTS.md` loads natively;
+   `SessionStart` ctx-inject loads the bound context once per session.
+2. Interactive sessions get the deterministic gate: PreToolUse `pre_gate` (matcher
+   `^(apply_patch|Edit|Write|Bash)$`) + matcher-less PostToolUse heartbeat, registered
+   in `.codex/hooks.json` via self-locating wrappers under `.dadaia/hooks/codex-*`.
+3. **Headless asymmetry (honesty):** `codex exec` fires NO hooks (upstream codex-cli
+   defect, live-verified) — headless enforcement is chokepoints-only.
+4. As a Layer-2 worker: the engine builds the exec argv (model `(id, effort)` discrete;
+   no approval flag — exec never prompts), pipes the fragment+persona prompt, and
+   extracts the result via the shared strict-schema-first extraction.
+
+## Trigger típico
+
+Layer 1: operator preference for the Codex TUI. Layer 2: every dadaia-workflow step
+whose governed harness resolves to `codex` (model catalog: `(gpt-5.5, high)`,
+`(gpt-5.5, medium)`).
+
+## Diferencial
+
+Runs on the operator's Codex subscription. Command policy is expressed natively as
+Starlark `.codex/rules/*.rules` (prefix rules, venv-form paths) — not in config keys.
+The interactive/headless enforcement split is the key operational fact: never assume a
+hook fired in an exec run.
+
+## Estado runtime tocado
+
+Scaffold projected by `dadaia public install --target codex`: `.codex/config.toml`
+(header + per-agent config blocks only — no inert keys), `.codex/hooks.json`,
+`.codex/agents/` (12 TOML personas, registry-derived tiering), `.codex/rules/`
+(Starlark command policy), `.codex/skills/` (context adapters), `.codex/workflows/`
+(reference-only). Wrappers in `.dadaia/hooks/codex-*`. A Codex-only workspace =
+`--target codex` (+ shared `--target agents`).
+
+## Dependências
+
+- [[tech-stack]] — roster + model catalog single source.
+- [[lifecycle-foundation]] — the engine that drives the CODEX_EXEC worker.
+- [[sdd-gate-v3]] — gate + chokepoint mechanism, incl. the headless asymmetry.
+- [[public-asset-distribution]] — the `.codex/` projection pipeline.
