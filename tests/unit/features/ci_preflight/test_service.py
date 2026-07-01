@@ -17,15 +17,22 @@ def _pass(argv: Sequence[str]) -> tuple[int, str]:
 
 
 def test_checks_for_full_has_lint_type_and_full_pytest() -> None:
-    names = [c.name for c in checks_for(quick=False)]
+    checks = checks_for(quick=False)
+    names = [c.name for c in checks]
     assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
     assert names[-1] == "pytest"
+    # W1-5: the full preflight pytest excludes tests/performance (wall-clock-bound flake).
+    assert "--ignore=tests/performance" in checks[-1].argv
 
 
 def test_checks_for_quick_swaps_in_no_e2e_pytest() -> None:
-    names = [c.name for c in checks_for(quick=True)]
+    checks = checks_for(quick=True)
+    names = [c.name for c in checks]
     assert names[:3] == ["ruff format --check", "ruff check", "mypy --strict"]
     assert names[-1] == "pytest (no e2e)"
+    # W1-5: performance is excluded in quick mode too, alongside the e2e exclusion.
+    assert "--ignore=tests/performance" in checks[-1].argv
+    assert "--ignore=tests/e2e" in checks[-1].argv
 
 
 def test_run_preflight_all_pass() -> None:

@@ -15,20 +15,20 @@ write sets are declared (PLAN write-set boundaries apply).
 
 ## W1 — Code fixes (owner: software-engineer)
 
-- [ ] T-47-10 Codex exec argv fix + stderr mapping + pin-test update (W1-1)
-- [ ] T-47-11 Remove inert codex config keys `approved_commands` + `[skills] paths` (W1-2)
-- [ ] T-47-12 Persona injection all verbs: shared helper + 5 bodies + CLI step path +
+- [x] T-47-10 Codex exec argv fix + stderr mapping + pin-test update (W1-1)
+- [x] T-47-11 Remove inert codex config keys `approved_commands` + `[skills] paths` (W1-2)
+- [-] T-47-12 Persona injection all verbs: shared helper + 5 bodies + CLI step path +
   per-verb prompt-content tests (W1-3)
-- [ ] T-47-13 Pre-commit backlog gate staged-path scoping (W1-4)
-- [ ] T-47-14 Preflight excludes `tests/performance` (W1-5)
-- [ ] T-47-15 Root-whitelist first-path-component classification + tests (W1-6)
-- [ ] T-47-16 ctx-inject bind attribution (harness pid) + two-session test (W1-7)
-- [ ] T-47-17 specs_resolver persisted-bind fallback + tests (W1-8)
-- [ ] T-47-18 Doctor guards: SPEC-DOC-037 no-enum; loose-audit WARN; `hooks` allowed subdir
+- [x] T-47-13 Pre-commit backlog gate staged-path scoping (W1-4)
+- [x] T-47-14 Preflight excludes `tests/performance` (W1-5)
+- [-] T-47-15 Root-whitelist first-path-component classification + tests (W1-6)
+- [-] T-47-16 ctx-inject bind attribution (harness pid) + two-session test (W1-7)
+- [-] T-47-17 specs_resolver persisted-bind fallback + tests (W1-8)
+- [-] T-47-18 Doctor guards: SPEC-DOC-037 no-enum; loose-audit WARN; `hooks` allowed subdir
   (W1-9)
-- [ ] T-47-19 SPEC-DOC-031 remediation text ↔ BL-SCHEMA vocabulary (W1-10)
-- [ ] T-47-20 FAKE closure smoke; fix iff broken (W1-11)
-- [ ] T-47-21 `setup.cfg` import-linter comment trued (not CI-enforced; cite backlog)
+- [-] T-47-19 SPEC-DOC-031 remediation text ↔ BL-SCHEMA vocabulary (W1-10)
+- [-] T-47-20 FAKE closure smoke; fix iff broken (W1-11)
+- [x] T-47-21 `setup.cfg` import-linter comment trued (not CI-enforced; cite backlog)
   (W1-12)
 
 ## W2 — Constitution + AGENTS.md (owner: product-engineer)

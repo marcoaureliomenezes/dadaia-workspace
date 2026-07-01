@@ -92,10 +92,9 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert argv[:2] == ["/usr/bin/codex", "exec"]
     assert "--ignore-user-config" in argv
     assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"]
-    assert argv[argv.index("--ask-for-approval") :][:2] == [
-        "--ask-for-approval",
-        "never",
-    ]
+    # W1-1: `--ask-for-approval` is interactive-only and rejected by `codex exec` on
+    # codex-cli 0.142.4; the adapter must NOT pass it (exec never prompts).
+    assert "--ask-for-approval" not in argv
     assert ["--cd", str(tmp_path)] == argv[argv.index("--cd") :][:2]
     assert argv[argv.index("-m") :][:2] == ["-m", "gpt-test"]
     assert 'model_reasoning_effort="medium"' in argv
@@ -229,6 +228,61 @@ def test_codex_exec_adapter_redacts_secret_values_from_errors(tmp_path: Path) ->
 
     assert result.status is AgentRunStatus.FAILED
     assert result.error == "failed with [REDACTED]"
+
+
+def test_codex_exec_adapter_maps_unexpected_argument_to_actionable_error(tmp_path: Path) -> None:
+    """W1-1: an "unexpected argument" stderr surfaces an actionable flag-contract message.
+
+    A codex-cli that rejects an argv flag (the ``--ask-for-approval`` incompatibility this
+    task fixed, or any future argv drift) exits non-zero with an "unexpected argument"
+    stderr. The adapter must not pass that raw complaint through — it maps the class to a
+    message naming the incompatible-flag contract so the failure is diagnosable.
+    """
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(
+            argv,
+            2,
+            stdout="",
+            stderr="error: unexpected argument '--ask-for-approval' found",
+        )
+
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.FAILED
+    assert (
+        result.summary == "codex exec rejected an argument (incompatible codex-cli flag contract)"
+    )
+    assert result.error is not None
+    assert "--ask-for-approval" in result.error
+    assert "-c approval_policy=" in result.error
+    # The underlying CLI complaint is preserved (appended) for diagnosis.
+    assert "unexpected argument" in result.error
+
+
+def test_codex_exec_adapter_generic_nonzero_exit_keeps_raw_stderr(tmp_path: Path) -> None:
+    """W1-1: a non-"unexpected argument" failure keeps the plain non-zero-exit summary."""
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="model timeout")
+
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.FAILED
+    assert result.summary == "codex exec returned non-zero exit"
+    assert result.error == "model timeout"
 
 
 def test_codex_exec_adapter_redacts_successful_json_output(tmp_path: Path) -> None:

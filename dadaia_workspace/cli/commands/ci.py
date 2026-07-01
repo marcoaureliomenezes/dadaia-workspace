@@ -137,14 +137,48 @@ def pre_commit_check() -> None:
     _run_backlog_doctor_gate(repo_root)
 
 
+def _staged_backlog_paths(repo_root: Path) -> list[str]:
+    """Return the paths staged for the pending commit that live under ``specs/backlog/``.
+
+    Uses ``git diff --cached --name-only -- specs/backlog`` (pathspec-filtered) run from the
+    repo root, the same ``subprocess`` seam this cli module already uses in ``_repo_root``.
+    An empty list means the staged changeset does not touch the backlog. Any git failure
+    (no repo, no git) yields an empty list — the caller then skips the gate (fail-open, the
+    CI full sweep remains the backstop).
+    """
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--", "specs/backlog"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
 def _run_backlog_doctor_gate(repo_root: Path) -> None:
     """Run BL-* over ``<repo_root>/specs`` at the pre-commit chokepoint (v0.1.25 R1).
 
     A no-op when the repo has no ``specs/backlog/`` (not an SDD spec context). Any ERROR
     finding blocks the commit with an actionable per-finding listing.
+
+    W1-4 scoping: the blocking BL-* sweep runs ONLY when the staged changeset intersects
+    ``specs/backlog/**``. A commit that stages no backlog file is never blocked by
+    pre-existing backlog debt (bugs ``precommit-backlog-doctor-blocks-unrelated-commits`` +
+    ``backlog-doctor-blocks-consumed-item-refactor-commit``). The full, unscoped sweep still
+    runs in CI via ``dadaia backlog doctor`` (the ci.yml backlog-doctor job) — unchanged.
     """
     specs_dir = repo_root / "specs"
     if not (specs_dir / "backlog").is_dir():
+        return
+    if not _staged_backlog_paths(repo_root):
+        typer.echo(
+            "[pre-commit] no staged specs/backlog changes — skipping backlog doctor gate.",
+            err=True,
+        )
         return
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
 

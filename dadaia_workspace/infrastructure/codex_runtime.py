@@ -69,6 +69,11 @@ class CodexExecConfig:
     model: str | None = None
     reasoning_effort: CodexEffort | None = None
     sandbox: str = "read-only"
+    # Retained for back-compat only (W1-1): `codex exec` never prompts — approval is
+    # structurally "never" in the exec subcommand — so this policy is no longer emitted
+    # into the argv. Passing the interactive-only `--ask-for-approval` flag to exec is
+    # rejected by codex-cli 0.142.4 ("unexpected argument"). The field stays so existing
+    # constructors keep working; it is intentionally not wired into `_command`.
     approval_policy: str = "never"
     env_allowlist: tuple[str, ...] = _DEFAULT_ENV_ALLOWLIST
     timeout_seconds: int = 900
@@ -143,24 +148,53 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                 )
 
             if proc.returncode != 0:
+                stderr_text = (proc.stderr or proc.stdout or "").strip()
+                summary, error = self._classify_failure(stderr_text)
                 return AgentRunResult(
                     status=AgentRunStatus.FAILED,
-                    summary="codex exec returned non-zero exit",
-                    error=self._redact((proc.stderr or proc.stdout or "").strip()),
+                    summary=summary,
+                    error=self._redact(error),
                 )
             result = self._result_from_output(request, output_path, proc)
             return self._with_changed_paths(result)
 
+    @staticmethod
+    def _classify_failure(stderr_text: str) -> tuple[str, str]:
+        """Map a non-zero codex exec failure to ``(summary, error)``.
+
+        An "unexpected argument" / "unrecognized" stderr means the argv carried a flag the
+        installed codex-cli's ``exec`` subcommand does not accept (e.g. the interactive-only
+        ``--ask-for-approval``, dropped in W1-1). That class is surfaced with an actionable
+        message naming the incompatible-flag contract instead of the raw CLI complaint, so a
+        future argv drift fails loudly at the adapter boundary rather than as an opaque
+        non-zero exit. All other failures keep the raw (redacted) stderr.
+        """
+        lowered = stderr_text.lower()
+        if "unexpected argument" in lowered or "unrecognized" in lowered:
+            return (
+                "codex exec rejected an argument (incompatible codex-cli flag contract)",
+                (
+                    "codex exec rejected an argument passed by the adapter — the installed "
+                    "codex-cli's `exec` subcommand does not accept it. Interactive-only flags "
+                    "(e.g. `--ask-for-approval`) must not be passed to `codex exec`; express "
+                    "approval policy via `-c approval_policy=...` config override instead. "
+                    f"Underlying codex-cli error: {stderr_text}"
+                ),
+            )
+        return ("codex exec returned non-zero exit", stderr_text)
+
     def _command(self, request: AgentRunRequest, output_path: Path) -> list[str]:
         model, effort = self._model_and_effort(request)
+        # W1-1: NO `--ask-for-approval` — that flag is interactive-only and is rejected by
+        # `codex exec` on codex-cli 0.142.4 ("unexpected argument"). exec never prompts, so
+        # approval policy needs no expression here (`CodexExecConfig.approval_policy` is kept
+        # only for constructor back-compat).
         args = [
             self._config.codex_bin,
             "exec",
             "--ignore-user-config",
             "--sandbox",
             self._config.sandbox,
-            "--ask-for-approval",
-            self._config.approval_policy,
             "--cd",
             str(self._config.cwd),
             "--output-last-message",
