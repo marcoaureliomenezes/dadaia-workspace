@@ -325,6 +325,17 @@ class TestRoot4:
         codes = {i.code for i in svc.check()}
         assert "ROOT-4" in codes
 
+    def test_dadaia_hooks_subdir_no_root4(self, tmp_path: Path) -> None:
+        """v0.1.47 W1-9: .dadaia/hooks/ (Python governance hooks) is canonical, not ROOT-4.
+
+        Regression for bug workspace-doctor-root4-false-positive-dadaia-hooks.
+        """
+        _init_workspace(tmp_path)
+        (tmp_path / ".dadaia" / "hooks").mkdir()
+        svc = _make_doctor(tmp_path)
+        codes = {i.code for i in svc.check()}
+        assert "ROOT-4" not in codes
+
     def test_dotfile_inside_dadaia_not_root4(self, tmp_path: Path) -> None:
         """Dotfiles (non-directories) inside .dadaia/ are allowed (e.g. .gitkeep)."""
         _init_workspace(tmp_path)

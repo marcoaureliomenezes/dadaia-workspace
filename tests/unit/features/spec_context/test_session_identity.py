@@ -291,3 +291,53 @@ def test_iter_bind_epochs_skips_invalid_names(tmp_path: Path) -> None:
     bad = si.bind_epoch_dir(ws, create=True) / "bad name!"
     bad.write_text("x", encoding="utf-8")
     assert dict(si.iter_bind_epochs(ws)).keys() == {"good"}
+
+
+# W1-7 (T-47-16): bind-epoch session attribution — the marker file CONTENT carries the
+# invoking harness pid so the ctx-inject hook honors it only for the owning session.
+
+
+def test_write_bind_epoch_records_pid_as_content(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pid=4242)
+    assert si.read_bind_epoch_pid(ws, CTX) == 4242
+    # The pid is the file content (a decimal string), not an empty marker.
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8").strip() == "4242"
+
+
+def test_write_bind_epoch_with_pid_refreshes_mtime(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pid=4242)
+    marker = si.bind_epoch_path(ws, CTX)
+    base = marker.stat().st_mtime
+    os.utime(marker, (base - 100, base - 100))
+    backdated = marker.stat().st_mtime
+    si.write_bind_epoch(ws, CTX, pid=5353)
+    assert marker.stat().st_mtime > backdated
+    assert si.read_bind_epoch_pid(ws, CTX) == 5353
+
+
+def test_read_bind_epoch_pid_none_for_legacy_empty_marker(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX)  # legacy shape: pid=None ⇒ EMPTY marker
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == ""
+    assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pid_none_for_absent_marker(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pid_none_for_non_integer_or_nonpositive(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    marker = si.bind_epoch_dir(ws, create=True) / CTX
+    for bad in ("not-a-pid", "0", "-7", ""):
+        marker.write_text(bad, encoding="utf-8")
+        assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pid_none_for_traversal_name(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    # A traversal ctx name never resolves to a marker path ⇒ fail-soft None, never raises.
+    assert si.read_bind_epoch_pid(ws, "../escape") is None

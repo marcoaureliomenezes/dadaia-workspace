@@ -52,6 +52,7 @@ __all__ = [
     "forbidden_token_in",
     "list_personas",
     "load_persona",
+    "resolve_persona_for_role",
     "validate_all",
 ]
 
@@ -217,6 +218,42 @@ class PersonaLoader(FrontmatterDocLoader):
 
 # Module-level convenience: a default loader bound to the packaged persona root.
 _DEFAULT_LOADER = PersonaLoader()
+
+
+def resolve_persona_for_role(role: str, loader: PersonaLoader | None = None) -> str | None:
+    """Resolve a step's ``role`` token to its Layer-2 persona mandate(s) (v0.1.44 / AC-2).
+
+    This is the SINGLE source of role→persona resolution shared by every prompt-assembly
+    surface — the :class:`~dadaia_workspace.features.lifecycle.pipeline.LifecyclePipeline`,
+    each fragment workflow body (release_definition / audit / research / bug_report /
+    backlog_definition), and the CLI single-step path — so every model-driven step prompt
+    on every verb carries the persona body as its operative role directive (W1-3).
+
+    ``role`` is comma-split (a multi-role step such as ``plan_review`` names
+    ``"qa-engineer, software-architect"``); each named role is resolved through
+    :meth:`PersonaLoader.load_optional`. ``role == "shared"`` and any role with no persona
+    atom (e.g. ``python``, ``project-manager``) resolve to ``None`` for that name — no
+    persona block, no crash. The result is:
+
+    * ``None`` when no named role resolves to a persona (a ``shared`` / unmapped step —
+      keeping the persona-less envelope byte-identical);
+    * the single mandate body when exactly one role resolves;
+    * each resolving role's mandate, delimited by a ``### Persona — <name>`` header, when
+      several do (the multi-role set carries every named persona's mandate).
+
+    ``loader`` is injectable for tests; ``None`` uses the packaged default loader.
+    """
+    active = loader if loader is not None else _DEFAULT_LOADER
+    resolved: list[tuple[str, str]] = []
+    for name in (part.strip() for part in role.split(",")):
+        persona = active.load_optional(name)
+        if persona is not None:
+            resolved.append((name, persona.body))
+    if not resolved:
+        return None
+    if len(resolved) == 1:
+        return resolved[0][1]
+    return "\n\n".join(f"### Persona — {name}\n{body}" for name, body in resolved)
 
 
 def load_persona(role: str) -> Persona:

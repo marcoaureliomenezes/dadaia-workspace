@@ -776,6 +776,13 @@ def test_nonterminal_backlog_referenced_in_archived_closure_reports_doc_031_warn
     # The finding text must cite the ADR-6 false-positive reasoning (why it stays WARN).
     assert "v0.0.9" in text
     assert all(i.path.endswith("feat-consumed-thing.md") for i in doc_031)
+    # W1-10 (T-47-19): remediation text is reconciled with BL-SCHEMA vocabulary — it must
+    # recommend a BARE terminal token + optional delivered_in + archive move, and must
+    # explicitly warn AGAINST the BL-SCHEMA-rejected 'TOKEN — vX.Y.Z' status form.
+    assert "status: delivered" in text  # bare terminal token BL-SCHEMA accepts
+    assert "delivered_in" in text  # optional release field, not part of the status token
+    assert "_archive" in text  # archive move per SPEC-DOC-035
+    assert "BL-SCHEMA" in text and "Do NOT" in text  # explicit rejected-form warning
 
 
 def test_open_backlog_referenced_in_archived_spec_reports_doc_031_warning(

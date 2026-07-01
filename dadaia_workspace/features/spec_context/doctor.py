@@ -81,6 +81,10 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
         "locks",
         "sessions",
         "handoff",
+        # Python governance hooks projected under .dadaia/hooks/ (workspace-init) — a
+        # canonical subdir, not a ROOT-4 violation (v0.1.47 W1-9, bug
+        # workspace-doctor-root4-false-positive-dadaia-hooks).
+        "hooks",
         ".cache",
         ".venv",
         # Additional dirs observed in practice

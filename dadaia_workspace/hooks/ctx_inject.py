@@ -131,32 +131,48 @@ def _session_bound_context(workspace: Path, session_id: str) -> str:
     return str(record.get("context") or "")
 
 
-def _newest_qualifying_marker(workspace: Path, sentinel_mtime: float | None) -> str:
+def _newest_qualifying_marker(
+    workspace: Path, sentinel_mtime: float | None, harness_pid: int
+) -> str:
     """Newest bind-epoch marker that qualifies for re-injection, else ``""``.
 
-    A marker qualifies only by being **newer than an EXISTING sentinel** (``sentinel_mtime``
-    is the sentinel's mtime, or ``None`` when no sentinel exists). When no sentinel exists,
-    NOTHING qualifies — a pre-existing marker never binds a fresh session (FR-W2-02). The
-    newest qualifying marker (by mtime) wins.
+    A marker qualifies only when BOTH hold:
+
+    1. it is **newer than an EXISTING sentinel** (``sentinel_mtime`` is the sentinel's
+       mtime, or ``None`` when no sentinel exists — then NOTHING qualifies, so a
+       pre-existing marker never binds a fresh session, FR-W2-02); and
+    2. its recorded harness pid **matches** ``harness_pid`` — this session's own harness
+       pid (W1-7 / T-47-16). A marker with no recorded pid (legacy/empty) or a pid
+       belonging to a DIFFERENT session is IGNORED, so a concurrent session's bind can
+       never steal this session's context. When no marker is attributable, the caller
+       falls back to generic preflight (never another session's context).
+
+    The newest qualifying, attributed marker (by mtime) wins.
     """
     if sentinel_mtime is None:
         return ""
-    qualifying = [
-        (mtime, slug)
-        for slug, mtime in session_identity.iter_bind_epochs(workspace)
-        if mtime > sentinel_mtime
-    ]
+    qualifying: list[tuple[float, str]] = []
+    for slug, mtime in session_identity.iter_bind_epochs(workspace):
+        if mtime <= sentinel_mtime:
+            continue
+        marker_pid = session_identity.read_bind_epoch_pid(workspace, slug)
+        if marker_pid is None or marker_pid != harness_pid:
+            continue
+        qualifying.append((mtime, slug))
     if not qualifying:
         return ""
     qualifying.sort()
     return qualifying[-1][1]
 
 
-def _resolve_context(workspace: Path, session_id: str, sentinel_mtime: float | None) -> str:
+def _resolve_context(
+    workspace: Path, session_id: str, sentinel_mtime: float | None, harness_pid: int
+) -> str:
     """Resolve the context to inject (FR-W2-01 chain). First-ALIVE fallback DELETED.
 
     Chain: ``DADAIA_CONTEXT`` env → self-keyed session record (bound context) → newest
-    bind-epoch marker newer than this session's sentinel → ``""`` (generic preflight).
+    bind-epoch marker newer than this session's sentinel AND attributed to this session's
+    harness pid (W1-7) → ``""`` (generic preflight).
     """
     env = os.environ.get("DADAIA_CONTEXT")
     if env:
@@ -164,7 +180,22 @@ def _resolve_context(workspace: Path, session_id: str, sentinel_mtime: float | N
     bound = _session_bound_context(workspace, session_id)
     if bound:
         return bound
-    return _newest_qualifying_marker(workspace, sentinel_mtime)
+    return _newest_qualifying_marker(workspace, sentinel_mtime, harness_pid)
+
+
+def _resolve_harness_pid(payload: dict[str, object]) -> int:
+    """Resolve this session's long-lived harness pid (W1-7 / T-47-16).
+
+    Reuses the SDD gate's lease-layer resolution (``sdd_gate._resolve_holder_pid``): a
+    payload-provided ``harness_pid``/``parent_pid``/``ppid`` wins, else ``os.getppid()``
+    (this hook child's parent — the harness process). ``dadaia context bind`` stamps the
+    bind-epoch marker with the bind CLI's own ``os.getppid()``; both are direct children of
+    the harness, so their pids match and the marker is attributed to this session. Lazy
+    import keeps the frequently-spawned hook's import surface minimal.
+    """
+    from dadaia_workspace.hooks.sdd_gate import _resolve_holder_pid
+
+    return _resolve_holder_pid(payload)
 
 
 def _emit(payload: str) -> None:
@@ -370,7 +401,13 @@ def main() -> int:
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
     sentinel_exists = sentinel_mtime is not None
 
-    context = _resolve_context(workspace, session_id, sentinel_mtime)
+    # W1-7 (T-47-16): the harness pid this session runs under — the SAME resolution the SDD
+    # gate uses for the lease layer (payload harness_pid → os.getppid()). A bind-epoch
+    # marker is honored only when its recorded pid matches this, so a concurrent session's
+    # bind cannot steal this session's context.
+    harness_pid = _resolve_harness_pid(payload)
+
+    context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
 
     # Unbound: generic preflight (NO memory). Emit once per session — a fresh session (no
     # sentinel) gets it and stamps the sentinel; a repeat prompt is silent.

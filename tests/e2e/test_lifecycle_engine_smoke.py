@@ -205,7 +205,14 @@ def test_temp_workspace_lifecycle_engine_smoke(
         app,
         ["specs", "doctor", "--specs-dir", str(_REPO_ROOT / "specs"), "--json"],
     )
-    assert specs_doctor.exit_code == 0, specs_doctor.output
-    summary = _payload(specs_doctor.output)["summary"]
-    assert isinstance(summary, dict)
-    assert summary["errors"] == 0
+    payload = _payload(specs_doctor.output)
+    issues = payload["issues"]
+    assert isinstance(issues, list)
+    # v0.1.47 W1-9 added SPEC-DOC-037: the constitution must not enumerate AgentRuntimeKind
+    # members. The LIVE constitution still enumerates them (FAKE/CODEX_EXEC/CLAUDE_SDK/
+    # PI_HEADLESS + removed OPENCODE_RUN) until the W2 lean-rewrite lands, so exactly this one
+    # tracked error is EXPECTED on the live tree per the release SPEC (§W1-9: "test against
+    # synthetic fixtures, NOT the live file — the live constitution still enumerates until W2;
+    # that's expected"). It self-clears once W2 lands. Every OTHER error is a real regression.
+    real_errors = [i for i in issues if i["severity"] == "error" and i["code"] != "SPEC-DOC-037"]
+    assert real_errors == [], specs_doctor.output

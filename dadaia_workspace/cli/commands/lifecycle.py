@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
+from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
 from dadaia_workspace.features.lifecycle.phase_workflow import (
     PhaseWorkflowResult,
     is_review_phase,
@@ -844,6 +845,7 @@ def _run_phase_step(
         prompt=_phase_step_prompt(label, release_id, context, target_phase),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
+        persona=resolve_persona_for_role(role),
     )
     result = workflow.run(
         run_id=run_id,

@@ -27,6 +27,16 @@ from pathlib import Path
 from dadaia_workspace.features.spec_context import session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
+# Two distinct, clearly-synthetic harness pids used to drive W1-7 session attribution. A
+# bind-epoch marker is honored only when its recorded pid matches the pid the hook resolves
+# for THIS session; the hook resolves it from the stdin ``harness_pid`` payload field (the
+# sanctioned test channel — see ``sdd_gate._resolve_holder_pid``), so passing a known pid
+# and stamping the marker with the same/different value lets a single test process simulate
+# two concurrent harness sessions with different pids. The values need only be positive and
+# distinct — ctx_inject compares them for equality, it never probes them for liveness.
+_PID_A = 990001
+_PID_B = 990002
+
 
 def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
     states = tmp_path / ".dadaia" / "states"
@@ -62,12 +72,24 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
 
-def _stamp_bind_epoch(tmp_path: Path, slug: str, *, mtime: float | None = None) -> Path:
-    """Write a bind-epoch marker for ``slug`` (optionally with an explicit mtime)."""
+def _stamp_bind_epoch(
+    tmp_path: Path, slug: str, *, mtime: float | None = None, pid: int | None = None
+) -> Path:
+    """Write a bind-epoch marker for ``slug`` (optionally with an explicit mtime).
+
+    W1-7 session attribution: ``pid`` records the marker's owning harness pid as the file
+    CONTENT (the shape ``session_identity.write_bind_epoch`` produces). ``pid=None`` writes
+    a legacy EMPTY marker — the pre-W1-7 shape, which the hook treats as unattributable and
+    never honors for injection. An explicit ``mtime`` is applied after the content is
+    written so the epoch ordering is deterministic.
+    """
     epoch_dir = tmp_path / ".dadaia" / "states" / "bind_epoch"
     epoch_dir.mkdir(parents=True, exist_ok=True)
     marker = epoch_dir / slug
-    marker.touch()
+    if pid is None:
+        marker.touch()  # legacy EMPTY marker — no attribution
+    else:
+        marker.write_text(f"{pid}\n", encoding="utf-8")
     if mtime is not None:
         os.utime(marker, (mtime, mtime))
     return marker
@@ -78,6 +100,7 @@ def _run(
     session_id: str,
     *,
     extra: dict[str, str] | None = None,
+    harness_pid: int | None = None,
 ) -> str:
     """Invoke ctx_inject as a real subprocess; return its stdout.
 
@@ -86,11 +109,21 @@ def _run(
     stdin field wins resolution). ``extra`` supplies harness-control output-contract vars.
     ``DADAIA_CONTEXT`` is popped so context resolution comes only from the bind-epoch /
     session chain (a developer shell exporting it must not leak into these tmp-workspace runs).
+
+    ``harness_pid`` (W1-7) is threaded into the stdin payload as the ``harness_pid`` field —
+    the sanctioned channel the hook resolves its owning harness pid from
+    (``sdd_gate._resolve_holder_pid``). Supplying it lets a test pin the pid the hook uses to
+    attribute bind-epoch markers, so one test process can simulate two concurrent sessions
+    with distinct pids. Omitted ⇒ the payload carries no pid and the hook falls back to
+    ``os.getppid()`` (the parent pytest process), the same-parent case the e2e exercises.
     """
     env = claude_hook_env(tmp_path, extra=extra)
     env.pop("CLAUDE_CODE_SESSION_ID", None)  # force resolution from the stdin field
     env.pop("DADAIA_CONTEXT", None)  # context comes only from the bind / marker chain
-    result = run_hook_subprocess("ctx_inject", {"session_id": session_id}, env)
+    payload: dict[str, object] = {"session_id": session_id}
+    if harness_pid is not None:
+        payload["harness_pid"] = harness_pid
+    result = run_hook_subprocess("ctx_inject", payload, env)
     assert result.returncode == 0, result.stderr
     return result.stdout
 
@@ -170,30 +203,33 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
 def test_bind_marker_newer_than_sentinel_injects_memory(tmp_path: Path) -> None:
     _ws(tmp_path)
     # First prompt: unbound ⇒ generic, stamps the sentinel.
-    first = _run(tmp_path, "sess")
+    first = _run(tmp_path, "sess", harness_pid=_PID_A)
     assert "[no bound context]" in first
-    # A bind stamps a marker NEWER than the sentinel ⇒ next prompt injects the context.
+    # A bind stamps a marker NEWER than the sentinel AND attributed to this session's harness
+    # pid ⇒ next prompt injects the context (W1-7).
     sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sess"
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)
-    second = _run(tmp_path, "sess")
+    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
+    second = _run(tmp_path, "sess", harness_pid=_PID_A)
     assert "[ctx]" in second
     assert "end memory bootstrap" in second
     assert "Python 3.12" in second
 
 
 def test_rebind_to_other_context_reinjects(tmp_path: Path) -> None:
+    # W1-7 acceptance (c): a same-pid re-bind to ANOTHER context re-injects. Both markers are
+    # attributed to the same harness pid (_PID_A), so both qualify for this session.
     _ws(tmp_path, slug="alpha")
     _add_context(tmp_path, "beta")
     sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-rb"
     # First prompt establishes the sentinel (a marker qualifies only against an EXISTING one).
-    _run(tmp_path, "rb")
-    # Bind alpha newer than the sentinel ⇒ inject alpha.
-    _stamp_bind_epoch(tmp_path, "alpha", mtime=sentinel.stat().st_mtime + 5)
-    out_a = _run(tmp_path, "rb")
+    _run(tmp_path, "rb", harness_pid=_PID_A)
+    # Bind alpha newer than the sentinel, attributed to this session ⇒ inject alpha.
+    _stamp_bind_epoch(tmp_path, "alpha", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
+    out_a = _run(tmp_path, "rb", harness_pid=_PID_A)
     assert "[alpha]" in out_a
-    # Re-bind beta with a still-newer marker ⇒ re-inject beta.
-    _stamp_bind_epoch(tmp_path, "beta", mtime=sentinel.stat().st_mtime + 5)
-    out_b = _run(tmp_path, "rb")
+    # Re-bind beta with a still-newer marker, same harness pid ⇒ re-inject beta.
+    _stamp_bind_epoch(tmp_path, "beta", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
+    out_b = _run(tmp_path, "rb", harness_pid=_PID_A)
     assert "[beta]" in out_b
     assert "Node 20" in out_b
 
@@ -201,14 +237,70 @@ def test_rebind_to_other_context_reinjects(tmp_path: Path) -> None:
 def test_repeat_prompt_same_context_is_silent(tmp_path: Path) -> None:
     _ws(tmp_path)
     sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-quiet"
-    # Establish the sentinel, then bind ctx newer than it.
-    _run(tmp_path, "quiet")
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)
-    first = _run(tmp_path, "quiet")
+    # Establish the sentinel, then bind ctx newer than it, attributed to this session.
+    _run(tmp_path, "quiet", harness_pid=_PID_A)
+    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
+    first = _run(tmp_path, "quiet", harness_pid=_PID_A)
     assert "[ctx]" in first
     # A repeat prompt with NO newer marker ⇒ silent.
-    second = _run(tmp_path, "quiet")
+    second = _run(tmp_path, "quiet", harness_pid=_PID_A)
     assert second == ""
+
+
+# --- W1-7 (T-47-16): bind-epoch session attribution ---------------------------
+
+
+def test_legacy_empty_marker_never_injects_context(tmp_path: Path) -> None:
+    """A legacy EMPTY (un-attributed) bind-epoch marker is never honored for injection.
+
+    Pre-W1-7 markers carry no harness pid (empty file). Such a marker is unattributable, so
+    the hook ignores it and stays on generic preflight — NEVER injecting a context. This
+    keeps backward compatibility with old markers while closing the cross-session steal, and
+    tolerates the empty content without crashing.
+    """
+    _ws(tmp_path)
+    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-legacy"
+    # Establish the sentinel (generic preflight).
+    first = _run(tmp_path, "legacy", harness_pid=_PID_A)
+    assert "[no bound context]" in first
+    # A legacy EMPTY marker newer than the sentinel is unattributable ⇒ ignored: no context.
+    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)  # pid=None
+    out = _run(tmp_path, "legacy", harness_pid=_PID_A)
+    assert "[ctx]" not in out
+    assert "end memory bootstrap" not in out
+
+
+def test_two_session_marker_attribution_never_steals(tmp_path: Path) -> None:
+    """W1-7 core: marker A (pid X) + a NEWER marker B (pid Y) never cross sessions.
+
+    Regression for bug ``ctx-inject-newest-bind-epoch-steals-other-sessions-context``. A
+    hook resolving pid X injects context A even though B's marker is strictly newer; a hook
+    resolving pid Y injects context B. Neither session ever receives the other's context.
+    """
+    _ws(tmp_path, slug="alpha")  # context A
+    _add_context(tmp_path, "beta")  # context B
+
+    # Session X establishes its own sentinel, then A is attributed to X and a strictly-NEWER
+    # B is attributed to Y.
+    sx = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sx"
+    _run(tmp_path, "sx", harness_pid=_PID_A)
+    base_x = sx.stat().st_mtime
+    _stamp_bind_epoch(tmp_path, "alpha", mtime=base_x + 5, pid=_PID_A)
+    _stamp_bind_epoch(tmp_path, "beta", mtime=base_x + 10, pid=_PID_B)  # newer, foreign pid
+    out_x = _run(tmp_path, "sx", harness_pid=_PID_A)
+    assert "[alpha]" in out_x
+    assert "[beta]" not in out_x  # the newer, foreign-pid marker is never stolen
+
+    # Symmetric: session Y (its own sentinel, pid Y) injects beta, never alpha. Re-stamp both
+    # markers newer than Y's just-created sentinel, same attribution.
+    sy = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sy"
+    _run(tmp_path, "sy", harness_pid=_PID_B)
+    base_y = sy.stat().st_mtime
+    _stamp_bind_epoch(tmp_path, "alpha", mtime=base_y + 5, pid=_PID_A)
+    _stamp_bind_epoch(tmp_path, "beta", mtime=base_y + 10, pid=_PID_B)
+    out_y = _run(tmp_path, "sy", harness_pid=_PID_B)
+    assert "[beta]" in out_y
+    assert "[alpha]" not in out_y
 
 
 def test_sentinel_path_byte_identical_to_shell(tmp_path: Path) -> None:

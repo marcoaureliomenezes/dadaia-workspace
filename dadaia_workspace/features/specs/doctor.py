@@ -265,6 +265,22 @@ _AUDIT_DISPOSITION_RE = re.compile(
     r"[\s:*]*v\d+\.\d+\.\d+"
 )
 
+# SPEC-DOC-037 (v0.1.47 W1-9 / WS-E): the constitution must not re-encode a mutable
+# runtime-kind roster. It states the runtime-kind invariant and cites ``[[tech-stack]]`` as
+# the roster single-source. Any standalone ``AgentRuntimeKind`` member token (the distinctive
+# ALL-CAPS enum identifiers) enumerated in ``specs/constitution.md`` is an ERROR — this is the
+# recurrence guard behind the v0.1.47 constitution rewrite. The tokens are word-bounded and
+# uppercase, so lowercase English prose ("fake") never matches; ``{claude, codex, pi}`` (the
+# Layer model set W2 keeps) is deliberately NOT matched — only runtime-kind ENUM members are.
+_CONSTITUTION_RUNTIME_KIND_RE = re.compile(
+    r"\b(FAKE|CODEX_EXEC|CLAUDE_SDK|PI_HEADLESS|OPENCODE_RUN)\b"
+)
+
+# SPEC-DOC-038 (v0.1.47 W1-9): audit-disposition law (release-governance) — a dispositioned
+# audit archives to ``specs/audits/_archive/``. Every audit DIRECTORY still loose directly
+# under ``specs/audits/`` (i.e. not under ``_archive/``) is the signal it is not yet archived
+# → one WARN each.
+
 # Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
 _BACKLOG_STATUS_RE = re.compile(r"^\s*(?:\*\*)?status\*?\*?\s*:?\*?\*?\s*(.+)$", re.IGNORECASE)
 
@@ -591,6 +607,9 @@ class SpecsDoctor:
         issues.extend(self._check_archive_dirs_exist())  # SPEC-DOC-034
         issues.extend(self._check_unarchived_terminal_backlog())  # SPEC-DOC-035
         issues.extend(self._check_audit_disposition())  # SPEC-DOC-036
+        # v0.1.47 / W1-9 — recurrence guards (constitution runtime enum + loose audits)
+        issues.extend(self._check_constitution_no_runtime_enum())  # SPEC-DOC-037
+        issues.extend(self._check_loose_undisposed_audits())  # SPEC-DOC-038
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -1536,10 +1555,14 @@ class SpecsDoctor:
                     description=(
                         f"backlog/{entry.name} has non-terminal status '{status}' but its "
                         f"slug is referenced by archived release(s) {releases} (outside "
-                        "'Backlog returns' sections). If it was consumed/shipped, flip the "
-                        "status to an ADR-11 terminal token (DELIVERED/SUPERSEDED/RESOLVED/"
-                        "CONSUMED — vX.Y.Z) with an evidence pointer. WARNING only — a slug "
-                        "mention is not proof of consumption (ADR-6 false-positive class)."
+                        "'Backlog returns' sections). If it was consumed/shipped, set a BARE "
+                        "terminal status token that BL-SCHEMA accepts (e.g. 'status: "
+                        "delivered'; also 'superseded'/'resolved'/'consumed'/'rejected'), "
+                        "record the release in an optional 'delivered_in: vX.Y.Z' field, and "
+                        "move the entry into specs/backlog/_archive/ (SPEC-DOC-035). Do NOT "
+                        "append '— vX.Y.Z' to the status token itself — BL-SCHEMA rejects a "
+                        "'TOKEN — vX.Y.Z' status. WARNING only — a slug mention is not proof "
+                        "of consumption (ADR-6 false-positive class)."
                     ),
                     path=str(entry),
                 )
@@ -1871,6 +1894,73 @@ class SpecsDoctor:
             if _AUDIT_DISPOSITION_RE.search(text):
                 return True
         return False
+
+    def _check_constitution_no_runtime_enum(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-037 (v0.1.47 W1-9 / WS-E): constitution must not enumerate runtime kinds.
+
+        The constitution states the runtime-kind INVARIANT and cites ``[[tech-stack]]`` (the
+        roster single-source) instead of re-encoding a mutable ``AgentRuntimeKind`` roster.
+        Any standalone enum-member token (FAKE / CODEX_EXEC / CLAUDE_SDK / PI_HEADLESS /
+        OPENCODE_RUN, matched word-bounded + uppercase per :data:`_CONSTITUTION_RUNTIME_KIND_RE`)
+        in ``specs/constitution.md`` is an ERROR — the recurrence guard behind the constitution
+        rewrite. The Layer model set ``{claude, codex, pi}`` is not a runtime-kind enumeration
+        and is deliberately not matched. Absent constitution → no-op (SPEC-DOC-001 owns that).
+        """
+        path = self.specs_dir / "constitution.md"
+        if not path.exists():
+            return []
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return []
+        found = sorted({m.group(1) for m in _CONSTITUTION_RUNTIME_KIND_RE.finditer(text)})
+        if not found:
+            return []
+        tokens = ", ".join(found)
+        return [
+            SpecsDoctorIssue(
+                code="SPEC-DOC-037",
+                severity=Severity.ERROR,
+                description=(
+                    f"constitution.md enumerates AgentRuntimeKind member/harness-roster "
+                    f"token(s) ({tokens}). The constitution must state the runtime-kind "
+                    "invariant and cite [[tech-stack]] as the roster single-source, never "
+                    "enumerate concrete runtime kinds (SPEC-DOC-037, ERROR)."
+                ),
+                path=str(path),
+            )
+        ]
+
+    def _check_loose_undisposed_audits(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-038 (v0.1.47 W1-9): WARN per loose audit directory in ``specs/audits/``.
+
+        Audit-disposition law (release-governance): a dispositioned audit archives to
+        ``specs/audits/_archive/``. Every audit DIRECTORY still loose directly under
+        ``specs/audits/`` (not under ``_archive/``) is the signal it has not been archived —
+        one WARN each, so an undisposed/loose audit is visible until its remediation release
+        archives it. Silent when ``audits/`` is absent or holds only ``_archive/``.
+        """
+        audits_dir = self.specs_dir / "audits"
+        if not audits_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for child in sorted(audits_dir.iterdir()):
+            if not child.is_dir() or child.name == "_archive":
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-038",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"audits/{child.name} is loose in specs/audits/ — a dispositioned "
+                        "audit must be archived to specs/audits/_archive/ (one remediation "
+                        "release dispositions every finding, then archives; audit-disposition "
+                        "law). SPEC-DOC-038, WARNING."
+                    ),
+                    path=str(child),
+                )
+            )
+        return issues
 
     # 7
     def _check_no_orphan_specs(self) -> list[SpecsDoctorIssue]:
