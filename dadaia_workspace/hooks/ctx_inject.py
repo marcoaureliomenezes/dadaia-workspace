@@ -141,9 +141,13 @@ def _newest_qualifying_marker(
     1. it is **newer than an EXISTING sentinel** (``sentinel_mtime`` is the sentinel's
        mtime, or ``None`` when no sentinel exists — then NOTHING qualifies, so a
        pre-existing marker never binds a fresh session, FR-W2-02); and
-    2. its recorded harness pid **matches** ``harness_pid`` — this session's own harness
-       pid (W1-7 / T-47-16). A marker with no recorded pid (legacy/empty) or a pid
-       belonging to a DIFFERENT session is IGNORED, so a concurrent session's bind can
+    2. ``harness_pid`` — this session's own harness pid — is a **member of the marker's
+       recorded ancestry chain** (W1-7/W1-8, v0.1.47). The marker records the bind
+       process's nearest-first ancestry pid chain; the hook's harness pid is the stable
+       anchor that appears in it (the hook is a direct child of the harness, so its
+       ``os.getppid()`` equals a chain entry) even after the ephemeral bind shell has died.
+       A legacy/empty marker (empty chain) or a chain belonging to a DIFFERENT session
+       (disjoint from this harness pid) is IGNORED, so a concurrent session's bind can
        never steal this session's context. When no marker is attributable, the caller
        falls back to generic preflight (never another session's context).
 
@@ -155,8 +159,8 @@ def _newest_qualifying_marker(
     for slug, mtime in session_identity.iter_bind_epochs(workspace):
         if mtime <= sentinel_mtime:
             continue
-        marker_pid = session_identity.read_bind_epoch_pid(workspace, slug)
-        if marker_pid is None or marker_pid != harness_pid:
+        marker_chain = session_identity.read_bind_epoch_pids(workspace, slug)
+        if harness_pid not in marker_chain:
             continue
         qualifying.append((mtime, slug))
     if not qualifying:
@@ -189,8 +193,9 @@ def _resolve_harness_pid(payload: dict[str, object]) -> int:
     Reuses the SDD gate's lease-layer resolution (``sdd_gate._resolve_holder_pid``): a
     payload-provided ``harness_pid``/``parent_pid``/``ppid`` wins, else ``os.getppid()``
     (this hook child's parent — the harness process). ``dadaia context bind`` stamps the
-    bind-epoch marker with the bind CLI's own ``os.getppid()``; both are direct children of
-    the harness, so their pids match and the marker is attributed to this session. Lazy
+    bind-epoch marker with the bind process's ancestry chain, which contains this same
+    harness pid deeper up, so the marker is attributed to this session by MEMBERSHIP
+    (``harness_pid in marker_chain``) even after the ephemeral bind shell has died. Lazy
     import keeps the frequently-spawned hook's import surface minimal.
     """
     from dadaia_workspace.hooks.sdd_gate import _resolve_holder_pid

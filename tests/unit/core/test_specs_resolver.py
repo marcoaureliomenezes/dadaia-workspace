@@ -36,10 +36,19 @@ def _mk_ws(tmp_path: Path, *, slug: str = "ctx") -> Path:
     return tmp_path
 
 
-def _stamp(tmp_path: Path, slug: str, *, pid: int | None) -> None:
-    """Write a bind-epoch marker for ``slug``; ``pid=None`` writes a legacy EMPTY marker."""
+def _stamp(
+    tmp_path: Path, slug: str, *, pid: int | None = None, chain: list[int] | None = None
+) -> None:
+    """Write a bind-epoch marker for ``slug``.
+
+    ``chain`` writes a nearest-first multi-line ancestry chain [shell, harness, …]; ``pid``
+    writes a single-line (legacy) marker; both ``None`` writes a legacy EMPTY marker.
+    """
     marker = tmp_path / ".dadaia" / "states" / "bind_epoch" / slug
-    marker.write_text("" if pid is None else f"{pid}\n", encoding="utf-8")
+    if chain is not None:
+        marker.write_text("".join(f"{p}\n" for p in chain), encoding="utf-8")
+    else:
+        marker.write_text("" if pid is None else f"{pid}\n", encoding="utf-8")
 
 
 # --- _persisted_bind_context: attribution semantics ---------------------------
@@ -88,6 +97,69 @@ def test_persisted_bind_context_none_when_dir_absent(tmp_path: Path) -> None:
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
     assert specs_resolver._persisted_bind_context(tmp_path) is None
+
+
+# --- W1-8 (v0.1.47): ancestry-chain MEMBERSHIP attribution --------------------
+
+
+def test_persisted_bind_context_resolves_via_ancestry_membership(tmp_path: Path) -> None:
+    """(b) A supplied ancestry set sharing ONE pid with the marker chain ⇒ resolves."""
+    ws = _mk_ws(tmp_path)
+    # Marker chain [dead shell, harness, grandparent]; the resolver's ancestry chain shares
+    # only the harness pid (222) — different ephemeral shells, same long-lived harness.
+    _stamp(ws, "ctx", chain=[111, 222, 333])
+    resolved = specs_resolver._persisted_bind_context(ws, frozenset({999, 222, 444}))
+    assert resolved == "ctx"
+
+
+def test_persisted_bind_context_none_when_ancestry_disjoint(tmp_path: Path) -> None:
+    """(b) A supplied ancestry set disjoint from the marker chain ⇒ unattributable."""
+    ws = _mk_ws(tmp_path)
+    _stamp(ws, "ctx", chain=[111, 222, 333])
+    assert specs_resolver._persisted_bind_context(ws, frozenset({444, 555})) is None
+
+
+def test_persisted_bind_context_legacy_single_line_degraded_equal(tmp_path: Path) -> None:
+    """(c) ancestry_pids=None ⇒ degraded single-getppid equality on a legacy single-line marker."""
+    ws = _mk_ws(tmp_path)
+    _stamp(ws, "ctx", pid=os.getppid())  # legacy one-line marker
+    # No ancestry set supplied ⇒ effective = {os.getppid()} ⇒ equality holds.
+    assert specs_resolver._persisted_bind_context(ws, None) == "ctx"
+    # An explicit ancestry set carrying getppid also resolves the legacy marker.
+    assert specs_resolver._persisted_bind_context(ws, frozenset({os.getppid()})) == "ctx"
+
+
+def test_persisted_bind_context_empty_marker_never_attributable_with_ancestry(
+    tmp_path: Path,
+) -> None:
+    """(d) An empty marker is unattributable regardless of the ancestry set supplied."""
+    ws = _mk_ws(tmp_path)
+    _stamp(ws, "ctx", pid=None)  # empty marker
+    assert specs_resolver._persisted_bind_context(ws, frozenset({os.getppid(), 1234})) is None
+
+
+def test_resolve_specs_dir_ancestry_membership_resolves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end: ancestry_pids sharing a pid with the marker chain resolves the specs dir."""
+    ws = _mk_ws(tmp_path, slug="proj")
+    _stamp(ws, "proj", chain=[111, 424242, 333])  # 424242 == the shared harness pid
+    _clean_env(monkeypatch)
+    monkeypatch.chdir(ws)
+    resolved = specs_resolver.resolve_specs_dir(None, ancestry_pids=frozenset({999, 424242}))
+    assert resolved == (ws / "repos" / "proj" / "specs").resolve()
+
+
+def test_resolve_specs_dir_ancestry_disjoint_falls_through_to_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Disjoint ancestry_pids ⇒ unattributable ⇒ the unchanged cwd/error path (no ./specs)."""
+    ws = _mk_ws(tmp_path, slug="proj")
+    _stamp(ws, "proj", chain=[111, 222, 333])
+    _clean_env(monkeypatch)
+    monkeypatch.chdir(ws)
+    with pytest.raises(typer.BadParameter):
+        specs_resolver.resolve_specs_dir(None, ancestry_pids=frozenset({444, 555}))
 
 
 # --- resolve_specs_dir: end-to-end persisted-bind resolution ------------------

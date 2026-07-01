@@ -415,15 +415,23 @@ def bind(
             # mtime+name is what the hook scans to re-inject on the next prompt. Standalone
             # file, NOT a `.ptr` field (the `.ptr` is lease-incumbency, untouched here).
             #
-            # W1-7 (T-47-16): record the invoking long-lived harness pid so the ctx-inject
-            # hook honors this marker ONLY for the session that bound it. ``os.getppid()`` is
-            # the harness process that spawned this ``dadaia context bind`` child — the SAME
-            # pid the hook resolves via ``sdd_gate._resolve_holder_pid`` (its own
-            # ``os.getppid()``) when both are direct children of the harness. A concurrent
-            # session's later bind therefore records a DIFFERENT pid and can no longer steal
-            # this session's injection; when attribution can't match, the hook safely falls
-            # back to generic preflight (never another session's context).
-            session_identity.write_bind_epoch(workspace_root, name, pid=os.getppid())
+            # W1-7/W1-8 (v0.1.47 ancestry-chain amendment): record the bind process's
+            # ANCESTRY PID CHAIN (nearest-first — ``os.getppid()`` then its ancestors) so the
+            # ctx-inject hook and the specs resolver can attribute this marker by MEMBERSHIP,
+            # not by single-pid equality. Recording only ``os.getppid()`` broke when bind ran
+            # through a harness Bash tool: the immediate parent is an EPHEMERAL shell that dies
+            # between calls, so a later hook/resolver (whose ``getppid`` is a NEW shell) never
+            # matched. The chain also captures the long-lived HARNESS pid deeper up, which both
+            # a later hook (its own ``os.getppid()`` == harness) and a later ``dadaia`` CLI
+            # child (harness in ITS ancestry) share — so attribution survives the shell churn
+            # while a concurrent session's disjoint chain still can never steal this injection.
+            # If the ancestry port is unavailable, the chain degrades to the single
+            # ``os.getppid()`` line (the pre-v0.1.47 behavior).
+            session_identity.write_bind_epoch(
+                workspace_root,
+                name,
+                pids=container.build_ancestry_pid_chain(os.getppid()),
+            )
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

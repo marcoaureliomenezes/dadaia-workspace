@@ -329,21 +329,21 @@ _WORKFLOW_PURPOSE: dict[str, str] = {
     ),
     "audit": (
         "Runs a bounded audit: project-auditor scopes the audit question + lenses, scans the "
-        "bounded surfaces for drift (a review gate — blocking drift BLOCKS), and project-manager "
+        "bounded surfaces for drift (a review gate — blocking drift BLOCKS), and project-auditor "
         "triages every finding into disposition-ready output (bug / backlog / accepted-risk / "
         "resolved — never a deletion). Python owns the step order, the drift-scan gate, and the "
         "terminal disposition gate. It walks audit_scope → drift_scan → triage → "
         "audit_disposition_gate."
     ),
     "research": (
-        "Runs a bounded research spike: project-manager frames the question + evidence bar, "
-        "software-architect investigates within the bounded scope, and project-manager "
+        "Runs a bounded research spike: product-engineer frames the question + evidence bar, "
+        "software-architect investigates within the bounded scope, and product-engineer "
         "synthesizes the evidence into a recommended next step (backlog / release action / "
         "justified no-action). Python owns the step order and the terminal synthesis gate. It "
         "walks research_scope → investigate → synthesis → research_synthesis_gate."
     ),
     "bug_report": (
-        "Normalizes a reported symptom into one additive bug record: project-manager captures + "
+        "Normalizes a reported symptom into one additive bug record: project-auditor captures + "
         "redacts the symptom/repro/severity, product-engineer dedupes against tracked bugs (a "
         "review gate — a duplicate BLOCKS the write), and product-engineer files exactly one "
         "ADDITIVE specs/bugs/ record (no lease, never blocked). Python owns the step order, the "

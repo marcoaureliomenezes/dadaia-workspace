@@ -286,6 +286,53 @@ def build_process_ancestry() -> ProcessAncestry:
     return WindowsToolhelpAncestry()
 
 
+#: Default cap on ancestry pids collected into a bind-epoch marker / a resolver-side
+#: attribution set (W1-7/W1-8, v0.1.47). Mirrors ``session_identity._BIND_EPOCH_MAX_CHAIN``.
+_ANCESTRY_CHAIN_CAP = 8
+
+
+def build_ancestry_pid_chain(start_pid: int, *, cap: int = _ANCESTRY_CHAIN_CAP) -> list[int]:
+    """Return ``[start_pid, parent, grandparent, …]`` nearest-first, capped at ``cap``.
+
+    Walks the PPID chain upward from ``start_pid`` using the platform-selected read-only
+    :class:`ProcessAncestry` adapter (the SAME accessor the pre-commit chokepoint and
+    ``context release`` use — :func:`build_process_ancestry`). This is the composition-root
+    seam for the bind-epoch ancestry-chain attribution: ``dadaia context bind`` records this
+    chain in the marker (W1-7) and the CLI resolver seam builds it for the current process
+    (W1-8), so a marker written from an ephemeral harness shell is still attributable on a
+    later call via the stable harness pid deeper in the chain.
+
+    The adapter's ppid walk is private to each concrete adapter; the port itself only
+    promises :meth:`~ProcessAncestry.is_ancestor`. When no ppid walk is available on this
+    platform (or any probe error), we degrade to the single ``[start_pid]`` line — exactly
+    the pre-v0.1.47 single-getppid behavior. Non-destructive (read-only /proc, ``ps``, or a
+    Toolhelp32 snapshot); never raises.
+    """
+    if start_pid <= 0:
+        return []
+    chain: list[int] = [start_pid]
+    try:
+        ancestry = build_process_ancestry()
+        ppid_of = getattr(ancestry, "_ppid_of", None)
+        if not callable(ppid_of):
+            return chain
+        seen = {start_pid}
+        current = start_pid
+        while len(chain) < cap:
+            raw = ppid_of(current)
+            parent = raw if isinstance(raw, int) else None
+            # Stop at an unreadable link, a root pid (0/1), or a cycle — none extend a
+            # useful attribution chain.
+            if parent is None or parent <= 1 or parent in seen:
+                break
+            chain.append(parent)
+            seen.add(parent)
+            current = parent
+    except Exception:  # noqa: BLE001 — attribution is best-effort; bind/resolve never fail on it.
+        return chain
+    return chain
+
+
 def _build_alive_contexts_provider(
     workspace_root: Path,
 ) -> Callable[[], list[tuple[str, str]]]:

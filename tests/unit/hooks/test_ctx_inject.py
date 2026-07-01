@@ -73,20 +73,30 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
 
 
 def _stamp_bind_epoch(
-    tmp_path: Path, slug: str, *, mtime: float | None = None, pid: int | None = None
+    tmp_path: Path,
+    slug: str,
+    *,
+    mtime: float | None = None,
+    pid: int | None = None,
+    chain: list[int] | None = None,
 ) -> Path:
     """Write a bind-epoch marker for ``slug`` (optionally with an explicit mtime).
 
-    W1-7 session attribution: ``pid`` records the marker's owning harness pid as the file
-    CONTENT (the shape ``session_identity.write_bind_epoch`` produces). ``pid=None`` writes
-    a legacy EMPTY marker — the pre-W1-7 shape, which the hook treats as unattributable and
-    never honors for injection. An explicit ``mtime`` is applied after the content is
+    W1-7/W1-8 session attribution: the marker CONTENT is the bind process's nearest-first
+    ancestry pid chain, one decimal pid per line (the shape
+    ``session_identity.write_bind_epoch`` produces). ``chain`` writes a multi-line ancestry
+    chain [shell, harness, …]; ``pid`` writes a single-line (legacy) marker; ``pid=None``
+    and ``chain=None`` write a legacy EMPTY marker — the pre-W1-7 shape, unattributable and
+    never honored for injection. The hook honors a marker when this session's harness pid is
+    a MEMBER of the recorded chain. An explicit ``mtime`` is applied after the content is
     written so the epoch ordering is deterministic.
     """
     epoch_dir = tmp_path / ".dadaia" / "states" / "bind_epoch"
     epoch_dir.mkdir(parents=True, exist_ok=True)
     marker = epoch_dir / slug
-    if pid is None:
+    if chain is not None:
+        marker.write_text("".join(f"{p}\n" for p in chain), encoding="utf-8")
+    elif pid is None:
         marker.touch()  # legacy EMPTY marker — no attribution
     else:
         marker.write_text(f"{pid}\n", encoding="utf-8")
@@ -266,6 +276,48 @@ def test_legacy_empty_marker_never_injects_context(tmp_path: Path) -> None:
     # A legacy EMPTY marker newer than the sentinel is unattributable ⇒ ignored: no context.
     _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)  # pid=None
     out = _run(tmp_path, "legacy", harness_pid=_PID_A)
+    assert "[ctx]" not in out
+    assert "end memory bootstrap" not in out
+
+
+def test_marker_ancestry_chain_membership_injects(tmp_path: Path) -> None:
+    """W1-8 (v0.1.47): the hook harness pid deep in a marker's ancestry chain still injects.
+
+    The marker records the bind process's chain [ephemeral shell, harness, …]. The ephemeral
+    bind shell (first entry) has since died, but this session's hook resolves the SAME
+    long-lived harness pid — the SECOND entry — so membership matches and the context is
+    injected. This is the exact ephemeral-shell case the single-pid-equality design missed.
+    """
+    _ws(tmp_path)
+    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-chain"
+    _run(tmp_path, "chain", harness_pid=_PID_A)  # establish the sentinel (generic preflight)
+    # Chain: [dead ephemeral shell, harness == _PID_A (2nd entry), grandparent]. The hook's
+    # harness pid is NOT the first entry — it must still match via membership.
+    _stamp_bind_epoch(
+        tmp_path,
+        "ctx",
+        mtime=sentinel.stat().st_mtime + 5,
+        chain=[555001, _PID_A, 700000],
+    )
+    out = _run(tmp_path, "chain", harness_pid=_PID_A)
+    assert "[ctx]" in out
+    assert "end memory bootstrap" in out
+    assert "Python 3.12" in out
+
+
+def test_marker_ancestry_chain_disjoint_pid_never_injects(tmp_path: Path) -> None:
+    """A chain that does NOT contain this session's harness pid is never honored."""
+    _ws(tmp_path)
+    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-dj"
+    _run(tmp_path, "dj", harness_pid=_PID_A)
+    # Chain belongs entirely to another session (no _PID_A anywhere) ⇒ ignored.
+    _stamp_bind_epoch(
+        tmp_path,
+        "ctx",
+        mtime=sentinel.stat().st_mtime + 5,
+        chain=[555002, _PID_B, 700001],
+    )
+    out = _run(tmp_path, "dj", harness_pid=_PID_A)
     assert "[ctx]" not in out
     assert "end memory bootstrap" not in out
 

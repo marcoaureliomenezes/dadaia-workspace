@@ -61,6 +61,7 @@ import json
 import os
 import re
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 
 __all__ = [
@@ -76,6 +77,7 @@ __all__ = [
     "liveness_timestamp",
     "ptr_path",
     "read_bind_epoch_pid",
+    "read_bind_epoch_pids",
     "read_incumbent_ptr",
     "read_session",
     "resolve_identity",
@@ -101,6 +103,11 @@ SESSION_GC_TTL_FIELD = "ttl_seconds"
 #: Creation-timestamp fields, tried in order when ``last_seen_at`` is absent (TTL-from-
 #: creation fallback for pre-heartbeat records). ``bound_at`` is the bind-CLI creation key.
 SESSION_CREATION_FIELDS: tuple[str, ...] = ("bound_at", "created_at")
+
+#: Cap on the number of ancestry pids kept in a bind-epoch marker (W1-7/W1-8, v0.1.47). A
+#: real harness ancestry chain (harness → shell → cli) is far shallower; the cap guards a
+#: corrupt/cyclic chain and bounds the marker size. Applied on both write and read.
+_BIND_EPOCH_MAX_CHAIN = 8
 
 
 def _validate(name: str, *, field: str) -> str:
@@ -205,55 +212,79 @@ def bind_epoch_path(workspace: Path, ctx: str, *, create: bool = False) -> Path:
     return bind_epoch_dir(workspace, create=create) / ctx
 
 
-def write_bind_epoch(workspace: Path, ctx: str, pid: int | None = None) -> None:
-    """Stamp the bind-epoch marker for ``ctx`` (create-or-refresh mtime), recording *pid*.
+def write_bind_epoch(workspace: Path, ctx: str, pids: Sequence[int] | None = None) -> None:
+    """Stamp the bind-epoch marker for ``ctx`` (create-or-refresh mtime), recording *pids*.
 
     Written on every successful bind. The marker dir is created on demand. Re-binding
     the same context refreshes the file's mtime (the hook compares it against a session
     sentinel's mtime to decide whether to re-inject).
 
-    Session attribution (W1-7 / T-47-16): the invoking long-lived harness ``pid`` is
-    recorded as the marker file **content** (a decimal string). The ctx-inject hook honors
-    a marker only when its recorded pid matches the hook's own harness pid, so a concurrent
-    session's bind can never steal another session's memory injection. The format is
-    backward-compatible: ``pid=None`` writes an EMPTY marker (the legacy shape), and an
-    empty/legacy marker reads back as "no attribution" (ignored for injection, never a
-    crash). Raises on validation/OS error.
+    Session attribution (W1-7/W1-8, v0.1.47 ancestry-chain amendment): the bind process's
+    ANCESTRY PID CHAIN — nearest-first (line 1 = the bind CLI's ``os.getppid()``, then its
+    successive ancestors up to :data:`_BIND_EPOCH_MAX_CHAIN`) — is recorded, one decimal
+    pid per line. Recording the *chain* rather than a single pid fixes the ephemeral-shell
+    gap: when ``dadaia context bind`` runs through a harness Bash tool the immediate parent
+    is a short-lived shell that dies, so a single-pid marker could never be matched on a
+    later call; the long-lived harness pid deeper in the chain is the stable anchor both
+    consumers test for **membership** against. The format is backward-compatible: a
+    single-line legacy marker still reads back as a one-element chain, and ``pids`` empty
+    or ``None`` writes an EMPTY marker (the legacy shape) that reads back as "no
+    attribution" (ignored for injection, never a crash). Raises on validation/OS error.
     """
     path = bind_epoch_path(workspace, ctx, create=True)
-    if pid is None:
+    valid = [p for p in (pids or ()) if isinstance(p, int) and p > 0][:_BIND_EPOCH_MAX_CHAIN]
+    if not valid:
         # Legacy shape: an empty marker. ``Path.touch`` + ``os.utime`` bumps mtime to now
         # whether or not the file already existed (the epoch-refresh contract).
         path.touch()
         os.utime(path, None)
         return
     # An atomic content write refreshes mtime to now (new inode via os.replace) — the
-    # epoch-refresh contract is preserved while the pid is recorded for attribution.
-    _atomic_write_text(path, f"{pid}\n")
+    # epoch-refresh contract is preserved while the chain is recorded for attribution.
+    _atomic_write_text(path, "".join(f"{p}\n" for p in valid))
 
 
-def read_bind_epoch_pid(workspace: Path, ctx: str) -> int | None:
-    """Return the harness pid recorded in ``ctx``'s bind-epoch marker, or ``None``.
+def read_bind_epoch_pids(workspace: Path, ctx: str) -> list[int]:
+    """Return the ancestry pid chain recorded in ``ctx``'s bind-epoch marker (nearest-first).
 
-    ``None`` is returned for a legacy/empty marker, a marker whose content is not a single
-    positive integer, or any OS/validation error — i.e. any marker that is not attributable
-    to a specific harness session (the hook then never injects that context). Fail-soft.
+    Each non-empty line is parsed as a positive integer; blank lines and any line that is
+    not a positive integer are skipped (fail-soft). Returns ``[]`` for a legacy/empty
+    marker, an all-garbage marker, an absent marker, or any OS/validation error — i.e. any
+    marker that is not attributable to a specific harness session. The list is capped at
+    :data:`_BIND_EPOCH_MAX_CHAIN`. Consumers test ``harness_pid in chain`` (membership),
+    so the stable harness pid deep in the chain matches even after the ephemeral shell dies.
     """
     try:
         path = bind_epoch_path(workspace, ctx)
     except ValueError:
-        return None
+        return []
     try:
-        text = path.read_text(encoding="utf-8").strip()
+        text = path.read_text(encoding="utf-8")
     except OSError:
-        return None
-    if not text:
-        return None
-    try:
-        value = int(text)
-    except ValueError:
-        return None
-    return value if value > 0 else None
+        return []
+    pids: list[int] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            value = int(stripped)
+        except ValueError:
+            continue
+        if value > 0:
+            pids.append(value)
+    return pids[:_BIND_EPOCH_MAX_CHAIN]
+
+
+def read_bind_epoch_pid(workspace: Path, ctx: str) -> int | None:
+    """Return the FIRST attributed pid (line 1 — nearest ancestor) of ``ctx``'s marker.
+
+    The single-pid compatibility reader over :func:`read_bind_epoch_pids`: returns the
+    first (nearest) pid of the recorded ancestry chain, or ``None`` for a legacy/empty,
+    all-garbage, or absent marker. Fail-soft — never raises.
+    """
+    pids = read_bind_epoch_pids(workspace, ctx)
+    return pids[0] if pids else None
 
 
 def iter_bind_epochs(workspace: Path) -> list[tuple[str, float]]:
