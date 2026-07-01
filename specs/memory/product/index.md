@@ -11,7 +11,7 @@
 |------|-------|------|
 
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/. |
-| `agent-monitoring` | agent-monitoring | telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac... |
+| `agent-monitoring` | agent-monitoring | telemetria local stdlib-only (Claude/Codex/PI sessions) → abas Agents/Workflows do panel; allowlist gate preserva privacidade. |
 | `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; 2 workflows; dispatcher purity. |
 | `agent-sdd-alignment` | agent-sdd-alignment | 9-core agents aligned to constitution §7 lifecycle phases; sub-agent model; dispatcher purity; Markdown memory protocol. |
 | `ai-context-engineering` | ai-context-engineering | Deep ai-engineer skill covering token economy, instruction hierarchy, persona-consistency invariants, model-tier selection, and scope-drift detection. |
@@ -21,13 +21,13 @@
 | `academy` | academy | knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots. |
 | `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ... |
+| `panel` | panel | superfície de controle local (dadaia panel); 6 tabs; Workflows lidera com diagram-cards server-SVG + model pickers inline por step (v0.1.45). |
 | `product-vision` | product-vision | Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md. |
 | `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
 | `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
 | `context-management` | context-management | multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa. |
 | `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
-| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows). |
+| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI get honest runtime-specific projections from one public source (OpenCode removed in v0.1.24; 9 agents / 18 skills / 2 workflows). |
 | `server-registry` | server-registry | registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre dev servers de agentes paralelos. |
 | `workspace-doctor` | workspace-doctor | diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC, VENV-1. |
 | `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |

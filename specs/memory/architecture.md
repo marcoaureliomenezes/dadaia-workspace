@@ -19,7 +19,7 @@ tags:
 - backlog
 agent_tier: self-pull
 token_estimate: 13000
-last_updated: '2026-06-30'
+last_updated: '2026-07-01'
 release_origin: v0.1.32
 ---
 
@@ -58,6 +58,7 @@ A cadeia bind → inject → enforce → parallel-multi-project é o que permite
   * **View composition** : `container.py build_panel_views()` instancia e retorna o dict de 15+ view callables. `views/kanban.py` serve `GET /api/kanban` (read-only; lê `.dadaia/sessions/*.json`; agrupa cards por context e modo; computa `is_stale` em read-time; nunca 500 para ausência do diretório).
   * **`window.Panel` registry pattern** em `core.js`: objeto `{ register(name, mod), activate(name, opts) }`. Lazy tab module loading. Módulos registrados: `agents`, `workflows`, `sessions`, `academy`, `reports`.
   * **Workspace resolver** : `_resolve_workspace()` em `panel.py` caminha de baixo para cima do cwd até encontrar o diretório contendo `.dadaia/` — `dadaia panel` funciona de qualquer subdiretório do workspace.
+  * **Panel redesign (v0.1.45)** : a aba **Workflows** LIDERA a superfície — o catálogo de **diagram-cards** (um card grande por workflow com fluxograma server-SVG via `render_dag_svg(stages, node_meta=…)`, onde `node_meta` é um mapa opcional keyed por stage-id carregando role + gate marker + harness/model; `StageDTO` NÃO é widened, o enrichment vive no lado do catálogo) é default-visible no topo; o policy matrix de model-governance por step é demovido para um disclosure `Model policy` colapsado. O **expand** do card foi reconstruído de um text-wall monospace para uma FLOW strip + per-step cards formatados + **model pickers inline por step** (toggle codex/pi + profile dropdown, incl. o profile built-in `pi-openrouter-kimi-high` que torna o id OpenRouter `kimi-2.7:high` selecionável/persistível via o overlay validado `PUT /api/workflow-model-policy`; default/reset). A antiga camada dead client-Mermaid do card + a cadeia producer órfã (`render_step_mermaid`, campo `diagram_mermaid`, consumidores detail-path) foram removidas — o SVG server-side é a única fonte de diagrama em card e detail. A **aba Agentic foi deletada inteiramente** (nav + section + views agents/personas/kanban + JS): `GET /api/personas` NÃO foi shipped (fora com a aba) e o board **Kanban** saiu junto (era parte estrutural da aba); `GET /api/agents` foi RETIDO por ser consumido pela telemetria/Sessions. A UI "Run snapshots" (`/api/lifecycle-runs`) foi folded out do painel no de-clutter — o endpoint continua servido, só a renderização saiu. Restyle token-ancorado (elevation + hover lift motion-guarded + radius suave + accent pills nos gate markers) preservando as 3 paletas e WCAG AA. Sem CDN/React/build-step; CSP inalterada (`script-src 'self'` + os dois hashes sha256 inline em `handler.py`; zero scripts CSP-blocked). O conjunto de abas do painel encolheu de 8 para as abas sem Agentic/Kanban.
 
 **core/** — `models/` (dataclasses puras), `protocols/` (ABCs / Protocols para DI), `exceptions.py`, `platform.py`. Zero I/O — a única exceção autorizada é `core/platform.py`, que lê `sys.platform` (o único site autorizado para essa chamada em todo o codebase). Pode importar stdlib apenas.
 
@@ -899,6 +900,22 @@ só no Layer 2. **OpenCode foi removido inteiramente em v0.1.24** (ambas as laye
   (`core/harness_models.py`), consistent with — but not a tier-view of —
   `core/model_registry.py`; PI honors the model (`pi --model <id>`), Codex takes the
   discrete `(id, effort)`.
+- **The persona entity (v0.1.44) — the Layer-2 equivalent of a Claude sub-agent.** A
+  **persona** is a harness-universal role mandate for Layer-2 workers: the codex/pi
+  counterpart of a Claude Layer-1 sub-agent persona. Source lives at
+  `dadaia_workspace/public/personas/<role>.md` — **8 files, one per non-PM role**
+  (`software-engineer`, `product-engineer`, `qa-engineer`, `security-reviewer`,
+  `code-reviewer`, `software-architect`, `ai-engineer`, `project-auditor`), each a
+  Markdown body with YAML frontmatter carrying exactly the 5 required keys
+  `{id, role, summary, source_agent, harness_universal}`. `features/lifecycle/personas/loader.py`
+  `PersonaLoader` (a `FrontmatterDocLoader`) loads + validates them into the frozen
+  `Persona` dataclass `{id, role, summary, source_agent, harness_universal, body, path}`.
+  Load-bearing shape fact: a persona has **no `model` and no `tier`** — a Layer-2 worker's
+  model is a per-workflow-**step** binding (`--step-model` / the governed `dadaia_catalog`
+  step), not a persona attribute. The persona `body` is injected into a workflow step's
+  prompt as the **operative role directive** (the "who you are" for that step's worker),
+  the same way a Claude sub-agent's persona file governs a Layer-1 dispatch. Personas are
+  projected + manifest-tracked like the other `public/` assets.
 
 A harness can exist at one layer and not the other. PI ships as a real **Layer-2**
 worker (`PiHeadlessAdapter`, wired in `container.py`, Ring-2 only) and a **Layer-1** `.pi/`
