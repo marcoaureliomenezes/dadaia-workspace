@@ -136,8 +136,27 @@ _HEADING_GROUP_D: frozenset[str] = frozenset(
     ]
 )
 
+# Group E — Workflow / backlog subsystem canon headings (v0.1.25–v0.1.45).
+# The v0.1.46 OpenCode/doctor-debt sweep (T-46-23, DRIFT-5) flagged these real,
+# stable section headings from architecture, panel, and lifecycle-foundation atoms as
+# LINT-1 WARNings. They document the workflow control plane, the workflow-step handoff
+# data plane, backlog-consistency, workflow model governance, and the harness-as-a-
+# governed-dimension subsystems — legitimate current canon. Adding them here silences
+# the spurious WARNs without touching atom content. Exact strings, case-sensitive.
+_HEADING_GROUP_E: frozenset[str] = frozenset(
+    [
+        "Backlog-consistency subsystem (`features/backlog/`, v0.1.25)",
+        "Workflow control plane subsystem (v0.1.28 + v0.1.29)",
+        "Workflow-step handoff data plane (v0.1.30)",
+        "Workflows control plane (v0.1.28, redesenhado em v0.1.45)",
+        "Workflow model governance (control plane, v0.1.28)",
+        "Harness as a governed dimension (v0.1.29)",
+        "Gating note (review-only typed gate + coherent worker-output contract)",
+    ]
+)
+
 HEADING_ALLOWLIST: frozenset[str] = (
-    _HEADING_GROUP_A | _HEADING_GROUP_B | _HEADING_GROUP_C | _HEADING_GROUP_D
+    _HEADING_GROUP_A | _HEADING_GROUP_B | _HEADING_GROUP_C | _HEADING_GROUP_D | _HEADING_GROUP_E
 )
 
 # Forbidden headings — belt-and-suspenders, checked independently of the allowlist.

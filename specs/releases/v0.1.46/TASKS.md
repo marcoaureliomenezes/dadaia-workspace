@@ -15,7 +15,7 @@ may run after A/B review.
 
 ## Wave A — JSONL bug-event core
 
-### [ ] T-46-01 — Bug-event JSON schema
+### [x] T-46-01 — Bug-event JSON schema
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/public/schemas/bugs/bug-event-v1.schema.json`
 - **Preconditions:** none
@@ -27,7 +27,7 @@ may run after A/B review.
   `.dadaia/agentic/schemas/bugs/` after `public stage`+`install`.
 - **Parallel:** yes (disjoint from T-46-02 code until wiring).
 
-### [ ] T-46-02 — Bug-event model + append-only JSONL store
+### [x] T-46-02 — Bug-event model + append-only JSONL store
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/bugs/` (`models.py`, `service.py`),
   `dadaia_workspace/infrastructure/jsonl_bug_store.py`, tests under `tests/`
@@ -38,7 +38,7 @@ may run after A/B review.
   tolerant of malformed lines; `append_event`/`status`/`stats` fold; unit tests green
   (append, rotation-boundary roll to `-<n+1>`, fold coherence, malformed-line skip).
 
-### [ ] T-46-03 — `dadaia bugs` CLI group
+### [x] T-46-03 — `dadaia bugs` CLI group
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/bugs.py`, `dadaia_workspace/cli/main.py`
   (add_typer `bugs`), tests
@@ -48,7 +48,7 @@ may run after A/B review.
   **observable STDOUT** (not exit-0 smoke): `status` lists the expected open `bug_id`(s)
   after a seeded append; `stats` prints the expected per-severity/status aggregate counts.
 
-### [ ] T-46-04 — Doctor JSONL invariant (schema + rotation + coherence)
+### [x] T-46-04 — Doctor JSONL invariant (schema + rotation + coherence)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`, tests
 - **Preconditions:** T-46-02
@@ -60,7 +60,7 @@ may run after A/B review.
   error, PLUS an `archived`-after-`resolved` case that must NOT error (exemption).
   Pure-module constraint preserved.
 
-### [ ] T-46-05 — One-time `*.md`→JSONL migration step
+### [x] T-46-05 — One-time `*.md`→JSONL migration step
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/migrate/bugs_jsonl.py`,
   `dadaia_workspace/features/migrate/registry.py`, `dadaia_workspace/core/specs_version.py`,
@@ -78,7 +78,7 @@ may run after A/B review.
   (3) re-run is a no-op (idempotent — no duplicate events, no re-move);
   (4) `--dry-run` writes nothing AND moves nothing (reports the plan only).
 
-### [ ] T-46-06 — Guardrail rule rewrite for JSONL events (R-1 pair)
+### [x] T-46-06 — Guardrail rule rewrite for JSONL events (R-1 pair)
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/rules/bug-registration-guardrail.md`,
   `dadaia_workspace/public/data/AGENTS.md`
@@ -94,7 +94,7 @@ may run after A/B review.
 
 ## Wave B — Taxonomy + `_archive` FROZEN + audit law
 
-### [ ] T-46-11 — Create `_archive` dirs (workspace + scaffolder + onboarding)
+### [x] T-46-11 — Create `_archive` dirs (workspace + scaffolder + onboarding)
 - **Owner:** software-engineer
 - **Write set:** `specs/backlog/_archive/.gitkeep`, `specs/audits/_archive/.gitkeep`,
   `specs/bugs/_archive/.gitkeep`, `dadaia_workspace/features/specs/scaffolder.py`, tests
@@ -102,7 +102,7 @@ may run after A/B review.
 - **Done:** the three `_archive` dirs exist in this workspace and are produced by the
   scaffolder + consumer-onboarding path; tests assert their presence.
 
-### [ ] T-46-12 — Gate: classify `_archive` subdirs as FROZEN (R-2 ordering fix)
+### [x] T-46-12 — Gate: classify `_archive` subdirs as FROZEN (R-2 ordering fix)
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/spec_context/gate_policy.py`, tests
 - **Preconditions:** none
@@ -114,7 +114,7 @@ may run after A/B review.
   slash is FROZEN, not a `_archive`-prefixed sibling); in-repo
   `repos/<slug>/specs/audits/_archive/…`→FROZEN; `evaluate` BLOCKs a Write into `_archive`.
 
-### [ ] T-46-13 — Doctor: taxonomy + disposition invariants
+### [x] T-46-13 — Doctor: taxonomy + disposition invariants
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/specs/doctor.py`, tests
 - **Preconditions:** T-46-11
@@ -127,7 +127,7 @@ may run after A/B review.
   (3) audit-without-disposition — pair: archived audit referencing its disposing release →
   clean; archived/undisposed audit with no release pointer → warns.
 
-### [ ] T-46-14 — Audit-disposition law text
+### [x] T-46-14 — Audit-disposition law text
 - **Owner:** ai-engineer
 - **Write set:** `dadaia_workspace/public/rules/release-governance.md`
 - **Preconditions:** T-46-13
@@ -139,7 +139,15 @@ may run after A/B review.
 
 ## Wave C — Cleanup + memory sweep (PE, DEFINITION/CLOSURE; disjoint from A/B)
 
-### [ ] T-46-21 — Disposition data sweep (audits + statuses + HTML cluster) — VERIFY-heavy
+### [x] T-46-21 — Disposition data sweep (audits + statuses + HTML cluster) — VERIFY-heavy
+
+> **Partial (descope valve R-4 taken):** the 76-bug archival SHIPPED — `dadaia specs
+> upgrade` ran the in-process migration, moving all 99 `.md` (incl. the 76 Closed) to
+> `specs/bugs/_archive/` and emitting 18 JSONL event files; `specs/bugs/` has 0 loose
+> `.md`; doctor 0-errors. The **audit-disposition + backlog-status-normalize + HTML-cluster
+> dedupe** portion is explicitly SLIPPED to **v0.1.47** (the SPEC-DOC-035 undisposed-audit
+> warnings are the now-live enforcing mechanism). Recorded in CLOSURE.
+
 - **Owner:** product-engineer (+ project-manager for backlog curation)
 - **Write set:** `specs/audits/**` (dispositions), `specs/backlog/*.md` (status
   normalization), JSONL dedupe of the HTML-report cluster; `git mv` for audit archive moves
@@ -154,7 +162,7 @@ may run after A/B review.
   AC-2). The mechanism (T-46-05/11/12/13/14) always ships in v0.1.46. Record any slip in
   CLOSURE.
 
-### [ ] T-46-22 — OpenCode product-memory sweep + catalog regen
+### [x] T-46-22 — OpenCode product-memory sweep + catalog regen
 - **Owner:** product-engineer (memory phase)
 - **Write set:** `specs/memory/product/{workspace-init,product-vision,
   public-asset-distribution,harness-primitives,cross-platform-portability,
@@ -166,7 +174,7 @@ may run after A/B review.
   OpenCode-as-a-live-target phrasing returns **zero** hits; the live harness set reads
   `{claude, codex, pi}`; `dadaia memory catalog generate` clean.
 
-### [ ] T-46-23 — Minor doctor debt (DRIFT-5 real items only)
+### [x] T-46-23 — Minor doctor debt (DRIFT-5 real items only)
 - **Owner:** product-engineer
 - **Write set:** `specs/memory/product/lifecycle-foundation.md` (token_estimate),
   `git mv` of malformed audit dir `specs/audits/2026-06-12T001813Z`,

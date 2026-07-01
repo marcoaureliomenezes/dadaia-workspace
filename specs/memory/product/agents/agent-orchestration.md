@@ -12,7 +12,7 @@ tags:
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 1160
+token_estimate: 1461
 last_updated: '2026-07-01'
 release_origin: v0.1.21
 ---
@@ -145,8 +145,8 @@ Claude Code uses Claude-native agent/tool semantics with real Agent tool dispatc
 Codex custom agents are real configured delegates projected under `.codex/agents/*.toml`;
 they are not simulated with fake tool names or stale tool-discovery promises. Codex
 workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
-turn a workflow file into a runtime primitive by itself. OpenCode uses its own agent and
-plugin projection. **PI** (`@earendil-works/pi-coding-agent`), the fourth harness, is
+turn a workflow file into a runtime primitive by itself. **PI**
+(`@earendil-works/pi-coding-agent`), the third harness, is
 governed at Layer 1 via `AGENTS.md`/`CLAUDE.md` (read natively) plus its projected `.pi/`
 surface — and, post-v0.1.21 (WS-PI-4), a real pre-disk (Ring-1) SDD-gate extension
 (`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes a `tool_call` hook that can block a

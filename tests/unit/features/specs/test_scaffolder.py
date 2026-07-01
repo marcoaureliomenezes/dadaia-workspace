@@ -36,6 +36,10 @@ _EXPECTED_FILES = [
     "_archive/releases/.gitkeep",
     "_archive/legacy-features/.gitkeep",
     "assets/.gitkeep",
+    # v0.1.46 AC-4 — per-artifact _archive dirs (FROZEN gate-class landing zone).
+    "backlog/_archive/.gitkeep",
+    "audits/_archive/.gitkeep",
+    "bugs/_archive/.gitkeep",
 ]
 
 
@@ -90,6 +94,31 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
 
     product_index_md = (specs_dir / "memory" / "product" / "index.md").read_text(encoding="utf-8")
     assert product_index_md.startswith("---"), "product/index.md must start with YAML frontmatter"
+
+
+# ---- v0.1.46 AC-4: scaffolder produces the three per-artifact _archive dirs
+
+
+def test_scaffold_creates_per_artifact_archive_dirs(tmp_path: Path) -> None:
+    """The scaffolder creates specs/{backlog,audits,bugs}/_archive/ (v0.1.46 AC-4).
+
+    These three FROZEN-classed subdirs are the landing zone for terminal/dispositioned
+    entries; the bugs->JSONL migration git-mv's source .md into specs/bugs/_archive/ in
+    process, so a new/upgraded workspace MUST already have them.
+    """
+    specs_dir = tmp_path / "specs"
+    result = scaffold(
+        specs_dir=specs_dir,
+        project_name="archive-project",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == [], f"Unexpected errors: {result.errors}"
+
+    for artifact in ("backlog", "audits", "bugs"):
+        gitkeep = specs_dir / artifact / "_archive" / ".gitkeep"
+        assert gitkeep.exists(), f"scaffolder must create {artifact}/_archive/.gitkeep"
+        assert gitkeep in result.created, f"{artifact}/_archive/.gitkeep must be reported created"
 
 
 # ---- test 2: idempotency — second run produces all skipped

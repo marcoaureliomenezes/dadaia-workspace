@@ -18,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.features.migrate.bugs_jsonl import migrate_bugs_jsonl
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
 
 
@@ -38,6 +39,7 @@ class MigrationStep:
 #: and registered in ascending order so the chain walker can splice any sub-range.
 REGISTRY: tuple[MigrationStep, ...] = (
     MigrationStep(from_version=0, to_version=1, key="tree-v2", apply=migrate_tree_v2),
+    MigrationStep(from_version=1, to_version=2, key="bugs-jsonl", apply=migrate_bugs_jsonl),
 )
 
 

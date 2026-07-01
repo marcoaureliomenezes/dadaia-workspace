@@ -25,7 +25,7 @@ tags:
 - chokepoints
 agent_tier: self-pull
 token_estimate: 3140
-last_updated: '2026-06-25'
+last_updated: '2026-07-01'
 release_origin: v0.1.21
 ---
 
@@ -253,6 +253,5 @@ Runtime| PreToolUse (`pre_gate`)| PostToolUse| Chokepoints git| Postura
 Claude Code| `.claude/settings.json` matcher `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` → `python -m dadaia_workspace.hooks.pre_gate` (comando único)| matcher `*` (todos os tools)| sim| determinístico: hooks + chokepoints
 Codex interativo (TUI)| `.codex/hooks.json` matcher `^(apply_patch\|Edit\|Write\|Bash)$` → `pre_gate`| **sem matcher** (match-all canônico)| sim| determinístico: hooks + chokepoints
 Codex headless (`codex exec`)| **não — exec não dispara hooks** (defeito upstream codex-cli 0.139.0; live-verificado, `tests/integration/codex_live/`, opt-in `DADAIA_CODEX_LIVE=1`)| não| sim| **chokepoints only**
-OpenCode| Plugin TS chama os hooks Python via subprocess (venv-path resolution)| sem post-hook separado (doctor `[unsupported]` — esperado)| sim| advisory + chokepoint-protected (ADR-G3)
 PI (`pi`) — Layer 1 interativo| Extensão TS `.pi/extensions/dadaia-sdd-gate.ts` registra o hook `tool_call`; mapeia write→Write/edit→Edit e delega ao `pre_gate` via subprocess (venv-path resolution); **ativa post-trust** (WS-PI-4)| sem post-hook (efeito Ring-1 só pré-disk via tool_call)| sim| determinístico post-trust + chokepoints; `.pi/**` é post-trust executable
 PI — Layer 2 worker (`PI_HEADLESS`)| n/a — worker headless `pi --mode json`, sem hook de entrada| n/a| sim| Ring-2 (git-diff) + chokepoints (não tem Ring-1; distinto do Layer 1)

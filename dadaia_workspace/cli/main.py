@@ -22,6 +22,7 @@ from dadaia_workspace.cli.commands import (
     server,
     specs,
 )
+from dadaia_workspace.cli.commands.bugs import bugs_app
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.cli.commands.memory import app as memory_app
@@ -66,6 +67,7 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(release_app, name="release")
 app.add_typer(backlog_app, name="backlog")
 app.add_typer(bug_app, name="bug")
+app.add_typer(bugs_app, name="bugs")
 
 
 def _safe_app() -> None:

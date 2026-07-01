@@ -15,7 +15,7 @@ tags:
 - schema
 agent_tier: self-pull
 token_estimate: 1230
-last_updated: '2026-06-11'
+last_updated: '2026-07-01'
 release_origin: v0.1.4.3
 ---
 
@@ -35,7 +35,7 @@ O contrato separa evidência humana de coordenação máquina: HTML reports são
 
   * **Canonical:** `dadaia_workspace/public/schemas/handoff-v1.schema.json` (JSON Schema Draft 2020-12, `$schema = "https://json-schema.org/draft/2020-12/schema"`).
   * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (gerado via `dadaia public stage`). É o path lógico que CLI + skill consomem em runtime.
-  * **NÃO projetado** para `.claude/schemas/`, `.codex/schemas/`, `.opencode/schemas/` — schema é consumido apenas pela CLI Python, não pelo runtime dos agentes. Decisão A1 economizou 3 duplicações.
+  * **NÃO projetado** para `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — schema é consumido apenas pela CLI Python, não pelo runtime dos agentes. Decisão A1 economizou 3 duplicações.
   * **Asset type novo:** `schemas` foi adicionado a `_COPY_DIRS` em `dadaia_workspace/infrastructure/public_assets.py`. Constitution L124 (originalmente target L106 da SPEC FR6) enumera os 10 tipos suportados: _rules, skills, commands, scripts, agents, templates, workflows, plugins, data, schemas_.
 
 
@@ -60,7 +60,7 @@ Required fields: `schema_version` (literal `"handoff-v1.1"`), `agent`, `context`
 
 ## Skill: dadaia-handoff-emitter
 
-Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projetada para `.agents/skills/`, `.claude/`, `.codex/`, `.opencode/` via mecanismo padrão de assets. Protocolo em 3 passos:
+Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projetada para `.agents/skills/`, `.claude/`, `.codex/`, `.pi/` via mecanismo padrão de assets. Protocolo em 3 passos:
 
   1. **sha256sum** do report HTML acabado de gerar.
   2. **Assemble dict** com campos obrigatórios + opcionais aplicáveis ao agente, referenciando o schema por path lógico `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — skill não duplica conteúdo do schema dentro do markdown; single source of truth).

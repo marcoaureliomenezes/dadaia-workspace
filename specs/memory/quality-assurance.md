@@ -59,7 +59,7 @@ flowchart TB
     end
 ```
 
-Os quatro adapters de harness (Codex/Claude-SDK/OpenCode/PI) seguem a mesma taxonomia:
+Os três adapters de harness (Codex/Claude-SDK/PI) seguem a mesma taxonomia:
 `unit` para construção de comando/parse/redaction/Ring-2, `integration` para projeção
 Layer-1 e o seam CLI `--harness`, e um teste `live` **opt-in** (`DADAIA_*_LIVE=1`, nunca
 CI-gated) para o binding upstream real.

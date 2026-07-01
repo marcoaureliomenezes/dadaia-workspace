@@ -25,6 +25,25 @@ releases, and how releases mature and are reviewed. Full detail: the
   **before** the SPEC is written. `project-manager` will not let a
   release-from-backlog reach SPEC without it.
 
+## Audit → release disposition (audit-disposition law)
+
+- **One audit always generates a release.** An audit report is not advice to file and
+  forget — it is a mandate. Every audit report generates exactly one dedicated
+  remediation release; there is no "read it and move on".
+- **The first release after an audit dispositions EVERY finding.** That first release
+  gives each finding an explicit disposition — `fixed` (remediated in the release),
+  `superseded` (a broader picked item covers it), or `deferred`/`rejected` **with a
+  reason**, routed to `specs/backlog/` as a tracked entry. No finding may be silently
+  dropped (symmetric with the never-drop-a-bug law above).
+- **Archive only when fully dispositioned AND approved.** An audit archives to
+  `specs/audits/_archive/` **only** when (a) every finding carries an explicit
+  disposition **and** (b) the disposing release is approved. An archived audit must
+  reference its disposing release; the `audit-without-disposition` doctor invariant
+  backs this. Never delete an audit file — archive it (never-delete law).
+- **Open work outranks plain backlog at pick.** At release-definition pick, **open bugs
+  and open (undispositioned) audits outrank plain backlog items.** `product-engineer`
+  clears the open-bug and open-audit debt before reaching for fresh backlog.
+
 ## Release maturity & review cadence
 
 - A release is `major.minor.patch` and matures through `alpha-N → rc-N` segments

@@ -55,6 +55,19 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
+#: Per-artifact ``_archive`` subdirs (v0.1.46 AC-4). These are FROZEN (read-only for
+#: file-write tools) and MUST be matched BEFORE ``_SPECS_ADDITIVE_PREFIXES`` in
+#: ``_classify_specs_relative`` — otherwise ``specs/bugs/`` (ADDITIVE) is checked first
+#: and swallows ``specs/bugs/_archive/`` as ADDITIVE (the R-2 ordering bug). The trailing
+#: ``/`` is load-bearing: only ``_archive/`` is FROZEN, never a ``_archive``-prefixed
+#: sibling like ``specs/bugs/_archivefoo.jsonl`` (which stays ADDITIVE). Archive MOVES run
+#: via ``git mv`` (Bash), outside the file-tool gate envelope — FROZEN only blocks
+#: Write/Edit *into* the archive, not the move that lands files there.
+_ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
+    "specs/backlog/_archive/",
+    "specs/audits/_archive/",
+    "specs/bugs/_archive/",
+)
 _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = (
     ".dadaia/reports/",
     ".dadaia/handoff/",
@@ -140,6 +153,13 @@ def _classify_specs_relative(spec_rel: str) -> PathClass | None:
     ``specs/`` class prefix matched — the caller decides the no-match verdict (MUTATING
     for in-repo, the release/protected/ungated tail for workspace-root paths).
     """
+    # R-2 ordering fix (v0.1.46 AC-4): the per-artifact ``_archive/`` subdirs are FROZEN
+    # and MUST be checked BEFORE the ADDITIVE prefixes, or ``specs/bugs/`` would swallow
+    # ``specs/bugs/_archive/`` as ADDITIVE. Trailing-slash match keeps ``_archivefoo``
+    # siblings ADDITIVE.
+    for prefix in _ARCHIVE_SUBDIR_PREFIXES:
+        if spec_rel.startswith(prefix):
+            return PathClass.FROZEN
     for prefix in _SPECS_ADDITIVE_PREFIXES:
         if spec_rel.startswith(prefix):
             return PathClass.ADDITIVE

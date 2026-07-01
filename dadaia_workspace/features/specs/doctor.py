@@ -50,6 +50,7 @@ Pure module — no I/O outside the supplied specs_dir / public_dir. No external 
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -232,6 +233,37 @@ _BACKLOG_NONTERMINAL_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
 # Bugs (ADR-11): the canon is exactly {Open, Closed} (case-insensitive). SPEC-DOC-032
 # WARNs on anything else (legacy Fixed/resolved/Rejected tokens, etc.).
 _BUG_STATUS_CANON: frozenset[str] = frozenset({"open", "closed"})
+
+# SPEC-DOC-033 (v0.1.46 AC-1): the JSONL bug-telemetry rotation ceiling. A
+# ``specs/bugs/<hour>Z-<n>.jsonl`` file with more than this many rows is a hard ERROR
+# (the store rolls to ``-<n+1>`` at the boundary). Kept as a local doctor constant so the
+# pure ``features.specs`` module never imports the infrastructure store (layering law).
+_BUGS_JSONL_ROW_CEILING = 1000
+
+# SPEC-DOC-033 canonical bug-log filename: ``<YYYYMMDDTHH>Z-<n>.jsonl``.
+_BUGS_JSONL_NAME_RE = re.compile(r"^\d{8}T\d{2}Z-\d+\.jsonl$")
+
+# SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs that must exist
+# (the FROZEN landing zone for disposed bugs/backlog/audits). Absent → WARN + auto-fix.
+_ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "audits", "bugs")
+
+# SPEC-DOC-035 (v0.1.46 AC-4): terminal backlog status prefixes. A backlog entry whose
+# Status is terminal but still loose in ``specs/backlog/`` (not under ``_archive/``) WARNs —
+# a consumed/shipped item must be moved into ``specs/backlog/_archive/``.
+_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = (
+    "delivered",
+    "consumed",
+    "superseded",
+    "resolved",
+)
+
+# SPEC-DOC-036 (v0.1.46 AC-4/AC-5): an archived audit must carry a disposing-release
+# pointer. Matches an explicit disposition marker line (frontmatter or ``**Disposition:**``)
+# whose value names a SemVer release.
+_AUDIT_DISPOSITION_RE = re.compile(
+    r"(?im)^\s*\**\s*(?:disposition|disposed_by|disposing[ _]release|release)"
+    r"[\s:*]*v\d+\.\d+\.\d+"
+)
 
 # Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
 _BACKLOG_STATUS_RE = re.compile(r"^\s*(?:\*\*)?status\*?\*?\s*:?\*?\*?\s*(.+)$", re.IGNORECASE)
@@ -553,6 +585,12 @@ class SpecsDoctor:
         # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
         issues.extend(self._check_consumed_backlog_disposition())  # SPEC-DOC-031
         issues.extend(self._check_bug_status_canon())  # SPEC-DOC-032
+        # v0.1.46 / T-46-04 (AC-1) — event-sourced JSONL bug-telemetry invariant
+        issues.extend(self._check_bugs_jsonl_invariant())  # SPEC-DOC-033
+        # v0.1.46 / T-46-13 (AC-4) — taxonomy + disposition invariants
+        issues.extend(self._check_archive_dirs_exist())  # SPEC-DOC-034
+        issues.extend(self._check_unarchived_terminal_backlog())  # SPEC-DOC-035
+        issues.extend(self._check_audit_disposition())  # SPEC-DOC-036
         return issues
 
     def _check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
@@ -602,6 +640,9 @@ class SpecsDoctor:
             try:
                 if issue.code == "TREE-4":
                     self._fix_tree4(issue)
+                    fixed.append(issue)
+                elif issue.code == "SPEC-DOC-034":
+                    self._fix_archive_dir(issue)
                     fixed.append(issue)
             except Exception:
                 # Leave as residual — will re-appear on next check()
@@ -1543,6 +1584,293 @@ class SpecsDoctor:
                 )
             )
         return issues
+
+    def _bug_event_schema_path(self) -> Path:
+        """Resolve the packaged ``bug-event-v1`` JSON Schema.
+
+        Prefers the injected ``public_dir`` (composition-root wiring); falls back to the
+        package-relative source tree (``dadaia_workspace/public/schemas/bugs/``) so the
+        pure module still validates without an injected public dir. Reading a bundled
+        schema resource is not I/O outside the pattern's own package.
+        """
+        if self.public_dir is not None:
+            return self.public_dir / "schemas" / "bugs" / "bug-event-v1.schema.json"
+        package_root = Path(__file__).resolve().parents[2]
+        return package_root / "public" / "schemas" / "bugs" / "bug-event-v1.schema.json"
+
+    def _check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-033 (v0.1.46 AC-1): event-sourced JSONL bug-telemetry invariant.
+
+        Three sub-checks over every ``specs/bugs/<hour>Z-<n>.jsonl`` (``_archive/`` excluded
+        — non-recursive glob):
+
+        1. **Per-line schema validity** (ERROR) — each non-blank line must be a JSON object
+           validating ``bug-event-v1``. A malformed-JSON line or a schema violation ERRORs.
+        2. **Rotation ceiling** (ERROR) — a file with more than
+           :data:`_BUGS_JSONL_ROW_CEILING` rows ERRORs (the store rolls at the boundary).
+        3. **Event coherence** over the terminal set ``{resolved, superseded, deferred,
+           rejected}`` (``archived`` is a NON-terminal annotation and is IGNORED): a
+           terminal event for a ``bug_id`` with no prior ``reported`` ERRORs; a terminal
+           after an existing terminal for the same ``bug_id`` ERRORs. A ``reported`` event
+           (re)opens a ``bug_id`` — clearing any prior terminal so a legitimate reopen is
+           not mis-flagged as a double-terminal.
+
+        Pure module: reads only under ``specs_dir`` plus the packaged schema resource.
+        Absent ``bugs/`` dir → no-op.
+        """
+        from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS
+
+        bugs_dir = self.specs_dir / "bugs"
+        if not bugs_dir.is_dir():
+            return []
+
+        schema_path = self._bug_event_schema_path()
+        validator = None
+        if schema_path.is_file():
+            from jsonschema import Draft202012Validator
+
+            validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+
+        issues: list[SpecsDoctorIssue] = []
+        seen_reported: set[str] = set()
+        terminated: set[str] = set()
+
+        for jsonl_path in sorted(bugs_dir.glob("*.jsonl")):
+            if not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
+                continue
+            lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+            row_count = sum(1 for line in lines if line.strip())
+            if row_count > _BUGS_JSONL_ROW_CEILING:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"bugs/{jsonl_path.name} has {row_count} rows, exceeding the "
+                            f"{_BUGS_JSONL_ROW_CEILING}-row rotation ceiling — the store must "
+                            "roll to the next '-<n+1>' counter (SPEC-DOC-033, ERROR)."
+                        ),
+                        path=str(jsonl_path),
+                    )
+                )
+            for lineno, raw_line in enumerate(lines, start=1):
+                stripped = raw_line.strip()
+                if not stripped:
+                    continue
+                try:
+                    obj = json.loads(stripped)
+                except json.JSONDecodeError as exc:
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-033",
+                            severity=Severity.ERROR,
+                            description=(
+                                f"bugs/{jsonl_path.name} line {lineno}: not valid JSON "
+                                f"({exc.msg}) — every JSONL row must be one bug-event object "
+                                "(SPEC-DOC-033, ERROR)."
+                            ),
+                            path=str(jsonl_path),
+                        )
+                    )
+                    continue
+                if validator is not None:
+                    error = next(iter(validator.iter_errors(obj)), None)
+                    if error is not None:
+                        issues.append(
+                            SpecsDoctorIssue(
+                                code="SPEC-DOC-033",
+                                severity=Severity.ERROR,
+                                description=(
+                                    f"bugs/{jsonl_path.name} line {lineno}: fails "
+                                    f"bug-event-v1 schema ({error.message}) "
+                                    "(SPEC-DOC-033, ERROR)."
+                                ),
+                                path=str(jsonl_path),
+                            )
+                        )
+                        continue
+                if not isinstance(obj, dict):
+                    continue
+                issues.extend(
+                    self._fold_bug_coherence(
+                        obj, jsonl_path, lineno, TERMINAL_EVENTS, seen_reported, terminated
+                    )
+                )
+        return issues
+
+    @staticmethod
+    def _fold_bug_coherence(
+        obj: dict[str, object],
+        jsonl_path: Path,
+        lineno: int,
+        terminal_events: frozenset[str],
+        seen_reported: set[str],
+        terminated: set[str],
+    ) -> list[SpecsDoctorIssue]:
+        """Advance the coherence fold for one event, emitting any coherence ERROR."""
+        bug_id = obj.get("bug_id")
+        event = obj.get("event")
+        if not isinstance(bug_id, str) or not isinstance(event, str):
+            return []
+        if event == "reported":
+            seen_reported.add(bug_id)
+            terminated.discard(bug_id)  # a reopen clears the prior terminal state
+            return []
+        if event not in terminal_events:
+            # ARCHIVED and any non-terminal annotation are ignored by the coherence rule.
+            return []
+        if bug_id in terminated:
+            return [
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-033",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' has a second "
+                        f"terminal event '{event}' after an existing terminal — a bug_id may "
+                        "carry at most one terminal (SPEC-DOC-033, ERROR)."
+                    ),
+                    path=str(jsonl_path),
+                )
+            ]
+        if bug_id not in seen_reported:
+            terminated.add(bug_id)
+            return [
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-033",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' for "
+                        f"bug '{bug_id}' with no prior 'reported' event — every stream must "
+                        "open with 'reported' (SPEC-DOC-033, ERROR)."
+                    ),
+                    path=str(jsonl_path),
+                )
+            ]
+        terminated.add(bug_id)
+        return []
+
+    def _check_archive_dirs_exist(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs must exist.
+
+        ``specs/{backlog,audits,bugs}/_archive/`` are the FROZEN landing zones for disposed
+        artifacts. A missing dir is a WARNING with an auto-fix (``doctor --fix`` mkdirs it
+        with a ``.gitkeep``). A parent dir that does not itself exist is skipped — its
+        absence is a separate TREE-4 concern, not this taxonomy invariant.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        for parent in _ARCHIVE_PARENT_DIRS:
+            parent_dir = self.specs_dir / parent
+            if not parent_dir.is_dir():
+                continue
+            archive_dir = parent_dir / "_archive"
+            if archive_dir.is_dir():
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-034",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"specs/{parent}/_archive/ is missing — the FROZEN landing zone for "
+                        "disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available "
+                        "(run doctor --fix)."
+                    ),
+                    path=str(archive_dir),
+                    fixable=True,
+                )
+            )
+        return issues
+
+    def _fix_archive_dir(self, issue: SpecsDoctorIssue) -> None:
+        """Create a missing ``_archive`` dir with a ``.gitkeep`` (SPEC-DOC-034 auto-fix)."""
+        assert issue.code == "SPEC-DOC-034"
+        target = Path(issue.path)  # type: ignore[arg-type]
+        target.mkdir(parents=True, exist_ok=True)
+        gitkeep = target / ".gitkeep"
+        if not gitkeep.exists():
+            gitkeep.write_text("", encoding="utf-8")
+
+    def _check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-035 (v0.1.46 AC-4): terminal-status backlog entry still loose → WARN.
+
+        A ``specs/backlog/<slug>.md`` whose Status line is a terminal token
+        ({DELIVERED, CONSUMED, SUPERSEDED, RESOLVED}, case-insensitive prefix match) but
+        which still lives directly in ``specs/backlog/`` (not under ``_archive/``) is
+        consumed-but-unarchived drift → WARNING (move it to ``specs/backlog/_archive/``).
+        An entry already under ``_archive/`` is clean (not scanned — non-recursive glob).
+        Aggregate files are skipped.
+        """
+        backlog_dir = self.specs_dir / "backlog"
+        if not backlog_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for entry in sorted(backlog_dir.glob("*.md")):
+            if entry.name in _BACKLOG_AGGREGATE_FILES:
+                continue
+            status = self._backlog_status_value(entry.read_text(encoding="utf-8"))
+            if status is None:
+                continue
+            if not status.lower().startswith(_BACKLOG_TERMINAL_PREFIXES):
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-035",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"backlog/{entry.name} has terminal status '{status}' but is still "
+                        "loose in specs/backlog/ — move it into specs/backlog/_archive/ "
+                        "(SPEC-DOC-035, WARNING)."
+                    ),
+                    path=str(entry),
+                )
+            )
+        return issues
+
+    def _check_audit_disposition(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-036 (v0.1.46 AC-4/AC-5): an archived audit must name its disposing release.
+
+        Every immediate child of ``specs/audits/_archive/`` (a per-audit dir or file) must
+        carry a disposition marker whose value is a SemVer release (see
+        :data:`_AUDIT_DISPOSITION_RE`). An archived audit with no release pointer WARNs —
+        an audit archives only when fully dispositioned by an approved release. Absent
+        ``audits/_archive/`` dir → no-op.
+        """
+        archive_dir = self.specs_dir / "audits" / "_archive"
+        if not archive_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for child in sorted(archive_dir.iterdir()):
+            if child.name in (".gitkeep", "README.md"):
+                continue
+            if self._audit_has_disposition(child):
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-036",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"audits/_archive/{child.name} is archived but names no disposing "
+                        "release — an audit archives only when fully dispositioned by an "
+                        "approved release (SPEC-DOC-036, WARNING)."
+                    ),
+                    path=str(child),
+                )
+            )
+        return issues
+
+    @staticmethod
+    def _audit_has_disposition(target: Path) -> bool:
+        """True iff ``target`` (an archived audit dir or file) names a disposing release."""
+        files = target.rglob("*.md") if target.is_dir() else iter([target])
+        for path in files:
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if _AUDIT_DISPOSITION_RE.search(text):
+                return True
+        return False
 
     # 7
     def _check_no_orphan_specs(self) -> list[SpecsDoctorIssue]:

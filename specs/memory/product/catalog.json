@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-01T15:27:51Z",
+  "generated_at": "2026-07-01T18:01:19Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -56,7 +56,7 @@
         "workflows",
         "dispatch"
       ],
-      "token_estimate": 1160,
+      "token_estimate": 1461,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture"
@@ -143,7 +143,7 @@
       "title": "harness-primitives",
       "category": "product",
       "tldr": "Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist.",
-      "summary": "Available to all 9 core agents. Defines at middle depth what each AI harness primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects them (public/ -> stage -> install -> .claude/.codex/.opencode/.agents; manifest SHA256; doctor checks), and a decision checklist for when to defer deeper questions to ai-engineer. Complements the ai-engineer-only deep skills without duplicating their protocol depth.",
+      "summary": "Available to all 9 core agents. Defines at middle depth what each AI harness primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects them (public/ -> stage -> install -> .claude/.codex/.pi/.agents; manifest SHA256; doctor checks), and a decision checklist for when to defer deeper questions to ai-engineer. Complements the ai-engineer-only deep skills without duplicating their protocol depth.",
       "path": "specs/memory/product/agents/harness-primitives.md",
       "tags": [
         "harness",
@@ -184,7 +184,7 @@
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
-      "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots.",
+      "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
       "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
@@ -484,7 +484,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 4100,
+      "token_estimate": 5576,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
