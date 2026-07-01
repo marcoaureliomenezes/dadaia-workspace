@@ -309,3 +309,46 @@ def test_wave_e_body_is_governed_and_resolvable(name: str) -> None:
     for entry in snapshot.steps:
         profile = model_profiles.resolve(entry.model_profile)
         assert entry.harness == profile.harness
+
+
+# ---------------------------------------------------------------------------
+# T-45-02 — node_meta enrichment of the card fluxogram (AC-1)
+# ---------------------------------------------------------------------------
+
+
+def test_node_meta_map_covers_every_worker_step() -> None:
+    """The catalog node_meta builder maps each worker step's label to its default model."""
+    for workflow in list_dadaia_workflows():
+        meta = dadaia_catalog._node_meta_for_steps(workflow.steps)
+        for step in workflow.steps:
+            if step.default_harness is None:
+                # Python-owned gate: no worker → omitted from the map.
+                assert step.label not in meta
+            else:
+                assert step.label in meta, f"{workflow.name}.{step.label} missing node meta"
+                node_meta = meta[step.label]
+                assert node_meta.harness == step.default_harness
+                profile = model_profiles.resolve(step.default_profiles[step.default_harness])
+                assert node_meta.model == profile.model_id
+
+
+def test_card_diagram_svg_carries_harness_model_line() -> None:
+    """A card's diagram_svg is enriched with per-node harness/model (node-meta text)."""
+    wf = get_dadaia_workflow("release_definition")
+    assert wf is not None
+    assert wf.diagram_svg
+    # The enriched SVG carries the node-meta class (present only when node_meta is passed).
+    assert "node-meta" in wf.diagram_svg
+    # At least one governed harness label appears in the fluxogram.
+    assert "codex" in wf.diagram_svg or "pi" in wf.diagram_svg
+
+
+def test_card_diagram_svg_for_gate_only_context_stays_bare() -> None:
+    """A workflow whose steps are all worker steps still enriches; gate nodes stay bare.
+
+    closure has a generic worker (close) + a Python gate (closure_removal_gate). The worker
+    node carries meta; the gate node label must not appear in the meta map.
+    """
+    meta = dadaia_catalog._node_meta_for_steps(get_dadaia_workflow("closure").steps)  # type: ignore[union-attr]
+    assert "close" in meta
+    assert "closure_removal_gate" not in meta

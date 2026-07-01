@@ -8,7 +8,7 @@
 //   1. Persist to localStorage.
 //   2. Set document.documentElement.dataset.runtime for CSS targeting.
 //   3. Fire CustomEvent('dadaia:runtime-change', { detail: { runtime: value } })
-//      on document — sessions.js, agents.js and workflows.js subscribe.
+//      on document — sessions.js and workflow_policy.js subscribe.
 //
 // The inline script in index.py <head> initialises data-theme equivalently for
 // the theme switcher.  This script mirrors that pattern but is file-based and

@@ -3,21 +3,6 @@
 from __future__ import annotations
 
 
-def test_agents_switcher_has_pi_button() -> None:
-    from dadaia_workspace.features.panel.views.agents import render_agents_section
-
-    html = render_agents_section()
-    assert 'id="agents-runtime-btn-pi"' in html
-    assert 'data-runtime-value="pi"' in html
-    assert "PI runtime" in html
-    # All three runtimes present, in order claude → codex → pi.
-    assert (
-        html.index('data-runtime-value="claude"')
-        < html.index('data-runtime-value="codex"')
-        < html.index('data-runtime-value="pi"')
-    )
-
-
 def test_sessions_switcher_has_pi_button() -> None:
     from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 

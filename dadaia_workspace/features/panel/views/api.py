@@ -701,8 +701,8 @@ def render_api_workflow_detail(
 def _dadaia_workflow_to_dict(wf: object, *, include_steps: bool) -> dict[str, object]:
     """Serialise a DadaiaWorkflowDTO to a JSON-ready dict.
 
-    The list form omits the heavy step bodies + diagrams (lean cards); the detail
-    form includes the full step sequence and both diagram renderings.
+    The list form omits the heavy step bodies + diagram (lean cards); the detail
+    form includes the full step sequence and the server-rendered SVG fluxogram.
     """
     base: dict[str, object] = {
         "name": getattr(wf, "name"),  # noqa: B009
@@ -729,7 +729,6 @@ def _dadaia_workflow_to_dict(wf: object, *, include_steps: bool) -> dict[str, ob
     ]
     base["steps"] = steps
     base["diagram_svg"] = getattr(wf, "diagram_svg")  # noqa: B009
-    base["diagram_mermaid"] = getattr(wf, "diagram_mermaid")  # noqa: B009
     return base
 
 
@@ -766,9 +765,8 @@ def render_api_dadaia_workflow_detail(
     """Return a closure that serves GET /api/dadaia-workflows/<name>.
 
     Returns the full self-description: purpose, the ordered step sequence with
-    per-step role/harness_options/model_options/availability flags, and both the
-    server-rendered SVG DAG (``diagram_svg``) and the Mermaid flowchart
-    (``diagram_mermaid``) of the step sequence.
+    per-step role/harness_options/model_options/availability flags, and the
+    server-rendered SVG DAG fluxogram (``diagram_svg``) of the step sequence.
 
     Status codes: 200 found; 400 invalid name (regex / traversal); 404 unknown.
 

@@ -95,7 +95,7 @@ def test_static_runtime_js_load_order() -> None:
 
     keys = list(_ASSETS.keys())
     idx_runtime = keys.index("runtime.js")
-    for dependent in ("agents.js", "workflows.js", "sessions.js"):
+    for dependent in ("workflow-policy.js", "sessions.js"):
         assert idx_runtime < keys.index(dependent), (
             f"runtime.js ({idx_runtime}) must precede {dependent} ({keys.index(dependent)}) in _ASSETS"
         )

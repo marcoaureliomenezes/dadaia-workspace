@@ -1,138 +1,129 @@
-"""Workflow model-governance editor CSS for the Dadaia Workspace Panel (Wave C, D-5).
+"""Workflow model-governance CSS for the Dadaia Workspace Panel (v0.1.45 redesign).
 
-Styles the first-class Workflows tab control plane: the per-workflow step matrix
-(Step | Role | Harness | Model profile | Concrete model | Fragments | Gate | diff), the
-segmented codex/pi harness control, the harness-filtered profile dropdown, the
-default-vs-effective diff flag, the validate-before-save banner, and the run-snapshot
-evidence tables. Tokens come from tokens.css; this module adds only layout + state.
+Styles the inline per-step model picker that now lives inside each workflow diagram
+card's expand — the segmented codex/pi harness control, the harness-filtered profile
+dropdown, the concrete-model readout, the default-vs-effective diff + reset — plus the
+single section-header Validate / Save toolbar and its banner. Fully token-anchored (no
+ad-hoc CSS literals in control rules); all values come from tokens.css.
 """
 
 WORKFLOW_POLICY_CSS: str = """
+/* ── Section-header Validate / Save toolbar + banner ──────────────────────── */
 .wfp-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-sm);
+}
+.wfp-validate-btn,
+.wfp-save-btn {
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-2xs) var(--space-md);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-accent, #9cddc8);
+  background: var(--color-surface);
+  color: var(--color-heading);
+  transition: background var(--duration-fast) var(--easing-standard);
+}
+.wfp-save-btn {
+  background: var(--color-accent, #9cddc8);
+}
+.wfp-validate-btn:hover,
+.wfp-save-btn:hover {
+  background: var(--color-card-hover, #f8feff);
+}
+.wfp-save-btn:hover {
+  background: var(--color-accent-secondary, #bfd8ad);
+}
+.wfp-validate-btn:focus-visible,
+.wfp-save-btn:focus-visible {
+  outline: 2px solid var(--color-accent-dark, #2d7d9a);
+  outline-offset: 2px;
 }
 .wfp-banner {
-  margin: 0.5rem 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  flex: 1 1 100%;
+  margin: var(--space-2xs) 0 0 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  border: var(--border-width) solid var(--color-border);
 }
-.wfp-banner--info { background: var(--surface-2, #eef); color: var(--text, #223); }
-.wfp-banner--ok { background: #e6f6ea; color: #1c6b30; }
-.wfp-banner--error { background: #fdecea; color: #9b1c1c; }
+.wfp-banner--info { background: var(--color-primary-bg, #f0fbf7); color: var(--color-text); }
+.wfp-banner--ok { background: var(--color-badge-active-bg, #d4f5e5); color: var(--color-badge-active-text, #1f7a46); }
+.wfp-banner--error { background: var(--color-warning-bg, #ddd9ab); color: var(--color-cost, #633d2e); }
 
-.wfp-workflow { margin: 1.25rem 0; }
-.wfp-workflow-head {
+/* ── Inline per-step model picker (hydrated by workflow-policy.js) ─────────── */
+.wfp-picker {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.wfp-workflow-title { margin: 0; font-size: 1.05rem; }
-
-.wfp-matrix {
+  flex-direction: column;
+  gap: var(--space-2xs);
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.88rem;
 }
-.wfp-matrix th, .wfp-matrix td {
-  text-align: left;
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border, #ddd);
-  vertical-align: middle;
-}
-.wfp-step-row--overridden { background: var(--surface-accent, #fff8e6); }
-.wfp-diff { font-size: 0.8rem; color: var(--text-muted, #667); }
-.wfp-diff--none { opacity: 0.6; }
-
-.wfp-seg { display: inline-flex; border: 1px solid var(--border, #ccc); border-radius: 6px; overflow: hidden; }
-.wfp-seg-btn {
-  border: 0;
-  background: transparent;
-  padding: 0.2rem 0.55rem;
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.wfp-seg-btn--active { background: var(--accent, #2b6cb0); color: #fff; }
-
-.wfp-profile-select { max-width: 16rem; }
-.wfp-effort { color: var(--text-muted, #778); }
-.wfp-gate { color: var(--accent, #b06a00); }
-
-.wfp-reset-btn {
-  font-size: 0.75rem;
-  margin-left: 0.4rem;
-  cursor: pointer;
-}
-.wfp-reset-btn[disabled] { opacity: 0.4; cursor: default; }
-
-.wfp-runs { margin-top: 0.6rem; padding: 0.5rem; background: var(--surface-2, #f6f7fb); border-radius: 6px; }
-.wfp-run { margin-bottom: 0.6rem; }
-.wfp-run-head { font-size: 0.82rem; color: var(--text-muted, #667); margin-bottom: 0.25rem; }
-.wfp-run-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.wfp-run-table th, .wfp-run-table td {
-  text-align: left;
-  padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid var(--border, #e5e5e5);
-}
-.wfp-error { color: #9b1c1c; }
-
-/* Read-only fragment inspector (T-28-D-01). */
-.wfp-frag-btn {
-  font: inherit;
-  font-size: 0.78rem;
-  background: var(--surface-2, #f6f7fb);
-  border: 1px solid var(--border, #e5e5e5);
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
-  margin: 0 0.15rem 0.15rem 0;
-  cursor: pointer;
-  color: var(--accent, #2f6feb);
-}
-.wfp-frag-btn:hover { background: var(--surface-3, #eceefb); }
-.wfp-inspector {
-  margin-top: 0.6rem;
-  padding: 0.6rem;
-  background: var(--surface-2, #f6f7fb);
-  border-radius: 6px;
-}
-.wfp-fragment-head {
+.wfp-picker-controls {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.4rem;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
-.wfp-fragment-id { font-weight: 600; }
-.wfp-fragment-meta { font-size: 0.8rem; color: var(--text-muted, #667); }
-.wfp-fragment-readonly {
-  margin-left: auto;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted, #667);
-  border: 1px solid var(--border, #e5e5e5);
-  border-radius: 4px;
-  padding: 0.05rem 0.3rem;
+.wfp-picker-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
 }
-.wfp-fragment-fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; margin: 0 0 0.5rem; }
-.wfp-fragment-fields dt { font-size: 0.8rem; color: var(--text-muted, #667); }
-.wfp-fragment-fields dd { margin: 0; font-size: 0.82rem; }
-.wfp-frag-input { font-size: 0.78rem; }
-.wfp-frag-none { color: var(--text-muted, #667); }
-.wfp-fragment-body {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 0.78rem;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e5e5e5);
-  border-radius: 4px;
-  padding: 0.5rem;
-  max-height: 22rem;
-  overflow: auto;
-  margin: 0;
+.wfp-picker-model {
+  font-family: var(--font-mono);
+  color: var(--color-heading);
 }
+.wfp-effort { color: var(--color-muted); }
+.wfp-diff { font-size: var(--text-xs); color: var(--color-accent-dark, #2d7d9a); }
+.wfp-diff--none { color: var(--color-muted); }
+.wfp-diff-harness { font-size: var(--text-xs); color: var(--color-accent-dark, #2d7d9a); }
+
+.wfp-seg {
+  display: inline-flex;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.wfp-seg-btn {
+  border: 0;
+  background: var(--color-surface);
+  padding: var(--space-2xs) var(--space-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+.wfp-seg-btn--active {
+  background: var(--color-accent, #9cddc8);
+  color: var(--color-heading);
+  font-weight: 700;
+}
+.wfp-profile-select {
+  max-width: 18rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.wfp-reset-btn {
+  font: inherit;
+  font-size: var(--text-2xs);
+  cursor: pointer;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+.wfp-reset-btn[disabled] { opacity: 0.4; cursor: default; }
 """

@@ -96,3 +96,24 @@ def test_deprecated_profiles_carry_replacement() -> None:
 def test_profile_ids_are_unique() -> None:
     ids = [p.id for p in model_profiles.list_profiles()]
     assert len(ids) == len(set(ids))
+
+
+def test_openrouter_kimi_profile_is_a_governed_pi_option() -> None:
+    """v0.1.45 T-45-06: the OpenRouter kimi option is selectable via a governed pi profile.
+
+    The picker persists PROFILE IDS (the resolver rejects a raw ``kimi-2.7:high`` override),
+    so kimi becomes end-to-end selectable only through a built-in profile. The profile
+    resolves to the discrete pi catalog option ``kimi-2.7:high`` — passing the
+    no-second-table guard because that option already lives in ``options_for('pi')`` and its
+    id is in ``known_layer2_model_ids()`` (v0.1.44).
+    """
+    profile = model_profiles.resolve("pi-openrouter-kimi-high")
+    assert profile.harness == "pi"
+    assert profile.model_id == "kimi-2.7"
+    assert profile.effort == "high"
+    # Governed: resolves to a real pi catalog option (never a second drifting table).
+    option = model_profiles.to_option(profile)
+    assert option in harness_models.options_for("pi")
+    assert option == HarnessModelOption("kimi-2.7", "high")
+    # It surfaces in the per-harness picker source (profiles_for drives the pi dropdown).
+    assert profile in model_profiles.profiles_for("pi")

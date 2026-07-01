@@ -26,6 +26,7 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
 )
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.views.workflow_policy import (
+    render_api_workflow_model_policy,
     render_post_workflow_model_policy_validate,
     render_put_workflow_model_policy,
 )
@@ -233,6 +234,61 @@ def test_put_invalid_candidate_never_overwrites_a_good_file(tmp_path: Path) -> N
     assert status == 400
     # The good file is byte-identical — the invalid candidate never touched it.
     assert store.path.read_text(encoding="utf-8") == before
+
+
+def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -> None:
+    """v0.1.45 T-45-06: the governed OpenRouter kimi profile persists end-to-end.
+
+    Selecting the kimi profile on a pi step, saving via PUT, reloading via GET, and
+    resolving the persisted overlay all agree: the persisted value is the PROFILE ID
+    ``pi-openrouter-kimi-high`` (not a raw ``kimi-2.7:high`` — the resolver rejects raw
+    ids), and the resolver resolves that profile to the discrete pi option
+    ``kimi-2.7:high`` (model ``kimi-2.7`` at effort ``high``). No changes to the overlay
+    store or resolver — only a new built-in profile makes kimi reachable.
+    """
+    store = _store(tmp_path)
+    factory = _factory(store)
+    put = render_put_workflow_model_policy(store, factory)
+    # The step runs on codex by default; move it to pi (harness) AND select the kimi
+    # pi-profile so the profile's harness matches the step's effective harness.
+    body = json.dumps(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {
+                    "workflows": {
+                        "implementation": {
+                            "default_harness": "pi",
+                            "steps": {"implement": "pi-openrouter-kimi-high"},
+                        }
+                    }
+                }
+            },
+        }
+    ).encode("utf-8")
+
+    status, payload = _decode(put(body=body, content_type="application/json", qs={}))
+    assert status == 200
+    assert payload["saved"] is True
+
+    # GET returns the persisted PROFILE ID verbatim (round-trips).
+    get = render_api_workflow_model_policy(store)
+    status, got = _decode(get(qs={}))
+    assert status == 200
+    persisted = got["policy"]["contexts"]["default"]["workflows"]["implementation"]
+    assert persisted["steps"]["implement"] == "pi-openrouter-kimi-high"
+
+    # The resolver resolves the persisted profile to the pi kimi-2.7:high option.
+    resolver = factory("default")
+    snapshot = resolver.resolve("implementation", context="default")
+    entry = snapshot.step("implement")
+    assert entry is not None
+    assert entry.harness == "pi"
+    assert entry.model_profile == "pi-openrouter-kimi-high"
+    assert entry.model == "kimi-2.7"
+    assert entry.reasoning == "high"
+    assert f"{entry.model}:{entry.reasoning}" == "kimi-2.7:high"
 
 
 # ---------------------------------------------------------------------------

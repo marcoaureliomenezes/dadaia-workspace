@@ -312,7 +312,11 @@ test('E2E-THM-10 — Deep-interaction: click control → option visible → them
 });
 
 // ---------------------------------------------------------------------------
-// E2E-THM-09 — axe-core: all 3 themes pass on Agents tab
+// E2E-THM-09 — axe-core: all 3 themes pass on the Workflows tab
+//
+// v0.1.45 redesign: the Agents tab was removed with the Agentic tab. The a11y
+// audit now runs on the Workflows tab (the workflow diagram-card catalog), which
+// carries the richest surviving interactive surface (cards, pickers, toolbar).
 // ---------------------------------------------------------------------------
 test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes', async ({
   page,
@@ -321,13 +325,11 @@ test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes
 
   for (const theme of ['mint', 'sage', 'warm'] as const) {
     // Navigate fresh for each theme.
-    // Agents are now inside the Ops tab (T-016-P09 consolidation).
     await gotoPanel(page);
-    await activateTab(page, 'ops');
-    await page.waitForSelector(
-      '#agents-grid .agent-card:not(.agent-card--skeleton)',
-      { timeout: 15000 }
-    );
+    await activateTab(page, 'workflows');
+    await page.waitForSelector('.dadaia-wf-catalog .dadaia-wf-card', {
+      timeout: 15000,
+    });
 
     // Apply theme
     await page.click('#theme-btn');
@@ -335,8 +337,8 @@ test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes
     await page.click(`[data-theme-value="${theme}"]`);
 
     const results = await new AxeBuilder({ page })
-      // color-contrast on .skill-chip (#646464 on #d2e4c6 = 4.41) is a known
-      // cosmetic issue tracked separately; exclude it per SPEC §13 DoD #7.
+      // color-contrast is a known cosmetic issue tracked separately; exclude it
+      // per SPEC §13 DoD #7.
       .disableRules(['color-contrast'])
       .analyze();
     const critical = results.violations.filter((v: any) =>

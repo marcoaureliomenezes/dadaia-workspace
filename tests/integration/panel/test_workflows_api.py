@@ -3,13 +3,14 @@
 These cover the *new* dadaia-workflow catalog surface that fully self-describes every
 Python-owned dadaia-workflow (release_definition, implementation, deferred) for the
 panel: purpose, per-step harness/model options, availability, and a server-rendered
-SVG DAG + Mermaid flowchart. They assert the additive contract — the new detail shape
-carries the legacy field names (``diagram_svg``) PLUS the new ones — and that:
+SVG DAG fluxogram. They assert the detail shape carries ``diagram_svg`` PLUS the
+descriptive fields — and that:
 
 - a deferred workflow is shown unavailable;
 - release-definition is fully described (every §6.1 step + per-step harness_options +
   model_options + purpose);
-- the Mermaid diagram is emitted.
+- the enhanced server-SVG fluxogram carries per-node harness/model (v0.1.45); the dead
+  client-Mermaid layer was removed.
 
 The catalog is sourced from the real workflow definitions, so no on-disk fixtures or
 mocks are needed — the endpoint closures are exercised directly (the dispatch envelope
@@ -100,15 +101,18 @@ class TestDadaiaWorkflowsList:
 
 class TestDadaiaWorkflowDetailAdditive:
     def test_detail_additive_shape_keeps_diagram_svg(self) -> None:
-        """Detail carries the legacy ``diagram_svg`` field PLUS the new fields (additive)."""
+        """Detail carries ``diagram_svg`` PLUS the descriptive fields.
+
+        v0.1.45 removed the dead client-Mermaid layer — the server-rendered SVG is the
+        single diagram source, so ``diagram_mermaid`` is no longer emitted.
+        """
         status, data = _detail("release_definition")
         assert status == 200
-        # Legacy field name preserved (old shape intact).
         assert "diagram_svg" in data
         assert data["diagram_svg"].startswith("<svg")
-        # New additive fields.
-        for key in ("purpose", "availability", "steps", "diagram_mermaid"):
-            assert key in data, f"missing additive key: {key}"
+        for key in ("purpose", "availability", "steps"):
+            assert key in data, f"missing key: {key}"
+        assert "diagram_mermaid" not in data
 
     def test_release_definition_fully_described(self) -> None:
         """Every §6.1 step is present with role + per-step harness/model + purpose."""
@@ -153,14 +157,17 @@ class TestDadaiaWorkflowDetailAdditive:
         assert gate["harness_options"] == []
         assert gate["model_options"] == {}
 
-    def test_mermaid_diagram_emitted(self) -> None:
-        """The detail emits a Mermaid flowchart of the step sequence."""
+    def test_svg_fluxogram_carries_per_node_harness_model(self) -> None:
+        """The detail's server-SVG fluxogram is enriched with per-node harness/model."""
         _status, data = _detail("release_definition")
-        mermaid = data["diagram_mermaid"]
-        assert "```mermaid" in mermaid
-        assert "flowchart TD" in mermaid
-        # One node per step + the gate-shaped node for the commit gate.
-        assert "release scope" in mermaid
+        svg = data["diagram_svg"]
+        assert svg.startswith("<svg")
+        # The enrichment adds the node-meta text class (only present when node_meta passed).
+        assert "node-meta" in svg
+        # A governed harness label appears in the fluxogram nodes.
+        assert "codex" in svg or "pi" in svg
+        # The dead client-Mermaid field is gone.
+        assert "diagram_mermaid" not in data
 
     def test_wave_e_body_detail_available_with_real_steps(self) -> None:
         """T-30-E-04: the audit detail is a real available body with its fragment+gate steps."""
@@ -187,10 +194,14 @@ class TestDadaiaWorkflowDetailAdditive:
 
 
 class TestDadaiaWorkflowsSectionView:
-    def test_section_renders_mermaid_and_availability_badges(self) -> None:
+    def test_section_renders_expandable_cards_and_availability_badges(self) -> None:
         html = render_dadaia_workflows_section()
-        # Mermaid fence rendered through the shared mistune path → <pre class="mermaid">.
-        assert 'pre class="mermaid"' in html
+        # v0.1.45: cards are native <details> disclosures — no client-Mermaid block.
+        assert 'pre class="mermaid"' not in html
+        assert '<details class="dadaia-wf-card"' in html
+        assert '<summary class="dadaia-wf-card-summary">' in html
+        # Compact step-chain summary on the collapsed face.
+        assert "dadaia-wf-step-chain" in html
         # Each workflow carries an availability badge. As of v0.1.30 Wave E no workflow is
         # deferred (the --unavailable modifier only renders for deferred), but the
         # available + partial badges are present.
@@ -199,5 +210,10 @@ class TestDadaiaWorkflowsSectionView:
         assert "dadaia-wf-badge--unavailable" not in html
         # Server-rendered SVG DAG is present (offline-safe diagram).
         assert "dadaia-wf-diagram-svg" in html
-        # Per-step harness/model options surfaced for the operator.
-        assert "gpt-5.5:high" in html
+        # Per-step model surfaced for the operator: each model-driven step renders an
+        # inline picker whose default label is the governed "harness &middot; model_id"
+        # (v0.1.45 redesign — the label shows the resolved model id, not model:effort).
+        assert "wf-step-picker-default" in html
+        assert 'class="wf-step-picker"' in html
+        assert "&middot;" in html
+        assert "gpt-5.5" in html

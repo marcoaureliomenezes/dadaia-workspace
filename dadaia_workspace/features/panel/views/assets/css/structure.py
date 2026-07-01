@@ -452,7 +452,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   border-bottom: 1px solid var(--color-border, #dddddd);
 }
 .ops-subsection-title {
-  font-size: 1rem;
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--color-heading, #111111);
   margin: 0;
@@ -502,4 +502,16 @@ html[data-theme="warm"] [role="menuitemradio"]:focus-visible {
            1px solid var(--color-accent, #f7af63);
   outline-offset: 2px;
 }
+
+/* ── Overflow safety (v0.1.45 / T-45-07) ─────────────────────────────────
+   The content column is capped at 1024px and centred, so at 1440px the panel
+   never scrolls horizontally. These defensive rules ensure that at 1024px a
+   long unbroken token inside a flex/grid child ellipsises (min-width:0 lets a
+   child shrink below its content) instead of forcing a horizontal scrollbar —
+   the "rows wrap / bad layout" the operator flagged. Token-anchored; no colour,
+   type, or radius literals. */
+.main { overflow-x: hidden; }
+.section,
+.panel-section,
+.ops-subsection { min-width: 0; }
 """

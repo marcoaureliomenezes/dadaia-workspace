@@ -1,7 +1,9 @@
 /**
- * E2E: panel harness toggle persists a real harness change (v0.1.29 / T-29-C-05, AC-6).
+ * E2E: panel harness toggle persists a real harness change (v0.1.45 redesign).
  *
- * These assertions are JS-driven and CANNOT be covered by a server-side pytest (qa H1):
+ * The per-step model governance now lives INSIDE each workflow diagram card's expand: an
+ * inline `.wf-step-picker` per model-driven step. These assertions are JS-driven and
+ * CANNOT be covered by a server-side pytest (qa H1):
  *   - flipping the codex/pi segmented control to pi filters the dropdown to pi profiles
  *     AND auto-selects the harness's default profile (mirrors the resolver, D-1);
  *   - the default-vs-effective diff renders a harness-overridden flag (codex → pi);
@@ -16,7 +18,7 @@
  * before and after so it never depends on, or leaks, live workspace state.
  */
 import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
+import { gotoPanel, activateTab, expandWorkflowCard, authHeaders, BASE_URL } from './helpers';
 
 const EMPTY_OVERLAY = {
   schema_version: 'workflow-model-policy-v1',
@@ -24,9 +26,11 @@ const EMPTY_OVERLAY = {
   contexts: { default: { workflows: {} } },
 };
 
-// The implementation.implement worker step: a producing step that supports both harnesses,
-// so a pi toggle is always valid (release_definition steps may be single-harness).
-const IMPLEMENT_ROW = '[data-wfp-workflow-card="implementation"] [data-wfp-step-row="implement"]';
+// The implement step's inline picker mount inside the implementation card's expand.
+// implement is a producing step that supports both harnesses, so a pi toggle is always
+// valid (release_definition steps may be single-harness).
+const IMPLEMENT_PICKER =
+  'details.dadaia-wf-card[data-workflow="implementation"] .wf-step-picker[data-wfp-step="implement"]';
 
 async function restoreEmptyOverlay(request: any): Promise<void> {
   await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
@@ -35,10 +39,14 @@ async function restoreEmptyOverlay(request: any): Promise<void> {
   });
 }
 
-async function openWorkflowsTab(page: any): Promise<void> {
+async function openImplementPicker(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
-  await page.waitForSelector(IMPLEMENT_ROW, { timeout: 15000 });
+  await expandWorkflowCard(page, 'implementation');
+  await page.waitForSelector(`${IMPLEMENT_PICKER} .wfp-picker`, {
+    state: 'visible',
+    timeout: 15000,
+  });
 }
 
 test.beforeEach(async ({ request }) => {
@@ -51,24 +59,30 @@ test.afterEach(async ({ request }) => {
 });
 
 test('Harness toggle to pi filters the dropdown and flags the harness diff', async ({ page }) => {
-  await openWorkflowsTab(page);
+  await openImplementPicker(page);
 
-  const row = page.locator(IMPLEMENT_ROW);
+  const picker = page.locator(`${IMPLEMENT_PICKER} .wfp-picker`);
   // implement defaults to codex — no harness override flag yet.
-  await expect(row).not.toHaveClass(/wfp-step-row--overridden/);
-  await expect(row.locator('[data-testid="wfp-diff-harness"]')).toHaveCount(0);
+  await expect(picker).not.toHaveClass(/wfp-picker--overridden/);
+  await expect(page.locator(`${IMPLEMENT_PICKER} [data-testid="wfp-diff-harness"]`)).toHaveCount(0);
 
   // Flip the segmented control to pi.
-  await row.locator('.wfp-seg-btn[data-wfp-harness="pi"]').click();
+  await page.locator(`${IMPLEMENT_PICKER} .wfp-seg-btn[data-wfp-harness="pi"]`).click();
 
-  // The row is now overridden and the dropdown lists only pi profiles.
-  await expect(page.locator(IMPLEMENT_ROW)).toHaveClass(/wfp-step-row--overridden/);
-  const piOptions = await page.locator(`${IMPLEMENT_ROW} .wfp-profile-select option`).allTextContents();
-  expect(piOptions.length).toBeGreaterThan(0);
-  expect(piOptions.every((o) => /pi/i.test(o))).toBe(true);
+  // The picker is now overridden and the dropdown lists only pi profiles.
+  // Assert on option VALUE (harness-prefixed profile id), not the label: v0.1.45's
+  // labelled kimi profile keeps its `pi-` id but its display text no longer contains "pi".
+  await expect(page.locator(`${IMPLEMENT_PICKER} .wfp-picker`)).toHaveClass(
+    /wfp-picker--overridden/
+  );
+  const piValues = await page
+    .locator(`${IMPLEMENT_PICKER} .wfp-profile-select option`)
+    .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+  expect(piValues.length).toBeGreaterThan(0);
+  expect(piValues.every((v) => v.startsWith('pi-'))).toBe(true);
 
   // The default-vs-effective diff shows the harness change codex → pi.
-  const harnessDiff = page.locator(`${IMPLEMENT_ROW} [data-testid="wfp-diff-harness"]`);
+  const harnessDiff = page.locator(`${IMPLEMENT_PICKER} [data-testid="wfp-diff-harness"]`);
   await expect(harnessDiff).toContainText('codex');
   await expect(harnessDiff).toContainText('pi');
 });
@@ -77,10 +91,10 @@ test('Harness toggle persists through PUT and the catalog diff reflects it', asy
   page,
   request,
 }) => {
-  await openWorkflowsTab(page);
+  await openImplementPicker(page);
 
   // Flip implement to pi, then validate + save.
-  await page.locator(`${IMPLEMENT_ROW} .wfp-seg-btn[data-wfp-harness="pi"]`).click();
+  await page.locator(`${IMPLEMENT_PICKER} .wfp-seg-btn[data-wfp-harness="pi"]`).click();
   await page.locator('#wfp-validate-btn').click();
   await expect(page.locator('#wfp-banner')).toHaveClass(/wfp-banner--ok/, { timeout: 10000 });
   await page.locator('#wfp-save-btn').click();

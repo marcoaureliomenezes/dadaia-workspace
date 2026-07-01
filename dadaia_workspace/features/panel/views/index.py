@@ -28,13 +28,11 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
-from dadaia_workspace.features.panel.views.agents import render_agents_subsection
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
 from dadaia_workspace.features.panel.views.workflows import (
     render_workflows_first_class_section,
-    render_workflows_subsection,
 )
 
 
@@ -55,8 +53,6 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
-        agents_subsection = render_agents_subsection()
-        workflows_subsection = render_workflows_subsection()
         workflows_section = render_workflows_first_class_section()
         sessions_section = render_sessions_section()
 
@@ -71,13 +67,11 @@ def render_index(
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/projects.css">
-  <link rel="stylesheet" href="/static/agents.css">
   <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/workflow-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
-  <link rel="stylesheet" href="/static/kanban.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -114,7 +108,6 @@ def render_index(
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
     <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="Workflows">Workflows</button>
-    <button class="nav-tab" data-section="ops" aria-selected="false" role="tab" id="tab-ops" aria-label="Agentic">Agentic</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
@@ -150,28 +143,6 @@ def render_index(
 
     {workflows_section}
 
-    <section id="section-ops" class="section panel-section" role="tabpanel" tabindex="0" aria-labelledby="tab-ops">
-      <div class="section-header">
-        <h2>Agentic</h2>
-        <p>Agents, legacy workflow DAGs and Kanban &mdash; stacked below. Model
-        governance now lives in the first-class Workflows tab.</p>
-      </div>
-
-      {agents_subsection}
-
-      {workflows_subsection}
-
-      <div class="ops-subsection" id="ops-subsection-kanban">
-        <div class="ops-subsection-header">
-          <h3 class="ops-subsection-title">Kanban</h3>
-          <p class="section-meta">Multi-agent workflow state &mdash; one swimlane per Spec Context Project.</p>
-          <span id="kanban-last-updated" class="kanban-last-updated" aria-live="polite" data-testid="kanban-last-updated"></span>
-        </div>
-        <div id="kanban-board" class="kanban-board" aria-label="Kanban board" aria-live="polite">
-        </div>
-      </div>
-    </section>
-
     {academy_section}
 
     {sessions_section}
@@ -182,13 +153,10 @@ def render_index(
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
-  <script src="/static/agents.js"></script>
-  <script src="/static/workflows.js"></script>
   <script src="/static/workflow-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
-  <script src="/static/kanban.js"></script>
   <!--
     The dadaia-workflow catalog renders each step-sequence diagram as a
     server-rendered SVG DAG (.dadaia-wf-diagram-svg) plus the raw mermaid source

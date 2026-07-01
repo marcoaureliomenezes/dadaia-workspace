@@ -4,7 +4,7 @@ The operator must be able to open dadaia-panel and clearly understand *every*
 dadaia-workflow (the v0.1.24 two-layer redesign, WS-8 / ADR-E): its **purpose**,
 its ordered **step sequence**, the per-step **harness/model** options it can run on,
 its **availability** (runnable now vs partially migrated vs deferred), and a
-**diagram** (server-rendered SVG DAG + a Mermaid flowchart of the step sequence).
+**diagram** (server-rendered SVG DAG fluxogram, enriched with per-node harness/model).
 
 Unlike the legacy ``*.workflow.md`` declarative DAGs served by
 :class:`WorkflowsService.get_detail`, this catalog describes the *real* Python-owned
@@ -68,7 +68,7 @@ from dadaia_workspace.features.lifecycle.workflows.release_definition import _SE
 from dadaia_workspace.features.lifecycle.workflows.research import (
     _SEQUENCE as _RESEARCH_SEQUENCE,
 )
-from dadaia_workspace.features.workflows.dag import render_dag_svg
+from dadaia_workspace.features.workflows.dag import NodeMeta, render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,6 @@ class DadaiaWorkflowDTO:
     step_count: int
     steps: list[DadaiaWorkflowStepDTO]
     diagram_svg: str = field(default="")
-    diagram_mermaid: str = field(default="")
 
 
 # ---------------------------------------------------------------------------
@@ -427,44 +426,31 @@ def _default_profiles_for(
 
 
 # ---------------------------------------------------------------------------
-# Mermaid flowchart of the step sequence (operator explicitly wants mermaid)
+# Card fluxogram enrichment (server-rendered SVG is the single diagram source)
 # ---------------------------------------------------------------------------
 
 
-def _mermaid_node_id(order: int) -> str:
-    return f"s{order}"
+def _node_meta_for_steps(steps: list[DadaiaWorkflowStepDTO]) -> dict[str, NodeMeta]:
+    """Build the ``{stage_id: NodeMeta}`` enrichment map for the card fluxogram.
 
-
-def _mermaid_label(step: DadaiaWorkflowStepDTO) -> str:
-    """A readable, mermaid-safe node label (no characters that break the parser)."""
-    base = step.label.replace("_", " ")
-    safe = "".join(ch for ch in base if ch.isalnum() or ch == " ").strip() or step.label
-    suffix = " (gate)" if step.is_gate else ""
-    return f"{safe}{suffix}"
-
-
-def render_step_mermaid(steps: list[DadaiaWorkflowStepDTO]) -> str:
-    """Render the ordered step sequence as a Mermaid ``flowchart TD``.
-
-    The output is a fenced ```mermaid block so it renders through the panel's existing
-    mistune mermaid path (``panel/views/_md_render.py``) exactly like memory-atom
-    diagrams — no new client dependency. Gate steps are diamond nodes; worker steps are
-    rounded rectangles; consecutive steps are linked top-to-bottom.
+    Keyed by ``step.label`` (the stage id ``_steps_to_stage_dtos`` assigns), each worker
+    step maps to its **governed default** harness + concrete model, resolved from the
+    step's ``default_profiles`` via the built-in profile registry — the same single source
+    the resolver reads (no second table). A Python-owned gate step (``default_harness is
+    None``) carries no worker and is omitted, so its node stays bare. Enrichment lives here
+    on the catalog side; ``dag.py``'s shared contract is untouched.
     """
-    if not steps:
-        return "```mermaid\nflowchart TD\n  empty[No steps]\n```"
-    lines = ["```mermaid", "flowchart TD"]
+    meta: dict[str, NodeMeta] = {}
     for step in steps:
-        node = _mermaid_node_id(step.order)
-        label = _mermaid_label(step)
-        if step.is_gate:
-            lines.append(f"  {node}{{{label}}}")
-        else:
-            lines.append(f"  {node}([{label}])")
-    for prev, nxt in zip(steps, steps[1:], strict=False):
-        lines.append(f"  {_mermaid_node_id(prev.order)} --> {_mermaid_node_id(nxt.order)}")
-    lines.append("```")
-    return "\n".join(lines)
+        harness = step.default_harness
+        if harness is None:
+            continue
+        profile_id = step.default_profiles.get(harness)
+        if profile_id is None:  # pragma: no cover - guarded by catalog import assert
+            continue
+        profile = model_profiles.resolve(profile_id)
+        meta[step.label] = NodeMeta(harness=harness, model=profile.model_id)
+    return meta
 
 
 def _steps_to_stage_dtos(steps: list[DadaiaWorkflowStepDTO]) -> list[StageDTO]:
@@ -720,8 +706,11 @@ def _build_workflow(
         availability=availability,
         step_count=len(steps),
         steps=steps,
-        diagram_svg=render_dag_svg(_steps_to_stage_dtos(steps)) if steps else "",
-        diagram_mermaid=render_step_mermaid(steps),
+        diagram_svg=(
+            render_dag_svg(_steps_to_stage_dtos(steps), _node_meta_for_steps(steps))
+            if steps
+            else ""
+        ),
     )
 
 
@@ -854,5 +843,4 @@ __all__ = [
     "get_dadaia_workflow",
     "governed_workflow_catalog",
     "list_dadaia_workflows",
-    "render_step_mermaid",
 ]

@@ -39,6 +39,7 @@ import re
 from collections.abc import Callable
 from typing import Protocol
 
+from dadaia_workspace.core import harness_models
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
@@ -238,12 +239,61 @@ def render_api_workflow_catalog_detail(
     return _view
 
 
+#: The Layer-2 model-capable harnesses whose discrete concrete-model catalog the picker
+#: surfaces as a reference (LAW 2). ``fake`` carries no model and is excluded.
+_MODEL_HARNESSES: tuple[str, ...] = (harness_models.PI_HARNESS, harness_models.CODEX_HARNESS)
+
+
+def _model_choice_label(model_id: str, effort: str) -> str:
+    """Human label for one ``<model_id>:<effort>`` catalog choice.
+
+    Curated OpenRouter ids (``LAYER2_EXTRA_MODEL_IDS`` — e.g. ``kimi-2.7``) are prefixed
+    "OpenRouter — " so the operator can tell a non-registry worker apart at a glance
+    (T-45-06). The effort suffix is preserved in the value (never stripped —
+    ``harness_models.validate`` expects the suffixed form).
+    """
+    if model_id in harness_models.LAYER2_EXTRA_MODEL_IDS:
+        return f"OpenRouter — {model_id} ({effort})"
+    return f"{model_id} ({effort})"
+
+
+def _model_choices_by_harness() -> dict[str, list[dict[str, str]]]:
+    """The full allowed concrete-model catalog per model-capable harness, labelled.
+
+    Each entry's ``value`` is the exact effort-suffixed catalog id (e.g. ``kimi-2.7:high``)
+    — the un-stripped form the resolver's ``harness_models.validate`` expects. This is the
+    single source (``harness_models.model_choices``), so the picker never drifts from the
+    governed allowed set (``known_layer2_model_ids()``).
+    """
+    out: dict[str, list[dict[str, str]]] = {}
+    for harness in _MODEL_HARNESSES:
+        choices: list[dict[str, str]] = []
+        for choice in harness_models.model_choices(harness):
+            model_id, _, effort = choice.rpartition(":")
+            choices.append({"value": choice, "label": _model_choice_label(model_id, effort)})
+        out[harness] = choices
+    return out
+
+
 def render_api_workflow_model_profiles() -> Callable[..., tuple[int, str, bytes]]:
-    """GET /api/workflow-model-profiles — the built-in profile registry (no I/O)."""
+    """GET /api/workflow-model-profiles — the built-in profile registry (no I/O).
+
+    Additive (v0.1.45 / T-45-06): also carries ``model_choices`` — the full per-harness
+    allowed concrete-model catalog (``harness_models.model_choices``, incl. the curated
+    OpenRouter ids such as ``kimi-2.7:high``, each labelled) — so the picker can surface
+    the complete allowed model set per harness alongside the named profiles.
+    """
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         profiles = [p.to_dict() for p in model_profiles.list_profiles()]
-        return _json_response(200, {"generated_at": _now_iso(), "profiles": profiles})
+        return _json_response(
+            200,
+            {
+                "generated_at": _now_iso(),
+                "profiles": profiles,
+                "model_choices": _model_choices_by_harness(),
+            },
+        )
 
     return _view
 

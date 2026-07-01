@@ -1,67 +1,87 @@
-import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
+/**
+ * workflows-tab.spec.ts — Workflows tab (v0.1.45 redesign).
+ *
+ * The Workflows tab LEADS with a catalog of big diagram cards (`.dadaia-wf-catalog`),
+ * one native `<details class="dadaia-wf-card">` per dadaia-workflow. The collapsed face
+ * is the card the operator scans; expanding it (via the `.dadaia-wf-expand-hint`
+ * summary) reveals a FLOW strip (`.dadaia-wf-flux` with a server-rendered SVG fluxogram)
+ * plus one `.dadaia-wf-step` card per step, each model-driven step carrying an inline
+ * `.wf-step-picker` model dropdown. There is no old DAG modal / detail-view any more.
+ *
+ * The legacy `/api/workflows` + `/api/workflows/<name>` DAG endpoints are still served
+ * (declarative *.workflow.md DAGs); their contract is asserted here at the API level.
+ */
 
-// The legacy *.workflow.md DAG cards (/api/workflows) live in the Agentic (ops) tab.
-// The first-class Workflows tab (T-28-C-03 / D-5) hosts the model-governance editor and
-// is exercised separately by workflow-policy-editor.spec.ts. These tests target the
-// legacy DAG card grid, which remains inside the Agentic tab.
-async function openWorkflowsTab(page: any) {
+import { test, expect } from '@playwright/test';
+import { gotoPanel, activateTab, expandWorkflowCard, authHeaders, BASE_URL } from './helpers';
+
+async function openWorkflowsTab(page: any): Promise<void> {
   await gotoPanel(page);
-  await activateTab(page, 'ops');
-  await page.waitForSelector(
-    '#workflows-grid .workflow-card:not(.workflow-card--skeleton), #workflows-empty:not([hidden])',
-    { timeout: 15000 }
-  );
+  await activateTab(page, 'workflows');
+  await page.waitForSelector('.dadaia-wf-catalog .dadaia-wf-card', { timeout: 15000 });
 }
 
-test('First-class Workflows tab exists alongside the legacy Agentic DAG cards', async ({ page }) => {
+test('Workflows is a first-class top-level tab leading with diagram cards', async ({ page }) => {
   await gotoPanel(page);
-  // D-5: Workflows promoted to a first-class top-level tab.
   await expect(page.locator('#tab-workflows')).toBeVisible();
   await activateTab(page, 'workflows');
   await expect(page.locator('#section-workflows.active')).toBeVisible();
-  // The Agentic tab still carries the legacy workflow DAG grid.
-  await activateTab(page, 'ops');
-  await expect(page.locator('#workflows-grid')).toBeAttached();
+
+  // The catalog of diagram cards leads the tab.
+  const cards = page.locator('.dadaia-wf-catalog .dadaia-wf-card');
+  expect(await cards.count()).toBeGreaterThan(0);
+
+  // The Agentic (ops) tab and its legacy DAG grid are gone.
+  expect(await page.$('#tab-ops')).toBeNull();
+  expect(await page.$('#workflows-grid')).toBeNull();
 });
 
-test('Workflows tab renders current workflow cards', async ({ page }) => {
+test('Each workflow diagram card shows a title, availability badge, and step count', async ({
+  page,
+}) => {
   await openWorkflowsTab(page);
 
-  const cards = page.locator('#workflows-grid .workflow-card:not(.workflow-card--skeleton)');
-  const count = await cards.count();
-  expect(count).toBeGreaterThan(0);
-
-  const first = cards.first();
-  await expect(first.locator('.workflow-card__name')).toHaveText(/\S+/);
-  await expect(first.locator('.workflow-card__description')).toBeVisible();
-  await expect(first.locator('.workflow-agent-chip:not(.skeleton-pulse)').first()).toBeVisible();
-  await expect(first.locator('.workflow-stage-badge')).toHaveText(/\d+\s*stage/i);
-  await expect(first.locator('.workflow-dag-cta')).toBeVisible();
+  const first = page.locator('.dadaia-wf-catalog .dadaia-wf-card').first();
+  await expect(first.locator('.dadaia-wf-card-title')).toHaveText(/\S+/);
+  await expect(first.locator('.dadaia-wf-badge')).toHaveText(/\S+/);
+  await expect(first.locator('.dadaia-wf-step-count')).toHaveText(/\d+\s*steps/i);
+  // The card is a native <details> disclosure — collapsed by default.
+  const open = await first.evaluate((el) => (el as HTMLDetailsElement).open);
+  expect(open).toBe(false);
 });
 
-test('Workflow detail journey opens DAG and returns to the grid', async ({ page }) => {
+test('Expanding a card reveals the flow strip (SVG fluxogram) and per-step cards', async ({
+  page,
+}) => {
   await openWorkflowsTab(page);
 
-  await page.locator('#workflows-grid .workflow-dag-cta[data-workflow-name]').first().click();
-  const detail = page.locator('#workflow-detail-view');
-  await expect(detail).toBeVisible({ timeout: 10000 });
-  await expect(detail.locator('svg')).toBeVisible({ timeout: 10000 });
+  // The `implementation` workflow has model-driven steps → its expand hydrates pickers.
+  await expandWorkflowCard(page, 'implementation');
+  const card = page.locator('details.dadaia-wf-card[data-workflow="implementation"]');
 
-  const svgValid = await page.evaluate(() => {
-    const svgEl = document.querySelector('#workflow-detail-view svg');
+  // The flow strip carries a server-rendered SVG fluxogram (no client Mermaid).
+  const flux = card.locator('.dadaia-wf-flux');
+  await expect(flux).toBeVisible();
+  const svg = flux.locator('.dadaia-wf-diagram-svg svg');
+  await expect(svg).toBeVisible();
+  const svgValid = await card.evaluate((el) => {
+    const svgEl = el.querySelector('.dadaia-wf-flux .dadaia-wf-diagram-svg svg');
     if (!svgEl) return false;
     const doc = new DOMParser().parseFromString(svgEl.outerHTML, 'image/svg+xml');
     return doc.querySelector('parsererror') === null;
   });
   expect(svgValid).toBe(true);
 
-  await page.locator('#detail-back-btn').click();
-  await expect(page.locator('#workflows-grid .workflow-card:not(.workflow-card--skeleton)').first())
-    .toBeVisible({ timeout: 8000 });
+  // One formatted step card per step, with a readable header + purpose.
+  const steps = card.locator('.dadaia-wf-steps .dadaia-wf-step');
+  expect(await steps.count()).toBeGreaterThan(0);
+  await expect(steps.first().locator('.dadaia-wf-step-label')).toHaveText(/\S+/);
+
+  // Model-driven steps carry an inline picker; it hydrates on expand.
+  await expect(card.locator('.wf-step-picker .wfp-picker').first()).toBeVisible();
 });
 
-test('Workflows API returns the current workflow envelope', async ({ request }) => {
+test('Workflows API returns the current legacy workflow envelope', async ({ request }) => {
   const response = await request.get(`${BASE_URL}/api/workflows`, { headers: authHeaders() });
   expect(response.status()).toBe(200);
 
@@ -102,8 +122,7 @@ test('Workflows tab does not load Mermaid', async ({ page }) => {
   });
 
   await openWorkflowsTab(page);
-  await page.locator('#workflows-grid .workflow-dag-cta[data-workflow-name]').first().click();
-  await expect(page.locator('#workflow-detail-view')).toBeVisible({ timeout: 10000 });
+  await expandWorkflowCard(page, 'implementation');
 
   expect(mermaidRequests).toHaveLength(0);
   expect(await page.evaluate(() => typeof (window as any).mermaid !== 'undefined')).toBe(false);
@@ -114,7 +133,7 @@ test('Workflows tab has no critical or serious axe violations', async ({ page })
 
   const { AxeBuilder } = await import('@axe-core/playwright');
   const results = await new AxeBuilder({ page })
-    .include('#section-ops')
+    .include('#section-workflows')
     .withTags(['wcag2a', 'wcag2aa'])
     .disableRules(['color-contrast'])
     .analyze();

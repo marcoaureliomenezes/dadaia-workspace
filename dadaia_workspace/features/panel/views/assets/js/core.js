@@ -219,8 +219,7 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for ops/sessions/academy/reports ────────
-  // Ops tab activates Agents + Workflows + Kanban sub-sections together.
+  // ── Tab activation hook — lazy fetch for workflows/sessions/academy/reports ──
   // Sessions module: window.Sessions (sessions.js, loaded after this script).
   // Academy module: window.Academy (academy.js, loaded after this script).
   // Reports module: window.Reports (reports.js, loaded after this script).
@@ -228,27 +227,7 @@
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
 
-      // ── Ops tab: load Agents, Workflows, and Kanban together ────────────────
-      if (target === 'ops') {
-        // Agents
-        if (window.Agents && !window.Agents.isLoaded()) {
-          window.Agents.load();
-        }
-        // Workflows — respect hash on activation
-        if (window.Workflows) {
-          if (!window.Workflows.isLoaded()) {
-            if (window.Workflows.handleHashOnActivation) {
-              window.Workflows.handleHashOnActivation();
-            } else {
-              window.Workflows.load();
-            }
-          }
-        }
-        // Kanban
-        window.Panel.activate('kanban');
-      }
-
-      // ── Workflows tab (first-class, D-5): load the model-governance editor ──────
+      // ── Workflows tab (first-class): load the per-step model pickers ──────────
       if (target === 'workflows') {
         if (window.WorkflowPolicy && !window.WorkflowPolicy.isLoaded()) {
           window.WorkflowPolicy.load();
@@ -268,24 +247,13 @@
   });
 
   // ── Hash-fragment routing on initial load ─────────────────────────────
-  // #agents, #workflows, and #kanban now live inside the Ops tab.
+  // #workflows activates the first-class Workflows tab (Agentic tab removed).
   (function () {
     var hash = location.hash;
     if (!hash) { return; }
-    if (hash.startsWith('#agents') || hash.startsWith('#workflows') || hash.startsWith('#kanban')) {
-      // Activate the Ops tab — its click handler will load all three sub-sections.
-      var opsTab = document.getElementById('tab-ops');
-      if (opsTab) {
-        opsTab.click();
-        // For agent filter deep-links, apply after Agents loads.
-        if (hash.startsWith('#agents')) {
-          setTimeout(function () {
-            if (window.Agents) { window.Agents.applyHashFilter(); }
-          }, 300);
-        }
-        // For workflow detail deep-links, handleHashOnActivation already ran
-        // via the click handler; nothing extra needed here.
-      }
+    if (hash.startsWith('#workflows')) {
+      var workflowsTab = document.getElementById('tab-workflows');
+      if (workflowsTab) { workflowsTab.click(); }
     } else if (hash.startsWith('#reports')) {
       var reportsTab = document.getElementById('tab-reports');
       if (reportsTab) { reportsTab.click(); }
@@ -298,15 +266,10 @@
   // ── Register modules into window.Panel ───────────────────────────────
   // Runs after all synchronous <script> tags have executed (DOMContentLoaded
   // fires after the parser has processed every script in the document head/body).
-  // By this point window.Agents and window.Workflows are already defined by
-  // their respective script tags which are loaded after core.js.
   document.addEventListener('DOMContentLoaded', function () {
-    if (window.Agents) { window.Panel.register('agents', window.Agents); }
-    if (window.Workflows) { window.Panel.register('workflows', window.Workflows); }
     if (window.Sessions) { window.Panel.register('sessions', window.Sessions); }
     if (window.Academy) { window.Panel.register('academy', window.Academy); }
     if (window.Reports) { window.Panel.register('reports', window.Reports); }
-    if (window.Kanban) { window.Panel.register('kanban', window.Kanban); }
   });
 
 })();

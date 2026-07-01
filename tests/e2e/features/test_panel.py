@@ -190,14 +190,15 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             body = resp.read().decode("utf-8", errors="replace")
 
         # The 3 section identifiers that must appear in the rendered HTML.
-        # The index view renders sections for Servers, Memories, and Agents.
-        # The exact text tokens are drawn from the frontend mockup / T-3.1 acceptance.
+        # The index view renders sections for Servers, Projects (memories), and
+        # Workflows (v0.1.45 redesign: the Agentic tab was removed and the
+        # dadaia-workflows catalog became a first-class section).
         assert "Servers" in body, "Index page missing 'Servers' section"
         assert any(marker in body for marker in ("Memórias", "Memories", "memories", "memory")), (
             "Index page missing Memories section marker"
         )
-        assert any(marker in body for marker in ("Agents", "Agentes", "Em breve", "Release-2")), (
-            "Index page missing Agents/Workflows section marker"
+        assert any(marker in body for marker in ("Workflows", "section-workflows")), (
+            "Index page missing Workflows section marker"
         )
 
         # --- /api/panel-status (credential-less — no-auth contract) ---

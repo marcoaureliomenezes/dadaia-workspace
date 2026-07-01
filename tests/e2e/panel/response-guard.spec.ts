@@ -3,14 +3,14 @@
  *
  * Tests: 2
  * Surface: Global guard — any status >= 400 or console error during a full
- *          tab tour (all 6 tabs, Agents+Workflows+Kanban merged into "Ops")
- *          plus clicking the first memory chip and waiting for networkidle.
+ *          tab tour (all 6 tabs) plus clicking the first memory chip and
+ *          waiting for networkidle.
  *
  * Priority: P0 — these guards must run before any other panel tests.
  * If these fail, other tests are unreliable.
  *
  * E2E-GUARD-01: Register a response listener BEFORE navigation. Fail on ANY
- *   response status >= 400 during a full tab tour (ops, sessions, reports,
+ *   response status >= 400 during a full tab tour (workflows, sessions, reports,
  *   academy, servers, memories) PLUS clicking the first memory chip and
  *   waiting for networkidle. Include the failing URL+status list in the
  *   assertion message.
@@ -19,18 +19,18 @@
  *   memory chip click). CSP-policy-string console errors are excluded because
  *   they are browser-internal metadata logs, not JS errors from the panel.
  *
- * T-016-P09 update: agents/workflows/kanban tabs removed; now a single "Ops"
- *   tab activates all three sub-sections. Tour updated accordingly.
+ * v0.1.45 redesign: the Agentic (ops) tab, agents grid, personas UI, and Kanban
+ *   view were removed. The tour now covers the surviving nav set.
  */
 
 import { test, expect } from '@playwright/test';
 import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 
 // ---------------------------------------------------------------------------
-// Tab tour definition — 6 tabs in display order (Ops merges 3 former tabs)
+// Tab tour definition — 6 tabs in display order (v0.1.45 nav set)
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
-  { tabId: '#tab-ops', sectionId: 'ops', label: 'Ops' },
+  { tabId: '#tab-workflows', sectionId: 'workflows', label: 'Workflows' },
   { tabId: '#tab-sessions', sectionId: 'sessions', label: 'Sessions' },
   { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },

@@ -25,11 +25,11 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
-  // v0.1.28 (D-5) promoted Workflows to a first-class top-level tab at position 2.
+  // v0.1.45 panel redesign: the Agentic tab was deleted; the nav is now exactly
+  // Projects, Workflows, Sessions, Reports, Academy, Servers.
   expect(tabs).toEqual([
     'Projects',
     'Workflows',
-    'Agentic',
     'Sessions',
     'Reports',
     'Academy',
@@ -76,7 +76,7 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
   await page.waitForSelector('[role="tab"]');
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
-    { tabId: '#tab-ops', sectionId: 'ops' },
+    { tabId: '#tab-workflows', sectionId: 'workflows' },
     { tabId: '#tab-sessions', sectionId: 'sessions' },
     { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
@@ -128,8 +128,8 @@ test('E2E-TAB-04 — No CSP violations on load and all tab activations', async (
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
-  // Navigate to each tab (agents/workflows/kanban now merged under Ops)
-  for (const sectionId of ['ops', 'servers', 'memories'] as const) {
+  // Navigate across the surviving tabs (Agentic/agents/kanban removed in v0.1.45).
+  for (const sectionId of ['workflows', 'servers', 'memories'] as const) {
     await activateTab(page, sectionId);
   }
 
