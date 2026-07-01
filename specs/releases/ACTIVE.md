@@ -1,16 +1,22 @@
-release: v0.1.46
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.46 — SDD Governance v2
+# Active release: none
 
-**v0.1.46** implements the `sdd-governance-v2-agents-lifecycle` EPIC (FEAT-GOV-V2-01),
-scoped by the 2026-07-01 compliance audit (`specs/audits/20260701T135346Z-6145b869/`).
+**v0.1.46** — *SDD Governance v2 (bugs as event-sourced JSONL)* — is **CLOSED and ARCHIVED**
+at `specs/_archive/releases/v0.1.46/` (CLOSURE.md). It fixed the long-standing bug-format
+rot: JSONL was mandated for v0.1.15 and never delivered, so 99 `.md` bug files accreted.
+This release shipped the event-sourced JSONL bug store + `dadaia bugs append|status|stats`
+CLI, ran the one-time migration (99 `.md` → 18 JSONL streams, all `.md` archived to
+`specs/bugs/_archive/`), rewrote the `bug-registration-guardrail` rule for the JSONL contract
+(R-1 pair), added the `_archive` FROZEN gate-class + doctor SPEC-DOC-033/034/035/036 + the
+audit-disposition law, and swept OpenCode-as-live from the product memory. Shipped via PR #82
+(`f2fd4e22`), all 35 CI green; qa + security APPROVED.
 
-Pillars: (1) **bugs → event-sourced JSONL** + `dadaia bugs` CLI + `*.md`→JSONL migration +
-**rewrite of the `bug-registration-guardrail` rule** (same release, or the drift regrows);
-(2) `_archive` FROZEN taxonomy + audit-disposition law; (3) **OpenCode product-memory
-sweep** (~11 atoms still describe OpenCode as live, removed v0.1.24); (4) disposition
-cleanup (archive 76 closed bugs, disposition ~14 audits, normalize statuses).
+No release is currently active.
 
-In DEFINITION.
+**Follow-up — v0.1.47:** the audit-disposition **data** sweep (T-46-21 descope valve) —
+disposition the ~14 undisposed audits, normalize the off-canon backlog statuses
+(SPEC-DOC-031), and dedupe the HTML-report bug cluster. The now-live SPEC-DOC-035/036 doctor
+warnings are the enforcing mechanism for this slipped work.
