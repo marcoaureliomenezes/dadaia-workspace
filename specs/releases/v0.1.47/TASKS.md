@@ -33,11 +33,11 @@ write sets are declared (PLAN write-set boundaries apply).
 
 ## W2 — Constitution + AGENTS.md (owner: product-engineer)
 
-- [ ] T-47-30 Constitution lean rewrite (WS-A1..A6; ≈200 lines; invariant+citation;
+- [x] T-47-30 Constitution lean rewrite (WS-A1..A6; ≈200 lines; invariant+citation;
   Governance section)
-- [ ] T-47-31 `public/data/AGENTS.md` truth fixes (reports-validate wording; injection
+- [x] T-47-31 `public/data/AGENTS.md` truth fixes (reports-validate wording; injection
   claim; harness-preference convention) + 8-rule stale sweep
-- [ ] T-47-32 One-time manual refresh of `repos/dadaia-workspace/AGENTS.md` from source
+- [x] T-47-32 One-time manual refresh of `repos/dadaia-workspace/AGENTS.md` from source
   (SPEC W2b; automated fan-out redesign stays deferred)
 
 ## W3 — Memory canon (owner: product-engineer)

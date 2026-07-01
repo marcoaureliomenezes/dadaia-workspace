@@ -231,12 +231,16 @@ is the **8 non-PM core roles** (`ai-engineer`, `code-reviewer`, `product-enginee
 `project-auditor`, `qa-engineer`, `security-reviewer`, `software-architect`,
 `software-engineer`); `project-manager` is the Layer-1 orchestrator, not a Layer-2
 persona, so it has no persona atom.
+**Harness preference (convention):** in a Codex or PI entry session, dadaia-workflows
+are the preferred execution path, and the Layer-2 worker harness defaults to the entry
+harness (enter `codex` ⇒ prefer `--harness codex`; enter `pi` ⇒ prefer `--harness pi`);
+an explicit `--harness`/`--step-harness` always wins. Claude Code is Layer-1-only —
+never a Layer-2 worker.
 Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
 **safety-gate-enforced** by the deterministic gate and git chokepoints described above
 (write-scope, lease, and phase) — there is no procedural check that a given workflow verb
 was actually run. For the full per-workflow description — purpose, ordered steps,
-per-step harness/model, mermaid diagram, and availability — open **`dadaia panel` →
-Agentic → dadaia-workflows**.
+per-step harness/model, flow diagram, and availability — open the **`dadaia panel` Workflows tab**.
 
 ## Memory
 
@@ -266,10 +270,11 @@ next handoff target is human, under:
 .dadaia/reports/<context>/<agent>/<UTC>-<slug>.html
 ```
 
-Validate it:
+Validate the report's **handoff JSON** (the validator takes handoff files only; the
+HTML's integrity rides on the handoff's `content_hash`):
 
 ```bash
-dadaia reports validate <path>
+dadaia reports validate <path-to>.handoff.json
 ```
 
 `dadaia panel` reads context state, reports, handoffs, servers, workflows, and
@@ -296,6 +301,6 @@ dadaia context show --json
 dadaia specs doctor
 dadaia public doctor
 dadaia server list
-dadaia reports validate <path>
+dadaia reports validate <path-to>.handoff.json
 dadaia panel
 ```
