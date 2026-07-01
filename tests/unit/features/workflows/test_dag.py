@@ -15,7 +15,7 @@ Coverage:
 
 import xml.etree.ElementTree as ET
 
-from dadaia_workspace.features.workflows.dag import NodeMeta, render_dag_svg
+from dadaia_workspace.features.workflows.dag import NODE_H_META, NodeMeta, render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
 
 
@@ -438,8 +438,9 @@ def test_node_meta_draws_harness_and_model_line() -> None:
     assert "pi" in svg
     # The meta style rule is emitted only when meta is present.
     assert ".dag-node text.node-meta" in svg
-    # Nodes are taller to fit the extra line.
-    assert 'height="58"' in svg
+    # Nodes are taller (enlarged legible card fluxogram) to fit the extra line.
+    assert f'height="{NODE_H_META}"' in svg
+    assert 'height="40"' not in svg
     root = _parse_svg(svg)
     assert root is not None
 

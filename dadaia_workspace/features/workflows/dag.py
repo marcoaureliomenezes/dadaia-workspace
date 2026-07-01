@@ -49,9 +49,10 @@ if TYPE_CHECKING:
 # Layout constants
 # ---------------------------------------------------------------------------
 
-NODE_W: int = 140  # node width in px
+NODE_W: int = 140  # node width in px (default, no per-node meta — byte-identical path)
+NODE_W_META: int = 220  # node width in px when node_meta is drawn (legible card fluxogram)
 NODE_H: int = 40  # node height in px (default, no per-node meta)
-NODE_H_META: int = 58  # node height in px when node_meta adds a harness/model line
+NODE_H_META: int = 92  # node height in px when node_meta adds a harness/model line
 GAP_X: int = 80  # horizontal gap between columns
 GAP_Y: int = 20  # vertical gap between nodes in same column
 MARGIN_X: int = 20  # left margin
@@ -176,13 +177,14 @@ def _compute_positions(
     stages: list[StageDTO],
     layer: dict[str, int],
     node_h: int = NODE_H,
+    node_w: int = NODE_W,
 ) -> list[_NodeLayout]:
     """Compute pixel (x, y) for each node given its layer and row assignment.
 
     Stages within a layer are ordered by their original appearance order in the
-    input list, preserving workflow intent. ``node_h`` is the effective node height
-    (taller when per-node meta is drawn); it defaults to :data:`NODE_H` so the
-    no-meta layout is unchanged.
+    input list, preserving workflow intent. ``node_h``/``node_w`` are the effective
+    node dimensions (larger when per-node meta is drawn); they default to
+    :data:`NODE_H`/:data:`NODE_W` so the no-meta layout is unchanged.
     """
     # Group stages by layer, preserving original order within each layer
     layer_members: dict[int, list[StageDTO]] = defaultdict(list)
@@ -191,7 +193,7 @@ def _compute_positions(
 
     nodes: list[_NodeLayout] = []
     for col_idx, layer_stages in sorted(layer_members.items()):
-        x = MARGIN_X + col_idx * (NODE_W + GAP_X)
+        x = MARGIN_X + col_idx * (node_w + GAP_X)
         for row_idx, s in enumerate(layer_stages):
             y = MARGIN_Y + row_idx * (node_h + GAP_Y)
             is_placeholder = s.agent.startswith("{{") and s.agent.endswith("}}")
@@ -231,9 +233,16 @@ def _svg_style(include_meta: bool = False) -> str:
     style block is byte-for-byte the historical one so the no-meta output is
     unchanged.
     """
+    # The card fluxogram (meta path) enlarges every glyph for legibility — these rules
+    # come AFTER the base block below, so for identical selectors the later rule wins and
+    # only the meta path is affected. The no-meta path omits meta_rule entirely and stays
+    # byte-for-byte identical (T-45-01).
     meta_rule = (
-        "\n  .dag-node text.node-meta { font-size: 8px; fill: #7a86a0; "
+        "\n  .dag-node text.stage-id { font-size: 15px; }"
+        "\n  .dag-node text.agent-name { font-size: 12px; }"
+        "\n  .dag-node text.node-meta { font-size: 11.5px; font-weight: 600; fill: #4a5578; "
         "font-family: system-ui, sans-serif; }"
+        "\n  .dag-gate .gate-marker { font-size: 17px; }"
         if include_meta
         else ""
     )
@@ -275,13 +284,15 @@ def _render_node(
     node: _NodeLayout,
     node_h: int = NODE_H,
     meta: NodeMeta | None = None,
+    node_w: int = NODE_W,
 ) -> str:
     """Render a single DAG node as an SVG <g> element.
 
-    ``node_h`` is the effective node height (defaults to :data:`NODE_H` for the
-    historical layout). ``meta``, when present, adds a compact ``harness · model``
-    line beneath the role and enriches the aria-label; when ``None`` the emitted
-    ``<g>`` is byte-for-byte the historical node.
+    ``node_h``/``node_w`` are the effective node dimensions (default to
+    :data:`NODE_H`/:data:`NODE_W` for the historical layout). ``meta``, when present,
+    adds a compact ``harness · model`` line beneath the role and enriches the
+    aria-label; when the node is at the historical size and ``meta`` is ``None`` the
+    emitted ``<g>`` is byte-for-byte the historical node (T-45-01).
     """
     classes = "dag-node"
     if node.gate:
@@ -295,21 +306,27 @@ def _render_node(
     if node.gate:
         aria_label_text += ", Gate"
 
+    # The enlarged (meta) layout spreads the text lines down the taller node; the
+    # historical (no-meta) layout keeps its exact y-offsets so its output is unchanged.
+    enlarged = node_h > NODE_H
+    stage_y, agent_y, meta_y = (30, 54, 78) if enlarged else (16, 30, 46)
+    gate_y = node.y + (18 if enlarged else 12)
+
     # Gate marker (⊙) positioned top-right of node
     gate_marker = ""
     if node.gate:
         gate_marker = (
-            f'<text class="gate-marker" x="{node.x + NODE_W - 6}" '
-            f'y="{node.y + 12}" text-anchor="end">&#x2299;</text>'
+            f'<text class="gate-marker" x="{node.x + node_w - 8}" '
+            f'y="{gate_y}" text-anchor="end">&#x2299;</text>'
         )
 
     meta_line = ""
     if meta is not None and (meta.harness or meta.model):
         meta_parts = [p for p in (meta.harness, meta.model) if p]
-        meta_text = _truncate(" · ".join(meta_parts), 28)
+        meta_text = _truncate(" · ".join(meta_parts), 40)
         aria_label_text += f", {' · '.join(meta_parts)}"
         meta_line = (
-            f'<text class="node-meta" x="{NODE_W // 2}" y="46" text-anchor="middle">'
+            f'<text class="node-meta" x="{node_w // 2}" y="{meta_y}" text-anchor="middle">'
             f"{_esc(meta_text)}</text>"
         )
 
@@ -322,10 +339,10 @@ def _render_node(
         f'data-status="pending" '
         f'aria-label="{aria_label_escaped}" '
         f'transform="translate({node.x},{node.y})">'
-        f'<rect width="{NODE_W}" height="{node_h}" rx="6" ry="6"/>'
-        f'<text class="stage-id" x="{NODE_W // 2}" y="16" text-anchor="middle">'
+        f'<rect width="{node_w}" height="{node_h}" rx="6" ry="6"/>'
+        f'<text class="stage-id" x="{node_w // 2}" y="{stage_y}" text-anchor="middle">'
         f"{stage_id_escaped}</text>"
-        f'<text class="agent-name" x="{NODE_W // 2}" y="30" text-anchor="middle">'
+        f'<text class="agent-name" x="{node_w // 2}" y="{agent_y}" text-anchor="middle">'
         f"{agent_escaped}</text>"
         f"{meta_line}"
         f"{gate_marker}"
@@ -337,10 +354,11 @@ def _render_edge(
     src: _NodeLayout,
     dst: _NodeLayout,
     node_h: int = NODE_H,
+    node_w: int = NODE_W,
 ) -> str:
     """Render a directed edge as an SVG <path> with arrowhead."""
     # Start at right-center of source, end at left-center of destination
-    x1 = src.x + NODE_W
+    x1 = src.x + node_w
     y1 = src.y + node_h // 2
     x2 = dst.x
     y2 = dst.y + node_h // 2
@@ -359,6 +377,7 @@ def _render_parallel_bands(
     stages: list[StageDTO],
     nodes_by_id: dict[str, _NodeLayout],
     node_h: int = NODE_H,
+    node_w: int = NODE_W,
 ) -> list[str]:
     """Render dashed background bands for parallel groups."""
     groups: dict[str, list[str]] = defaultdict(list)
@@ -376,7 +395,7 @@ def _render_parallel_bands(
         ys = [n.y for n in group_layouts]
         min_x = min(xs) - BAND_PAD
         min_y = min(ys) - BAND_PAD
-        max_x = max(xs) + NODE_W + BAND_PAD
+        max_x = max(xs) + node_w + BAND_PAD
         max_y = max(ys) + node_h + BAND_PAD
 
         bands.append(
@@ -427,16 +446,17 @@ def render_dag_svg(
 
     has_meta = bool(node_meta)
     node_h = NODE_H_META if has_meta else NODE_H
+    node_w = NODE_W_META if has_meta else NODE_W
 
     # 1. Assign layers
     layer_map = _compute_layers(stages)
 
     # 2. Compute pixel positions
-    nodes = _compute_positions(stages, layer_map, node_h)
+    nodes = _compute_positions(stages, layer_map, node_h, node_w)
     nodes_by_id: dict[str, _NodeLayout] = {n.stage_id: n for n in nodes}
 
     # 3. Compute canvas dimensions
-    max_x = max(n.x + NODE_W for n in nodes) + MARGIN_X
+    max_x = max(n.x + node_w for n in nodes) + MARGIN_X
     max_y = max(n.y + node_h for n in nodes) + MARGIN_Y
 
     # 4. Collect edges
@@ -459,17 +479,17 @@ def render_dag_svg(
     parts.append(_arrowhead_marker())
 
     # Parallel-group bands (rendered before nodes so nodes appear on top)
-    bands = _render_parallel_bands(stages, nodes_by_id, node_h)
+    bands = _render_parallel_bands(stages, nodes_by_id, node_h, node_w)
     parts.extend(bands)
 
     # Edges (rendered before nodes so nodes appear on top of edge endpoints)
     for src_id, dst_id in edge_pairs:
-        parts.append(_render_edge(nodes_by_id[src_id], nodes_by_id[dst_id], node_h))
+        parts.append(_render_edge(nodes_by_id[src_id], nodes_by_id[dst_id], node_h, node_w))
 
     # Nodes
     meta_map = node_meta or {}
     for node in nodes:
-        parts.append(_render_node(node, node_h, meta_map.get(node.stage_id)))
+        parts.append(_render_node(node, node_h, meta_map.get(node.stage_id), node_w))
 
     parts.append("</svg>")
 

@@ -677,12 +677,21 @@ WORKFLOWS_CSS: str = """
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.dadaia-wf-diagram {
+.dadaia-wf-flux {
+  margin: 0 0 var(--space-md) 0;
   background: var(--color-bg);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-sm);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
   overflow-x: auto;
+}
+.dadaia-wf-flux-cap {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted);
 }
 .dadaia-wf-diagram-svg svg {
   display: block;
@@ -707,60 +716,115 @@ WORKFLOWS_CSS: str = """
   color: var(--color-cost, #633d2e);
 }
 .dadaia-wf-detail {
-  margin-top: var(--space-sm);
-  padding-top: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
   border-top: var(--border-width) solid var(--color-border);
 }
+/* One formatted CARD per step — clean typographic hierarchy, no monospace comma-dump. */
 .dadaia-wf-steps {
   margin: 0;
-  padding-left: var(--space-md);
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-md);
 }
 .dadaia-wf-step {
-  font-size: var(--text-md);
-  color: var(--color-text);
-  line-height: 1.4;
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width-accent) solid var(--color-accent, #9cddc8);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+}
+.dadaia-wf-step--gate {
+  border-left-color: var(--color-alert, #f7af63);
+}
+.dadaia-wf-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 .dadaia-wf-step-order {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent, #9cddc8);
+  color: var(--color-heading);
   font-family: var(--font-mono);
-  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
 }
 .dadaia-wf-step-label {
   font-weight: 700;
+  font-size: var(--text-lg);
   color: var(--color-heading);
 }
-.dadaia-wf-step-gate {
-  display: inline-block;
-  background: var(--color-primary-bg, #f0fbf7);
-  border: var(--border-width) solid var(--color-accent, #9cddc8);
-  border-radius: var(--radius-pill);
-  padding: 0 0.4rem;
-  color: var(--color-cost, #633d2e);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
 .dadaia-wf-step-role {
-  color: var(--color-muted);
-}
-.dadaia-wf-step-purpose {
-  margin: 0.2rem 0;
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  line-height: 1.4;
-}
-.dadaia-wf-step-harness {
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--color-muted);
 }
-.dadaia-wf-step-harness--none {
-  font-style: italic;
+.dadaia-wf-step-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.55rem;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
-.dadaia-wf-harness strong {
-  color: var(--color-heading);
+.dadaia-wf-step-badge--worker {
+  background: var(--color-primary-bg, #f0fbf7);
+  color: var(--color-accent-dark);
+  border: var(--border-width) solid var(--color-accent, #9cddc8);
+}
+.dadaia-wf-step-badge--gate {
+  background: var(--color-warning-bg, #ddd9ab);
+  color: var(--color-cost, #633d2e);
+  border: var(--border-width) solid var(--color-alert, #f7af63);
+}
+.dadaia-wf-step-purpose {
+  margin: var(--space-xs) 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.dadaia-wf-step-gatenote {
+  margin: var(--space-sm) 0 0 0;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-muted);
+}
+/* Inline per-step model picker — a labelled control, hydrated by workflow-policy.js. */
+.dadaia-wf-step-model {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.dadaia-wf-step-model-label {
+  flex-shrink: 0;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.wf-step-picker {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.wf-step-picker-default {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text);
 }
 .dadaia-wf-empty-steps {
   margin: 0;

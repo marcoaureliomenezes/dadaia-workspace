@@ -24,23 +24,22 @@ _JS_DIR = (
 
 
 def _build_panel_js() -> str:
+    # v0.1.45: the Agentic tab was removed; agents.js/workflows.js/kanban.js were
+    # deleted. The workflows-tab pickers live in workflow_policy.js.
     return (
         (_JS_DIR / "core.js").read_text(encoding="utf-8")
         + "\n"
-        + (_JS_DIR / "agents.js").read_text(encoding="utf-8")
-        + "\n"
-        + (_JS_DIR / "workflows.js").read_text(encoding="utf-8")
+        + (_JS_DIR / "workflow_policy.js").read_text(encoding="utf-8")
     )
 
 
 def _build_panel_css() -> str:
-    from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
     from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
     from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
     from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
     from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
-    return TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+    return TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
 
 # ---------------------------------------------------------------------------
@@ -159,10 +158,6 @@ def _button_fragment(html: str, tab_id: str) -> str:
     [
         ("section-servers", ">Servers<"),
         ("section-memories", ">Projects<"),
-        # Agents, Workflows, and Kanban are sub-sections inside section-ops (T-016-P09).
-        ("section-ops", "agents-grid"),
-        ("section-ops", "workflows-grid"),
-        ("section-ops", "kanban-board"),
         ("section-sessions", "sessions-tbody"),
         ("section-reports", "reports-list"),
         ("section-academy", "academy-content"),
@@ -171,42 +166,25 @@ def _button_fragment(html: str, tab_id: str) -> str:
 def test_index_renders_panel_sections(section_id: str, visible_text: str) -> None:
     """The index shell must render every top-level panel section.
 
-    After T-016-P09: agents-grid, workflows-grid, and kanban-board live inside
-    section-ops; there are no longer separate section-agents / section-workflows /
-    section-kanban top-level sections.
+    v0.1.45: the Agentic tab (section-ops — agents/personas/legacy-workflows/kanban)
+    was removed entirely; only the first-class Workflows tab remains for workflow
+    governance.
     """
     html = _render(_build_service())
     assert f'id="{section_id}"' in html
     assert visible_text in html
 
 
-def test_agentic_subsection_order_is_agents_workflows_kanban() -> None:
-    """Operator demand: inside the Agentic tab the order must be
-    Agents → Workflows → Kanban (Kanban was previously first)."""
-    html = _render(_build_service())
-    idx_agents = html.index('id="agents-grid"')
-    idx_workflows = html.index('id="workflows-grid"')
-    idx_kanban = html.index('id="kanban-board"')
-    assert idx_agents < idx_workflows < idx_kanban, (
-        "Agentic subsections must render Agents → Workflows → Kanban"
-    )
-
-
 def test_index_tablist_contract() -> None:
     """The nav must expose the current tab order and active default tab.
 
-    After T-016-P09: Agents, Workflows, and Kanban are merged into one "Agentic" tab.
-    After T-016-P10: "Spec Context Projects" tab is renamed to "Projects",
-                      "Ops" tab is renamed to "Agentic".
-    After T-28-C-03 (D-5): Workflows is promoted back to a first-class top-level tab
-                      (model governance); Agents + Kanban remain in the Agentic tab.
-                      There are now 7 tabs.
+    v0.1.45: the "Agentic" tab (tab-ops) was removed entirely per operator directive.
+    The nav is now 6 tabs: Projects, Workflows, Sessions, Reports, Academy, Servers.
     """
     html = _render(_build_service())
     expected = [
         ("tab-memories", "Projects"),
         ("tab-workflows", "Workflows"),
-        ("tab-ops", "Agentic"),
         ("tab-sessions", "Sessions"),
         ("tab-reports", "Reports"),
         ("tab-academy", "Academy"),
@@ -230,8 +208,8 @@ def test_index_tablist_contract() -> None:
     assert 'aria-label="Projects"' in memories_button
     assert 'aria-selected="false"' in servers_button
 
-    # Agents and Kanban remain merged into the Agentic tab (no standalone tabs).
-    # Workflows is a first-class tab again (D-5).
+    # The Agentic tab and its former standalone siblings are gone.
+    assert 'id="tab-ops"' not in html
     assert 'id="tab-agents"' not in html
     assert 'id="tab-kanban"' not in html
     assert 'id="tab-workflows"' in html
@@ -241,10 +219,7 @@ def test_index_tablist_contract() -> None:
     ("section_id", "tab_id"),
     [
         ("section-memories", "tab-memories"),
-        # D-5: Workflows is a first-class top-level section again (model governance).
         ("section-workflows", "tab-workflows"),
-        # T-016-P09: Agents + Kanban remain merged into the Ops tab.
-        ("section-ops", "tab-ops"),
         ("section-sessions", "tab-sessions"),
         ("section-reports", "tab-reports"),
         ("section-academy", "tab-academy"),
@@ -254,15 +229,14 @@ def test_index_tablist_contract() -> None:
 def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
     """Every top-level section must be connected to its tab for keyboard and screen-reader users.
 
-    After T-016-P09 there were 6 sections; T-28-C-03 (D-5) adds a first-class
-    section-workflows for model governance, so there are now 7.
+    v0.1.45: the Agentic tab was removed, leaving 6 tabpanels.
     """
     html = _render(_build_service())
     section = _section_fragment(html, section_id)
     assert 'role="tabpanel"' in section
     assert 'tabindex="0"' in section
     assert f'aria-labelledby="{tab_id}"' in section
-    assert html.count('role="tabpanel"') == 7
+    assert html.count('role="tabpanel"') == 6
 
 
 def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:
@@ -285,8 +259,6 @@ def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:
         "panel_token",  # core.js purges the stale credential key from localStorage
         "localStorage",
         "authedFetch",  # kept as a thin alias of fetch — adds no credential header
-        "authedFetch('/api/agents?runtime='",
-        "authedFetch('/api/workflows?runtime='",
     ]:
         assert expected in panel_js
 
@@ -306,21 +278,18 @@ def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:
         "tokens.css",
         "structure.css",
         "projects.css",
-        "agents.css",
         "workflows.css",
+        "workflow-policy.css",
         "sessions.css",
         "academy.css",
         "reports.css",
-        "kanban.css",
         "runtime.js",
         "themes.js",
         "core.js",
-        "agents.js",
-        "workflows.js",
+        "workflow-policy.js",
         "sessions.js",
         "academy.js",
         "reports.js",
-        "kanban.js",
     ],
 )
 def test_index_links_registered_static_assets(asset: str) -> None:

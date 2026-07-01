@@ -51,7 +51,6 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.lifecycle.antislop.retention import RetentionSweep
 from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, slop_scan
 from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
-from dadaia_workspace.features.lifecycle.personas.loader import PersonaLoader
 from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
@@ -69,7 +68,6 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_contexts,
     render_api_dadaia_workflow_detail,
     render_api_dadaia_workflows_list,
-    render_api_personas,
     render_api_reports,
     render_api_servers,
     render_api_session_detail,
@@ -1168,9 +1166,6 @@ def build_panel_views(
     """
     academy = build_academy_service(workspace_root)
     workflows_service = build_workflow_catalog_service(workspace_root)
-    # Layer-2 persona roster reader (v0.1.45 / T-45-04). Reads the packaged/projected
-    # public/personas/ via PersonaLoader — read-only, no telemetry, no model/tier.
-    personas_loader = PersonaLoader()
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
 
     # Workflow model-governance control plane (Wave C). The panel reads the SAME governed
@@ -1211,7 +1206,6 @@ def build_panel_views(
         "api_workflow_detail": render_api_workflow_detail(workflows_service),
         "api_dadaia_workflows": render_api_dadaia_workflows_list(workflows_service),
         "api_dadaia_workflow_detail": render_api_dadaia_workflow_detail(workflows_service),
-        "api_personas": render_api_personas(personas_loader),
         # Workflow model-governance control plane (Wave C — T-28-C-01/02).
         "api_workflow_catalog": render_api_workflow_catalog(wf_catalog, _resolver_factory),
         "api_workflow_catalog_detail": render_api_workflow_catalog_detail(

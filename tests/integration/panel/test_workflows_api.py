@@ -210,5 +210,10 @@ class TestDadaiaWorkflowsSectionView:
         assert "dadaia-wf-badge--unavailable" not in html
         # Server-rendered SVG DAG is present (offline-safe diagram).
         assert "dadaia-wf-diagram-svg" in html
-        # Per-step harness/model options surfaced for the operator.
-        assert "gpt-5.5:high" in html
+        # Per-step model surfaced for the operator: each model-driven step renders an
+        # inline picker whose default label is the governed "harness &middot; model_id"
+        # (v0.1.45 redesign — the label shows the resolved model id, not model:effort).
+        assert "wf-step-picker-default" in html
+        assert 'class="wf-step-picker"' in html
+        assert "&middot;" in html
+        assert "gpt-5.5" in html

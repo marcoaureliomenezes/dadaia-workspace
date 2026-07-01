@@ -1,89 +1,129 @@
 /**
- * E2E: first-class Workflows nav — model-governance editor (T-28-C-04, qa H1).
+ * E2E: Workflows tab — inline per-step model picker (v0.1.45 redesign).
+ *
+ * The per-step model governance moved INTO each workflow diagram card's expand: every
+ * model-driven step card carries a `.wf-step-picker` mount that `workflow-policy.js`
+ * hydrates with a real editor (segmented codex/pi harness control + profile `<select>` +
+ * default-vs-effective diff + reset). A single Validate / Save toolbar at the top of the
+ * Workflows tab commits the pending overrides. There is no longer a separate collapsed
+ * "Model policy" matrix and no old DAG modal.
  *
  * These assertions are JS-driven and CANNOT be covered by a server-side pytest:
- *   - the profile dropdown is filtered by the segmented codex/pi harness control;
- *   - switching harness / picking a profile flips the default-vs-effective diff DOM;
+ *   - the profile dropdown is filtered by the segmented codex/pi harness control
+ *     (and the pi list includes the labelled OpenRouter kimi option, id `pi-openrouter-kimi-high`);
+ *   - picking a profile flips the default-vs-effective diff DOM;
  *   - reset-to-default clears the override;
  *   - validate runs before save and surfaces a banner;
- *   - save persists the overlay (PUT) and the editor reloads it as effective.
+ *   - save persists the overlay (PUT) and the picker reloads it as effective.
  *
- * The panel is loopback with no credential; the Host-guard is satisfied by the
- * webServer fixture (playwright.config.ts boots `dadaia panel`).
+ * The panel is loopback with no credential; the Host-guard is satisfied by the webServer
+ * fixture (playwright.config.ts boots `dadaia panel`). The picker targets the
+ * `implementation` workflow's `implement` step (both harnesses supported) and restores the
+ * empty overlay before/after so it never depends on, or leaks, live workspace state.
  */
 import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, openModelPolicy, authHeaders, BASE_URL } from './helpers';
+import { gotoPanel, activateTab, expandWorkflowCard, authHeaders, BASE_URL } from './helpers';
 
-async function openWorkflowsTab(page: any): Promise<void> {
+const EMPTY_OVERLAY = {
+  schema_version: 'workflow-model-policy-v1',
+  policy_id: 'default',
+  contexts: { default: { workflows: {} } },
+};
+
+// The implement step's inline picker mount inside the implementation card's expand.
+const IMPLEMENT_PICKER =
+  'details.dadaia-wf-card[data-workflow="implementation"] .wf-step-picker[data-wfp-step="implement"]';
+
+async function restoreEmptyOverlay(request: any): Promise<void> {
+  await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    data: EMPTY_OVERLAY,
+  });
+}
+
+async function openImplementPicker(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
-  // v0.1.45: the model-governance matrix is a collapsed disclosure below the
-  // diagram cards — expand it before interacting with the step rows.
-  await openModelPolicy(page);
-  // The editor renders one step matrix per governed workflow.
-  await page.waitForSelector('#wfp-root .wfp-matrix', { state: 'visible', timeout: 15000 });
+  await expandWorkflowCard(page, 'implementation');
+  await page.waitForSelector(`${IMPLEMENT_PICKER} .wfp-picker`, {
+    state: 'visible',
+    timeout: 15000,
+  });
 }
+
+test.beforeEach(async ({ request }) => {
+  await restoreEmptyOverlay(request);
+});
+
+test.afterEach(async ({ request }) => {
+  await restoreEmptyOverlay(request);
+});
 
 test('Workflows is a first-class top-level tab', async ({ page }) => {
   await gotoPanel(page);
   await expect(page.locator('#tab-workflows')).toBeVisible();
   await activateTab(page, 'workflows');
   await expect(page.locator('#section-workflows.active')).toBeVisible();
-  // Agents + Kanban remain available in the Agentic tab during the transition (D-5).
-  await expect(page.locator('#tab-ops')).toBeVisible();
+  // The Agentic (ops) tab was removed in v0.1.45.
+  expect(await page.$('#tab-ops')).toBeNull();
 });
 
 test('Profile dropdown is filtered by the selected harness', async ({ page }) => {
-  await openWorkflowsTab(page);
+  await openImplementPicker(page);
 
-  const firstRow = page.locator('#wfp-root .wfp-step-row').first();
-  const select = firstRow.locator('.wfp-profile-select');
+  const picker = page.locator(IMPLEMENT_PICKER);
+  const select = picker.locator('.wfp-profile-select');
 
   // Default harness is codex — every profile in the dropdown is a codex profile.
   // Assert on the option VALUE (profile id, harness-prefixed) rather than the label:
-  // v0.1.45 added the labelled OpenRouter kimi profile ("OpenRouter — kimi-2.7 (high)")
-  // whose display text no longer contains its harness name, but its id stays `pi-…`.
+  // v0.1.45's labelled OpenRouter kimi profile ("OpenRouter — kimi …") keeps its `pi-`
+  // id but its display text no longer contains its harness name.
   const codexValues = await select
     .locator('option')
     .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
   expect(codexValues.length).toBeGreaterThan(0);
   expect(codexValues.every((v) => v.startsWith('codex-'))).toBe(true);
 
-  // Switch the segmented control to pi — the dropdown now lists pi profiles only.
-  await firstRow.locator('.wfp-seg-btn[data-wfp-harness="pi"]').click();
-  const piValues = await firstRow
-    .locator('.wfp-profile-select option')
+  // Switch the segmented control to pi — the dropdown now lists pi profiles only,
+  // including the labelled OpenRouter kimi profile.
+  await picker.locator('.wfp-seg-btn[data-wfp-harness="pi"]').click();
+  const piValues = await page
+    .locator(`${IMPLEMENT_PICKER} .wfp-profile-select option`)
     .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
   expect(piValues.length).toBeGreaterThan(0);
   expect(piValues.every((v) => v.startsWith('pi-'))).toBe(true);
+  expect(piValues).toContain('pi-openrouter-kimi-high');
 });
 
 test('Editing a profile flips the default-vs-effective diff, reset clears it', async ({ page }) => {
-  await openWorkflowsTab(page);
+  await openImplementPicker(page);
 
-  const firstRow = page.locator('#wfp-root .wfp-step-row').first();
   // Initially not overridden.
-  await expect(firstRow).not.toHaveClass(/wfp-step-row--overridden/);
+  await expect(page.locator(`${IMPLEMENT_PICKER} .wfp-picker`)).not.toHaveClass(
+    /wfp-picker--overridden/
+  );
 
   // Choose a different codex profile (review-deep) to create an override.
-  await firstRow.locator('.wfp-profile-select').selectOption('codex-review-deep');
-  const overriddenRow = page.locator('#wfp-root .wfp-step-row').first();
-  await expect(overriddenRow).toHaveClass(/wfp-step-row--overridden/);
-  await expect(overriddenRow.locator('[data-testid="wfp-diff"]')).toContainText('→');
+  await page.locator(`${IMPLEMENT_PICKER} .wfp-profile-select`).selectOption('codex-review-deep');
+  await expect(page.locator(`${IMPLEMENT_PICKER} .wfp-picker`)).toHaveClass(
+    /wfp-picker--overridden/
+  );
+  await expect(page.locator(`${IMPLEMENT_PICKER} [data-testid="wfp-diff"]`)).toContainText('→');
 
   // Reset clears the override (diff returns to "default").
-  await overriddenRow.locator('[data-wfp-reset]').click();
-  await expect(page.locator('#wfp-root .wfp-step-row').first()).not.toHaveClass(
-    /wfp-step-row--overridden/
+  await page.locator(`${IMPLEMENT_PICKER} [data-wfp-reset]`).click();
+  await expect(page.locator(`${IMPLEMENT_PICKER} .wfp-picker`)).not.toHaveClass(
+    /wfp-picker--overridden/
   );
 });
 
-test('Validate-before-save shows a banner, save persists the overlay', async ({ page, request }) => {
-  await openWorkflowsTab(page);
+test('Validate-before-save shows a banner, save persists the overlay', async ({
+  page,
+  request,
+}) => {
+  await openImplementPicker(page);
 
-  const firstRow = page.locator('#wfp-root .wfp-step-row').first();
-  const stepName = (await firstRow.locator('.wfp-c-step').textContent())?.trim();
-  await firstRow.locator('.wfp-profile-select').selectOption('codex-review-deep');
+  await page.locator(`${IMPLEMENT_PICKER} .wfp-profile-select`).selectOption('codex-review-deep');
 
   // Validate → green banner.
   await page.locator('#wfp-validate-btn').click();
@@ -106,15 +146,4 @@ test('Validate-before-save shows a banner, save persists the overlay', async ({ 
     Object.values(wf.steps).includes('codex-review-deep')
   );
   expect(anyStep).toBe(true);
-  expect(stepName && stepName.length).toBeTruthy();
-});
-
-test('Run-snapshot evidence view reads the persisted snapshot', async ({ page }) => {
-  await openWorkflowsTab(page);
-  // Opening the run-snapshot panel must not error even with no runs recorded.
-  await page.locator('.wfp-runs-btn').first().click();
-  const panel = page.locator('[data-wfp-runs-panel]').first();
-  await expect(panel).toBeVisible();
-  // Either snapshots render, or the empty-state message appears — never an error.
-  await expect(panel.locator('.wfp-error')).toHaveCount(0);
 });

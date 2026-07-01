@@ -22,8 +22,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
-from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
-from dadaia_workspace.features.panel.views.assets.css.kanban import KANBAN_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory_doc import MEMORY_DOC_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
@@ -65,14 +63,12 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         (REPORTS_DOC_BASE_CSS + REPORTS_DOC_OVERRIDE_CSS).encode("utf-8"),
     ),
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
-    "agents.css": ("text/css; charset=utf-8", AGENTS_CSS.encode("utf-8")),
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
     "workflows.css": ("text/css; charset=utf-8", WORKFLOWS_CSS.encode("utf-8")),
     "workflow-policy.css": ("text/css; charset=utf-8", WORKFLOW_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
     "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
-    "kanban.css": ("text/css; charset=utf-8", KANBAN_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "core.js").read_bytes(),
@@ -81,22 +77,13 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         "application/javascript; charset=utf-8",
         (_JS_DIR / "themes.js").read_bytes(),
     ),
-    # runtime.js MUST be registered before agents.js, workflows.js, and
-    # sessions.js (load-order invariant, PR5-D7).  window.Runtime must be
-    # defined before any module calls Runtime.get() or subscribes to
-    # dadaia:runtime-change.  The dict insertion order here mirrors the
-    # <script> order enforced in index.py.
+    # runtime.js MUST be registered before workflow-policy.js and sessions.js
+    # (load-order invariant, PR5-D7).  window.Runtime must be defined before any
+    # module calls Runtime.get() or subscribes to dadaia:runtime-change.  The
+    # dict insertion order here mirrors the <script> order enforced in index.py.
     "runtime.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "runtime.js").read_bytes(),
-    ),
-    "agents.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "agents.js").read_bytes(),
-    ),
-    "workflows.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "workflows.js").read_bytes(),
     ),
     "workflow-policy.js": (
         "application/javascript; charset=utf-8",
@@ -113,10 +100,6 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "reports.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "reports.js").read_bytes(),
-    ),
-    "kanban.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "kanban.js").read_bytes(),
     ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",

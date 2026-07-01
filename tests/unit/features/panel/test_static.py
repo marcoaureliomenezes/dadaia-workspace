@@ -53,16 +53,17 @@ def test_structure_css_content_type() -> None:
     assert ct == "text/css; charset=utf-8"
 
 
-def test_agents_css_content_type() -> None:
-    status, ct, _ = _view("agents.css")
-    assert status == 200
-    assert ct == "text/css; charset=utf-8"
-
-
 def test_workflows_css_content_type() -> None:
     status, ct, _ = _view("workflows.css")
     assert status == 200
     assert ct == "text/css; charset=utf-8"
+
+
+def test_agentic_tab_assets_no_longer_served() -> None:
+    """v0.1.45: the Agentic tab was removed; its assets are unregistered (404)."""
+    for name in ("agents.css", "kanban.css", "agents.js", "workflows.js", "kanban.js"):
+        status, _, _ = _view(name)
+        assert status == 404, f"{name} must no longer be served after the Agentic-tab removal"
 
 
 # ---------------------------------------------------------------------------
@@ -82,14 +83,8 @@ def test_themes_js_content_type() -> None:
     assert ct == "application/javascript; charset=utf-8"
 
 
-def test_agents_js_content_type() -> None:
-    status, ct, _ = _view("agents.js")
-    assert status == 200
-    assert ct == "application/javascript; charset=utf-8"
-
-
-def test_workflows_js_content_type() -> None:
-    status, ct, _ = _view("workflows.js")
+def test_workflow_policy_js_content_type() -> None:
+    status, ct, _ = _view("workflow-policy.js")
     assert status == 200
     assert ct == "application/javascript; charset=utf-8"
 
@@ -168,7 +163,7 @@ def test_path_traversal_returns_400(name: str) -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ["tokens.css", "structure.css", "agents.css", "workflows.css", "core.js"],
+    ["tokens.css", "structure.css", "workflows.css", "workflow-policy.css", "core.js"],
 )
 def test_body_is_bytes(name: str) -> None:
     _, _, body = _view(name)

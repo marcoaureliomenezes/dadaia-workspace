@@ -97,15 +97,9 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.agent import AgentNotFoundError, InvalidAgentIdError
 from dadaia_workspace.core.models.telemetry import AgentSummary
-from dadaia_workspace.features.lifecycle.personas.loader import PersonaLoader
 from dadaia_workspace.features.panel.service import PanelService
 
 logger = logging.getLogger(__name__)
-
-#: Every Layer-2 persona carries this constant layer label — a persona has no single
-#: model (model is a per-workflow-STEP binding), so the panel renders ``layer`` as the
-#: constant it is and NEVER a per-persona ``model``/``tier`` column (arch finding #1).
-_PERSONA_LAYER = "Layer-2"
 
 _ACTIVE_WINDOW_DAYS_MIN = 1
 _ACTIVE_WINDOW_DAYS_MAX = 365
@@ -736,53 +730,6 @@ def _dadaia_workflow_to_dict(wf: object, *, include_steps: bool) -> dict[str, ob
     base["steps"] = steps
     base["diagram_svg"] = getattr(wf, "diagram_svg")  # noqa: B009
     return base
-
-
-def render_api_personas(
-    loader: PersonaLoader,
-) -> Callable[..., tuple[int, str, bytes]]:
-    """Return a closure that serves GET /api/personas — the Layer-2 persona roster.
-
-    Reads the 8 non-PM personas via :class:`PersonaLoader` and surfaces EXACTLY the real
-    ``Persona`` fields ``{id, role, summary, source_agent, harness_universal}`` plus a
-    **constant** ``layer = "Layer-2"``. The ``Persona`` dataclass has no ``model`` and no
-    ``tier`` — a persona's model is a per-workflow-STEP binding, not a persona attribute —
-    so this endpoint MUST NOT fabricate a ``model``/``tier`` field (arch finding #1).
-
-    Bearer-only + loopback-bypass consistent with the other read routes.
-
-    Security (OWASP A03, A06): no user input consumed; a loader failure degrades to an
-    empty roster (generic 200) rather than leaking internals; json.dumps escapes output.
-    """
-
-    def _view(**_kwargs: object) -> tuple[int, str, bytes]:
-        try:
-            personas = loader.list_personas()
-        except Exception:  # noqa: BLE001
-            logger.warning(
-                "render_api_personas: loader.list_personas() failed; serving empty roster"
-            )
-            personas = []
-        items = [
-            {
-                "id": p.id,
-                "role": p.role,
-                "summary": p.summary,
-                "source_agent": p.source_agent,
-                "harness_universal": p.harness_universal,
-                "layer": _PERSONA_LAYER,
-            }
-            for p in personas
-        ]
-        payload = {
-            "generated_at": datetime.datetime.now(tz=datetime.UTC).isoformat(),
-            "layer": _PERSONA_LAYER,
-            "personas": items,
-        }
-        body = json.dumps(payload).encode("utf-8")
-        return (200, "application/json; charset=utf-8", body)
-
-    return _view
 
 
 def render_api_dadaia_workflows_list(
