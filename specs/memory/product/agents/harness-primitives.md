@@ -6,7 +6,7 @@ tldr: 'Middle-depth harness literacy for all agents: primitive definitions, Clau
 summary: Available to all 9 core agents. Defines at middle depth what each AI harness
   primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code
   and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects
-  them (public/ -> stage -> install -> .claude/.codex/.opencode/.agents; manifest SHA256;
+  them (public/ -> stage -> install -> .claude/.codex/.pi/.agents; manifest SHA256;
   doctor checks), and a decision checklist for when to defer deeper questions to ai-engineer.
   Complements the ai-engineer-only deep skills without duplicating their protocol depth.
 tags:
@@ -18,7 +18,7 @@ tags:
 - literacy
 agent_tier: self-pull
 token_estimate: 620
-last_updated: '2026-06-25'
+last_updated: '2026-07-01'
 release_origin: v0.1.18
 ---
 
@@ -31,10 +31,10 @@ protocols without needing to become harness specialists.
 
 "Harness" carries two meanings, and the skill teaches both (the **two-layer agentic
 model** — see [[architecture]]): **Layer 1** is the entry harness the operator launches
-in the terminal — `claude`, `codex`, `opencode`, or `pi` — where governance is
+in the terminal — `claude`, `codex`, or `pi` — where governance is
 `AGENTS.md` + the projected `.X/` asset trees; **Layer 2** is the per-step worker harness
 the lifecycle engine drives behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
-`CLAUDE_SDK`, `OPENCODE_RUN`, `PI_HEADLESS`), selectable via `--harness`. PI is the fourth
+`CLAUDE_SDK`, `PI_HEADLESS`), selectable via `--harness`. PI is the third
 harness at both layers. The Claude-Code-vs-Codex deltas below are Layer-1 deltas.
 
 The skill defines each primitive (agent persona, subagent/dispatch, skill, rule,
@@ -73,7 +73,7 @@ that middle layer: agents can answer their own basic harness questions and reser
 
 - No runtime state written by this skill.
 - Projected to: `.claude/skills/harness-primitives/SKILL.md`,
-  `.agents/skills/harness-primitives/SKILL.md`, and relevant Codex/OpenCode paths
+  `.agents/skills/harness-primitives/SKILL.md`, and relevant Codex/PI paths
   via `dadaia public install`.
 - Source: `dadaia_workspace/public/skills/harness-primitives/SKILL.md`.
 

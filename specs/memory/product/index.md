@@ -19,7 +19,7 @@
 | `ai-harness-codex` | ai-harness-codex | Deep ai-engineer Codex skill — AGENTS.md law, rules collision, trust model, live-verified hook facts. |
 | `harness-primitives` | harness-primitives | Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist. |
 | `academy` | academy | knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI. |
-| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, OpenCode, and shared .agents roots. |
+| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots. |
 | `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
 | `panel` | panel | superfície de controle local (dadaia panel); 6 tabs; Workflows lidera com diagram-cards server-SVG + model pickers inline por step (v0.1.45). |
 | `product-vision` | product-vision | Identity, pillars, lifecycle, concurrency model, agent roster, and anti-slop stance — the normative shape of dadaia-workspace from docs/01_medium_codex.md. |

@@ -13,7 +13,7 @@ tags:
 - release-lifecycle
 agent_tier: self-pull
 token_estimate: 695
-last_updated: '2026-06-07'
+last_updated: '2026-07-01'
 release_origin: v0.2.2
 ---
 
@@ -81,7 +81,7 @@ context, and task ownership.
 The same SDD rules apply to `dadaia_workspace/public/**`: public agents, skills,
 rules, workflows, hooks, and AGENTS.md sources are product behavior. Changes to
 that surface require release context and must remain generic, public-safe, and
-runtime-accurate for Claude Code, Codex, and OpenCode.
+runtime-accurate for Claude Code, Codex, and PI.
 
 `product-engineer` may write `specs/memory/**` only in DEFINITION and CLOSURE phases
 (constitution §13). No other agent may write memory atoms.

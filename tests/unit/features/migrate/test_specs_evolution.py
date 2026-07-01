@@ -126,7 +126,9 @@ def test_backup_root_is_sibling_of_specs(tmp_path: Path) -> None:
 
 def test_upgrade_noop_when_already_canonical(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
-    _write_constitution(specs, "---\nspecs_pattern_version: 1\n---\n# C\n")
+    _write_constitution(
+        specs, f"---\nspecs_pattern_version: {_version.CANONICAL_SPECS_VERSION}\n---\n# C\n"
+    )
     result = _upgrade.upgrade(specs, clock=_FIXED)
     assert result.no_op is True
     assert result.backup_path is None
@@ -140,7 +142,7 @@ def test_upgrade_dry_run_writes_nothing(tmp_path: Path) -> None:
     (specs / "foundation" / "SPEC.md").write_text("x", encoding="utf-8")
     result = _upgrade.upgrade(specs, dry_run=True, clock=_FIXED)
     assert result.dry_run is True
-    assert result.from_version == 0 and result.to_version == 1
+    assert result.from_version == 0 and result.to_version == _version.CANONICAL_SPECS_VERSION
     assert not (tmp_path / "specs_bkp").exists()  # no backup written on dry-run
     assert _version.read_pattern_version(specs) == 0  # not re-stamped
     assert (specs / "foundation").exists()  # not migrated
@@ -162,7 +164,7 @@ def test_upgrade_backup_first_chain_restamp(tmp_path: Path) -> None:
     assert (specs / "releases" / "legacy" / "foundation").exists()
     assert not (specs / "foundation").exists()
     # 3. re-stamped to canonical
-    assert _version.read_pattern_version(specs) == 1
+    assert _version.read_pattern_version(specs) == _version.CANONICAL_SPECS_VERSION
 
 
 def test_upgrade_is_idempotent(tmp_path: Path) -> None:

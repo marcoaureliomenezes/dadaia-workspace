@@ -17,9 +17,16 @@ matches no class is MUTATING (FR-R1-04), **never** UNGATED.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
+from dadaia_workspace.features.spec_context.gate_policy import (
+    Decision,
+    PathClass,
+    classify_path,
+    evaluate,
+)
 
 # The default (self-hosting) context slug and a non-default consumer slug. The class of a
 # path must depend only on its context-relative remainder, never on which slug it is.
@@ -137,3 +144,88 @@ def test_first_match_wins_ordering_in_repo() -> None:
     """Ordered classification (FR-P1-05) holds context-relatively: ADDITIVE before MUTATING."""
     # A bugs path under a release-looking dir still matches ADDITIVE first by prefix order.
     assert classify_path(_in_repo(_DEFAULT_SLUG, "specs/bugs/x.md")) == PathClass.ADDITIVE
+
+
+# ---------------------------------------------------------------------------
+# v0.1.46 AC-4 / R-2 — per-artifact _archive/ subdirs classify FROZEN, and are
+# matched BEFORE the ADDITIVE prefixes (the ordering bug the release fixes).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "rel_path",
+    [
+        "specs/backlog/_archive/epic.md",
+        "specs/audits/_archive/2026-01-01T000000Z-abc12345/audit.md",
+        "specs/bugs/_archive/lease-stolen.md",
+    ],
+)
+def test_archive_subdir_is_frozen_at_root(rel_path: str) -> None:
+    """R-2: specs/{backlog,audits,bugs}/_archive/ → FROZEN at the workspace root.
+
+    Before the fix the ADDITIVE prefixes (specs/bugs/ …) were checked first and swallowed
+    the archive path as ADDITIVE — writable. The archive subdir must win.
+    """
+    assert classify_path(rel_path) == PathClass.FROZEN
+
+
+def test_archive_subdir_frozen_beats_additive_ordering() -> None:
+    """The _archive/ subdir prefix is checked BEFORE the ADDITIVE prefix (ordering)."""
+    # specs/bugs/x.jsonl (a LIVE bug log) stays ADDITIVE — must NOT be caught by the fix.
+    assert classify_path("specs/bugs/20260701T00Z-00.jsonl") == PathClass.ADDITIVE
+    assert classify_path("specs/backlog/candidates.md") == PathClass.ADDITIVE
+    assert classify_path("specs/audits/live-report/audit.md") == PathClass.ADDITIVE
+    # But the _archive/ subdir of the same family is FROZEN.
+    assert classify_path("specs/bugs/_archive/20260101T00Z-00.jsonl") == PathClass.FROZEN
+
+
+def test_archive_prefix_boundary_only_trailing_slash_is_frozen() -> None:
+    """Only ``_archive/`` (with trailing slash) is FROZEN — a ``_archive``-prefixed sibling
+    like ``_archivefoo.jsonl`` is NOT under the archive dir and stays ADDITIVE."""
+    assert classify_path("specs/bugs/_archivefoo.jsonl") == PathClass.ADDITIVE
+    assert classify_path("specs/backlog/_archived.md") == PathClass.ADDITIVE
+    # The bare directory marker itself (no trailing content) is not the '_archive/' prefix.
+    assert classify_path("specs/bugs/_archive") == PathClass.ADDITIVE
+
+
+@pytest.mark.parametrize("slug", [_DEFAULT_SLUG, _NONDEFAULT_SLUG])
+def test_archive_subdir_frozen_in_repo(slug: str) -> None:
+    """R-2 holds context-relatively: repos/<slug>/specs/audits/_archive/… → FROZEN."""
+    assert (
+        classify_path(_in_repo(slug, "specs/audits/_archive/2026-01-01T00Z-abc/audit.md"))
+        == PathClass.FROZEN
+    )
+    # And a live in-repo audit stays ADDITIVE.
+    assert (
+        classify_path(_in_repo(slug, "specs/audits/2026-01-01T00Z-abc/audit.md"))
+        == PathClass.ADDITIVE
+    )
+
+
+def test_evaluate_blocks_write_into_archive(tmp_path: Path) -> None:
+    """gate.evaluate BLOCKs a Write into a per-artifact _archive/ (FROZEN, read-only)."""
+    decision, message = evaluate(
+        tmp_path,
+        "specs/audits/_archive/2026-01-01T00Z-abc/audit.md",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="sess-1",
+        release="v0.1.46",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.BLOCK
+    assert "frozen archive" in message.lower()
+
+
+def test_evaluate_allows_write_into_live_bugs(tmp_path: Path) -> None:
+    """Negative control: a live specs/bugs/*.jsonl write is ADDITIVE → ALLOW (no lease)."""
+    decision, _ = evaluate(
+        tmp_path,
+        "specs/bugs/20260701T00Z-00.jsonl",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="sess-1",
+        release="v0.1.46",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.ALLOW

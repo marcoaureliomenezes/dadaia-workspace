@@ -18,7 +18,7 @@ tags:
   - anti-slop
 agent_tier: self-pull
 token_estimate: 1095
-last_updated: '2026-06-25'
+last_updated: '2026-07-01'
 release_origin: v0.1.19
 ---
 
@@ -41,10 +41,10 @@ The workspace combines seven elements:
 2. Spec-Driven Development (SDD).
 3. Spec Context Projects (the keystone concept — see [[spec-context-project]]).
 4. Multi-agent roles, skills, hooks, rules, and scoped `AGENTS.md`.
-5. Multi-harness support at two layers: four entry harnesses (Claude Code, Codex,
-   OpenCode, PI) and five `AgentRuntimeKind` worker runtimes driven inside the
-   lifecycle engine — four real (Claude SDK, Codex headless, OpenCode headless, PI
-   headless) plus a FAKE runtime for offline/test.
+5. Multi-harness support at two layers: three entry harnesses (Claude Code, Codex,
+   PI) and four `AgentRuntimeKind` worker runtimes driven inside the
+   lifecycle engine — three real (Claude SDK, Codex headless, PI headless) plus a
+   FAKE runtime for offline/test.
 6. Reports, handoffs, audits, memory, and a panel.
 7. A strict anti-slop operating model.
 
@@ -84,7 +84,7 @@ simple at the surface and strict where correctness matters.
 
 1. **Multi-harness development**: one canonical source (`dadaia_workspace/public/`)
    projects agents, skills, rules, hooks, workflows, and instructions into Claude Code,
-   Codex, OpenCode, PI, and generic agent surfaces.
+   Codex, PI, and generic agent surfaces.
 2. **SDD as the operating model**: releases are defined before implementation through
    `SPEC.md`, `PLAN.md`, `TASKS.md`, and closed through `CLOSURE.md`. No bypass language
    overrides the gate.
@@ -115,11 +115,11 @@ only.
 
 The same agent fleet runs at two layers, and "harness" means a different thing at each.
 **Layer 1** is the entry harness the operator launches in the terminal — `claude`,
-`codex`, `opencode`, or `pi` — governed by `AGENTS.md` read up-tree plus the projected
+`codex`, or `pi` — governed by `AGENTS.md` read up-tree plus the projected
 `.X/` asset trees. **Layer 2** is the bounded agent workers that `dadaia lifecycle` drives
-per step behind `AgentRuntimePort`, harness-selectable per step across four worker runtimes
-(plus a FAKE runtime for offline/test): Claude SDK, Codex headless, OpenCode headless, and
-PI headless. PI is an officially supported fourth harness at both layers (Layer-2 worker
+per step behind `AgentRuntimePort`, harness-selectable per step across three worker runtimes
+(plus a FAKE runtime for offline/test): Claude SDK, Codex headless, and
+PI headless. PI is an officially supported third harness at both layers (Layer-2 worker
 shipped; Layer-1 `.pi/` projection added in v0.1.18). [[architecture]] and
 [[lifecycle-foundation]] carry the normative detail; constitution §0 names the two layers.
 

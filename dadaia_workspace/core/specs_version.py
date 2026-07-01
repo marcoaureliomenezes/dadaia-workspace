@@ -19,7 +19,7 @@ from pathlib import Path
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
-CANONICAL_SPECS_VERSION = 1
+CANONICAL_SPECS_VERSION = 2
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0

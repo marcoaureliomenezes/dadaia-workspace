@@ -390,6 +390,54 @@ def test_legitimate_canon_headings_in_allowlist() -> None:
     assert not missing, f"Legitimate headings still missing from allowlist: {missing}"
 
 
+def test_group_e_workflow_headings_in_allowlist() -> None:
+    """T-46-23 (DRIFT-5): the v0.1.25–v0.1.45 workflow/backlog subsystem headings
+    flagged by the v0.1.46 doctor-debt sweep must be in the curated allowlist so
+    `specs doctor` stops emitting heading WARNs for those legitimate current canon
+    sections. No atom content changes — only the allowlist grows.
+    """
+    allowlist = _lint_mod.HEADING_ALLOWLIST
+    widened = [
+        "Backlog-consistency subsystem (`features/backlog/`, v0.1.25)",
+        "Workflow control plane subsystem (v0.1.28 + v0.1.29)",
+        "Workflow-step handoff data plane (v0.1.30)",
+        "Workflows control plane (v0.1.28, redesenhado em v0.1.45)",
+        "Workflow model governance (control plane, v0.1.28)",
+        "Harness as a governed dimension (v0.1.29)",
+        "Gating note (review-only typed gate + coherent worker-output contract)",
+    ]
+    missing = [h for h in widened if h not in allowlist]
+    assert not missing, f"Widened workflow headings still missing from allowlist: {missing}"
+
+
+def test_widening_does_not_disable_heading_check(tmp_path: Path) -> None:
+    """T-46-23 (DRIFT-5) NEGATIVE test: the allowlist widening for the known
+    workflow/backlog headings must NOT weaken the check. A genuinely-unknown heading
+    that merely *resembles* the widened ones (same version-tag style) is NOT in the
+    allowlist and MUST still produce a WARN. The widening adds exactly the enumerated
+    known strings — it does not turn the heading gate into a no-op.
+    """
+    unknown = "Totally Fabricated subsystem (v9.9.9)"
+    assert unknown not in _lint_mod.HEADING_ALLOWLIST, (
+        "Test precondition: the fabricated heading must not be in the allowlist."
+    )
+
+    schema = _load_schema_real()
+    md_path = _make_atom(
+        tmp_path,
+        slug="test-atom",
+        body=f"## Propósito\n\nBody.\n\n## {unknown}\n\nContent.\n",
+    )
+
+    result = lint_atom(md_path, tmp_path, schema)
+
+    assert not result.has_errors, f"Unknown heading should not ERROR. Got: {result.errors}"
+    assert result.has_warnings, "A heading outside the widened allowlist must still WARN"
+    assert any("allowlist" in w.lower() or unknown.lower() in w.lower() for w in result.warnings), (
+        f"Warning should mention the allowlist / the unknown heading. Got: {result.warnings}"
+    )
+
+
 def test_exit_code_warn_only_is_two(tmp_path: Path) -> None:
     """_exit_code returns 2 when only warnings exist."""
     schema = _load_schema_real()

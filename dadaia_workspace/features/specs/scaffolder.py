@@ -185,6 +185,16 @@ def scaffold(
     _touch(specs_dir / "_archive" / "legacy-features" / ".gitkeep")
     _touch(specs_dir / "assets" / ".gitkeep")
 
+    # 11, 12, 13 — per-artifact _archive dirs (v0.1.46 AC-4, FROZEN gate-class landing
+    # zone). Each additive artifact family (backlog/audits/bugs) gets its own _archive/
+    # subdir where terminal/dispositioned entries are git-mv'd. The gate classifies these
+    # three subdirs FROZEN (features/spec_context/gate_policy.py); creating them here
+    # ensures new + upgraded workspaces have the landing zone before any archive move
+    # (the bugs->JSONL migration moves source .md into specs/bugs/_archive/ in-process).
+    _touch(specs_dir / "backlog" / "_archive" / ".gitkeep")
+    _touch(specs_dir / "audits" / "_archive" / ".gitkeep")
+    _touch(specs_dir / "bugs" / "_archive" / ".gitkeep")
+
     return result
 
 

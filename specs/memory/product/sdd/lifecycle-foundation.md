@@ -42,7 +42,7 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 4100
+token_estimate: 5576
 last_updated: '2026-06-27'
 release_origin: v0.1.32
 ---

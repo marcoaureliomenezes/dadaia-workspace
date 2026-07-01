@@ -14,7 +14,7 @@ tags:
 - idempotent
 agent_tier: self-pull
 token_estimate: 620
-last_updated: '2026-06-12'
+last_updated: '2026-07-01'
 release_origin: v0.1.14
 ---
 
@@ -22,7 +22,7 @@ CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-re
 
 ## Propósito
 
-Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura idempotente em `.dadaia/` (academy, agentic, reports, scripts, states, src), o virtualenv Python (`.venv`), os diretórios de runtime dos quatro tools agentic (`.claude/`, `.agents/`, `.codex/`, `.opencode/`), faz stage+install dos assets canônicos públicos (agentes, skills, workflows, commands, rules, templates, scripts) e configura os hooks de governança em `.claude/settings.json` e `.codex/hooks.json`.
+Porta de entrada do produto. Bootstrapa um workspace novo criando a estrutura idempotente em `.dadaia/` (academy, agentic, reports, scripts, states, src), o virtualenv Python (`.venv`), os diretórios de runtime dos tools agentic (`.claude/`, `.agents/`, `.codex/`, `.pi/`), faz stage+install dos assets canônicos públicos (agentes, skills, workflows, commands, rules, templates, scripts) e configura os hooks de governança em `.claude/settings.json` e `.codex/hooks.json`.
 
 Os hooks de governança são registrados como **comandos Python** (`python -m dadaia_workspace.hooks.<name>`) via `infrastructure/runtime_config.py`. Não há dependência de bash para os hooks de SDD — o pacote `dadaia_workspace/hooks/` (8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) provê os hooks em Python puro, funcionando em Windows, macOS e Linux sem Git Bash ou WSL. O PreToolUse é UM único comando (`pre_gate`, que avalia root-whitelist → venv-guard → SDD gate, first-block-wins). Os git chokepoints (pre-commit lease gate + pre-push CI/security gate) são instalados separadamente por `dadaia ci install-hook`.
 
