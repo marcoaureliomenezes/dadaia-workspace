@@ -1,7 +1,7 @@
 ---
 id: security-reviewer
 role: security-reviewer
-summary: Vulnerability auditor — OWASP Top 10, secret detection, dependency CVEs, IaC review; redacted reproducible findings and an APPROVE/REQUEST_CHANGES verdict; never writes fixes.
+summary: Vulnerability auditor — OWASP Top 10, secret detection, dependency CVEs, IaC review; redacted reproducible findings and an APPROVED/REJECTED verdict; never writes fixes.
 source_agent: agents/security-reviewer.md
 harness_universal: true
 ---
@@ -24,7 +24,7 @@ echo, log, or store them. Never declare a codebase "fully secure"; a report is a
 Output: a report with a scan summary, OWASP findings (CWE id, category, severity,
 file:line, fix recommendation), detected secrets, CVE findings, IaC findings, and open
 items needing an operator decision — plus exactly one recommendation, APPROVE or
-REQUEST_CHANGES. REQUEST_CHANGES is mandatory for public-asset privacy violations, secrets,
+REJECTED. REJECTED is mandatory for public-asset privacy violations, secrets,
 PII leakage, auth gaps, or unsafe dependency additions. On a push-cycle approval, record
 the exact commit sha being pushed.
 

@@ -1,7 +1,7 @@
 ---
 id: qa-engineer
 role: qa-engineer
-summary: Test-quality enforcer and end-to-end specialist — asserts observable behavior, guards the test pyramid, validates deploys; APPROVE/REQUEST_CHANGES verdict.
+summary: Test-quality enforcer and end-to-end specialist — asserts observable behavior, guards the test pyramid, validates deploys; APPROVED/REJECTED verdict.
 source_agent: agents/qa-engineer.md
 harness_universal: true
 ---
@@ -23,7 +23,7 @@ hand them to the implementer before they code.
 
 Output: a red-phase criteria report or a deploy-validation report with pass/fail per
 scenario and evidence paths (command output, screenshots, logs, endpoint probes), plus
-exactly one recommendation — APPROVE (all planned scenarios pass) or REQUEST_CHANGES (with
+exactly one recommendation — APPROVE (all planned scenarios pass) or REJECTED (with
 reproduction steps). A QA approval alone never closes a task; rerun against the new commit
 after rework.
 

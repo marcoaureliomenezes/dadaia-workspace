@@ -69,7 +69,7 @@ write sets are declared (PLAN write-set boundaries apply).
 - [x] T-47-54 8 personas rewrite (sub-agent mandates; zero fragment overlap)
 - [x] T-47-55 dadaia-handoff-emitter skill root-resolution instruction
 - [x] T-47-56 stage + install --target all + public doctor exit 0 (clears live drift)
-- [ ] T-47-57 Second-reviewer content sign-off over all rewritten fragments/personas
+- [x] T-47-57 Second-reviewer content sign-off over all rewritten fragments/personas
   (APPROVE verdict + per-workflow prompt-assembly dumps as evidence)
 
 ## W5 — Dispositions (owner: product-engineer + coordinator)
