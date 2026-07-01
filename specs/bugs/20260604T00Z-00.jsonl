@@ -1,0 +1,4 @@
+{"bug_id": "codex-agent-orchestration-mismatch", "component": "", "context": "", "event": "reported", "expected": "", "notes": "", "reported_by": "bugs-jsonl-migration", "repro": "", "severity": "CRITICAL", "surface": "", "symptom": "", "tags": [], "title": "codex-agent-orchestration-mismatch", "ts": "2026-06-04T00:00:00Z"}
+{"bug_id": "codex-agent-orchestration-mismatch", "event": "resolved", "release": "v0.1.4.2", "reported_by": "bugs-jsonl-migration", "ts": "2026-06-04T00:00:00Z"}
+{"bug_id": "session-bind-primary-residue", "component": "", "context": "", "event": "reported", "expected": "", "notes": "", "reported_by": "bugs-jsonl-migration", "repro": "", "severity": "CRITICAL", "surface": "", "symptom": "", "tags": [], "title": "session-bind-primary-residue", "ts": "2026-06-04T00:00:00Z"}
+{"bug_id": "session-bind-primary-residue", "event": "resolved", "release": "v0.1.4.2", "reported_by": "bugs-jsonl-migration", "ts": "2026-06-04T00:00:00Z"}
