@@ -214,6 +214,8 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
         AuthClass.BEARER,
     ),
     (r"^/api/dadaia-workflows$", "api_dadaia_workflows", AuthClass.BEARER),
+    # Layer-2 persona roster (v0.1.45 / T-45-04): read-only, bearer + loopback-bypass.
+    (r"^/api/personas$", "api_personas", AuthClass.BEARER),
     # Workflow model-governance control plane (Wave C — T-28-C-01/02). The
     # /<id> detail pattern MUST precede the list pattern (more specific first).
     # The static /validate path MUST precede the catch-all policy route.

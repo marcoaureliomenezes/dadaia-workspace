@@ -39,19 +39,28 @@ AGENTS_CSS: str = """
   text-align: left;
   border: 1px solid var(--color-border-card, #dddddd);
   border-left: 3px solid transparent;
-  border-radius: var(--radius-card, 4px);
-  padding: 0.45rem 0.55rem 0.4rem;
+  border-radius: var(--radius-lg, 10px);
+  padding: var(--space-sm, 0.6rem) var(--space-md, 1rem);
   background: var(--color-surface, #ffffff);
   cursor: pointer;
   font-family: var(--font-stack, -apple-system, sans-serif);
-  font-size: 0.82rem;
+  font-size: var(--text-md, 0.82rem);
   color: var(--color-text, #222222);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--shadow-card-rest);
+  transition: box-shadow var(--duration-normal, 220ms) ease,
+              border-color var(--duration-normal, 220ms) ease,
+              transform var(--duration-normal, 220ms) ease;
 }
 .agent-card:hover {
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card-hover);
   border-color: var(--color-accent, #9cddc8);
   border-left-color: var(--color-accent, #9cddc8);
+  transform: translateY(var(--lift-hover, -2px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-card { transition: box-shadow var(--duration-normal, 220ms) ease,
+                            border-color var(--duration-normal, 220ms) ease; }
+  .agent-card:hover { transform: none; }
 }
 .agent-card:focus-visible {
   outline: 2px solid var(--color-accent-dark, #2d7d9a);
@@ -656,5 +665,149 @@ AGENTS_CSS: str = """
 .sessions-drilldown button[aria-expanded]:focus-visible {
   outline: 2px solid var(--color-accent, #9cddc8);
   outline-offset: 2px;
+}
+
+/* ── Layer-2 personas roster (v0.1.45 / T-45-05) ─────────────────────── */
+/* Server-rendered second roster in the Agentic tab, keyed by role. Data-dense,
+   no wrap/overflow; token-anchored with brand-token fallbacks. */
+.personas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-card-min-w), 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+.persona-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-card);
+  border-left: var(--border-width-accent) solid var(--color-accent, #9cddc8);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  box-shadow: var(--shadow-card-rest);
+  transition: box-shadow var(--duration-normal) var(--easing-standard),
+              border-color var(--duration-normal) var(--easing-standard),
+              transform var(--duration-normal) var(--easing-decelerate);
+}
+.persona-card:hover {
+  border-color: var(--color-accent, #9cddc8);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(var(--lift-hover));
+}
+.persona-card:focus-within {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .persona-card { transition: box-shadow var(--duration-normal) var(--easing-standard),
+                              border-color var(--duration-normal) var(--easing-standard); }
+  .persona-card:hover { transform: none; }
+}
+.persona-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.persona-card-role {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-heading);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.persona-layer-badge {
+  flex-shrink: 0;
+  background: var(--color-primary-bg, #f0fbf7);
+  color: var(--color-cost, #633d2e);
+  border: var(--border-width) solid var(--color-accent, #9cddc8);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.55rem;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.persona-summary {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: var(--color-text);
+}
+.persona-source {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.persona-source-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.35rem;
+}
+.persona-whereused {
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-sm);
+}
+.persona-whereused-label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  margin-bottom: 0.35rem;
+}
+.persona-step-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.persona-step {
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.persona-step-wf {
+  font-weight: 600;
+  color: var(--color-heading);
+}
+.persona-step-arrow {
+  color: var(--color-muted);
+}
+.persona-step-label {
+  font-family: var(--font-mono);
+  color: var(--color-text);
+}
+.persona-step-binding {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-accent-dark, #2d7d9a);
+  white-space: nowrap;
+}
+.persona-whereused-empty {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-muted);
+}
+@media (max-width: 640px) {
+  .personas-grid { grid-template-columns: 1fr; }
 }
 """

@@ -15,7 +15,7 @@ Coverage:
 
 import xml.etree.ElementTree as ET
 
-from dadaia_workspace.features.workflows.dag import render_dag_svg
+from dadaia_workspace.features.workflows.dag import NodeMeta, render_dag_svg
 from dadaia_workspace.features.workflows.service import StageDTO
 
 
@@ -402,3 +402,89 @@ def test_single_gate_node_has_correct_classes() -> None:
         if "dag-node" in e.get("class", "") and "dag-gate" in e.get("class", "")
     ]
     assert len(nodes_with_gate) == 1
+
+
+# ---------------------------------------------------------------------------
+# T-45-01 — optional node_meta enrichment (AC-1 fluxogram)
+# ---------------------------------------------------------------------------
+
+
+def test_no_node_meta_output_is_byte_identical_to_positional_call() -> None:
+    """render_dag_svg(stages) and render_dag_svg(stages, None) are byte-identical.
+
+    The optional node_meta parameter defaults to None; the first-class detail view
+    (which calls with no meta) must be byte-for-byte unchanged.
+    """
+    fixtures = [_LINEAR_STAGES, _PARALLEL_STAGES, _CROSS_CUTTING_STAGES, []]
+    for stages in fixtures:
+        assert render_dag_svg(stages) == render_dag_svg(stages, None)
+
+
+def test_no_node_meta_output_has_no_meta_markup() -> None:
+    """Without node_meta the SVG carries no node-meta text or style rule."""
+    svg = render_dag_svg(_LINEAR_STAGES)
+    assert "node-meta" not in svg
+    # Default node height (40) is used — no taller-node meta layout.
+    assert 'height="40"' in svg
+    assert 'height="58"' not in svg
+
+
+def test_node_meta_draws_harness_and_model_line() -> None:
+    """With node_meta a node carries a node-meta line with harness · model."""
+    meta = {"step_a": NodeMeta(harness="pi", model="kimi-2.7:high")}
+    svg = render_dag_svg(_LINEAR_STAGES, meta)
+    assert "node-meta" in svg
+    assert "kimi-2.7:high" in svg
+    assert "pi" in svg
+    # The meta style rule is emitted only when meta is present.
+    assert ".dag-node text.node-meta" in svg
+    # Nodes are taller to fit the extra line.
+    assert 'height="58"' in svg
+    root = _parse_svg(svg)
+    assert root is not None
+
+
+def test_node_meta_enriches_aria_label() -> None:
+    """A node with meta includes harness/model in its aria-label."""
+    meta = {"step_b": NodeMeta(harness="codex", model="gpt-5.3-codex:high")}
+    svg = render_dag_svg(_LINEAR_STAGES, meta)
+    root = _parse_svg(svg)
+    labelled = [
+        e
+        for e in root.iter()
+        if "dag-node" in e.get("class", "") and e.get("data-stage-id") == "step_b"
+    ]
+    assert labelled
+    aria = labelled[0].get("aria-label", "")
+    assert "codex" in aria
+    assert "gpt-5.3-codex:high" in aria
+
+
+def test_node_meta_partial_map_only_enriches_present_stages() -> None:
+    """Only stages present in node_meta get a meta line; others stay bare."""
+    meta = {"step_a": NodeMeta(harness="pi", model="claude")}
+    svg = render_dag_svg(_LINEAR_STAGES, meta)
+    # Exactly one node-meta text element (step_a).
+    assert svg.count('class="node-meta"') == 1
+
+
+def test_node_meta_empty_fields_render_no_meta_line() -> None:
+    """A NodeMeta with empty harness+model adds no meta text for that node."""
+    meta = {"step_a": NodeMeta(harness="", model="")}
+    svg = render_dag_svg(_LINEAR_STAGES, meta)
+    assert 'class="node-meta"' not in svg
+
+
+def test_node_meta_is_html_escaped() -> None:
+    """Harness/model text in node_meta is HTML-escaped (OWASP A03)."""
+    meta = {"step_a": NodeMeta(harness="<x>", model="a&b")}
+    svg = render_dag_svg(_LINEAR_STAGES, meta)
+    assert "<x>" not in svg
+    root = _parse_svg(svg)
+    assert root is not None
+
+
+def test_node_meta_render_is_pure() -> None:
+    """Same stages + same node_meta produce identical output."""
+    meta = {"step_a": NodeMeta(harness="pi", model="kimi-2.7:high")}
+    assert render_dag_svg(_LINEAR_STAGES, meta) == render_dag_svg(_LINEAR_STAGES, meta)

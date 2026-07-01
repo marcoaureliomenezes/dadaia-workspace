@@ -7,6 +7,11 @@ for this unit test.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import re
+from pathlib import Path
+
 
 def _make_handler_with_spy():
     """Return a PanelHandler-like instance with a tracked send_header."""
@@ -130,3 +135,77 @@ class TestSecurityHeaders:
         assert _CSP_SCRIPT_HASH_2 in script_src, (
             f"Runtime-switcher hash {_CSP_SCRIPT_HASH_2} missing from script-src"
         )
+
+
+# ---------------------------------------------------------------------------
+# Falsifiable CSP coverage: every inline <script> on the served index page
+# must be covered by a sha256 hash in script-src (zero CSP-blocked scripts).
+# ---------------------------------------------------------------------------
+
+# <script ...>BODY</script> where the opening tag carries no src= attribute.
+_INLINE_SCRIPT_RE = re.compile(
+    r"<script(?P<attrs>(?:(?!>).)*)>(?P<body>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _render_index_html() -> str:
+    from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
+    from dadaia_workspace.core.models.spec_context import SpecContextProject
+    from dadaia_workspace.features.panel.service import PanelService
+    from dadaia_workspace.features.panel.views.index import render_index
+
+    class _FakeRegistry:
+        def list_entries(
+            self, project: str | None = None, include_stale: bool = True
+        ) -> list[tuple[PortEntry, PortStatus]]:
+            return []
+
+    class _FakeSpecContext:
+        def list_all(self) -> list[SpecContextProject]:
+            return []
+
+    service = PanelService(
+        registry=_FakeRegistry(),  # type: ignore[arg-type]
+        spec_context=_FakeSpecContext(),  # type: ignore[arg-type]
+        workspace_root=Path("/workspace"),
+    )
+    status, content_type, body = render_index(service)()
+    assert status == 200
+    return body.decode("utf-8")
+
+
+def _script_src_from_handler() -> str:
+    handler, headers_sent = _make_handler_with_spy()
+    handler._security_headers("text/html; charset=utf-8")  # type: ignore[attr-defined]
+    csp = next(v for k, v in headers_sent if k == "Content-Security-Policy")
+    return next(d.strip() for d in csp.split(";") if d.strip().startswith("script-src"))
+
+
+class TestInlineScriptCspCoverage:
+    """Recompute each emitted inline-script hash and assert CSP covers it."""
+
+    def test_every_inline_script_is_covered_by_a_csp_hash(self) -> None:
+        html = _render_index_html()
+        script_src = _script_src_from_handler()
+
+        inline_bodies = [
+            m.group("body")
+            for m in _INLINE_SCRIPT_RE.finditer(html)
+            if "src=" not in m.group("attrs").lower()
+        ]
+        # The served index page carries exactly two inline scripts
+        # (theme pre-paint + runtime pre-paint). A new un-hashed inline
+        # script would be CSP-blocked in the browser — fail loudly here.
+        assert len(inline_bodies) == 2, (
+            f"expected 2 inline scripts on the index page, found {len(inline_bodies)}; "
+            "a new inline <script> needs its sha256 added to _CSP_SCRIPT_HASH_*"
+        )
+
+        for body in inline_bodies:
+            digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
+            token = f"'sha256-{digest}'"
+            assert token in script_src, (
+                f"inline script not covered by CSP script-src (would be blocked): "
+                f"computed {token} absent. Script body:\n{body}"
+            )

@@ -96,6 +96,16 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
         effort="low",
         purpose="Low-cost mechanical effort on PI.",
     ),
+    WorkflowModelProfile(
+        id="pi-openrouter-kimi-high",
+        harness="pi",
+        label="OpenRouter — kimi-2.7 (high)",
+        model_id="kimi-2.7",
+        effort="high",
+        purpose="OpenRouter kimi-2.7 (high reasoning) as a governed PI worker (v0.1.44 "
+        "allowlist-validated Layer-2-native id). Carries no registry pricing row — cost "
+        "reports 'unknown', never fabricated.",
+    ),
 )
 
 #: Layer-2 harness names a profile may declare (LAW 1). ``fake`` carries no model.

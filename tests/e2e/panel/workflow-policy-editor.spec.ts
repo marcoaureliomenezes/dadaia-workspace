@@ -12,13 +12,16 @@
  * webServer fixture (playwright.config.ts boots `dadaia panel`).
  */
 import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
+import { gotoPanel, activateTab, openModelPolicy, authHeaders, BASE_URL } from './helpers';
 
 async function openWorkflowsTab(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
+  // v0.1.45: the model-governance matrix is a collapsed disclosure below the
+  // diagram cards — expand it before interacting with the step rows.
+  await openModelPolicy(page);
   // The editor renders one step matrix per governed workflow.
-  await page.waitForSelector('#wfp-root .wfp-matrix', { timeout: 15000 });
+  await page.waitForSelector('#wfp-root .wfp-matrix', { state: 'visible', timeout: 15000 });
 }
 
 test('Workflows is a first-class top-level tab', async ({ page }) => {
@@ -36,16 +39,23 @@ test('Profile dropdown is filtered by the selected harness', async ({ page }) =>
   const firstRow = page.locator('#wfp-root .wfp-step-row').first();
   const select = firstRow.locator('.wfp-profile-select');
 
-  // Default harness is codex — every option in the dropdown is a codex profile.
-  const codexOptions = await select.locator('option').allTextContents();
-  expect(codexOptions.length).toBeGreaterThan(0);
-  expect(codexOptions.every((o) => /codex/i.test(o))).toBe(true);
+  // Default harness is codex — every profile in the dropdown is a codex profile.
+  // Assert on the option VALUE (profile id, harness-prefixed) rather than the label:
+  // v0.1.45 added the labelled OpenRouter kimi profile ("OpenRouter — kimi-2.7 (high)")
+  // whose display text no longer contains its harness name, but its id stays `pi-…`.
+  const codexValues = await select
+    .locator('option')
+    .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+  expect(codexValues.length).toBeGreaterThan(0);
+  expect(codexValues.every((v) => v.startsWith('codex-'))).toBe(true);
 
   // Switch the segmented control to pi — the dropdown now lists pi profiles only.
   await firstRow.locator('.wfp-seg-btn[data-wfp-harness="pi"]').click();
-  const piOptions = await firstRow.locator('.wfp-profile-select option').allTextContents();
-  expect(piOptions.length).toBeGreaterThan(0);
-  expect(piOptions.every((o) => /pi/i.test(o))).toBe(true);
+  const piValues = await firstRow
+    .locator('.wfp-profile-select option')
+    .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+  expect(piValues.length).toBeGreaterThan(0);
+  expect(piValues.every((v) => v.startsWith('pi-'))).toBe(true);
 });
 
 test('Editing a profile flips the default-vs-effective diff, reset clears it', async ({ page }) => {

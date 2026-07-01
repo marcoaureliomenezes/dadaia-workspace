@@ -16,7 +16,7 @@
  * before and after so it never depends on, or leaks, live workspace state.
  */
 import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, authHeaders, BASE_URL } from './helpers';
+import { gotoPanel, activateTab, openModelPolicy, authHeaders, BASE_URL } from './helpers';
 
 const EMPTY_OVERLAY = {
   schema_version: 'workflow-model-policy-v1',
@@ -38,7 +38,10 @@ async function restoreEmptyOverlay(request: any): Promise<void> {
 async function openWorkflowsTab(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
-  await page.waitForSelector(IMPLEMENT_ROW, { timeout: 15000 });
+  // v0.1.45: the model-governance matrix is a collapsed disclosure below the
+  // diagram cards — expand it before interacting with the step rows.
+  await openModelPolicy(page);
+  await page.waitForSelector(IMPLEMENT_ROW, { state: 'visible', timeout: 15000 });
 }
 
 test.beforeEach(async ({ request }) => {
@@ -62,10 +65,15 @@ test('Harness toggle to pi filters the dropdown and flags the harness diff', asy
   await row.locator('.wfp-seg-btn[data-wfp-harness="pi"]').click();
 
   // The row is now overridden and the dropdown lists only pi profiles.
+  // Assert on option VALUE (harness-prefixed profile id), not the label: v0.1.45's
+  // labelled kimi profile ("OpenRouter — kimi-2.7 (high)") keeps its `pi-…` id but
+  // its display text no longer contains "pi".
   await expect(page.locator(IMPLEMENT_ROW)).toHaveClass(/wfp-step-row--overridden/);
-  const piOptions = await page.locator(`${IMPLEMENT_ROW} .wfp-profile-select option`).allTextContents();
-  expect(piOptions.length).toBeGreaterThan(0);
-  expect(piOptions.every((o) => /pi/i.test(o))).toBe(true);
+  const piValues = await page
+    .locator(`${IMPLEMENT_ROW} .wfp-profile-select option`)
+    .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+  expect(piValues.length).toBeGreaterThan(0);
+  expect(piValues.every((v) => v.startsWith('pi-'))).toBe(true);
 
   // The default-vs-effective diff shows the harness change codex → pi.
   const harnessDiff = page.locator(`${IMPLEMENT_ROW} [data-testid="wfp-diff-harness"]`);

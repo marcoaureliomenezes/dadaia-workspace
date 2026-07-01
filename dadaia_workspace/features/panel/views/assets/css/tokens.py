@@ -61,6 +61,24 @@ TOKENS_CSS: str = """
   --topbar-h:    52px;
   --nav-h:       48px;
 
+  /* ── Typography scale (v0.1.45 / T-45-07 — semantic, token-anchored) ──
+     Restyled control rules consume these instead of ad-hoc rem literals so
+     type sizing is consistent and reviewable by grep. */
+  --text-2xs:    0.68rem;
+  --text-xs:     0.72rem;
+  --text-sm:     0.78rem;
+  --text-md:     0.82rem;
+  --text-base:   0.85rem;
+  --text-lg:     0.95rem;
+  --text-xl:     1rem;
+
+  /* ── Border widths (semantic) ─────────────────────────────────── */
+  --border-width:        1px;
+  --border-width-accent: 3px;
+
+  /* ── Responsive card-grid track floor (v0.1.45 / T-45-07) ──────── */
+  --grid-card-min-w:     340px;
+
   /* ── Spacing ──────────────────────────────────────── */
   --space-2xs:   0.25rem;
   --space-3xl:   3rem;
@@ -68,11 +86,20 @@ TOKENS_CSS: str = """
   /* ── Border-radius ────────────────────────────────── */
   --radius-modal: 0.75rem;
   --radius-pill:  9999px;
+  /* Modern card radius (v0.1.45 / T-45-08 restyle) — softer than --radius-card
+     so big content cards read contemporary, not boxy. Token-anchored. */
+  --radius-lg:    10px;
 
   /* ── Shadows ──────────────────────────────────────── */
   --shadow-none:  none;
   --shadow-card:  0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
   --shadow-modal: 0 8px 32px rgba(0,0,0,.24), 0 2px 8px rgba(0,0,0,.12);
+  /* Elevation pair for content cards (v0.1.45 / T-45-08 restyle): a calm resting
+     shadow and a stronger hover lift shadow, so cards feel tactile without noise. */
+  --shadow-card-rest:  0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-card-hover: 0 6px 20px rgba(0,0,0,.10), 0 3px 8px rgba(0,0,0,.06);
+  /* Vertical translate applied on card hover (motion-guarded at call sites). */
+  --lift-hover:   -2px;
 
   /* ── Z-index ──────────────────────────────────────── */
   --z-modal-overlay: 400;

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import html
 
-from dadaia_workspace.features.panel.views._md_render import render_md_to_html
 from dadaia_workspace.features.workflows.dadaia_catalog import (
     AVAILABILITY_AVAILABLE,
     AVAILABILITY_DEFERRED,
@@ -73,45 +72,76 @@ def _render_step_row(step: DadaiaWorkflowStepDTO) -> str:
     )
 
 
+def _render_step_summary(steps: list[DadaiaWorkflowStepDTO]) -> str:
+    """Compact one-line step chain for the collapsed card face.
+
+    Renders the ordered step labels joined by arrows; CSS truncates with an ellipsis
+    so the summary never wraps or overflows the card. The full per-step detail lives
+    in the expandable body.
+    """
+    if not steps:
+        return ""
+    chain = " → ".join(html.escape(s.label) for s in steps)
+    return f'<p class="dadaia-wf-step-chain" title="{chain}">{chain}</p>'
+
+
 def _render_dadaia_workflow_card(wf: DadaiaWorkflowDTO) -> str:
+    """Render one dadaia-workflow as a big, expandable diagram card (AC-1 / T-45-03).
+
+    The card is a native ``<details>`` disclosure — server-rendered and CSP-clean, no
+    client script, not a ``<dialog>``. The collapsed ``<summary>`` face carries the
+    header (display-name, availability badge, step count), the purpose, the enhanced
+    server-rendered SVG fluxogram (nodes carry role + gate marker + harness/model), and
+    a compact step-chain summary. Expanding reveals the full per-step detail
+    (order, label, gate flag, role, purpose, harness/model). The dead client-Mermaid
+    block and its producer chain were removed (arch finding #5) — the enhanced SVG is
+    the single diagram source on both the card and the detail.
+    """
     steps_html = (
         '<ol class="dadaia-wf-steps">' + "".join(_render_step_row(s) for s in wf.steps) + "</ol>"
         if wf.steps
         else '<p class="dadaia-wf-empty-steps">No steps yet — this workflow is scaffolded only.</p>'
     )
-    # Mermaid flowchart of the step sequence, rendered through the shared mistune
-    # mermaid path (-> <pre class="mermaid">), hydrated client-side by mermaid.run().
-    mermaid_html = render_md_to_html(wf.diagram_mermaid)
     # The server-rendered SVG DAG is always available even without JS.
     diagram_block = (
         f'<div class="dadaia-wf-diagram-svg">{wf.diagram_svg}</div>' if wf.diagram_svg else ""
     )
     aria_unavail = ' aria-disabled="true"' if wf.availability == AVAILABILITY_DEFERRED else ""
+    expand_hint = (
+        '<span class="dadaia-wf-expand-hint" aria-hidden="true">Show step detail</span>'
+        if wf.steps
+        else ""
+    )
     return (
-        f'<article class="dadaia-wf-card" data-workflow="{html.escape(wf.name)}" '
+        f'<details class="dadaia-wf-card" data-workflow="{html.escape(wf.name)}" '
         f'data-availability="{html.escape(wf.availability)}"{aria_unavail}>'
+        '<summary class="dadaia-wf-card-summary">'
         '<header class="dadaia-wf-card-header">'
         f'<h4 class="dadaia-wf-card-title">{html.escape(wf.display_name)}</h4>'
         f"{_availability_badge(wf.availability)}"
         f'<span class="dadaia-wf-step-count">{wf.step_count} steps</span>'
         "</header>"
         f'<p class="dadaia-wf-purpose">{html.escape(wf.purpose)}</p>'
-        f'<div class="dadaia-wf-diagram">{diagram_block}'
-        f'<div class="dadaia-wf-diagram-mermaid">{mermaid_html}</div></div>'
-        f"{steps_html}"
-        "</article>"
+        f'<div class="dadaia-wf-diagram">{diagram_block}</div>'
+        f"{_render_step_summary(wf.steps)}"
+        f"{expand_hint}"
+        "</summary>"
+        f'<div class="dadaia-wf-detail">{steps_html}</div>'
+        "</details>"
     )
 
 
 def render_dadaia_workflows_section() -> str:
     """Server-rendered catalog of every dadaia-workflow (WS-8 / ADR-E).
 
-    Renders, per workflow: its purpose, availability badge (deferred workflows are
-    visibly marked unavailable), the ordered step sequence with per-step role +
-    harness/model options, and both diagrams (server-rendered SVG DAG + a Mermaid
-    flowchart of the step sequence). Fully server-rendered — no API round-trip — so
-    the operator sees the complete catalog on first paint; the only client-side step
-    is mermaid hydration of the already-emitted ``<pre class="mermaid">`` blocks.
+    Renders each workflow as a big, expandable ``<details>`` card: its purpose,
+    availability badge (deferred workflows are visibly marked unavailable), the
+    enhanced server-rendered SVG fluxogram (nodes carry role + gate marker +
+    harness/model), a compact step-chain summary on the collapsed face, and the full
+    ordered step sequence with per-step role + harness/model options in the expanded
+    body. Fully server-rendered — no API round-trip, no client script — so the
+    operator sees the complete catalog on first paint. The server-rendered SVG is the
+    single diagram source; the dead client-Mermaid layer was removed in v0.1.45.
     """
     workflows = list_dadaia_workflows()
     cards = "".join(_render_dadaia_workflow_card(wf) for wf in workflows)
@@ -128,20 +158,25 @@ def render_dadaia_workflows_section() -> str:
 
 
 def render_workflows_first_class_section() -> str:
-    """The first-class Workflows panel area (D-5, T-28-C-03).
+    """The first-class Workflows panel area (D-5, T-28-C-03; IA flip v0.1.45 / T-45-08).
 
-    Promotes Workflows from the Ops subtab to a top-level nav area. It carries:
+    Promotes Workflows from the Ops subtab to a top-level nav area. **Cards lead, policy
+    is secondary** (operator directive, v0.1.45): the tab opens on the prominent,
+    default-visible **dadaia-workflow diagram catalog** — one big card per workflow with a
+    server-rendered SVG fluxogram (nodes carry role + gate marker + harness/model) and
+    click-to-expand step detail — because that is what the operator scans first. Below it,
+    the **model-governance editor** is demoted into a collapsed ``Model policy`` disclosure
+    (secondary, opt-in): a toolbar (validate / save) + banner + an empty ``#wfp-root`` that
+    ``workflow-policy.js`` populates with one step matrix per governed workflow (Step | Role
+    | Harness | Model profile | Concrete model | Fragments | Gate | default-vs-effective
+    diff), the segmented codex/pi harness control, the harness-filtered profile dropdown,
+    reset-to-default, validate-before-save, save→PUT, and the per-workflow run-snapshot
+    evidence view (reads the persisted snapshot — never re-resolves).
 
-    - the **model-governance editor**: a toolbar (validate / save) + banner + an empty
-      ``#wfp-root`` that ``workflow-policy.js`` populates with one step matrix per governed
-      workflow (Step | Role | Harness | Model profile | Concrete model | Fragments | Gate
-      | default-vs-effective diff), the segmented codex/pi harness control, the
-      harness-filtered profile dropdown, reset-to-default, validate-before-save, save→PUT,
-      and the per-workflow run-snapshot evidence view (reads the persisted snapshot —
-      never re-resolves);
-    - the **server-rendered dadaia-workflow catalog** (diagrams + step sequence) below it,
-      fully SSR for first paint and as the no-JS fallback. The server-rendered SVG DAG is
-      the canonical, offline diagram — browser-Mermaid is never an execution dependency.
+    Both surfaces stay fully functional: ``#wfp-root`` is populated on load regardless of
+    the disclosure's open state, so demoting the matrix into a collapsed ``<details>``
+    changes only its prominence, not its behavior. The server-rendered SVG DAG is the
+    canonical, offline diagram — browser-Mermaid is never an execution dependency.
 
     Agents and Kanban remain available in the Ops tab during the transition (D-5).
     """
@@ -150,22 +185,31 @@ def render_workflows_first_class_section() -> str:
         'tabindex="0" aria-labelledby="tab-workflows">\n'
         '  <div class="section-header">\n'
         "    <h2>Workflows</h2>\n"
-        "    <p>Govern the per-step model policy for every dadaia-workflow, and inspect "
-        "what each run actually executed.</p>\n"
+        "    <p>Every dadaia-workflow as a diagram card — purpose, step fluxogram, per-step "
+        "harness/model, and availability. Expand a card for the full step detail; open "
+        "<strong>Model policy</strong> below to govern per-step model selection.</p>\n"
         "  </div>\n"
-        '  <div class="wfp-toolbar">\n'
-        '    <button type="button" class="wfp-validate-btn" id="wfp-validate-btn">'
+        # Cards LEAD — prominent, default-visible catalog (operator directive, T-45-08).
+        f"  {render_dadaia_workflows_section()}\n"
+        # Model policy is SECONDARY — demoted into a collapsed disclosure below the cards.
+        '  <details class="wfp-policy">\n'
+        '    <summary class="wfp-policy-summary">\n'
+        '      <span class="wfp-policy-title">Model policy</span>\n'
+        '      <span class="wfp-policy-hint">Govern the per-step harness &amp; model for '
+        "every workflow, and inspect what each run executed.</span>\n"
+        "    </summary>\n"
+        '    <div class="wfp-policy-body">\n'
+        '      <div class="wfp-toolbar">\n'
+        '        <button type="button" class="wfp-validate-btn" id="wfp-validate-btn">'
         "Validate</button>\n"
-        '    <button type="button" class="wfp-save-btn" id="wfp-save-btn">Save policy'
+        '        <button type="button" class="wfp-save-btn" id="wfp-save-btn">Save policy'
         "</button>\n"
-        "  </div>\n"
-        '  <div class="wfp-banner" id="wfp-banner" role="status" aria-live="polite" hidden>'
-        "</div>\n"
-        '  <div id="wfp-root" class="wfp-catalog" aria-live="polite">'
+        "      </div>\n"
+        '      <div class="wfp-banner" id="wfp-banner" role="status" aria-live="polite" '
+        "hidden></div>\n"
+        '      <div id="wfp-root" class="wfp-catalog" aria-live="polite">'
         '<p class="wfp-loading">Loading workflow model policy…</p></div>\n'
-        '  <details class="wfp-reference">\n'
-        "    <summary>Reference: full step sequence + diagrams</summary>\n"
-        f"    {render_dadaia_workflows_section()}\n"
+        "    </div>\n"
         "  </details>\n"
         "</section>"
     )

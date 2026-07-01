@@ -50,10 +50,26 @@
   // Pending harness overrides: { workflow_id: { step: harness } } (D-3, T-29-C-02).
   var pendingHarness = {};
   var profilesByHarness = {}; // harness -> [profile]
+  var modelChoicesByHarness = {}; // harness -> [{value, label}] (full allowed set, T-45-06)
   var catalog = null;         // last catalog payload
 
   function profilesFor(harness) {
     return profilesByHarness[harness] || [];
+  }
+
+  // v0.1.45 / T-45-06: a compact, native <details> reference of the full allowed
+  // concrete-model set for a harness (incl. the labelled OpenRouter kimi option). The
+  // value is the exact effort-suffixed id (never stripped). Display-only — CSP-clean,
+  // no inline script; the persisted override is still the named profile.
+  function renderAllowedModels(harness) {
+    var choices = modelChoicesByHarness[harness] || [];
+    if (!choices.length) { return ''; }
+    var items = choices.map(function (c) {
+      return '<li class="wfp-allowed-model" data-model-value="' + escHtml(c.value) + '">' +
+        escHtml(c.label) + '</li>';
+    }).join('');
+    return '<details class="wfp-allowed-models"><summary>allowed models</summary>' +
+      '<ul class="wfp-allowed-model-list">' + items + '</ul></details>';
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────
@@ -167,7 +183,8 @@
         renderProfileOptions(harness, eff) + '</select>' +
       '</td>' +
       '<td class="wfp-c-model">' + escHtml(step.model || '—') +
-        (step.reasoning ? ' <span class="wfp-effort">(' + escHtml(step.reasoning) + ')</span>' : '') + '</td>' +
+        (step.reasoning ? ' <span class="wfp-effort">(' + escHtml(step.reasoning) + ')</span>' : '') +
+        renderAllowedModels(harness) + '</td>' +
       '<td class="wfp-c-frag">' + fragments + '</td>' +
       '<td class="wfp-c-gate">' + gate + '</td>' +
       '<td class="wfp-c-diff">' + diff +
@@ -481,6 +498,10 @@
         if (!profilesByHarness[p.harness]) { profilesByHarness[p.harness] = []; }
         profilesByHarness[p.harness].push(p);
       });
+      // v0.1.45 / T-45-06: the full per-harness allowed concrete-model catalog
+      // (incl. curated OpenRouter ids like kimi-2.7:high, each labelled) — surfaced as
+      // a per-step reference so the operator sees the complete allowed model set.
+      modelChoicesByHarness = (res.body && res.body.model_choices) || {};
     });
   }
 

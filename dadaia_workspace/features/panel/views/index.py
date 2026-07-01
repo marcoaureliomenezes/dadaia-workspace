@@ -28,7 +28,10 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
-from dadaia_workspace.features.panel.views.agents import render_agents_subsection
+from dadaia_workspace.features.panel.views.agents import (
+    render_agents_subsection,
+    render_personas_subsection,
+)
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
@@ -56,6 +59,7 @@ def render_index(
         academy_section = render_academy_section()
         reports_section = render_reports_section()
         agents_subsection = render_agents_subsection()
+        personas_subsection = render_personas_subsection()
         workflows_subsection = render_workflows_subsection()
         workflows_section = render_workflows_first_class_section()
         sessions_section = render_sessions_section()
@@ -158,6 +162,8 @@ def render_index(
       </div>
 
       {agents_subsection}
+
+      {personas_subsection}
 
       {workflows_subsection}
 

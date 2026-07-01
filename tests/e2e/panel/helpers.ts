@@ -65,6 +65,32 @@ export async function activateTab(
   await page.waitForSelector(`#section-${sectionId}.active`, { timeout: 8000 });
 }
 
+/**
+ * Expand the Workflows tab's "Model policy" disclosure.
+ *
+ * v0.1.45 (T-45-08 refinement #1) demoted the per-step model-governance matrix
+ * into a collapsed `<details class="wfp-policy">` below the diagram cards. The
+ * cards LEAD the tab; the policy matrix is secondary/opt-in. `#wfp-root` is
+ * populated on load regardless of the disclosure state, but its controls are
+ * `hidden` (display:none) until the `<details>` is open — so any test that
+ * interacts with a step row / toolbar must expand it first.
+ */
+export async function openModelPolicy(page: Page): Promise<void> {
+  const details = page.locator('details.wfp-policy');
+  await details.waitFor({ state: 'attached', timeout: 8000 });
+  const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open);
+  if (!isOpen) {
+    await page.locator('summary.wfp-policy-summary').click();
+  }
+  await page.waitForFunction(
+    () => {
+      const d = document.querySelector('details.wfp-policy') as HTMLDetailsElement | null;
+      return !!d && d.open;
+    },
+    { timeout: 8000 }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // API helpers (direct HTTP, no browser rendering)
 // ---------------------------------------------------------------------------

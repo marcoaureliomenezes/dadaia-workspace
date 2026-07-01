@@ -135,4 +135,83 @@ WORKFLOW_POLICY_CSS: str = """
   overflow: auto;
   margin: 0;
 }
+
+/* ── Allowed concrete-model reference (v0.1.45 / T-45-06) ─────────────── */
+/* Per-step, per-harness reference of the full allowed model set incl. the labelled
+   OpenRouter kimi option. Native <details> — display-only, CSP-clean, token-anchored. */
+.wfp-allowed-models {
+  margin-top: var(--space-xs);
+  font-size: var(--text-xs);
+}
+.wfp-allowed-models > summary {
+  cursor: pointer;
+  color: var(--color-accent-dark, #2d7d9a);
+  font-weight: 600;
+}
+.wfp-allowed-model-list {
+  list-style: none;
+  margin: var(--space-xs) 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.wfp-allowed-model {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* ── Secondary "Model policy" disclosure (v0.1.45 / T-45-08 IA flip) ─────────
+   The diagram-card catalog now LEADS the Workflows tab; the per-step model-policy
+   matrix is demoted below the cards into this collapsed disclosure. Token-anchored
+   to match the modern card restyle. */
+.wfp-policy {
+  margin-top: var(--space-lg);
+  border: var(--border-width) solid var(--color-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card-rest);
+  overflow: hidden;
+}
+.wfp-policy-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-primary-bg, #f0fbf7);
+  border-bottom: var(--border-width) solid transparent;
+  transition: background var(--duration-fast) var(--easing-standard);
+}
+.wfp-policy-summary::-webkit-details-marker {
+  display: none;
+}
+.wfp-policy[open] .wfp-policy-summary {
+  border-bottom-color: var(--color-border);
+}
+.wfp-policy-summary:hover {
+  background: var(--color-card-hover, #f8feff);
+}
+.wfp-policy-summary:focus-visible {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: -2px;
+}
+.wfp-policy-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-heading);
+}
+.wfp-policy-hint {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.wfp-policy-body {
+  padding: var(--space-lg);
+}
+.wfp-policy-body .wfp-toolbar {
+  margin-top: 0;
+}
 """

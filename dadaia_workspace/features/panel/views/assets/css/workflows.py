@@ -564,4 +564,211 @@ WORKFLOWS_CSS: str = """
   color: var(--color-muted, #666666);
   user-select: none;
 }
+
+/* ── dadaia-workflow catalog cards (v0.1.45 / T-45-03) ───────────────── */
+/* Big, scannable, expandable diagram cards in a responsive grid. Each card is a
+   native <details> disclosure: server-rendered, CSP-clean, no client script, not a
+   <dialog>. The collapsed <summary> face carries the header, purpose, the enhanced
+   server-SVG fluxogram, and a compact step-chain; the expanded body carries the full
+   per-step detail. Token-anchored (no ad-hoc literals). */
+.dadaia-wf-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-card-min-w), 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+.dadaia-wf-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card-rest);
+  transition: box-shadow var(--duration-normal) var(--easing-standard),
+              border-color var(--duration-normal) var(--easing-standard),
+              transform var(--duration-normal) var(--easing-decelerate);
+}
+.dadaia-wf-card:hover {
+  border-color: var(--color-accent, #9cddc8);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(var(--lift-hover));
+}
+.dadaia-wf-card[open] {
+  border-color: var(--color-accent, #9cddc8);
+  box-shadow: var(--shadow-card-hover);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dadaia-wf-card { transition: box-shadow var(--duration-normal) var(--easing-standard),
+                                border-color var(--duration-normal) var(--easing-standard); }
+  .dadaia-wf-card:hover { transform: none; }
+}
+.dadaia-wf-card[aria-disabled="true"] {
+  opacity: 0.6;
+}
+.dadaia-wf-card-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.dadaia-wf-card-summary::-webkit-details-marker {
+  display: none;
+}
+.dadaia-wf-card-summary:focus-visible {
+  outline: 2px solid var(--color-accent, #9cddc8);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+.dadaia-wf-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: nowrap;
+}
+.dadaia-wf-card-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--color-heading);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dadaia-wf-step-count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.dadaia-wf-badge {
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.55rem;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-primary-bg, #f0fbf7);
+  color: var(--color-cost, #633d2e);
+  border: var(--border-width) solid var(--color-accent, #9cddc8);
+}
+.dadaia-wf-badge--partial {
+  background: var(--color-warning-bg, #ddd9ab);
+  color: var(--color-cost, #633d2e);
+  border-color: var(--color-accent-secondary, #bfd8ad);
+}
+.dadaia-wf-badge--unavailable {
+  background: var(--color-row-hover);
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+.dadaia-wf-purpose {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dadaia-wf-diagram {
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-sm);
+  overflow-x: auto;
+}
+.dadaia-wf-diagram-svg svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.dadaia-wf-step-chain {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dadaia-wf-expand-hint {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent-dark);
+}
+.dadaia-wf-card[open] .dadaia-wf-expand-hint {
+  color: var(--color-cost, #633d2e);
+}
+.dadaia-wf-detail {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.dadaia-wf-steps {
+  margin: 0;
+  padding-left: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.dadaia-wf-step {
+  font-size: var(--text-md);
+  color: var(--color-text);
+  line-height: 1.4;
+}
+.dadaia-wf-step-order {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+.dadaia-wf-step-label {
+  font-weight: 700;
+  color: var(--color-heading);
+}
+.dadaia-wf-step-gate {
+  display: inline-block;
+  background: var(--color-primary-bg, #f0fbf7);
+  border: var(--border-width) solid var(--color-accent, #9cddc8);
+  border-radius: var(--radius-pill);
+  padding: 0 0.4rem;
+  color: var(--color-cost, #633d2e);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.dadaia-wf-step-role {
+  color: var(--color-muted);
+}
+.dadaia-wf-step-purpose {
+  margin: 0.2rem 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.4;
+}
+.dadaia-wf-step-harness {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.dadaia-wf-step-harness--none {
+  font-style: italic;
+}
+.dadaia-wf-harness strong {
+  color: var(--color-heading);
+}
+.dadaia-wf-empty-steps {
+  margin: 0;
+  font-style: italic;
+  color: var(--color-muted);
+  font-size: var(--text-md);
+}
+@media (max-width: 640px) {
+  .dadaia-wf-catalog { grid-template-columns: 1fr; }
+}
 """
