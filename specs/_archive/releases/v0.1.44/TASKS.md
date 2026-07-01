@@ -195,7 +195,7 @@
 - **Done:** the GPT-only → allowlist-validated (no `claude-*`) amendment is written only
   after operator confirmation; the no-claude safety bound is explicitly retained.
 
-### [ ] T-44-18 — Update MEMORY atoms asserting GPT-only (DEFINITION/CLOSURE)
+### [x] T-44-18 — Update MEMORY atoms asserting GPT-only (DEFINITION/CLOSURE)
 - **Owner:** product-engineer
 - **Write set:** `specs/memory/architecture.md` (line ~893),
   `specs/memory/product/sdd/lifecycle-foundation.md` (lines ~95,127)

@@ -888,12 +888,15 @@ só no Layer 2. **OpenCode foi removido inteiramente em v0.1.24** (ambas as laye
 - **LAW 2 (v0.1.24) — discrete per-harness GPT model catalog.** Each Layer-2 workflow
   harness has a discrete model catalog selected on the CLI (`--model` / `--step-model`),
   validated against the chosen harness's set; an invalid `(harness, model)` pair is rejected
-  with the valid set. **pi → 3 models:** `(gpt-5.5, high)`, `(gpt-5.5, low)`,
-  `(gpt-5.3-codex, medium)`. **codex → 2 models:** `(gpt-5.5, high)`, `(gpt-5.5, medium)`.
-  Both catalogs are **GPT-only** by construction (PI runs on the operator's Codex
-  subscription → GPT ids): no `claude-*` id (including the region-restricted
-  `claude-fable-5`) is **ever** selectable at Layer 2. The catalog is explicit GPT data
-  keyed by harness (`core/harness_models.py`), consistent with — but not a tier-view of —
+  with the valid set. **pi → 4 models:** `(gpt-5.5, high)`, `(gpt-5.5, low)`,
+  `(gpt-5.3-codex, medium)`, and the curated OpenRouter id `kimi-2.7` (contributed via
+  `LAYER2_EXTRA_MODEL_IDS`). **codex → 2 models:** `(gpt-5.5, high)`, `(gpt-5.5, medium)`.
+  Both catalogs are **allowlist-validated** by construction: a Layer-2 model id must belong
+  to `_known_codex_ids() | LAYER2_EXTRA_MODEL_IDS` — the registry's codex ids plus a curated
+  set of Layer-2-native ids (e.g. pi's OpenRouter `kimi-2.7`). The hard no-`claude-*` bound
+  is **retained**: no `claude-*` id (including the region-restricted `claude-fable-5`) is
+  **ever** selectable at Layer 2. The catalog is explicit data keyed by harness
+  (`core/harness_models.py`), consistent with — but not a tier-view of —
   `core/model_registry.py`; PI honors the model (`pi --model <id>`), Codex takes the
   discrete `(id, effort)`.
 
