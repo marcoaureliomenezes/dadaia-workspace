@@ -1,6 +1,7 @@
 """Unit tests for the discrete per-harness Layer-2 model catalog (T-24-04, WS-2).
 
-LAW 2 (ADR-B): pi → 3 discrete options, codex → 2; both allowlist-validated; never
+LAW 2 (v0.1.44, supersedes ADR-B): pi → 4 discrete options (incl. OpenRouter
+``kimi-2.7``), codex → 2; both allowlist-validated; never
 ``claude-*``. Every catalog id resolves via the union of ``model_registry.REGISTRY``
 codex ids and the curated Layer-2 allowlist (``LAYER2_EXTRA_MODEL_IDS``).
 """
