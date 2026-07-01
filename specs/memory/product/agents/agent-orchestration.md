@@ -13,7 +13,7 @@ tags:
 - dispatch
 agent_tier: self-pull
 token_estimate: 1160
-last_updated: '2026-06-25'
+last_updated: '2026-07-01'
 release_origin: v0.1.21
 ---
 
@@ -93,6 +93,22 @@ MUTATING span (phase 5), PM acquires ONE lease and holds it through definition �
 implementation → review-closure. `product-engineer` and `software-engineer` run as
 PM sub-agents under that single lease. They never independently bind a session, so
 there is no session handoff and no second lock.
+
+### Layer-2 personas (v0.1.44) — the codex/pi equivalent of a Claude sub-agent
+
+The 9-core roster above is the **Claude Layer-1** sub-agent surface. The **persona** is its
+**Layer-2 counterpart**: a harness-universal role mandate that governs a codex/pi worker
+inside the `dadaia lifecycle` workflow engine, the way a Claude sub-agent persona governs a
+Layer-1 dispatch. Personas ship as `dadaia_workspace/public/personas/<role>.md` — **8 files,
+one per non-PM role** (`software-engineer`, `product-engineer`, `qa-engineer`,
+`security-reviewer`, `code-reviewer`, `software-architect`, `ai-engineer`,
+`project-auditor`) — each a Markdown body with YAML frontmatter carrying the 5 required keys
+`{id, role, summary, source_agent, harness_universal}`. `PersonaLoader`
+(`features/lifecycle/personas/loader.py`) loads + validates them. Load-bearing: a persona
+has **no `model` and no `tier`** — a Layer-2 worker's model is a per-workflow-**step**
+binding (`--step-model` / the governed `dadaia_catalog` step), not a persona attribute. The
+persona body is **injected into a workflow step's prompt as the operative role directive**.
+See [[architecture]] "Two-layer agentic model" for the loader/dataclass detail.
 
 ### ADDITIVE vs MUTATING activity classes
 

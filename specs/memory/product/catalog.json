@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T20:33:15Z",
+  "generated_at": "2026-07-01T15:27:51Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -26,15 +26,15 @@
       "slug": "agent-monitoring",
       "title": "agent-monitoring",
       "category": "product",
-      "tldr": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privac...",
-      "summary": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite; alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privacidade por construção.",
+      "tldr": "telemetria local stdlib-only (Claude/Codex/PI sessions) → abas Agents/Workflows do panel; allowlist gate preserva privacidade.",
+      "summary": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite + PI session jsonl (~/.pi/agent/sessions/); alimenta abas Agents e Workflows do panel; allowlist gate hardcoded preserva privacidade por construção.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
         "telemetry",
         "sessions"
       ],
-      "token_estimate": 1318,
+      "token_estimate": 1500,
       "agent_tier": "self-pull",
       "depends_on": [
         "panel",
@@ -58,7 +58,9 @@
       ],
       "token_estimate": 1160,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "architecture"
+      ]
     },
     {
       "rank": 4,
@@ -219,8 +221,8 @@
       "slug": "panel",
       "title": "panel",
       "category": "product",
-      "tldr": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com ...",
-      "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Agents / Workflows / Sessions / Reports / Academy / Servers) com agent cards brand-identity (mint/sage/warm palette, WCAG AA badges), 12 workflow cards + DAG SVG server-rendered, tabela Sessions 8 colunas com per-cell min-width (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder '—' em PROJECT, theme switcher 3 paletas, per-tab runtime toggle Claude/Codex, memory .md renderizado in-memory via mistune (D-4, memory-markdown-source-v1), Bearer token + CSP/nosniff; loopback bypass (panel-ux-fix-v1): GET /api/* retorna 200 sem token quando bind=127.0.0.1 (loopback_bypass=True em make_handler_class()).",
+      "tldr": "superfície de controle local (dadaia panel); 6 tabs; Workflows lidera com diagram-cards server-SVG + model pickers inline por step (v0.1.45).",
+      "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) após o redesign v0.1.45 — a aba Agentic (que continha Agents + personas + Kanban) foi deletada inteiramente. Workflows LIDERA a superfície: catálogo de diagram-cards server-SVG (render_dag_svg + node_meta opcional carregando role/gate/harness/model; StageDTO não widened) default-visible no topo, expand = FLOW strip + per-step cards formatados + model pickers inline por step (toggle codex/pi + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix demovido para disclosure Model policy colapsado. Tabela Sessions 8 colunas com per-cell min-width (CSS class selectors, floor 792px) + overflow-x:auto + Codex placeholder '—' em PROJECT, theme switcher 3 paletas, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md renderizado in-memory via mistune (D-4, memory-markdown-source-v1), Bearer token + CSP/nosniff; loopback bypass: GET /api/* retorna 200 sem token quando bind=127.0.0.1. /api/personas NÃO shipped; /api/agents retido para telemetria; /api/lifecycle-runs servido mas UI de Run snapshots folded out.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
@@ -228,17 +230,20 @@
         "http",
         "dashboard"
       ],
-      "token_estimate": 3983,
+      "token_estimate": 4400,
       "agent_tier": "self-pull",
       "depends_on": [
+        "agent-orchestration",
+        "architecture",
+        "lifecycle-foundation",
         "agent-monitoring",
+        "brand-identity",
         "server-registry",
         "context-management",
         "public-asset-distribution",
         "academy",
         "specs-doctor",
-        "sdd-gate-v3",
-        "brand-identity"
+        "sdd-gate-v3"
       ]
     },
     {
@@ -365,17 +370,17 @@
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
-      "tldr": "Claude Code, Codex, OpenCode, and PI get honest runtime-specific projections from one public source (9 agents / 18 skills / 2 workflows).",
-      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks; OpenCode is canonized \"advisory + chokepoint-protected\" (ADR-G3). PI (the fourth harness, post-v0.1.18) projects an inert `.pi/` surface and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
+      "tldr": "Claude Code, Codex, and PI get honest runtime-specific projections from one public source (OpenCode removed in v0.1.24; 9 agents / 18 skills / 2 workflows).",
+      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only, per the §8 enforcement matrix), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks. The Layer-1 entry-harness set is exactly {claude, codex, pi} — OpenCode was removed entirely in v0.1.24 (both layers; no opencode target/.opencode projection/OPENCODE_RUN worker). PI (post-v0.1.18) projects a minimal `.pi/` surface and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate, WS-PI-4). Public surface is 9 core agents, 18 skills, 2 workflows. Plugin stubs (frontend-engineer, design-specialist, devops-engineer) project as thin stubs with no behavior until the plugin is installed.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
-        "opencode",
         "claude-code",
+        "pi",
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1600,
+      "token_estimate": 1550,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
@@ -470,7 +475,7 @@
       "title": "lifecycle-foundation",
       "category": "product",
       "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind)` (FAKE, CODEX_EXEC, CLAUDE_SDK, OPENCODE_RUN, PI_HEADLESS). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→ SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps, which carry model tiers. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (FAKE, CODEX_EXEC, CLAUDE_SDK, PI_HEADLESS — OPENCODE_RUN removed in v0.1.24). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; CLAUDE_SDK kept/tested for Layer-1). LAW 2: a discrete per-harness GPT model catalog selected on the CLI (--model/--step-model; pi-3 / codex-2). The verbs are dadaia-workflows: Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates; the release-definition workflow is the first fully fragment-driven workflow. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. v0.1.28 adds the workflow model governance control plane: a built-in WorkflowModelProfile registry over harness_models, an atomic operator overlay (missing != invalid), one shared WorkflowExecutionPolicyResolver, a per-run policy snapshot resolved once before step 1, and WMP-* governance doctor checks. v0.1.29 makes harness a first-class governed dimension: an effective-harness precedence chain (CLI step > CLI default > overlay step > overlay default_harness > catalog default), profile validated against the effective harness, auto-profile-on-harness-override, apply_resolved_policy as the single runtime_kind author (FAKE preserved), overlay default_harness/harnesses fields. v0.1.30 ships operator-added PI profiles (a never-projected local store merged with built-ins), per-context overlay `extends` inheritance (the D-2 collapse removed), a run-scoped workflow-step handoff data plane (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor), and real audit/research/bug_report fragment+gate workflow bodies (DEFERRED_WORKFLOWS emptied) plus ctx-inject dehydration. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",
@@ -479,10 +484,11 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 1870,
+      "token_estimate": 4100,
       "agent_tier": "self-pull",
       "depends_on": [
-        "architecture"
+        "architecture",
+        "panel"
       ]
     },
     {
