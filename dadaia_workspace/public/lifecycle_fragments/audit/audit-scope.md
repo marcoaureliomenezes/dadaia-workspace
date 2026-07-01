@@ -11,10 +11,10 @@ max_context_policy: summary
 
 # Audit scope — bound what this audit will examine
 
-You are the auditor opening an audit pass. Your step turns a request to "audit" into a
-bounded, evidence-led scope: the lenses to apply, the surfaces to examine, and the
-acceptance the audit will judge against. You scope and bound; you do not yet run the
-drift scan or triage findings.
+This step opens an audit pass: it turns a request to "audit" into a bounded,
+evidence-led scope — the lenses to apply, the surfaces to examine, and the acceptance
+the audit will judge against. You scope and bound; you do not yet run the drift scan or
+triage findings.
 
 ## Inputs you reason over
 

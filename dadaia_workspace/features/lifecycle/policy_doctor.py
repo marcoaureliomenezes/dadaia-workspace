@@ -26,6 +26,12 @@ The checks keep the layer honest so it cannot rot silently:
   longer skipped, and an overlay harness referencing an unsupported harness on a step (or a
   step with no default profile for the effective harness) is flagged. A
   deprecated-without-replacement profile fails.
+* **WMP-PERSONA** (v0.1.44 / AC-4) — every model-driven catalog/pipeline step's resolved
+  role maps to a real non-PM Layer-2 persona atom. Delegates to
+  :func:`persona_doctor.check_persona_resolution`, which resolves each step ``role`` the
+  SAME way ``pipeline._scope()`` does (comma-split through the persona loader; NOT a
+  fragment ``rglob``) and reports any role resolving to no persona atom or to
+  ``project-manager`` (the Layer-1 orchestrator is not a worker persona — D-1).
 * **WMP-7** — no ``claude``/``opencode`` Layer-2 residue in any built-in profile or in any
   governed catalog step (LAW 1 — Layer-2 workers are ``codex``/``pi`` only).
 * **WMP-8** (``WMP-STATE``) — an invalid policy state file fails with an actionable
@@ -83,6 +89,7 @@ class PolicyDoctorCode(StrEnum):
     WMP_OVERLAY = "WMP-OVERLAY"
     WMP_LAYER2_RESIDUE = "WMP-LAYER2-RESIDUE"
     WMP_STATE = "WMP-STATE"
+    WMP_PERSONA = "WMP-PERSONA"
 
 
 class Severity(StrEnum):
@@ -266,7 +273,7 @@ def _check_profile_registry() -> list[Finding]:
                     PolicyDoctorCode.WMP_LAYER2_RESIDUE,
                     Severity.ERROR,
                     f"built-in profile {profile.id!r} names a Claude model "
-                    f"{profile.model_id!r}; Layer-2 is GPT-only.",
+                    f"{profile.model_id!r}; Layer-2 is allowlist-validated (no claude-*).",
                 )
             )
     return out
@@ -346,6 +353,40 @@ def _resolve_overlay(
     return out
 
 
+def _check_persona_resolution() -> list[Finding]:
+    """WMP-PERSONA (v0.1.44 / AC-4): every model-driven pipeline step's resolved role maps
+    to a real non-PM Layer-2 persona atom.
+
+    Delegates to the persona-resolution anti-regression doctor
+    (:func:`persona_doctor.check_persona_resolution`), which enumerates the actual resolved
+    role of every model-driven catalog/pipeline step the SAME way ``pipeline._scope()`` does
+    (comma-split through the persona loader; NOT a fragment ``rglob``) and reports any role
+    resolving to no persona atom or to ``project-manager``. Each violation is surfaced here
+    as a ``WMP-PERSONA`` ERROR so the governance doctor fails on any regression.
+    """
+    from dadaia_workspace.features.lifecycle import persona_doctor
+
+    report = persona_doctor.check_persona_resolution()
+    out: list[Finding] = []
+    for violation in report.violations:
+        if violation.kind is persona_doctor.PersonaResolutionFindingKind.PROJECT_MANAGER:
+            reason = (
+                "resolves to project-manager (the Layer-1 orchestrator is not a worker "
+                "persona — D-1)"
+            )
+        else:
+            reason = "resolves to no persona atom"
+        out.append(
+            Finding(
+                PolicyDoctorCode.WMP_PERSONA,
+                Severity.ERROR,
+                f"model-driven step {violation.step} role {violation.role!r} {reason}; "
+                "every model-driven step must resolve to a non-PM persona atom.",
+            )
+        )
+    return out
+
+
 def run_policy_doctor(
     *,
     workspace_root: Path,
@@ -371,6 +412,7 @@ def run_policy_doctor(
     findings.extend(_check_step_invariants(catalog, loader))
     findings.extend(_check_profile_registry())
     findings.extend(_check_overlay(workspace_root, catalog, store))
+    findings.extend(_check_persona_resolution())
     return findings
 
 

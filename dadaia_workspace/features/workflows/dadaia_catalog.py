@@ -22,7 +22,7 @@ introspected directly from its authoritative definition:
 
 The per-step harness/model options come from the single discrete Layer-2 catalog
 (:mod:`dadaia_workspace.core.harness_models`, LAW 2 / ADR-B): a model step may run on
-``pi`` (3 discrete options) or ``codex`` (2 options); the deterministic ``fake`` test
+``pi`` (4 discrete options) or ``codex`` (2 options); the deterministic ``fake`` test
 adapter carries no model. Python-owned gate steps (no worker) carry no harness/model.
 
 Everything here is **pure data assembly over existing sources** — zero I/O, no second

@@ -381,6 +381,10 @@ class AgentRunRequest:
     # adapter prefers this over the legacy ``model_profile`` tier-name fallback (M2).
     # ``model_profile`` is kept for back-compat / observability.
     resolved_model: ResolvedModelConfig | None = None
+    # Additive-optional Layer-2 persona mandate for this request's role (v0.1.44 / AC-2).
+    # When present, the headless envelope carries it as an operative directive instructing
+    # the worker to act per the mandate; ``None`` keeps the persona-less payload byte-stable.
+    persona: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -396,6 +400,7 @@ class AgentRunRequest:
             "expected_schema": self.expected_schema,
             "required_evidence": [kind.value for kind in self.required_evidence],
             "resolved_model": self.resolved_model.to_dict() if self.resolved_model else None,
+            "persona": self.persona,
         }
 
     @classmethod
@@ -421,6 +426,7 @@ class AgentRunRequest:
             expected_schema=_optional_str(data.get("expected_schema")),
             required_evidence=tuple(GateEvidenceKind(str(kind)) for kind in required_evidence),
             resolved_model=(ResolvedModelConfig.from_dict(resolved_raw) if resolved_raw else None),
+            persona=_optional_str(data.get("persona")),
         )
 
 

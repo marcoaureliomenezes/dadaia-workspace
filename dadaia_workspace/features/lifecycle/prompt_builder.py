@@ -161,6 +161,11 @@ class PromptScope:
     # threaded into the request so the adapter runs the policy-selected model (M2). Kept
     # additive-optional: ``model_profile`` stays for back-compat / observability.
     resolved_model: ResolvedModelConfig | None = None
+    # The resolved Layer-2 persona mandate for this step's role(s) (v0.1.44 / AC-2). When
+    # present it is threaded into the request and emitted into the worker envelope as an
+    # operative directive (act-per-mandate). Additive-optional: ``None`` (shared / no-atom
+    # role) carries no persona block, keeping the persona-less payload byte-identical.
+    persona: str | None = None
 
 
 @dataclass(frozen=True)
@@ -199,6 +204,7 @@ class LifecyclePromptBuilder:
             expected_schema=scope.expected_schema,
             required_evidence=scope.required_evidence,
             resolved_model=scope.resolved_model,
+            persona=scope.persona,
         )
         prompt_text = self._prompt_text(scope)
         if prefix is not None:

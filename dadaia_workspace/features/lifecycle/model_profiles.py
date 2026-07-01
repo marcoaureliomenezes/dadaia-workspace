@@ -10,7 +10,7 @@ governance unit instead of a raw ``<id>:<effort>`` string, while every profile's
 The no-second-table guard mirrors ``harness_models._assert_ids_known``:
 :func:`_assert_profiles_resolve` runs at import time and fails loudly if any profile names
 a ``(model_id, effort)`` pair the catalog does not carry, names a ``claude-*`` id (the
-GPT-only Layer-2 invariant), uses a non-Layer-2 harness, or is deprecated without a
+no-``claude-*`` Layer-2 invariant), uses a non-Layer-2 harness, or is deprecated without a
 ``replacement`` that itself exists.
 
 Layering: ``features`` over ``core`` data — zero I/O.
@@ -124,7 +124,7 @@ def _assert_profiles_resolve() -> None:
         if profile.model_id.startswith("claude-"):
             raise ValueError(
                 f"profile {profile.id!r} names a Claude id {profile.model_id!r}; "
-                "Layer-2 is GPT-only (ADR-B)"
+                "Layer-2 is allowlist-validated; claude-* is never a Layer-2 worker (ADR-B)"
             )
         option = HarnessModelOption(profile.model_id, _as_effort(profile.effort))
         if option not in harness_models.options_for(profile.harness):
@@ -193,7 +193,7 @@ def _assert_operator_profiles_resolve(profiles: tuple[WorkflowModelProfile, ...]
         if profile.model_id.startswith("claude-"):
             raise ValueError(
                 f"operator profile {profile.id!r} names a Claude id {profile.model_id!r}; "
-                "Layer-2 is GPT-only (ADR-B)"
+                "Layer-2 is allowlist-validated; claude-* is never a Layer-2 worker (ADR-B)"
             )
         option = HarnessModelOption(profile.model_id, _as_effort(profile.effort))
         if option not in harness_models.options_for(profile.harness):

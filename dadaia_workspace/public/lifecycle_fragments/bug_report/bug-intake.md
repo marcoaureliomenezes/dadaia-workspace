@@ -1,6 +1,6 @@
 ---
 id: bug_report.bug_intake
-role: project-manager
+role: project-auditor
 workflow: bug_report
 step: bug_intake
 static_inputs: []

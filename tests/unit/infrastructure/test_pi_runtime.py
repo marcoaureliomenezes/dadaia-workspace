@@ -572,6 +572,58 @@ def test_pi_per_request_resolved_model_reaches_command(tmp_path: Path) -> None:
     assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "gpt-5.5"]
 
 
+def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None:
+    """AC-5 (v0.1.44): a curated OpenRouter id flows through ``pi --mode json --model <id>``.
+
+    The adapter forwards ``request.resolved_model.model`` verbatim — no source edit was
+    needed to open pi to the allowlisted OpenRouter ids; this pins that passthrough so a
+    future change cannot silently rewrite or drop the selected id.
+    """
+    import dataclasses
+
+    from dadaia_workspace.core.harness_models import validate
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+    )
+
+    # The id is a real, allowlist-validated pi catalog option.
+    option = validate("pi", "kimi-2.7:high")
+    assert option.model_id == "kimi-2.7"
+
+    captured: list[list[str]] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end("done"))
+
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={})
+    request = dataclasses.replace(
+        _request(),
+        resolved_model=ResolvedModelConfig(
+            profile_id="pi-operator-kimi",
+            harness="pi",
+            model="kimi-2.7",
+            reasoning="high",
+            source=PolicySource.CLI,
+        ),
+    )
+
+    adapter.run(request)
+
+    argv = captured[0]
+    assert argv[: argv.index("--model")] == [
+        "pi",
+        "--mode",
+        "json",
+        "--tools",
+        "read,write,edit,bash",
+    ]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "kimi-2.7"]
+
+
 def test_pi_no_model_flag_when_neither_request_nor_config(tmp_path: Path) -> None:
     captured: list[list[str]] = []
 

@@ -134,7 +134,7 @@ class ReleaseDefinitionResult:
 _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="release_scope",
-        role="project-manager",
+        role="product-engineer",
         fragment_id="release_definition.release_scope",
         shared_fragment_ids=(
             "shared.grill_questionnaire",

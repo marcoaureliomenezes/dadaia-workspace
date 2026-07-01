@@ -1,6 +1,6 @@
 ---
 id: research.synthesis
-role: project-manager
+role: product-engineer
 workflow: research
 step: synthesis
 static_inputs: []

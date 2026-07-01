@@ -15,7 +15,7 @@ The sequence is:
 2. ``drift_scan`` (project-auditor, **review**) — runs the lenses over the bounded
    surfaces and returns a verdict + findings. Consumes ``audit_scope``; produces
    ``audit-findings-handoff-v1``. A REJECTED verdict (blocking drift) BLOCKS the run.
-3. ``triage`` (project-manager) — disposes every finding (bug / backlog / accepted-risk /
+3. ``triage`` (project-auditor) — disposes every finding (bug / backlog / accepted-risk /
    resolved) into **disposition-ready** output (A29). Consumes ``drift_scan``; produces
    ``audit-disposition-handoff-v1``.
 4. ``audit_disposition_gate`` (python, no model) — the terminal Python gate. Advances the
@@ -152,7 +152,7 @@ _SEQUENCE: tuple[AuditStep, ...] = (
     ),
     AuditStep(
         label="triage",
-        role="project-manager",
+        role="project-auditor",
         fragment_id="audit.triage",
         shared_fragment_ids=("shared.output_handoff",),
         produces="audit-disposition-handoff-v1",
