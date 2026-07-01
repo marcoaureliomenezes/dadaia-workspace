@@ -40,6 +40,20 @@ fails on a mismatch or a missing file.
 
 ## Protocol
 
+### Step 0 — Resolve the workspace root (before composing any path)
+
+Handoff and report paths are **workspace-root-relative**, never cwd-relative. A sub-agent
+frequently runs with its cwd inside a repo (`repos/<slug>/…`); composing
+`.dadaia/handoff/…` from there would create a stray `.dadaia/` **inside the repo**, which
+corrupts workspace-vs-repo boundary detection and hides the handoff from the panel.
+
+Before composing any `.dadaia/handoff/…` or `.dadaia/reports/…` path, resolve the
+workspace root: starting at the current working directory, walk up parent by parent and
+stop at the first ancestor that **already contains** a `.dadaia/` directory. That ancestor
+is the workspace root — compose every handoff and report path under it. Never create a new
+`.dadaia/`: if no ancestor already contains one, stop and report the missing workspace
+root rather than materializing `.dadaia/` inside a repo working tree.
+
 ### Step 1 — Determine the mode
 
 Default to handoff-only. Switch to report mode only if the operator asked for an HTML
@@ -179,6 +193,8 @@ referenced report exists and its hash matches. Fix any non-zero exit before proc
 - Never include `artifact.path` without its matching `content_hash` (the validator
   recomputes and fails on mismatch).
 - Never write handoff JSON under `.dadaia/reports/`.
+- Resolve the workspace root first (the nearest ancestor already containing `.dadaia/`);
+  never create a `.dadaia/` directory inside a repo working tree.
 - `produced_at` must be a valid ISO 8601 UTC timestamp ending in `Z`.
 - `artifact.content_hash`, when present, is a bare 64-character lowercase hex string —
   no prefix.

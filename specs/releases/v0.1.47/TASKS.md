@@ -62,13 +62,13 @@ write sets are declared (PLAN write-set boundaries apply).
 
 ## W4 — Fragments + personas (owner: ai-engineer)
 
-- [-] T-47-50 Shared fragments de-slop (output_handoff, anti_slop, memory_selection, etc.)
-- [-] T-47-51 release_definition + backlog_definition fragment sets
-- [-] T-47-52 audit / research / bug_report fragment sets
-- [-] T-47-53 pipeline phase fragments (implementation/review/closure)
-- [-] T-47-54 8 personas rewrite (sub-agent mandates; zero fragment overlap)
-- [-] T-47-55 dadaia-handoff-emitter skill root-resolution instruction
-- [-] T-47-56 stage + install --target all + public doctor exit 0 (clears live drift)
+- [x] T-47-50 Shared fragments de-slop (output_handoff, anti_slop, memory_selection, etc.)
+- [x] T-47-51 release_definition + backlog_definition fragment sets
+- [x] T-47-52 audit / research / bug_report fragment sets
+- [x] T-47-53 pipeline phase fragments (implementation/review/closure)
+- [x] T-47-54 8 personas rewrite (sub-agent mandates; zero fragment overlap)
+- [x] T-47-55 dadaia-handoff-emitter skill root-resolution instruction
+- [x] T-47-56 stage + install --target all + public doctor exit 0 (clears live drift)
 - [ ] T-47-57 Second-reviewer content sign-off over all rewritten fragments/personas
   (APPROVE verdict + per-workflow prompt-assembly dumps as evidence)
 
