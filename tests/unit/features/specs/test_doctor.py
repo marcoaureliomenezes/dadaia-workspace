@@ -565,8 +565,9 @@ def test_semver_folder_name_new_release_passes(tmp_path: Path) -> None:
 def test_semver_folder_name_non_semver_new_release_warns(tmp_path: Path) -> None:
     """A release folder named 'my-feature-v1' with Created: >= cutoff raises SPEC-DOC-016."""
     specs = _make_clean_specs_tree(tmp_path, release_id="my-feature-v1")
+    # Created after RELEASE_VINTAGE_CUTOFF (2026-06-04) so it is enforced, not grandfathered.
     (specs / "releases" / "my-feature-v1" / "SPEC.md").write_text(
-        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-01\n\nContent.\n",
+        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-10\n\nContent.\n",
         encoding="utf-8",
     )
     from datetime import date as _date

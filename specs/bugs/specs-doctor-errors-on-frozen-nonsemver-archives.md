@@ -1,10 +1,23 @@
 ---
 name: specs-doctor-errors-on-frozen-nonsemver-archives
-status: Open
+status: Closed
 severity: MEDIUM
 reported: 2026-07-01
+resolved: 2026-07-01
 surface: dadaia specs doctor (SPEC-DOC-016) + tests/e2e/test_lifecycle_engine_smoke.py
 session_id: null
+---
+
+**Resolution (v0.1.45, operator-directed):** bumped `RELEASE_VINTAGE_CUTOFF` in
+`dadaia_workspace/features/specs/doctor.py` from `2026-05-17` to `2026-06-04`, grandfathering
+the frozen pre-June-5 `_archive` sub-patch releases (created June 2-4) that predate the
+SemVer-folder mandate's rollout. The `SPEC-DOC-016` rule keeps **hard-enforcing** for every
+release created after the cutoff (v0.1.44 onward), so future non-SemVer folder names still
+break CI. `specs doctor` on the repo returns 0 errors again and
+`test_temp_workspace_lifecycle_engine_smoke` passes. The `test_semver_folder_name_non_semver_new_release_warns`
+fixture Created date was moved to `2026-06-10` so it stays post-cutoff and continues to
+assert enforcement. No FROZEN archive was renamed (immutable history preserved).
+
 ---
 
 **Symptom:** `dadaia specs doctor --specs-dir <repo>/specs` reports **8 SPEC-DOC-016

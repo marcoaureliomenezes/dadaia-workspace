@@ -126,11 +126,15 @@ _PLAYBOOK_HEADING_RE = re.compile(
 )
 
 # SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
-# Vintage releases (Created: <= 2026-05-17) are excluded.
+# Vintage releases (Created: <= 2026-06-04) are excluded — this grandfathers the frozen
+# pre-June-5 _archive sub-patch releases (v0.1.4.1..v0.1.4.6, ctx-inject-v2-drift-fix-v1)
+# that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
+# every release created after the cutoff (v0.1.44 onward). See specs/bugs/
+# specs-doctor-errors-on-frozen-nonsemver-archives.md (v0.1.45).
 RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
-RELEASE_VINTAGE_CUTOFF = date(2026, 5, 17)  # releases on/before this are excluded
+RELEASE_VINTAGE_CUTOFF = date(2026, 6, 4)  # releases on/before this are excluded
 
 # SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
 # release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
