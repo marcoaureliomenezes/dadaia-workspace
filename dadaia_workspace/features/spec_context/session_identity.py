@@ -147,6 +147,23 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
     return _sessions_dir(workspace, create=create) / f"{session_id}.json"
 
 
+def session_record_pid(workspace: Path, session_id: str) -> int | None:
+    """Fail-soft ``pid`` field of a CLI session record (v0.1.50 FR1).
+
+    Lineage evidence for lease self-recognition: a rotated session id can prove
+    it belongs to the SAME harness process only when the replaced sid's session
+    record (written by ``dadaia context bind``) carries the same pid. Missing,
+    invalid, or corrupt records yield ``None`` — no evidence, no recognition.
+    """
+    try:
+        path = session_record_path(workspace, session_id)
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    pid = data.get("pid") if isinstance(data, dict) else None
+    return pid if isinstance(pid, int) else None
+
+
 def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     """Path of the session-record directory ``.dadaia/sessions/`` (T-011-05 / FR-W1-05).
 

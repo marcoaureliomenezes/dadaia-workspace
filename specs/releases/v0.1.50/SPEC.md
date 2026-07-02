@@ -78,13 +78,25 @@ context-exit machinery — has four verified defect clusters:
   is alive ⇒ RENEW (update sid/heartbeat, preserve holder state) instead of
   `LockHeldError`. The no-steal invariant for FOREIGN pids is unchanged by
   construction (the rung can only match this very process).
-- `active_release` hygiene — **primary fix on the `is_stale` side**: treat non-SemVer
-  sentinel strings (`'none'`, `''`) as `None` so the release-mismatch reclaim branch
-  never fires on an I/O-failure sentinel (today `hooks/sdd_gate.py` does
-  `_active_field(...) or "none"`, and that string bypasses the pid-veto). Reader-seam
-  note: the hook's `release` variable is DUAL-USE (it is also the new lease record's
-  `release` field) — any reader-side change must preserve a written record-release;
-  the sentinel tolerance in `is_stale` is the load-bearing half.
+  **Implementation ADR (W1, 2026-07-02):** bare pid equality collided with two
+  frozen contracts (`test_lease_toctou.py` and the gate's yield-iff-live-foreign
+  test both model foreign holders with the test process's own pid). The rung
+  therefore additionally requires **lineage evidence**: the replaced sid's CLI
+  session record (written by `dadaia context bind`, read via the new
+  `session_identity.session_record_pid`) must carry the same pid. Real rotations
+  always have the record; evidence-less same-pid holders keep blocking — every
+  frozen contract stays green with zero edits.
+- `active_release` hygiene — **Implementation ADR (W1, 2026-07-02): the fix lives at
+  the READER seam, not in `is_stale`.** The frozen release-aware contract
+  (`test_lock_liveness_release_aware.py`) deliberately pins `'none'`/`''` as reclaim
+  triggers — the legitimate between-releases reclaim (T-43-10). Normalizing them in
+  `is_stale` would break it. Instead: `_active_field` becomes tri-state
+  (readable → str, absent file → `""` legit-none, I/O failure → `None` UNKNOWN);
+  the gate computes `veto_release = None if unreadable else release` and threads it
+  through a new `gate_policy.evaluate(veto_release=…)` →
+  `lease.acquire(active_release=…)` kwarg (default: legacy coupling to `release`),
+  so the RECORD release stays written while the veto is preserved exactly and only
+  on I/O failure.
 - **Sid resolution seam = `hooks/_common.resolve_session_id`** (NOT `sdd_gate.py`,
   which merely calls it): exact precedence becomes `DADAIA_SESSION_ID` (explicit
   eval-flow override, stays first) > **harness payload sid** >

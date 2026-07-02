@@ -221,13 +221,23 @@ def _incumbent_is_stale(
     return not lock_liveness.is_stale(holder, pid_probe=pid_probe, active_release=active_release)
 
 
-def _active_field(specs_dir: Path, field: str) -> str:
-    """Read a ``<field>: <value>`` line from ``releases/ACTIVE.md`` (empty on miss)."""
+def _active_field(specs_dir: Path, field: str) -> str | None:
+    """Read a ``<field>: <value>`` line from ``releases/ACTIVE.md`` (tri-state).
+
+    v0.1.50 FR1 (audit F-3): the return distinguishes three outcomes —
+    ``str`` (readable; ``""`` when the field is missing), ``""`` when the file does
+    not exist (a fresh context legitimately has no ACTIVE.md — "no release" truth),
+    and ``None`` when the file exists but could NOT be read (a genuine I/O failure).
+    Callers must treat ``None`` as UNKNOWN, never as "none": an unreadable ACTIVE.md
+    must not weaken the lease pid-veto via the release-mismatch reclaim.
+    """
     active = specs_dir / "releases" / "ACTIVE.md"
     try:
         text = active.read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
         return ""
+    except OSError:
+        return None
     pat = re.compile(rf"^{re.escape(field)}:\s*(.+?)\s*$", re.MULTILINE)
     m = pat.search(text)
     return m.group(1) if m else ""
@@ -269,8 +279,14 @@ def _evaluate_target(
 
     ctx = _context_slug(workspace, fpath)
     specs_dir = workspace / "repos" / ctx / "specs" if ctx else workspace / "specs"
-    phase = _active_field(specs_dir, "phase")
-    release = _active_field(specs_dir, "release") or "none"
+    phase = _active_field(specs_dir, "phase") or ""
+    # Tri-state release read (v0.1.50 FR1): a readable ACTIVE.md that says none (or
+    # an absent file) yields the legitimate "none" — release-aware reclaim applies;
+    # an UNREADABLE ACTIVE.md (I/O failure) yields veto_release=None so the pid-veto
+    # is preserved (an I/O failure never makes a live holder stealable).
+    release_raw = _active_field(specs_dir, "release")
+    release = release_raw or "none"
+    veto_release: str | None = None if release_raw is None else release
     session_id = _common.resolve_session_id(payload, default="anon-session")
     # Single probe construction point (R8 dedup): the PID-liveness probe is built once here
     # and threaded into both the incumbent-staleness check (via ``_resolve_mode``) and the
@@ -284,7 +300,7 @@ def _evaluate_target(
     # treated as reclaimable in the liveness verdict. ``release`` here is ACTIVE.md's release
     # (``"none"`` when archived), so any release-pinned stale holder on a different release is
     # no longer a live incumbent that downgrades this session's mode.
-    mode = _resolve_mode(workspace, session_id, ctx, pid_probe, active_release=release)
+    mode = _resolve_mode(workspace, session_id, ctx, pid_probe, active_release=veto_release)
 
     # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
     # NOTE: a READ-bound session that *does* resolve a context is still blocked below by
@@ -300,6 +316,7 @@ def _evaluate_target(
         phase=phase,
         session_id=session_id,
         release=release,
+        veto_release=veto_release,
         mode=mode,
         pid_probe=pid_probe,
         # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this

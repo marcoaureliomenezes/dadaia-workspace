@@ -1,60 +1,102 @@
-"""`is_stale` sentinel tolerance for `active_release` (v0.1.50 FR1 — audit F-3).
+"""Veto-release decoupling at the acquire seam (v0.1.50 FR1 — audit F-3).
 
-`hooks/sdd_gate.py` degrades an unreadable ACTIVE.md to the *string* ``"none"``;
-that sentinel must never enter the release-mismatch reclaim branch, or an I/O
-failure bypasses the pid-veto and a live holder becomes stealable.
+An UNREADABLE ACTIVE.md (I/O failure) must never weaken the pid-veto: the gate
+passes ``active_release=None`` (veto-preserving) while still writing a ``"none"``
+record release. A READABLE "none" (between releases, or a fresh context with no
+ACTIVE.md) keeps the legitimate release-aware reclaim — the frozen
+``test_lock_liveness_release_aware`` contract is untouched.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import lock_liveness
+from dadaia_workspace.features.spec_context import lease
 
 pytestmark = pytest.mark.unit
 
 _TTL = 120
-_HB = datetime(2026, 6, 30, 12, 0, 0, tzinfo=UTC)
+_T0 = datetime(2026, 6, 30, 12, 0, 0, tzinfo=UTC)
 
 
-def _stale_clock() -> datetime:
-    return _HB + timedelta(seconds=_TTL + 30)
+def _old_clock() -> datetime:
+    return _T0
 
 
-def _rec(release: str, *, pid: int = 4321) -> dict[str, object]:
-    return {
-        "heartbeat": _HB.isoformat(),
-        "ttl": _TTL,
-        "pid": pid,
-        "session_id": "holder-sess",
-        "release": release,
-    }
+def _now_clock() -> datetime:
+    return _T0 + timedelta(seconds=_TTL + 30)
 
 
 def _alive(_pid: int) -> bool:
     return True
 
 
-@pytest.mark.parametrize("sentinel", ["none", ""])
-def test_sentinel_active_release_preserves_pid_veto(sentinel: str) -> None:
-    """A sentinel active_release is treated as None: the live-pid veto holds."""
-    verdict = lock_liveness.is_stale(
-        _rec("v0.1.50"),
-        clock=_stale_clock,
+def _seed_stale_foreign_holder(workspace: Path) -> None:
+    """A TTL-stale holder pinned to a real release, its pid demonstrably alive."""
+    status, _ = lease.acquire(
+        workspace,
+        "ctx",
+        "holder-sess",
+        "v0.1.50",
+        "implementation",
+        clock=_old_clock,
         pid_probe=_alive,
-        active_release=sentinel,
+        pid=1111,
     )
-    assert verdict is False
+    assert status == "ACQUIRED"
 
 
-def test_real_release_mismatch_still_reclaims() -> None:
-    """Release-aware reclaim (T-43-10) is untouched for REAL SemVer mismatches."""
-    verdict = lock_liveness.is_stale(
-        _rec("v0.1.50"),
-        clock=_stale_clock,
+def test_unreadable_active_preserves_pid_veto(tmp_path: Path) -> None:
+    """active_release=None (unreadable ACTIVE.md) ⇒ the live-pid veto HOLDS."""
+    _seed_stale_foreign_holder(tmp_path)
+
+    with pytest.raises(lease.LockHeldError):
+        lease.acquire(
+            tmp_path,
+            "ctx",
+            "intruder-sess",
+            "none",
+            "implementation",
+            clock=_now_clock,
+            pid_probe=_alive,
+            pid=2222,
+            active_release=None,
+        )
+
+
+def test_readable_none_release_still_reclaims(tmp_path: Path) -> None:
+    """Legit 'none' (readable ACTIVE, no active release) keeps release-aware reclaim."""
+    _seed_stale_foreign_holder(tmp_path)
+
+    status, rec = lease.acquire(
+        tmp_path,
+        "ctx",
+        "next-sess",
+        "none",
+        "implementation",
+        clock=_now_clock,
         pid_probe=_alive,
-        active_release="v0.1.51",
+        pid=2222,
     )
-    assert verdict is True
+    assert status == "ACQUIRED"
+    assert rec["session_id"] == "next-sess"
+
+
+def test_real_release_mismatch_still_reclaims(tmp_path: Path) -> None:
+    """Release-aware reclaim (T-43-10) untouched for REAL SemVer mismatches."""
+    _seed_stale_foreign_holder(tmp_path)
+
+    status, _ = lease.acquire(
+        tmp_path,
+        "ctx",
+        "next-sess",
+        "v0.1.51",
+        "implementation",
+        clock=_now_clock,
+        pid_probe=_alive,
+        pid=2222,
+    )
+    assert status == "ACQUIRED"
