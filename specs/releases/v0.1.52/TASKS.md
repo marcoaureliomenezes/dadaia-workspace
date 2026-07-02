@@ -24,15 +24,23 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
 
 ## W1 — FR1 aggregate endpoint (write set: PLAN §W1)
 
-- [ ] T-52-10 TDD: `test(T-52-10): aggregate matrix RED` commit (8-case cost-known
-  matrix + deleted-route 404), then ONE `feat(T-52-10)` commit: `aggregate_sessions`
-  SQL + `TelemetryService.aggregate_sessions` facade + `/api/sessions` payload
-  switch + DELETE detail endpoint at ALL handler sites + DELETE dead facades
-  (`TelemetryService.list_sessions`/`get_session`) + aggregator
-  `list_sessions`/`get_session` (`list_sessions_by_agent` stays) + the three
-  list-era test files replaced by matrix successors. Coverage inventory (deleted
-  behaviors → named successors, incl. `/api/agents/<id>/sessions` intact) recorded
-  on this line. Owner: software-engineer.
+- [x] T-52-10 DONE. RED `72caa6cc` (32 failed for the right reasons —
+  `aggregate_sessions` missing / envelope mismatch / 503) → feat `21cb8158`.
+  Landed: `aggregate_sessions` SQL + facade (dead facades deleted; grep-proof: the
+  only surviving hit is a kept dataclass docstring; `list_sessions_by_agent`
+  intact at 4 sites); `/api/sessions` aggregate envelope; detail endpoint deleted
+  at ALL handler sites + `container.py` `api_session_detail` unwiring (caught
+  beyond the SPEC enumeration); 2 collateral tests updated
+  (`test_handler_route_classification`, `test_no_auth_contract`). Scope run: 38
+  passed (3 reworked files) + **915 passed, exit 0** (panel+telemetry+contract) +
+  ruff/mypy clean. COVERAGE INVENTORY recorded in the W1 handoff
+  (`2026-07-02T234313Z-software-engineer-T-52-10.handoff.json`): every surviving
+  behavior mapped to a named successor (matrix cases 1-8, auth/503/Host-guard,
+  deleted-route 404); list/detail-only behaviors (pagination, ordering, per-row
+  fields, event_timestamps) intentionally dead; `/api/agents/<id>/sessions`
+  coverage confirmed intact (10 named tests). Design note for QA: codex/pi cost
+  forced null/false via `_COST_UNKNOWN_RUNTIMES` even against stray stored data.
+  Owner: software-engineer.
 
 ## W2 — FR2 dashboard-only view (write set: PLAN §W2)
 
