@@ -221,6 +221,20 @@ def _index_remove(workspace: Path, ctx: str, session_id: str) -> None:
         path.unlink(missing_ok=True)
 
 
+def session_holds(workspace: Path, ctx: str, session_id: str) -> bool:
+    """True iff ``session_id``'s by-session index entry names ``ctx`` (v0.1.50 FR2).
+
+    The entry is written in the SAME CAS transaction as every acquire, so it is
+    acquisition evidence: a lock record whose holder also appears in the index is a
+    CONFIRMED holder (holder-confirmation for SPEC-DOC-029) — a divergent incumbent
+    ``.ptr`` alone is drift, not forgery. Fail-soft: absent/corrupt index ⇒ False.
+    """
+    try:
+        return ctx in _read_by_session(workspace, session_id)
+    except (OSError, ValueError):
+        return False
+
+
 def release_for_session(workspace: Path, session_id: str) -> list[str]:
     """Eval-flow release (FR-W4-03 a): drop every lease the ``session_id`` holds.
 
@@ -540,6 +554,12 @@ def acquire(
                 # drifted to a foreign id due to a relaunch without .ptr cleanup).
                 rec = read_record(workspace, ctx)
                 if rec is not None:
+                    # v0.1.50 FR2 (audit F-7): the replaced sid's by-session entry
+                    # must not dangle — same hygiene as the takeover branch.
+                    drifted_sid = str(rec.get("session_id", ""))
+                    if drifted_sid and drifted_sid != session_id:
+                        with contextlib.suppress(OSError, ValueError):
+                            _index_remove(workspace, ctx, drifted_sid)
                     rec["session_id"] = session_id
                     rec["pid"] = holder_pid
                     rec["heartbeat"] = clock().isoformat()

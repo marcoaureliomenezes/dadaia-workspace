@@ -18,7 +18,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W1 — FR1 lease identity (write set: `core/lock_liveness.py`, `features/spec_context/lease.py`, `hooks/sdd_gate.py`, unit tests)
 
-- [-] T-50-10 TDD: failing rotated-sid self-block regression as its OWN red commit
+- [x] T-50-10 TDD: failing rotated-sid self-block regression as its OWN red commit
   (same recorded harness pid + new sid ⇒ currently `LockHeldError`); then the third
   identity rung (RENEW) at the acquire ladder in `lease.py`; sid precedence fixed
   ONCE in `hooks/_common.resolve_session_id` (`DADAIA_SESSION_ID` override stays
@@ -29,7 +29,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W2 — FR2 coherence + index hygiene (write set: `session_identity.py`, doctor state-dir seam, tests)
 
-- [ ] T-50-11 TDD: SPEC-DOC-029 holder-confirmation coherence (a confirmed live
+- [-] T-50-11 TDD: SPEC-DOC-029 holder-confirmation coherence (a confirmed live
   holder is coherent despite `.ptr` drift; NO by-session schema change); RENEW-branch
   dangling-entry cleanup (`_index_remove` for the replaced sid); doctor `--specs-dir`
   isolated `workspace_state_dir`. Owner: software-engineer.

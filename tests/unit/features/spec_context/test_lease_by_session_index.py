@@ -151,3 +151,33 @@ def test_post_gate_full_scan_fallback_when_index_dir_absent(tmp_path: Path) -> N
     assert not (lock_dir / "by-session").exists()
     # Fallback returns the legacy record's context via the full scan.
     assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_x") == ["legacy"]
+
+
+def test_ptr_renew_removes_replaced_sid_entry(tmp_path: Path) -> None:
+    """v0.1.50 FR2 (audit F-7): the .ptr-match RENEW must not dangle the old sid."""
+    lease.acquire(tmp_path, "ctxa", "sess_inc", "v1", "IMPLEMENTATION", pid=4321)
+
+    # Simulate a drifted lock record (relaunch without .ptr cleanup): the record
+    # names a foreign sid with its own index entry, while .ptr still names sess_inc.
+    rec = lease.read_record(tmp_path, "ctxa")
+    assert rec is not None
+    rec["session_id"] = "sess_drift"
+    lease._write_record(lease._record_path(tmp_path, "ctxa"), rec)
+    lease._index_add(tmp_path, "ctxa", "sess_drift")
+
+    status, renewed = lease.acquire(tmp_path, "ctxa", "sess_inc", "v1", "IMPLEMENTATION", pid=4321)
+    assert status == "RENEWED"
+    assert renewed["session_id"] == "sess_inc"
+
+    index_dir = tmp_path / ".dadaia" / "states" / "ctx_locks" / "by-session"
+    assert (index_dir / "sess_inc.json").exists()
+    assert not (index_dir / "sess_drift.json").exists()
+
+
+def test_session_holds_reads_acquisition_evidence(tmp_path: Path) -> None:
+    """v0.1.50 FR2: session_holds is True only for a same-CAS-indexed holder."""
+    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
+
+    assert lease.session_holds(tmp_path, "ctxa", "sess_a") is True
+    assert lease.session_holds(tmp_path, "ctxa", "sess_ghost") is False
+    assert lease.session_holds(tmp_path, "ctxb", "sess_a") is False

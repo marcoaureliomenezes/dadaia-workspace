@@ -52,9 +52,15 @@ def test_cli_doctor_reaches_coherence_check_on_incoherent_state(
     specs = _make_workspace(tmp_path)
     ctx = "ctx-a"
 
-    # Production writers: a real lease record + incumbent ptr (holder = S1), then drift
-    # the incumbent ptr to S2 and persist S2's session record → three-source divergence.
+    # v0.1.50 FR2 (holder-confirmation): a REAL acquire writes the by-session index
+    # (acquisition evidence), so a drifted ptr alone is no longer forgery. The 029
+    # ERROR now requires an EVIDENCE-LESS live holder: forge the lock record
+    # directly (out-of-band edit, no index entry), then diverge the incumbent ptr.
     lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
+    rec = lease.read_record(tmp_path, ctx)
+    assert rec is not None
+    rec["session_id"] = "sessForged"
+    lease._write_record(lease._record_path(tmp_path, ctx), rec)
     session_identity.set_incumbent(tmp_path, ctx, "sessS2")
     session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
 
@@ -78,3 +84,36 @@ def test_cli_doctor_coherent_state_has_no_doc_029(
     result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
 
     assert "SPEC-DOC-029" not in result.output, result.output
+
+
+def test_cli_doctor_external_specs_dir_isolates_live_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.1.50 FR2 (audit F-4): an explicit --specs-dir OUTSIDE the workspace never
+    reads the live workspace's lock/session state — fixture doctor runs report no
+    SPEC-DOC-029 sourced from the live tree."""
+    ws_root = tmp_path / "ws"
+    ws_root.mkdir()
+    _make_workspace(ws_root)
+    # Plant an INCOHERENT live state in the workspace: an evidence-less forged
+    # holder (no index entry) + a drifted incumbent ptr — the 029 ERROR shape.
+    lease.acquire(ws_root, "ctxa", "sess_holder", "v1", "IMPLEMENTATION", pid=4321)
+    rec = lease.read_record(ws_root, "ctxa")
+    assert rec is not None
+    rec["session_id"] = "sess_forged"
+    lease._write_record(lease._record_path(ws_root, "ctxa"), rec)
+    session_identity.set_incumbent(ws_root, "ctxa", "sess_drift")
+
+    # A fixture specs tree OUTSIDE the workspace root.
+    outside = tmp_path / "elsewhere" / "specs"
+    result = scaffold(
+        specs_dir=outside,
+        project_name="fixture-tree",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == [], result.errors
+
+    monkeypatch.chdir(ws_root)
+    run = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(outside)])
+    assert "SPEC-DOC-029" not in run.output

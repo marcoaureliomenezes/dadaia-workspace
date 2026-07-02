@@ -141,6 +141,13 @@ def doctor(
     # the specs tree). Best-effort: if no workspace root resolves (e.g. a bare --specs-dir
     # in CI), the backstop stays a documented no-op.
     workspace_state_dir = _resolve_workspace_state_dir()
+    # v0.1.50 FR2 (audit F-4): an EXPLICIT --specs-dir pointing OUTSIDE the resolved
+    # workspace is a fixture/CI run — the live workspace's lock/session state must not
+    # bleed into its verdicts. The backstop degrades to the documented no-op.
+    if specs_dir is not None and workspace_state_dir is not None:
+        ws_root = workspace_state_dir.parent.resolve()
+        if not target.resolve().is_relative_to(ws_root):
+            workspace_state_dir = None
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,

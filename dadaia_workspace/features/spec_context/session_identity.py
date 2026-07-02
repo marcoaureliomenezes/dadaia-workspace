@@ -486,6 +486,7 @@ def coherence(
     ctx: str,
     *,
     lock_holder: str | None,
+    holder_confirmed: bool = False,
 ) -> str | None:
     """Return a divergence message if the three identity sources disagree, else ``None``.
 
@@ -520,6 +521,14 @@ def coherence(
 
     names = {value for _label, value in present}
     if len(names) <= 1:
+        return None
+
+    # Holder-confirmation (v0.1.50 FR2, audit F-4): when the caller proved the
+    # lock-holder is the TRUE holder (its by-session index entry — written in the
+    # same CAS as the acquire — names this ctx), a divergent incumbent ``.ptr``
+    # (e.g. a later read-bind moved it) is DRIFT, not lease↔session forgery.
+    # Only an evidence-less live holder yields the incoherence message.
+    if holder_confirmed and lock_holder:
         return None
 
     detail = ", ".join(f"{label}={value!r}" for label, value in present)
