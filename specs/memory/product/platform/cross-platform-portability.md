@@ -20,51 +20,51 @@ tags:
 - hooks
 - security
 agent_tier: self-pull
-token_estimate: 1400
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 1750
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
-Documenta o modelo de portabilidade de plataforma do dadaia-workspace. A release 0.1.8 fechou
-o gap entre o classificador PyPI `OS Independent` e a realidade Linux-only, estabelecendo uma
-fronteira port/adapter para todos os domínios OS-sensíveis e um contrato de resiliência em 3
-tiers que governa o comportamento em plataformas não-Linux.
+Documents the platform-portability model of dadaia-workspace. Release 0.1.8 closed
+the gap between the PyPI classifier `OS Independent` and the Linux-only reality, establishing a
+port/adapter boundary for all OS-sensitive domains and a 3-tier resilience
+contract that governs behavior on non-Linux platforms.
 
-A fundação é o seam `core/platform.py`: um singleton `PLATFORM` que é o único site autorizado
-para a chamada `sys.platform` em todo o codebase. Nenhum outro arquivo pode ler `sys.platform`
-diretamente (exceto durante guards transitionals em function bodies, per ADR-1, cada um anotado
-com `# TODO: Replace with PLATFORM.has_<flag>`).
+The foundation is the `core/platform.py` seam: a `PLATFORM` singleton that is the only authorized site
+for the `sys.platform` call in the entire codebase. No other file may read `sys.platform`
+directly (except during transitional guards in function bodies, per ADR-1, each annotated
+with `# TODO: Replace with PLATFORM.has_<flag>`).
 
-## Fluxo de uso
+## Usage flow
 
-  1. `container.py` lê `PLATFORM` na startup e seleciona os adapters concretos para cada domínio
-     OS-sensível (file lock, telemetry lock, file permissions, process probe, signal handling).
-  2. `features/` recebem os adapters injetados via Protocol — zero `import fcntl` / `import signal`
-     / `os.chmod` direto em features.
-  3. Em um Windows runner: `python -c "import dadaia_workspace"` exits 0. `dadaia --help` exits 0.
-  4. Governance hooks rodam como `python -m dadaia_workspace.hooks.<name>` — sem bash
-     dependency. O PreToolUse registrado é o entrypoint MERGED `pre_gate` (root-whitelist →
-     venv-guard → SDD gate, first-block-wins); `ctx_inject` e `sdd_post_gate` rodam como
-     entrypoints próprios.
-  5. CI importability-smoke job (Windows/macOS) confirma portabilidade a cada push.
+  1. `container.py` reads `PLATFORM` at startup and selects the concrete adapters for each
+     OS-sensitive domain (file lock, telemetry lock, file permissions, process probe, signal handling).
+  2. `features/` receive the adapters injected via Protocol — zero direct `import fcntl` / `import signal`
+     / `os.chmod` in features.
+  3. On a Windows runner: `python -c "import dadaia_workspace"` exits 0. `dadaia --help` exits 0.
+  4. Governance hooks run as `python -m dadaia_workspace.hooks.<name>` — no bash
+     dependency. The registered PreToolUse is the MERGED `pre_gate` entrypoint (root-whitelist →
+     venv-guard → SDD gate, first-block-wins); `ctx_inject` and `sdd_post_gate` run as
+     their own entrypoints.
+  5. The CI importability-smoke job (Windows/macOS) confirms portability on every push.
 
-## Trigger típico
+## Typical trigger
 
-Quando uma nova plataforma (Windows ou macOS) precisa executar dadaia-workspace, ou quando um
-agente precisa verificar que uma funcionalidade OS-sensível degrada corretamente em vez de crashar.
+When a new platform (Windows or macOS) needs to run dadaia-workspace, or when an
+agent needs to verify that an OS-sensitive capability degrades correctly instead of crashing.
 
-## Diferencial
+## Differentiator
 
-Sem a plataforma seam, o CLI crashava no Windows antes de executar qualquer comando (`import fcntl`
-top-level, `ModuleNotFoundError`). Com a seam, o CLI importa e executa em todos os três OS. O
-modelo port/adapter garante que adições futuras de suporte a Windows seguem um padrão claro
-sem espalhar `sys.platform` checks pelo codebase.
+Without the platform seam, the CLI crashed on Windows before executing any command (top-level
+`import fcntl`, `ModuleNotFoundError`). With the seam, the CLI imports and runs on all three OSes. The
+port/adapter model guarantees that future additions of Windows support follow a clear pattern
+without scattering `sys.platform` checks across the codebase.
 
-## Plataforma seam — `core/platform.py`
+## Platform seam — `core/platform.py`
 
-`Capabilities` frozen dataclass com `detect()` classmethod. Flags:
+`Capabilities` frozen dataclass with a `detect()` classmethod. Flags:
 
 | Flag | Linux | macOS | Windows |
 |------|-------|-------|---------|
@@ -76,101 +76,101 @@ sem espalhar `sys.platform` checks pelo codebase.
 | `venv_exe_suffix` | `""` | `""` | `.exe` |
 | `tmp_dir` | `Path(tempfile.gettempdir())` | idem | idem |
 
-Singleton `PLATFORM` é acessado via `from dadaia_workspace.core.platform import PLATFORM`.
-`detect()` nunca é chamado diretamente — apenas `PLATFORM` é consumido.
+The `PLATFORM` singleton is accessed via `from dadaia_workspace.core.platform import PLATFORM`.
+`detect()` is never called directly — only `PLATFORM` is consumed.
 
-## Contrato de resiliência — 3 tiers
+## Resilience contract — 3 tiers
 
-**TIER 1 — FAIL LOUD (controles de segurança; silent no-op proibido):**
-- `WindowsFilePermissionSetter.restrict_to_owner()` — aplica ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` ANTES de criar o arquivo protegido. `icacls` com `shell=False`. Username via `getpass.getuser()`. Falha → `PlatformSecurityError` (nunca warn-and-continue). (O consumidor original — o token de auth do panel — foi removido com o modelo no-auth do panel; o resíduo `panel.token` em telemetry é tracked no backlog `hygiene-and-dead-code-cleanup`.)
-- `WindowsFileLock.acquire()` — usa `msvcrt.locking` (stdlib). Se `msvcrt` ausente → `PlatformCapabilityError`. Silent no-op é proibido (cria falsa confiança de serialização).
+**TIER 1 — FAIL LOUD (security controls; silent no-op forbidden):**
+- `WindowsFilePermissionSetter.restrict_to_owner()` — applies the ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` BEFORE creating the protected file. `icacls` with `shell=False`. Username via `getpass.getuser()`. Failure → `PlatformSecurityError` (never warn-and-continue). (The original consumer — the panel auth token — was removed with the panel's no-auth model; the `panel.token` residue in telemetry is tracked in the `hygiene-and-dead-code-cleanup` backlog.)
+- `WindowsFileLock.acquire()` — uses `msvcrt.locking` (stdlib). If `msvcrt` is absent → `PlatformCapabilityError`. Silent no-op is forbidden (it creates false confidence of serialization).
 
-**TIER 2 — DEGRADE COM INFO LOG (features não-security):**
-- `/proc` scan → não-Linux retorna `[]` + INFO "orphan detection disabled". Panel mostra "Scan unavailable on this platform."
-- `signal.SIGTERM` no Windows → registra SIGINT only + INFO log.
-- `WindowsTelemetryRefreshLock` → always-acquire no-op + INFO log. Seguro porque SQLite WAL mode provê serialização própria de writes. Se WAL for desabilitado, este adapter deve ser revisado.
-- `WindowsFilePermissionSetter` em telemetry/lease dirs → Tier 2 (log INFO + continua).
-- `os.chmod(db_path, 0o600)` em `features/telemetry/service.py` (1 site) — sem guard `PLATFORM.has_posix_chmod`; silent no-op no Windows. Tier-2 aceitável (telemetry DB não é credencial de segurança). Guard é follow-up de baixa prioridade.
-- `script.chmod(0o755)` em `infrastructure/public_assets.py` (1 site) — executability bit; sem guard; silent no-op no Windows. Tier-2 aceitável. Guard é follow-up de baixa prioridade.
+**TIER 2 — DEGRADE WITH INFO LOG (non-security features):**
+- `/proc` scan → non-Linux returns `[]` + INFO "orphan detection disabled". Panel shows "Scan unavailable on this platform."
+- `signal.SIGTERM` on Windows → registers SIGINT only + INFO log.
+- `WindowsTelemetryRefreshLock` → always-acquire no-op + INFO log. Safe because SQLite WAL mode provides its own write serialization. If WAL is ever disabled, this adapter must be revisited.
+- `WindowsFilePermissionSetter` on telemetry/lease dirs → Tier 2 (INFO log + continue).
+- `os.chmod(db_path, 0o600)` in `features/telemetry/service.py` (1 site) — no `PLATFORM.has_posix_chmod` guard; silent no-op on Windows. Tier-2 acceptable (the telemetry DB is not a security credential). Guard is a low-priority follow-up.
+- `script.chmod(0o755)` in `infrastructure/public_assets.py` (1 site) — executability bit; no guard; silent no-op on Windows. Tier-2 acceptable. Guard is a low-priority follow-up.
 
-**TIER 3 — UNSUPPORTED PLATFORM at construction.** Onde não existe degradação, `PlatformCapabilityError` / `PlatformSecurityError` é raised em `container.py` na construção do serviço, não na hora da chamada.
+**TIER 3 — UNSUPPORTED PLATFORM at construction.** Where no degradation exists, `PlatformCapabilityError` / `PlatformSecurityError` is raised in `container.py` at service construction, not at call time.
 
-## Portos e adapters (4 + 9)
+## Ports and adapters (4 + 9)
 
-**Protocol ports em `core/protocols/`:**
+**Protocol ports in `core/protocols/`:**
 - `file_lock.py` — `WorkspaceLock`, `ContextLock`
 - `telemetry_lock.py` — `TelemetryRefreshLock`
 - `platform_services.py` — `FilePermissionSetter`
 - `shutdown_handler.py` — `ShutdownHandler`
 
-**Adapters em `infrastructure/`:**
+**Adapters in `infrastructure/`:**
 - `file_lock_posix.py`, `file_lock_windows.py`
 - `telemetry_lock_posix.py`, `telemetry_lock_windows.py`
 - `file_permission_posix.py`, `file_permission_windows.py`
-- `process_probe_adapter.py` (POSIX; `OsProcessProbe` movido de `core/`)
+- `process_probe_adapter.py` (POSIX; `OsProcessProbe` moved from `core/`)
 - `signal_shutdown_posix.py`, `signal_shutdown_windows.py`
 
 ## Python governance hooks package
 
-`dadaia_workspace/hooks/` — 8 módulos: `__init__`, `_common`, `pre_gate`, `sdd_gate`,
+`dadaia_workspace/hooks/` — 8 modules: `__init__`, `_common`, `pre_gate`, `sdd_gate`,
 `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`.
 
-Wiring PreToolUse: o harness registra **um único** entrypoint, o MERGED `pre_gate`
-(`python -m dadaia_workspace.hooks.pre_gate`), que executa os estágios root-whitelist →
-venv-guard → SDD gate em sequência, first-block-wins. `sdd_gate.py` e `root_whitelist.py`
-permanecem como módulos de POLÍTICA expondo `evaluate_payload()`, consumido por `pre_gate`
-(os `main()` standalone legados ainda existem; remoção tracked no backlog
-`hygiene-and-dead-code-cleanup`). `ctx_inject` e `sdd_post_gate` têm entrypoints próprios
+PreToolUse wiring: the harness registers **a single** entrypoint, the MERGED `pre_gate`
+(`python -m dadaia_workspace.hooks.pre_gate`), which runs the stages root-whitelist →
+venv-guard → SDD gate in sequence, first-block-wins. `sdd_gate.py` and `root_whitelist.py`
+remain POLICY modules exposing `evaluate_payload()`, consumed by `pre_gate`
+(the legacy standalone `main()`s still exist; removal tracked in the
+`hygiene-and-dead-code-cleanup` backlog). `ctx_inject` and `sdd_post_gate` have their own entrypoints
 (`if __name__ == '__main__': sys.exit(main())`).
 
-Invariantes de paridade (parity contract com os hooks bash anteriores):
-- `sdd_gate.py` delega a `gate_policy.evaluate()` / `gate_policy.classify_path()` — não re-deriva política. `.dadaia/sessions/**` é PROTECTED (fail-closed, SEC-01).
-- Context-slug é derivado PATH-first do write target: write sob `repos/B/...` adquire o context de `repos/B`, nunca de `repos/A` (first-ALIVE).
-- `ctx_inject.py` preserva o sentinel once-per-session keyed no session id nativo do harness. Sentinel path byte-idêntico ao sentinel bash (`.dadaia/tmp/ctx-inject-fired-<sessionId>`).
-- `sdd_post_gate.py` usa `os.replace` atomic renewal + `[A-Za-z0-9_-]` session-id strip.
-- Fail-open: qualquer erro não-PROTECTED → ALLOW. PROTECTED é o único fail-closed path.
+Parity invariants (parity contract with the previous bash hooks):
+- `sdd_gate.py` delegates to `gate_policy.evaluate()` / `gate_policy.classify_path()` — it does not re-derive policy. `.dadaia/sessions/**` is PROTECTED (fail-closed, SEC-01).
+- Context-slug is derived PATH-first from the write target: a write under `repos/B/...` acquires the context of `repos/B`, never of `repos/A` (first-ALIVE).
+- `ctx_inject.py` preserves the once-per-session sentinel keyed on the harness-native session id. Sentinel path byte-identical to the bash sentinel (`.dadaia/tmp/ctx-inject-fired-<sessionId>`).
+- `sdd_post_gate.py` uses `os.replace` atomic renewal + `[A-Za-z0-9_-]` session-id strip.
+- Fail-open: any non-PROTECTED error → ALLOW. PROTECTED is the only fail-closed path.
 
-`runtime_config.py` emite o comando Python para `.claude/settings.json`; para o Codex,
-emite wrappers executáveis em `.dadaia/hooks/codex-*` — the platform angle is that each
+`runtime_config.py` emits the Python command for `.claude/settings.json`; for Codex, it
+emits executable wrappers at `.dadaia/hooks/codex-*` — the platform angle is that each
 wrapper resolves the venv Python **relative to its own path**, cross-platform; the
 registration/matcher mechanics are owned by [[public-asset-distribution]].
-`workspace/service.py` reconhece tanto o
-caminho `.sh` antigo quanto o novo comando Python para evitar dupla-registro em
-workspaces migrados.
+`workspace/service.py` recognizes both the
+old `.sh` path and the new Python command to avoid double registration in
+migrated workspaces.
 
-PI (`.pi/extensions/dadaia-sdd-gate.ts`, post-trust Ring-1) chama os Python hooks via
-subprocess. Resolução do binário venv: `.dadaia/.venv/bin/python` →
-`.dadaia/.venv/Scripts/python.exe` → bare `python` — cross-platform em Windows.
+PI (`.pi/extensions/dadaia-sdd-gate.ts`, post-trust Ring-1) calls the Python hooks via
+subprocess. Venv binary resolution: `.dadaia/.venv/bin/python` →
+`.dadaia/.venv/Scripts/python.exe` → bare `python` — cross-platform on Windows.
 
-`pre_push_ci.py` NÃO está no pacote. O hook `.sh` pre-push é retido (git-for-Windows ships bash).
+`pre_push_ci.py` is NOT in the package. The `.sh` pre-push hook is retained (git-for-Windows ships bash).
 
 ## CI matrix 3-OS (graduated — hard-gated)
 
-A matrix 3-OS está **HARD-GATED** desde rc-2 (0.1.8). Todos os `continue-on-error` foram
-removidos e o comentário `# GRADUATION-GATE:` foi eliminado. As legs Windows e macOS são
-agora required checks na branch-protection (6 contextos adicionados via API).
+The 3-OS matrix has been **HARD-GATED** since rc-2 (0.1.8). All `continue-on-error` entries were
+removed and the `# GRADUATION-GATE:` comment was eliminated. The Windows and macOS legs are
+now required checks in branch-protection (6 contexts added via API).
 
-O classificador PyPI foi ampliado de `POSIX :: Linux` para
-`POSIX :: Linux + MacOS + Microsoft :: Windows` (não mais "OS Independent" provisório).
+The PyPI classifier was widened from `POSIX :: Linux` to
+`POSIX :: Linux + MacOS + Microsoft :: Windows` (no longer the provisional "OS Independent").
 
-**Jobs com cobertura 3-OS (Linux/macOS/Windows):** `importability-smoke`, `unit-fast`,
-`contract-coverage` — todos hard-gated. Qualquer falha em Windows ou macOS bloqueia o merge.
+**Jobs with 3-OS coverage (Linux/macOS/Windows):** `importability-smoke`, `unit-fast`,
+`contract-coverage` — all hard-gated. Any failure on Windows or macOS blocks the merge.
 
-**Linux-only by design (nunca adicionar Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
-Dependem de `/proc` e `ss` — documentado no docstring de `scan.py`.
+**Linux-only by design (never add Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
+They depend on `/proc` and `ss` — documented in the `scan.py` docstring.
 
-## Estado runtime tocado
+## Runtime state touched
 
-- `dadaia_workspace/core/platform.py` — singleton `PLATFORM` instanciado em module load
-- `dadaia_workspace/hooks/` — pacote Python; executados como subprocess pelo harness
-- `.dadaia/scripts/*.sh` — scripts bash legados; ainda presentes mas não mais os hooks registrados
-  (exceto `pre-push-ci-gate.sh` que permanece ativo)
-- `.claude/settings.json` + `.codex/hooks.json` — entradas de hook com comando Python
+- `dadaia_workspace/core/platform.py` — `PLATFORM` singleton instantiated at module load
+- `dadaia_workspace/hooks/` — Python package; executed as a subprocess by the harness
+- `.dadaia/scripts/*.sh` — legacy bash scripts; still present but no longer the registered hooks
+  (except `pre-push-ci-gate.sh`, which remains active)
+- `.claude/settings.json` + `.codex/hooks.json` — hook entries with the Python command
 
-## Dependências
+## Dependencies
 
-- Depende de [[workspace-init]] (cria `.venv`, registra os hooks, provisiona o pacote Python)
-- [[context-management]] usa os protocolos `WorkspaceLock`/`ContextLock` para Lock-1/Lock-2
-- [[sdd-gate-v3]] descreve o comportamento do gate; a política Python é `hooks/sdd_gate.py`
-  (`evaluate_payload()`), consumida pelo entrypoint wired `hooks/pre_gate.py`
-- [[architecture]] descreve o layering invariant e os contratos de layer que enforcement depende
+- Depends on [[workspace-init]] (creates `.venv`, registers the hooks, provisions the Python package)
+- [[context-management]] uses the `WorkspaceLock`/`ContextLock` protocols for Lock-1/Lock-2
+- [[sdd-gate-v3]] describes the gate's behavior; the Python policy is `hooks/sdd_gate.py`
+  (`evaluate_payload()`), consumed by the wired entrypoint `hooks/pre_gate.py`
+- [[architecture]] describes the layering invariant and the layer contracts the enforcement depends on

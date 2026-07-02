@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T03:24:39Z",
+  "generated_at": "2026-07-02T04:09:44Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -8,15 +8,15 @@
       "title": "agent-comms — Handoff Contract v1",
       "category": "product",
       "area": "agents",
-      "tldr": "handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/.",
-      "summary": "contrato handoff-v1.1 separa evidência humana de coordenação entre agentes: reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro do workspace — qualquer path relativo existente sob o root resolve workspace-rooted (incl. repos/<slug>/specs/audits), com fallback legacy handoff-dir; reports next e o gate QA/security consomem a raiz canônica.",
+      "tldr": "handoff-v1.1 separates HTML reports from JSON handoffs in .dadaia/handoff/.",
+      "summary": "the handoff-v1.1 contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. The CLI validates schema and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
         "agent-comms",
         "handoff",
         "schema"
       ],
-      "token_estimate": 1200,
+      "token_estimate": 1075,
       "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution"
@@ -28,8 +28,8 @@
       "title": "agent-monitoring",
       "category": "product",
       "area": "agents",
-      "tldr": "telemetria local stdlib-only (Claude/Codex/PI sessions) → aba Sessions do panel + /api/agents; allowlist gate preserva privacidade.",
-      "summary": "telemetria local stdlib-only consumindo Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + PI session jsonl (~/.pi/agent/sessions/); alimenta a aba Sessions do panel e os endpoints /api/agents e /api/sessions; allowlist gate hardcoded preserva privacidade por construção; endpoints servidos sem credencial atrás do bind loopback + Host allowlist do panel.",
+      "tldr": "stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy.",
+      "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + PI session jsonl (~/.pi/agent/sessions/); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
@@ -59,7 +59,7 @@
         "workflows",
         "dispatch"
       ],
-      "token_estimate": 1430,
+      "token_estimate": 1700,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
@@ -74,15 +74,15 @@
       "title": "academy",
       "category": "product",
       "area": "distribution",
-      "tldr": "knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI.",
-      "summary": "a aba Academy do panel navega diretamente os módulos da knowledge_basis (GET /api/academy lista todos os módulos com títulos e contagem de lições; rota read-only traversal-guarded GET /academy/<module>/<lesson> renderiza a lição em Markdown). A CLI copy-from-template (dadaia academy create/update/delete) permanece como superfície de gestão de cursos derivados.",
+      "tldr": "browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI.",
+      "summary": "the panel's Academy tab browses the knowledge_basis modules directly (GET /api/academy lists all modules with titles and lesson counts; the read-only traversal-guarded route GET /academy/<module>/<lesson> renders the lesson in Markdown). The copy-from-template CLI (dadaia academy create/update/delete) remains the management surface for derived courses.",
       "path": "specs/memory/product/distribution/academy.md",
       "tags": [
         "academy",
         "onboarding",
         "courses"
       ],
-      "token_estimate": 660,
+      "token_estimate": 775,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
@@ -105,7 +105,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 690,
+      "token_estimate": 875,
       "agent_tier": "self-pull",
       "depends_on": []
     },
@@ -124,7 +124,7 @@
         "layer-1",
         "projection"
       ],
-      "token_estimate": 470,
+      "token_estimate": 475,
       "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
@@ -149,7 +149,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 545,
+      "token_estimate": 550,
       "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
@@ -174,7 +174,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 510,
+      "token_estimate": 500,
       "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
@@ -190,8 +190,8 @@
       "title": "brand-identity",
       "category": "product",
       "area": "panel",
-      "tldr": "paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1).",
-      "summary": "paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1).",
+      "tldr": "canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1).",
+      "summary": "canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1).",
       "path": "specs/memory/product/panel/brand-identity.md",
       "tags": [
         "brand",
@@ -199,7 +199,7 @@
         "css",
         "tokens"
       ],
-      "token_estimate": 350,
+      "token_estimate": 375,
       "agent_tier": "self-pull",
       "depends_on": [
         "panel"
@@ -211,8 +211,8 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "superfície de controle local (dadaia panel); 6 tabs; Workflows lidera com diagram-cards server-SVG + model pickers inline por step (v0.1.45).",
-      "summary": "superfície de controle local em http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) — a antiga aba Agentic (Agents + personas + Kanban) não existe. Workflows LIDERA a superfície: catálogo de diagram-cards server-SVG (render_dag_svg + node_meta opcional carregando role/gate/harness/model) default-visible no topo, expand = FLOW strip + per-step cards formatados + model pickers inline por step (toggle codex/pi + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix em disclosure colapsado. Tabela Sessions 8 colunas com per-cell min-width, theme switcher 3 paletas, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md renderizado in-memory via mistune. SEM autenticação: os guards são o bind loopback-only + Host-header allowlist (403 a Host estrangeiro), iguais para mutações; CSP estrita + nosniff. /api/personas NÃO existe; /api/agents servido para telemetria; /api/kanban servido sem consumidor de UI; /api/lifecycle-runs servido sem UI dedicada.",
+      "tldr": "local control surface (dadaia panel); 6 tabs; Workflows leads with server-SVG diagram-cards + inline per-step model pickers (v0.1.45).",
+      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions table with 8 columns and per-cell min-width, 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune. NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban served with no UI consumer; /api/lifecycle-runs served with no dedicated UI.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
@@ -220,7 +220,7 @@
         "http",
         "dashboard"
       ],
-      "token_estimate": 4300,
+      "token_estimate": 5275,
       "agent_tier": "self-pull",
       "depends_on": [
         "agent-orchestration",
@@ -252,7 +252,7 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 1560,
+      "token_estimate": 1700,
       "agent_tier": "self-pull",
       "depends_on": [
         "spec-context-project",
@@ -292,7 +292,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 885,
+      "token_estimate": 900,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
@@ -307,8 +307,8 @@
       "title": "context-management",
       "category": "product",
       "area": "platform",
-      "tldr": "multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa.",
-      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker `.dadaia/states/bind_epoch/<ctx>` — o ÚNICO trigger de injeção de context-memory (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC mechanics owned by sdd-gate-v3) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o heartbeat jamais ressuscita lease de sessão released; bind records renovados por heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug registration is the event-sourced `dadaia bugs append`).",
+      "tldr": "multi-context ALIVE/DEAD; bind persists mode and writes the bind-epoch marker; TTL+PID-veto lease; `context release` drops the lease; dead() needs a clean tree.",
+      "summary": "multi-context ALIVE/DEAD lifecycle (no global primary); `dadaia context bind` (--mode optional, default read) persists context/mode/pid in the CLI-owned session record via session_identity, refreshes the incumbent pointer AND writes the `.dadaia/states/bind_epoch/<ctx>` marker — the ONLY context-memory injection trigger (first-ALIVE deleted from the injection chain; an unbound session receives only the generic preflight + list of ALIVE contexts); READ sessions are non-acquiring in the gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC mechanics owned by sdd-gate-v3) plus port/adapter Lock-1 (workspace) and Lock-2 (per-context git ops); `dadaia context release` drops the session's lease(s) (eval flow by sid; default flow by bound-context + dead-pid-or-ancestry, never drops a live foreign holder) and the heartbeat never resurrects a released session's lease; bind records renewed by heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin on alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files without --commit and runs a secret scan before the push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug registration is the event-sourced `dadaia bugs append`).",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -346,7 +346,7 @@
         "hooks",
         "security"
       ],
-      "token_estimate": 1400,
+      "token_estimate": 1750,
       "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution",
@@ -372,7 +372,7 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1450,
+      "token_estimate": 1600,
       "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
@@ -388,15 +388,15 @@
       "title": "repos-catalog",
       "category": "product",
       "area": "platform",
-      "tldr": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
-      "summary": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
+      "tldr": "repos.xlsx lookup for fast discovery of known repos with slug + URL.",
+      "summary": "repos.xlsx lookup for fast discovery of known repos with slug + URL.",
       "path": "specs/memory/product/platform/repos-catalog.md",
       "tags": [
         "repos",
         "catalog",
         "discovery"
       ],
-      "token_estimate": 212,
+      "token_estimate": 325,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
@@ -409,8 +409,8 @@
       "title": "server-registry",
       "category": "product",
       "area": "platform",
-      "tldr": "registry interno de portas com TTL+PID para evitar conflito entre dev servers de agentes paralelos; range 3000-3999 só na alocação next_port.",
-      "summary": "registry interno de portas com TTL+PID para evitar conflito entre dev servers de agentes paralelos. O range 3000-3999 é aplicado apenas pela alocação next_port; register() aceita qualquer porta.",
+      "tldr": "internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation.",
+      "summary": "internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers. The 3000-3999 range is enforced only by next_port allocation; register() accepts any port.",
       "path": "specs/memory/product/platform/server-registry.md",
       "tags": [
         "server",
@@ -418,7 +418,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 640,
+      "token_estimate": 750,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
@@ -431,8 +431,8 @@
       "title": "workspace-doctor",
       "category": "product",
       "area": "platform",
-      "tldr": "diagnóstico + repair do workspace state; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix roda SENTINEL/PTR/GRAVEYARD-GC.",
-      "summary": "diagnóstico + repair de invariantes do workspace state com --fix opcional. Checks emitidos: context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW), lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama pid vivo), production-write sem task_id no audit log (LOCK-4), BLOCKED_ATTEMPT no audit log (LOCK-5, sinal), context ALIVE com repo_url vazio (CTX-URL-1), root whitelist + caches proibidos + tool configs + subdirs de .dadaia/ (ROOT-1..4), saúde do venv (VENV-1). Ações fix-only (aparecem só no --fix, não como issues): SENTINEL-GC, PTR-GC, GRAVEYARD-GC. Bind/session records decaem por TTL contra last_seen_at heartbeat-renovado. Limitação conhecida: o comando sai 0 mesmo com issues.",
+      "tldr": "workspace-state diagnosis + repair; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix runs SENTINEL/PTR/GRAVEYARD-GC.",
+      "summary": "diagnosis + repair of workspace-state invariants with optional --fix. Emitted checks: context ALIVE/DEAD (INV-4, INV-5), invalid TTL-lease (LOCK-NEW), stale lease of a dead/unprobeable holder (LOCK-GC — never reclaims a live pid), production-write without task_id in the audit log (LOCK-4), BLOCKED_ATTEMPT in the audit log (LOCK-5, signal), ALIVE context with empty repo_url (CTX-URL-1), root whitelist + forbidden caches + tool configs + .dadaia/ subdirs (ROOT-1..4), venv health (VENV-1). Fix-only actions (appear only under --fix, not as issues): SENTINEL-GC, PTR-GC, GRAVEYARD-GC. Bind/session records decay by TTL against heartbeat-renewed last_seen_at. Known limitation: the command exits 0 even with issues.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -440,7 +440,7 @@
         "health",
         "repair"
       ],
-      "token_estimate": 1000,
+      "token_estimate": 1300,
       "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
@@ -454,8 +454,8 @@
       "title": "workspace-init",
       "category": "product",
       "area": "platform",
-      "tldr": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente.",
-      "summary": "porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente; PreToolUse registrado como UM comando Python (python -m dadaia_workspace.hooks.pre_gate), não bash; ctx-inject.sh retido apenas como fallback não-instalado.",
+      "tldr": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure.",
+      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a non-installed fallback.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -463,7 +463,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 786,
+      "token_estimate": 850,
       "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution",
@@ -476,8 +476,8 @@
       "title": "workspace-portability",
       "category": "product",
       "area": "platform",
-      "tldr": "export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.",
-      "summary": "export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas.",
+      "tldr": "export/import of the whole workspace as a tar.gz for backup or migration between machines.",
+      "summary": "export/import of the whole workspace as a tar.gz for backup or migration between machines.",
       "path": "specs/memory/product/platform/workspace-portability.md",
       "tags": [
         "portability",
@@ -485,7 +485,7 @@
         "import",
         "backup"
       ],
-      "token_estimate": 336,
+      "token_estimate": 400,
       "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
@@ -507,7 +507,7 @@
         "lifecycle",
         "layer-2"
       ],
-      "token_estimate": 950,
+      "token_estimate": 750,
       "agent_tier": "self-pull",
       "depends_on": [
         "lifecycle-foundation",
@@ -533,7 +533,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 5560,
+      "token_estimate": 5225,
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
@@ -560,7 +560,7 @@
         "alpha-rc-model",
         "backlog-ownership"
       ],
-      "token_estimate": 1550,
+      "token_estimate": 1575,
       "agent_tier": "self-pull",
       "depends_on": [
         "specs-doctor",
@@ -577,7 +577,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto.",
-      "summary": "Enforcement em duas camadas. (1) Hooks Python: o PreToolUse roda por UM entrypoint merged — `dadaia_workspace.hooks.pre_gate` — que lê o stdin uma vez e avalia as policies em ordem fixa root-whitelist → venv-guard → SDD gate, first-block-wins, cada policy fail-open (PROTECTED é o único caminho fail-closed). O classificador SDD é context-relative (ADDITIVE allow sem lease, MEMORY gated por fase, FROZEN block — incl. os _archive per-artifact matchados ANTES de ADDITIVE (R-2), MUTATING adquire o TTL-lease via O_EXCL CAS com PID veto); apply_patch multi-file classifica TODOS os headers (veredito mais restritivo vence); READ é non-acquiring. O PostToolUse renova heartbeat via by-session index (sem full scan) e roda o reconciler advisory (nunca bloqueia). (2) Chokepoints git: pre-commit lease gate (cadeia DP-4, zero-false-block, degradação advisory ALLOW+WARN) e pre-push gate mecânico de verdict de security (metrics.commit_sha por sha pushed) — rodam independentemente de hooks de harness. Tunables em core/kernel_tunables.py; latência de hook em .dadaia/logs/hook-latency.jsonl.",
+      "summary": "Two-layer enforcement. (1) Python hooks: PreToolUse runs through ONE merged entrypoint — `dadaia_workspace.hooks.pre_gate` — which reads stdin once and evaluates the policies in fixed order root-whitelist → venv-guard → SDD gate, first-block-wins, each policy fail-open (PROTECTED is the only fail-closed path). The SDD classifier is context-relative (ADDITIVE allows with no lease, MEMORY gated by phase, FROZEN blocks — incl. the per-artifact _archives matched BEFORE ADDITIVE (R-2), MUTATING acquires the TTL-lease via O_EXCL CAS with PID veto); a multi-file apply_patch classifies ALL headers (most restrictive verdict wins); READ is non-acquiring. PostToolUse renews the heartbeat via the by-session index (no full scan) and runs the advisory reconciler (never blocks). (2) Git chokepoints: the pre-commit lease gate (DP-4 chain, zero-false-block, advisory ALLOW+WARN degradation) and the mechanical pre-push security-verdict gate (metrics.commit_sha per pushed sha) — they run independently of harness hooks. Tunables in core/kernel_tunables.py; hook latency in .dadaia/logs/hook-latency.jsonl.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -586,7 +586,7 @@
         "enforcement",
         "chokepoints"
       ],
-      "token_estimate": 3250,
+      "token_estimate": 3425,
       "agent_tier": "self-pull",
       "depends_on": [
         "sdd-bug-backlog-governance",
@@ -601,7 +601,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034.",
-      "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001..009, 012, 016; 022/023 embutidos no check de backlog 012) cobrindo memory .md via LINT-1 + CAT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (fase↔markers), 026/027 (ids/naming de release), 028 (refs da constitution), 029 (coerência lease↔session em 3 estados), 030 (naming de audits), 031/035 (disposição de backlog), 032 (status legado de bug), 033 (event store JSONL de bugs), 034 (_archive dirs, auto-fix), 036 (audit arquivado nomeia release), 037 (constitution não enumera runtime kinds), 038 (audit loose sem disposição, WARN); SPECS-VERSION (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repara TREE-4 E SPEC-DOC-034.",
+      "summary": "SDD structural checks: non-sequential SPEC-DOC IDs (001..009, 012, 016; 022/023 embedded in backlog check 012) covering memory .md via LINT-1 + CAT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (phase↔markers), 026/027 (release ids/naming), 028 (constitution refs), 029 (lease↔session coherence in 3 states), 030 (audit naming), 031/035 (backlog disposition), 032 (legacy bug status), 033 (bug JSONL event store), 034 (_archive dirs, auto-fix), 036 (archived audit names its release), 037 (constitution does not enumerate runtime kinds), 038 (loose undispositioned audit, WARN); SPECS-VERSION (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repairs TREE-4 AND SPEC-DOC-034.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -609,7 +609,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 1900,
+      "token_estimate": 2150,
       "agent_tier": "self-pull",
       "depends_on": [
         "sdd-bug-backlog-governance",

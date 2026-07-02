@@ -14,19 +14,19 @@ tags:
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 1430
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 1700
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 `dadaia-workspace` orchestrates specialist agents through SDD-aware workflows and
 project-manager coordinator logic. The public default topology is generic and safe for
 all consumers; project-specific, game-specific, data-vendor-specific, or private
 agents belong in optional packs or local overlays.
 
-## Fluxo de uso
+## Usage flow
 
 The public default has **9 core agents** in the coordinator + sub-agent architecture
 defined by constitution §9:
@@ -183,7 +183,7 @@ surfaces, Ring-1/Ring-2 boundaries, worker transports) lives in [[harness-codex]
 [[harness-pi]]. The dispatcher layer must report unsupported runtime capabilities
 honestly instead of simulating success.
 
-## Estado runtime tocado
+## Runtime state touched
 
 `ai-engineer` owns public AI entities under
 `dadaia_workspace/public/{agents,skills,rules,workflows,personas,lifecycle_fragments}/**`.

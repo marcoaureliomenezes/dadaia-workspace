@@ -14,53 +14,53 @@ tags:
 - lifecycle
 - concurrency
 agent_tier: self-pull
-token_estimate: 885
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 900
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
-O **Spec Context Project** é o conceito central do dadaia-workspace. Constitution §0 define-o como the single unit through which the workspace's purpose is delivered. Tudo o mais na constitution — o lock model (§8), o roster de agentes (§14), a lifecycle gate sequence (§7), o coordinator + sub-agent topology (§9) — é maquinaria a serviço deste conceito.
+The **Spec Context Project** is the central concept of dadaia-workspace. Constitution §0 defines it as the single unit through which the workspace's purpose is delivered. Everything else in the constitution — the lock model (§8), the agent roster (§14), the lifecycle gate sequence (§7), the coordinator + sub-agent topology (§9) — is machinery in service of this concept.
 
-Um Spec Context Project é **uma canonical specs folder bound to one repository**. A specs folder segue um pattern fixo (`backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, mais `constitution.md` e `AGENTS.md`); o repository é o código que as specs governam.
+A Spec Context Project is **one canonical specs folder bound to one repository**. The specs folder follows a fixed pattern (`backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, plus `constitution.md` and `AGENTS.md`); the repository is the code the specs govern.
 
-## Fluxo de uso
+## Usage flow
 
-O binding de um Spec Context Project a uma terminal session dispara a cadeia de valor:
+Binding a Spec Context Project to a terminal session triggers the value chain:
 
-1. **Bind** — a sessão se anexa a um Spec Context Project. O operador executa `dadaia context bind <name>`, que persiste contexto/modo no session record, atualiza o incumbent pointer e escreve o bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — o ÚNICO trigger de injeção de context-memory. `--print-env` é o escape back-compat para o fluxo `eval $(...)` com exports `DADAIA_*`.
+1. **Bind** — the session attaches to a Spec Context Project. The operator runs `dadaia context bind <name>`, which persists context/mode into the session record, updates the incumbent pointer, and writes the bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — the ONLY trigger of context-memory injection. `--print-env` is the back-compat escape for the `eval $(...)` flow with `DADAIA_*` exports.
 
-2. **Inject** — o binding injeta a memory do contexto por **lazy product-feature consumption**: um digest bounded de `tech-stack.md` + o tldr-digest do `catalog.json` carregam up front; feature atoms individuais são pulled on demand pelo agente conforme relevantes à tarefa. A `constitution.md` NÃO é injetada — é lida do disco. Nenhuma sessão paga pelo catálogo inteiro antecipadamente.
+2. **Inject** — the binding injects the context's memory by **lazy product-feature consumption**: a bounded digest of `tech-stack.md` + the tldr-digest of `catalog.json` load up front; individual feature atoms are pulled on demand by the agent as relevant to the task. `constitution.md` is NOT injected — it is read from disk. No session pays for the whole catalog up front.
 
-3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O entrypoint PreToolUse único (`python -m dadaia_workspace.hooks.pre_gate`) enforça deterministicamente path-class × lease × fase × modo a cada write, e os chokepoints git (pre-commit lease gate + pre-push security-verdict gate) gateiam commit/push independentemente de hooks de harness. Markers `[-]` e aprovações de spec são disciplina de agente/PM, não mecanismo do gate.
+3. **Enforce** — the SDD lifecycle (constitution §7) is enforced for every production write under that context: no production change without an approved release and a reserved task. The single PreToolUse entrypoint (`python -m dadaia_workspace.hooks.pre_gate`) deterministically enforces path-class × lease × phase × mode on every write, and the git chokepoints (pre-commit lease gate + pre-push security-verdict gate) gate commit/push independently of harness hooks. `[-]` markers and spec approvals are agent/PM discipline, not gate mechanism.
 
-4. **Parallel multi-project** — porque cada contexto carrega exatamente um MUTATING lease (§8), múltiplos Spec Context Projects podem ser trabalhados concorrentemente em sessões diferentes. Trabalho ADDITIVE (backlog, bugs, research, audit, review) dentro de qualquer contexto roda em paralelo — sem colisão, porque o lock contract torna structuralmente impossível ter mais de um MUTATING writer por contexto ao mesmo tempo.
+4. **Parallel multi-project** — because each context carries exactly one MUTATING lease (§8), multiple Spec Context Projects can be worked on concurrently in different sessions. ADDITIVE work (backlog, bugs, research, audit, review) inside any context runs in parallel — with no collision, because the lock contract makes it structurally impossible to have more than one MUTATING writer per context at a time.
 
-## Trigger típico
+## Typical trigger
 
-Quando o operador ou o project-manager inicia trabalho num projeto: `dadaia context bind <name>` em um novo terminal. Cada projeto ativo roda em seu próprio terminal — o binding é o ato de declarar "esta sessão trabalha neste contexto". Para trabalho ADDITIVE (reports, handoffs, audits), o binding é opcional; o gate permite esses writes unconditionally.
+When the operator or the project-manager starts work on a project: `dadaia context bind <name>` in a new terminal. Each active project runs in its own terminal — binding is the act of declaring "this session works on this context". For ADDITIVE work (reports, handoffs, audits), binding is optional; the gate allows those writes unconditionally.
 
-## Diferencial
+## Differentiator
 
-Sem o Spec Context Project como unidade central, um generic agent fleet teria que re-derivar como trabalhar a cada sessão, não teria memória de produto persistente, não teria lifecycle enforcement, e colidiria em projetos paralelos. O Spec Context Project é o que transforma um generic fleet em uma disciplined, parallel, multi-project software team:
+Without the Spec Context Project as the central unit, a generic agent fleet would have to re-derive how to work every session, would have no persistent product memory, would have no lifecycle enforcement, and would collide on parallel projects. The Spec Context Project is what turns a generic fleet into a disciplined, parallel, multi-project software team:
 
-- **Context engineering sem re-derivação:** o digest de memory do contexto é injetado automaticamente no bind; os agentes nunca começam às cegas.
-- **SDD enforcement mecânico:** o gate bloqueia writes fora de scope — não é uma convenção, é um PreToolUse hook.
-- **Paralelismo seguro:** a single-lease-per-context invariant (§8) garante exclusividade estrutural para writers MUTATING; writers ADDITIVE correm concorrentemente por design.
+- **Context engineering without re-derivation:** the context's memory digest is injected automatically on bind; agents never start blind.
+- **Mechanical SDD enforcement:** the gate blocks out-of-scope writes — it is not a convention, it is a PreToolUse hook.
+- **Safe parallelism:** the single-lease-per-context invariant (§8) guarantees structural exclusivity for MUTATING writers; ADDITIVE writers run concurrently by design.
 
-## Estado runtime tocado
+## Runtime state touched
 
-  * `.dadaia/states/spec_contexts.json` — registry de todos os Spec Context Projects (`schema_version: "2"`; state ALIVE/DEAD).
-  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease para o contexto (adquirido no primeiro write MUTATING da sessão).
+  * `.dadaia/states/spec_contexts.json` — registry of all Spec Context Projects (`schema_version: "2"`; state ALIVE/DEAD).
+  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease for the context (acquired on the session's first MUTATING write).
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (D1 soul-fold).
-  * `specs/memory/**` — memory canônica do contexto (architecture.md, tech-stack.md, product/).
-  * `specs/releases/ACTIVE.md` — release ativa do contexto.
+  * `specs/memory/**` — the context's canonical memory (architecture.md, tech-stack.md, product/).
+  * `specs/releases/ACTIVE.md` — the context's active release.
 
-## Dependências
+## Dependencies
 
-  * [[context-management]] — gerencia o ALIVE/DEAD lifecycle e o session binding.
-  * [[sdd-gate-v3]] — enforce o SDD contract a cada production write.
-  * [[agent-orchestration]] — coordina os agentes que trabalham dentro do contexto.
-  * [[public-asset-distribution]] — projeta a canonical surface para todos os runtimes que servem o contexto.
-  * Constitution §0 é a single source of truth para a definição e filosofia deste conceito — este atom cita, não duplica.
+  * [[context-management]] — manages the ALIVE/DEAD lifecycle and session binding.
+  * [[sdd-gate-v3]] — enforces the SDD contract on every production write.
+  * [[agent-orchestration]] — coordinates the agents working inside the context.
+  * [[public-asset-distribution]] — projects the canonical surface to all runtimes serving the context.
+  * Constitution §0 is the single source of truth for this concept's definition and philosophy — this atom cites, does not duplicate.

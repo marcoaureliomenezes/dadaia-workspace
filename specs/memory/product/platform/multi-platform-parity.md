@@ -21,12 +21,12 @@ tags:
 - parity
 - multi-platform
 agent_tier: self-pull
-token_estimate: 1450
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 1600
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 Multi-platform parity means the same canonical public assets are projected to
 Claude Code, Codex, and PI without pretending the runtimes are identical. Each
@@ -76,7 +76,7 @@ must stay green.
 Plugin stubs (`frontend-engineer`, `design-specialist`, `devops-engineer`) project as
 empty stubs — no behavior until the corresponding plugin is installed.
 
-## Fluxo de uso
+## Usage flow
 
 Codex receives:
 
@@ -135,7 +135,7 @@ privilege grant, never hand-edited — so the Ring-1 block is active once the op
 trusts `.pi/` (the upstream trust seam; live efficacy verified on a trusted interactive
 run, the same class as the `pi --mode json` live test).
 
-## Estado runtime tocado
+## Runtime state touched
 
 `dadaia public doctor` is the source of truth for projection state. It reports:
 - `.claude/agents/`: 12 agent files (9 core + 3 plugin stubs); no orphan files from

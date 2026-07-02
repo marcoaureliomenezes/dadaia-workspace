@@ -2,24 +2,24 @@
 slug: context-management
 title: context-management
 category: product
-tldr: multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa.
-summary: multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind`
-  (--mode opcional, default read) persiste contexto/modo/pid no session record
-  CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker
-  `.dadaia/states/bind_epoch/<ctx>` — o ÚNICO trigger de injeção de context-memory
-  (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight
-  genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate;
-  locking = ONE cross-platform TTL-lease per context
+tldr: multi-context ALIVE/DEAD; bind persists mode and writes the bind-epoch marker; TTL+PID-veto lease; `context release` drops the lease; dead() needs a clean tree.
+summary: multi-context ALIVE/DEAD lifecycle (no global primary); `dadaia context bind`
+  (--mode optional, default read) persists context/mode/pid in the CLI-owned session
+  record via session_identity, refreshes the incumbent pointer AND writes the
+  `.dadaia/states/bind_epoch/<ctx>` marker — the ONLY context-memory injection trigger
+  (first-ALIVE deleted from the injection chain; an unbound session receives only the
+  generic preflight + list of ALIVE contexts); READ sessions are non-acquiring in the
+  gate; locking = ONE cross-platform TTL-lease per context
   (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC
   mechanics owned by sdd-gate-v3) plus
-  port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context
-  release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por
-  bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o
-  heartbeat jamais ressuscita lease de sessão released;
-  bind records renovados por
+  port/adapter Lock-1 (workspace) and Lock-2 (per-context git ops); `dadaia context
+  release` drops the session's lease(s) (eval flow by sid; default flow by
+  bound-context + dead-pid-or-ancestry, never drops a live foreign holder) and the
+  heartbeat never resurrects a released session's lease;
+  bind records renewed by
   heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via
-  origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
-  files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2);
+  origin on alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
+  files without --commit and runs a secret scan before the push; dadaia migrate (v1→v2);
   scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory
   product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug
   registration is the event-sourced `dadaia bugs append`).
@@ -30,82 +30,82 @@ tags:
 - locking
 agent_tier: self-pull
 token_estimate: 3325
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bug new` (LEGACY — canonical bug path is `dadaia bugs append`, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
 
-## Propósito
+## Purpose
 
-Gerencia múltiplos **Spec Context Projects** — cada um mapeia `nome → repo_slug → repo_url` e tem state machine binária: **ALIVE** (repo clonado em `repos/<repo_slug>/`, disponível para implementação) ou **DEAD** (repo removido do disco, fora de uso). Não existe "global primary": o binding de sessão (`dadaia context bind <name>`) **persiste** contexto, modo, release e pid em um session record CLI-owned (`.dadaia/sessions/<id>.json`, via `session_identity`) — o store que os hooks realmente leem. O bind não emite eval-exports por default; `--print-env` é o escape back-compat para `eval $(...)`.
+Manages multiple **Spec Context Projects** — each maps `name → repo_slug → repo_url` and has a binary state machine: **ALIVE** (repo cloned into `repos/<repo_slug>/`, available for implementation) or **DEAD** (repo removed from disk, out of use). There is no "global primary": session binding (`dadaia context bind <name>`) **persists** context, mode, release and pid in a CLI-owned session record (`.dadaia/sessions/<id>.json`, via `session_identity`) — the store the hooks actually read. Bind emits no eval-exports by default; `--print-env` is the back-compat escape for `eval $(...)`.
 
-O modelo v2 (semver 2.0.0) elimina o contexto global implícito. A policy SDD (dentro do entrypoint PreToolUse único `python -m dadaia_workspace.hooks.pre_gate`) deriva o contexto PATH-first do write target, resolve o modo da sessão (env → session record → incumbent → IMPLEMENTATION) e valida o lease antes de permitir qualquer write em produção. Bind nunca é precondição de trabalho: uma sessão sem bind permanece IMPLEMENTATION-capable (lease livre apenas; nunca takeover de holder vivo).
+The v2 model (semver 2.0.0) eliminates the implicit global context. The SDD policy (inside the single PreToolUse entrypoint `python -m dadaia_workspace.hooks.pre_gate`) derives the context PATH-first from the write target, resolves the session's mode (env → session record → incumbent → IMPLEMENTATION) and validates the lease before allowing any production write. Bind is never a precondition for work: an unbound session remains IMPLEMENTATION-capable (free lease only; never a takeover of a live holder).
 
 ### State machine ALIVE/DEAD
 
 ```mermaid
 stateDiagram-v2
     [*] --> DEAD : context create
-    DEAD --> ALIVE : dadaia context alive (clona repo)
+    DEAD --> ALIVE : dadaia context alive (clones repo)
     ALIVE --> DEAD : dadaia context dead (rmtree)
     DEAD --> [*] : context delete
 ```
 
-### Ciclo de vida do `repo_url`
+### `repo_url` lifecycle
 
-O record `nome → repo_slug → repo_url` tem quatro superfícies de manutenção da URL:
+The `name → repo_slug → repo_url` record has four URL-maintenance surfaces:
 
-  * `dadaia context create <name> --repo <slug> [--url <url>]` — `--url` persiste a URL
-    explicitamente e **vence** o lookup do catálogo (repos.xlsx).
-  * **Back-fill automático:** `context alive` e `context dead` preenchem `repo_url` a
-    partir de `git remote get-url origin` (via o git-ops port per-context, nunca
-    subprocess em features) quando a URL do record está vazia e o repo existe em disco
-    (`alive` dentro do Lock 2; `dead` antes do rmtree).
-  * `dadaia context update <name> --url <url>` — verbo de reparo sobre o `update()` do
-    store (cenário de migração VPS sem repo em disco para back-fill).
-  * `dadaia doctor` flags `CTX-URL-1` para context ALIVE com `repo_url` vazio (manual;
-    roteia para `context update`).
+  * `dadaia context create <name> --repo <slug> [--url <url>]` — `--url` persists the URL
+    explicitly and **wins** over the catalog lookup (repos.xlsx).
+  * **Automatic back-fill:** `context alive` and `context dead` fill `repo_url` from
+    `git remote get-url origin` (via the per-context git-ops port, never
+    subprocess in features) when the record's URL is empty and the repo exists on disk
+    (`alive` inside Lock 2; `dead` before the rmtree).
+  * `dadaia context update <name> --url <url>` — repair verb over the store's
+    `update()` (VPS-migration scenario with no repo on disk to back-fill from).
+  * `dadaia doctor` flags `CTX-URL-1` for an ALIVE context with empty `repo_url`
+    (manual; routes to `context update`).
 
-Um context com URL preenchida é portável: `dadaia export` → import em outra máquina →
-`context alive` clona da URL do record.
+A context with a filled-in URL is portable: `dadaia export` → import on another machine →
+`context alive` clones from the record's URL.
 
-### Session binding e camadas de locking
+### Session binding and locking layers
 
-Uma sessão obtém um binding via:
+A session obtains a binding via:
 
 ```
 dadaia context bind <name> [--mode read|implementation|review] [--release <id>]
-# → persiste {context, mode, release, pid, session_id (sess_<hex8>)} no session record
-# → atualiza o incumbent pointer (sessions/runtime/<ctx>.ptr)
-# → escreve o bind-epoch marker .dadaia/states/bind_epoch/<ctx> (trigger de injeção)
-# --mode é opcional (default read); --release é exigido para implementation/review
-# --print-env: adicionalmente emite as linhas legacy `export DADAIA_*` (eval-compat)
+# → persists {context, mode, release, pid, session_id (sess_<hex8>)} in the session record
+# → refreshes the incumbent pointer (sessions/runtime/<ctx>.ptr)
+# → writes the bind-epoch marker .dadaia/states/bind_epoch/<ctx> (injection trigger)
+# --mode is optional (default read); --release is required for implementation/review
+# --print-env: additionally emits the legacy `export DADAIA_*` lines (eval-compat)
 ```
 
-**Bind-driven context injection (DP-2) com atribuição de sessão:** `bind` é o ÚNICO
-trigger de injeção de context-memory. O marker standalone
-`.dadaia/states/bind_epoch/<ctx>` (NÃO um campo do `.ptr` — o `.ptr` é
+**Bind-driven context injection (DP-2) with session attribution:** `bind` is the ONLY
+context-memory injection trigger. The standalone marker
+`.dadaia/states/bind_epoch/<ctx>` (NOT a field of the `.ptr` — the `.ptr` is
 lease-incumbency) carries as CONTENT the bind process's **ancestry pid chain** — one
 decimal pid per line, nearest-first (line 1 = the bind CLI's parent), capped at 8 entries
 (`features/spec_context/session_identity.py::write_bind_epoch`). Recording the chain
 instead of a single pid closes the ephemeral-shell gap that caused cross-session
 contamination: when `dadaia context bind` runs through a harness Bash tool the immediate
 parent is a short-lived shell that dies — the long-lived harness pid deeper in the chain
-is the stable anchor. A cadeia de resolução do hook
-`ctx_inject`: `DADAIA_CONTEXT` env → session record self-keyed (contexto bound) →
+is the stable anchor. The `ctx_inject` hook's resolution
+chain: `DADAIA_CONTEXT` env → self-keyed session record (bound context) →
 **bind-epoch marker newer than this session's sentinel AND whose recorded ancestry chain
 CONTAINS this session's harness pid (membership test — `hooks/ctx_inject.py`; the specs
-resolver attributes the same way)** → preflight genérico apenas (preflight de dispatcher + lista
-de contexts ALIVE; SEM context memory). A atribuição por membership garante que o bind de uma
-sessão paralela nunca rouba a injeção desta; marker vazio/legado (empty chain) é não-atribuível ⇒
-ignorado para injeção (nunca o contexto de outra sessão). O first-ALIVE foi deletado
-da injeção (permanece válido só na resolução de lease-context do gate). O hook
-re-injeta quando (a) não há sentinel para o sid, ou (b) um marker atribuível a esta
-sessão é mais novo que o mtime do sentinel — re-bind para outro contexto re-injeta;
-marker pré-existente nunca binda sessão fresca (sem sentinel ⇒ preflight genérico, que
-estampa o sentinel). Bind permanece non-blocking para trabalho ADDITIVE — o fluxo
-nunca para para exigir um bind.
+resolver attributes the same way)** → generic preflight only (dispatcher preflight + list
+of ALIVE contexts; NO context memory). Membership attribution guarantees that a
+parallel session's bind never steals this session's injection; an empty/legacy marker
+(empty chain) is non-attributable ⇒ ignored for injection (never another session's
+context). First-ALIVE was deleted from injection (it remains valid only in the gate's
+lease-context resolution). The hook re-injects when (a) there is no sentinel for the
+sid, or (b) a marker attributable to this session is newer than the sentinel's mtime —
+a re-bind to another context re-injects; a pre-existing marker never binds a fresh
+session (no sentinel ⇒ generic preflight, which stamps the sentinel). Bind remains
+non-blocking for ADDITIVE work — the flow never stops to demand a bind.
 
 **Hook execution detail (`hooks/ctx_inject.py`):** the hook resolves a stable
 `SESSION_ID` in the order `DADAIA_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` →
@@ -116,38 +116,38 @@ pointer via `session_identity`) and emits the payload inside bounded markers
 Per-runtime hook event registration (which events/matchers each harness wires):
 [[public-asset-distribution]].
 
-**Resolução de specs_dir em shell bound (CLI):** `core/specs_resolver.py` resolve o
-`specs_dir` de comandos como `dadaia specs doctor`/`bugs`/`backlog` na ordem env →
-**bind persistido de uma sessão atribuível/viva** (o incumbent do contexto) → cwd —
-um shell de workspace bound resolve sem flag `--specs-dir`.
+**specs_dir resolution in a bound shell (CLI):** `core/specs_resolver.py` resolves the
+`specs_dir` of commands like `dadaia specs doctor`/`bugs`/`backlog` in the order env →
+**persisted bind of an attributable/live session** (the context's incumbent) → cwd —
+a bound workspace shell resolves without the `--specs-dir` flag.
 
-Três camadas de lock garantem operações concorrentes seguras:
+Three lock layers guarantee safe concurrent operations:
 
-| Lock | Caminho | Impl | Escopo |
+| Lock | Path | Impl | Scope |
 |------|---------|------|--------|
-| Lock 1 (workspace) | `.dadaia/states/.ws_lock` | `WorkspaceLock` protocol; POSIX adapter (`infrastructure/file_lock_posix.py`) uses `fcntl LOCK_EX`, 5s timeout | Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`) |
-| Lock 2 (per-context) | `.dadaia/states/ctx_locks/<slug>.lock` | `ContextLock` protocol; POSIX adapter uses `fcntl LOCK_EX`, 5s timeout | `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe) |
-| TTL-lease (per-context) | `.dadaia/states/ctx_locks/<ctx>.lock.json` | JSON TTL-lease (mechanics: [[sdd-gate-v3]]) | Mutex de MUTATING release para o context |
+| Lock 1 (workspace) | `.dadaia/states/.ws_lock` | `WorkspaceLock` protocol; POSIX adapter (`infrastructure/file_lock_posix.py`) uses `fcntl LOCK_EX`, 5s timeout | Every mutation of `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`) |
+| Lock 2 (per-context) | `.dadaia/states/ctx_locks/<slug>.lock` | `ContextLock` protocol; POSIX adapter uses `fcntl LOCK_EX`, 5s timeout | `git clone` and `shutil.rmtree` per context (outside Lock 1; L1>L2 is the only safe direction) |
+| TTL-lease (per-context) | `.dadaia/states/ctx_locks/<ctx>.lock.json` | JSON TTL-lease (mechanics: [[sdd-gate-v3]]) | MUTATING release mutex for the context |
 
-Lock-1 e Lock-2 operam através dos protocolos `WorkspaceLock` e `ContextLock`
-(`core/protocols/file_lock.py`), com o adapter POSIX em `infrastructure/file_lock_posix.py`.
-A implementação concreta (`fcntl`) nunca importa diretamente em `features/` — apenas o
-protocol é injetado via `container.py`.
+Lock-1 and Lock-2 operate through the `WorkspaceLock` and `ContextLock` protocols
+(`core/protocols/file_lock.py`), with the POSIX adapter in `infrastructure/file_lock_posix.py`.
+The concrete implementation (`fcntl`) is never imported directly in `features/` — only the
+protocol is injected via `container.py`.
 
-**O TTL-lease** é o único mecanismo que serializa writers MUTATING. Ele foi introduzido em v0.1.6 substituindo o modelo 4-store anterior (sessions, Lock-3, semaphore).
+**The TTL-lease** is the only mechanism that serializes MUTATING writers. It was introduced in v0.1.6, replacing the previous 4-store model (sessions, Lock-3, semaphore).
 
-### Modos de sessão (--mode)
+### Session modes (--mode)
 
-| Mode | Persistido como | Semântica |
+| Mode | Persisted as | Semantics |
 |------|-----------------|-----------|
-| `read` (default; alias legacy `spec`) | `READ` | Non-acquiring: o gate bloqueia writes MUTATING **sem tocar o lease**; ADDITIVE (bugs/backlog/audits/reports/handoff/tmp) flui. |
-| `implementation` | `BOUND_IMPLEMENTATION` | Requer `--release <id>`; acquire do TTL-lease no primeiro write MUTATING. |
-| `review` | `BOUND_REVIEW` | Requer `--release <id>`; lease-taking, tratado como implementation no gate. |
-| (sem bind) | — | Default IMPLEMENTATION no gate: pode adquirir lease **livre**, nunca takeover de holder vivo (D-3). ADDITIVE sempre flui. |
+| `read` (default; legacy alias `spec`) | `READ` | Non-acquiring: the gate blocks MUTATING writes **without touching the lease**; ADDITIVE (bugs/backlog/audits/reports/handoff/tmp) flows. |
+| `implementation` | `BOUND_IMPLEMENTATION` | Requires `--release <id>`; TTL-lease acquire on the first MUTATING write. |
+| `review` | `BOUND_REVIEW` | Requires `--release <id>`; lease-taking, treated as implementation by the gate. |
+| (no bind) | — | Default IMPLEMENTATION in the gate: may acquire a **free** lease, never a takeover of a live holder (D-3). ADDITIVE always flows. |
 
 ### TTL-lease: bind/release lifecycle (mechanics owned by [[sdd-gate-v3]])
 
-O lease é adquirido inline pelo gate no primeiro write MUTATING da sessão (não em
+The lease is acquired inline by the gate on the session's first MUTATING write (not at
 `context bind`). Schema: `{context, release, session_id, mode, pid, acquired_at,
 heartbeat, ttl}`. The full acquire/liveness mechanics — O_EXCL CAS sentinel, the
 by-session index written in the same CAS transaction, TTL floor + PID veto, PostToolUse
@@ -156,77 +156,77 @@ probe-gated `dadaia lock steal`, and doctor LOCK-GC reclaim — are owned by
 [[sdd-gate-v3]] and are not restated here. This atom owns the lifecycle around the
 lease: bind, explicit release, and session/bind-record decay.
 
-- **Release explícito:** `dadaia context release` solta o(s) lease(s) que a sessão segura ANTES de remover o session record. Predicados por fluxo: (a) **eval flow** (`--print-env`, `DADAIA_SESSION_ID` exportado) — solta todo lock record que nomeia o sid do env; (b) **default flow** (sid do CLI ≠ sid do harness) — resolve o contexto bound do session record e solta o lease daquele contexto apenas se o pid do holder está morto OU casa com a ancestralidade do processo chamador (port `ProcessAncestry`); um lease de holder estrangeiro vivo NUNCA é solto por nome de contexto. Pós-release, o heartbeat jamais ressuscita o lease ([[sdd-gate-v3]], DP-3). `context dead <ctx>` procede após um release bem-sucedido.
-- **Decay de bind/session records:** bind/session records decaem por TTL medido contra `last_seen_at`, renovado pelo heartbeat PostToolUse a cada tool use — um READ bind de sessão ativa nunca decai (sem READ→IMPLEMENTATION silencioso); record sem `last_seen_at` mantém TTL-from-creation; o pid do session record (bind-CLI, morto por construção) não é consultado. O doctor de specs valida coerência lease↔session com triagem em 3 estados (SPEC-DOC-029: stale-dead ⇒ WARN com remediação; live-incoerente ⇒ ERR; coerente ⇒ ok).
+- **Explicit release:** `dadaia context release` drops the lease(s) the session holds BEFORE removing the session record. Per-flow predicates: (a) **eval flow** (`--print-env`, `DADAIA_SESSION_ID` exported) — drops every lock record that names the env's sid; (b) **default flow** (CLI sid ≠ harness sid) — resolves the session record's bound context and drops that context's lease only if the holder's pid is dead OR matches the calling process's ancestry (`ProcessAncestry` port); a live foreign holder's lease is NEVER dropped by context name. Post-release, the heartbeat never resurrects the lease ([[sdd-gate-v3]], DP-3). `context dead <ctx>` proceeds after a successful release.
+- **Bind/session record decay:** bind/session records decay by TTL measured against `last_seen_at`, renewed by the PostToolUse heartbeat on every tool use — an active session's READ bind never decays (no silent READ→IMPLEMENTATION); a record without `last_seen_at` keeps TTL-from-creation; the session record's pid (bind-CLI, dead by construction) is not consulted. The specs doctor validates lease↔session coherence with 3-state triage (SPEC-DOC-029: stale-dead ⇒ WARN with remediation; live-incoherent ⇒ ERR; coherent ⇒ ok).
 
-### Migração v1→v2 (`dadaia migrate`)
+### v1→v2 migration (`dadaia migrate`)
 
-Qualquer workspace v1 (`schema_version: "1"` ou `state: "ativo"`) é bloqueado com loud guard ao rodar qualquer comando `dadaia context`. Migração:
+Any v1 workspace (`schema_version: "1"` or `state: "ativo"`) is blocked with a loud guard when running any `dadaia context` command. Migration:
 
 ```
 dadaia migrate [--dry-run] [--yes]
 ```
 
-Ações: mapeamento de estados, renomeação de campos, remoção do flag global legado, adição de `dead_since: null`, atualização de `schema_version` para `"2"`, deleção do marcador global legado, criação de `.dadaia/sessions/`, `.dadaia/states/ctx_locks/`. Idempotente em workspace v2.
+Actions: state mapping, field renaming, removal of the legacy global flag, addition of `dead_since: null`, update of `schema_version` to `"2"`, deletion of the legacy global marker, creation of `.dadaia/sessions/` and `.dadaia/states/ctx_locks/`. Idempotent on a v2 workspace.
 
 ### Canonical specs/ tree v2 (scaffold baseline)
 
-O scaffold de novo consumer repo (`dadaia init` + `dadaia context create`) entrega a árvore v2:
+The new-consumer-repo scaffold (`dadaia init` + `dadaia context create`) delivers the v2 tree:
 
-  * `specs/constitution.md` — leis absolutas do produto.
-  * `specs/memory/architecture.md` e `specs/memory/tech-stack.md` — memory Markdown atômica.
-  * `specs/memory/product/index.md` — entry point do catalog; `dadaia memory product add <slug>` cria feature Markdown e regenera o catalog.
-  * `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` — diretórios de lifecycle com `README.md` e `.gitkeep`.
-  * `specs/AGENTS.md` — contrato SDD do spec tree para o operador do consumer repo.
+  * `specs/constitution.md` — the product's absolute laws.
+  * `specs/memory/architecture.md` and `specs/memory/tech-stack.md` — atomic memory Markdown.
+  * `specs/memory/product/index.md` — catalog entry point; `dadaia memory product add <slug>` creates the feature Markdown and regenerates the catalog.
+  * `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` — lifecycle directories with `README.md` and `.gitkeep`.
+  * `specs/AGENTS.md` — the spec tree's SDD contract for the consumer-repo operator.
 
-Doctor TREE-1..7 enforça e repara esta árvore: `dadaia specs doctor` em workspace recém-scaffoldado deve sair com 0 violations.
+Doctor TREE-1..7 enforces and repairs this tree: `dadaia specs doctor` on a freshly scaffolded workspace must exit with 0 violations.
 
-**CLIs de criação de artefatos SDD** (evitam frontmatter manual):
+**SDD artifact-creation CLIs** (avoid manual frontmatter):
 
-  * `dadaia release new <id>` — cria `specs/releases/<id>/SPEC.md` stub com frontmatter canônico.
-  * `dadaia backlog new <slug>` — cria `specs/backlog/<slug>.md` stub.
-  * `dadaia bug new <slug>` — **LEGACY**: cria o stub Markdown `specs/bugs/<slug>.md` com `session_id: null`. The canonical bug-registration path is the event-sourced `dadaia bugs append` (JSONL, `bug-event-v1`) — see [[sdd-bug-backlog-governance]].
-  * `dadaia memory product add <slug>` — cria feature Markdown em `specs/memory/product/<slug>.md` e regenera `catalog.json` de forma idempotente.
+  * `dadaia release new <id>` — creates the `specs/releases/<id>/SPEC.md` stub with canonical frontmatter.
+  * `dadaia backlog new <slug>` — creates the `specs/backlog/<slug>.md` stub.
+  * `dadaia bug new <slug>` — **LEGACY**: creates the `specs/bugs/<slug>.md` Markdown stub with `session_id: null`. The canonical bug-registration path is the event-sourced `dadaia bugs append` (JSONL, `bug-event-v1`) — see [[sdd-bug-backlog-governance]].
+  * `dadaia memory product add <slug>` — creates the feature Markdown at `specs/memory/product/<slug>.md` and regenerates `catalog.json` idempotently.
 
-## Fluxo de uso
+## Usage flow
 
-  1. `dadaia context create my-project --repo dadaia-workspace [--url <git-url>]` — registra o context (DEAD, sem clone); `--url` persiste a remote URL (senão lookup do catálogo; back-fill posterior em alive/dead).
-  2. `dadaia context alive my-project` — clona o repo em `repos/dadaia-workspace/`, faz checkout da branch, marca ALIVE.
-  3. `dadaia context list` — mostra todos com state (ALIVE/DEAD), repo slug, datas.
-  4. `dadaia context bind my-project --mode implementation --release my-release-v1` — persiste o session record (contexto, modo, release, pid). O lease é adquirido inline no primeiro write MUTATING.
-  5. `dadaia context release` — solta o(s) lease(s) que a sessão segura (predicados eval/default flow acima) e remove o session record, liberando o contexto para outro agente.
-  6. `dadaia context dead my-project` — remove o repo do disco (rmtree), marca DEAD. Bloqueado se TTL-lease HELD para o context. **Review gate:** com arquivos untracked e sem `--commit`, `dead()` recusa e não faz push; com `--commit`, um secret scan (privacy engine) roda sobre o conteúdo staged e bloqueia o push em qualquer finding.
+  1. `dadaia context create my-project --repo dadaia-workspace [--url <git-url>]` — registers the context (DEAD, no clone); `--url` persists the remote URL (otherwise catalog lookup; later back-fill on alive/dead).
+  2. `dadaia context alive my-project` — clones the repo into `repos/dadaia-workspace/`, checks out the branch, marks ALIVE.
+  3. `dadaia context list` — shows all contexts with state (ALIVE/DEAD), repo slug, dates.
+  4. `dadaia context bind my-project --mode implementation --release my-release-v1` — persists the session record (context, mode, release, pid). The lease is acquired inline on the first MUTATING write.
+  5. `dadaia context release` — drops the lease(s) the session holds (eval/default-flow predicates above) and removes the session record, freeing the context for another agent.
+  6. `dadaia context dead my-project` — removes the repo from disk (rmtree), marks DEAD. Blocked if the TTL-lease is HELD for the context. **Review gate:** with untracked files and no `--commit`, `dead()` refuses and does not push; with `--commit`, a secret scan (privacy engine) runs over the staged content and blocks the push on any finding.
 
-O hook `python -m dadaia_workspace.hooks.ctx_inject` executa no SessionStart/UserPromptSubmit. A injeção é **bind-driven**: sessão unbound recebe apenas o preflight genérico + lista de contexts ALIVE (sem context memory); após `dadaia context bind X`, o próximo prompt injeta a memory de X (tech-stack + catalog) uma vez por sessão lógica; re-bind para Y re-injeta Y. Para ADDITIVE writes (reports, handoffs, bugs, backlog, audits), o bind não é necessário — o gate permite esses paths sem lease.
+The `python -m dadaia_workspace.hooks.ctx_inject` hook runs on SessionStart/UserPromptSubmit. Injection is **bind-driven**: an unbound session receives only the generic preflight + list of ALIVE contexts (no context memory); after `dadaia context bind X`, the next prompt injects X's memory (tech-stack + catalog) once per logical session; a re-bind to Y re-injects Y. For ADDITIVE writes (reports, handoffs, bugs, backlog, audits), bind is not required — the gate allows those paths without a lease.
 
-## Trigger típico
+## Typical trigger
 
-Quando o operador vai começar a trabalhar em um repositório, ou quando um agente de implementação precisa adquirir o direito exclusivo de mutar um release específico de um context ALIVE.
+When the operator is about to start working on a repository, or when an implementation agent needs to acquire the exclusive right to mutate a specific release of an ALIVE context.
 
-## Diferencial
+## Differentiator
 
-Sem context management v2, múltiplos agentes em paralelo podem editar a mesma release simultaneamente, um agente pode remover o repo enquanto outro tem fds abertos, ou duas sessões podem corromper `spec_contexts.json` por update perdido. O modelo ALIVE/DEAD + session binding + TTL-lease fecha esse surface completamente. O TTL-lease com stable-session-identity (D1) elimina o soft-deadlock: uma sessão relaunched é reconhecida como incumbente e RENEWS sem conflict.
+Without context management v2, multiple parallel agents can edit the same release simultaneously, one agent can remove the repo while another has open fds, or two sessions can corrupt `spec_contexts.json` through a lost update. The ALIVE/DEAD model + session binding + TTL-lease closes that surface completely. The TTL-lease with stable-session-identity (D1) eliminates the soft-deadlock: a relaunched session is recognized as the incumbent and RENEWS without conflict.
 
-## Estado runtime tocado
+## Runtime state touched
 
-  * `.dadaia/states/spec_contexts.json` — registro de todos os contexts (`schema_version: "2"`; state ALIVE/DEAD; `alive_since`; `dead_since`; sem flag global)
-  * `.dadaia/states/.ws_lock` — fcntl workspace lock (gitignored; criado em runtime)
+  * `.dadaia/states/spec_contexts.json` — registry of all contexts (`schema_version: "2"`; ALIVE/DEAD state; `alive_since`; `dead_since`; no global flag)
+  * `.dadaia/states/.ws_lock` — fcntl workspace lock (gitignored; created at runtime)
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
-  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease (criado inline no primeiro write MUTATING; mechanics: [[sdd-gate-v3]])
+  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease (created inline on the first MUTATING write; mechanics: [[sdd-gate-v3]])
   * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index ([[sdd-gate-v3]])
-  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven; content = the bind process's ancestry pid chain, one decimal pid per line, nearest-first, capped at 8 — consumers attribute a marker to a session by MEMBERSHIP of the session's harness pid in the chain)
-  * `.dadaia/sessions/<id>.json` — session record CLI-owned escrito por `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo)
-  * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (escrito em acquire; I/O via `session_identity`)
-  * `.dadaia/logs/lock-events.jsonl` — audit log append-only (eventos: acquire, release, steal, HEARTBEAT)
-  * `repos/<repo_slug>/` — repo clonado durante `alive`, removido em `dead`
-  * `DADAIA_CONTEXT`, `DADAIA_SESSION_ID`, `DADAIA_MODE` — env vars opcionais de operador, emitidas apenas com `--print-env` (overrides; o caminho harness-real é o session record)
+  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker written by `context bind` (trigger and discovery source of bind-driven injection; content = the bind process's ancestry pid chain, one decimal pid per line, nearest-first, capped at 8 — consumers attribute a marker to a session by MEMBERSHIP of the session's harness pid in the chain)
+  * `.dadaia/sessions/<id>.json` — CLI-owned session record written by `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); read by the gate (mode)
+  * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (written on acquire; I/O via `session_identity`)
+  * `.dadaia/logs/lock-events.jsonl` — append-only audit log (events: acquire, release, steal, HEARTBEAT)
+  * `repos/<repo_slug>/` — repo cloned during `alive`, removed on `dead`
+  * `DADAIA_CONTEXT`, `DADAIA_SESSION_ID`, `DADAIA_MODE` — optional operator env vars, emitted only with `--print-env` (overrides; the real harness path is the session record)
 
-**Stores que não existem (não recriar):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3) e `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4). O mutex MUTATING é exclusivamente o single-record TTL-lease.
+**Stores that do not exist (do not recreate):** `.dadaia/locks/implementation/<ctx>__<release>.json` (Lock 3) and `.dadaia/states/ctx_locks/<ctx>.semaphore.json` (semaphore / Lock 4). The MUTATING mutex is exclusively the single-record TTL-lease.
 
-## Dependências
+## Dependencies
 
-  * Depende de [[workspace-init]] (cria `spec_contexts.json` e o hook ctx-inject; garante que `.dadaia/states/ctx_locks/` exista).
-  * `alive()` indiretamente usa git clone (infra); `dead()` usa rmtree.
-  * [[sdd-gate-v3]] invoca `lease.py` para validar identidade + ownership por sessão.
-  * [[workspace-doctor]] valida invariantes sobre o TTL-lease e session state.
-  * [[agent-orchestration]] resolve paths de specs via a cadeia de discovery (env `DADAIA_CONTEXT` opcional do operador → registry/session record → `dadaia context show --json`); `bind` NÃO exporta env vars — apenas `--print-env` emite as linhas legacy `export DADAIA_*`.
+  * Depends on [[workspace-init]] (creates `spec_contexts.json` and the ctx-inject hook; ensures `.dadaia/states/ctx_locks/` exists).
+  * `alive()` indirectly uses git clone (infra); `dead()` uses rmtree.
+  * [[sdd-gate-v3]] invokes `lease.py` to validate per-session identity + ownership.
+  * [[workspace-doctor]] validates invariants over the TTL-lease and session state.
+  * [[agent-orchestration]] resolves spec paths via the discovery chain (optional operator `DADAIA_CONTEXT` env → registry/session record → `dadaia context show --json`); `bind` does NOT export env vars — only `--print-env` emits the legacy `export DADAIA_*` lines.

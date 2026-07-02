@@ -39,9 +39,9 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 5560
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 5225
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
@@ -53,16 +53,16 @@ worker harness behind `AgentRuntimePort` and advancing only when the gate passes
 
 ```mermaid
 flowchart TB
-    OP["dadaia lifecycle pipeline --release &lt;id&gt;<br/>(ou implement · review qa|security|code · close)"]
-    OP --> PB["prompt_builder · PromptPrefix<br/>(sha256, cacheable, reusado byte-a-byte por step)"]
+    OP["dadaia lifecycle pipeline --release &lt;id&gt;<br/>(or implement · review qa|security|code · close)"]
+    OP --> PB["prompt_builder · PromptPrefix<br/>(sha256, cacheable, reused byte-for-byte per step)"]
     PB --> LAD
-    subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persiste a cada step · para no 1º bloqueio)"]
+    subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persists at every step · stops at the 1st block)"]
         direction LR
-        I["implement"] --> Q["review_qa"] --> S["review_security"] --> C["review_code<br/>(→ fase CLOSURE)"]
-        C -.->|"close é step separado"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
+        I["implement"] --> Q["review_qa"] --> S["review_security"] --> C["review_code<br/>(→ CLOSURE phase)"]
+        C -.->|"close is a separate step"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
     end
     LAD -.->|"build_agent_runtime(kind) — --step-harness"| RT
-    subgraph RT["AgentRuntimePort — worker harness selecionável por step (LAW 1: pi/codex/fake)"]
+    subgraph RT["AgentRuntimePort — per-step selectable worker harness (LAW 1: pi/codex/fake)"]
         direction LR
         FK["FAKE"]:::w
         CXk["CODEX_EXEC"]:::w
@@ -70,8 +70,8 @@ flowchart TB
         CLk["CLAUDE_SDK · Ring-1<br/>(kept, NOT workflow harness)"]:::x
     end
     RT --> GATE{"LifecycleAgentRunner gate:<br/>verdict APPROVED?<br/>Ring-2 changed_paths in-scope?"}
-    GATE -->|sim| NEXT(["transição legal → próximo step"])
-    GATE -->|não| BLK(["BlockedState + resume token"])
+    GATE -->|yes| NEXT(["legal transition → next step"])
+    GATE -->|no| BLK(["BlockedState + resume token"])
     classDef w fill:#238636,color:#fff,stroke:#238636;
     classDef x fill:#6e7681,color:#fff,stroke:#6e7681;
 ```

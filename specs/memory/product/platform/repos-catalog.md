@@ -2,49 +2,49 @@
 slug: repos-catalog
 title: repos-catalog
 category: product
-tldr: lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.
-summary: lookup do repos.xlsx para discovery rápida de repos conhecidos com slug +
+tldr: repos.xlsx lookup for fast discovery of known repos with slug + URL.
+summary: repos.xlsx lookup for fast discovery of known repos with slug +
   URL.
 tags:
 - repos
 - catalog
 - discovery
 agent_tier: self-pull
-token_estimate: 212
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+token_estimate: 325
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia repos list` · Closure: sdd-release-lifecycle-v1
 
-## Propósito
+## Purpose
 
-Consulta o catálogo estático de repos conhecidos em `.dadaia/src/repos.xlsx` e exibe slug, URL, descrição. Serve como discovery rápida para o operador criar novos contexts sem memorizar URLs.
+Queries the static catalog of known repos at `.dadaia/src/repos.xlsx` and displays slug, URL, description. Serves as fast discovery for the operator to create new contexts without memorizing URLs.
 
-## Fluxo de uso
+## Usage flow
 
-  1. `dadaia repos list` — mostra tabela com todos os repos do catálogo.
-  2. Operador identifica o slug desejado e usa em `dadaia context create <name> --repo <slug>`.
-  3. **Programmatic consumer:** `dadaia context create` sem `--url` consulta o catálogo via `ReposService.list_known()` (`cli/commands/context.py` → `container.build_repos_service()`) para back-fill do `repo_url`, falhando gracefully quando o catálogo está ausente; `--url` explícito vence o lookup.
-  4. Para atualizar o catálogo: editar manualmente o XLSX (ou regenerar via release dedicada).
+  1. `dadaia repos list` — shows a table with all catalog repos.
+  2. The operator identifies the desired slug and uses it in `dadaia context create <name> --repo <slug>`.
+  3. **Programmatic consumer:** `dadaia context create` without `--url` queries the catalog via `ReposService.list_known()` (`cli/commands/context.py` → `container.build_repos_service()`) to back-fill `repo_url`, failing gracefully when the catalog is absent; an explicit `--url` wins over the lookup.
+  4. To update the catalog: edit the XLSX manually (or regenerate it via a dedicated release).
 
 
 
-## Trigger típico
+## Typical trigger
 
-Quando o operador vai criar um context para um repo que não lembra a URL exata.
+When the operator is about to create a context for a repo whose exact URL they do not remember.
 
-## Diferencial
+## Differentiator
 
-Sem o catálogo, criar context exigia colar URL completa cada vez. O slug curto encurta o caminho e centraliza descoberta.
+Without the catalog, creating a context required pasting the full URL every time. The short slug shortens the path and centralizes discovery.
 
-## Estado runtime tocado
+## Runtime state touched
 
   * Read-only: `.dadaia/src/repos.xlsx`
 
 
 
-## Dependências
+## Dependencies
 
-  * Depende de [[workspace-init]] (instala o XLSX em `.dadaia/src/`).
-  * Consumido pela [[context-management]] (operador olha repos list antes de criar context).
+  * Depends on [[workspace-init]] (installs the XLSX at `.dadaia/src/`).
+  * Consumed by [[context-management]] (the operator checks repos list before creating a context).

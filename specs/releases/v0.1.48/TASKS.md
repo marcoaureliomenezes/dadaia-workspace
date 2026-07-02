@@ -37,9 +37,9 @@ SPEC §5.
 
 ## W4 — English canon (write set: surviving `specs/memory/**` + regenerated catalog/index)
 
-- [ ] T-48-40 Translate set A (platform 7 + panel 2 + distribution 2 + philosophy 2): bodies, frontmatter, Group-A headings → English canon; token_estimate refresh.
-- [ ] T-48-41 Translate set B (agents 3 keepers + sdd 5 + harness 3 + architecture/tech-stack/quality-assurance residual PT): same contract.
-- [ ] T-48-42 Regenerate catalog + index; LINT-1 0/0; CAT-1 clean; AC-4 greps = 0.
+- [x] T-48-40 Translate set A (platform 7 + panel 2 + distribution 2 + philosophy 2): bodies, frontmatter, Group-A headings → English canon; token_estimate refresh.
+- [x] T-48-41 Translate set B (agents 3 keepers + sdd 5 + harness 3 + architecture/tech-stack/quality-assurance residual PT): same contract.
+- [x] T-48-42 Regenerate catalog + index; LINT-1 0/0; CAT-1 clean; AC-4 greps = 0.
 
 ## W5 — hygiene
 

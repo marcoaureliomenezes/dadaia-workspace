@@ -2,75 +2,75 @@
 slug: academy
 title: academy
 category: product
-tldr: knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI.
-summary: a aba Academy do panel navega diretamente os módulos da knowledge_basis
-  (GET /api/academy lista todos os módulos com títulos e contagem de lições; rota
-  read-only traversal-guarded GET /academy/<module>/<lesson> renderiza a lição em
-  Markdown). A CLI copy-from-template (dadaia academy create/update/delete)
-  permanece como superfície de gestão de cursos derivados.
+tldr: browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI.
+summary: the panel's Academy tab browses the knowledge_basis modules directly
+  (GET /api/academy lists all modules with titles and lesson counts; the read-only
+  traversal-guarded route GET /academy/<module>/<lesson> renders the lesson in
+  Markdown). The copy-from-template CLI (dadaia academy create/update/delete)
+  remains the management surface for derived courses.
 tags:
 - academy
 - onboarding
 - courses
 agent_tier: self-pull
-token_estimate: 660
-last_updated: '2026-06-12'
-release_origin: memory-markdown-source-v1
+token_estimate: 775
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia academy {modules|list|create|update|delete}` · Panel: `Academy` tab at `http://127.0.0.1:4999/#academy` · Closure: dadaia-workspace-panel-r5-v1 · 2026-05-21
 
-## Propósito
+## Purpose
 
-Sistema interno de cursos para onboarding e estudo, com duas superfícies:
+Internal course system for onboarding and study, with two surfaces:
 
-1. **Browsing direto da knowledge_basis (acesso primário).** A aba Academy do panel
-   (`http://127.0.0.1:4999/#academy`) lista TODOS os módulos shipped em
+1. **Direct knowledge_basis browsing (primary access).** The panel's Academy tab
+   (`http://127.0.0.1:4999/#academy`) lists ALL modules shipped in
    `dadaia_workspace/features/academy/knowledge_basis/` via `GET /api/academy`
-   (títulos + contagem de lições). Clicar em um módulo expande suas lições; clicar em
-   uma lição renderiza o Markdown no panel via a rota read-only
+   (titles + lesson counts). Clicking a module expands its lessons; clicking a
+   lesson renders the Markdown in the panel via the read-only route
    `GET /academy/<module>/<lesson>` — traversal-guarded (single-segment +
-   `Path.resolve()` + `is_relative_to`). Nenhum `dadaia academy create` é
-   pré-condição para a aba ter conteúdo.
-2. **Gestão copy-from-template (CLI).** `dadaia academy create` copia um módulo da
-   knowledge basis para `.dadaia/academy/<slug>/`, registrado no índice
-   `academy.json`; update/delete gerenciam esses cursos derivados.
+   `Path.resolve()` + `is_relative_to`). No `dadaia academy create` is a
+   precondition for the tab to have content.
+2. **Copy-from-template management (CLI).** `dadaia academy create` copies a
+   knowledge-basis module to `.dadaia/academy/<slug>/`, registered in the
+   `academy.json` index; update/delete manage those derived courses.
 
-O módulo `07_codex` é um curso completo em inglês sobre o runtime Codex
-(README + lições numeradas + exercises + example + references), com fatos
-live-verificados do contrato Codex anotados por evidence-level.
+The `07_codex` module is a complete English-language course on the Codex runtime
+(README + numbered lessons + exercises + example + references), with live-verified
+Codex-contract facts annotated by evidence-level.
 
-Útil para acelerar onboarding de novos contribuidores (humanos) ou produzir material de referência estruturado que agentes podem consultar.
+Useful for accelerating the onboarding of new (human) contributors or producing structured reference material that agents can consult.
 
-## Fluxo de uso
+## Usage flow
 
-  1. `dadaia panel` → aba **Academy** : `GET /api/academy` lista todos os módulos da knowledge_basis com título e contagem de lições.
-  2. Clicar em um módulo expande a lista de lições; clicar em uma lição carrega `GET /academy/<module>/<lesson>` e renderiza o Markdown inline com breadcrumb `[← Back to Academy]`.
-  3. `dadaia academy modules` — lista os módulos disponíveis na knowledge basis (numerados) via CLI.
-  4. `dadaia academy create "my-course" --module 1` — copia o módulo 1 para `.dadaia/academy/my-course/` e registra em `academy.json`.
-  5. `dadaia academy list` / `update` / `delete` — gestão dos cursos derivados via CLI.
-
-
-
-## Trigger típico
-
-Onboarding de novo contribuidor ou agente; criação de material de referência estruturado. O operador abre o panel e acessa a aba Academy para navegar os módulos disponíveis sem sair da janela.
-
-## Diferencial
-
-Templated learning — acelera onboarding oferecendo conhecimento estruturado em vez de documentação dispersa. Cada curso é uma pasta versionável que pode ser editada pelo operador. A integração como aba no panel elimina a necessidade de sair da janela de controle para consultar conteúdo de onboarding.
-
-## Estado runtime tocado
-
-  * `dadaia_workspace/features/academy/knowledge_basis/<NN_module>/` — fonte read-only dos módulos shipped (lida por `GET /api/academy` para o catálogo e por `GET /academy/<module>/<lesson>` para o conteúdo; render via `views/_md_render.py`).
-  * `.dadaia/academy/academy.json` — índice de cursos derivados (lido por `AcademyService.list_all()`; escrito por CLI `dadaia academy create/update/delete`).
-  * `.dadaia/academy/<slug>/` — diretório do curso copy-from-template (copiado pela CLI).
-  * `GET /api/academy` — lista os módulos da knowledge_basis (títulos + lesson counts).
-  * `GET /academy/<module>/<lesson>` — rota read-only traversal-guarded (single-segment + resolve + `is_relative_to`) que renderiza a lição Markdown.
+  1. `dadaia panel` → **Academy** tab: `GET /api/academy` lists all knowledge_basis modules with title and lesson count.
+  2. Clicking a module expands the lesson list; clicking a lesson loads `GET /academy/<module>/<lesson>` and renders the Markdown inline with the `[← Back to Academy]` breadcrumb.
+  3. `dadaia academy modules` — lists the modules available in the knowledge basis (numbered) via CLI.
+  4. `dadaia academy create "my-course" --module 1` — copies module 1 to `.dadaia/academy/my-course/` and registers it in `academy.json`.
+  5. `dadaia academy list` / `update` / `delete` — management of derived courses via CLI.
 
 
 
-## Dependências
+## Typical trigger
 
-  * Depende de [[workspace-init]] (cria `academy.json` e instala módulos via `public-asset-distribution`).
-  * [[panel]]: `AcademyService` é injetado como DI opcional em `PanelService(academy=None)` no composition root de `panel.py`. A aba Academy no panel consome `GET /api/academy` via `academy.js`, que regista o módulo via `window.Panel.register('academy', Academy)` e usa `window.authedFetch` e `window.escHtml` (globais de `core.js`; `authedFetch` is a residual name — it is a thin alias of plain `fetch` that sends NO credential, per the panel's no-auth model).
+Onboarding of a new contributor or agent; creation of structured reference material. The operator opens the panel and accesses the Academy tab to browse the available modules without leaving the window.
+
+## Differentiator
+
+Templated learning — accelerates onboarding by offering structured knowledge instead of scattered documentation. Each course is a versionable folder the operator can edit. The integration as a panel tab eliminates the need to leave the control window to consult onboarding content.
+
+## Runtime state touched
+
+  * `dadaia_workspace/features/academy/knowledge_basis/<NN_module>/` — read-only source of the shipped modules (read by `GET /api/academy` for the catalog and by `GET /academy/<module>/<lesson>` for the content; rendered via `views/_md_render.py`).
+  * `.dadaia/academy/academy.json` — index of derived courses (read by `AcademyService.list_all()`; written by the `dadaia academy create/update/delete` CLI).
+  * `.dadaia/academy/<slug>/` — copy-from-template course directory (copied by the CLI).
+  * `GET /api/academy` — lists the knowledge_basis modules (titles + lesson counts).
+  * `GET /academy/<module>/<lesson>` — read-only traversal-guarded route (single-segment + resolve + `is_relative_to`) that renders the lesson Markdown.
+
+
+
+## Dependencies
+
+  * Depends on [[workspace-init]] (creates `academy.json` and installs modules via `public-asset-distribution`).
+  * [[panel]]: `AcademyService` is injected as optional DI in `PanelService(academy=None)` at the composition root of `panel.py`. The panel's Academy tab consumes `GET /api/academy` via `academy.js`, which registers the module via `window.Panel.register('academy', Academy)` and uses `window.authedFetch` and `window.escHtml` (globals from `core.js`; `authedFetch` is a residual name — it is a thin alias of plain `fetch` that sends NO credential, per the panel's no-auth model).

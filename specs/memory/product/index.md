@@ -9,15 +9,15 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/. |
-| `agent-monitoring` | agent-monitoring | telemetria local stdlib-only (Claude/Codex/PI sessions) → aba Sessions do panel + /api/agents; allowlist gate preserva privacidade. |
+| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.1 separates HTML reports from JSON handoffs in .dadaia/handoff/. |
+| `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
 | `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas. |
 
 ### distribution
 
 | slug | title | tldr |
 |------|-------|------|
-| `academy` | academy | knowledge_basis navegável na aba Academy do panel + gestão copy-from-template via CLI. |
+| `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots. |
 
 ### harness
@@ -32,8 +32,8 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `brand-identity` | brand-identity | paleta canônica de 5 cores e tokens CSS do panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | superfície de controle local (dadaia panel); 6 tabs; Workflows lidera com diagram-cards server-SVG + model pickers inline por step (v0.1.45). |
+| `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
+| `panel` | panel | local control surface (dadaia panel); 6 tabs; Workflows leads with server-SVG diagram-cards + inline per-step model pickers (v0.1.45). |
 
 ### philosophy
 
@@ -46,14 +46,14 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `context-management` | context-management | multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa. |
+| `context-management` | context-management | multi-context ALIVE/DEAD; bind persists mode and writes the bind-epoch marker; TTL+PID-veto lease; `context release` drops the lease; dead() needs a clean tree. |
 | `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI get honest runtime-specific projections from one public source (9 core agents / 18 skills / 2 reference workflow docs). |
-| `repos-catalog` | repos-catalog | lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL. |
-| `server-registry` | server-registry | registry interno de portas com TTL+PID para evitar conflito entre dev servers de agentes paralelos; range 3000-3999 só na alocação next_port. |
-| `workspace-doctor` | workspace-doctor | diagnóstico + repair do workspace state; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix roda SENTINEL/PTR/GRAVEYARD-GC. |
-| `workspace-init` | workspace-init | porta de entrada; cria .dadaia/, .venv, Python governance hooks e estrutura idempotente. |
-| `workspace-portability` | workspace-portability | export/import do workspace inteiro como tar.gz para backup ou migração entre máquinas. |
+| `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
+| `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |
+| `workspace-doctor` | workspace-doctor | workspace-state diagnosis + repair; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix runs SENTINEL/PTR/GRAVEYARD-GC. |
+| `workspace-init` | workspace-init | entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure. |
+| `workspace-portability` | workspace-portability | export/import of the whole workspace as a tar.gz for backup or migration between machines. |
 
 ### sdd
 

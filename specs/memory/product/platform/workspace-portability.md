@@ -2,56 +2,56 @@
 slug: workspace-portability
 title: workspace-portability
 category: product
-tldr: export/import do workspace inteiro como tar.gz para backup ou migração entre
-  máquinas.
-summary: export/import do workspace inteiro como tar.gz para backup ou migração entre
-  máquinas.
+tldr: export/import of the whole workspace as a tar.gz for backup or migration between
+  machines.
+summary: export/import of the whole workspace as a tar.gz for backup or migration between
+  machines.
 tags:
 - portability
 - export
 - import
 - backup
 agent_tier: self-pull
-token_estimate: 336
-last_updated: '2026-07-01'
-release_origin: memory-markdown-source-v1
+token_estimate: 400
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-CLI surface: `dadaia export [--output DIR] [--include-reports] [--exclude-mnt]` e `dadaia import <archive> [--workspace DEST] [--skip-activate]` · Closure: sdd-release-lifecycle-v1
+CLI surface: `dadaia export [--output DIR] [--include-reports] [--exclude-mnt]` and `dadaia import <archive> [--workspace DEST] [--skip-activate]` · Closure: sdd-release-lifecycle-v1
 
-## Propósito
+## Purpose
 
-Empacota e restaura o estado durável do workspace (state files, academy, rules, skills) como `.tar.gz` portável. Secretos (`.env`), caches e `repos/` clonados são excluídos por padrão; reports HTML opt-in via flag.
+Packages and restores the workspace's durable state (state files, academy, rules, skills) as a portable `.tar.gz`. Secrets (`.env`), caches and cloned `repos/` are excluded by default; HTML reports opt-in via flag.
 
-Restore patches absolute paths para a nova máquina, reativa contexts conforme estavam, e (a menos que `--skip-activate`) re-roda `workspace-init` para reconfigurar hooks.
+Restore patches absolute paths for the new machine, reactivates contexts as they were, and (unless `--skip-activate`) re-runs `workspace-init` to reconfigure hooks.
 
-## Fluxo de uso
+## Usage flow
 
-  1. `dadaia export` — gera `.dadaia/dist/workspace-<timestamp>.tar.gz` com state + academy + rules + skills.
-  2. Operador transporta o arquivo (scp, upload, etc.) para a nova máquina.
-  3. Na nova máquina, em um diretório limpo: `dadaia import /path/to/archive.tar.gz`.
-  4. Import extrai, faz patch de paths absolutos, restaura contexts e (default) executa init.
-  5. Operador valida com `dadaia context list` e `dadaia doctor`.
-
-
-
-## Trigger típico
-
-Migração entre máquinas, backup periódico, ou sharing de workspace template para colega/equipe.
-
-## Diferencial
-
-Workspace reprodutível em alguns segundos sem rebuild manual — todas as configurações de contexts, regras, skills e materiais de academy preservadas. Sem essa feature, migrar workspace exigiria reproduzir manualmente dezenas de arquivos em vários runtime dirs.
-
-## Estado runtime tocado
-
-  * Export: cria `.dadaia/dist/<archive>.tar.gz`
-  * Import: extrai sobre workspace destino, sobrescreve `.dadaia/states/*`, `.dadaia/academy/`, `.claude/rules/`, `.agents/skills/`
-  * Repos clonados NÃO viajam — re-clone via `dadaia context alive` após import
+  1. `dadaia export` — generates `.dadaia/dist/workspace-<timestamp>.tar.gz` with state + academy + rules + skills.
+  2. The operator transports the archive (scp, upload, etc.) to the new machine.
+  3. On the new machine, in a clean directory: `dadaia import /path/to/archive.tar.gz`.
+  4. Import extracts, patches absolute paths, restores contexts and (by default) runs init.
+  5. The operator validates with `dadaia context list` and `dadaia doctor`.
 
 
 
-## Dependências
+## Typical trigger
 
-  * Export depende de [[context-management]] (lê `spec_contexts.json`).
-  * Import dispara [[workspace-init]] internamente para reconfigurar hooks.
+Migration between machines, periodic backup, or sharing a workspace template with a colleague/team.
+
+## Differentiator
+
+A reproducible workspace in a few seconds without a manual rebuild — all context configurations, rules, skills and academy materials preserved. Without this feature, migrating a workspace would require manually reproducing dozens of files across several runtime dirs.
+
+## Runtime state touched
+
+  * Export: creates `.dadaia/dist/<archive>.tar.gz`
+  * Import: extracts over the destination workspace, overwrites `.dadaia/states/*`, `.dadaia/academy/`, `.claude/rules/`, `.agents/skills/`
+  * Cloned repos do NOT travel — re-clone via `dadaia context alive` after import
+
+
+
+## Dependencies
+
+  * Export depends on [[context-management]] (reads `spec_contexts.json`).
+  * Import triggers [[workspace-init]] internally to reconfigure hooks.

@@ -187,6 +187,38 @@ _HEADING_GROUP_F: frozenset[str] = frozenset(
     ]
 )
 
+_HEADING_GROUP_G: frozenset[str] = frozenset(
+    [
+        # v0.1.48 W4 English-canon renames of the accreted non-Group-A headings
+        # (PT originals retained above for consumer-workspace compatibility).
+        "Adoption (9 core agents)",
+        "Agent topology (9 core + 3 plugins)",
+        "Approved dependencies",
+        "Canonical commands",
+        "Capability map",
+        "Contracts between modules",
+        "Data flow — asset chain pipeline",
+        "Dependency rules",
+        "Known limits",
+        "Languages",
+        "Layers",
+        "Lease acquire (O_EXCL CAS + stable-session-identity)",
+        "Overview",
+        "Platform seam — `core/platform.py`",
+        "Ports and adapters (4 + 9)",
+        "Resilience contract — 3 tiers",
+        "Restrictions and prohibitions",
+        "Runtimes and tools",
+        "Runtime state",
+        "The 3 report/communication channels (constitution §11)",
+        "The Spec Context Project (central concept)",
+        "Users",
+        "Visual evidence",
+        "What it is",
+        "Workflows control plane (v0.1.28, redesigned in v0.1.45)",
+    ]
+)
+
 HEADING_ALLOWLIST: frozenset[str] = (
     _HEADING_GROUP_A
     | _HEADING_GROUP_A_EN
@@ -195,6 +227,7 @@ HEADING_ALLOWLIST: frozenset[str] = (
     | _HEADING_GROUP_D
     | _HEADING_GROUP_E
     | _HEADING_GROUP_F
+    | _HEADING_GROUP_G
 )
 
 # Forbidden headings — belt-and-suspenders, checked independently of the allowlist.
