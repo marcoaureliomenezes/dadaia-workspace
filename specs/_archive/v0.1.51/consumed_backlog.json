@@ -1,0 +1,13 @@
+{
+  "release": "v0.1.51",
+  "consumed": [
+    {
+      "slug": "e2e-journey-coverage-and-test-canon",
+      "shipped_anchors": [
+        "context bind",
+        "specs upgrade",
+        "memory/quality-assurance.md#Purpose"
+      ]
+    }
+  ]
+}

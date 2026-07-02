@@ -128,15 +128,21 @@ sets are disjoint (PLAN §Write sets).
   the stated remaining-evidence condition: finalized against the PR's green
   `e2e-panel` run (T-51-21 confirms before merge). MINOR-1 (docstring drift item 5
   in the onboarding acceptance) fixed in this review commit. Owner: qa-engineer.
-- [ ] T-51-21 Security review (push gate): APPROVE handoff with `metrics.commit_sha`
-  = pushed sha; push; CI green (incl. `e2e-panel`); PR; merge.
-  Owner: security-reviewer + orchestrator.
+- [x] T-51-21 Security review (push gate): APPROVED for `ced5da20` (0 findings above
+  INFO across 6 dimensions; panel-spec live-state unreachability verified
+  structurally; INFO-1 advisory on retired residue-level drift detection); handoff
+  `2026-07-02T222812Z-security-reviewer-v0151-push-gate.handoff.json` VALID with
+  `metrics.commit_sha` = pushed sha; preflight 4/4 PASS; PR #91 38 checks green —
+  `e2e-panel` PASS closed AC-4's remaining-evidence condition; squash-merged as
+  `5329cd96`. Owner: security-reviewer + orchestrator.
 
 ## W7 — closure (CLOSURE phase)
 
-- [ ] T-51-30 CLOSURE.md (incl. `## Validations` + `## Drifts` — SPEC-DOC-006);
-  consumed entry `e2e-journey-coverage-and-test-canon` removed with durable copy +
-  `consumed_backlog.json`; memory: refresh `quality-assurance.md` coverage
-  description ONLY if now understated (no law change; closure-phase MEMORY write);
-  catalog + lint; archive; ACTIVE → none; candidates.md R3 row marked shipped.
+- [x] T-51-30 CLOSURE.md authored (incl. `## Validations` + `## Drifts` —
+  SPEC-DOC-006); consumed entry archived with durable copy +
+  `consumed_backlog.json` under `specs/_archive/v0.1.51/`; memory: the conditional
+  fired — `quality-assurance.md` refreshed (bracket re-validated to 4,424 per its
+  own closure instruction + named-journey coverage paragraph; LAW text unchanged,
+  no carve-out) — lint all-pass; release archived; ACTIVE → none; candidates.md R3
+  row marked shipped. No bug events this release (none found, none filed).
   Owner: product-engineer.
