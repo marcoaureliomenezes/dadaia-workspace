@@ -74,13 +74,24 @@ sets are disjoint (PLAN §Write sets).
 
 ## W4 — FR4 panel journey (write set: `tests/e2e/panel/spec-context-operation-journey.spec.ts`)
 
-- [ ] T-51-13 Verification-first: confirm the Spec Context Projects tab re-reads
-  `spec_contexts.json` per request (if startup-cached: `dadaia bugs append` + the
-  documented restart fallback). Then the pinned journey: seed contexts X (ALIVE) +
-  Y (DEAD) → assert X's badge ALIVE → flip X to DEAD in `spec_contexts.json` →
-  reload → assert the pinned DOM delta (X's badge ALIVE→DEAD). Sessions specs
-  untouched. AC-7 mutation-sanity: demonstrate failure under a one-line sabotage of
-  the seeded state; record on this line; revert. Verified in the `e2e-panel` CI job.
+- [x] T-51-13 DONE. Verification-first RECORDED: the tab is per-request fresh —
+  `render_index._view` calls `list_active_contexts()` per GET, which reads the
+  spec-context store per call (no startup cache; no bug to file). Pinned-delta
+  ADJUSTMENT (mechanism verification, FR4 clause): `list_active_contexts()` filters
+  `state == alive` BY DESIGN, so a DEAD context renders NO card — the delta is card
+  PRESENCE→ABSENCE with an unrelated alive card asserted as the liveness control
+  (strongest content assertion the surface exposes), not a badge-text change.
+  Journey landed (`spec-context-operation-journey.spec.ts`): append ALIVE context
+  in the registry → card renders (name + data-slug asserted) → flip to DEAD
+  (state + dead_since, the exact `context dead` transition) → reload → card gone,
+  control card present. Safety: mutates ONLY a checkout/sandbox registry — skips
+  when `REPO_ROOT/.dadaia/states/spec_contexts.json` is absent (local live
+  workspace never touched); `PANEL_TEST_REGISTRY` env enables a sandbox run.
+  Verified LOCALLY against a scratchpad sandbox workspace (1 passed, 4.0s) — not
+  CI-only after all. AC-7 mutation-sanity RECORDED: one-line sabotage of
+  `panel/service.py:_active_contexts` (drop the ALIVE filter) failed the spec at
+  the disappearance `toHaveCount(0)` assertion; reverted; 1 passed post-revert.
+  Sessions specs untouched. Final AC-4 evidence: the PR's `e2e-panel` run.
   Owner: software-engineer.
 
 ## W5 — FR5 parametrization (write set: the 5 named unit files)
