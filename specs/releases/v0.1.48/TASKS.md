@@ -43,7 +43,7 @@ SPEC §5.
 
 ## W5 — hygiene
 
-- [ ] T-48-50 F-81 `git mv specs/releases/v0.1.23 specs/_archive/releases/`; F-82 delete `specs/backlog/img/`; F-83 delete `docs/img`; specs+backlog+public+workflow doctors green.
+- [x] T-48-50 F-81 `git mv specs/releases/v0.1.23 specs/_archive/releases/`; F-82 delete `specs/backlog/img/`; F-83 delete `docs/img`; specs+backlog+public+workflow doctors green.
 
 ## W6 — ship
 
