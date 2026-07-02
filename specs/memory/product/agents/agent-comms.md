@@ -40,14 +40,14 @@ O contrato separa evidência humana de coordenação máquina: HTML reports são
 
 
 
-Required fields: `schema_version` (literal `"handoff-v1.1"`), `agent`, `context`, `produced_at` (ISO 8601 via `format: date-time`), `scope`, `metrics`, `artifact{type,content_hash}`, and `findings[]`. Optional: `artifact.path`, `release_id`, `decisions_required[]`, `next_handoff`, `verdict`, `verdict_reason`. `artifact.path` is workspace-relative when present; absolute paths and parent traversal are rejected. `additionalProperties: false` em todos os objetos.
+The field contract's single source of truth is the schema file itself: `dadaia_workspace/public/schemas/handoff-v1.schema.json`. One-line summary: required top-level fields are `schema_version` (enum `"handoff-v1"` | `"handoff-v1.1"`), `agent`, `context`, `produced_at`, `artifact` (requires only `type`; `path` is optional and workspace-relative — `content_hash` must accompany it when present), `scope`, `metrics`; `findings[]` is OPTIONAL (each finding item requires `severity`, `message`, `detail_md`, `fix_recommendation`). Absolute paths and parent traversal are rejected; the top-level object is `additionalProperties: false` (while `metrics` accepts arbitrary keys).
 
 ## CLI
 
 
     dadaia reports validate [PATHS...] [--all] [--release <id>] [--strict|--no-strict] [--json]
 
-  * **Validator stdlib-only** (~85 LoC em `infrastructure/stdlib_handoff_validator.py`): `json`, `re`, `datetime.fromisoformat`. Whitelist explícita de keywords (`type`, `required`, `enum`, `pattern`, `properties`, `items`, `additionalProperties`, `format`, `minimum`, `minItems`). Schema com keyword fora do whitelist (`oneOf`, `allOf`, `$ref`) levanta `HandoffSchemaError` no init.
+  * **Validator stdlib-only** (`infrastructure/stdlib_handoff_validator.py`): `json`, `re`, `datetime.fromisoformat`. Whitelist explícita de keywords (`type`, `required`, `enum`, `pattern`, `properties`, `items`, `additionalProperties`, `format`, `minimum`, `minItems`). Schema com keyword fora do whitelist (`oneOf`, `allOf`, `$ref`) levanta `HandoffSchemaError` no init.
   * **Discovery:** `--all` lê `.dadaia/handoff/` por padrão. Paths explícitos continuam suportados.
   * **Hash:** quando `artifact.path` existe, `validate_file()` resolve o artefato dentro do workspace e reprova mismatch, artefato ausente ou referência fora do workspace.
   * **Resolução de `artifact.path` (workspace-rooted):** qualquer path **relativo** que exista sob o workspace root resolve a partir do root — cobre `repos/<slug>/specs/audits/<UTC>/…` (o canal committado do auditor) e qualquer outro path workspace-rooted, não só `.dadaia/…`. O fallback legacy (resolução relativa ao diretório do próprio handoff) é mantido para paths que só existem lá; quando um path resolve das duas formas, **workspace-root vence**. Paths absolutos e segmentos `..` continuam rejeitados pelo schema; o guard `_within_workspace` permanece.
@@ -60,7 +60,7 @@ Required fields: `schema_version` (literal `"handoff-v1.1"`), `agent`, `context`
 
 ## Skill: dadaia-handoff-emitter
 
-Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projetada para `.agents/skills/`, `.claude/`, `.codex/`, `.pi/` via mecanismo padrão de assets. Protocolo em 3 passos:
+Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projetada para `.agents/skills/` (universal projection — the Codex runtime consumes this dir) e `.claude/skills/`; nothing lands in `.codex/skills/` or `.pi/` (the PI projection carries only the staged `pi/` tree). Protocolo em 3 passos:
 
   1. **sha256sum** do report HTML acabado de gerar.
   2. **Assemble dict** com campos obrigatórios + opcionais aplicáveis ao agente, referenciando o schema por path lógico `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — skill não duplica conteúdo do schema dentro do markdown; single source of truth).
@@ -90,27 +90,6 @@ flowchart LR
     VAL -->|0 ok / 1 strict / 2 nf / 3 bad| EXIT[exit code]
 ```
 
-## Fora de escopo (deferido a backlog)
+## Dependências
 
-Itens explicitamente deferidos em SPEC §"Out-of-scope" e promovidos como candidatas no [backlog/candidates.md](../../backlog/candidates.md):
-
-  * `reports-next-cli` — `dadaia reports next` (v2): descobre próximo handoff esperado dado o estado atual do workspace.
-  * `reports-mcp-server` — MCP integration (v3): emissão programática via servidor MCP em vez de skill markdown.
-  * `reports-evaluator` — Evaluator semântico (v4): valida qualidade de findings, não apenas estrutura JSON.
-  * `agent-comms-wave-2` — Migrar `qa-engineer` para piloto (próxima onda).
-  * `agent-comms-wave-3-7` — Migrar `devops-engineer`, `backend-engineer`, `frontend-engineer`, e 3 `game-*` (waves separadas).
-  * `reports-ci-gate` — Job `dadaia reports validate --all --strict` em `.github/workflows/ci.yml` após 100% adoção (NFR4).
-  * `reports-hash-mismatch-enforcement` — Promover hash-mismatch de warning para erro em strict (v2).
-  * `spec-discovery-chain-workflow` — Workflow seed para o padrão D4 (PE→architect→SE→PE→SE), se virar recorrente (Q6).
-  * `reports-handoff-schema-v2` — Evolução do schema para suportar `oneOf` e `$ref` (requer upgrade do validator).
-
-
-
-## Referência
-
-  * Release id: `agent-comms-v1` arquivada em `specs/_archive/releases/agent-comms-v1/` (SPEC + PLAN + TASKS + CLOSURE).
-  * Dependência: [[public-asset-distribution]] — chain `public/` → `.dadaia/agentic/` → projeções multi-tool propaga o asset type `schemas`.
-  * NFR3: zero novas dependências de runtime (validator stdlib-only).
-  * ADR-006 (dual ownership de `public/agents/*.md`): SE owns frontmatter YAML, PE owns markdown body.
-  * ADR-007 (procedure for constitution update in release): FR explícito + verification triple + operator confirmation via SPEC approval + doctor verde pós-patch.
-  * Auditoria precedente que motivou a release: `.dadaia/reports/dadaia-workspace/software-architect/2026-05-15-orchestration-audit.md`.
+  * [[public-asset-distribution]] — chain `public/` → `.dadaia/agentic/` → projeções multi-tool propaga o asset type `schemas`.

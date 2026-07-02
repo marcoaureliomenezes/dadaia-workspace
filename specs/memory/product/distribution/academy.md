@@ -73,4 +73,4 @@ Templated learning — acelera onboarding oferecendo conhecimento estruturado em
 ## Dependências
 
   * Depende de [[workspace-init]] (cria `academy.json` e instala módulos via `public-asset-distribution`).
-  * [[panel]]: `AcademyService` é injetado como DI opcional em `PanelService(academy=None)` no composition root de `panel.py`. A aba Academy no panel consome `GET /api/academy` via `academy.js`, que regista o módulo via `window.Panel.register('academy', Academy)` e usa `window.authedFetch` e `window.escHtml` (globais de `core.js`).
+  * [[panel]]: `AcademyService` é injetado como DI opcional em `PanelService(academy=None)` no composition root de `panel.py`. A aba Academy no panel consome `GET /api/academy` via `academy.js`, que regista o módulo via `window.Panel.register('academy', Academy)` e usa `window.authedFetch` e `window.escHtml` (globais de `core.js`; `authedFetch` is a residual name — it is a thin alias of plain `fetch` that sends NO credential, per the panel's no-auth model).

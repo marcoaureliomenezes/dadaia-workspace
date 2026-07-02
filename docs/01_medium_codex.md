@@ -18,7 +18,7 @@ The workspace combines:
 2. Spec-Driven Development (SDD).
 3. Spec Context Projects.
 4. Multi-agent roles, skills, hooks, rules, and scoped `AGENTS.md`.
-5. Multi-harness support for Claude Code, Codex, and OpenCode.
+5. Multi-harness support for Claude Code, Codex, and PI.
 6. Reports, handoffs, audits, memory, and a panel.
 7. A strict anti-slop operating model.
 
@@ -38,7 +38,7 @@ The core philosophy is simple:
 The pillars are:
 
 1. **Multi-harness development**: one canonical source projects agents, skills,
-   rules, hooks, workflows, and instructions into Claude Code, Codex, OpenCode,
+   rules, hooks, workflows, and instructions into Claude Code, Codex, PI,
    and generic agent surfaces.
 2. **SDD as the operating model**: releases are defined before implementation
    through `SPEC.md`, `PLAN.md`, `TASKS.md`, and closed through `CLOSURE.md`.
@@ -61,7 +61,7 @@ Allowed root entries are:
 2. `.claude/`: Claude Code projection.
 3. `.codex/`: Codex projection.
 4. `.dadaia/`: operational data for the workspace.
-5. `.opencode/`: OpenCode projection.
+5. `.pi/`: PI projection.
 6. `repos/`: alive repos associated with Spec Context Projects.
 7. `AGENTS.md`: root workspace rules.
 8. `CLAUDE.md`: Claude compatibility pointer where needed.

@@ -16,8 +16,11 @@ or report work.
 | Write/edit any atom | `product-engineer` only, in `DEFINITION` or `CLOSURE` phase |
 | Edit by any other agent | never, in any phase |
 
-The write-lock is enforced by the SDD gate. `product-engineer` is the sole
-author of memory atoms; gate details are in `constitution.md §13`. Stale memory
+Enforcement is split. The SDD gate deterministically enforces only the **phase**
+half: `specs/memory/**` is the MEMORY path class, writable through file tools
+only while the active phase is `DEFINITION` or `CLOSURE`. The **who** half —
+`product-engineer` as sole author — is agent discipline, not gate-enforced (no
+hook can verify persona identity); see `constitution.md §13`. Stale memory
 found mid-implementation becomes a bug or a closure note — never patch it in
 place outside the allowed phases.
 
@@ -41,8 +44,11 @@ dadaia memory catalog generate
 
 ## Atom Format
 
-- YAML frontmatter with `name`, `description`, `agent_tier`, `token_estimate`,
-  and any catalog fields the index expects.
+- YAML frontmatter validated against `memory-frontmatter-v1`
+  (`dadaia_workspace/public/schemas/memory/memory-frontmatter-v1.schema.json`).
+  All 10 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
+  `tags`, `agent_tier`, `token_estimate`, `last_updated`, `release_origin` —
+  and `additionalProperties: false` makes any stray field a hard error.
 - Body uses curated headings only — the `lint-memory-atoms` allowlist governs
   which h2 sections are valid.
 - `[[slug]]` wikilinks resolve by slug at any depth; do not hardcode paths.

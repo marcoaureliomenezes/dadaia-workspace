@@ -47,7 +47,7 @@ last_updated: '2026-07-01'
 release_origin: v0.1.47
 ---
 
-CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
+CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
@@ -119,10 +119,11 @@ CLI and the panel (see [[panel]] for the panel control plane).
 - `features/lifecycle/model_profiles.py` — the `WorkflowModelProfile` registry. As of
   v0.1.30 `list_profiles`/`profiles_for` **merge the built-in recommended profiles with
   operator-added profiles** from the local store (see "Operator profiles + per-context
-  overlays" below); v0.1.28 shipped built-in only. Five built-in profiles: Codex `codex-implementation-standard`
+  overlays" below); v0.1.28 shipped built-in only. Six built-in profiles: Codex `codex-implementation-standard`
   (`gpt-5.5:medium`), `codex-review-deep` (`gpt-5.5:high`); PI `pi-implementation-standard`
   (`gpt-5.3-codex:medium`), `pi-reasoning-high` (`gpt-5.5:high`), `pi-reasoning-low`
-  (`gpt-5.5:low`). Each profile resolves to a real `harness_models.HarnessModelOption`; an
+  (`gpt-5.5:low`), `pi-openrouter-kimi-high` (`kimi-2.7:high` — no registry pricing row; cost
+  reports "unknown", never fabricated). Each profile resolves to a real `harness_models.HarnessModelOption`; an
   import-time `_assert_profiles_resolve` (mirrors `_assert_ids_known`) fails loudly on any
   ungoverned `(model_id, effort)` pair, a `claude-*` id (registry/allowlist-validated Layer-2 invariant; never `claude-*`), a
   non-Layer-2 harness, a duplicate id, or a deprecated profile without a known replacement —

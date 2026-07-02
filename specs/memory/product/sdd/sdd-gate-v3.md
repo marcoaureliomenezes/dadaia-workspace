@@ -126,10 +126,13 @@ Fail-open permanece para crashes internos do hook e para MUTATING sem contexto
 resolvível; PROTECTED é a única classe fail-closed.
 
 **ctx-inject com atribuição de sessão:** o hook `ctx_inject` (mesmo pacote) honra um
-bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) apenas quando o **pid gravado no
-conteúdo do marker** — escrito por `dadaia context bind` com o pid do harness de vida
-longa — casa com o harness pid do próprio hook. Um bind de outra sessão nunca rouba a
-injeção desta; marker vazio/legado é não-atribuível ⇒ ignorado (preflight genérico,
+bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) apenas quando o marker's recorded
+**ancestry pid chain** — written by `dadaia context bind` as one decimal pid per line,
+nearest-first, capped at 8 (`session_identity.write_bind_epoch`) — **CONTAINS the hook's
+own harness pid** (membership test, `hooks/ctx_inject.py`). The chain replaced the old
+single-pid content, whose ephemeral-shell gap caused cross-session contamination. Um bind
+de outra sessão nunca rouba a
+injeção desta; marker vazio/legado (empty chain) é não-atribuível ⇒ ignorado (preflight genérico,
 nunca o contexto de outra sessão). Mecânica de bind/injeção: [[context-management]].
 
 **Tunables e telemetria:** todas as constantes do kernel (lease TTL, GC TTLs, CAS

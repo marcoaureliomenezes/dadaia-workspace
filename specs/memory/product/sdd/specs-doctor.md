@@ -2,7 +2,7 @@
 slug: specs-doctor
 title: specs-doctor
 category: product
-tldr: 'Valida invariantes SDD: SPEC-DOC 001..009/012/016/022-024/026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix repara TREE-4 e SPEC-DOC-034.'
+tldr: 'Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034.'
 summary: 'Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001..009, 012, 016;
   022/023 embutidos no check de backlog 012) cobrindo memory .md via LINT-1 + CAT-1,
   ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (fase↔markers),
@@ -30,7 +30,7 @@ CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closur
 
 Valida invariantes estruturais do diretório `specs/` sob o modelo SDD release-lifecycle. Grupos de checks:
 
-  * **SPEC-DOC estruturais** (IDs não-sequenciais vivos: 001, 002, 002L, 003, 004, 005, 006, 007, 008 refs de imagem, 009, 012, 016): presença de `constitution.md`, memory `.md` com folder catalog em `product/`, `ACTIVE.md` bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory sem changelog (check #8 greppa o corpo `.md`), links de imagem resolvendo, schema de backlog (o check 012 embute as regras **022** — formato dos bullets de `## Hotfixes pendentes` — e **023** — bullet de hotfix stale > 72h), **SPEC-DOC-002L** (stray `.html` sob `specs/memory/` devem ser deletados), e **D-OC-1** (bidirectional orchestration registry consistency). Os ids 010/011/013/014/015/025 não existem (aposentados/absorvidos).
+  * **SPEC-DOC estruturais** (IDs não-sequenciais vivos: 001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016): presença de `constitution.md`, memory `.md` com folder catalog em `product/`, `ACTIVE.md` bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, **008** — atomicidade do memory: forbidden changelog/history `##` headings no corpo `.md` (check #8 greppa o corpo; ERROR), schema de backlog (o check 012 embute as regras **022** — formato dos bullets de `## Hotfixes pendentes` — e **023** — bullet de hotfix stale > 72h; 022/023 nunca são emitidos como códigos próprios), **SPEC-DOC-002L** (stray `.html` sob `specs/memory/` devem ser deletados), e **D-OC-1** (bidirectional orchestration registry consistency). Os ids 010/011 são stubs no-op aposentados (image-link/mermaid checks da era HTML); 013/014/015/025 não existem (aposentados/absorvidos).
   * **Ledger + governança** (024, 026..038): ver a tabela abaixo.
   * **SPECS-VERSION**: WARN quando o `specs_pattern_version` da árvore está abaixo do canônico da lib — recomenda `dadaia specs upgrade`.
   * **TREE-1..7 + TREE-5M**: canonical `specs/` tree v2 shape. TREE-3 exige `specs/memory/quality-assurance.md` no top-level. O check de `specs/memory/AGENTS.md` é **TREE-5M**. CAT-1 e SPEC-DOC-002 usam `rglob` para atoms nested.
@@ -84,7 +84,7 @@ Código| O que detecta| Severity| Notas
 LINT-1| Qualquer atom `.md` em `specs/memory/` ou `specs/memory/product/` falha validação de `lint-memory-atoms.py`| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
 SPEC-DOC-002| Check #2: memory files existem como `.md`| ERROR| Agora requer `.md`, não `.html`; aceita headings `##` conforme allowlist
 SPEC-DOC-002L| Stray `.html` presentes sob `specs/memory/`| ERROR| Esses arquivos devem ser deletados; D-4 proíbe HTML commitado na pasta memory
-SPEC-DOC-008| Byte-identity do HTML commitado| —| **Removido** — não aplicável ao modelo MD-source (D-4: HTML é efêmero, renderizado in-memory)
+SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (`features/specs/doctor.py` check #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008
 
 ### Invariantes TREE-1..7 + TREE-5M (canonical tree v2, pós v0.2.1)
 

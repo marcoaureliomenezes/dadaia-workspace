@@ -21,20 +21,21 @@ summary: multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context
   heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via
   origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
   files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2);
-  scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory
-  product add.
+  scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory
+  product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug
+  registration is the event-sourced `dadaia bugs append`).
 tags:
 - context
 - lifecycle
 - session
 - locking
 agent_tier: self-pull
-token_estimate: 2750
+token_estimate: 3325
 last_updated: '2026-07-01'
 release_origin: v0.1.47
 ---
 
-CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog|bug} new` · `dadaia memory product add` · `dadaia migrate tree-v2`
+CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bug new` (LEGACY — canonical bug path is `dadaia bugs append`, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
 
 ## Propósito
 
@@ -86,13 +87,19 @@ dadaia context bind <name> [--mode read|implementation|review] [--release <id>]
 **Bind-driven context injection (DP-2) com atribuição de sessão:** `bind` é o ÚNICO
 trigger de injeção de context-memory. O marker standalone
 `.dadaia/states/bind_epoch/<ctx>` (NÃO um campo do `.ptr` — o `.ptr` é
-lease-incumbency) carrega como CONTEÚDO o **pid do harness de vida longa que bindou**
-(decimal; resolvido por ancestry do processo do CLI). A cadeia de resolução do hook
+lease-incumbency) carries as CONTENT the bind process's **ancestry pid chain** — one
+decimal pid per line, nearest-first (line 1 = the bind CLI's parent), capped at 8 entries
+(`features/spec_context/session_identity.py::write_bind_epoch`). Recording the chain
+instead of a single pid closes the ephemeral-shell gap that caused cross-session
+contamination: when `dadaia context bind` runs through a harness Bash tool the immediate
+parent is a short-lived shell that dies — the long-lived harness pid deeper in the chain
+is the stable anchor. A cadeia de resolução do hook
 `ctx_inject`: `DADAIA_CONTEXT` env → session record self-keyed (contexto bound) →
-**marker bind-epoch mais novo que o sentinel desta sessão E cujo pid gravado casa com
-o harness pid do hook** → preflight genérico apenas (preflight de dispatcher + lista
-de contexts ALIVE; SEM context memory). A atribuição por pid garante que o bind de uma
-sessão paralela nunca rouba a injeção desta; marker vazio/legado é não-atribuível ⇒
+**bind-epoch marker newer than this session's sentinel AND whose recorded ancestry chain
+CONTAINS this session's harness pid (membership test — `hooks/ctx_inject.py`; the specs
+resolver attributes the same way)** → preflight genérico apenas (preflight de dispatcher + lista
+de contexts ALIVE; SEM context memory). A atribuição por membership garante que o bind de uma
+sessão paralela nunca rouba a injeção desta; marker vazio/legado (empty chain) é não-atribuível ⇒
 ignorado para injeção (nunca o contexto de outra sessão). O first-ALIVE foi deletado
 da injeção (permanece válido só na resolução de lease-context do gate). O hook
 re-injeta quando (a) não há sentinel para o sid, ou (b) um marker atribuível a esta
@@ -168,7 +175,7 @@ Doctor TREE-1..7 enforça e repara esta árvore: `dadaia specs doctor` em worksp
 
   * `dadaia release new <id>` — cria `specs/releases/<id>/SPEC.md` stub com frontmatter canônico.
   * `dadaia backlog new <slug>` — cria `specs/backlog/<slug>.md` stub.
-  * `dadaia bug new <slug>` — cria `specs/bugs/<slug>.md` com `session_id: null`.
+  * `dadaia bug new <slug>` — **LEGACY**: cria o stub Markdown `specs/bugs/<slug>.md` com `session_id: null`. The canonical bug-registration path is the event-sourced `dadaia bugs append` (JSONL, `bug-event-v1`) — see [[sdd-bug-backlog-governance]].
   * `dadaia memory product add <slug>` — cria feature Markdown em `specs/memory/product/<slug>.md` e regenera `catalog.json` de forma idempotente.
 
 ## Fluxo de uso
@@ -197,7 +204,7 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
   * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease com `pid` (criado inline no primeiro write MUTATING; TTL piso 120s via `kernel_tunables` + PID veto)
   * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index (escrito/removido na mesma transação CAS do lock record; renovação O(1) sem full scan)
-  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven; conteúdo = pid do harness que bindou, para atribuição de sessão)
+  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven; content = the bind process's ancestry pid chain, one decimal pid per line, nearest-first, capped at 8 — consumers attribute a marker to a session by MEMBERSHIP of the session's harness pid in the chain)
   * `.dadaia/sessions/<id>.json` — session record CLI-owned escrito por `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo)
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (escrito em acquire; I/O via `session_identity`)
   * `.dadaia/logs/lock-events.jsonl` — audit log append-only (eventos: acquire, release, steal, HEARTBEAT)
@@ -212,4 +219,4 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
   * `alive()` indiretamente usa git clone (infra); `dead()` usa rmtree.
   * [[sdd-gate-v3]] invoca `lease.py` para validar identidade + ownership por sessão.
   * [[workspace-doctor]] valida invariantes sobre o TTL-lease e session state.
-  * [[agent-orchestration]] consome `DADAIA_CONTEXT` exportado por bind para resolver paths de specs.
+  * [[agent-orchestration]] resolve paths de specs via a cadeia de discovery (env `DADAIA_CONTEXT` opcional do operador → registry/session record → `dadaia context show --json`); `bind` NÃO exporta env vars — apenas `--print-env` emite as linhas legacy `export DADAIA_*`.

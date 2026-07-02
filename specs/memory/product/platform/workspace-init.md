@@ -13,7 +13,7 @@ tags:
 - setup
 - idempotent
 agent_tier: self-pull
-token_estimate: 640
+token_estimate: 786
 last_updated: '2026-07-01'
 release_origin: v0.1.47
 ---
@@ -32,7 +32,7 @@ Os hooks de governança são o pacote Python `dadaia_workspace/hooks/` (8 módul
 
 ## Fluxo de uso
 
-  1. Operador executa `dadaia init` (auto-detecta workspace root procurando `.claude/` ou `.dadaia/` em ancestrais).
+  1. Operador executa `dadaia init` (sem `--workspace`: walks up from cwd looking for the sentinel `.dadaia/states/spec_contexts.json` — a bare `.dadaia/` dir without `states/` is skipped as sub-repo/partial init — falling back to cwd when none is found; with `--workspace <dir>`, that dir is authoritative, no ancestor walk — `core/workspace_resolver.py`).
   2. CLI cria a árvore idempotente sob `.dadaia/` e os runtime dirs `.claude/`, `.agents/skills/`, `.codex/` (`.pi/` vem do public install).
   3. `PythonEnvironmentManager` provisiona o `.venv` Python usando `PLATFORM.venv_scripts_dir` e `PLATFORM.venv_exe_suffix` para paths cross-platform.
   4. Faz `public stage` e `public install` automáticos (a menos que `--skip-assets`).

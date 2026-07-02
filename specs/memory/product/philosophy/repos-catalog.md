@@ -25,7 +25,8 @@ Consulta o catálogo estático de repos conhecidos em `.dadaia/src/repos.xlsx` e
 
   1. `dadaia repos list` — mostra tabela com todos os repos do catálogo.
   2. Operador identifica o slug desejado e usa em `dadaia context create <name> --repo <slug>`.
-  3. Para atualizar o catálogo: editar manualmente o XLSX (ou regenerar via release dedicada).
+  3. **Programmatic consumer:** `dadaia context create` sem `--url` consulta o catálogo via `ReposService.list_known()` (`cli/commands/context.py` → `container.build_repos_service()`) para back-fill do `repo_url`, falhando gracefully quando o catálogo está ausente; `--url` explícito vence o lookup.
+  4. Para atualizar o catálogo: editar manualmente o XLSX (ou regenerar via release dedicada).
 
 
 

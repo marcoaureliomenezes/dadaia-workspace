@@ -187,7 +187,7 @@ Locais canônicos de estado em disco:
   * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease (`{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`).
   * `.dadaia/states/ctx_locks/<ctx>.lock.sentinel` — CAS sentinel (transient).
   * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index (mesma transação CAS do lock record).
-  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `dadaia context bind`; o CONTEÚDO é o pid do harness que bindou (atribuição de sessão — o hook ctx-inject só honra marker cujo pid casa com o seu próprio harness pid).
+  * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `dadaia context bind`; o CONTEÚDO é the bind process's ancestry pid chain (one decimal pid per line, nearest-first, capped at 8) — o hook ctx-inject só honra marker cuja chain CONTÉM o seu próprio harness pid (membership; ver [[context-management]]).
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (lease incumbent).
   * `.dadaia/sessions/runtime/<session_id>.ptr` — pointer de sessão do ctx-inject.
   * `.dadaia/sessions/<id>.json` — session record CLI-owned (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo).
@@ -223,7 +223,7 @@ O bootstrap injetado é um **digest**: digest bounded de `tech-stack.md` (com po
 
 Em Codex roda no `SessionStart` (matcher `startup|resume`); em Claude Code no `UserPromptSubmit`. A injeção completa ocorre uma vez por sessão lógica. A injeção é **bind-driven**: `dadaia context bind` escreve o marker `.dadaia/states/bind_epoch/<ctx>` e é o ÚNICO trigger de context-memory. O hook:
 
-1. Resolve o contexto: `DADAIA_CONTEXT` env → session record self-keyed → **marker bind-epoch mais novo que o sentinel desta sessão E cujo pid gravado casa com o harness pid do hook** (atribuição de sessão: um bind de outra sessão nunca rouba a injeção desta; marker legado/vazio ⇒ não-atribuível ⇒ ignorado) → **preflight genérico apenas** (preflight de dispatcher + lista de contexts ALIVE; sem context memory).
+1. Resolve o contexto: `DADAIA_CONTEXT` env → session record self-keyed → **marker bind-epoch mais novo que o sentinel desta sessão E cuja ancestry pid chain gravada CONTÉM o harness pid do hook (membership)** (atribuição de sessão: um bind de outra sessão nunca rouba a injeção desta; marker legado/vazio (empty chain) ⇒ não-atribuível ⇒ ignorado) → **preflight genérico apenas** (preflight de dispatcher + lista de contexts ALIVE; sem context memory).
 2. Resolve um `SESSION_ID` estável (`DADAIA_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` → `CODEX_SESSION_ID` → `session_id` do payload stdin; sem fallback de PID), sanitizado antes de virar componente de filename. Re-injeta quando não há sentinel para o sid ou quando um marker atribuível é mais novo que o sentinel; marker pré-existente nunca binda sessão fresca.
 3. Estampa o sentinel (pointer de sessão via `session_identity`) e emite o payload dentro de bounded markers (`=== workspace memory (tech + catalog) === … === end memory bootstrap ===`).
 

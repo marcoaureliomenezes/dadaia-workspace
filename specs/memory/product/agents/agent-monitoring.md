@@ -49,7 +49,6 @@ flowchart LR
     RFR -->|reader factory| CR[reader/claude.py jsonl]
     RFR -->|reader factory| CX[reader/codex.py sqlite RO]
     RFR -->|reader factory| PIr[reader/pi.py jsonl metadata]
-    RFR -->|reader factory| WF[reader/workflows.py SKILL.md]
     CR -->|allowlist gate T1| ALW[reader/allowlist.py]
     CX -->|allowlist gate T1| ALW
     ALW -->|approved keys| DAO[store/dao.py]
@@ -62,7 +61,7 @@ flowchart LR
 
 ## Trigger típico
 
-Operador inspeciona consumo de tokens/custos por agente para decidir trade-offs de escolha de modelo, ou correlaciona spike de custo com Spec Context específico, ou descobre workflows registrados localmente que aceitam invocação. Critério mecânico: **se o operador quer ver "quem consumiu quanto, onde, quando", ele abre a aba Agents do panel.**
+Operador inspeciona consumo de tokens/custos por agente para decidir trade-offs de escolha de modelo, ou correlaciona spike de custo com Spec Context específico, ou descobre workflows registrados localmente que aceitam invocação. Critério mecânico: **se o operador quer ver "quem consumiu quanto, onde, quando", ele abre a aba Sessions do panel** (there is no Agents tab; `/api/agents` remains served with no dedicated tab).
 
 ## Diferencial
 
@@ -71,17 +70,17 @@ Sem este módulo, `ccusage` (npm) era a única alternativa: dependência Node ex
 ## Estado runtime tocado
 
   * **Read** : `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail com `byte_offset` checkpoint em `reader_state` + inode detection para rotação; `~/.codex/state_5.sqlite` (default; env-overridable) via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` com defensive column selection; `~/.pi/agent/sessions/` (PI session jsonl por dir-slug, metadata-only, T1); `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` para workflows.
-  * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) com schema `PRAGMA user_version=5`: 6 tables (`reader_state`, `sessions`, `agents`, `events`, `workflows`, `workflow_agents`) + 6 indices. WAL + synchronous=NORMAL + foreign_keys=ON. **NO** column de conteúdo (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — bloqueado por construção via allowlist gate.
+  * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) com schema `PRAGMA user_version=6` (`store/schema.py`, migrations 1→6): 6 tables (`reader_state`, `sessions`, `agents`, `events`, `workflows`, `workflow_agents`) + 6 indices. WAL + synchronous=NORMAL + foreign_keys=ON. **NO** column de conteúdo (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — bloqueado por construção via allowlist gate.
   * **Read+Write** : `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` evita refresh concorrente. (Não há arquivo de token: o panel é no-auth; um path residual `panel.token` em `service.py` é dead-code tracked no backlog `hygiene-and-dead-code-cleanup`.)
   * **HTTP routes** : `GET /api/sessions?runtime=…`, `GET /api/sessions/<runtime>/<id>`, `GET /api/agents` (query params: `limit` default 50, `context` slug, `days` default 180), `GET /api/agents/{id}/sessions` (paginação), `GET /api/workflows`. Todas servidas **sem credencial** — guards: bind loopback + Host allowlist ([[panel]]). `X-Content-Type-Options: nosniff` em JSON.
-  * **Retention** : 180d raw events em `events` + agregados perpétuos em `events_daily` (compactação por janela diária após 30d, cron interna lazy-on-request). Eventos > 180d são apagados de `events` mas mantidos em agregados.
+  * **Retention** : none — no retention/compaction/deletion machinery exists and there is no daily-aggregate table; raw events accumulate in `events` indefinitely. The only 180-day figure is the aggregation-query default `window_days=180` (`features/telemetry/service.py`), surfaced as the `days` query param default.
   * **Guard** : `os.getuid() == 0` recusa start do TelemetryService (devops T6 — não lê `~/.claude/projects/` de outros usuários).
 
 
 
 ## Dependências
 
-  * Consumido por [[panel]]: abas Agents e Workflows fazem fetch dos endpoints; `PanelService` injeta `TelemetryService` via DI.
+  * Consumido por [[panel]]: a aba Sessions faz fetch dos endpoints (`/api/sessions`); there is no Agents tab (`/api/agents` é servido sem consumer de UI dedicado); `PanelService` injeta `TelemetryService` via DI.
   * Consome [[context-management]] via `SpecContextService.list_all()` para cwd→context lookup em query time (architect D9); bucket "unassigned" para cwd fora dos contextos.
   * Consome tokens da [[brand-identity]] (`--color-cost`, `--color-warning-bg`, `--color-alert`, `--color-accent`, `--color-accent-secondary`) com fallback aos valores anteriores (D-AM-22). Coupling de cronograma zero — release agnóstica de ordem.
   * Stdlib only: `sqlite3`, `secrets`, `fcntl`, `subprocess`, `pathlib`, `json`, `dataclasses`, `datetime`, `re`. Zero novas dependências (NFR3).
