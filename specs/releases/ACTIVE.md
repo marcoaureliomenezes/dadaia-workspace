@@ -1,20 +1,17 @@
 ---
-release: v0.1.48
-phase: CLOSURE
+release: none
+phase: none
 ---
 
-# Active release: v0.1.48
+# Active release: none
 
-**v0.1.48** — *Memory Single-Ownership + Truth + English Canon* — is ACTIVE on branch
-`feature/v0.1.48`.
+**v0.1.48** — *Memory Single-Ownership + Truth + English Canon* — is **CLOSED and ARCHIVED**
+at `specs/_archive/releases/v0.1.48/` (CLOSURE.md). It disposed the 5-lane content-scoping
+audit `20260702T015037Z-56b226fb` (84/84 findings) and both open bugs: memory canon
+consolidated 31 → 25 atoms with every fact single-homed, all verified-false claims fixed,
+the catalog generator repaired (contiguous GFM, derived `area`, `rank` out of session
+digests), and the entire memory surface moved to the English canon (SDD status tokens
+retained by law). Merged as `fe3511d3` (PR #85, 38/38 checks green).
 
-Origin: operator directives 2026-07-02 ("All specs must be in english. go v0.1.48") disposing
-audit `specs/audits/20260702T015037Z-56b226fb/` (84 findings, 5-lane content-scoping review)
-plus 2 open bugs (`memory-index-table-broken-gfm`, `specs-doctor-tree5m-remediation-wrong`).
-
-Scope (SPEC §3): W1 memory truth fixes · W2 ownership consolidation (31→25 atom canon) ·
-W3 catalog/lint code (GFM fix, `area` field, `rank` out of digests, English heading canon) ·
-W4 English translation sweep · W5 tree hygiene · W6 ship.
-
-Phase: CLOSURE — all waves delivered; CLOSURE.md written; ship ritual (QA checkpoint,
-security-gated push, CI watch, PR) in progress. Archive move follows the merge.
+No release is active. Next work enters through PM-curated `specs/backlog/` +
+`specs/bugs/` intake per the `release-governance` rule.
