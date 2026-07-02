@@ -258,21 +258,27 @@ def _derive_doc_anchors(specs_dir: Path) -> set[str]:
     return anchors
 
 
-def _derive_invariant_anchors(specs_dir: Path, source_root: Path) -> set[str]:
-    """Derive named ``INV-*`` invariants from memory docs and source."""
+def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
+    """Derive named ``INV-*`` invariants from the memory docs ONLY.
+
+    ``specs/memory/**`` Markdown is the sole invariant declaration surface
+    (v0.1.49 FR2). Source code and tests are never scanned: docstring examples
+    and test-fixture ids must not mint live anchors, or the fail-closed
+    classifier can be satisfied by junk.
+    """
     anchors: set[str] = set()
-    for root in (specs_dir / "memory", source_root):
-        if not root.is_dir():
+    root = specs_dir / "memory"
+    if not root.is_dir():
+        return anchors
+    for path in sorted(root.rglob("*.md")):
+        if not path.is_file():
             continue
-        for path in sorted(root.rglob("*")):
-            if not path.is_file() or path.suffix not in {".md", ".py"}:
-                continue
-            try:
-                content = path.read_text(encoding="utf-8")
-            except (OSError, ValueError):
-                continue
-            for match in _INVARIANT_RE.finditer(content):
-                anchors.add(match.group(0))
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            continue
+        for match in _INVARIANT_RE.finditer(content):
+            anchors.add(match.group(0))
     return anchors
 
 
@@ -389,7 +395,7 @@ def build_registry(
         SubjectKind.CLI: _derive_cli_anchors(cli_app),
         SubjectKind.CATALOG: _derive_catalog_anchors(catalog_path),
         SubjectKind.DOC: _derive_doc_anchors(specs_dir),
-        SubjectKind.INVARIANT: _derive_invariant_anchors(specs_dir, source_root),
+        SubjectKind.INVARIANT: _derive_invariant_anchors(specs_dir),
     }
     aliases = load_alias_map(alias_map_path)
     return Registry(anchors=anchors, aliases=aliases)

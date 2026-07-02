@@ -221,6 +221,23 @@ def test_invariant_unknown_halts(fixture_tree: dict[str, Path]) -> None:
     assert reg.bind("INV-made-up", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
 
 
+def test_invariant_in_py_docstring_does_not_resolve(fixture_tree: dict[str, Path]) -> None:
+    """FR2 (v0.1.49): ``.py`` content is not an invariant declaration surface."""
+    leaky = fixture_tree["source_root"] / "pkg" / "leaky.py"
+    leaky.write_text('"""Docstring example: INV-py-docstring-leak."""\n', encoding="utf-8")
+    reg = _build(fixture_tree)
+    assert reg.bind("INV-py-docstring-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
+
+
+def test_invariant_under_tests_dir_does_not_resolve(fixture_tree: dict[str, Path]) -> None:
+    """FR2 (v0.1.49): test fixtures under the source root never mint anchors."""
+    tests_dir = fixture_tree["source_root"] / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_leak.py").write_text("EXPECT = 'INV-test-fixture-leak'\n", encoding="utf-8")
+    reg = _build(fixture_tree)
+    assert reg.bind("INV-test-fixture-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
+
+
 # ── panel/api — alias-map ONLY in R1 ─────────────────────────────────────────────
 
 
