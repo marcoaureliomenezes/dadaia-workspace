@@ -114,6 +114,16 @@ pip-wheel-metadata/
 !/specs/bugs/*.jsonl
 !/specs/bugs/_archive/
 !/specs/bugs/_archive/*.md
+# Backlog is PM-curated repository truth (backlog-ownership + release-governance;
+# v0.1.49 FR1 — bug backlog-gitignored-governance-vacuous): opt in ONLY *.md, live
+# entries + candidates.md + _archive durable copies, so the BL-* pre-commit scope and
+# the CI backlog-doctor job exercise the real committed tree.
+!/specs/backlog/
+/specs/backlog/*
+!/specs/backlog/*.md
+!/specs/backlog/_archive/
+/specs/backlog/_archive/*
+!/specs/backlog/_archive/*.md
 !/specs/releases/
 !/specs/releases/ACTIVE.md
 !/specs/releases/*/

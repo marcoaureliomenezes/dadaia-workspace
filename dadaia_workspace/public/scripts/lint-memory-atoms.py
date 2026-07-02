@@ -219,6 +219,16 @@ _HEADING_GROUP_G: frozenset[str] = frozenset(
     ]
 )
 
+# Group S — scaffold template sections (v0.1.49 FR3). The library's own linted
+# scaffold atoms (public/scaffold/memory/, minus AGENTS.md/index.md which are never
+# linted) must lint clean on a freshly scaffolded workspace with NO workspace
+# allowlist file. tests/unit/scripts enforces scaffold->allowlist coverage.
+_HEADING_GROUP_S: frozenset[str] = frozenset(
+    [
+        "Padrões de qualidade",
+    ]
+)
+
 HEADING_ALLOWLIST: frozenset[str] = (
     _HEADING_GROUP_A
     | _HEADING_GROUP_A_EN
@@ -228,7 +238,34 @@ HEADING_ALLOWLIST: frozenset[str] = (
     | _HEADING_GROUP_E
     | _HEADING_GROUP_F
     | _HEADING_GROUP_G
+    | _HEADING_GROUP_S
 )
+
+# Workspace extension file (v0.1.49 FR3): optional `<memory-dir>/.heading-allowlist`
+# — UTF-8, one exact heading per line; blank lines and `#` comments ignored. Merged
+# (union) with the curated allowlist at lint time so consumers extend the canon
+# without editing this lib-originated script. The file sits in the MEMORY path
+# class: consumers edit it via file tools in DEFINITION/CLOSURE phase (gate law).
+_WORKSPACE_ALLOWLIST_NAME = ".heading-allowlist"
+
+
+def load_workspace_allowlist(memory_dir: Path) -> frozenset[str]:
+    """Load the optional workspace heading allowlist from ``memory_dir``."""
+    path = memory_dir / _WORKSPACE_ALLOWLIST_NAME
+    if not path.is_file():
+        return frozenset()
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return frozenset()
+    headings: set[str] = set()
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        headings.add(stripped)
+    return frozenset(headings)
+
 
 # Forbidden headings — belt-and-suspenders, checked independently of the allowlist.
 # Case-insensitive match (strip/lower comparison).
@@ -338,6 +375,7 @@ def lint_atom(
     md_path: Path,
     memory_dir: Path,
     schema: dict[str, Any],
+    allowlist: frozenset[str] = HEADING_ALLOWLIST,
 ) -> AtomResult:
     """Lint a single memory atom .md file.  Returns an AtomResult."""
     result = AtomResult(md_path)
@@ -385,11 +423,12 @@ def lint_atom(
             )
             continue
 
-        # Allowlist check
-        if heading not in HEADING_ALLOWLIST:
+        # Allowlist check (curated groups ∪ workspace .heading-allowlist)
+        if heading not in allowlist:
             result.warn(
                 f"'## {heading}' is not in the curated allowlist — consider "
-                "normalising or adding it to the allowlist in lint-memory-atoms.py."
+                "normalising, adding it to the allowlist in lint-memory-atoms.py, "
+                f"or listing it in <memory-dir>/{_WORKSPACE_ALLOWLIST_NAME}."
             )
 
         # Duplicate check
@@ -451,9 +490,10 @@ def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]
         print(f"WARNING: no .md atoms found in {memory_dir}", file=sys.stderr)
         return []
 
+    allowlist = HEADING_ALLOWLIST | load_workspace_allowlist(memory_dir)
     results: list[AtomResult] = []
     for md_path in atom_files:
-        results.append(lint_atom(md_path, memory_dir, schema))
+        results.append(lint_atom(md_path, memory_dir, schema, allowlist))
     return results
 
 

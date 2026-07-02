@@ -33,6 +33,12 @@ def test_sdd_release_gate_artifacts_are_not_gitignored() -> None:
         # /specs/* privacy backstop must not hide them from review/CI.
         "specs/bugs/some-bug.md",
         "specs/audits/20991231T235959Z/index.md",
+        # Backlog is PM-curated repository truth (v0.1.49 FR1 — bug
+        # backlog-gitignored-governance-vacuous): live entries, the curated
+        # index, and _archive durable copies are all visible to review/CI.
+        "specs/backlog/candidates.md",
+        "specs/backlog/some-entry.md",
+        "specs/backlog/_archive/some-consumed-entry.md",
     ]
 
     ignored = [path for path in visible_paths if _is_ignored(path)]
@@ -43,7 +49,10 @@ def test_sdd_release_gate_artifacts_are_not_gitignored() -> None:
 def test_noncanonical_specs_content_stays_gitignored() -> None:
     """Only canonical lifecycle artifacts are opted back into version control."""
     ignored_paths = [
-        "specs/backlog/candidates.md",
+        # Backlog opt-in is Markdown-only (v0.1.49 FR1): non-md content and the
+        # _archive/.gitkeep placeholder stay hidden by the privacy backstop.
+        "specs/backlog/non-markdown-attachment.png",
+        "specs/backlog/_archive/.gitkeep",
         "specs/bugs/non-markdown-attachment.png",
         "specs/releases/v9.9.9/local-notes.md",
         "specs/releases/v9.9.9/tmp/debug.json",

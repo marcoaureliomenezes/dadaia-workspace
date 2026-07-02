@@ -656,3 +656,62 @@ def test_main_bad_atom_exit_one(tmp_path: Path) -> None:
     )
     code = main(["--memory-dir", str(tmp_path)])
     assert code == 1, f"Expected exit 1, got {code}"
+
+
+# ---------------------------------------------------------------------------
+# v0.1.49 FR3 — workspace allowlist extension + scaffold coverage
+# ---------------------------------------------------------------------------
+
+
+def test_workspace_allowlist_absent_is_empty(tmp_path: Path) -> None:
+    """No .heading-allowlist file -> empty extension set (curated list only)."""
+    assert _lint_mod.load_workspace_allowlist(tmp_path) == frozenset()
+
+
+def test_workspace_allowlist_malformed_lines_ignored(tmp_path: Path) -> None:
+    """Blank lines and '#' comments are ignored; real lines load verbatim."""
+    (tmp_path / ".heading-allowlist").write_text(
+        "\n   \n# comment only\nReal Heading\n", encoding="utf-8"
+    )
+    assert _lint_mod.load_workspace_allowlist(tmp_path) == frozenset({"Real Heading"})
+
+
+def test_workspace_allowlist_merges_at_lint_time(tmp_path: Path) -> None:
+    """A consumer heading listed in .heading-allowlist stops warning."""
+    (tmp_path / ".heading-allowlist").write_text(
+        "# consumer extensions\nMy Custom Section\n", encoding="utf-8"
+    )
+    md_path = _make_atom(tmp_path, body="## My Custom Section\n\nBody.\n")
+    schema = _load_schema_real()
+    results = lint_directory(tmp_path, schema)
+    [result] = [r for r in results if r.path == md_path]
+    assert not any("allowlist" in w for w in result.warnings), result.warnings
+
+
+def test_without_workspace_file_unknown_heading_still_warns(tmp_path: Path) -> None:
+    """The curated check is unchanged when no extension file exists."""
+    md_path = _make_atom(tmp_path, body="## Not A Canon Heading\n\nBody.\n")
+    schema = _load_schema_real()
+    results = lint_directory(tmp_path, schema)
+    [result] = [r for r in results if r.path == md_path]
+    assert any("allowlist" in w for w in result.warnings)
+
+
+def test_scaffold_atom_headings_are_allowlisted() -> None:
+    """Every ``##`` heading of the LINTED scaffold atoms is curated-allowlisted.
+
+    Scope mirrors ``lint_directory``'s exclusions: ``public/scaffold/memory/**/*.md``
+    minus ``AGENTS.md`` (a directory contract, never linted) and ``index.md`` (a
+    generated TOC). AGENTS.md governance headings must never enter the allowlist
+    (v0.1.49 FR3) — a fresh scaffold must lint clean with NO workspace file.
+    """
+    scaffold_memory = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold" / "memory"
+    assert scaffold_memory.is_dir()
+    missing: list[str] = []
+    for md in sorted(scaffold_memory.glob("**/*.md")):
+        if md.name in {"AGENTS.md", "index.md"}:
+            continue
+        for heading in _lint_mod._extract_h2_headings(md.read_text(encoding="utf-8")):
+            if heading not in _lint_mod.HEADING_ALLOWLIST:
+                missing.append(f"{md.name}: {heading}")
+    assert missing == [], f"scaffold headings missing from allowlist: {missing}"
