@@ -36,10 +36,9 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
       2. Contain the born-markdown memory atoms (architecture.md, tech-stack.md,
          product/index.md), each with valid YAML frontmatter.
       3. Contain specs/AGENTS.md (the SDD workflow contract).
-      4. NOT contain specs/foundation/ or specs/SPEC.md at the tree root.
-      5. NOT contain legacy YAML stubs (.yaml) or rendered HTML files (.html) for
-         memory atoms — the .md-only scaffold is the source of truth (T-MMS-10/11).
-      6. Produce 0 TREE-* ERROR-severity issues when SpecsDoctor.check() is run.
+      4. NOT contain specs/foundation/ or specs/SPEC.md at the tree root (the
+         positive v2 tree-shape contract, backed by doctor TREE-1/TREE-2).
+      5. Produce 0 TREE-* ERROR-severity issues when SpecsDoctor.check() is run.
     """
     specs_dir = tmp_path / "specs"
 
@@ -79,22 +78,13 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
         "specs/SPEC.md at the tree root must NOT exist in a v2 scaffold tree"
     )
 
-    # ---- Assertion 5: no legacy YAML stubs or HTML atoms (T-MMS-10/11) ----
-    for stale in (
-        specs_dir / "memory" / "architecture.yaml",
-        specs_dir / "memory" / "architecture.html",
-        specs_dir / "memory" / "tech-stack.yaml",
-        specs_dir / "memory" / "tech-stack.html",
-        specs_dir / "memory" / "product" / "index.yaml",
-        specs_dir / "memory" / "product" / "index.html",
-        specs_dir / "memory" / "product" / "placeholder.html",
-    ):
-        assert not stale.exists(), (
-            f"{stale.relative_to(tmp_path)} must NOT exist in the .md-only scaffold "
-            "(legacy YAML/HTML pipeline retired in T-MMS-10/11)"
-        )
+    # (The former Assertion 5 — legacy YAML/HTML absence — was removed in v0.1.51
+    # FR3: it asserted a fully-retired render pipeline stays deleted, violating the
+    # no-slop law, and was redundant with the .md-only copytree source. Assertion 4
+    # above stays: it is the positive v2 tree-shape contract backed by the live
+    # doctor checks TREE-1/TREE-2.)
 
-    # ---- Assertion 6 (AC-O-1 core): SpecsDoctor reports 0 TREE-* ERRORs ----
+    # ---- Assertion 5 (AC-O-1 core): SpecsDoctor reports 0 TREE-* ERRORs ----
     doctor = SpecsDoctor(specs_dir, public_dir=_PUBLIC_DIR)
     issues = doctor.check()
 
