@@ -22,15 +22,19 @@ sets are disjoint (PLAN §Write sets).
 
 ## W1 — FR1 master journey (write set: `tests/e2e/features/test_lifecycle_journey_e2e.py`, additive helpers in `tests/e2e/lease_rendezvous.py`)
 
-- [ ] T-51-10 Narrative lifecycle E2E: sandboxed workspace + local bare fixture
-  remote; create → alive (real clone) → bind (real subprocess, own sid) → ctx_inject
-  (second subprocess, different sid, ancestry-attributed marker) asserts the bound
-  context's memory marker → pre_gate MUTATING write acquires the lease (record names
-  the journey context) → foreign-sid MUTATING attempt blocked. Bounded rendezvous
-  only; actor stdout/stderr captured. AC-7 mutation-sanity: demonstrate the journey
-  FAILS under a one-line sabotage of bind attribution; record sabotage + failure on
-  this line; revert before commit. Any product failure ⇒ `dadaia bugs append`, never
-  an inline fix. Owner: software-engineer.
+- [x] T-51-10 Narrative lifecycle E2E landed
+  (`test_master_lifecycle_journey_create_alive_bind_inject_gate`): create → alive
+  (real clone from local bare remote) → fresh-session generic preflight (stamps the
+  sentinel; DP-2 honored — a pre-existing marker never binds a fresh session, which
+  the first draft got wrong and the run corrected) → bind (real subprocess) →
+  ctx_inject (different sid) injects JOURNEY-MARKER via ancestry attribution →
+  pre_gate MUTATING allow acquires the lease (record names journey/s-journey-hook) →
+  foreign-sid attempt blocked, holder record survives. All actors bounded
+  `subprocess.run`; zero sleeps. AC-7 mutation-sanity RECORDED: one-line sabotage
+  `session_identity.write_bind_epoch` valid-chain filter → `valid = []` (empty
+  marker ⇒ attribution dead) made the journey FAIL at the injection assertion
+  (`assert "[journey]" in injected`, exit 1); reverted via git checkout; green again
+  (1 passed, exit 0). No product defect found. Owner: software-engineer.
 
 ## W2 — FR2 upgrade E2E (write set: `tests/e2e/features/test_specs_upgrade_e2e.py`)
 

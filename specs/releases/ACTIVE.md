@@ -1,6 +1,6 @@
 ---
 release: v0.1.51
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.51 — E2E Journey Canon
