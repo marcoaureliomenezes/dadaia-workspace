@@ -1416,10 +1416,18 @@ class SpecsDoctor:
                 )
                 continue
             # State (b)/(c): the holder is LIVE. Only now is a three-source divergence a
-            # genuine incoherence worth flagging as possible forgery.
+            # genuine incoherence worth flagging as possible forgery. Holder-
+            # confirmation (v0.1.50 FR2): a live holder whose by-session index entry
+            # names this ctx (same-CAS acquisition evidence) is the TRUE holder — a
+            # drifted incumbent .ptr is then drift, never a forgery ERROR.
             holder = record.get("session_id") if isinstance(record, dict) else None
             lock_holder = str(holder) if holder else None
-            message = session_identity.coherence(workspace_root, ctx, lock_holder=lock_holder)
+            holder_confirmed = bool(
+                lock_holder and lease.session_holds(workspace_root, ctx, lock_holder)
+            )
+            message = session_identity.coherence(
+                workspace_root, ctx, lock_holder=lock_holder, holder_confirmed=holder_confirmed
+            )
             if message is not None:
                 issues.append(
                     SpecsDoctorIssue(

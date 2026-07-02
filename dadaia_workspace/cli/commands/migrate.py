@@ -14,7 +14,7 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
+from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.features.migrate.state_v2 import (
     MigrationPlan,
     execute_migration,
@@ -45,7 +45,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
     3. ``<cwd>/specs`` fallback.
     """
-    return _shared_resolve_specs_dir(specs_dir)
+    return resolve_specs_dir_for_cli(specs_dir)
 
 
 def _print_plan(plan: MigrationPlan) -> None:

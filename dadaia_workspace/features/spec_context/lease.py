@@ -221,6 +221,20 @@ def _index_remove(workspace: Path, ctx: str, session_id: str) -> None:
         path.unlink(missing_ok=True)
 
 
+def session_holds(workspace: Path, ctx: str, session_id: str) -> bool:
+    """True iff ``session_id``'s by-session index entry names ``ctx`` (v0.1.50 FR2).
+
+    The entry is written in the SAME CAS transaction as every acquire, so it is
+    acquisition evidence: a lock record whose holder also appears in the index is a
+    CONFIRMED holder (holder-confirmation for SPEC-DOC-029) — a divergent incumbent
+    ``.ptr`` alone is drift, not forgery. Fail-soft: absent/corrupt index ⇒ False.
+    """
+    try:
+        return ctx in _read_by_session(workspace, session_id)
+    except (OSError, ValueError):
+        return False
+
+
 def release_for_session(workspace: Path, session_id: str) -> list[str]:
     """Eval-flow release (FR-W4-03 a): drop every lease the ``session_id`` holds.
 
@@ -447,6 +461,24 @@ def _yield_message(ctx: str, holder_id: str, heartbeat: str) -> str:
     )
 
 
+#: Sentinel: "no explicit veto release supplied — use ``release``" (v0.1.50 FR1).
+_UNSET_RELEASE: str = "\x00unset"
+
+
+def _session_record_pid(workspace: Path, session_id: str) -> int | None:
+    """Fail-soft pid of a CLI session record (self-recognition lineage evidence).
+
+    Lazy import: ``session_identity`` owns the record path schema; ``lease`` only
+    reads through the owner's helper (no cycle — session_identity does not import
+    lease). Missing/corrupt record ⇒ ``None`` ⇒ no self-recognition (safe default).
+    """
+    from dadaia_workspace.features.spec_context.session_identity import (
+        session_record_pid,
+    )
+
+    return session_record_pid(workspace, session_id)
+
+
 def acquire(
     workspace: Path,
     ctx: str,
@@ -459,6 +491,7 @@ def acquire(
     permission_setter: FilePermissionSetter | None = None,
     pid_probe: PidProbe | None = None,
     pid: int | None = None,
+    active_release: str | None = _UNSET_RELEASE,
 ) -> tuple[str, dict[str, object]]:
     """Acquire (or renew) the lease via O_EXCL CAS.
 
@@ -521,6 +554,12 @@ def acquire(
                 # drifted to a foreign id due to a relaunch without .ptr cleanup).
                 rec = read_record(workspace, ctx)
                 if rec is not None:
+                    # v0.1.50 FR2 (audit F-7): the replaced sid's by-session entry
+                    # must not dangle — same hygiene as the takeover branch.
+                    drifted_sid = str(rec.get("session_id", ""))
+                    if drifted_sid and drifted_sid != session_id:
+                        with contextlib.suppress(OSError, ValueError):
+                            _index_remove(workspace, ctx, drifted_sid)
                     rec["session_id"] = session_id
                     rec["pid"] = holder_pid
                     rec["heartbeat"] = clock().isoformat()
@@ -559,7 +598,14 @@ def acquire(
             # -release lease can no longer deadlock the next release. A foreign lease on the SAME
             # release keeps the pid-veto (a genuinely-active holder is never stolen).
             if rec is None or is_stale(
-                rec, clock=clock, pid_probe=pid_probe, active_release=release
+                rec,
+                clock=clock,
+                pid_probe=pid_probe,
+                # v0.1.50 FR1 (audit F-3): the veto release is decoupled from the
+                # RECORD release. Callers that could not READ ACTIVE.md pass
+                # ``active_release=None`` (veto-preserving) while still writing a
+                # "none" record release; the default keeps the legacy coupling.
+                active_release=(release if active_release == _UNSET_RELEASE else active_release),
             ):
                 # A takeover transfers holder identity: drop the stale holder's index
                 # entry for this ctx, then claim it for the new session — same CAS.
@@ -575,6 +621,34 @@ def acquire(
                 _write_ptr(workspace, ctx, session_id)
                 _audit(workspace, "acquire", ctx, session_id, clock=clock)
                 return "ACQUIRED", new
+
+            # --- Self-recognition (v0.1.50 FR1, audit F-1): third identity rung ---
+            # The live record's holder pid IS this very process (same harness pid,
+            # rotated session id) AND the record's old sid demonstrably belonged to
+            # this pid (its CLI session record — written by `dadaia context bind` —
+            # carries the same pid: LINEAGE EVIDENCE). A process can never be foreign
+            # to itself: RENEW under the current sid instead of self-blocking. Bare
+            # pid equality is NOT enough — unit fixtures and eval flows legitimately
+            # model foreign holders with the current process pid and no session
+            # record, and those must keep blocking (yield-iff-live-foreign).
+            rec_pid = rec.get("pid")
+            old_sid = str(rec.get("session_id", ""))
+            if (
+                isinstance(rec_pid, int)
+                and rec_pid == holder_pid
+                and old_sid
+                and old_sid != session_id
+                and _session_record_pid(workspace, old_sid) == holder_pid
+            ):
+                with contextlib.suppress(OSError, ValueError):
+                    _index_remove(workspace, ctx, old_sid)
+                rec["session_id"] = session_id
+                rec["pid"] = holder_pid
+                rec["heartbeat"] = clock().isoformat()
+                _write_record(record_path, rec)
+                _index_add(workspace, ctx, session_id)
+                _write_ptr(workspace, ctx, session_id)
+                return "RENEWED", rec
 
             # Foreign lease that is still live — either TTL-fresh, or TTL-stale but the
             # holder pid is demonstrably alive (WS-R2 FR-R2-03 no-steal veto).

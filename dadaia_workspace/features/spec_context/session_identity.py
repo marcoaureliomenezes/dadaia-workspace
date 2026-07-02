@@ -147,6 +147,23 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
     return _sessions_dir(workspace, create=create) / f"{session_id}.json"
 
 
+def session_record_pid(workspace: Path, session_id: str) -> int | None:
+    """Fail-soft ``pid`` field of a CLI session record (v0.1.50 FR1).
+
+    Lineage evidence for lease self-recognition: a rotated session id can prove
+    it belongs to the SAME harness process only when the replaced sid's session
+    record (written by ``dadaia context bind``) carries the same pid. Missing,
+    invalid, or corrupt records yield ``None`` — no evidence, no recognition.
+    """
+    try:
+        path = session_record_path(workspace, session_id)
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    pid = data.get("pid") if isinstance(data, dict) else None
+    return pid if isinstance(pid, int) else None
+
+
 def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     """Path of the session-record directory ``.dadaia/sessions/`` (T-011-05 / FR-W1-05).
 
@@ -469,6 +486,7 @@ def coherence(
     ctx: str,
     *,
     lock_holder: str | None,
+    holder_confirmed: bool = False,
 ) -> str | None:
     """Return a divergence message if the three identity sources disagree, else ``None``.
 
@@ -503,6 +521,14 @@ def coherence(
 
     names = {value for _label, value in present}
     if len(names) <= 1:
+        return None
+
+    # Holder-confirmation (v0.1.50 FR2, audit F-4): when the caller proved the
+    # lock-holder is the TRUE holder (its by-session index entry — written in the
+    # same CAS as the acquire — names this ctx), a divergent incumbent ``.ptr``
+    # (e.g. a later read-bind moved it) is DRIFT, not lease↔session forgery.
+    # Only an evidence-less live holder yields the incoherence message.
+    if holder_confirmed and lock_holder:
         return None
 
     detail = ", ".join(f"{label}={value!r}" for label, value in present)

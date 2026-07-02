@@ -228,6 +228,7 @@ def evaluate(
     clock: Callable[[], datetime] = _utcnow,
     pid_probe: lease.PidProbe | None = None,
     holder_pid: int | None = None,
+    veto_release: str | None = lease._UNSET_RELEASE,
 ) -> tuple[Decision, str]:
     """Return the gate decision for one write target — the fail-safe contract.
 
@@ -300,6 +301,10 @@ def evaluate(
             clock=clock,
             pid_probe=pid_probe,
             pid=holder_pid,
+            # v0.1.50 FR1: the liveness-veto release, decoupled from the record
+            # release — None when ACTIVE.md was UNREADABLE (I/O failure ⇒ the
+            # pid-veto must hold); defaults to ``release`` (legacy coupling).
+            active_release=veto_release,
         )
     except LockHeldError as exc:
         # Genuine live-foreign conflict — BLOCK with the informative yield message.

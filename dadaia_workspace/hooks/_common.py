@@ -122,14 +122,19 @@ def sanitize_session_id(raw: str | None) -> str:
 def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
     """Resolve the harness-native session id, sanitized.
 
-    Order (matches the shell hooks): explicit ``DADAIA_SESSION_ID`` override, then the
-    per-harness env vars, then the stdin ``session_id`` field, then ``default``.
+    Order (v0.1.50 FR1): explicit ``DADAIA_SESSION_ID`` override (eval-flow contract,
+    always first), then the stdin ``session_id`` payload field (the harness's live
+    truth for THIS session), then the per-harness env vars (which may be INHERITED
+    from a parent shell and stale — the audit F-1 rotated-sid self-block source),
+    then ``default``. Shared seam: the gate, the PostToolUse heartbeat, and
+    ctx-inject all resolve through here, staying sid-consistent by construction.
     """
     candidate = (
         os.environ.get("DADAIA_SESSION_ID")
+        or str(payload.get("session_id") or "")
         or os.environ.get("CLAUDE_CODE_SESSION_ID")
         or os.environ.get("CODEX_SESSION_ID")
-        or str(payload.get("session_id") or "")
+        or ""
     )
     sanitized = sanitize_session_id(candidate)
     return sanitized or default
