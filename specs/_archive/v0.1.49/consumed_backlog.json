@@ -1,0 +1,6 @@
+{
+  "release": "v0.1.49",
+  "consumed": [
+    {"slug": "memory-heading-allowlist-extension", "shipped_anchors": ["specs-doctor"]}
+  ]
+}
