@@ -1,6 +1,6 @@
 ---
 release: v0.1.47
-phase: DEFINITION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.47
@@ -18,5 +18,5 @@ fallback, doctor guards) · W2 constitution lean rewrite + AGENTS.md truth · W3
 rewrite + NEW `memory/product/harness/` docs · W4 fragments (32) + personas (8) de-slop
 optimization · W5 full disposition sweep (bugs, duplicate pairs, 15 loose audits) · W6 ship.
 
-Phase note: stays `DEFINITION` through W2–W4 (MEMORY-class writes require it); flips to
-`CLOSURE` for memory stamps + CLOSURE.md at W6.
+Phase: CLOSURE — all waves delivered; CLOSURE.md written; ship ritual (security-gated
+push + CI watch + PR) in progress. Archive move follows the merge (closure commit).

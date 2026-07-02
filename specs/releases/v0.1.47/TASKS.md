@@ -83,6 +83,6 @@ write sets are declared (PLAN write-set boundaries apply).
 
 ## W6 — Ship (owner: coordinator)
 
-- [ ] T-47-70 Full validation matrix green (PLAN table)
-- [ ] T-47-71 qa checkpoint → commits; security APPROVE handoff per pushed sha; push;
+- [x] T-47-70 Full validation matrix green (PLAN table)
+- [x] T-47-71 qa checkpoint → commits; security APPROVE handoff per pushed sha; push;
   CI watch to all-green; PR
