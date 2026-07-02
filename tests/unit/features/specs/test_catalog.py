@@ -131,6 +131,7 @@ class TestGenerateCatalogValidParse:
             "slug",
             "title",
             "category",
+            "area",
             "tldr",
             "summary",
             "path",
@@ -506,3 +507,71 @@ class TestSubdirectoryAtomDiscovery:
             assert slug in slugs, f"Atom {slug!r} from subdir was not discovered"
 
         assert len(catalog["features"]) == len(subdirs_and_slugs)
+
+
+# ---------------------------------------------------------------------------
+# F-75 (v0.1.48 W3): `area` derived from the parent directory under product/
+# ---------------------------------------------------------------------------
+
+
+class TestAreaDerivation:
+    """`area` = the atom's parent directory name under product/ ("product" at root)."""
+
+    def _write_subdir_atom(self, product_dir: Path, subdir: str, slug: str) -> Path:
+        atom_dir = product_dir / subdir
+        atom_dir.mkdir(parents=True, exist_ok=True)
+        md_path = atom_dir / f"{slug}.md"
+        md_path.write_text(
+            _FRONTMATTER_TEMPLATE.format(
+                slug=slug,
+                title=slug,
+                tldr=f"{slug} feature.",
+                summary=f"{slug} summary.",
+                tags="[]",
+                purpose=f"Describes {slug}.",
+            ),
+            encoding="utf-8",
+        )
+        return md_path
+
+    def test_root_atom_area_is_product(self, tmp_path: Path) -> None:
+        specs = _make_specs_dir(tmp_path)
+        for entry in generate_catalog(specs)["features"]:
+            assert entry["area"] == "product"
+
+    def test_subdir_atom_area_is_parent_dir_name(self, tmp_path: Path) -> None:
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+        self._write_subdir_atom(product_dir, "sdd", "specs-doctor")
+        self._write_subdir_atom(product_dir, "philosophy", "spec-context-project")
+
+        by_slug = {f["slug"]: f for f in generate_catalog(specs)["features"]}
+        assert by_slug["specs-doctor"]["area"] == "sdd"
+        assert by_slug["spec-context-project"]["area"] == "philosophy"
+
+    def test_area_does_not_override_category(self, tmp_path: Path) -> None:
+        """`category` stays sourced from frontmatter; `area` is a separate field."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+        self._write_subdir_atom(product_dir, "sdd", "specs-doctor")
+
+        entry = generate_catalog(specs)["features"][0]
+        assert entry["category"] == "product"
+        assert entry["area"] == "sdd"
+
+    def test_render_index_md_groups_by_area(self, tmp_path: Path) -> None:
+        """index.md sections group by area, not the single 'product' category bucket."""
+        specs = tmp_path / "specs"
+        product_dir = specs / "memory" / "product"
+        product_dir.mkdir(parents=True)
+        self._write_subdir_atom(product_dir, "sdd", "specs-doctor")
+        self._write_subdir_atom(product_dir, "platform", "workspace-init")
+
+        catalog = generate_catalog(specs)
+        index_md = render_index_md(catalog)
+
+        assert "## Features by area" in index_md
+        assert "### sdd" in index_md
+        assert "### platform" in index_md

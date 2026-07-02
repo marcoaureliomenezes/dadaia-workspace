@@ -6,7 +6,7 @@ Usage:
                                [--index-out <index.md path>]
                                [--context <name>]
 
-    --memory-dir   Path to the specs/memory directory (must contain product/*.md).
+    --memory-dir   Path to the specs/memory directory (must contain product/<area>/*.md).
     --out          Output path for catalog.json.
     --index-out    Optional output path for an index.md TOC.
     --context      Workspace context name embedded in catalog.json (default: dadaia-workspace).
@@ -15,9 +15,10 @@ Exit codes:
     0  — success
     1  — at least one error (missing required frontmatter, unreadable file, etc.)
 
-Catalog JSON shape (compatible with the existing catalog.json):
+Catalog JSON shape (canonical shape owned by features/specs/catalog.py; kept
+identical here by tests/contract/test_memory_catalog_render_contract.py):
     {
-      "generated_at": "<ISO 8601 UTC>",
+      "generated_at": "<YYYY-MM-DDTHH:MM:SSZ>",
       "context": "<workspace-context-name>",
       "features": [
         {
@@ -25,18 +26,21 @@ Catalog JSON shape (compatible with the existing catalog.json):
           "slug": "<slug>",
           "title": "<title>",
           "category": "<core|product|ops>",
+          "area": "<parent dir under product/, or 'product'>",
           "tldr": "<one-sentence>",
           "summary": "<1-2 sentences>",
+          "path": "specs/memory/product/<area>/<slug>.md",
           "tags": ["<tag>", ...],
           "token_estimate": <int>,
           "agent_tier": "<inject|self-pull>",
-          "path": "specs/memory/product/<slug>.md",
           "depends_on": ["<slug>", ...]
         },
         ...
       ]
     }
 
+'rank' is the 1-based position in the alphabetical (sorted-path) file order — a
+stable enumeration aid, NOT a priority signal.
 Sourced ENTIRELY from frontmatter — no HTML scraping.
 'depends_on' is derived from [[slug]] wikilinks in the body.
 """
@@ -146,27 +150,41 @@ def _build_feature_entry(
     rank: int,
     memory_dir: Path,
 ) -> dict[str, Any]:
-    """Build a single catalog feature entry from parsed frontmatter + body."""
+    """Build a single catalog feature entry from parsed frontmatter + body.
+
+    Field order and value shapes are the CANONICAL shape owned by
+    ``features/specs/catalog.py:generate_catalog`` — keep the two in lockstep
+    (pinned by tests/contract/test_memory_catalog_render_contract.py).
+    ``rank`` is the 1-based alphabetical (sorted-path) file order — a stable
+    enumeration aid, NOT a priority signal.
+    """
     slug: str = str(fm.get("slug", md_path.stem))
     depends_on = _extract_depends_on(body)
 
-    # Compute path relative to repo root (specs/memory/product/<slug>.md)
+    # Compute path relative to repo root (specs/memory/product/<area>/<slug>.md).
+    # Always POSIX "/" separators — the path is a stable identifier.
     try:
-        rel_path = str(md_path.relative_to(memory_dir.parent.parent))
+        rel_path = md_path.relative_to(memory_dir.parent.parent).as_posix()
     except ValueError:
-        rel_path = str(md_path)
+        rel_path = md_path.as_posix()
+
+    # F-75: `area` = the atom's parent directory name under product/;
+    # atoms living directly in product/ belong to the "product" area.
+    product_dir = memory_dir / "product"
+    area = "product" if md_path.parent == product_dir else md_path.parent.name
 
     return {
         "rank": rank,
         "slug": slug,
         "title": str(fm.get("title", slug)),
         "category": str(fm.get("category", "product")),
+        "area": area,
         "tldr": str(fm.get("tldr", "")),
         "summary": str(fm.get("summary", "")),
+        "path": rel_path,
         "tags": list(fm.get("tags") or []),
         "token_estimate": int(fm.get("token_estimate", 0)),
         "agent_tier": str(fm.get("agent_tier", "self-pull")),
-        "path": rel_path,
         "depends_on": depends_on,
     }
 
@@ -174,6 +192,11 @@ def _build_feature_entry(
 # ---------------------------------------------------------------------------
 # Catalog generator
 # ---------------------------------------------------------------------------
+
+
+def _generated_at() -> str:
+    """UTC timestamp in the canonical ``YYYY-MM-DDTHH:MM:SSZ`` shape (F-84)."""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def generate_catalog(
@@ -194,7 +217,7 @@ def generate_catalog(
     if not md_files:
         # Empty product dir is valid — return an empty catalog.
         catalog: dict[str, Any] = {
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": _generated_at(),
             "context": context,
             "features": [],
         }
@@ -227,7 +250,7 @@ def generate_catalog(
         return None, errors
 
     catalog = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": _generated_at(),
         "context": context,
         "features": features,
     }
@@ -241,30 +264,38 @@ def generate_catalog(
 _INDEX_MD_TEMPLATE = """\
 # Memory Catalog — {context}
 
-> Generated automatically from `specs/memory/product/*.md` frontmatter.
+> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
 > Do not edit this file manually — re-run `generate-memory-catalog.py` to refresh.
 
-## Features by category
+## Features by area
 
 {tables}
 """
 
 _TABLE_ROW = "| `{slug}` | {title} | {tldr} |"
-_TABLE_HEADER = "| slug | title | tldr |\n|------|-------|------|\n"
+# No trailing newline: sections are "\n".join-ed, so a trailing "\n" here would
+# insert a blank line between the separator row and the first data row, breaking
+# the GFM table block (bug memory-index-table-broken-gfm / F-73).
+_TABLE_HEADER = "| slug | title | tldr |\n|------|-------|------|"
 
 
 def generate_index_md(catalog: dict[str, Any]) -> str:
-    """Generate a Markdown TOC from a catalog dict."""
-    # Group features by category
-    by_category: dict[str, list[dict[str, Any]]] = {}
+    """Generate a Markdown TOC from a catalog dict.
+
+    Sections group by ``area`` (the atom's parent directory under ``product/``,
+    F-75), falling back to ``"product"`` for catalogs predating the field.
+    Output must stay identical to ``features/specs/catalog.py:render_index_md``
+    except the "re-run" tool name (contract-pinned).
+    """
+    by_area: dict[str, list[dict[str, Any]]] = {}
     for feature in catalog.get("features", []):
-        cat = feature.get("category", "product")
-        by_category.setdefault(cat, []).append(feature)
+        area = str(feature.get("area", "product"))
+        by_area.setdefault(area, []).append(feature)
 
     sections: list[str] = []
-    for category in sorted(by_category.keys()):
-        features = by_category[category]
-        lines = [f"### {category}\n", _TABLE_HEADER]
+    for area in sorted(by_area.keys()):
+        features = by_area[area]
+        lines = [f"### {area}\n", _TABLE_HEADER]
         for feat in features:
             lines.append(
                 _TABLE_ROW.format(
@@ -330,10 +361,10 @@ def main(argv: list[str] | None = None) -> int:
 
     assert catalog is not None
 
-    # Write catalog.json
+    # Write catalog.json (trailing newline — canonical write_catalog shape, F-84)
     out_path: Path = args.out.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"catalog.json written to {out_path} ({len(catalog['features'])} feature(s))")
 
     # Optionally write index.md

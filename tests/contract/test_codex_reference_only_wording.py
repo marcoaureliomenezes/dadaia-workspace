@@ -63,4 +63,7 @@ def test_codex_dispatcher_memory_names_custom_agent_boundary() -> None:
     content = _text(AGENT_ORCHESTRATION).lower()
     assert "codex custom agents" in content
     assert "workflow markdown" in content
-    assert "does not auto-execute" in content
+    # The v0.1.48 W2 ownership-consolidation rewrote the atom's phrasing from
+    # "does not auto-execute" to "never auto-execute(s)" — the boundary claim is
+    # the invariant, not its exact wording; accept either canonical form.
+    assert "does not auto-execute" in content or "never auto-execute" in content

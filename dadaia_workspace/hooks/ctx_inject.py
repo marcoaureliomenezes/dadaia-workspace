@@ -54,9 +54,12 @@ from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
 #: the injection (catalog.json on disk is untouched — self-pull depth intact). Keeping
-#: rank/slug/title/tldr/path is enough for the once-per-session first-pass scan; an agent
-#: that needs depth self-pulls the full atom (Step 0 memory bootstrap).
-_DIGEST_FIELDS: tuple[str, ...] = ("rank", "slug", "title", "tldr", "path")
+#: slug/title/tldr/path is enough for the once-per-session first-pass scan; an agent
+#: that needs depth self-pulls the full atom (Step 0 memory bootstrap). ``rank`` is
+#: deliberately NOT injected (F-77): in catalog.json it is the 1-based alphabetical
+#: file order — a stable enumeration aid, not a priority signal — so injecting it
+#: would only invite agents to misread file order as importance.
+_DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
 
 #: Filename prefix of the once-per-session sentinel (``ctx-inject-fired-<sessionId>``).
 _SENTINEL_PREFIX = "ctx-inject-fired-"
@@ -225,10 +228,11 @@ def _emit(payload: str) -> None:
 def _digest_catalog(raw: str) -> str:
     """Return a tldr-digest of ``catalog.json`` text: drop ``summary``, keep lean fields.
 
-    Each feature is reduced to :data:`_DIGEST_FIELDS` (rank/slug/title/tldr/path). The
-    catalog FILE is never modified — this operates on the read-in text and returns the
-    smaller string to INJECT. On any parse failure the raw text is returned verbatim
-    (fail-open: a malformed catalog must not break the bootstrap).
+    Each feature is reduced to :data:`_DIGEST_FIELDS` (slug/title/tldr/path — ``rank``
+    is excluded: it is alphabetical file order, not priority). The catalog FILE is
+    never modified — this operates on the read-in text and returns the smaller string
+    to INJECT. On any parse failure the raw text is returned verbatim (fail-open: a
+    malformed catalog must not break the bootstrap).
     """
     try:
         data = json.loads(raw)

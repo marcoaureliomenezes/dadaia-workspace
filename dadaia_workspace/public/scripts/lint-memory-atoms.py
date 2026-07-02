@@ -36,7 +36,9 @@ sys.dont_write_bytecode = True
 # Exact strings, case-sensitive.  See T-MMS-W0-01 for the enumeration.
 # ---------------------------------------------------------------------------
 
-# Group A — Standard product atom sections (used 14× each)
+# Group A — Standard product atom sections.
+# PT legacy entries are KEPT (G2, v0.1.48): consumer workspaces carry PT atoms and
+# must keep linting clean without any atom edit.
 _HEADING_GROUP_A: frozenset[str] = frozenset(
     [
         "Propósito",
@@ -45,6 +47,19 @@ _HEADING_GROUP_A: frozenset[str] = frozenset(
         "Diferencial",
         "Estado runtime tocado",
         "Dependências",
+    ]
+)
+
+# Group A (EN) — the ENGLISH canonical Group-A set (F-79 / v0.1.48 English canon).
+# 1:1 translations of the PT Group-A sections above; new/renamed atoms use these.
+_HEADING_GROUP_A_EN: frozenset[str] = frozenset(
+    [
+        "Purpose",
+        "Usage flow",
+        "Typical trigger",
+        "Differentiator",
+        "Runtime state touched",
+        "Dependencies",
     ]
 )
 
@@ -58,7 +73,7 @@ _HEADING_GROUP_B: frozenset[str] = frozenset(
         "Schema location",
         "CLI",
         "Skill: dadaia-handoff-emitter",
-        "Adoção (15 de 15 agentes)",
+        # "Adoção (15 de 15 agentes)" pruned in v0.1.48 (F-79): 0 usages in specs/memory/.
         "Referência",
         "Brand identity",
         "Decision Authority Matrix — domínios novos (r3)",
@@ -90,7 +105,7 @@ _HEADING_GROUP_C: frozenset[str] = frozenset(
         "Linguagens",
         "Runtimes e ferramentas",
         "Agent runtimes",
-        "Model assignments (20 agentes)",
+        # "Model assignments (20 agentes)" pruned in v0.1.48 (F-79): 0 usages in specs/memory/.
         "Plugin inventory",
         "Schema handoff-v1.1",
         "Dependências aprovadas",
@@ -128,7 +143,7 @@ _HEADING_GROUP_D: frozenset[str] = frozenset(
         "Plataforma seam — `core/platform.py`",
         "Portos e adapters (4 + 9)",
         "Public surface counts (v0.2.0)",
-        "Purpose",
+        # "Purpose" moved to _HEADING_GROUP_A_EN (v0.1.48 English Group-A canon).
         "Python governance hooks package",
         "Structured-memory-source subsystem (memory-markdown-source-v1)",
         "Sub-agent model (constitution §9)",
@@ -155,8 +170,31 @@ _HEADING_GROUP_E: frozenset[str] = frozenset(
     ]
 )
 
+# Group F — v0.1.48 architecture.md canon (F-79). The W2 ownership-consolidation wave
+# dropped the version tags from these architecture.md headings (F-16), so the current
+# strings are listed verbatim; the English canon forms are pre-added so the W4 English
+# rename also lands 0-WARN. Three of the four current strings are already English and
+# double as their own canon form.
+_HEADING_GROUP_F: frozenset[str] = frozenset(
+    [
+        # Current (post-W2) architecture.md headings — verbatim.
+        "Modelo de concorrência e lease",
+        "Backlog-consistency subsystem (`features/backlog/`)",
+        "Workflow control plane subsystem",
+        "Workflow-step handoff data plane",
+        # English canon form for the W4 rename of the PT heading above.
+        "Concurrency and lease model",
+    ]
+)
+
 HEADING_ALLOWLIST: frozenset[str] = (
-    _HEADING_GROUP_A | _HEADING_GROUP_B | _HEADING_GROUP_C | _HEADING_GROUP_D | _HEADING_GROUP_E
+    _HEADING_GROUP_A
+    | _HEADING_GROUP_A_EN
+    | _HEADING_GROUP_B
+    | _HEADING_GROUP_C
+    | _HEADING_GROUP_D
+    | _HEADING_GROUP_E
+    | _HEADING_GROUP_F
 )
 
 # Forbidden headings — belt-and-suspenders, checked independently of the allowlist.

@@ -30,10 +30,10 @@ SPEC §5.
 
 ## W3 — code (write set: PLAN §Write sets W3)
 
-- [ ] T-48-30 F-73 GFM fix both renderers + contract test pinning table shape; F-84 align output shape between implementations; F-78 docstrings.
-- [ ] T-48-31 F-75 `area` derived from parent dir (catalog field + index.md grouping); F-77 drop `rank` from `_DIGEST_FIELDS`; F-25 quality-assurance `category: core`.
-- [ ] T-48-32 F-79 lint-memory-atoms: English Group-A canon added, dead strings pruned, PT legacy kept; tests assert both canons pass. core.js stale `#agents` comment. Bug `specs-doctor-tree5m-remediation-wrong`: fix TREE-5M remediation text in `features/specs/doctor.py` (~2503-2520) to state the real repair (edit the file/scaffold copies; install does not project it).
-- [ ] T-48-33 Full gate: pytest (minus performance), ruff format --check, ruff check, mypy --strict — all green; regenerate catalog/index with fixed generator.
+- [x] T-48-30 F-73 GFM fix both renderers + contract test pinning table shape; F-84 align output shape between implementations; F-78 docstrings.
+- [x] T-48-31 F-75 `area` derived from parent dir (catalog field + index.md grouping); F-77 drop `rank` from `_DIGEST_FIELDS`; F-25 quality-assurance `category: core`.
+- [x] T-48-32 F-79 lint-memory-atoms: English Group-A canon added, dead strings pruned, PT legacy kept; tests assert both canons pass. core.js stale `#agents` comment. Bug `specs-doctor-tree5m-remediation-wrong`: fix TREE-5M remediation text in `features/specs/doctor.py` (~2503-2520) to state the real repair (edit the file/scaffold copies; install does not project it).
+- [x] T-48-33 Full gate: pytest (minus performance), ruff format --check, ruff check, mypy --strict — all green; regenerate catalog/index with fixed generator. NOTE: 1 pre-existing e2e failure (`test_lifecycle_engine_smoke::test_temp_workspace_lifecycle_engine_smoke`) reproduced at HEAD 78012790 with W3 changes stashed — caused by W0/W2 tree state outside the W3 write set (SPEC-DOC-006 ×2 on `specs/_archive/releases/v0.1.47/CLOSURE.md`; SPEC-DOC-024 ACTIVE.md phase vs [x]-majority), not by W3 code.
 
 ## W4 — English canon (write set: surviving `specs/memory/**` + regenerated catalog/index)
 

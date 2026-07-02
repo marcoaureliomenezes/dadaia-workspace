@@ -438,6 +438,72 @@ def test_widening_does_not_disable_heading_check(tmp_path: Path) -> None:
     )
 
 
+def test_english_group_a_canon_passes(tmp_path: Path) -> None:
+    """F-79 (v0.1.48 W3): the ENGLISH Group-A canon headings pass lint with no warnings."""
+    schema = _load_schema_real()
+    body = (
+        "## Purpose\n\nBody.\n\n"
+        "## Usage flow\n\nBody.\n\n"
+        "## Typical trigger\n\nBody.\n\n"
+        "## Differentiator\n\nBody.\n\n"
+        "## Runtime state touched\n\nBody.\n\n"
+        "## Dependencies\n\nBody.\n"
+    )
+    md_path = _make_atom(tmp_path, slug="test-atom", body=body)
+
+    result = lint_atom(md_path, tmp_path, schema)
+
+    assert not result.has_errors, f"EN Group-A canon must not ERROR. Got: {result.errors}"
+    assert not result.has_warnings, f"EN Group-A canon must not WARN. Got: {result.warnings}"
+
+
+def test_portuguese_group_a_legacy_still_passes(tmp_path: Path) -> None:
+    """F-79 / G2: PT Group-A entries are KEPT — consumer workspaces carry PT atoms."""
+    schema = _load_schema_real()
+    body = (
+        "## Propósito\n\nBody.\n\n"
+        "## Fluxo de uso\n\nBody.\n\n"
+        "## Trigger típico\n\nBody.\n\n"
+        "## Diferencial\n\nBody.\n\n"
+        "## Estado runtime tocado\n\nBody.\n\n"
+        "## Dependências\n\nBody.\n"
+    )
+    md_path = _make_atom(tmp_path, slug="test-atom", body=body)
+
+    result = lint_atom(md_path, tmp_path, schema)
+
+    assert not result.has_errors, f"PT Group-A legacy must not ERROR. Got: {result.errors}"
+    assert not result.has_warnings, f"PT Group-A legacy must not WARN. Got: {result.warnings}"
+
+
+def test_dead_allowlist_strings_pruned() -> None:
+    """F-79: provably-dead allowlist strings (0 usages across specs/memory/) are gone."""
+    allowlist = _lint_mod.HEADING_ALLOWLIST
+    dead = [
+        "Adoção (15 de 15 agentes)",
+        "Model assignments (20 agentes)",
+    ]
+    residue = [h for h in dead if h in allowlist]
+    assert not residue, f"Dead strings must be pruned from the allowlist: {residue}"
+
+
+def test_architecture_current_headings_and_english_forms_in_allowlist() -> None:
+    """v0.1.48 W3 (F-79): the 4 post-W2 architecture.md headings pass lint NOW, and
+    their English canon forms are pre-added so the W4 rename lands 0-WARN too."""
+    allowlist = _lint_mod.HEADING_ALLOWLIST
+    required = [
+        # Current (post-W2) architecture.md headings — verbatim.
+        "Modelo de concorrência e lease",
+        "Backlog-consistency subsystem (`features/backlog/`)",
+        "Workflow control plane subsystem",
+        "Workflow-step handoff data plane",
+        # English canon forms for the W4 rename.
+        "Concurrency and lease model",
+    ]
+    missing = [h for h in required if h not in allowlist]
+    assert not missing, f"Architecture headings missing from allowlist: {missing}"
+
+
 def test_exit_code_warn_only_is_two(tmp_path: Path) -> None:
     """_exit_code returns 2 when only warnings exist."""
     schema = _load_schema_real()

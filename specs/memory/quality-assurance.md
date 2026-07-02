@@ -1,7 +1,7 @@
 ---
 slug: quality-assurance
 title: quality-assurance
-category: product
+category: core
 tldr: 'Five-layer pytest architecture, multi-job CI (10 quality + 5 governance), no-slop policy — design-of-record for implementers and qa-engineer.'
 summary: >-
   Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with

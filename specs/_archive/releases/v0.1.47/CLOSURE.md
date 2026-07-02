@@ -7,6 +7,15 @@ disposition sweep earmarked by the previous ACTIVE.md.
 **Consumes:** `specs-truth-realignment-constitution-memory` (fully delivered by W2/W3;
 archived copy + ledger sidecar written at close per ADR-C).
 
+## Summary
+
+Context-Surface Truth + Fragments/Personas Optimization + Audit Remediation. Disposed the
+full 9-lane audit (20260701T201136Z-0bcd6c19, overall 7/10) same-day: bug ledger 27 -> 0 open,
+constitution rewritten 685 -> 224 lines (roster single-sourced to tech-stack), memory canon
+re-trued with NEW harness/ atoms, 31 fragments + 8 personas de-slopped with independent
+APPROVE, 15 loose audits archived with dispositions. Shipped as PR #84 (squash-merged as
+b8c40708), 38/38 CI checks green.
+
 ## Shipped (by wave; conventional commits on the feature branch)
 
 - **W0 definition** (`d4ff84b8`) — GRILL (QA REJECT→fix→APPROVE) + SPEC/PLAN/TASKS
@@ -53,6 +62,14 @@ archived copy + ledger sidecar written at close per ADR-C).
   JSONL bug-store atom; catalog + index regenerated (31 features).
 
 ## Validations (final, this tree)
+
+| Check | Result | Evidence |
+|---|---|---|
+| pytest (full, minus CI-only performance dir) | 4361 passed / 0 failed / 17 skipped | final-tree run, 2026-07-02 |
+| ruff format --check + ruff check | clean (749 files) | final-tree run |
+| mypy --strict | 0 issues (298 files) | final-tree run |
+| specs doctor | 0 errors post-CLOSURE flip | final-tree run |
+| CI on PR #84 | 38/38 checks green | github checks rollup, merge b8c40708 |
 
 - pytest full (minus the CI-only performance dir): **4361 passed, 17 skipped (opt-in live/Windows/LAN), 1 transitional failure = the live-tree SPEC-DOC-024 e2e assertion during DEFINITION→CLOSURE flip, green after the flip (re-run evidence below)**
 - ruff format --check: 749 files clean · ruff check: clean · mypy --strict: 0 issues
