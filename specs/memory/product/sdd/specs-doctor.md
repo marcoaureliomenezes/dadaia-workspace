@@ -21,7 +21,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 2150
 last_updated: '2026-07-02'
-release_origin: v0.1.48
+release_origin: v0.1.49
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -81,7 +81,7 @@ Exit code 1 if there are errors; 0 if only warnings or all green. Supports `--js
 
 Code| What it detects| Severity| Notes
 ---|---|---|---
-LINT-1| Any `.md` atom in `specs/memory/` or `specs/memory/product/` fails `lint-memory-atoms.py` validation| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
+LINT-1| Any `.md` atom in `specs/memory/` or `specs/memory/product/` fails `lint-memory-atoms.py` validation| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN. Heading allowlist = curated groups ∪ the optional workspace file `specs/memory/.heading-allowlist` (v0.1.49: one exact heading per line, `#` comments ignored — consumers extend without editing the lib-originated script; the file is MEMORY-class, so edit in DEFINITION/CLOSURE)
 SPEC-DOC-002| Check #2: memory files exist as `.md`| ERROR| Now requires `.md`, not `.html`; accepts `##` headings per the allowlist
 SPEC-DOC-002L| Stray `.html` present under `specs/memory/`| ERROR| Those files must be deleted; D-4 forbids committed HTML in the memory folder
 SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (`features/specs/doctor.py` check #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008

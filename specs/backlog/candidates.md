@@ -8,10 +8,9 @@ entries were removed per removal-on-release and the never-keep-the-past law.
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
 
-**Open-bug debt (outranks plain backlog at pick):** 3 open bugs —
-`backlog-gitignored-governance-vacuous`,
-`backlog-subject-registry-invariant-content-scan`, and
-`bugs-append-bound-session-falls-through-to-cwd-specs` (all 2026-07-02, MEDIUM).
+**Open-bug debt (outranks plain backlog at pick):** 1 open bug —
+`bugs-append-bound-session-falls-through-to-cwd-specs` (2026-07-02, MEDIUM;
+consumed by R2/v0.1.50).
 
 ---
 
@@ -26,7 +25,7 @@ grill on the picked set before SPEC.
 
 | # | Release theme | Consumes (backlog / bugs) | Why this position |
 |---|---|---|---|
-| R1 | Intake integrity | bugs `backlog-gitignored-governance-vacuous` + `backlog-subject-registry-invariant-content-scan`; `memory-heading-allowlist-extension` | Fix the release machine first: git-tracked backlog makes the BL-* chokepoint/CI real; fail-closed registry stops docstring/test junk anchors. Everything downstream is defined FROM this backlog. |
+| R1 | **SHIPPED — v0.1.49** (merged `3743cb06`, PR #87, 2026-07-02) | bugs `backlog-gitignored-governance-vacuous` + `backlog-subject-registry-invariant-content-scan`; `memory-heading-allowlist-extension` (all consumed) | Fix the release machine first: git-tracked backlog makes the BL-* chokepoint/CI real; fail-closed registry stops docstring/test junk anchors. |
 | R2 | Kernel hardening | `lease-kernel-identity-hardening`; `context-dead-exit-path`; bug `bugs-append-bound-session-falls-through-to-cwd-specs` | The single deterministic lock, session attribution, and the context exit path are the safety spine; removes the reproduced self-block pain. |
 | R3 | E2E journey canon | `e2e-journey-coverage-and-test-canon` | Safety net BEFORE the refactor chain; the master lifecycle E2E can only assert correct bind attribution after R2. Residue-test disposition aligns the suite with the no-slop law. |
 | R4 | Panel plumbing | `panel-sessions-cost-dashboard-only` → `panel-runtime-reliability` | Operator-elected, fully independent; kills the SQLite corruption bug; reliability lands on the post-removal route surface; every later release runs a smaller suite. |
@@ -130,9 +129,6 @@ Audit-C dead-code inventory + agent_tier wire-or-remove + dead telemetry call si
 ### `features-import-infrastructure-direct-debt` — features → infrastructure layering debt
 Remove the 3 documented direct-import `ignore_imports` edges behind ports
 (referenced by name in setup.cfg).
-
-### `memory-heading-allowlist-extension` — Memory heading allowlist extension
-Consumer-extensible heading allowlist; scaffold-template headings lint clean.
 
 ### `centralize-release-semver-canon` — Centralize the release SemVer canon
 One shared constant in `core/specs_version.py` replacing 3 literal copies.

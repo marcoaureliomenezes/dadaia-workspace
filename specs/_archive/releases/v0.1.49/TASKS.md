@@ -46,18 +46,20 @@ sets are disjoint (PLAN §Write sets).
   release; broader-is-stronger scaffold glob; privacy pre-scan clean — formal
   clearance routed to T-49-21). Verdict landed as this review commit.
   Owner: qa-engineer.
-- [ ] T-49-21 Security review (push gate): OWASP/secret/dep review of the diff; emit
-  APPROVE handoff with `metrics.commit_sha` = pushed sha; push; watch CI to green;
-  open PR; merge after every job is green. Owner: security-reviewer (verdict) +
-  orchestrator (push/PR/CI watch).
+- [x] T-49-21 Security review (push gate): APPROVED (security-reviewer, 2026-07-02) —
+  4 dimensions clean (new backlog surface no-leak, code net security-positive
+  CWE-1284-class hardening, gitignore probes, no dep changes; 1 INFO); verdict
+  extended to tip `2fca11b2` after one-line docs delta verification; APPROVE handoff
+  with `metrics.commit_sha=2fca11b2…` validated + on disk; pre-push gates passed;
+  PR #87 → 38/38 checks green → squash-merged as `3743cb06`.
+  Owner: security-reviewer (verdict) + orchestrator (push/PR/CI watch).
 
 ## W5 — closure (CLOSURE phase)
 
-- [ ] T-49-30 CLOSURE.md (evidence triples); `dadaia bugs append --event resolved
-  --release v0.1.49` for `backlog-gitignored-governance-vacuous` and
-  `backlog-subject-registry-invariant-content-scan`; remove consumed
-  `memory-heading-allowlist-extension.md` with durable copy under
-  `specs/_archive/v0.1.49/consumed-backlog/`; memory updates
-  (`sdd-bug-backlog-governance`, `specs-doctor`) + catalog regenerate + lint; archive
-  `specs/releases/v0.1.49/` → `specs/_archive/releases/`; ACTIVE → none.
-  Owner: product-engineer.
+- [x] T-49-30 CLOSURE.md (evidence triples); 2 bug `resolved` events appended
+  (`--release v0.1.49`); consumed `memory-heading-allowlist-extension.md` removed
+  with durable copy + `consumed_backlog.json` ledger under `specs/_archive/v0.1.49/`
+  (tracked backlog = 30, the exact AC-1 post-W5 number); memory updates
+  (`sdd-bug-backlog-governance` ×3 facts, `specs-doctor` LINT-1 allowlist fact,
+  release_origin → v0.1.49) + catalog regenerated (25 features) + lint 28 OK/0 WARN;
+  release archived; ACTIVE → none. Owner: product-engineer.

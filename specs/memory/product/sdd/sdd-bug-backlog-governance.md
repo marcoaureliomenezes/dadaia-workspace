@@ -22,7 +22,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1575
 last_updated: '2026-07-02'
-release_origin: v0.1.48
+release_origin: v0.1.49
 ---
 
 Skill: `dadaia-release-definition` · Rules: `release-governance.md`, `backlog-ownership.md`, `bug-registration-guardrail.md` (always-on)
@@ -81,16 +81,22 @@ The backlog is a deduplicated, conflict-free, non-stale SET, mechanically enforc
   `invariant`; `panel`/`api` bind only through the operator's alias map
   (`.dadaia/states/backlog_subject_aliases.txt`). The model proposes a subject; Python
   binds it to an anchor and **HALTs** on unresolved/ambiguous (never silent NEW).
+  `invariant` anchors derive ONLY from `specs/memory/**` Markdown (v0.1.49): source
+  code and tests are never a declaration surface, so docstring examples and
+  test-fixture ids cannot mint live anchors.
 - **Fail-closed classifier** (`classifier.py`): empty anchor intersection ⇒
   `UNRELATED` (no model); same anchors + same change ⇒ `DUPLICATE`; shared anchor +
   divergent change ⇒ **`DIVERGENT_CONFLICT`** by default — the model may only
   downgrade with an explicit proven-compatible merge.
-- **`dadaia backlog doctor`** (the real enforcement — backlog is gitignored +
-  ADDITIVE, so the file-write gate does not classify it): BL-SCHEMA / BL-DUP /
+- **`dadaia backlog doctor`** (the real enforcement — backlog is ADDITIVE, so the
+  file-write gate never blocks it): BL-SCHEMA / BL-DUP /
   BL-CONFLICT / BL-STALE, non-zero exit on violation. Runs in CI (job
   `backlog-doctor`) and in the **scoped** pre-commit chokepoint: BL-* blocks only
   commits whose staged paths intersect `specs/backlog/**` — pre-existing debt does not
-  block an unrelated commit; the full sweep stays in CI.
+  block an unrelated commit; the full sweep stays in CI. Since v0.1.49 the backlog is
+  **git-tracked repository truth** (Markdown-only gitignore opt-in: live entries,
+  `candidates.md`, `_archive/*.md`), so both enforcement points exercise the real
+  committed tree.
 - **Removal-on-release (closed loop):** the SPEC's `**Consumes:** <slugs>` line →
   the post-step of `dadaia lifecycle release define` writes the ledger
   `specs/_archive/<release>/consumed_backlog.json` (fail-loud `ConsumesBindError` on
@@ -165,8 +171,8 @@ mechanical gate, not a convention.
 
 - `specs/bugs/*.jsonl` (git-tracked; append via `dadaia bugs append`) +
   `specs/bugs/_archive/` (legacy sources moved by `git mv`).
-- `specs/backlog/**` (gitignored in the source repo; ADDITIVE) +
-  `.dadaia/states/backlog_subject_aliases.txt`.
+- `specs/backlog/**` (git-tracked Markdown since v0.1.49; ADDITIVE for the write
+  gate) + `.dadaia/states/backlog_subject_aliases.txt`.
 - `specs/_archive/<release>/consumed_backlog.json` + `consumed-backlog/<slug>.md`.
 - `specs/releases/ACTIVE.md`, `specs/releases/<ver>/**`.
 - Git hooks: `pre-commit-lease-gate.sh` (+ scoped backlog-doctor),
