@@ -36,7 +36,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W3 — FR3 dead-exit path (write set: `git_subprocess.py`, `spec_context/service.py`, tests)
 
-- [-] T-50-12 TDD: explicit-refspec push (`HEAD:<upstream-branch>`) + empty-push skip
+- [x] T-50-12 TDD: explicit-refspec push (`HEAD:<upstream-branch>`) + empty-push skip
   (`rev-list @{u}..HEAD`); drop the non-writable rglob scan for
   `shutil.rmtree(onexc=chmod-and-retry)`; move surviving refusal pre-checks BEFORE
   the push phase. Fixture repos: 0444 git objects, mismatched upstream, nothing-to-
@@ -44,7 +44,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W4 — FR4 bound-session resolution (write set: `cli/commands/bugs.py` + sibling `resolve_specs_dir` callers + `core/specs_resolver.py` cwd guard + tests + this task's root-cause line)
 
-- [ ] T-50-13 VERIFY-PINNED-CAUSE-THEN-FIX: red integration test on a bound-session
+- [-] T-50-13 VERIFY-PINNED-CAUSE-THEN-FIX: red integration test on a bound-session
   fixture proving `bugs append` falls to cwd (verifies the definition-review pin);
   record the verification result on the line below; then CENTRALIZE
   ancestry-threading in one shared CLI seam consumed by all five

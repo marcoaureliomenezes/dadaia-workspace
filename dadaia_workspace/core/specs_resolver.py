@@ -176,6 +176,16 @@ def resolve_specs_dir(
 
     candidate = cwd / "specs"
     if candidate.exists():
+        # v0.1.50 FR4 (bug bugs-append-bound-session-falls-through-to-cwd-specs):
+        # a top-level specs/ AT THE WORKSPACE ROOT violates the root whitelist —
+        # never silently write governance artifacts there. Redaction-safe message
+        # (no absolute operator-local path echoed).
+        if workspace_root is not None and cwd.resolve() == workspace_root.resolve():
+            raise typer.BadParameter(
+                "Refusing the workspace-root 'specs/' fallback: the Workspace Root "
+                "Law forbids a top-level specs/ directory. Bind a context "
+                "(`dadaia context bind <name>`) or pass --specs-dir explicitly."
+            )
         return candidate.resolve()
 
     raise typer.BadParameter(

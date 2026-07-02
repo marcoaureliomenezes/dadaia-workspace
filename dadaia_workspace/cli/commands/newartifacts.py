@@ -10,14 +10,13 @@ Implements:
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.backlog import SubjectKind
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
     bug_new,
@@ -63,25 +62,6 @@ bug_app = typer.Typer(help="Bug report management commands.")
 # ── helper: resolve specs_dir ─────────────────────────────────────────────────
 
 
-def _current_ancestry_pids() -> frozenset[int] | None:
-    """Build this ``dadaia`` process's nearest-first ancestry pid chain for bind attribution.
-
-    W1-8 (v0.1.47): the persisted-bind fallback attributes a bind-epoch marker by
-    ancestry-chain MEMBERSHIP. A marker written from an ephemeral harness Bash shell records
-    the bind process's chain (incl. the long-lived harness pid); this CLI runs under a
-    DIFFERENT short-lived shell but shares that harness pid deeper in ITS chain, so passing
-    this process's chain lets the resolver match on the shared anchor. Built via the
-    composition-root ancestry seam (same read-only port the chokepoints use). Any failure ⇒
-    ``None`` ⇒ the resolver degrades to single-getppid equality.
-    """
-    try:
-        from dadaia_workspace import container
-
-        return frozenset(container.build_ancestry_pid_chain(os.getppid()))
-    except Exception:  # noqa: BLE001 — attribution is best-effort; never break resolution.
-        return None
-
-
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve the target specs/ directory.
 
@@ -91,7 +71,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
        marker attributed by ancestry-chain membership — W1-8).
     3. ``<cwd>/specs`` fallback.
     """
-    return _shared_resolve_specs_dir(specs_dir, ancestry_pids=_current_ancestry_pids())
+    return resolve_specs_dir_for_cli(specs_dir)
 
 
 # ── dadaia release new ────────────────────────────────────────────────────────

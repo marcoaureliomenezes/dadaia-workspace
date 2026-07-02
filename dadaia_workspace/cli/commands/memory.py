@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
+from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
 from dadaia_workspace.features.specs.catalog import (
     generate_catalog,
@@ -31,7 +31,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
     3. ``<cwd>/specs`` fallback.
     """
-    return _shared_resolve_specs_dir(specs_dir)
+    return resolve_specs_dir_for_cli(specs_dir)
 
 
 @product_app.command("add")

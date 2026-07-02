@@ -9,7 +9,7 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
+from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import lease
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
@@ -47,7 +47,7 @@ def _write_active(specs_dir: Path, release: str, segment: str | None, phase: str
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    return _shared_resolve_specs_dir(specs_dir)
+    return resolve_specs_dir_for_cli(specs_dir)
 
 
 def _resolve_workspace_state_dir() -> Path | None:

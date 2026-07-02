@@ -20,8 +20,8 @@ import typer
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.bugs import BugEvent, BugEventKind
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _shared_resolve_specs_dir
 from dadaia_workspace.features.bugs.service import BugService
 from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore
 
@@ -35,7 +35,7 @@ _SCHEMA_ID = "bug-event-v1"
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve the target specs/ directory (explicit flag → bound context → cwd/specs)."""
-    return _shared_resolve_specs_dir(specs_dir)
+    return resolve_specs_dir_for_cli(specs_dir)
 
 
 def _schema_root() -> Path:
