@@ -14,12 +14,12 @@ tags:
 - layer-2
 - projection
 agent_tier: self-pull
-token_estimate: 510
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 500
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 PI (`@earendil-works/pi-coding-agent`) is a **dual-layer** harness. Layer 1: the
 operator's `pi` terminal agent — it reads `AGENTS.md` natively up-tree and, once the
@@ -30,7 +30,7 @@ Layer 2: the `PI_HEADLESS` worker — `pi --mode json` driven one-shot per step,
 bounded. In a PI entry session, dadaia-workflows default the Layer-2 harness to `pi`
 unless the operator overrides to `codex`.
 
-## Fluxo de uso
+## Usage flow
 
 1. Operator installs `pi` (external optional CLI — never a pinned dependency; build
    stays offline-first without it) and grants `.pi/` trust on first launch.
@@ -46,20 +46,20 @@ unless the operator overrides to `codex`.
    `~/.pi/agent/sessions/` (invariant T1 — no message bodies; cost unknown ⇒ never
    fabricated).
 
-## Trigger típico
+## Typical trigger
 
 Layer 1: operator preference for PI. Layer 2: every dadaia-workflow step whose
 governed harness resolves to `pi` — model set `(gpt-5.5, high)`, `(gpt-5.5, low)`,
 `(gpt-5.3-codex, medium)`, plus the curated OpenRouter `kimi-2.7:high` (via the
 Layer-2 allowlist + the `pi-openrouter-kimi-high` profile; never a `claude-*` id).
 
-## Diferencial
+## Differentiator
 
 The only harness with BOTH a real Layer-1 pre-disk gate (post-trust) and a Layer-2
 worker role, and the widest Layer-2 model set (operator-extensible via the local
 profile store, validated, no API keys stored). Live-verified build: pi 0.79.3.
 
-## Estado runtime tocado
+## Runtime state touched
 
 Scaffold projected by `dadaia public install --target pi`: `.pi/SYSTEM.md`,
 `.pi/settings.json`, `.pi/prompts/`, `.pi/extensions/dadaia-sdd-gate.ts`.
@@ -67,7 +67,7 @@ Operator-local model profiles live in `.dadaia/states/workflow_model_profiles.lo
 (validated, never projected to `public/`). A PI-only workspace = `--target pi`
 (+ shared `--target agents`).
 
-## Dependências
+## Dependencies
 
 - [[tech-stack]] — roster, PI auth truth, model catalog single source.
 - [[lifecycle-foundation]] — the engine driving the PI_HEADLESS worker.

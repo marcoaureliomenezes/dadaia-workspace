@@ -1,10 +1,8 @@
-// Hash navigation grammar (normative, per SPEC §7.1):
-//   #<tab-section-id>[?key=val&...]
-//   #memories | #agents | #workflows | #servers  — bare tab activation
-//   #agents?filter=<agent-name>                  — agent filter (existing pattern)
-//   #workflows?detail=<workflow-name>            — workflow detail view (PR3-17 FE)
-// This module-level comment documents the grammar; the hash router below parses both.
-// PR3-17 (FE) will extend the router to handle #workflows?detail= in js/workflows.js.
+// Hash navigation grammar (as implemented by the initial-load router below):
+//   #workflows | #reports | #academy  — bare tab activation (prefix match, so a
+//   trailing ?key=val is tolerated but not parsed).
+// No other hash routes exist (the former #memories/#agents/#servers routes and the
+// #agents?filter= / #workflows?detail= params were never wired — v0.1.48 F-truth fix).
 
 (function () {
   'use strict';

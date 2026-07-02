@@ -10,30 +10,27 @@ summary: >-
   semantic handoff gates, blocked/resume states, and scoped worker prompts. Each
   lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the
   harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the
-  four-member AgentRuntimeKind roster — single source [[tech-stack]]). LAW 1: the
-  selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a
-  workflow harness; CLAUDE_SDK kept/tested for Layer-1). LAW 2: a discrete per-harness
-  GPT model catalog selected on the CLI (--model/--step-model; pi-3 / codex-2). The verbs
-  are dadaia-workflows: Python bodies that import prompt fragments, select dynamic
-  context, call workers, and advance Python-validated gates; the release-definition
-  workflow is the first fully fragment-driven workflow. Single-step verbs run
+  runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2
+  workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness;
+  the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness
+  model catalog selected on the CLI (--model/--step-model). The verbs are
+  dadaia-workflows — Python bodies that import prompt fragments, select dynamic
+  context, call workers, and advance Python-validated gates (workflow roster and
+  invocability: the dadaia-workflows atom). Single-step verbs run
   `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the
   IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude
   SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match`
-  classifier; a cacheable hashed `PromptPrefix` is reused across steps. v0.1.28 adds the
-  workflow model governance control plane: a built-in WorkflowModelProfile registry over
-  harness_models, an atomic operator overlay (missing != invalid), one shared
-  WorkflowExecutionPolicyResolver, a per-run policy snapshot resolved once before step 1,
-  and WMP-* governance doctor checks. v0.1.29 makes harness a first-class governed dimension:
-  an effective-harness precedence chain (CLI step > CLI default > overlay step > overlay
-  default_harness > catalog default), profile validated against the effective harness,
-  auto-profile-on-harness-override, apply_resolved_policy as the single runtime_kind author
-  (FAKE preserved), overlay default_harness/harnesses fields. v0.1.30 ships operator-added PI
-  profiles (a never-projected local store merged with built-ins), per-context overlay `extends`
-  inheritance (the D-2 collapse removed), a run-scoped workflow-step handoff data plane
-  (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver +
-  retention + attempt loop + handoffs doctor), and real audit/research/bug_report fragment+gate
-  workflow bodies (DEFERRED_WORKFLOWS emptied) plus ctx-inject dehydration. Anti-slop
+  classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND
+  harness selection are governed by one control plane: a built-in + operator-local
+  WorkflowModelProfile registry over harness_models, an atomic validated operator
+  overlay with per-context `extends` inheritance (missing != invalid), one shared
+  WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI
+  default > overlay step > overlay default_harness > catalog default;
+  apply_resolved_policy as the single runtime_kind author), a per-run policy snapshot
+  frozen before step 1, and WMP-* governance doctor checks. Workflow steps
+  communicate over a run-scoped producer→consumer handoff ledger
+  (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads +
+  resolver + retention + attempt loop + handoffs doctor). Anti-slop
   self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.
 tags:
 - sdd
@@ -42,12 +39,12 @@ tags:
 - hygiene
 - gates
 agent_tier: self-pull
-token_estimate: 5560
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 5225
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
+CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
@@ -56,16 +53,16 @@ worker harness behind `AgentRuntimePort` and advancing only when the gate passes
 
 ```mermaid
 flowchart TB
-    OP["dadaia lifecycle pipeline --release &lt;id&gt;<br/>(ou implement · review qa|security|code · close)"]
-    OP --> PB["prompt_builder · PromptPrefix<br/>(sha256, cacheable, reusado byte-a-byte por step)"]
+    OP["dadaia lifecycle pipeline --release &lt;id&gt;<br/>(or implement · review qa|security|code · close)"]
+    OP --> PB["prompt_builder · PromptPrefix<br/>(sha256, cacheable, reused byte-for-byte per step)"]
     PB --> LAD
-    subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persiste a cada step · para no 1º bloqueio)"]
+    subgraph LAD["LifecyclePipeline — phase ladder (1 LifecycleRun · persists at every step · stops at the 1st block)"]
         direction LR
-        I["implement"] --> Q["review_qa"] --> S["review_security"] --> C["review_code<br/>(→ fase CLOSURE)"]
-        C -.->|"close é step separado"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
+        I["implement"] --> Q["review_qa"] --> S["review_security"] --> C["review_code<br/>(→ CLOSURE phase)"]
+        C -.->|"close is a separate step"| CLp["CLOSURE<br/>(dadaia lifecycle close)"]
     end
     LAD -.->|"build_agent_runtime(kind) — --step-harness"| RT
-    subgraph RT["AgentRuntimePort — worker harness selecionável por step (LAW 1: pi/codex/fake)"]
+    subgraph RT["AgentRuntimePort — per-step selectable worker harness (LAW 1: pi/codex/fake)"]
         direction LR
         FK["FAKE"]:::w
         CXk["CODEX_EXEC"]:::w
@@ -73,8 +70,8 @@ flowchart TB
         CLk["CLAUDE_SDK · Ring-1<br/>(kept, NOT workflow harness)"]:::x
     end
     RT --> GATE{"LifecycleAgentRunner gate:<br/>verdict APPROVED?<br/>Ring-2 changed_paths in-scope?"}
-    GATE -->|sim| NEXT(["transição legal → próximo step"])
-    GATE -->|não| BLK(["BlockedState + resume token"])
+    GATE -->|yes| NEXT(["legal transition → next step"])
+    GATE -->|no| BLK(["BlockedState + resume token"])
     classDef w fill:#238636,color:#fff,stroke:#238636;
     classDef x fill:#6e7681,color:#fff,stroke:#6e7681;
 ```
@@ -92,8 +89,8 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 - `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds.
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
 - `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
-- `core/harness_models.py` (v0.1.24) is the discrete per-harness GPT model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. **pi → 4** (incl. OpenRouter `kimi-2.7`)**:** `(gpt-5.5,high)`, `(gpt-5.5,low)`, `(gpt-5.3-codex,medium)`, `kimi-2.7`; **codex → 2:** `(gpt-5.5,high)`, `(gpt-5.5,medium)`. Both catalogs are allowlist-validated (a Layer-2 id must be in the union of registry codex ids + `LAYER2_EXTRA_MODEL_IDS`, the curated Layer-2-native set); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
-- `features/lifecycle/fragments/loader.py` (v0.1.24) loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/release_definition.py` is the first fully fragment-driven dadaia-workflow: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`, Python owns step order and blocks on missing/rejected handoffs. **As of v0.1.30 the `backlog_definition`, `audit`, `research`, and `bug_report` workflow bodies are all real fragment+gate bodies too** (the fail-loud `_deferred.py` stubs were removed; `DEFERRED_WORKFLOWS == ()`); each mirrors `release_definition.py` and communicates per step via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
+- `core/harness_models.py` is the discrete per-harness model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. The per-harness options are enumerated once in [[tech-stack]] §Agent runtimes. Both catalogs are allowlist-validated (a Layer-2 id must be in the union of registry codex ids + `LAYER2_EXTRA_MODEL_IDS`, the curated Layer-2-native set); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
+- `features/lifecycle/fragments/loader.py` loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/` carries the executable dadaia-workflow bodies — the workflow roster and operator invocability are owned by [[dadaia-workflows]]. Every workflow body is fully fragment-driven: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`; Python owns step order and blocks on missing/rejected handoffs; steps communicate via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
 - `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected. v0.1.24 adds a fragment-suffix path: a workflow step's prompt is assembled from a fragment bundle (not the generic "Run the step" suffix). **Prompt observability (v0.1.24):** each lifecycle run record persists, per step, the fragment ids, dynamic context refs, `prefix_hash`, the discrete model, the runtime kind, the output schema, and the gate result — surfaced in a panel/report view; whole-memory injection is never the default (context selection is scoped).
 - `features/lifecycle/hygiene.py` owns the canonical `SlopPolicy`: reports TTL 48h, handoffs TTL 24h, tmp TTL 24h, safe-zone cleanup, protected residuals, unknown `.dadaia/` top-level detection, malformed/orphan handoffs, and elapsed scan metrics.
 - `features/lifecycle/antislop/slop_scan.py` is the directory-aware slop metric: a directory tree counts as ONE entry with recursive size (closing the directory-blind gap where multi-GB caches/venvs hid from the file-only metric); the canonical manifest derives from `hooks/root_whitelist._WHITELIST`, never hand-copied. Surfaced via `dadaia lifecycle slop`.
@@ -107,7 +104,7 @@ Lifecycle code depends on `AgentRuntimePort`; `build_agent_runtime(kind, *, cwd=
 
 The Codex adapter does not read project-local provider/auth/profile configuration, does not pass through `os.environ`, accepts only an explicit environment allowlist, redacts credential-looking values, and records sandbox/profile widening only when operator-controlled input requests it. The Claude SDK adapter derives a real Ring-1 `write_permission` decider from the request's allowed/forbidden paths via the same `core/scope_match` classifier the runner's Ring-2 uses; its transport is injectable (`query_fn`) so permission + result mapping are tested hermetically. `claude-agent-sdk` is an OPTIONAL, operator-installed runtime extra (not a locked dependency, offline-first build); the default transport lazily imports it and returns an actionable `pip install claude-agent-sdk` message when absent.
 
-The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p` (prompt on stdin; the trailing `-` was a non-existent `pi` "read stdin" marker that broke every headless run — removed in `c8513fa5`, adopted + re-verified + smoke-hardened in v0.1.31) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes). **Structured-payload extraction is single-sourced and shared (v0.1.31 hardening → v0.1.32 coherent contract):** result extraction lives once in `headless_adapter_base` (`SubprocessAdapterMixin`) and is shared by both `pi_runtime` and `codex_runtime`. It scans candidates from a fenced ```` ```json ```` block, the whole bare message, or the outermost `{…}` slice, and accepts a payload by strict `schema == expected_schema` as the PRIMARY path with structural acceptance (non-empty `artifact_refs` + `status`/`summary`/`structured_output`, `normalize_artifact_refs` taking string OR object refs) as documented defence-in-depth — without making the create-step gate permissive (a no-op worker still yields empty `artifact_refs` and BLOCKs). The v0.1.31 prompt-side root cause (the prompt named two schemas, confusing real workers) is **fixed** in v0.1.32 (the coherent contract — one `schema` field, one `agent-run-result-v1` value, step-kind-aware across three surfaces), so worker compliance no longer *depends* on the structural tolerance: the live review proof passed via the strict path. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex. The Layer-2 `PI_HEADLESS` worker (this adapter, `pi --mode json` headless) has no CLI-level pre-disk (Ring-1) gate: its enforcement posture is Ring-2 + git chokepoints, identical to Codex. (The **Layer-1** interactive `pi` entry harness is separate and DOES have a Ring-1 SDD-gate extension — `.pi/extensions/dadaia-sdd-gate.ts`, WS-PI-4, active post-trust — see [[architecture]] §"two-layer agentic model".) The first-layer `.pi/` projection (WS-PI-3) shipped in v0.1.18 and the Layer-1 Ring-1 extension (WS-PI-4) in v0.1.21; both are no longer deferred. The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is verified via the opt-in `DADAIA_PI_LIVE=1` / `DADAIA_E2E_REAL_WORKER=1` integration tests (`tests/integration/pi_live/`), not CI-gated. This seam is **live-verified end-to-end** against the pinned `pi` build (0.79.3, provider openai-codex, model gpt-5.5): the anti-fake real-worker e2e drove a real `pi` worker through `release_scope → spec_create` past step 1 under the review-only gate (v0.1.31, the create path), and as of v0.1.32 through `release_scope → spec_create → spec_arch_review` — a real review step emitting `verdict: APPROVED` with the verdict gate PASSING on real worker output via the strict acceptance path.
+The PI adapter (`PiHeadlessAdapter` + frozen `PiHeadlessConfig`) is a structural twin of `CodexExecAdapter`: it drives `pi --mode json --tools <csv> -p` (prompt on stdin) over an injectable subprocess runner, imports no PI client at module load (offline-first preserved), and accepts only an explicit env allowlist (incl. `ANTHROPIC_API_KEY`, redacted from output). Result mapping parses the line-delimited JSON stream and takes the **last** `message_end` event's assistant text from `message.content`, handling both string and content-block shapes; an absent or unparseable `message_end` degrades to raw stdout as the summary (SUCCEEDED, never crashes). **Structured-payload extraction is single-sourced and shared:** result extraction lives once in `headless_adapter_base` (`SubprocessAdapterMixin`) and is shared by both `pi_runtime` and `codex_runtime`. It scans candidates from a fenced ```` ```json ```` block, the whole bare message, or the outermost `{…}` slice, and accepts a payload by strict `schema == expected_schema` as the PRIMARY path with structural acceptance (non-empty `artifact_refs` + `status`/`summary`/`structured_output`, `normalize_artifact_refs` taking string OR object refs) as documented defence-in-depth — without making the create-step gate permissive (a no-op worker still yields empty `artifact_refs` and BLOCKs). Worker compliance does not *depend* on the structural tolerance: the coherent worker-output contract (one `schema` field, one `agent-run-result-v1` value, step-kind-aware — see "Gating note" below) makes real workers pass via the strict path. A valid terminal `message_end` maps to SUCCEEDED **even when `pi` exits non-zero** — the terminal assistant message is trusted over the raw exit code (deliberate precedence); the downstream verdict gate and the Ring-2 write boundary still apply. PI's Ring-2 write boundary is real: `changed_paths` is computed from the injected git client's `diff_name_only(cwd)` (working-tree + staged + untracked, non-ignored) at result time and written into `structured_output["changed_paths"]`, **unconditionally overwriting any model self-report** — so the runner's Ring-2 out-of-scope block fires for PI exactly as for Codex. The Layer-2 `PI_HEADLESS` worker (this adapter, `pi --mode json` headless) has no CLI-level pre-disk (Ring-1) gate: its enforcement posture is Ring-2 + git chokepoints, identical to Codex. (The **Layer-1** interactive `pi` entry harness is separate and DOES have a Ring-1 SDD-gate extension — `.pi/extensions/dadaia-sdd-gate.ts`, active post-trust — see [[architecture]] §"two-layer agentic model".) The live `pi --mode json` event schema — specifically the `AgentMessage.content` shape — is verified via the opt-in `DADAIA_PI_LIVE=1` / `DADAIA_E2E_REAL_WORKER=1` integration tests (`tests/integration/pi_live/`), not CI-gated; the end-to-end live proof of this seam is stated once in "Current limits" below.
 
 ## Workflow model governance (control plane, v0.1.28)
 
@@ -119,10 +116,11 @@ CLI and the panel (see [[panel]] for the panel control plane).
 - `features/lifecycle/model_profiles.py` — the `WorkflowModelProfile` registry. As of
   v0.1.30 `list_profiles`/`profiles_for` **merge the built-in recommended profiles with
   operator-added profiles** from the local store (see "Operator profiles + per-context
-  overlays" below); v0.1.28 shipped built-in only. Five built-in profiles: Codex `codex-implementation-standard`
+  overlays" below); v0.1.28 shipped built-in only. Six built-in profiles: Codex `codex-implementation-standard`
   (`gpt-5.5:medium`), `codex-review-deep` (`gpt-5.5:high`); PI `pi-implementation-standard`
   (`gpt-5.3-codex:medium`), `pi-reasoning-high` (`gpt-5.5:high`), `pi-reasoning-low`
-  (`gpt-5.5:low`). Each profile resolves to a real `harness_models.HarnessModelOption`; an
+  (`gpt-5.5:low`), `pi-openrouter-kimi-high` (`kimi-2.7:high` — no registry pricing row; cost
+  reports "unknown", never fabricated). Each profile resolves to a real `harness_models.HarnessModelOption`; an
   import-time `_assert_profiles_resolve` (mirrors `_assert_ids_known`) fails loudly on any
   ungoverned `(model_id, effort)` pair, a `claude-*` id (registry/allowlist-validated Layer-2 invariant; never `claude-*`), a
   non-Layer-2 harness, a duplicate id, or a deprecated profile without a known replacement —
@@ -223,14 +221,12 @@ the panel toggle — and the executed adapter and the recorded snapshot always a
   harness field resolves byte-identically to v0.1.28 (catalog default codex). The panel
   codex/pi toggle persists a real harness change through `PUT /api/workflow-model-policy`;
   the resolver honors it (see [[panel]]).
-- **Completed governed catalog — 7 workflows (D-4).** `closure` is cataloged as its real
-  single `close` worker step (role product-engineer, generic/no-fragment) plus the Python
-  `closure_removal_gate` modeled as a gate; `governed_workflow_catalog()` projects the
-  `close` step so `policy show closure` resolves. **v0.1.30:** `audit` / `research` /
-  `bug_report` are now real fragment+gate workflow bodies with governed steps (no longer
-  `deferred`); `_deferred.DEFERRED_WORKFLOWS == ()` is empty and `resolve(audit|research|
-  bug_report)` resolves with each body's real governed step labels. No invented model-step
-  ladders, no second drifting source.
+- **The governed catalog covers every workflow (D-4).** Every dadaia-workflow resolves
+  through the governed catalog with its body's real governed step labels (workflow
+  roster: [[dadaia-workflows]]); `closure` is cataloged as its real single `close`
+  worker step (role product-engineer, generic/no-fragment) plus the Python
+  `closure_removal_gate` modeled as a gate, so `policy show closure` resolves. No
+  invented model-step ladders, no second drifting source.
 - **Doctor validates the harness dimension (D-doctor).** `dadaia lifecycle workflow doctor`
   resolves every overlay harness override through the shared resolver, so an overlay harness
   referencing a harness the step does not support is a hard ERROR; an overlay harness value
@@ -286,19 +282,19 @@ consumes the `qa#1` rejection. See [[architecture]] §"Workflow-step handoff dat
 
 The typed gate is **review-only**. `agent_runner._blocked_result` branches on an `is_review`
 signal threaded into `AgentRunnerInput`: **review** steps gate on `verdict == APPROVED` +
-populated `artifact_refs` + in-scope `changed_paths` (unchanged contract); **create** steps gate
+populated `artifact_refs` + in-scope `changed_paths`; **create** steps gate
 on a schema-valid/structural payload + populated `artifact_refs` + in-scope paths, and the
 `verdict` field is **ignored** for them (a create step produces an artifact, it does not approve
-anything). The fix lands once in the runner so every caller benefits; `is_review` is threaded at
+anything). The branch lives once in the runner so every caller benefits; `is_review` is threaded at
 all **seven** runner call sites — `release_definition`, `audit`, `bug_report`, `research`
 (`step.is_review`), `backlog_definition` (`backlog_author` create step → `False`), and `pipeline`
-+ `phase_workflow`. Crucially `PipelineStep` gained an `is_review` field so the
++ `phase_workflow`. `PipelineStep` carries an `is_review` field so the
 `review_qa`/`review_security`/`review_code` gates that protect the push boundary keep their
-`verdict == APPROVED` requirement (the C1 regression — they would otherwise default to `False` and
+`verdict == APPROVED` requirement (guard C1 — a default of `False` would
 silently lose it). Create-step gating is not made permissive: a no-op worker emits no payload →
 empty `artifact_refs` → it still BLOCKs.
 
-**The worker-output contract is coherent by design (v0.1.32).** The worker is told exactly ONE
+**The worker-output contract is coherent by design.** The worker is told exactly ONE
 field name — `schema` — with exactly ONE value — the transport id `agent-run-result-v1`. The
 fragment's `output_schema` (e.g. `release-scope-handoff-v1`) stays descriptive (Python tags the
 produced payload with it from the run ledger's `produces`) and is no longer surfaced to the worker
@@ -309,29 +305,18 @@ surfaces: `build_fragment_suffix` (an `is_review`-aware keyword-only, no-default
 forgotten flag is a call error, threaded at all six suffix call sites),
 `pipeline._generic_prompt`, and the CLI's `_run_phase_step` (all routed through one shared
 `is_review_phase` helper so a future surface inherits the correct branch). The single
-`shared.output_handoff` fragment documents the canonical field `schema` (was `schema_version`).
+`shared.output_handoff` fragment documents the canonical field `schema`.
 
 Result extraction is **single-sourced** in `headless_adapter_base` (`SubprocessAdapterMixin`):
 one candidate scan (fenced/bare/sliced) + one acceptance decision — strict
 `schema == expected_schema` as PRIMARY, structural acceptance (non-empty `artifact_refs` +
 `status`/`summary`/`structured_output`) as documented **defence-in-depth**, and
 `normalize_artifact_refs` accepting string OR object-form refs — shared by BOTH `pi_runtime` and
-`codex_runtime` (a patch-the-helper test proves both call it, so the two cannot diverge). Codex
-gained the reject-guard for free: arbitrary JSON lacking the result shape no longer maps to a
-result. A no-op worker still yields empty `artifact_refs` → BLOCK; structural acceptance never
-shadows strict (pinned by a behaviour test).
-
-**Proven end-to-end on a real Layer-2 worker — the REVIEW path, live (v0.1.32).** v0.1.31 proved
-the *create* path live (real `pi` through `release_scope → spec_create` past step 1). v0.1.32
-proves the *review/verdict* path live: an env-gated **anti-fake** real-worker e2e
-(`DADAIA_E2E_REAL_WORKER=1`, skipped by default — CI/`pytest` stay fully faked + green) drives a
-real `pi` worker (gpt-5.5, software-architect) through `release_scope → spec_create →
-spec_arch_review`; the worker reviews a substantive SPEC, emits `verdict: APPROVED`, and the
-Python verdict gate PASSES on real worker output. The live acceptance was via the **STRICT** path
-— the worker emitted `schema: agent-run-result-v1` matching `expected_schema`, so the structural
-fallback was not needed: the coherent contract makes the worker comply by design. The
-REJECTED-blocks negative is proven via the faked gate path (default CI green, no second live run).
-The e2e is the law that a fake runtime can never again mask a worker-contract gap.
+`codex_runtime` (a patch-the-helper test proves both call it, so the two cannot diverge; the
+shared reject-guard means arbitrary JSON lacking the result shape never maps to a
+result). A no-op worker still yields empty `artifact_refs` → BLOCK; structural acceptance never
+shadows strict (pinned by a behaviour test). The live end-to-end proof of this contract is
+stated once in "Current limits" below.
 
 ## Blocking and resume
 
@@ -345,11 +330,17 @@ Lifecycle hygiene status measures reports, handoffs, and tmp zones without delet
 
 Every single-step verb and the multi-step pipeline run the engine over a real
 `AgentRuntimePort`, but the engine does not yet autonomously drive a live end-to-end
-release. A real `pi` Layer-2 worker is **proven to advance a workflow through a real review/gate
-step** under the review-only gate on the coherent worker-output contract (the anti-fake e2e drives
-`release_scope → spec_create → spec_arch_review`; the review step emits a real `APPROVED` verdict
-accepted via the strict path), and the phase-specific gate refinement is **done** (the gate is
-review-only — see "Gating note" above). Deferred: live Claude SDK binding verification (the
+release. **Live proof (stated once, here):** the env-gated **anti-fake** real-worker e2e
+(`DADAIA_E2E_REAL_WORKER=1`, skipped by default — CI/`pytest` stay fully faked + green)
+drives a real `pi` worker (pinned build 0.79.3, provider openai-codex, model gpt-5.5)
+through `release_scope → spec_create → spec_arch_review`: both the *create* path and the
+*review/verdict* path are proven live — the review step (software-architect) reviews a
+substantive SPEC and emits `verdict: APPROVED`, and the Python verdict gate PASSES on
+real worker output via the **strict** acceptance path (`schema: agent-run-result-v1`
+matching `expected_schema`; the structural fallback was not needed). The
+REJECTED-blocks negative is proven via the faked gate path (no second live run). The
+phase-specific gate refinement is **done** (the gate is review-only — see "Gating note"
+above). Deferred: live Claude SDK binding verification (the
 `_default_query_fn` `query()`/`can_use_tool` call is the one unverified piece — offline build) plus
 provider cache-control marker wiring; a **full all-steps** live release run (the minimal
 `release_scope → spec_create → spec_arch_review` chain is the proof, not the whole ladder); a live

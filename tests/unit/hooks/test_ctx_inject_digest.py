@@ -5,10 +5,12 @@ runner (never an in-process ``main()`` + ``sys.stdin`` simulation — banned by 
 harness-env contract):
 
 1. **tldr-digest of the injected catalog.** ``ctx_inject`` must inject a digest of
-   ``catalog.json`` that keeps ``rank``/``slug``/``title``/``tldr``/``path`` and drops the
-   heavy ``summary`` field. The catalog ON DISK must stay byte-identical (self-pull depth
-   intact). The injected payload must be measurably smaller than injecting the raw catalog;
-   the before/after byte sizes are asserted here and recorded for CLOSURE.
+   ``catalog.json`` that keeps ``slug``/``title``/``tldr``/``path`` and drops the heavy
+   ``summary`` field plus ``rank`` (F-77, v0.1.48: rank is alphabetical file order, not
+   priority — it must not reach the session digest). The catalog ON DISK must stay
+   byte-identical (self-pull depth intact). The injected payload must be measurably
+   smaller than injecting the raw catalog; the before/after byte sizes are asserted
+   here and recorded for CLOSURE.
 
 2. **Stale once-per-session sentinel GC, pinned to INJECT TIME.** The home for the sweep is
    inside ``ctx_inject`` itself (NOT ``spec_context/doctor.py`` — avoids the doctor
@@ -118,13 +120,14 @@ def test_injected_catalog_is_tldr_digest_drops_summary(tmp_path: Path) -> None:
     for feat in digest["features"]:
         # summary is the heavy field that must be dropped.
         assert "summary" not in feat
+        # rank must be dropped too (F-77: alphabetical file order, not priority).
+        assert "rank" not in feat
         # the lean fields the digest must preserve.
-        assert set(feat) == {"rank", "slug", "title", "tldr", "path"}
+        assert set(feat) == {"slug", "title", "tldr", "path"}
     # Spot-check a concrete value survived the digest.
     first = digest["features"][0]
     assert first["slug"] == "agent-comms"
     assert first["path"] == "specs/memory/product/agents/agent-comms.md"
-    assert first["rank"] == 1
 
 
 def test_digest_is_smaller_than_raw_catalog_before_after_bytes(tmp_path: Path) -> None:

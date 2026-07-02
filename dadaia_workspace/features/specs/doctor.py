@@ -2502,10 +2502,14 @@ class SpecsDoctor:
     def _check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
         """Check: specs/memory/AGENTS.md must exist (WARNING only).
 
-        The file is created during WS-2 (ai-engineer projects it from
-        dadaia_workspace/public/data/memory-AGENTS.md).  It is expected to be
-        absent on fresh scaffolds and early in the lifecycle, so absence is
-        flagged as WARN (never ERROR) and does NOT cause doctor to exit non-zero.
+        The specs-tree copy is NOT a projection target: `dadaia public install`
+        only scaffolds it when the file is missing and never updates an existing
+        copy (bug specs-doctor-tree5m-remediation-wrong). The real repair is to
+        create/edit specs/memory/AGENTS.md directly, restoring content from the
+        canonical source dadaia_workspace/public/data/memory-AGENTS.md and
+        keeping the data/ + scaffold/ source copies in sync. Absence is expected
+        on fresh scaffolds and early in the lifecycle, so it is flagged as WARN
+        (never ERROR) and does NOT cause doctor to exit non-zero.
         """
         memory_agents_md = self.specs_dir / "memory" / "AGENTS.md"
         if memory_agents_md.exists():
@@ -2516,8 +2520,12 @@ class SpecsDoctor:
                 severity=Severity.WARNING,
                 description=(
                     "specs/memory/AGENTS.md is missing — expected memory ownership contract. "
-                    "Project it by running `dadaia public install --target all` after "
-                    "dadaia_workspace/public/data/memory-AGENTS.md has been created."
+                    "Restore it by copying the canonical source "
+                    "dadaia_workspace/public/data/memory-AGENTS.md into specs/memory/AGENTS.md "
+                    "(edit the specs-tree copy directly and keep both source copies — "
+                    "public/data/ and public/scaffold/memory/ — in sync). "
+                    "Note: `dadaia public install` does NOT project this file; it only "
+                    "scaffolds it when missing and never updates an existing copy."
                 ),
                 path=str(memory_agents_md),
                 fixable=False,

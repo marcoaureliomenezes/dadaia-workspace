@@ -1,0 +1,20 @@
+[
+ {
+  "slug": "specs-truth-realignment-constitution-memory",
+  "shipped_anchors": [
+   "memory/tech-stack.md#agent-runtimes",
+   "memory/architecture.md#camadas",
+   "memory/quality-assurance.md#Prop\u00f3sito",
+   "product-vision",
+   "harness-primitives",
+   "public-asset-distribution",
+   "multi-platform-parity",
+   "workspace-init",
+   "workspace-portability",
+   "lifecycle-foundation",
+   "sdd-gate-v3",
+   "dadaia_workspace/infrastructure/fake_runtime.py#FakeAgentRuntime",
+   "dadaia_workspace/features/specs/doctor.py#SpecsDoctorIssue"
+  ]
+ }
+]

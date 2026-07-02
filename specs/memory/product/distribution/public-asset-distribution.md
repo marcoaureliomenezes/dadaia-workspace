@@ -11,12 +11,12 @@ tags:
 - projection
 - privacy
 agent_tier: self-pull
-token_estimate: 690
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 875
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 `dadaia public {stage|install|doctor}` distributes the public agentic surface of
 `dadaia-workspace`. The live asset types under `dadaia_workspace/public/` are:
@@ -30,7 +30,7 @@ release_origin: v0.1.47
 `.codex/`, `.pi/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, scoped
 runtime rule files, and the Codex hook wrappers under `.dadaia/hooks/`.
 
-## Diferencial
+## Differentiator
 
 Default public assets must be generic and safe for any consumer. They must not
 ship private project names, private repo paths, hostnames, IP addresses,
@@ -52,7 +52,7 @@ public assets with a denylist for private identifiers and reports
 `[ok] public-privacy` only when the distributed surface is clean. CI treats this
 as a release gate.
 
-## Fluxo de uso
+## Usage flow
 
 The root `AGENTS.md` is a short global router. Specific behavior lives in
 scoped AGENTS files:
@@ -67,7 +67,7 @@ scoped AGENTS files:
 The installer and doctor manage only lib-originated projections. Operator-owned
 domain-scoped AGENTS files are not overwritten.
 
-## Estado runtime tocado
+## Runtime state touched
 
 The `dadaia-workspace` source repo must stay free of root runtime projections
 and local harness files. Generated/local artefacts such as `.dadaia/`,
@@ -79,15 +79,16 @@ and local harness files. Generated/local artefacts such as `.dadaia/`,
 the operator explicitly opts in with `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1`.
 Staged temp workspaces remain supported.
 
-## Dependências
+## Dependencies
 
 - Claude Code: `.claude/agents`, `.claude/skills`, `.claude/rules`,
   `.claude/workflows`, `.claude/settings.json` (hook registration).
 - Codex: `.codex/config.toml`, `.codex/hooks.json` (referencing the `.dadaia/hooks/codex-*`
   wrappers), `.codex/agents`, `.codex/rules`, `.codex/skills`, reference workflows, and
   `AGENTS.md` context.
-- PI: `.pi/` Layer-1 surface (`SYSTEM.md`, `settings.json`, `prompts/`, `extensions/` —
-  post-trust executable).
+- PI: `.pi/` Layer-1 surface — exactly `SYSTEM.md`, `settings.json`,
+  `prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts` (post-trust
+  executable). This atom is the sole owner of the `.pi/` surface inventory.
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
 `public doctor` compares canonical source, staging, and projections across three

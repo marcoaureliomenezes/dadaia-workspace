@@ -19,84 +19,83 @@ tags:
 - lifecycle
 - layer-2
 agent_tier: self-pull
-token_estimate: 950
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 750
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
-Um **dadaia-workflow** é um corpo Python que dirige workers Layer-2 por steps: importa
-o **fragment** do step (a instrução single-step: inputs, task, contrato de output),
-injeta a **persona** do role (a diretiva operativa "quem você é"), seleciona contexto
-dinâmico, chama um worker `(harness, model)` discreto e avança **gates
-Python-validados** — o modelo recomenda, Python decide a legalidade da transição.
-Este atom é a fonte única do ROSTER e da INVOCABILIDADE; a mecânica do engine
-(pipeline, gates, run store, data plane) é [[lifecycle-foundation]].
+A **dadaia-workflow** is a Python body that drives Layer-2 workers through steps: it
+imports the step's **fragment** (the single-step instruction: inputs, task, output
+contract), injects the role's **persona** (the operative "who you are" directive),
+selects dynamic context, calls a discrete `(harness, model)` worker, and advances
+**Python-validated gates** — the model recommends, Python decides the legality of the
+transition. This atom is the single source of the ROSTER and of INVOCABILITY; the
+engine mechanics (pipeline, gates, run store, data plane) are [[lifecycle-foundation]].
 
-**Os 7 workflows do catálogo governado** (`features/workflows/dadaia_catalog.py` —
+**The 7 workflows of the governed catalog** (`features/workflows/dadaia_catalog.py` —
 `governed_workflow_catalog()`):
 
-| Workflow | Corpo | Availability | Verbo CLI hoje |
-|----------|-------|--------------|----------------|
+| Workflow | Body | Availability | CLI verb today |
+|----------|------|--------------|----------------|
 | `release_definition` | `workflows/release_definition.py` | available | `dadaia lifecycle release define` |
 | `backlog_definition` | `workflows/backlog_definition.py` | available | `dadaia lifecycle backlog define` |
-| `implementation` | `pipeline.py` / `phase_workflow.py` | partial | `dadaia lifecycle pipeline` (+ steps avulsos `implement`, `review qa\|security\|code`) |
+| `implementation` | `pipeline.py` / `phase_workflow.py` | partial | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`) |
 | `closure` | step `close` + `closure_removal_gate` | partial | `dadaia lifecycle close` |
-| `audit` | `workflows/audit.py` (real, fragment+gate) | available no catálogo | **sem verbo** — pendente |
-| `research` | `workflows/research.py` (real, fragment+gate) | available no catálogo | **sem verbo** — pendente |
-| `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available no catálogo | **sem verbo** — pendente |
+| `audit` | `workflows/audit.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
+| `research` | `workflows/research.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
+| `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
 
-**Invocabilidade honesta: 4 verbos de workflow hoje** — `release define`,
-`backlog define`, `pipeline`, `close`. `audit`/`research`/`bug_report` são entradas
-governadas do catálogo com corpos reais mas **nenhum verbo CLI os invoca ainda**
-(wiring de verbo + container builders é o backlog
-`lifecycle-verb-governance-uniformity`). Não afirmar 7 invocáveis.
+**Honest invocability: 4 workflow verbs today** — `release define`,
+`backlog define`, `pipeline`, `close`. `audit`/`research`/`bug_report` are governed
+catalog entries with real bodies but **no CLI verb invokes them yet**
+(verb wiring + container builders is the `lifecycle-verb-governance-uniformity`
+backlog). Do not claim 7 invocable.
 
-## Fluxo de uso
+## Usage flow
 
-1. Um harness de entrada (ou o operador) invoca um verbo:
-   `dadaia lifecycle <verbo> --release-id <id> --harness {pi|codex|fake} [--model …]`.
-2. O policy resolver congela o snapshot `(harness, profile, model)` por step antes do
+1. An entry harness (or the operator) invokes a verb:
+   `dadaia lifecycle <verb> --release-id <id> --harness {pi|codex|fake} [--model …]`.
+2. The policy resolver freezes the per-step `(harness, profile, model)` snapshot before
    step 1 ([[lifecycle-foundation]] — control plane).
-3. Para cada step model-driven, o prompt é montado como **persona (role directive) +
-   fragment bundle + contexto dinâmico + contrato de output** — a injeção de persona
-   vale para TODOS os verbos (helper compartilhado threaded nos 5 corpos de workflow
-   E no `_run_phase_step` da CLI), não só no pipeline.
-4. O worker responde com o payload `schema: agent-run-result-v1`; o gate typed
-   (review-only) decide: review steps exigem `verdict == APPROVED`; create steps
-   exigem payload estrutural + `artifact_refs`; Ring-2 valida `changed_paths`.
-5. Steps comunicam via o workflow-step handoff ledger; um required upstream ausente
-   BLOQUEIA antes do próximo prompt.
+3. For each model-driven step, the prompt is assembled as **persona (role directive) +
+   fragment bundle + dynamic context + output contract** — persona injection applies
+   to ALL verbs (a shared helper threaded through the 5 workflow bodies AND the CLI's
+   `_run_phase_step`), not just the pipeline.
+4. The worker replies with the `schema: agent-run-result-v1` payload; the typed gate
+   decides the advance (gate mechanics: [[lifecycle-foundation]] §"Gating note").
+5. Steps communicate via the workflow-step handoff ledger ([[lifecycle-foundation]]
+   §"Workflow-step handoff data plane"); a missing required upstream BLOCKS.
 
-## Trigger típico
+## Typical trigger
 
-Definição de release ou de item de backlog num harness de entrada Codex/PI (onde
-dadaia-workflows são o caminho de execução preferido); o pipeline
-implementation→review numa release; o close no fim.
+Release or backlog-item definition in a Codex/PI entry harness (where
+dadaia-workflows are the preferred execution path); the implementation→review
+pipeline in a release; the close at the end.
 
-## Diferencial
+## Differentiator
 
-A autoridade do workflow fica em Python (ordem de steps, gates, ledger), não em texto
-livre de agente — um worker não consegue "se aprovar" fora do contrato. Fragment e
-persona separam o QUE do step do QUEM do role, cada um com um único home
+Workflow authority stays in Python (step order, gates, ledger), not in free-form agent
+text — a worker cannot "approve itself" outside the contract. Fragment and persona
+separate the step's WHAT from the role's WHO, each with a single home
 (`public/lifecycle_fragments/`, `public/personas/`).
 
-## Estado runtime tocado
+## Runtime state touched
 
-- `.dadaia/states/lifecycle/<run_id>.json` — run records (snapshot de policy + step
+- `.dadaia/states/lifecycle/<run_id>.json` — run records (policy snapshot + step
   ledger).
-- `.dadaia/runs/lifecycle/<run_id>/steps/*.step-payload.json` — payloads imutáveis.
-- `.dadaia/states/workflow_model_policy.json` — overlay de política (panel/CLI).
-- `specs/` do contexto — os artefatos que cada workflow produz (SPEC/PLAN/TASKS,
-  backlog item, CLOSURE), sob o gate SDD normal.
+- `.dadaia/runs/lifecycle/<run_id>/steps/*.step-payload.json` — immutable payloads.
+- `.dadaia/states/workflow_model_policy.json` — policy overlay (panel/CLI).
+- The context's `specs/` — the artifacts each workflow produces (SPEC/PLAN/TASKS,
+  backlog item, CLOSURE), under the normal SDD gate.
 
-## Dependências
+## Dependencies
 
-- [[lifecycle-foundation]] — o engine (pipeline, gates, run store, data plane,
+- [[lifecycle-foundation]] — the engine (pipeline, gates, run store, data plane,
   model/harness governance).
-- [[agent-orchestration]] — a superfície de personas Layer-2.
-- [[tech-stack]] — o roster de harness/modelo que os verbos aceitam.
-- [[sdd-gate-v3]] — o gate e os chokepoints sob os quais os writes dos workers caem.
-- [[panel]] — a superfície do operador (diagram-cards + model pickers) sobre o mesmo
-  catálogo governado.
+- [[agent-orchestration]] — the Layer-2 persona surface.
+- [[tech-stack]] — the harness/model roster the verbs accept.
+- [[sdd-gate-v3]] — the gate and chokepoints the workers' writes fall under.
+- [[panel]] — the operator surface (diagram-cards + model pickers) over the same
+  governed catalog.

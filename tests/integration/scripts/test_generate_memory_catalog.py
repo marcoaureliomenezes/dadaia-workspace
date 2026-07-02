@@ -150,6 +150,7 @@ def test_single_atom_catalog_shape(tmp_path: Path) -> None:
     assert feat["slug"] == "workspace-init"
     assert feat["title"] == "Test Feature"
     assert feat["category"] == "product"
+    assert feat["area"] == "product", "top-level product/ atom must carry area='product'"
     assert feat["tldr"] == "Short description under 160 chars."
     assert feat["summary"] == "One-sentence summary."
     assert feat["tags"] == ["test"]
@@ -299,10 +300,17 @@ def test_depends_on_deduplicates_wikilinks(tmp_path: Path) -> None:
 
 
 def test_generate_index_md_has_expected_sections(tmp_path: Path) -> None:
-    """generate_index_md produces a markdown TOC with category headers."""
+    """generate_index_md produces a markdown TOC grouped by area (F-75).
+
+    Grouping is by the atom's parent directory under product/ — NOT by the
+    frontmatter category: two atoms sharing category land in different sections
+    when they live in different area subdirs.
+    """
     memory_dir, product_dir = _make_memory_dir(tmp_path)
-    _make_product_atom(product_dir, slug="feat-a", fm_overrides={"category": "product"})
-    _make_product_atom(product_dir, slug="feat-b", fm_overrides={"category": "core"})
+    _make_product_atom(product_dir, slug="feat-a")
+    sdd_dir = product_dir / "sdd"
+    sdd_dir.mkdir()
+    _make_product_atom(sdd_dir, slug="feat-b")
 
     catalog, errors = generate_catalog(memory_dir)
     assert not errors
@@ -312,8 +320,9 @@ def test_generate_index_md_has_expected_sections(tmp_path: Path) -> None:
 
     assert "feat-a" in index_md
     assert "feat-b" in index_md
+    assert "## Features by area" in index_md
     assert "### product" in index_md
-    assert "### core" in index_md
+    assert "### sdd" in index_md
 
 
 # ---------------------------------------------------------------------------

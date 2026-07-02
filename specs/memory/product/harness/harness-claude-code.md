@@ -12,12 +12,12 @@ tags:
 - layer-1
 - projection
 agent_tier: self-pull
-token_estimate: 470
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 475
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 Claude Code is a **Layer-1-only** harness: the operator's interactive coding agent, and
 the only harness with native sub-agent dispatch (the Agent tool). By law it is **never a
@@ -27,7 +27,7 @@ operator's subscription, so `claude` is rejected as a `--harness` value (the
 the operator works Claude-only, the 9-agent roster runs entirely inside Claude Code via
 sub-agents; dadaia-workflows remain available but drive pi/codex workers.
 
-## Fluxo de uso
+## Usage flow
 
 1. Operator launches `claude` at the workspace root; `CLAUDE.md` (`@AGENTS.md` bridge)
    loads the workspace law — Claude Code does not read `AGENTS.md` natively.
@@ -41,19 +41,19 @@ sub-agents; dadaia-workflows remain available but drive pi/codex workers.
 4. Coordinators (project-manager, project-auditor) dispatch role sub-agents from
    `.claude/agents/`; skills load on invocation.
 
-## Trigger típico
+## Typical trigger
 
 Any interactive session: releases coordinated by PM sub-agents, audits, reviews,
 ad-hoc engineering. Also the harness of choice when the operator wants multi-agent
 fan-out without the lifecycle engine.
 
-## Diferencial
+## Differentiator
 
 Strongest Layer-1 posture: deterministic hooks + chokepoints, native sub-agents,
 first-message context injection. The trade-off is the Layer-2 exclusion — heavy
 batch/workflow execution is delegated to pi/codex workers.
 
-## Estado runtime tocado
+## Runtime state touched
 
 Scaffold projected by `dadaia public install --target claude` (all lib-originated,
 manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin stubs),
@@ -62,7 +62,7 @@ manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin 
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
 `--target agents` tree); no `.codex/` or `.pi/` is required.
 
-## Dependências
+## Dependencies
 
 - [[tech-stack]] — the harness/runtime roster single source.
 - [[sdd-gate-v3]] — the deterministic enforcement mechanism this harness participates in.

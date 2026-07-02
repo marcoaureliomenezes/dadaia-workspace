@@ -2,29 +2,31 @@
 slug: agent-orchestration
 title: agent-orchestration
 category: product
-tldr: "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; dispatcher purity; Layer-2 personas."
+tldr: "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas."
 summary: Defines the public default 9-core agent topology with coordinator+sub-agent
   architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch),
-  ADDITIVE vs MUTATING activity classes, and the Layer-2 persona surface.
+  per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD
+  step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, and
+  the Layer-2 persona surface.
 tags:
 - orchestration
 - agents
 - workflows
 - dispatch
 agent_tier: self-pull
-token_estimate: 1430
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 1700
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 `dadaia-workspace` orchestrates specialist agents through SDD-aware workflows and
 project-manager coordinator logic. The public default topology is generic and safe for
 all consumers; project-specific, game-specific, data-vendor-specific, or private
 agents belong in optional packs or local overlays.
 
-## Fluxo de uso
+## Usage flow
 
 The public default has **9 core agents** in the coordinator + sub-agent architecture
 defined by constitution §9:
@@ -94,6 +96,37 @@ implementation → review-closure. `product-engineer` and `software-engineer` ru
 PM sub-agents under that single lease. They never independently bind a session, so
 there is no session handoff and no second lock.
 
+### Phase ownership (constitution §14 + §7)
+
+| Agent | Phase | Activity class | Lease relationship |
+|-------|-------|----------------|--------------------|
+| project-manager | 1–2, coordinates all MUTATING phases | ADDITIVE (backlog/bugs); MUTATING coordinator | holds + coordinates + releases the release lease |
+| project-auditor | 4 (audit) | ADDITIVE | no lease |
+| product-engineer | 5 + 8 (definition, closure) | MUTATING | PM sub-agent; no independent acquire |
+| software-engineer | 6 (implementation) | MUTATING | PM sub-agent; no independent acquire |
+| qa-engineer | 7 gate → commit | ADDITIVE evidence; votes | no lease |
+| security-reviewer | 7 gate → push | ADDITIVE evidence; votes | no lease |
+| code-reviewer | 7 gate → PR | ADDITIVE evidence; votes | no lease |
+| ai-engineer | surface owner (`dadaia_workspace/public/**`) | MUTATING under PM lease during releases; own short lease for ad-hoc surface fixes | PM sub-agent when part of a release; own short MUTATING lease outside release spans (gate still enforces at-most-one-holder) |
+| software-architect | feeds findings into phases 4/5 | ADDITIVE | no lease |
+
+### SDD step-0 read order
+
+For any implementation, review, or report that depends on product context:
+
+1. Resolve the active Spec Context via `DADAIA_CONTEXT`, state, or
+   `dadaia context show --json`.
+2. Read `specs/constitution.md`.
+3. Read `specs/memory/architecture.md`, `specs/memory/tech-stack.md`, and
+   `specs/memory/product/index.md` or `catalog.json`.
+4. Pull the 1-3 relevant `specs/memory/product/<slug>.md` atoms.
+5. Read `specs/releases/ACTIVE.md`.
+6. Read the active release `SPEC.md`, `PLAN.md`, and `TASKS.md` according to phase.
+
+**Memory-format law:** Markdown is the memory source. `specs/memory/**/*.html`,
+`.yaml`, and `.yml` are legacy/generated formats and must not be written as product
+memory.
+
 ### Layer-2 personas — the codex/pi equivalent of a Claude sub-agent
 
 The 9-core roster above is the **Claude Layer-1** sub-agent surface. The **persona** is its
@@ -143,23 +176,14 @@ push, PR, merge, deploy, and memory updates are blocked until all required revie
 
 ### Runtime dispatch honesty
 
-Claude Code uses Claude-native agent/tool semantics with real Agent tool dispatch.
-Codex custom agents are real configured delegates projected under `.codex/agents/*.toml`;
-they are not simulated with fake tool names or stale tool-discovery promises. Codex
-workflow Markdown is still documentation: it does not auto-execute, schedule fan-out, or
-turn a workflow file into a runtime primitive by itself. **PI**
-(`@earendil-works/pi-coding-agent`), the third harness, is
-governed at Layer 1 via `AGENTS.md`/`CLAUDE.md` (read natively) plus its projected `.pi/`
-surface — including a real pre-disk (Ring-1) SDD-gate extension
-(`.pi/extensions/dadaia-sdd-gate.ts`): PI's CLI exposes a `tool_call` hook that can block a
-write before it executes, and the extension delegates write/edit to the same Python
-`pre_gate` the other harnesses use (active once the operator trusts `.pi/`). At Layer 2 the
-`PiHeadlessAdapter` drives a real `pi --mode json` worker behind `AgentRuntimePort` with a
-git-diff Ring-2 boundary (the Layer-2 worker has no Ring-1 — the two layers differ).
-The dispatcher layer must report unsupported runtime capabilities honestly instead of
-simulating success.
+Claude Code dispatches via the native Agent tool; Codex custom agents are real
+configured delegates under `.codex/agents/*.toml`, while workflow Markdown remains
+documentation that never auto-executes. Per-harness capability truth (enforcement
+surfaces, Ring-1/Ring-2 boundaries, worker transports) lives in [[harness-codex]] and
+[[harness-pi]]. The dispatcher layer must report unsupported runtime capabilities
+honestly instead of simulating success.
 
-## Estado runtime tocado
+## Runtime state touched
 
 `ai-engineer` owns public AI entities under
 `dadaia_workspace/public/{agents,skills,rules,workflows,personas,lifecycle_fragments}/**`.

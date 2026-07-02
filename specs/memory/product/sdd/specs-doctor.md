@@ -2,133 +2,133 @@
 slug: specs-doctor
 title: specs-doctor
 category: product
-tldr: 'Valida invariantes SDD: SPEC-DOC 001..009/012/016/022-024/026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix repara TREE-4 e SPEC-DOC-034.'
-summary: 'Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001..009, 012, 016;
-  022/023 embutidos no check de backlog 012) cobrindo memory .md via LINT-1 + CAT-1,
-  ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (fase↔markers),
-  026/027 (ids/naming de release), 028 (refs da constitution), 029 (coerência
-  lease↔session em 3 estados), 030 (naming de audits), 031/035 (disposição de
-  backlog), 032 (status legado de bug), 033 (event store JSONL de bugs), 034
-  (_archive dirs, auto-fix), 036 (audit arquivado nomeia release), 037 (constitution
-  não enumera runtime kinds), 038 (audit loose sem disposição, WARN);
-  SPECS-VERSION (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repara
-  TREE-4 E SPEC-DOC-034.'
+tldr: 'Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034.'
+summary: 'SDD structural checks: non-sequential SPEC-DOC IDs (001..009, 012, 016;
+  022/023 embedded in backlog check 012) covering memory .md via LINT-1 + CAT-1,
+  ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (phase↔markers),
+  026/027 (release ids/naming), 028 (constitution refs), 029 (lease↔session
+  coherence in 3 states), 030 (audit naming), 031/035 (backlog disposition), 032
+  (legacy bug status), 033 (bug JSONL event store), 034 (_archive dirs, auto-fix),
+  036 (archived audit names its release), 037 (constitution does not enumerate
+  runtime kinds), 038 (loose undispositioned audit, WARN); SPECS-VERSION
+  (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repairs TREE-4 AND
+  SPEC-DOC-034.'
 tags:
 - specs
 - doctor
 - validation
 - sdd
 agent_tier: self-pull
-token_estimate: 1900
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 2150
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
 
-## Propósito
+## Purpose
 
-Valida invariantes estruturais do diretório `specs/` sob o modelo SDD release-lifecycle. Grupos de checks:
+Validates structural invariants of the `specs/` directory under the SDD release-lifecycle model. Check groups:
 
-  * **SPEC-DOC estruturais** (IDs não-sequenciais vivos: 001, 002, 002L, 003, 004, 005, 006, 007, 008 refs de imagem, 009, 012, 016): presença de `constitution.md`, memory `.md` com folder catalog em `product/`, `ACTIVE.md` bem formada, status canônicos, PLAN ≤ 300 linhas, CLOSURE com evidence triples, atomicidade do memory sem changelog (check #8 greppa o corpo `.md`), links de imagem resolvendo, schema de backlog (o check 012 embute as regras **022** — formato dos bullets de `## Hotfixes pendentes` — e **023** — bullet de hotfix stale > 72h), **SPEC-DOC-002L** (stray `.html` sob `specs/memory/` devem ser deletados), e **D-OC-1** (bidirectional orchestration registry consistency). Os ids 010/011/013/014/015/025 não existem (aposentados/absorvidos).
-  * **Ledger + governança** (024, 026..038): ver a tabela abaixo.
-  * **SPECS-VERSION**: WARN quando o `specs_pattern_version` da árvore está abaixo do canônico da lib — recomenda `dadaia specs upgrade`.
-  * **TREE-1..7 + TREE-5M**: canonical `specs/` tree v2 shape. TREE-3 exige `specs/memory/quality-assurance.md` no top-level. O check de `specs/memory/AGENTS.md` é **TREE-5M**. CAT-1 e SPEC-DOC-002 usam `rglob` para atoms nested.
-  * **LINT-1 + CAT-1**: memory atoms (lint script) + sync do `catalog.json`.
+  * **Structural SPEC-DOC** (live non-sequential IDs: 001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016): presence of `constitution.md`, memory `.md` with a folder catalog in `product/`, well-formed `ACTIVE.md`, canonical statuses, PLAN ≤ 300 lines, CLOSURE with evidence triples, **008** — memory atomicity: forbidden changelog/history `##` headings in the `.md` body (check #8 greps the body; ERROR), backlog schema (check 012 embeds rules **022** — the format of `## Hotfixes pendentes` bullets — and **023** — hotfix bullet stale > 72h; 022/023 are never emitted as their own codes), **SPEC-DOC-002L** (stray `.html` under `specs/memory/` must be deleted), and **D-OC-1** (bidirectional orchestration registry consistency). Ids 010/011 are retired no-op stubs (HTML-era image-link/mermaid checks); 013/014/015/025 do not exist (retired/absorbed).
+  * **Ledger + governance** (024, 026..038): see the table below.
+  * **SPECS-VERSION**: WARN when the tree's `specs_pattern_version` is below the library's canonical one — recommends `dadaia specs upgrade`.
+  * **TREE-1..7 + TREE-5M**: canonical `specs/` tree v2 shape. TREE-3 requires `specs/memory/quality-assurance.md` at the top level. The `specs/memory/AGENTS.md` check is **TREE-5M**. CAT-1 and SPEC-DOC-002 use `rglob` for nested atoms.
+  * **LINT-1 + CAT-1**: memory atoms (lint script) + `catalog.json` sync.
 
 ```mermaid
 flowchart TB
-    CMD["dadaia specs doctor [--fix] [--json]"] --> RUN["resolve specs_dir · roda todos os checks em ordem"]
+    CMD["dadaia specs doctor [--fix] [--json]"] --> RUN["resolve specs_dir · run all checks in order"]
     RUN --> FAM
-    subgraph FAM["Famílias de invariantes"]
+    subgraph FAM["Invariant families"]
         direction LR
-        A["SPEC-DOC 001..016<br/>presença · forma"]
-        B["Ledger + governança 024..038<br/>estado da máquina SDD"]
-        C["TREE-1..7 + 5M<br/>shape canônico do tree"]
+        A["SPEC-DOC 001..016<br/>presence · shape"]
+        B["Ledger + governance 024..038<br/>SDD state machine"]
+        C["TREE-1..7 + 5M<br/>canonical tree shape"]
         D["LINT-1 + CAT-1<br/>memory atoms + catalog sync"]
         E["D-OC-1 · SPECS-VERSION"]
     end
-    FAM --> VERD{"algum ERROR?"}
-    VERD -->|sim| EX1(["exit 1 — bloqueia merge em CI"])
-    VERD -->|"só WARN / verde"| EX0(["exit 0"])
-    CMD -.->|"--fix"| FIX["auto-repara TREE-4 (cria dirs) + SPEC-DOC-034 (_archive dirs) · migration guard TREE-1/2"]
+    FAM --> VERD{"any ERROR?"}
+    VERD -->|yes| EX1(["exit 1 — blocks merge in CI"])
+    VERD -->|"WARN only / green"| EX0(["exit 0"])
+    CMD -.->|"--fix"| FIX["auto-repairs TREE-4 (creates dirs) + SPEC-DOC-034 (_archive dirs) · migration guard TREE-1/2"]
 ```
 
 ### Ledger invariants (SPEC-DOC-024 + 026..038)
 
-O doctor valida as próprias transições de estado da máquina SDD (a verdade que o gate lê):
+The doctor validates the SDD state machine's own transitions (the truth the gate reads):
 
-Código| O que detecta| Severity| Notas
+Code| What it detects| Severity| Notes
 ---|---|---|---
-SPEC-DOC-024| `ACTIVE.md phase` incoerente com os markers do TASKS.md ativo: fase SPEC/DEFINITION com maioria `[x]`; IMPLEMENTATION sem TASKS.md `**Status:** Aprovado`; CLOSURE com task não-`[x]`| ERROR| Constitution §7; suporta `segment:`
-SPEC-DOC-026| Release id duplicado entre `releases/` e `_archive/releases/` (recursivo)| ERROR (WARN se envolve dir legacy documentado)| Mata a ambiguidade de arqueologia de archive
-SPEC-DOC-027| Nome de release dir fora do canon `^v\d+\.\d+\.\d+$`| ERROR para release viva criada após o cutoff; silencioso para os dirs legacy pré-canon enumerados na allowlist documentada no source (sem renames de história arquivada); WARN para legacy fora da allowlist| Alinha com SPEC-DOC-016; enforcement forward intacto para dirs novos
-SPEC-DOC-028| Referência backtick path-like em `constitution.md` que não resolve no repo root| WARN| Só refs com `/`; no-op sem `repo_root` injetado
-SPEC-DOC-029| Coerência lease↔session em triagem de **3 estados**: (a) lease TTL-expirado com holder morto/unprobeable ⇒ WARN "stale lease from a dead session — safe to reclaim" nomeando a remediação (`dadaia doctor --fix` / `dadaia lock steal <ctx>`); (b) holder **vivo** + incoerência lease↔session genuína ⇒ ERR (única sede da linguagem de forgery); (c) coerente ⇒ silencioso| WARN (a) / ERROR (b)| Backstop D-2; liveness via `lease.is_held` (TTL piso + pid veto); pid-probe **composition-root-wired** (a CLI injeta via o seam do hook layer; default `None` ⇒ TTL-only); lê os records reais `<ctx>.lock.json` via `session_identity.coherence`; só roda com `workspace_state_dir` injetado
-SPEC-DOC-030| Diretório novo em `specs/audits/` fora do canon `<YYYYMMDDTHHMMSSZ>-<sid8>` (exceto os 4 dirs grandfathered no §8 da constitution e `_archive/`)| WARN| Constitution §8 naming law (amendment 2026-06-10); enforcement forward-only
-SPEC-DOC-031| Entry em `specs/backlog/**` com status **não-terminal** ({OPEN, PICKED, CANDIDATE}, prefix match case-insensitive na Status line) cujo slug/ID aparece em CLOSURE/SPEC de release **arquivada**, fora de seções "Backlog returns"| WARN| Vocabulário ADR-11 (v0.1.11): terminal = {DELIVERED, SUPERSEDED, RESOLVED, CONSUMED, DEFERRED, REJECTED}, sufixos permitidos (`— vX.Y.Z`); falso-positivo conhecido: menções defer/supersede em CLOSUREs arquivadas — razão de ser WARN, não ERR
-SPEC-DOC-032| Arquivo `.md` LEGADO em `specs/bugs/**` com `status:` fora do canon {`Open`, `Closed`}| WARN| Aplica-se só a fontes Markdown legadas; o caminho canônico de bugs é o event store JSONL (033)
-SPEC-DOC-033| Event store JSONL de bugs: linha inválida contra `bug-event-v1`; arquivo acima do rotation ceiling; terminal sem `reported` prévio ou terminal duplo por `bug_id` (`archived` ignorado — não-terminal; `reported` reabre)| ERROR| Varre `specs/bugs/*.jsonl` (não-recursivo; `_archive/` excluído) — [[sdd-bug-backlog-governance]]
-SPEC-DOC-034| Um dos três `_archive/` per-artifact (`backlog/`, `bugs/`, `audits/`) ausente| WARNING| **auto-fix**: `--fix` cria o dir com `.gitkeep`
-SPEC-DOC-035| Entry de backlog com status terminal ainda loose (não movido para `specs/backlog/_archive/`)| WARN| Disposição terminal ⇒ archive move
-SPEC-DOC-036| Audit arquivado em `specs/audits/_archive/` sem nomear a release que o dispôs| WARNING| Audit-disposition law
-SPEC-DOC-037| `constitution.md` enumera membro de `AgentRuntimeKind` / roster de harness (token uppercase word-bounded)| ERROR| A constitution declara o invariante e cita `[[tech-stack]]`; guard de recorrência do rewrite
-SPEC-DOC-038| Diretório de audit loose direto sob `specs/audits/` (fora de `_archive/`)| WARNING| Um WARN por audit não-disposto — visível até a release de remediação arquivá-lo
+SPEC-DOC-024| `ACTIVE.md phase` incoherent with the active TASKS.md markers: SPEC/DEFINITION phase with a `[x]` majority; IMPLEMENTATION without TASKS.md `**Status:** Aprovado`; CLOSURE with a non-`[x]` task| ERROR| Constitution §7; supports `segment:`
+SPEC-DOC-026| Duplicate release id between `releases/` and `_archive/releases/` (recursive)| ERROR (WARN if a documented legacy dir is involved)| Kills archive-archaeology ambiguity
+SPEC-DOC-027| Release dir name outside the canon `^v\d+\.\d+\.\d+$`| ERROR for a live release created after the cutoff; silent for the pre-canon legacy dirs enumerated in the allowlist documented in source (no renames of archived history); WARN for legacy outside the allowlist| Aligns with SPEC-DOC-016; forward enforcement intact for new dirs
+SPEC-DOC-028| Path-like backtick reference in `constitution.md` that does not resolve at the repo root| WARN| Only refs with `/`; no-op without an injected `repo_root`
+SPEC-DOC-029| Lease↔session coherence in a **3-state** triage: (a) TTL-expired lease with a dead/unprobeable holder ⇒ WARN "stale lease from a dead session — safe to reclaim" naming the remediation (`dadaia doctor --fix` / `dadaia lock steal <ctx>`); (b) **live** holder + genuine lease↔session incoherence ⇒ ERR (the only seat of the forgery language); (c) coherent ⇒ silent| WARN (a) / ERROR (b)| Backstop D-2; liveness via `lease.is_held` (TTL floor + pid veto); pid-probe **composition-root-wired** (the CLI injects it via the hook layer's seam; default `None` ⇒ TTL-only); reads the real `<ctx>.lock.json` records via `session_identity.coherence`; only runs with an injected `workspace_state_dir`
+SPEC-DOC-030| New directory in `specs/audits/` outside the canon `<YYYYMMDDTHHMMSSZ>-<sid8>` (except the 4 dirs grandfathered in constitution §8 and `_archive/`)| WARN| Constitution §8 naming law (amendment 2026-06-10); forward-only enforcement
+SPEC-DOC-031| Entry in `specs/backlog/**` with a **non-terminal** status ({OPEN, PICKED, CANDIDATE}, case-insensitive prefix match on the Status line) whose slug/ID appears in the CLOSURE/SPEC of an **archived** release, outside "Backlog returns" sections| WARN| ADR-11 vocabulary (v0.1.11): terminal = {DELIVERED, SUPERSEDED, RESOLVED, CONSUMED, DEFERRED, REJECTED}, suffixes allowed (`— vX.Y.Z`); known false positive: defer/supersede mentions in archived CLOSUREs — the reason it is WARN, not ERR
+SPEC-DOC-032| LEGACY `.md` file in `specs/bugs/**` with a `status:` outside the canon {`Open`, `Closed`}| WARN| Applies only to legacy Markdown sources; the canonical bug path is the JSONL event store (033)
+SPEC-DOC-033| Bug JSONL event store: line invalid against `bug-event-v1`; file above the rotation ceiling; terminal without a prior `reported` or double terminal per `bug_id` (`archived` ignored — non-terminal; `reported` reopens)| ERROR| Scans `specs/bugs/*.jsonl` (non-recursive; `_archive/` excluded) — [[sdd-bug-backlog-governance]]
+SPEC-DOC-034| One of the three per-artifact `_archive/` dirs (`backlog/`, `bugs/`, `audits/`) missing| WARNING| **auto-fix**: `--fix` creates the dir with `.gitkeep`
+SPEC-DOC-035| Backlog entry with a terminal status still loose (not moved to `specs/backlog/_archive/`)| WARN| Terminal disposition ⇒ archive move
+SPEC-DOC-036| Archived audit in `specs/audits/_archive/` that does not name the release that dispositioned it| WARNING| Audit-disposition law
+SPEC-DOC-037| `constitution.md` enumerates an `AgentRuntimeKind` member / harness roster (uppercase word-bounded token)| ERROR| The constitution declares the invariant and cites `[[tech-stack]]`; recurrence guard for the rewrite
+SPEC-DOC-038| Loose audit directory directly under `specs/audits/` (outside `_archive/`)| WARNING| One WARN per undispositioned audit — visible until the remediation release archives it
 
-Exit code 1 se houver errors; 0 se só warnings ou tudo verde. Suporta `--json` para integração com CI/automação e `--fix` para auto-repair dos invariantes tratáveis.
+Exit code 1 if there are errors; 0 if only warnings or all green. Supports `--json` for CI/automation integration and `--fix` for auto-repair of the treatable invariants.
 
-### Invariante LINT-1 (memory-markdown-source-v1)
+### LINT-1 invariant (memory-markdown-source-v1)
 
-Código| O que detecta| Severity| Notas
+Code| What it detects| Severity| Notes
 ---|---|---|---
-LINT-1| Qualquer atom `.md` em `specs/memory/` ou `specs/memory/product/` falha validação de `lint-memory-atoms.py`| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
-SPEC-DOC-002| Check #2: memory files existem como `.md`| ERROR| Agora requer `.md`, não `.html`; aceita headings `##` conforme allowlist
-SPEC-DOC-002L| Stray `.html` presentes sob `specs/memory/`| ERROR| Esses arquivos devem ser deletados; D-4 proíbe HTML commitado na pasta memory
-SPEC-DOC-008| Byte-identity do HTML commitado| —| **Removido** — não aplicável ao modelo MD-source (D-4: HTML é efêmero, renderizado in-memory)
+LINT-1| Any `.md` atom in `specs/memory/` or `specs/memory/product/` fails `lint-memory-atoms.py` validation| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN
+SPEC-DOC-002| Check #2: memory files exist as `.md`| ERROR| Now requires `.md`, not `.html`; accepts `##` headings per the allowlist
+SPEC-DOC-002L| Stray `.html` present under `specs/memory/`| ERROR| Those files must be deleted; D-4 forbids committed HTML in the memory folder
+SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (`features/specs/doctor.py` check #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008
 
-### Invariantes TREE-1..7 + TREE-5M (canonical tree v2, pós v0.2.1)
+### TREE-1..7 + TREE-5M invariants (canonical tree v2, post v0.2.1)
 
-Código| O que detecta| Severity| `--fix` policy
+Code| What it detects| Severity| `--fix` policy
 ---|---|---|---
-TREE-1| Diretório `specs/foundation/` presente (depreciado)| WARN| warn-only; **migration guard** impresso independente de `--fix` — instrução: `dadaia migrate tree-v2`
-TREE-2| Arquivo `specs/SPEC.md` na raiz (pre-release-model)| WARN| warn-only; **migration guard** impresso — instrução: `dadaia migrate tree-v2`
-TREE-3| Memory `.md` atom obrigatório ausente — checa `memory/architecture.md`, `memory/tech-stack.md`, `memory/quality-assurance.md` (top-level, pós v0.2.1) e `memory/product/index.md`| WARNING| **no-fix** (warn-only): atoms `.md` são operator-authored, não gerados de template — `--fix` não os recria
-TREE-4| Um ou mais de `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` ausentes| WARNING| **auto-fix** : recria diretório(s) ausente(s) com README.md + `.gitkeep` (quando há scaffold source; senão warn "create manually")
-TREE-5| `specs/AGENTS.md` ausente (drift em relação ao template canônico)| WARN| warn-only (sem auto-overwrite — arquivo pode ter customizações do consumer)
-TREE-5M| `specs/memory/AGENTS.md` ausente| WARN| warn-only (projetado via `dadaia public install` — WS-2)
-TREE-6| Diretório de release em `specs/releases/` sem pelo menos um artefato SDD obrigatório (`SPEC.md`)| ERROR| no-fix (decisão humana)
-TREE-7| Arquivo de bug em `specs/bugs/` sem campo `session_id` no frontmatter| ERROR| no-fix (campo requer valor real)
+TREE-1| `specs/foundation/` directory present (deprecated)| WARN| warn-only; **migration guard** printed regardless of `--fix` — instruction: `dadaia migrate tree-v2`
+TREE-2| `specs/SPEC.md` file at the root (pre-release-model)| WARN| warn-only; **migration guard** printed — instruction: `dadaia migrate tree-v2`
+TREE-3| Required memory `.md` atom missing — checks `memory/architecture.md`, `memory/tech-stack.md`, `memory/quality-assurance.md` (top-level, post v0.2.1) and `memory/product/index.md`| WARNING| **no-fix** (warn-only): `.md` atoms are operator-authored, not template-generated — `--fix` does not recreate them
+TREE-4| One or more of `specs/backlog/`, `specs/bugs/`, `specs/releases/`, `specs/audits/` missing| WARNING| **auto-fix**: recreates the missing directory(ies) with README.md + `.gitkeep` (when a scaffold source exists; else warn "create manually")
+TREE-5| `specs/AGENTS.md` missing (drift from the canonical template)| WARN| warn-only (no auto-overwrite — the file may carry consumer customizations)
+TREE-5M| `specs/memory/AGENTS.md` missing| WARN| warn-only (projected via `dadaia public install` — WS-2)
+TREE-6| Release directory in `specs/releases/` without at least one required SDD artifact (`SPEC.md`)| ERROR| no-fix (human decision)
+TREE-7| Bug file in `specs/bugs/` without a `session_id` frontmatter field| ERROR| no-fix (field requires a real value)
 
-**Migration guard (TREE-1/2):** quando detectados, o doctor imprime a mensagem de migration guard independentemente do flag `--fix` — o auto-move de `foundation/` e root `SPEC.md` para `releases/legacy/` é feito exclusivamente por `dadaia migrate tree-v2`.
+**Migration guard (TREE-1/2):** when detected, the doctor prints the migration-guard message regardless of the `--fix` flag — the auto-move of `foundation/` and root `SPEC.md` to `releases/legacy/` is done exclusively by `dadaia migrate tree-v2`.
 
-## Fluxo de uso
+## Usage flow
 
-  1. `dadaia specs doctor` — resolve `specs_dir` via `--specs-dir` ou contexto de sessão bound (fallback persistido de bind: env → incumbent atribuível/vivo → cwd), roda todos os checks em ordem, exibe issues formatados com código + severity + path. LINT-1 invoca `lint-memory-atoms.py` nos átomos `.md`; token drift é WARN; violações de frontmatter ou heading proibido são ERROR.
-  2. `dadaia specs doctor --fix` — executa os checks e auto-repara os DOIS invariantes com policy `auto-fix`: **TREE-4** (recria diretórios de lifecycle ausentes) e **SPEC-DOC-034** (cria `_archive/` per-artifact ausente com `.gitkeep`); emite migration guard para TREE-1/2; deixa TREE-3 e TREE-5..7 como warnings/errors sem alterar arquivos (TREE-3 é warn-only — atoms `.md` são operator-authored, não gerados).
-  3. Para automação: `dadaia specs doctor --json` emite payload `{specs_dir, issues[], summary{errors, warnings}}`.
-  4. Em CI: usado como gate de PR para bloquear merge se houver erros estruturais nos specs.
-
-
-
-Inventário vivo de códigos: `SPEC-DOC-001..009`, `012`, `016` (+ regras 022/023 dentro do 012; sufixo `L` para legacy — `002L`) + ledger/governança `SPEC-DOC-024`, `026..038` + `SPECS-VERSION` + `D-OC-1` + `TREE-1..7` + `TREE-5M` + `LINT-1` + `CAT-1`. `--fix` repara TREE-4 e SPEC-DOC-034. Os códigos de GC de runtime (`LOCK-GC`, `CTX-URL-1`, etc.) pertencem ao [[workspace-doctor]], não a este.
-
-## Trigger típico
-
-CI gate antes de merge; manualmente após qualquer movimentação grande de specs (migração, archive, criação de release nova) para confirmar que a estrutura ainda está sã.
-
-## Diferencial
-
-Sem este validador, drift entre modelo SDD e a realidade no disco vira bug latente — memory virando changelog, releases sem CLOSURE, status não-canônicos passando despercebidos. Os checks são post-hoc (não bloqueiam edição como o gate faz) mas detectam violações que o gate não consegue capturar (por exemplo, conteúdo de CLOSURE.md, broken images, link integrity).
-
-## Estado runtime tocado
-
-  * Read-only sobre todo `specs_dir` (modo padrão).
-  * **Com`--fix`:** escreve em `specs_dir` apenas para os dois invariantes com policy `auto-fix`: TREE-4 (recria diretórios de lifecycle ausentes com README/`.gitkeep`) e SPEC-DOC-034 (cria os `_archive/` per-artifact ausentes com `.gitkeep`). TREE-3 (memory atoms ausentes) é warn-only — não é recriado por `--fix`, pois atoms `.md` são operator-authored. Todos os outros invariantes permanecem read-only mesmo com `--fix`.
+  1. `dadaia specs doctor` — resolves `specs_dir` via `--specs-dir` or the session's bound context (persisted bind fallback: env → attributable/live incumbent → cwd), runs all checks in order, prints formatted issues with code + severity + path. LINT-1 invokes `lint-memory-atoms.py` on the `.md` atoms; token drift is WARN; frontmatter violations or a forbidden heading are ERROR.
+  2. `dadaia specs doctor --fix` — runs the checks and auto-repairs the TWO invariants with `auto-fix` policy: **TREE-4** (recreates missing lifecycle directories) and **SPEC-DOC-034** (creates the missing per-artifact `_archive/` with `.gitkeep`); prints the migration guard for TREE-1/2; leaves TREE-3 and TREE-5..7 as warnings/errors without changing files (TREE-3 is warn-only — `.md` atoms are operator-authored, not generated).
+  3. For automation: `dadaia specs doctor --json` emits a `{specs_dir, issues[], summary{errors, warnings}}` payload.
+  4. In CI: used as a PR gate to block merge if there are structural errors in the specs.
 
 
 
-## Dependências
+Live code inventory: `SPEC-DOC-001..009`, `012`, `016` (+ rules 022/023 inside 012; `L` suffix for legacy — `002L`) + ledger/governance `SPEC-DOC-024`, `026..038` + `SPECS-VERSION` + `D-OC-1` + `TREE-1..7` + `TREE-5M` + `LINT-1` + `CAT-1`. `--fix` repairs TREE-4 and SPEC-DOC-034. The runtime GC codes (`LOCK-GC`, `CTX-URL-1`, etc.) belong to the [[workspace-doctor]], not to this one.
 
-  * Resolução de `specs_dir`: [[context-management]] (via explicit flag or session-bound context).
-  * Complementar a [[sdd-gate-v3]] (gate previne writes inválidos; doctor detecta inconsistências post-hoc).
-  * Complementar a [[workspace-doctor]] (workspace state vs specs structure).
+## Typical trigger
+
+CI gate before merge; manually after any large specs movement (migration, archive, new release creation) to confirm the structure is still sane.
+
+## Differentiator
+
+Without this validator, drift between the SDD model and the on-disk reality becomes a latent bug — memory turning into a changelog, releases without CLOSURE, non-canonical statuses going unnoticed. The checks are post-hoc (they do not block editing the way the gate does) but they detect violations the gate cannot capture (for example, CLOSURE.md content, broken images, link integrity).
+
+## Runtime state touched
+
+  * Read-only over the whole `specs_dir` (default mode).
+  * **With `--fix`:** writes into `specs_dir` only for the two invariants with `auto-fix` policy: TREE-4 (recreates missing lifecycle directories with README/`.gitkeep`) and SPEC-DOC-034 (creates the missing per-artifact `_archive/` dirs with `.gitkeep`). TREE-3 (missing memory atoms) is warn-only — it is not recreated by `--fix`, since `.md` atoms are operator-authored. All other invariants remain read-only even with `--fix`.
+
+
+
+## Dependencies
+
+  * `specs_dir` resolution: [[context-management]] (via explicit flag or session-bound context).
+  * Complementary to [[sdd-gate-v3]] (the gate prevents invalid writes; the doctor detects inconsistencies post-hoc).
+  * Complementary to [[workspace-doctor]] (workspace state vs specs structure).

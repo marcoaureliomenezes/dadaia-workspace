@@ -1270,6 +1270,20 @@ def test_memory_agents_md_absent_emits_tree5m_warning(tmp_path: Path) -> None:
         f"TREE-5M must be WARNING, got: {tree5m[0].severity}"
     )
     assert not tree5m[0].fixable
+    # Bug specs-doctor-tree5m-remediation-wrong (v0.1.48 W3): the remediation must
+    # state the REAL repair — restore/edit the specs-tree copy directly from the
+    # public/data source — and must not prescribe `public install` as a projection
+    # mechanism (install only scaffolds the file when missing; it never updates it).
+    description = tree5m[0].description
+    assert "public/data/memory-AGENTS.md" in description, (
+        f"TREE-5M remediation must name the canonical source. Got: {description}"
+    )
+    assert "does NOT project" in description, (
+        f"TREE-5M remediation must state install does not project the file. Got: {description}"
+    )
+    assert "Project it by running" not in description, (
+        f"TREE-5M remediation must not prescribe install as projection. Got: {description}"
+    )
 
 
 def test_memory_agents_md_absent_does_not_cause_errors(tmp_path: Path) -> None:

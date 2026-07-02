@@ -1,13 +1,13 @@
 ---
 slug: quality-assurance
 title: quality-assurance
-category: product
+category: core
 tldr: 'Five-layer pytest architecture, multi-job CI (10 quality + 5 governance), no-slop policy — design-of-record for implementers and qa-engineer.'
 summary: >-
   Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with
   machine-readable pytest markers, a CI split into 10 quality jobs (plus 5 governance
   jobs) with explicit timeouts, conftest safety guards, a CI-only 80% coverage gate,
-  and a no-slop policy. This atom is the single source of truth for test design.
+  and a no-slop policy.
 tags:
   - testing
   - pytest
@@ -16,11 +16,11 @@ tags:
   - test-architecture
 agent_tier: self-pull
 token_estimate: 1250
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
-## Propósito
+## Purpose
 
 dadaia-workspace uses an enforced five-layer test architecture. The five layers
 are: `unit` (pure or near-pure functions, fastest), `contract` (public CLI/API/
@@ -54,7 +54,7 @@ flowchart TB
         TM["tmp — one-off repro · quarantined · excluded from default collection"]
     end
     PYR --> CI
-    subgraph CI["CI — 10 quality jobs (+ 5 governance) · cada um com timeout + marker filter"]
+    subgraph CI["CI — 10 quality jobs (+ 5 governance) · each with a timeout + marker filter"]
         direction LR
         J0["importability-smoke"]
         J1["lint<br/>ruff format --check + ruff check"]
@@ -67,10 +67,10 @@ flowchart TB
     end
 ```
 
-Os três adapters de harness (Codex/Claude-SDK/PI) seguem a mesma taxonomia:
-`unit` para construção de comando/parse/redaction/Ring-2, `integration` para projeção
-Layer-1 e o seam CLI `--harness`, e um teste `live` **opt-in** (`DADAIA_*_LIVE=1`, nunca
-CI-gated) para o binding upstream real.
+The three harness adapters (Codex/Claude-SDK/PI) follow the same taxonomy:
+`unit` for command construction/parse/redaction/Ring-2, `integration` for the Layer-1
+projection and the `--harness` CLI seam, and an **opt-in** `live` test
+(`DADAIA_*_LIVE=1`, never CI-gated) for the real upstream binding.
 
 The no-slop policy is the durable rule that prevents a test pile from accumulating:
 no test may be named after a PR, release, or task id; no test may assert that
@@ -82,7 +82,7 @@ This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
 normative vision §6.
 
-## Fluxo de uso
+## Usage flow
 
 1. Developer picks the test layer based on what the test exercises: pure function
    → `unit`; public CLI/schema/security → `contract`; multi-component with real
@@ -93,7 +93,7 @@ normative vision §6.
 3. Local fast path: `pytest -q -m "unit and not slow" tests/unit` — runs in under
    10 seconds without coverage instrumentation.
 4. CI runs 10 quality jobs: importability-smoke, lint (ruff only — import-linter
-   contracts are NOT wired into any CI job; backlog `import-boundary-enforcement`),
+   enforcement status stated once in [[architecture]] §Enforcement),
    typecheck, unit-fast, unit-fast-cross, contract-coverage, contract-coverage-cross,
    integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
    marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;
@@ -102,16 +102,13 @@ normative vision §6.
    jobs (pr-title, repo-hygiene, backlog-doctor, hotfix-branch-name, verdict-gate)
    gate PR shape, repo/backlog hygiene, and the security push verdict; a separate
    secret-scan workflow runs gitleaks.
-5. One-off debugging reproductions go to `tests/tmp/` with an expiry note; they
-   are never counted toward coverage or release closure and are excluded from
-   default collection.
 
-## Trigger típico
+## Typical trigger
 
 Used when implementing a new feature, refactoring a public contract, or reproducing
 a CI failure.
 
-## Diferencial
+## Differentiator
 
 Without the layer taxonomy there is no enforceable boundary between fast pure-unit
 tests and slow process-boundary journeys: local runs become slow, coverage
@@ -121,13 +118,12 @@ are closed simultaneously by: the layer taxonomy (boundary enforcement via marke
 the CI split into per-layer jobs (each job targets its layer, with its own timeout), and
 the no-slop policy (prevents re-accumulation).
 
-## Estado runtime tocado
+## Runtime state touched
 
 Files the test suite reads or writes at runtime:
 
 - `pyproject.toml` — pytest configuration (`-p no:cacheprovider`), marker
-  declarations, `norecursedirs`, `tmp_path_retention_policy = "failed"`; coverage in
-  CI redirects its data file via the `COVERAGE_FILE` env (runner temp dir).
+  declarations, `norecursedirs`, `tmp_path_retention_policy = "failed"`.
 - `tests/unit/**` — pure or near-pure fast tests; forbidden: CLI runner,
   subprocess, server threads, public stage/install, full workspace init, sleeps.
 - `tests/contract/**` — public CLI/API/schema/security/projection contracts;
@@ -136,8 +132,8 @@ Files the test suite reads or writes at runtime:
   service wiring; forbidden: browser, real remotes, duplicate unit matrices.
 - `tests/e2e/**` — named user journeys and process-boundary flows; forbidden:
   micro assertions, implementation internals, exhaustive branch matrices.
-- `tests/tmp/**` — one-off debugging reproductions only; excluded from default
-  collection, CI, and coverage. Each subdirectory must include an expiry note.
+- `tests/tmp/**` — the `tmp`-layer quarantine (rules stated once in Purpose and
+  the no-slop policy).
 - `.github/workflows/ci.yml` — 10 quality jobs (importability-smoke, lint,
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
@@ -150,7 +146,7 @@ Files the test suite reads or writes at runtime:
   session-level pre/post snapshot pollution guard (`pytest_sessionstart`/`finish`)
   that catches cache/artifact leaks the per-test guard cannot.
 
-## Dependências
+## Dependencies
 
 - [[specs-doctor]] — `dadaia specs doctor` validates SDD structural invariants;
   the test layer and the specs gate are separate quality gates at different scopes.

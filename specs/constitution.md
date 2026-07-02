@@ -31,9 +31,11 @@ Definitions used by this law:
 - **Harness roster invariant** — the concrete Layer-1 harness set, the Layer-2 worker
   set, and the `AgentRuntimeKind` members are enumerated in exactly ONE memory atom —
   `[[tech-stack]]` §Agent runtimes — which must stay set-equal to the code enum. This
-  constitution never enumerates them. **Claude Code is Layer-1-only**: a `claude-*`
+  constitution never enumerates the rosters or the runtime-kind enum members;
+  individual harness names (claude, codex, pi) may appear in prose where a law is
+  harness-specific. **Claude Code is Layer-1-only**: a `claude-*`
   model id is never a Layer-2 worker (cost bound). Layer-2 model ids are
-  registry-validated against the known-id set plus the curated Layer-2 allowlist.
+  allowlist-governed.
 - **Persona / fragment** — a persona is a harness-universal role mandate injected into
   every Layer-2 step prompt (the Layer-2 equivalent of a Claude sub-agent persona);
   a fragment is the single-step instruction (inputs, task, output contract) injected
@@ -158,8 +160,9 @@ A **checkpoint** is PM-mediated discipline (an APPROVE handoff required to advan
 **gate** is a mechanical block (the merged PreToolUse gate and the git chokepoints).
 Spec review: qa-engineer first (mandatory), software-architect parallel (optional),
 software-engineer last. Implementation: qa APPROVE → commit; the push boundary is a
-mechanical gate — every pushed sha requires an APPROVED security-reviewer handoff whose
-`metrics.commit_sha` equals that sha (stale approvals fail; deletions/tag-only exempt);
+mechanical gate — every pushed sha requires an APPROVED security-reviewer handoff
+sha-matched to that exact sha (stale approvals fail; deletions/tag-only exempt; the
+carrying field is mechanism — [[sdd-gate-v3]], [[agent-comms]]);
 code-review APPROVE → PR merge; memory updates only after the code-review checkpoint. A
 REJECT re-opens the task (`[-]` → `[ ]`).
 
@@ -182,7 +185,7 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 
 ## 13. Memory Canon
 
-Authoritative memory: `specs/memory/architecture.md` (layers, module map, ADRs,
+Authoritative memory: `specs/memory/architecture.md` (layers, module map,
 topology) · `specs/memory/product/**` (one atom per production feature + `index.md`
 with vision/users/catalog/capability-map/limits + `harness/` per-harness truth) ·
 `specs/memory/tech-stack.md` (approved tech; THE home of the harness/runtime roster) ·

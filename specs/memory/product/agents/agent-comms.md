@@ -2,86 +2,86 @@
 slug: agent-comms
 title: agent-comms — Handoff Contract v1
 category: product
-tldr: 'handoff-v1.1 separa reports HTML de handoffs JSON em .dadaia/handoff/.'
-summary: 'contrato handoff-v1.1 separa evidência humana de coordenação entre agentes:
-  reports HTML em .dadaia/reports/<context>/<agent>/ e handoffs JSON em
-  .dadaia/handoff/<context>/. O CLI valida schema e hash de artifact.path dentro
-  do workspace — qualquer path relativo existente sob o root resolve
-  workspace-rooted (incl. repos/<slug>/specs/audits), com fallback legacy
-  handoff-dir; reports next e o gate QA/security consomem a raiz canônica.'
+tldr: 'handoff-v1.1 separates HTML reports from JSON handoffs in .dadaia/handoff/.'
+summary: 'the handoff-v1.1 contract separates human evidence from agent-to-agent
+  coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs
+  in .dadaia/handoff/<context>/. The CLI validates schema and artifact.path hash
+  inside the workspace — any existing relative path under the root resolves
+  workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir
+  fallback; reports next and the QA/security gate consume the canonical root.'
 tags:
 - agent-comms
 - handoff
 - schema
 agent_tier: self-pull
-token_estimate: 1200
-last_updated: '2026-07-01'
-release_origin: v0.1.47
+token_estimate: 1075
+last_updated: '2026-07-02'
+release_origin: v0.1.48
 ---
 
 CLI surface: `dadaia reports validate [PATHS...] [--all] [--release <id>] [--strict|--no-strict] [--json]` · `dadaia reports lint [DIR]` · `dadaia reports next [--context <ctx>] [--json]`
 
-## O que é
+## What it is
 
-O **handoff-v1** é o contrato JSON estruturado que cada agente especialista emite para coordenação entre agentes. Reports HTML permanecem em `.dadaia/reports/<context>/<agent>/`; handoffs JSON vivem em `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. O documento referencia o report ou artefato entregue via `artifact.path` e `artifact.content_hash`.
+**handoff-v1** is the structured JSON contract every specialist agent emits for agent-to-agent coordination. HTML reports stay in `.dadaia/reports/<context>/<agent>/`; JSON handoffs live in `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. The document references the delivered report or artifact via `artifact.path` and `artifact.content_hash`.
 
-Materializa o referente simbólico `schema_ref: handoff-schema-v1` declarado pelos agentes da topologia; o schema vive em disco (`public/schemas/` → staging) e é consumido por CLI + skill.
+It materializes the symbolic referent `schema_ref: handoff-schema-v1` declared by the topology's agents; the schema lives on disk (`public/schemas/` → staging) and is consumed by CLI + skill.
 
-Resolve o pattern "build-on-stale-layer" identificado na auditoria de orquestração: `input_contract` era declarado como verificável, mas o referente apontava para vácuo. Qualquer handoff pode ser auditado mecanicamente via `dadaia reports validate <path>` ou `dadaia reports validate --all` — sem dependências externas além da stdlib.
+It resolves the "build-on-stale-layer" pattern identified in the orchestration audit: `input_contract` was declared as verifiable, but the referent pointed at a vacuum. Any handoff can be audited mechanically via `dadaia reports validate <path>` or `dadaia reports validate --all` — with no external dependencies beyond the stdlib.
 
-O contrato separa evidência humana de coordenação máquina: HTML reports são para leitura humana/painel; handoffs são o estado verificável que outros agentes leem antes de QA, review, security ou closure.
+The contract separates human evidence from machine coordination: HTML reports are for human/panel reading; handoffs are the verifiable state other agents read before QA, review, security, or closure.
 
 ## Schema location
 
   * **Canonical:** `dadaia_workspace/public/schemas/handoff-v1.schema.json` (JSON Schema Draft 2020-12, `$schema = "https://json-schema.org/draft/2020-12/schema"`).
-  * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (gerado via `dadaia public stage`). É o path lógico que CLI + skill consomem em runtime.
-  * **NÃO projetado** para `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — schema é consumido apenas pela CLI Python, não pelo runtime dos agentes. Decisão A1 economizou 3 duplicações.
-  * **Asset type:** `schemas` é um dos asset types de `_COPY_DIRS` em `dadaia_workspace/infrastructure/public_assets_common.py`. A lista viva de asset types é documentada em [[public-asset-distribution]] (a constitution não enumera asset types).
+  * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (generated via `dadaia public stage`). It is the logical path CLI + skill consume at runtime.
+  * **NOT projected** to `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — the schema is consumed only by the Python CLI, not by the agents' runtime. Decision A1 saved 3 duplications.
+  * **Asset type:** `schemas` is one of the asset types in `_COPY_DIRS` in `dadaia_workspace/infrastructure/public_assets_common.py`. The live list of asset types is documented in [[public-asset-distribution]] (the constitution does not enumerate asset types).
 
 
 
-Required fields: `schema_version` (literal `"handoff-v1.1"`), `agent`, `context`, `produced_at` (ISO 8601 via `format: date-time`), `scope`, `metrics`, `artifact{type,content_hash}`, and `findings[]`. Optional: `artifact.path`, `release_id`, `decisions_required[]`, `next_handoff`, `verdict`, `verdict_reason`. `artifact.path` is workspace-relative when present; absolute paths and parent traversal are rejected. `additionalProperties: false` em todos os objetos.
+The field contract's single source of truth is the schema file itself: `dadaia_workspace/public/schemas/handoff-v1.schema.json`. One-line summary: required top-level fields are `schema_version` (enum `"handoff-v1"` | `"handoff-v1.1"`), `agent`, `context`, `produced_at`, `artifact` (requires only `type`; `path` is optional and workspace-relative — `content_hash` must accompany it when present), `scope`, `metrics`; `findings[]` is OPTIONAL (each finding item requires `severity`, `message`, `detail_md`, `fix_recommendation`). Absolute paths and parent traversal are rejected; the top-level object is `additionalProperties: false` (while `metrics` accepts arbitrary keys).
 
 ## CLI
 
 
     dadaia reports validate [PATHS...] [--all] [--release <id>] [--strict|--no-strict] [--json]
 
-  * **Validator stdlib-only** (~85 LoC em `infrastructure/stdlib_handoff_validator.py`): `json`, `re`, `datetime.fromisoformat`. Whitelist explícita de keywords (`type`, `required`, `enum`, `pattern`, `properties`, `items`, `additionalProperties`, `format`, `minimum`, `minItems`). Schema com keyword fora do whitelist (`oneOf`, `allOf`, `$ref`) levanta `HandoffSchemaError` no init.
-  * **Discovery:** `--all` lê `.dadaia/handoff/` por padrão. Paths explícitos continuam suportados.
-  * **Hash:** quando `artifact.path` existe, `validate_file()` resolve o artefato dentro do workspace e reprova mismatch, artefato ausente ou referência fora do workspace.
-  * **Resolução de `artifact.path` (workspace-rooted):** qualquer path **relativo** que exista sob o workspace root resolve a partir do root — cobre `repos/<slug>/specs/audits/<UTC>/…` (o canal committado do auditor) e qualquer outro path workspace-rooted, não só `.dadaia/…`. O fallback legacy (resolução relativa ao diretório do próprio handoff) é mantido para paths que só existem lá; quando um path resolve das duas formas, **workspace-root vence**. Paths absolutos e segmentos `..` continuam rejeitados pelo schema; o guard `_within_workspace` permanece.
-  * **Exit codes:** `0` = todos válidos (ou violations em non-strict); `1` = violation em strict; `2` = file not found; `3` = bad invocation (sem PATHS nem `--all`, ou workspace não inicializado).
-  * **Default`--strict=false`**: violations aparecem como warning em non-strict. Gates de release usam handoffs QA/security com `verdict`, `release_id`, `context` e `agent` coerentes.
-  * **Composição (constitution L67-compliant):** `cli/commands/reports.py` resolve `ReportsValidationService` via `container.build_reports_validation_service(workspace_root)`; `service.py` não importa `StdlibHandoffValidator` direto — recebe via `ValidatorPort` Protocol em `core/protocols/handoff_validator.py`.
-  * **Coverage:** 98% scoped em `features/reports_validation` (NFR8 ≥ 80% honrado com folga).
+  * **Stdlib-only validator** (`infrastructure/stdlib_handoff_validator.py`): `json`, `re`, `datetime.fromisoformat`. Explicit keyword whitelist (`type`, `required`, `enum`, `pattern`, `properties`, `items`, `additionalProperties`, `format`, `minimum`, `minItems`). A schema with a keyword outside the whitelist (`oneOf`, `allOf`, `$ref`) raises `HandoffSchemaError` at init.
+  * **Discovery:** `--all` reads `.dadaia/handoff/` by default. Explicit paths remain supported.
+  * **Hash:** when `artifact.path` exists, `validate_file()` resolves the artifact inside the workspace and rejects mismatch, missing artifact, or a reference outside the workspace.
+  * **`artifact.path` resolution (workspace-rooted):** any **relative** path that exists under the workspace root resolves from the root — covering `repos/<slug>/specs/audits/<UTC>/…` (the auditor's committed channel) and any other workspace-rooted path, not just `.dadaia/…`. The legacy fallback (resolution relative to the handoff's own directory) is kept for paths that only exist there; when a path resolves both ways, **workspace-root wins**. Absolute paths and `..` segments remain rejected by the schema; the `_within_workspace` guard remains.
+  * **Exit codes:** `0` = all valid (or violations in non-strict); `1` = violation in strict; `2` = file not found; `3` = bad invocation (neither PATHS nor `--all`, or workspace not initialized).
+  * **Default `--strict=false`**: violations surface as warnings in non-strict. Release gates use QA/security handoffs with coherent `verdict`, `release_id`, `context`, and `agent`.
+  * **Composition (constitution L67-compliant):** `cli/commands/reports.py` resolves `ReportsValidationService` via `container.build_reports_validation_service(workspace_root)`; `service.py` does not import `StdlibHandoffValidator` directly — it receives it via the `ValidatorPort` Protocol in `core/protocols/handoff_validator.py`.
+  * **Coverage:** 98% scoped in `features/reports_validation` (NFR8 ≥ 80% honored with room to spare).
 
 
 
 ## Skill: dadaia-handoff-emitter
 
-Skill standalone em `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projetada para `.agents/skills/`, `.claude/`, `.codex/`, `.pi/` via mecanismo padrão de assets. Protocolo em 3 passos:
+Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projected to `.agents/skills/` (universal projection — the Codex runtime consumes this dir) and `.claude/skills/`; nothing lands in `.codex/skills/` or `.pi/` (the PI projection carries only the staged `pi/` tree). 3-step protocol:
 
-  1. **sha256sum** do report HTML acabado de gerar.
-  2. **Assemble dict** com campos obrigatórios + opcionais aplicáveis ao agente, referenciando o schema por path lógico `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — skill não duplica conteúdo do schema dentro do markdown; single source of truth).
-  3. **Write** o arquivo `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
+  1. **sha256sum** of the just-generated HTML report.
+  2. **Assemble dict** with the required fields + the optional fields applicable to the agent, referencing the schema by the logical path `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — the skill does not duplicate schema content inside the markdown; single source of truth).
+  3. **Write** the file `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`.
 
 
 
-Handoff mínimo: ~500 bytes (apenas obrigatórios); típico: <2 KB; warning se >4 KB. Para report HTML médio de 50–70 KB, overhead ~3% no pior caso (NFR5).
+Minimal handoff: ~500 bytes (required fields only); typical: <2 KB; warning if >4 KB. For an average 50–70 KB HTML report, overhead is ~3% worst case (NFR5).
 
-## Adoção (9 agentes core)
+## Adoption (9 core agents)
 
-Os 9 agentes públicos core declaram `dadaia-handoff-emitter` quando produzem
-reports/handoffs que precisam de sidecar machine-readable. Optional packs podem
-adotar o mesmo contrato, mas não fazem parte da topologia pública default.
+The 9 core public agents declare `dadaia-handoff-emitter` when they produce
+reports/handoffs that need a machine-readable sidecar. Optional packs may adopt the
+same contract, but they are not part of the default public topology.
 
 ```mermaid
 flowchart LR
-    AG[Agente piloto] -->|gera| HTML[report HTML]
-    AG -->|invoca| SKILL[dadaia-handoff-emitter SKILL]
+    AG[Pilot agent] -->|generates| HTML[HTML report]
+    AG -->|invokes| SKILL[dadaia-handoff-emitter SKILL]
     SKILL -->|sha256sum| HASH[content_hash]
-    SKILL -->|monta dict| DOC[HandoffDocument]
+    SKILL -->|assembles dict| DOC[HandoffDocument]
     SKILL -->|Write| JSON[.dadaia/handoff/context/file.handoff.json]
     JSON -.artifact.path.- HTML
     CLI[dadaia reports validate] -->|read| JSON
@@ -90,27 +90,6 @@ flowchart LR
     VAL -->|0 ok / 1 strict / 2 nf / 3 bad| EXIT[exit code]
 ```
 
-## Fora de escopo (deferido a backlog)
+## Dependencies
 
-Itens explicitamente deferidos em SPEC §"Out-of-scope" e promovidos como candidatas no [backlog/candidates.md](../../backlog/candidates.md):
-
-  * `reports-next-cli` — `dadaia reports next` (v2): descobre próximo handoff esperado dado o estado atual do workspace.
-  * `reports-mcp-server` — MCP integration (v3): emissão programática via servidor MCP em vez de skill markdown.
-  * `reports-evaluator` — Evaluator semântico (v4): valida qualidade de findings, não apenas estrutura JSON.
-  * `agent-comms-wave-2` — Migrar `qa-engineer` para piloto (próxima onda).
-  * `agent-comms-wave-3-7` — Migrar `devops-engineer`, `backend-engineer`, `frontend-engineer`, e 3 `game-*` (waves separadas).
-  * `reports-ci-gate` — Job `dadaia reports validate --all --strict` em `.github/workflows/ci.yml` após 100% adoção (NFR4).
-  * `reports-hash-mismatch-enforcement` — Promover hash-mismatch de warning para erro em strict (v2).
-  * `spec-discovery-chain-workflow` — Workflow seed para o padrão D4 (PE→architect→SE→PE→SE), se virar recorrente (Q6).
-  * `reports-handoff-schema-v2` — Evolução do schema para suportar `oneOf` e `$ref` (requer upgrade do validator).
-
-
-
-## Referência
-
-  * Release id: `agent-comms-v1` arquivada em `specs/_archive/releases/agent-comms-v1/` (SPEC + PLAN + TASKS + CLOSURE).
-  * Dependência: [[public-asset-distribution]] — chain `public/` → `.dadaia/agentic/` → projeções multi-tool propaga o asset type `schemas`.
-  * NFR3: zero novas dependências de runtime (validator stdlib-only).
-  * ADR-006 (dual ownership de `public/agents/*.md`): SE owns frontmatter YAML, PE owns markdown body.
-  * ADR-007 (procedure for constitution update in release): FR explícito + verification triple + operator confirmation via SPEC approval + doctor verde pós-patch.
-  * Auditoria precedente que motivou a release: `.dadaia/reports/dadaia-workspace/software-architect/2026-05-15-orchestration-audit.md`.
+  * [[public-asset-distribution]] — the `public/` → `.dadaia/agentic/` → multi-tool projection chain propagates the `schemas` asset type.
