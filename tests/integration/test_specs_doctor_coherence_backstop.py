@@ -60,6 +60,13 @@ def test_doctor_flags_incoherent_lease_session_created_by_production_writers(
        session record — the out-of-band drift the D-2 backstop exists to catch.
     """
     lease.acquire(workspace, _CTX, "sessAlpha", "rel-1", "implementation")
+    # v0.1.50 FR2 (holder-confirmation): a REAL acquire leaves same-CAS index
+    # evidence — ptr drift alone is coherent now. Forge the record out-of-band
+    # (no index entry) to reproduce the true evidence-less 029 ERROR shape.
+    rec = lease.read_record(workspace, _CTX)
+    assert rec is not None
+    rec["session_id"] = "sessForged"
+    lease._write_record(lease._record_path(workspace, _CTX), rec)
     session_identity.set_incumbent(workspace, _CTX, "sessBeta")
     session_identity.write_session(workspace, "sessBeta", {"session_id": "sessBeta"})
 

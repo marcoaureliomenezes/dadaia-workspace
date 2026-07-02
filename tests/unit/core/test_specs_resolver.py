@@ -185,14 +185,33 @@ def test_resolve_specs_dir_uses_persisted_bind_from_workspace_root(
 def test_resolve_specs_dir_unbound_falls_through_to_cwd_specs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """No attributable marker ⇒ unchanged behavior: a local ``./specs`` still wins."""
-    ws = _mk_ws(tmp_path, slug="proj")  # no bind-epoch marker stamped
-    local_specs = ws / "specs"
-    local_specs.mkdir()
+    """No workspace in sight ⇒ a local ``./specs`` still wins (plain repo layout)."""
+    repo = tmp_path / "plain-repo"  # NOT a workspace root — no .dadaia/states
+    local_specs = repo / "specs"
+    local_specs.mkdir(parents=True)
     _clean_env(monkeypatch)
-    monkeypatch.chdir(ws)
+    monkeypatch.chdir(repo)
     resolved = specs_resolver.resolve_specs_dir(None)
     assert resolved == local_specs.resolve()
+
+
+def test_resolve_specs_dir_refuses_workspace_root_specs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.1.50 FR4: a specs/ AT the workspace root violates the root law ⇒ refuse.
+
+    This exact shape was the disposed bug's landing zone
+    (bugs-append-bound-session-falls-through-to-cwd-specs); the refusal message is
+    actionable and redaction-safe (no absolute path echoed).
+    """
+    ws = _mk_ws(tmp_path, slug="proj")  # a real workspace root, no bind marker
+    (ws / "specs").mkdir()
+    _clean_env(monkeypatch)
+    monkeypatch.chdir(ws)
+    with pytest.raises(typer.BadParameter) as exc_info:
+        specs_resolver.resolve_specs_dir(None)
+    assert "Workspace Root" in str(exc_info.value)
+    assert str(ws) not in str(exc_info.value)
 
 
 def test_resolve_specs_dir_unbound_no_specs_raises_unchanged(

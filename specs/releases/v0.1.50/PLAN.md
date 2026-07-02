@@ -29,7 +29,7 @@
 
 | Wave | Files |
 |---|---|
-| W1 | `core/lock_liveness.py`, `features/spec_context/lease.py`, `hooks/_common.py` (the shared sid seam), `hooks/sdd_gate.py` (caller only, if needed), their unit test files |
+| W1 | `core/lock_liveness.py`, `features/spec_context/lease.py`, `features/spec_context/gate_policy.py` (`veto_release` thread-through — named by the FR1 ADR; added here for traceability per QA MINOR-1), `hooks/_common.py` (the shared sid seam), `hooks/sdd_gate.py` (caller only, if needed), their unit test files |
 | W2 | `features/spec_context/session_identity.py`, `features/specs/doctor.py` (SPEC-DOC-029 seat, only if a doctor-side edit is needed), `cli/commands/specs.py` (`workspace_state_dir` isolation), their tests |
 | W3 | `infrastructure/git_subprocess.py`, `features/spec_context/service.py`, their tests |
 | W4 | one shared ancestry-threading CLI seam + the five `_resolve_specs_dir` wrappers (`bugs.py`, `migrate.py`, `specs.py`, `memory.py`, `newartifacts.py`) + `core/specs_resolver.py` (cwd guard), their tests, and the single root-cause-verification line in `specs/releases/v0.1.50/TASKS.md` (T-50-13) |
