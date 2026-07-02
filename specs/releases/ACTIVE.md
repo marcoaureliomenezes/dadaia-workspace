@@ -1,22 +1,20 @@
 ---
-release: v0.1.47
-phase: CLOSURE
+release: v0.1.48
+phase: DEFINITION
 ---
 
-# Active release: v0.1.47
+# Active release: v0.1.48
 
-**v0.1.47** — *Context-Surface Truth + Fragments/Personas Optimization + Audit Remediation* —
-is ACTIVE on branch `feature/v0.1.47`.
+**v0.1.48** — *Memory Single-Ownership + Truth + English Canon* — is ACTIVE on branch
+`feature/v0.1.48`.
 
-Origin: operator `/goal` directive 2026-07-01 + full audit
-`specs/audits/20260701T201136Z-0bcd6c19/` (overall 7/10) + the disposition sweep previously
-earmarked here. Consumes backlog `specs-truth-realignment-constitution-memory` in full.
+Origin: operator directives 2026-07-02 ("All specs must be in english. go v0.1.48") disposing
+audit `specs/audits/20260702T015037Z-56b226fb/` (84 findings, 5-lane content-scoping review)
+plus open bug `memory-index-table-broken-gfm`.
 
-Scope (SPEC §3): W1 prompt-assembly + enforcement code fixes (codex exec argv, persona
-injection on all verbs, chokepoint scoping, ctx-inject session attribution, resolver
-fallback, doctor guards) · W2 constitution lean rewrite + AGENTS.md truth · W3 memory canon
-rewrite + NEW `memory/product/harness/` docs · W4 fragments (32) + personas (8) de-slop
-optimization · W5 full disposition sweep (bugs, duplicate pairs, 15 loose audits) · W6 ship.
+Scope (SPEC §3): W1 memory truth fixes (16 false/divergent claims) · W2 ownership consolidation
+(4 atom deletions, 1 merge, 1 archive, 1 re-home, wikilink single-sourcing) · W3 catalog/lint
+code (GFM fix, `area` field, `rank` out of digests, English heading canon) · W4 English
+translation sweep · W5 tree hygiene · W6 ship.
 
-Phase: CLOSURE — all waves delivered; CLOSURE.md written; ship ritual (security-gated
-push + CI watch + PR) in progress. Archive move follows the merge (closure commit).
+Phase: DEFINITION — stays DEFINITION through W1–W5 (MEMORY-class writes), flips to CLOSURE at W6.
