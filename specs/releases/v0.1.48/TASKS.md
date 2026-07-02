@@ -47,5 +47,5 @@ SPEC §5.
 
 ## W6 — ship
 
-- [ ] T-48-60 ACTIVE → CLOSURE; CLOSURE.md (incl. deletion list per G10); terminal `resolved --release v0.1.48` events for BOTH picked bugs (`memory-index-table-broken-gfm`, `specs-doctor-tree5m-remediation-wrong`); audit → `specs/audits/_archive/` + DISPOSITION.md; backlog `hygiene-and-dead-code-cleanup` gains agent_tier item (F-76).
-- [ ] T-48-61 qa-engineer release checkpoint (APPROVE required); security-reviewer handoff keyed to final sha; push (nohup+Monitor); CI watch until every job green; open PR.
+- [x] T-48-60 ACTIVE → CLOSURE; CLOSURE.md (incl. deletion list per G10); terminal `resolved --release v0.1.48` events for BOTH picked bugs (`memory-index-table-broken-gfm`, `specs-doctor-tree5m-remediation-wrong`); audit → `specs/audits/_archive/` + DISPOSITION.md; backlog `hygiene-and-dead-code-cleanup` gains agent_tier item (F-76).
+- [x] T-48-61 qa-engineer release checkpoint (APPROVE required); security-reviewer handoff keyed to final sha; push (nohup+Monitor); CI watch until every job green; open PR.
