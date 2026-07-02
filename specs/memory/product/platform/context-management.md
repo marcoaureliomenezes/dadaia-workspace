@@ -31,7 +31,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 3325
 last_updated: '2026-07-02'
-release_origin: v0.1.48
+release_origin: v0.1.50
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bug new` (LEGACY — canonical bug path is `dadaia bugs append`, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -108,9 +108,10 @@ session (no sentinel ⇒ generic preflight, which stamps the sentinel). Bind rem
 non-blocking for ADDITIVE work — the flow never stops to demand a bind.
 
 **Hook execution detail (`hooks/ctx_inject.py`):** the hook resolves a stable
-`SESSION_ID` in the order `DADAIA_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` →
-`CODEX_SESSION_ID` → the stdin payload's `session_id` (no PID fallback), sanitized
-before becoming a filename component. On injection it stamps the sentinel (session
+`SESSION_ID` via the shared `hooks/_common.resolve_session_id` — order (v0.1.50):
+`DADAIA_SESSION_ID` (operator override) → the stdin payload's `session_id` (harness
+live-truth) → inherited `CLAUDE_CODE_SESSION_ID` → `CODEX_SESSION_ID` (no PID
+fallback), sanitized before becoming a filename component. On injection it stamps the sentinel (session
 pointer via `session_identity`) and emits the payload inside bounded markers
 (`=== workspace memory (tech + catalog) === … === end memory bootstrap ===`).
 Per-runtime hook event registration (which events/matchers each harness wires):
@@ -118,8 +119,15 @@ Per-runtime hook event registration (which events/matchers each harness wires):
 
 **specs_dir resolution in a bound shell (CLI):** `core/specs_resolver.py` resolves the
 `specs_dir` of commands like `dadaia specs doctor`/`bugs`/`backlog` in the order env →
-**persisted bind of an attributable/live session** (the context's incumbent) → cwd —
-a bound workspace shell resolves without the `--specs-dir` flag.
+**persisted bind of an attributable/live session** (the context's incumbent, attributed
+by ancestry-chain MEMBERSHIP) → cwd — a bound workspace shell resolves without the
+`--specs-dir` flag. Since v0.1.50 every specs-dir-taking CLI command consumes the ONE
+shared seam `cli/_specs_resolution.resolve_specs_dir_for_cli` (which threads the
+invoking process's full `ancestry_pids` into the resolver — a deep-ancestor bind marker
+attributes correctly; the omission class that produced
+`bugs-append-bound-session-falls-through-to-cwd-specs` is structurally impossible), and
+the cwd fallback **refuses** a `specs/` directly at the workspace root (Workspace Root
+Law; redaction-safe message) instead of silently writing there.
 
 Three lock layers guarantee safe concurrent operations:
 
@@ -195,7 +203,7 @@ Doctor TREE-1..7 enforces and repairs this tree: `dadaia specs doctor` on a fres
   3. `dadaia context list` — shows all contexts with state (ALIVE/DEAD), repo slug, dates.
   4. `dadaia context bind my-project --mode implementation --release my-release-v1` — persists the session record (context, mode, release, pid). The lease is acquired inline on the first MUTATING write.
   5. `dadaia context release` — drops the lease(s) the session holds (eval/default-flow predicates above) and removes the session record, freeing the context for another agent.
-  6. `dadaia context dead my-project` — removes the repo from disk (rmtree), marks DEAD. Blocked if the TTL-lease is HELD for the context. **Review gate:** with untracked files and no `--commit`, `dead()` refuses and does not push; with `--commit`, a secret scan (privacy engine) runs over the staged content and blocks the push on any finding.
+  6. `dadaia context dead my-project` — removes the repo from disk (rmtree), marks DEAD. Blocked if the TTL-lease is HELD for the context. **Review gate:** with untracked files and no `--commit`, `dead()` refuses and does not push; with `--commit`, a secret scan (privacy engine) runs over the staged content and blocks the push on any finding. **Exit path (v0.1.50):** all refusal pre-checks run BEFORE the push phase (a late failure can no longer strand a half-dead context); the push uses an explicit refspec `HEAD:<upstream-branch>` parsed from the tracking ref (a differently-named upstream no longer fails under `push.default=simple`) and is skipped entirely when `rev-list @{u}..HEAD` is empty; the rmtree uses `shutil.rmtree(onexc=chmod-and-retry)` — 0444 git loose objects are handled in-flight, replacing the old per-file non-writable pre-scan that falsely rejected standard git repos.
 
 The `python -m dadaia_workspace.hooks.ctx_inject` hook runs on SessionStart/UserPromptSubmit. Injection is **bind-driven**: an unbound session receives only the generic preflight + list of ALIVE contexts (no context memory); after `dadaia context bind X`, the next prompt injects X's memory (tech-stack + catalog) once per logical session; a re-bind to Y re-injects Y. For ADDITIVE writes (reports, handoffs, bugs, backlog, audits), bind is not required — the gate allows those paths without a lease.
 

@@ -62,5 +62,5 @@
 | `dadaia-workflows` | dadaia-workflows | The 7 governed Layer-2 workflows; 4 operator-invocable verbs today (release define, backlog define, pipeline, close); every model step gets fragment + persona. |
 | `lifecycle-foundation` | lifecycle-foundation | Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bug store + backlog-consistency engine + bug/backlog → release governance (grill, disposition, audit-disposition law, security-gated push). |
-| `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto. |
+| `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition. |
 | `specs-doctor` | specs-doctor | Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034. |

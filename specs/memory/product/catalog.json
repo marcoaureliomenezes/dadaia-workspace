@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T17:59:12Z",
+  "generated_at": "2026-07-02T20:07:24Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -576,7 +576,7 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto.",
+      "tldr": "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition.",
       "summary": "Two-layer enforcement. (1) Python hooks: PreToolUse runs through ONE merged entrypoint — `dadaia_workspace.hooks.pre_gate` — which reads stdin once and evaluates the policies in fixed order root-whitelist → venv-guard → SDD gate, first-block-wins, each policy fail-open (PROTECTED is the only fail-closed path). The SDD classifier is context-relative (ADDITIVE allows with no lease, MEMORY gated by phase, FROZEN blocks — incl. the per-artifact _archives matched BEFORE ADDITIVE (R-2), MUTATING acquires the TTL-lease via O_EXCL CAS with PID veto); a multi-file apply_patch classifies ALL headers (most restrictive verdict wins); READ is non-acquiring. PostToolUse renews the heartbeat via the by-session index (no full scan) and runs the advisory reconciler (never blocks). (2) Git chokepoints: the pre-commit lease gate (DP-4 chain, zero-false-block, advisory ALLOW+WARN degradation) and the mechanical pre-push security-verdict gate (metrics.commit_sha per pushed sha) — they run independently of harness hooks. Tunables in core/kernel_tunables.py; hook latency in .dadaia/logs/hook-latency.jsonl.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
