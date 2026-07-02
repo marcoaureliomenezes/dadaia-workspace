@@ -38,14 +38,20 @@ sets are disjoint (PLAN §Write sets).
 
 ## W2 — FR2 upgrade E2E (write set: `tests/e2e/features/test_specs_upgrade_e2e.py`)
 
-- [ ] T-51-11 Below-canonical, structurally-complete tree (unstamped constitution +
-  all required memory atoms + mandatory dirs + legacy `foundation/` + root `SPEC.md`
-  + one legacy bug markdown) → real `dadaia specs upgrade` → `dadaia init` → assert:
-  backup dir created; re-stamp to `CANONICAL_SPECS_VERSION`; `releases/legacy/`
-  relocation trips no doctor ERROR; legacy bug converted; `specs doctor` 0 errors.
-  Scenario 2: at-target rerun is a no-op (no new backup). AC-7 mutation-sanity:
-  demonstrate failure under a one-line sabotage of the re-stamp; record on this
-  line; revert. Owner: software-engineer.
+- [x] T-51-11 Upgrade E2E landed (`test_specs_upgrade_e2e.py`, 2 scenarios green):
+  below-canonical structurally-complete tree (unstamped constitution ⇒ v0; the four
+  memory atoms seeded from the package's OWN canonical scaffold stubs — LINT-1
+  requires valid frontmatter, hand-rolled atoms fail the doctor; mandatory dirs;
+  legacy `foundation/` + root `SPEC.md`; legacy bug markdown) → real
+  `specs upgrade --yes` → `specs init` → `specs doctor` **0 errors**; asserted:
+  backup created, re-stamp to `CANONICAL_SPECS_VERSION` (constant lives at
+  `core/specs_version`, NOT `features/migrate/upgrade`), `foundation/`+`SPEC.md`
+  relocated under `releases/legacy/` (doctor treats it as a WARN-only legacy name,
+  no ERROR). Scenario 2: at-target rerun no-op (backup set unchanged). AC-7
+  mutation-sanity RECORDED: one-line sabotage of `upgrade.py:85`
+  (`write_pattern_version` → `pass`, re-stamp skipped) failed BOTH scenarios
+  (exit 1); reverted; 2 passed exit 0. No product defect found.
+  Owner: software-engineer.
 
 ## W3 — FR3 residue disposition (write set: three deletions + `tests/integration/test_onboarding_tree_v2_e2e.py` + `tests/contract/test_public_source_hygiene.py`)
 
