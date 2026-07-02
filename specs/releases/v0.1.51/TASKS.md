@@ -55,17 +55,22 @@ sets are disjoint (PLAN §Write sets).
 
 ## W3 — FR3 residue disposition (write set: three deletions + `tests/integration/test_onboarding_tree_v2_e2e.py` + `tests/contract/test_public_source_hygiene.py`)
 
-- [ ] T-51-12 Land the SINGLE explicit ship assertion (`pre-push-ci-gate.sh` present
-  in the `public/scripts/` listing) in `test_public_source_hygiene.py` (decision
-  recorded here per the definition review: the explicit assertion is kept as the one
-  canonical home; `test_pre_push_gate_venv_probe.py`'s execution coverage is a
-  behavior test, not a ship assertion); confirm the bytecode invariant is already
-  covered by `test_no_bytecode_committed_under_public`; DELETE
-  `test_retired_model_id_residue.py`, `test_bash_hook_residue.py`, and
-  `test_session_bound_context_residue.py`; strip ONLY the legacy-YAML/HTML
-  Assertion-5 group from `test_ac_o1_copytree_scaffold_produces_valid_v2_tree`
-  (Assertion 4 stays — live v2-shape contract backed by TREE-1/TREE-2). Full suite
-  green after. Owner: software-engineer.
+- [x] T-51-12 DONE. Ship-contract decision RECORDED: the explicit presence assertion
+  is kept as the single canonical home —
+  `test_public_source_hygiene.py::test_pre_push_ci_gate_script_ships` (directory
+  listing); exactly-once verified by grep: only 3 files suite-wide mention the
+  script — the hygiene contract (presence) + `test_pre_push_gate_venv_probe.py` +
+  `test_push_gate_check.py` (both execute it = behavior tests, excluded by
+  definition). Bytecode invariant confirmed already covered by
+  `test_no_bytecode_committed_under_public` (no move). DELETED the three
+  law-violating files (`test_retired_model_id_residue.py`,
+  `test_bash_hook_residue.py`, `test_session_bound_context_residue.py`); stripped
+  ONLY Assertion 5 from the onboarding acceptance (Assertion 4 stays with the
+  TREE-1/TREE-2 rationale inline). Also aligned `tests/contract/README.md`: its
+  "residue grep is the canonical contract form" paragraph endorsed the outlawed
+  pattern — rewritten to the discriminator; stale inventory rows removed; hygiene
+  row added. Full suite after: **4,407 passed / 17 skipped, exit 0** (unpiped
+  pipefail). Owner: software-engineer.
 
 ## W4 — FR4 panel journey (write set: `tests/e2e/panel/spec-context-operation-journey.spec.ts`)
 

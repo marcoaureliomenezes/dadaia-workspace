@@ -24,19 +24,21 @@ Creation-path tests routinely miss the asymmetric paths. For every feature, ensu
 - **dirty input** — malformed, partial, or hostile input;
 - **missing dependency** — a required upstream artifact/file/service absent.
 
-A residue grep is the canonical contract form for the delete/orphan path: it proves the
-retired thing did not resurface. An undocumented asymmetric path is a gap, not coverage.
+The delete/orphan path is covered by POSITIVE live contracts, never by residue greps:
+the no-slop law (`specs/memory/quality-assurance.md` §Purpose) forbids tests whose sole
+subject is that a specifically deleted/retired name stays absent (v0.1.51 FR3 removed
+the three files of that shape). A `*_residue.py`-style file is compliant only when it
+asserts a live invariant (a required kwarg threaded at every call site, a governance
+contract over public assets). An undocumented asymmetric path is a gap, not coverage.
 
 ## Active contracts (inventory)
 
 | File | Pins |
 |---|---|
 | `test_import_linter_ignore_cap.py` | **Cap**: total `setup.cfg` import-linter `ignore_imports` edges ≤ recorded cap (17); fails on growth (arch F10) |
-| `test_retired_model_id_residue.py` | **Residue**: retired model ids (`claude-haiku-3-5`) absent from live code, excluding the registry lineage docstring; do not resolve in the registry index |
-| `test_bash_hook_residue.py` | **Residue**: retired bash hook quartet absent from `public/scripts/` and not shipped/invoked from code (`pre-push-ci-gate.sh` retained) |
 | `test_harness_env_contract.py` | **Hard-fail (no baseline)**: any non-allowlisted `DADAIA_*` setenv outside the fixture; any test that imports a hook behavior module AND simulates `sys.stdin` in-process to drive its `main()` |
+| `test_public_source_hygiene.py` | No bytecode under `public/` (at rest, on script runs, in builds); the SINGLE explicit ship assertion that `pre-push-ci-gate.sh` is in the `public/scripts/` listing (v0.1.51 FR3 — execution-based tests are behavior tests, not ship assertions) |
 | `test_session_store_ownership.py` | Session-store ownership residue (retired multi-store model) |
-| `test_session_bound_context_residue.py` | Session-bound context residue |
 | `test_source_repo_hygiene.py` | Source-repo files stay visible to review/CI (no stray ignores) |
 | `test_handoff_schema_contract.py` | Public handoff sidecar schema (`handoff-v1.1`) |
 | `test_platform_classifier.py` | `pyproject.toml` OS classifiers |
@@ -65,7 +67,7 @@ its row here in the same change (real coverage or an explicit `GAP` cell).
 
 | Subpackage | Delete / orphan | Dirty input | Missing dependency |
 |---|---|---|---|
-| `spec_context` (lifecycle: `dead`/clean-tree) | `unit/test_spec_context_service.py::test_dead_removes_repo_and_marks_dead`, `::test_dead_clean_tree_unchanged_no_untracked`; residue `contract/test_session_bound_context_residue.py` | `unit/test_spec_context_service.py::test_dead_with_commit_blocks_on_planted_secret` / `_private_ip` / `_untracked_pem_key_file`, `::test_dead_refuses_on_untracked_files_without_commit` | `unit/test_spec_context_service.py::test_dead_not_found_raises`, `::test_dead_state_error_when_not_alive`, `::test_dead_raises_context_locked_when_impl_lock_held` |
+| `spec_context` (lifecycle: `dead`/clean-tree) | `unit/test_spec_context_service.py::test_dead_removes_repo_and_marks_dead`, `::test_dead_clean_tree_unchanged_no_untracked` | `unit/test_spec_context_service.py::test_dead_with_commit_blocks_on_planted_secret` / `_private_ip` / `_untracked_pem_key_file`, `::test_dead_refuses_on_untracked_files_without_commit` | `unit/test_spec_context_service.py::test_dead_not_found_raises`, `::test_dead_state_error_when_not_alive`, `::test_dead_raises_context_locked_when_impl_lock_held` |
 | `spec_context` (lease) | `test_lock_steal.py::test_steal_stale_record_returns_true_with_new_session`, `test_lease_pid_liveness.py::test_acquire_ttl_stale_dead_holder_takes_over`; live holder protected: `::test_acquire_ttl_stale_alive_holder_blocks_no_takeover` | `test_lease_stale.py::test_row2_missing_fields_is_stale`, `::test_row3_corrupt_heartbeat_is_stale`, `::test_row1_none_is_stale` | `test_lease_pid_liveness.py::test_is_stale_ttl_expired_no_probe_is_stale_fallback`, `::test_is_stale_probe_raises_falls_back_to_ttl`; `test_lock_steal.py::test_steal_absent_record_creates_new` |
 | `spec_context` (session_identity) | `test_session_identity.py::test_iter_ptr_files_empty_when_dir_absent`, `::test_coherence_absent_sources_are_not_a_violation` | `::test_session_record_fail_soft_on_corrupt_json`, `::test_read_session_invalid_id_returns_none`, `::test_path_validation_rejects_traversal` (CWE-22) | `::test_coherence_absent_sources_are_not_a_violation` (absent ptr/record is fail-soft, not an error) |
 | `public` (install/stage/doctor) | `test_install_prune.py::test_copy_tree_prunes_orphan` (+ nested variants) | `test_public_assets.py::test_agent_missing_name_skipped`, `::test_invalid_agent_names_raise` | `test_doctor_projected_drift.py::test_cli_exits_nonzero_on_missing`, `::test_cli_exits_nonzero_on_drift` |
