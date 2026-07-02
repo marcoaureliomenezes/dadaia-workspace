@@ -69,15 +69,20 @@ sets are disjoint (PLAN §Write sets).
   APPROVE verified: frozen 9-path suite zero-diff, all ACs pass, ADR fidelity
   confirmed, refusal-message redaction now regression-tested. Verdict landed as
   this review commit. Owner: qa-engineer.
-- [ ] T-50-21 Security review (push gate): APPROVE handoff with `metrics.commit_sha`
-  = pushed sha; push; CI green; PR; merge. Owner: security-reviewer + orchestrator.
+- [x] T-50-21 Security review (push gate): APPROVED for `873b11d2` (0 findings above
+  INFO across 6 dimensions; frozen-suite zero-diff independently confirmed); handoff
+  `2026-07-02T194652Z-security-reviewer-v0150-push-gate.handoff.json` validated with
+  `metrics.commit_sha` = pushed sha; pre-push preflight 4/4 PASS; PR #89 38 checks
+  green; squash-merged as `7b198d49`. Owner: security-reviewer + orchestrator.
 
 ## W6 — closure (CLOSURE phase)
 
-- [ ] T-50-30 CLOSURE.md (incl. `## Validations` + `## Drifts` — SPEC-DOC-006); bug
-  `resolved --release v0.1.50` event; consumed entries
-  (`lease-kernel-identity-hardening`, `context-dead-exit-path`) removed with durable
-  copies + `consumed_backlog.json`; memory updates (`sdd-gate-v3`,
-  `context-management`, `workspace-doctor` as needed) + catalog + lint; archive;
-  ACTIVE → none; candidates.md sequence row R2 marked shipped.
-  Owner: product-engineer.
+- [x] T-50-30 CLOSURE.md authored (incl. `## Validations` + `## Drifts` —
+  SPEC-DOC-006); bug `resolved --release v0.1.50` event appended (ledger: 0 open);
+  consumed entries (`lease-kernel-identity-hardening`, `context-dead-exit-path`)
+  archived with durable copies + `consumed_backlog.json` under
+  `specs/_archive/v0.1.50/`; memory updates landed in `sdd-gate-v3`,
+  `context-management`, `specs-doctor` (the 029/--specs-dir seat — `workspace-doctor`
+  unchanged, no runtime-doctor behavior in scope) + catalog regenerated (25 features)
+  + lint all-pass; release archived; ACTIVE → none; candidates.md R2 row marked
+  shipped. Owner: product-engineer.

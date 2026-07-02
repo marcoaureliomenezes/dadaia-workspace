@@ -1,14 +1,21 @@
 ---
-release: v0.1.50
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.50 — Kernel Hardening
+# Active release: none
 
-Sequence position: **R2 of the operator-approved 12-release plan** (grilled 2026-07-02,
-`specs/backlog/candidates.md` §Release sequence). Hardens the spec-context kernel:
-lease identity self-recognition, session/lease coherence, the `context dead()` exit
-path, and bound-session attribution for CLI subprocesses.
+**v0.1.50** — *Kernel Hardening* — is **CLOSED and ARCHIVED** at
+`specs/_archive/releases/v0.1.50/` (CLOSURE.md). R2 of the 2026-07-02 operator
+sequence: the lease acquire ladder gained a lineage-evidenced self-recognition rung
+(rotated-sid self-block fixed, no-steal invariant untouched — frozen 9-path suite
+zero-diff), an unreadable `ACTIVE.md` can no longer bypass the pid veto (reader-seam
+tri-state), SPEC-DOC-029 holder-confirmation ends the live-holder false-forgery class,
+`context dead()` works on standard git repos (refspec push, empty-push skip,
+`rmtree(onexc)`), and all five specs-dir CLIs resolve the bound context through one
+shared ancestry-threading seam with a Root-Law cwd refusal. Bug ledger: 0 open.
+Merged as `7b198d49` (PR #89, 38 checks green).
 
-Previous: **v0.1.49** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.49/`
-(merged `3743cb06`; closure `918589e2`).
+No release is active. Next in sequence: **R3 — E2E journey canon** (v0.1.51:
+`e2e-journey-coverage-and-test-canon`) per `specs/backlog/candidates.md`
+§Release sequence.

@@ -2,7 +2,7 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD, first-block-wins); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto."
+tldr: "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition."
 summary: >-
   Two-layer enforcement. (1) Python hooks: PreToolUse runs through ONE merged
   entrypoint — `dadaia_workspace.hooks.pre_gate` — which reads stdin once and
@@ -27,7 +27,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 3425
 last_updated: '2026-07-02'
-release_origin: v0.1.48
+release_origin: v0.1.50
 ---
 
 Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, single entrypoint) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + advisory reconciler) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (installed via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). The `sdd_gate` and `root_whitelist` modules are thin policy modules consumed by `pre_gate` (`evaluate_payload()`); their legacy `main()`s are kept for one release.
@@ -156,10 +156,33 @@ process**, resolved by `sdd_gate._resolve_holder_pid` (`harness_pid`/`parent_pid
 `ppid` from the stdin payload, else `os.getppid()`) and threaded down to
 `lease.acquire`; never the hook's ephemeral subprocess pid. Decision tree:
 
-1. `.ptr` match → unconditional **RENEW** (the incumbent, even after a relaunch).
+1. `.ptr` match → unconditional **RENEW** (the incumbent, even after a relaunch); the
+   replaced sid's by-session index entry is removed in the same transition (v0.1.50
+   index hygiene — no dangling entry).
 2. Record with the same `session_id` → **RENEWED**, even past-TTL (holder-safe: a holder never loses its own lease to its own staleness).
-3. Record absent, or TTL-stale with the holder pid dead/absent → **ACQUIRED** (takeover).
-4. Live foreign record — TTL-fresh **or** TTL-stale with a live pid (**PID veto**, `core/lock_liveness.is_stale`) → **LockHeldError**; the gate blocks with a yield message. The message reports holder and heartbeat and **never** instructs rebind, relaunch, or steal.
+3. **Self-recognition** (v0.1.50, rotated-sid fix): record pid == the acquiring
+   session's harness pid **AND** the recorded old sid's session record
+   (`.dadaia/sessions/<old_sid>.json` — PROTECTED, CLI-owned) names that **same** pid
+   (lineage evidence) → **RENEW** under the new sid; the old sid's index entry is
+   removed. Both conjuncts are required — pid equality alone never renews, so a test
+   or process that models a foreign holder with its own pid still blocks.
+4. Record absent, or TTL-stale with the holder pid dead/absent → **ACQUIRED** (takeover).
+5. Live foreign record — TTL-fresh **or** TTL-stale with a live pid (**PID veto**, `core/lock_liveness.is_stale`) → **LockHeldError**; the gate blocks with a yield message. The message reports holder and heartbeat and **never** instructs rebind, relaunch, or steal.
+
+**Veto tri-state (v0.1.50):** the hook's `_active_field` reader distinguishes a
+readable phase/release (str) from a legitimately absent `ACTIVE.md`
+(`FileNotFoundError` → `""` → `veto_release = "none"`, release-aware reclaim between
+releases still fires) from an **unreadable** one (`OSError` → `None` →
+`veto_release = None`, which SKIPS the release-mismatch reclaim in `is_stale` and
+preserves the pid veto — an I/O failure can never bypass the no-steal invariant). The
+`veto_release` is threaded gate → `gate_policy.evaluate` → `lease.acquire`
+(`_UNSET_RELEASE` sentinel decouples it from the record's own release field).
+
+**Session-id resolution (v0.1.50):** `hooks/_common.resolve_session_id` order is
+`DADAIA_SESSION_ID` (operator override) → **stdin payload `session_id`**
+(harness live-truth) → inherited `CLAUDE_CODE_SESSION_ID` → `CODEX_SESSION_ID` — the
+payload now outranks possibly-stale inherited env, so a harness relaunch inside the
+same shell resolves its own sid instead of the previous session's.
 
 **By-session index (structural atomicity):** `acquire`/`steal`/`release` write and
 remove the `ctx_locks/by-session/<sid>.json` entry **inside the SAME O_EXCL sentinel

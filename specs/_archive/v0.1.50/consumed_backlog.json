@@ -1,0 +1,20 @@
+{
+  "release": "v0.1.50",
+  "consumed": [
+    {
+      "slug": "lease-kernel-identity-hardening",
+      "shipped_anchors": [
+        "dadaia_workspace/core/lock_liveness.py#is_stale",
+        "dadaia_workspace/hooks/sdd_gate.py#_resolve_holder_pid",
+        "dadaia_workspace/features/spec_context/session_identity.py#coherence"
+      ]
+    },
+    {
+      "slug": "context-dead-exit-path",
+      "shipped_anchors": [
+        "dadaia_workspace/infrastructure/git_subprocess.py#GitSubprocessClient",
+        "context-management"
+      ]
+    }
+  ]
+}
