@@ -10,6 +10,7 @@ import hashlib
 import json
 import sys
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
@@ -839,6 +840,36 @@ def _build_minimal_agentic_dir(tmp_path: Path) -> tuple[Path, Path]:
 # ---------------------------------------------------------------------------
 
 
+def _dcx1_toml_present(agentic_dir: Path, workspace_root: Path) -> Path:
+    """Source agent with a matching projected TOML — nothing missing."""
+    agents_dir = agentic_dir / "agents"
+    agents_dir.mkdir()
+    (agents_dir / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
+    codex_dir = workspace_root / ".codex"
+    codex_agents = codex_dir / "agents"
+    codex_agents.mkdir(parents=True)
+    (codex_agents / "my-agent.toml").write_text(
+        'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\nbody\n"""\n',
+        encoding="utf-8",
+    )
+    return codex_dir
+
+
+def _dcx1_empty_agents_dir(agentic_dir: Path, workspace_root: Path) -> Path:
+    """An empty source agents/ dir — nothing to project, nothing missing."""
+    (agentic_dir / "agents").mkdir()
+    codex_dir = workspace_root / ".codex"
+    codex_dir.mkdir()
+    return codex_dir
+
+
+def _dcx1_no_agents_dir(agentic_dir: Path, workspace_root: Path) -> Path:
+    """No source agents/ dir at all — nothing to project, nothing missing."""
+    codex_dir = workspace_root / ".codex"
+    codex_dir.mkdir()
+    return codex_dir
+
+
 class TestDcx1MissingToml:
     def test_reports_missing_toml(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -851,38 +882,22 @@ class TestDcx1MissingToml:
         out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
         assert any("my-agent.toml" in line and "[missing]" in line for line in out)
 
-    def test_no_missing_when_toml_present(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        "setup",
+        [
+            pytest.param(_dcx1_toml_present, id="toml-present"),
+            pytest.param(_dcx1_empty_agents_dir, id="empty-agents-dir"),
+            pytest.param(_dcx1_no_agents_dir, id="nonexistent-agents-dir"),
+        ],
+    )
+    def test_returns_empty_when_nothing_missing(
+        self, tmp_path: Path, setup: Callable[[Path, Path], Path]
+    ) -> None:
+        """_dcx1_missing_toml reports nothing when every source agent already has its
+        TOML, or when there are no source agents to project at all."""
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        agents_dir = agentic_dir / "agents"
-        agents_dir.mkdir()
-        (agents_dir / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
-        codex_dir = workspace_root / ".codex"
-        codex_agents = codex_dir / "agents"
-        codex_agents.mkdir(parents=True)
-        (codex_agents / "my-agent.toml").write_text(
-            'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = """\nbody\n"""\n',
-            encoding="utf-8",
-        )
-        manager2 = FileSystemPublicAssetManager()
-        out = manager2._dcx1_missing_toml(agentic_dir, codex_dir)
-        assert out == []
-
-    def test_empty_agents_dir_no_reports(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        agents_dir = agentic_dir / "agents"
-        agents_dir.mkdir()
-        codex_dir = workspace_root / ".codex"
-        codex_dir.mkdir()
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
-        assert out == []
-
-    def test_nonexistent_agents_dir_returns_empty(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        codex_dir = workspace_root / ".codex"
-        codex_dir.mkdir()
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
+        codex_dir = setup(agentic_dir, workspace_root)
+        out = FileSystemPublicAssetManager()._dcx1_missing_toml(agentic_dir, codex_dir)
         assert out == []
 
 
@@ -979,6 +994,54 @@ class TestDcx3WorkflowDrift:
 # ---------------------------------------------------------------------------
 
 
+def _dcx4_clean_gpt_toml(tmp_path: Path) -> Path:
+    """A codex dir whose only TOML uses a gpt model — no claude string."""
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "test.toml").write_text('model = "gpt-4o"\n', encoding="utf-8")
+    return codex_dir
+
+
+def _dcx4_nonexistent_dir(tmp_path: Path) -> Path:
+    """A codex dir that does not exist."""
+    return tmp_path / "no-such-dir"
+
+
+def _dcx4_non_text_suffix(tmp_path: Path) -> Path:
+    """A non-text file (.bin) is skipped even when it contains 'claude' bytes."""
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "binary.bin").write_bytes(b"claude-something")
+    return codex_dir
+
+
+def _dcx4_registry_tier_toml(tmp_path: Path) -> Path:
+    """A persona using registry-tier terms is not flagged."""
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "ai-engineer.toml").write_text(
+        'developer_instructions = """\n'
+        "Recommend the deep / dispatch / fast registry tiers; tune "
+        "model_reasoning_effort per workload.\n"
+        '"""\n',
+        encoding="utf-8",
+    )
+    return codex_dir
+
+
+def _dcx4_harness_skill_name(tmp_path: Path) -> Path:
+    """The ai-harness-claude-code skill name must not trip the tier-name pattern."""
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "ai-engineer.toml").write_text(
+        'developer_instructions = """\n'
+        "Use the ai-harness-claude-code skill when auditing projections.\n"
+        '"""\n',
+        encoding="utf-8",
+    )
+    return codex_dir
+
+
 class TestDcx4ClaudeStrings:
     def test_reports_claude_string_in_toml(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
@@ -989,26 +1052,24 @@ class TestDcx4ClaudeStrings:
         out = manager._dcx4_claude_strings(codex_dir)
         assert any("[error]" in line and "claude-model-or-path" in line for line in out)
 
-    def test_no_report_when_no_claude_strings(self, tmp_path: Path) -> None:
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        codex_dir = workspace_root / ".codex"
-        codex_dir.mkdir()
-        (codex_dir / "test.toml").write_text('model = "gpt-4o"\n', encoding="utf-8")
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx4_claude_strings(codex_dir)
-        assert out == []
-
-    def test_nonexistent_codex_dir_returns_empty(self, tmp_path: Path) -> None:
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx4_claude_strings(tmp_path / "no-such-dir")
-        assert out == []
-
-    def test_non_text_suffix_skipped(self, tmp_path: Path) -> None:
-        codex_dir = tmp_path / ".codex"
-        codex_dir.mkdir()
-        (codex_dir / "binary.bin").write_bytes(b"claude-something")
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx4_claude_strings(codex_dir)
+    @pytest.mark.parametrize(
+        "setup",
+        [
+            pytest.param(_dcx4_clean_gpt_toml, id="clean-gpt-toml"),
+            pytest.param(_dcx4_nonexistent_dir, id="nonexistent-codex-dir"),
+            pytest.param(_dcx4_non_text_suffix, id="non-text-suffix-skipped"),
+            pytest.param(_dcx4_registry_tier_toml, id="registry-tier-terms-clean"),
+            pytest.param(_dcx4_harness_skill_name, id="harness-skill-name-not-false-positive"),
+        ],
+    )
+    def test_returns_empty_for_clean_or_skipped(
+        self, tmp_path: Path, setup: Callable[[Path], Path]
+    ) -> None:
+        """_dcx4_claude_strings flags nothing for a clean TOML (gpt model, registry-tier
+        terms, or the ai-harness-claude-code skill name), a nonexistent dir, or a
+        non-text file."""
+        codex_dir = setup(tmp_path)
+        out = FileSystemPublicAssetManager()._dcx4_claude_strings(codex_dir)
         assert out == []
 
     def test_flags_standalone_anthropic_tier_name(self, tmp_path: Path) -> None:
@@ -1023,37 +1084,6 @@ class TestDcx4ClaudeStrings:
         manager = FileSystemPublicAssetManager()
         out = manager._dcx4_claude_strings(codex_dir)
         assert any("[error]" in line and "anthropic-tier-name" in line for line in out)
-
-    def test_clean_toml_without_tier_names_passes(self, tmp_path: Path) -> None:
-        """A Codex persona that uses registry-tier terms is not flagged."""
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        codex_dir = workspace_root / ".codex"
-        codex_dir.mkdir()
-        (codex_dir / "ai-engineer.toml").write_text(
-            'developer_instructions = """\n'
-            "Recommend the deep / dispatch / fast registry tiers; tune "
-            "model_reasoning_effort per workload.\n"
-            '"""\n',
-            encoding="utf-8",
-        )
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx4_claude_strings(codex_dir)
-        assert out == []
-
-    def test_harness_skill_name_not_false_positive(self, tmp_path: Path) -> None:
-        """ai-harness-claude-code skill name must not trip the tier-name pattern."""
-        agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
-        codex_dir = workspace_root / ".codex"
-        codex_dir.mkdir()
-        (codex_dir / "ai-engineer.toml").write_text(
-            'developer_instructions = """\n'
-            "Use the ai-harness-claude-code skill when auditing projections.\n"
-            '"""\n',
-            encoding="utf-8",
-        )
-        manager = FileSystemPublicAssetManager()
-        out = manager._dcx4_claude_strings(codex_dir)
-        assert out == []
 
 
 # ---------------------------------------------------------------------------
@@ -2173,6 +2203,57 @@ class TestInstallCodexRuntimeAdapters:
 # ---------------------------------------------------------------------------
 
 
+def _dcx6_manager(public_dir: Path) -> FileSystemPublicAssetManager:
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir
+    return manager
+
+
+def _dcx6_in_sync(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """Installed adapter content matches source — no drift, no issue."""
+    public_dir = tmp_path / "public"
+    content = "# My Adapter\n"
+    adapter_dir = public_dir / "runtime" / "codex" / "my-adapter"
+    adapter_dir.mkdir(parents=True)
+    (adapter_dir / "SKILL.md").write_text(content, encoding="utf-8")
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
+    dst.parent.mkdir(parents=True)
+    dst.write_text(content, encoding="utf-8")
+    return _dcx6_manager(public_dir), workspace_root
+
+
+def _dcx6_no_src_root(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """No public/runtime/codex/ source root — nothing to check."""
+    public_dir = tmp_path / "public"
+    public_dir.mkdir()
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    return _dcx6_manager(public_dir), workspace_root
+
+
+def _dcx6_file_at_src_root(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """A regular file at the runtime/codex/ root (not a subdir) is skipped."""
+    public_dir = tmp_path / "public"
+    runtime_codex = public_dir / "runtime" / "codex"
+    runtime_codex.mkdir(parents=True)
+    (runtime_codex / "README.md").write_text("# README\n", encoding="utf-8")
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    return _dcx6_manager(public_dir), workspace_root
+
+
+def _dcx6_subdir_without_skill(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """An adapter subdir without SKILL.md is silently skipped."""
+    public_dir = tmp_path / "public"
+    runtime_codex = public_dir / "runtime" / "codex" / "empty-adapter"
+    runtime_codex.mkdir(parents=True)
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    return _dcx6_manager(public_dir), workspace_root
+
+
 class TestDcx6CodexRuntimeAdapters:
     def _make_manager_with_fake_public(self, public_dir: Path) -> FileSystemPublicAssetManager:
         manager = FileSystemPublicAssetManager()
@@ -2196,17 +2277,23 @@ class TestDcx6CodexRuntimeAdapters:
             "[missing]" in line and "my-adapter" in line and "D-CX-6" in line for line in out
         )
 
-    def test_ok_when_codex_skill_present_and_matches(self, tmp_path: Path) -> None:
-        """No issues when adapter is installed and content matches source."""
-        public_dir = tmp_path / "public"
-        content = "# My Adapter\n"
-        self._setup_adapter(public_dir, "my-adapter", content)
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
-        dst.parent.mkdir(parents=True)
-        dst.write_text(content, encoding="utf-8")
-        manager = self._make_manager_with_fake_public(public_dir)
+    @pytest.mark.parametrize(
+        "setup",
+        [
+            pytest.param(_dcx6_in_sync, id="installed-matches-source"),
+            pytest.param(_dcx6_no_src_root, id="no-src-root"),
+            pytest.param(_dcx6_file_at_src_root, id="file-at-src-root-skipped"),
+            pytest.param(_dcx6_subdir_without_skill, id="subdir-without-skill-skipped"),
+        ],
+    )
+    def test_returns_empty_when_in_sync_or_nothing_to_check(
+        self,
+        tmp_path: Path,
+        setup: Callable[[Path], tuple[FileSystemPublicAssetManager, Path]],
+    ) -> None:
+        """_dcx6_codex_runtime_adapters reports nothing when the installed adapter matches
+        source, or when there is no adapter source to project."""
+        manager, workspace_root = setup(tmp_path)
         out = manager._dcx6_codex_runtime_adapters(workspace_root)
         assert out == []
 
@@ -2239,39 +2326,6 @@ class TestDcx6CodexRuntimeAdapters:
             "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line
             for line in out
         )
-
-    def test_no_src_root_returns_empty(self, tmp_path: Path) -> None:
-        """Returns empty list when public/runtime/codex/ does not exist."""
-        public_dir = tmp_path / "public"
-        public_dir.mkdir()
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        manager = self._make_manager_with_fake_public(public_dir)
-        out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert out == []
-
-    def test_files_in_src_root_not_dirs_are_skipped(self, tmp_path: Path) -> None:
-        """Regular files at runtime/codex/ root level (not dirs) are ignored."""
-        public_dir = tmp_path / "public"
-        runtime_codex = public_dir / "runtime" / "codex"
-        runtime_codex.mkdir(parents=True)
-        (runtime_codex / "README.md").write_text("# README\n", encoding="utf-8")
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        manager = self._make_manager_with_fake_public(public_dir)
-        out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert out == []
-
-    def test_subdirs_without_skill_md_are_skipped(self, tmp_path: Path) -> None:
-        """Adapter subdirs without SKILL.md are silently skipped."""
-        public_dir = tmp_path / "public"
-        runtime_codex = public_dir / "runtime" / "codex" / "empty-adapter"
-        runtime_codex.mkdir(parents=True)
-        workspace_root = tmp_path / "workspace"
-        workspace_root.mkdir()
-        manager = self._make_manager_with_fake_public(public_dir)
-        out = manager._dcx6_codex_runtime_adapters(workspace_root)
-        assert out == []
 
     def test_check_codex_drift_includes_dcx6(self, tmp_path: Path) -> None:
         """_check_codex_drift() calls _dcx6_codex_runtime_adapters() and includes its output."""

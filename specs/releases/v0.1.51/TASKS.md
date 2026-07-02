@@ -96,12 +96,23 @@ sets are disjoint (PLAN §Write sets).
 
 ## W5 — FR5 parametrization (write set: the 5 named unit files)
 
-- [ ] T-51-14 Parametrize true shape-duplicates of the `assert … == []` pattern in
-  `test_public_assets.py` (30), `test_doctor.py` (24), `test_scaffolder.py` (14),
-  `test_doctor_taxonomy_disposition.py` (11), `test_session_identity.py` (8);
-  before/after `(callable-under-test, fixture-state)` pair inventory recorded on
-  this line at completion; the pair-set must be preserved (semantic diff, not
-  node-id diff). Owner: software-engineer.
+- [x] T-51-14 DONE. Aggregate `== []` 87 → 74 (−13): 19 standalone shape-duplicate
+  tests → 6 parametrized tests carrying the SAME 19 cases. Pair-set inventory
+  (before == after, full tables in the software-engineer handoff
+  `2026-07-02T220149Z-…-T-51-14-store-assertion-parametrization.handoff.json`):
+  `test_public_assets.py` 30→21 — DCX-1 `_dcx1_missing_toml` ×3 case-states
+  (toml-present / empty-agents-dir / nonexistent-agents-dir), DCX-4
+  `_dcx4_claude_strings` ×5 (clean-gpt-toml / nonexistent-codex-dir /
+  non-text-suffix / registry-tier-terms / harness-skill-name), DCX-6
+  `_dcx6_codex_runtime_adapters` ×4 (installed-matches / no-src-root /
+  file-at-src-root / subdir-without-skill); `test_doctor.py` 24→20 — DOC-012
+  candidates ×2 + hotfix ×2, DOC-016 semver ×3. NO-true-duplicate findings
+  RECORDED (rule 5): `test_scaffolder.py` (all 14 embedded in multi-assert
+  behavior tests), `test_doctor_taxonomy_disposition.py` (deliberate
+  invariant-pair structure, distinct silent scenarios),
+  `test_session_identity.py` (2 standalone but different callables; 6 embedded).
+  Verification: 5 files 327 passed BEFORE == 327 passed AFTER, real exit 0
+  (pipefail); ruff format+check clean. Owner: software-engineer.
 
 ## W6 — gates + ship (flat release: single ship gate)
 
