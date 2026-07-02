@@ -2,25 +2,26 @@
 slug: workspace-doctor
 title: workspace-doctor
 category: product
-tldr: diagnóstico + repair de invariantes do workspace state com --fix opcional; emite LOCK-NEW, LOCK-GC, CTX-URL-1, INV-4, INV-5, SENTINEL-GC, PTR-GC, VENV-1.
-summary: diagnóstico + repair de invariantes do workspace state com --fix opcional.
-  Cobre context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW), reclaim
-  probe-gated de lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama
-  pid vivo), context ALIVE com repo_url vazio (CTX-URL-1, manual via context
-  update --url), orphan sentinel files (SENTINEL-GC), orphan .ptr files (PTR-GC) e
-  saúde do venv do workspace (VENV-1 — .dadaia/.venv presente, entrypoint dadaia
-  executável). Bind/session records decaem por TTL contra last_seen_at
-  heartbeat-renovado. Invariantes SEM-1 e Lock-3 foram removidos em v0.1.6; os
-  antigos LEASE-1..4 nunca existiram no código.
+tldr: 'diagnóstico + repair do workspace state; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix roda SENTINEL/PTR/GRAVEYARD-GC.'
+summary: >-
+  diagnóstico + repair de invariantes do workspace state com --fix opcional.
+  Checks emitidos: context ALIVE/DEAD (INV-4, INV-5), TTL-lease inválido (LOCK-NEW),
+  lease stale de holder morto/unprobeable (LOCK-GC — nunca reclama pid vivo),
+  production-write sem task_id no audit log (LOCK-4), BLOCKED_ATTEMPT no audit log
+  (LOCK-5, sinal), context ALIVE com repo_url vazio (CTX-URL-1), root whitelist +
+  caches proibidos + tool configs + subdirs de .dadaia/ (ROOT-1..4), saúde do venv
+  (VENV-1). Ações fix-only (aparecem só no --fix, não como issues): SENTINEL-GC,
+  PTR-GC, GRAVEYARD-GC. Bind/session records decaem por TTL contra last_seen_at
+  heartbeat-renovado. Limitação conhecida: o comando sai 0 mesmo com issues.
 tags:
 - workspace
 - doctor
 - health
 - repair
 agent_tier: self-pull
-token_estimate: 950
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+token_estimate: 1000
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 CLI surface: `dadaia doctor [--fix]`
@@ -49,20 +50,35 @@ O TTL-lease usa um single-record JSON por context em `.dadaia/states/ctx_locks/<
 | `CTX-URL-1` | Context com `state=ALIVE` e `repo_url` vazio no record (context não-portável) | Manual: `dadaia context update <name> --url <url>` — ou back-fill automático em `alive`/`dead` quando o repo on-disk tem origin. |
 | `INV-4` | Context com `state=ALIVE` e repo ausente em `repos/` | Manual: `dadaia context alive <name>`. |
 | `INV-5` | Context com `state=DEAD` e repo presente em `repos/` | AUTO-FIX: `dadaia context dead <name>` ou remoção manual. |
-| `SENTINEL-GC` | Orphan `.lock.sentinel` com mtime > 30s (processo morreu entre CAS e unlink) | AUTO-FIX (`--fix`): deleta o sentinel. |
-| `PTR-GC` | Orphan `.ptr` file em `.dadaia/sessions/runtime/` para um context sem `.lock.json` ou com lease expirado | AUTO-FIX (`--fix`): deleta o `.ptr`. |
+| `LOCK-4` | Evento de production-write em `lock-events.jsonl` sem campo `task_id` | Manual (sinal de disciplina). |
+| `LOCK-5` | Evento `BLOCKED_ATTEMPT` em `lock-events.jsonl` | Manual (sinal — surfaced, sem fix). |
+| `ROOT-1` | Entrada de top-level no workspace root fora do whitelist (+ `root_exceptions.txt`) | Manual. |
+| `ROOT-2` | Cache/output proibido no root (ex. `.pytest_cache/`, `coverage/`) | Manual. |
+| `ROOT-3` | Tool config fora do home canônico e fora da exception list (WARN) | Manual. |
+| `ROOT-4` | Subdir desconhecido de top-level dentro de `.dadaia/` (allowlist inclui `hooks/`) | Manual. |
 | `VENV-1` | Saúde do venv do workspace: `.dadaia/.venv` ausente, `bin/dadaia` ausente ou não-executável, ou interpreter incoerente com o venv do workspace (complementa o venv-guard do hook `pre_gate`) | Manual: recriar/reparar o venv (`dadaia init` ou provisionamento do `.dadaia/.venv`). |
+
+**Ações fix-only** (executadas por `--fix`, não emitidas como issues do `check()`):
+`SENTINEL-GC` (deleta orphan `.lock.sentinel` com mtime > 30s), `PTR-GC` (deleta orphan
+`.ptr` em `.dadaia/sessions/runtime/` sem lease vivo) e `GRAVEYARD-GC` (deleta session
+files expirados).
 
 Bind/session records (`.dadaia/sessions/<id>.json`) são coletados por TTL medido contra
 `last_seen_at`, que o heartbeat PostToolUse renova a cada tool use — um bind de sessão
 ativa nunca decai; record sem `last_seen_at` mantém TTL-from-creation; o pid do record
 (bind-CLI, morto por construção) não é consultado.
 
-Mensagens de `LOCK-NEW`/`LOCK-GC` incluem: `context`, `session_id` do holder, e `heartbeat` — informação suficiente para diagnóstico sem instrução de reclaim manual.
+Mensagens de `LOCK-NEW`/`LOCK-GC` incluem `context`, `session_id` do holder e
+`heartbeat`; a mensagem de `LOCK-GC` **nomeia as remediações** (`dadaia doctor --fix`
+ou `dadaia lock steal <ctx>`) para um lease stale-dead seguro de reclamar.
+
+**Limitação conhecida:** `dadaia doctor` imprime as issues mas **sai com exit 0 mesmo
+quando há issues** (só sai non-zero quando o workspace não está inicializado) — não
+serve como gate mecânico em pipelines sem parsing do output.
 
 ## Fluxo de uso
 
-  1. `dadaia doctor` — executa checklist de invariantes (INV-4, INV-5, LOCK-NEW, LOCK-GC, CTX-URL-1, SENTINEL-GC, PTR-GC, VENV-1) e lista issues com flag `[fixable]` ou `[manual]`.
+  1. `dadaia doctor` — executa checklist de invariantes (LOCK-NEW, LOCK-GC, LOCK-4, LOCK-5, CTX-URL-1, INV-4, INV-5, ROOT-1..4, VENV-1) e lista issues com flag `[fixable]` ou `[manual]`.
   2. Operador inspeciona os issues; se todos forem `[fixable]`, roda `dadaia doctor --fix`.
   3. Doctor aplica os reparos e mostra a lista de ações realizadas.
   4. Re-rodar `dadaia doctor` deve retornar "All invariants OK".

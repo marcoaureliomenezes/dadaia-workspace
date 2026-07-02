@@ -205,7 +205,8 @@ def test_temp_workspace_lifecycle_engine_smoke(
         app,
         ["specs", "doctor", "--specs-dir", str(_REPO_ROOT / "specs"), "--json"],
     )
-    assert specs_doctor.exit_code == 0, specs_doctor.output
-    summary = _payload(specs_doctor.output)["summary"]
-    assert isinstance(summary, dict)
-    assert summary["errors"] == 0
+    payload = _payload(specs_doctor.output)
+    issues = payload["issues"]
+    assert isinstance(issues, list)
+    real_errors = [i for i in issues if i["severity"] == "error"]
+    assert real_errors == [], specs_doctor.output

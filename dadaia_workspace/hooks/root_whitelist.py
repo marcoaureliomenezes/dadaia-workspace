@@ -7,8 +7,11 @@ The Law: the workspace root may contain ONLY these entries::
 
 Any other top-level entry is blocked. An operator exception list at
 ``.dadaia/states/root_exceptions.txt`` (one fnmatch glob per line) documents deliberate
-exceptions. The gate only fires on writes whose immediate parent IS the workspace root;
-writes under any subdirectory are allowed. Fails open on unparseable input.
+exceptions. The gate classifies the **first path component** of the target relative to the
+workspace root (T-47-15): a write blocks when that first component would create a NEW
+top-level entry outside the whitelist/exceptions — so a nested write like
+``<root>/.opencode/agents/foo.md`` is blocked, while a write into an existing (operator-
+created) top-level dir is allowed. Fails open on unparseable input.
 """
 
 from __future__ import annotations
@@ -100,30 +103,51 @@ def main() -> int:
 
 
 def _root_violation(workspace: Path, raw_path: str) -> str | None:
-    """Return a block reason if *raw_path* writes a forbidden new root entry, else ``None``.
+    """Return a block reason if *raw_path* creates a forbidden new root entry, else ``None``.
 
-    Fail-open: an unresolvable parent or a non-root target yields ``None`` (allowed).
+    The gate classifies the **first path component** of the target relative to the
+    workspace root (T-47-15). A write blocks when that first component would create a NEW
+    top-level entry that is neither whitelisted nor matched by an operator-exception glob —
+    which closes the nested hole where ``Write <root>/.opencode/agents/foo.md`` was allowed
+    even though it materializes a forbidden new top-level ``.opencode/`` entry.
+
+    An **existing** non-whitelisted top-level entry is presumed operator-created and left
+    alone (the operator exception, fail-open): only a not-yet-existing first component is
+    blocked, preserving the original new-entry semantics — just computed on the first
+    component rather than the immediate parent.
+
+    Fail-open: an unresolvable path or a target outside the workspace root yields ``None``.
     """
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = workspace / fpath
 
-    # Only gate writes whose immediate parent is exactly the workspace root.
     try:
-        is_at_root = fpath.parent.resolve() == workspace.resolve()
+        ws = workspace.resolve()
+        resolved = fpath.resolve()
     except OSError:
         return None
-    if not is_at_root:
+
+    # The target must live under the workspace root; anything else is not root-relevant.
+    try:
+        rel = resolved.relative_to(ws)
+    except ValueError:
+        return None
+    if not rel.parts:
         return None
 
-    basename = fpath.name
-    if basename in _WHITELIST:
+    first = rel.parts[0]
+    if first in _WHITELIST:
         return None
-    if _operator_exception(workspace, basename):
+    if _operator_exception(workspace, first):
+        return None
+    # Only a NEW top-level entry is forbidden. An existing non-whitelisted top-level entry
+    # is presumed operator-created (origin-ambiguous → fail-open, per the Root Law).
+    if (ws / first).exists():
         return None
 
     return (
-        f"[ROOT WHITELIST GATE] Writing '{basename}' at workspace root is forbidden. "
+        f"[ROOT WHITELIST GATE] Writing '{first}' at workspace root is forbidden. "
         "The workspace root may only contain: .agents/ .claude/ .codex/ .dadaia/ "
         ".pi/ repos/ AGENTS.md CLAUDE.md prompt.md. Redirect output to "
         ".dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: "

@@ -19,7 +19,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 620
 last_updated: '2026-07-01'
-release_origin: v0.1.18
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -33,9 +33,10 @@ protocols without needing to become harness specialists.
 model** — see [[architecture]]): **Layer 1** is the entry harness the operator launches
 in the terminal — `claude`, `codex`, or `pi` — where governance is
 `AGENTS.md` + the projected `.X/` asset trees; **Layer 2** is the per-step worker harness
-the lifecycle engine drives behind `AgentRuntimePort` (`FAKE`, `CODEX_EXEC`,
-`CLAUDE_SDK`, `PI_HEADLESS`), selectable via `--harness`. PI is the third
-harness at both layers. The Claude-Code-vs-Codex deltas below are Layer-1 deltas.
+the lifecycle engine drives behind `AgentRuntimePort`, selectable via `--harness`
+(workers pi/codex + FAKE test-only; the four-member `AgentRuntimeKind` roster is
+single-sourced in [[tech-stack]] §Agent runtimes). PI is the third harness at both
+layers. The Claude-Code-vs-Codex deltas below are Layer-1 deltas.
 
 The skill defines each primitive (agent persona, subagent/dispatch, skill, rule,
 hook, AGENTS.md, MCP tool injection), explains how Claude Code and Codex differ in

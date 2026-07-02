@@ -111,6 +111,9 @@ pip-wheel-metadata/
 !/specs/bugs/
 /specs/bugs/*
 !/specs/bugs/*.md
+!/specs/bugs/*.jsonl
+!/specs/bugs/_archive/
+!/specs/bugs/_archive/*.md
 !/specs/releases/
 !/specs/releases/ACTIVE.md
 !/specs/releases/*/
@@ -119,6 +122,8 @@ pip-wheel-metadata/
 !/specs/releases/*/PLAN.md
 !/specs/releases/*/TASKS.md
 !/specs/releases/*/CLOSURE.md
+!/specs/releases/*/GRILL.md
+!/specs/releases/*/OQ-DECISIONS.md
 # alpha/rc segment files (ADR-1/ADR-5): track the 4 canonical files per segment.
 !/specs/releases/*/alpha-*/
 /specs/releases/*/alpha-*/*
@@ -126,12 +131,16 @@ pip-wheel-metadata/
 !/specs/releases/*/alpha-*/PLAN.md
 !/specs/releases/*/alpha-*/TASKS.md
 !/specs/releases/*/alpha-*/CLOSURE.md
+!/specs/releases/*/alpha-*/GRILL.md
+!/specs/releases/*/alpha-*/OQ-DECISIONS.md
 !/specs/releases/*/rc-*/
 /specs/releases/*/rc-*/*
 !/specs/releases/*/rc-*/SPEC.md
 !/specs/releases/*/rc-*/PLAN.md
 !/specs/releases/*/rc-*/TASKS.md
 !/specs/releases/*/rc-*/CLOSURE.md
+!/specs/releases/*/rc-*/GRILL.md
+!/specs/releases/*/rc-*/OQ-DECISIONS.md
 !/specs/_archive/
 !/specs/_archive/releases/
 !/specs/_archive/releases/*/

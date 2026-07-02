@@ -1,22 +1,22 @@
-release: none
-phase: none
+---
+release: v0.1.47
+phase: CLOSURE
 ---
 
-# Active release: none
+# Active release: v0.1.47
 
-**v0.1.46** — *SDD Governance v2 (bugs as event-sourced JSONL)* — is **CLOSED and ARCHIVED**
-at `specs/_archive/releases/v0.1.46/` (CLOSURE.md). It fixed the long-standing bug-format
-rot: JSONL was mandated for v0.1.15 and never delivered, so 99 `.md` bug files accreted.
-This release shipped the event-sourced JSONL bug store + `dadaia bugs append|status|stats`
-CLI, ran the one-time migration (99 `.md` → 18 JSONL streams, all `.md` archived to
-`specs/bugs/_archive/`), rewrote the `bug-registration-guardrail` rule for the JSONL contract
-(R-1 pair), added the `_archive` FROZEN gate-class + doctor SPEC-DOC-033/034/035/036 + the
-audit-disposition law, and swept OpenCode-as-live from the product memory. Shipped via PR #82
-(`f2fd4e22`), all 35 CI green; qa + security APPROVED.
+**v0.1.47** — *Context-Surface Truth + Fragments/Personas Optimization + Audit Remediation* —
+is ACTIVE on branch `feature/v0.1.47`.
 
-No release is currently active.
+Origin: operator `/goal` directive 2026-07-01 + full audit
+`specs/audits/20260701T201136Z-0bcd6c19/` (overall 7/10) + the disposition sweep previously
+earmarked here. Consumes backlog `specs-truth-realignment-constitution-memory` in full.
 
-**Follow-up — v0.1.47:** the audit-disposition **data** sweep (T-46-21 descope valve) —
-disposition the ~14 undisposed audits, normalize the off-canon backlog statuses
-(SPEC-DOC-031), and dedupe the HTML-report bug cluster. The now-live SPEC-DOC-035/036 doctor
-warnings are the enforcing mechanism for this slipped work.
+Scope (SPEC §3): W1 prompt-assembly + enforcement code fixes (codex exec argv, persona
+injection on all verbs, chokepoint scoping, ctx-inject session attribution, resolver
+fallback, doctor guards) · W2 constitution lean rewrite + AGENTS.md truth · W3 memory canon
+rewrite + NEW `memory/product/harness/` docs · W4 fragments (32) + personas (8) de-slop
+optimization · W5 full disposition sweep (bugs, duplicate pairs, 15 loose audits) · W6 ship.
+
+Phase: CLOSURE — all waves delivered; CLOSURE.md written; ship ritual (security-gated
+push + CI watch + PR) in progress. Archive move follows the merge (closure commit).

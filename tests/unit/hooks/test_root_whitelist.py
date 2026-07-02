@@ -103,3 +103,66 @@ def test_unparseable_path_fails_open(tmp_path: Path) -> None:
     out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {}})
     assert out == ""
     assert block is None
+
+
+# --- W1-6 (T-47-15): first-path-component classification --------------------------
+
+
+def test_nested_write_under_new_toplevel_dir_blocks(tmp_path: Path) -> None:
+    """A nested write that materializes a forbidden NEW top-level entry is blocked.
+
+    ``<root>/.opencode/agents/foo.md`` used to be allowed (its immediate parent was not the
+    root); it must now block because ``.opencode`` is a new, non-whitelisted top-level entry.
+    """
+    ws = _ws(tmp_path)
+    target = ws / ".opencode" / "agents" / "foo.md"
+    _out, block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    )
+    assert block is not None
+    assert block["decision"] == "block"
+    assert "ROOT WHITELIST GATE" in block["reason"]
+    assert ".opencode" in block["reason"]
+
+
+def test_nested_write_under_existing_operator_dir_allows(tmp_path: Path) -> None:
+    """A nested write into an EXISTING (operator-created) top-level dir stays allowed.
+
+    Only a not-yet-existing first component is blocked; an existing non-whitelisted
+    top-level entry is presumed operator-created (fail-open per the Root Law).
+    """
+    ws = _ws(tmp_path)
+    (ws / "operator-tool").mkdir()
+    target = ws / "operator-tool" / "sub" / "note.txt"
+    out, block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    )
+    assert out == ""
+    assert block is None
+
+
+def test_nested_write_under_whitelisted_root_allows(tmp_path: Path) -> None:
+    """A deep write under a whitelisted root entry (.dadaia/...) is allowed regardless."""
+    ws = _ws(tmp_path)
+    target = ws / ".dadaia" / "tmp" / "agent" / "20260701" / "scratch.json"
+    out, block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    )
+    assert out == ""
+    assert block is None
+
+
+def test_nested_exception_glob_allows(tmp_path: Path) -> None:
+    """An operator-exception glob matching the first component allows a nested write."""
+    ws = _ws(tmp_path)
+    (ws / ".dadaia" / "states" / "root_exceptions.txt").write_text(".opencode\n", encoding="utf-8")
+    target = ws / ".opencode" / "agents" / "foo.md"
+    out, block = _run(
+        tmp_path,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    )
+    assert out == ""
+    assert block is None

@@ -1672,20 +1672,19 @@ class TestConfigGenerators:
         assert any("[rm]" in item and "stale-agent.toml" in item for item in installed)
         assert any("[rm]" in item and "stale.workflow.md" in item for item in installed)
 
-    def test_codex_config_contains_approved_commands(self, tmp_path: Path) -> None:
+    def test_codex_config_omits_inert_approved_commands(self, tmp_path: Path) -> None:
+        """W1-2: the inert ``approved_commands`` array is no longer emitted (invalid in codex-cli)."""
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
         manager = FileSystemPublicAssetManager()
         config_text = manager._codex_config(agentic_dir)
-        assert "approved_commands" in config_text
-        assert '"git"' in config_text
+        assert "approved_commands" not in config_text
 
-    def test_codex_config_skills_section(self, tmp_path: Path) -> None:
+    def test_codex_config_omits_inert_skills_table(self, tmp_path: Path) -> None:
+        """W1-2: the inert ``[skills] paths`` table is no longer emitted (not a codex config key)."""
         agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
         manager = FileSystemPublicAssetManager()
         config_text = manager._codex_config(agentic_dir)
-        assert "[skills]" in config_text
-        assert ".agents/skills" in config_text
-        assert ".codex/skills" in config_text
+        assert "[skills]" not in config_text
 
 
 # ---------------------------------------------------------------------------

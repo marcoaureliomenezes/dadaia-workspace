@@ -88,6 +88,56 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
     assert blocked["reason"] == expected_reason
 
 
+def test_close_fake_harness_fails_actionably_not_crash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """W1-11 (T-47-20, grill D-10) smoke: `lifecycle close --harness fake` fails actionably.
+
+    Recorded behavior: `close` targets CLOSURE (a create step). The bare FAKE worker emits no
+    artifact evidence, so the typed create-step gate holds and the CLI exits with the
+    documented BLOCKED code (3) — NOT a crash/traceback and NOT a silent no-op. The block
+    carries a human-readable reason naming the missing evidence, so the outcome is actionable
+    (the operator sees exactly why the step held). This is the intended create-step gate
+    contract, already codified in
+    ``test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness`` — the D-10 concern of
+    an *unactionable* block is NOT reproducible, so no production fix is warranted.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        ["lifecycle", "close", "--release-id", "multiharness-engine-v0116", "--harness", "fake"],
+    )
+
+    # Documented BLOCKED exit code — a clean typed failure, never a crash (1/2) or success (0).
+    assert result.exit_code == 3, result.output
+    # No Python traceback leaked to the operator — the failure is gate-mediated, not an error.
+    assert "Traceback (most recent call last)" not in result.output
+    # The human-facing line names the blocked verb + harness + phase (actionable orientation).
+    assert "BLOCKED close" in result.output
+    assert "harness=fake" in result.output
+
+    # And the --json surface carries the actionable reason string.
+    json_result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "close",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+    assert json_result.exit_code == 3, json_result.output
+    payload = _payload(json_result.output)
+    assert payload["accepted"] is False
+    assert payload["blocked"]["reason"] == "agent result missing artifact evidence"
+
+
 def test_release_define_runs_fragment_driven_sequence_on_fake(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

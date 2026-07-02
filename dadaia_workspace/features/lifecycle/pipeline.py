@@ -49,7 +49,10 @@ from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
     FragmentLoader,
 )
-from dadaia_workspace.features.lifecycle.personas.loader import PersonaLoader
+from dadaia_workspace.features.lifecycle.personas.loader import (
+    PersonaLoader,
+    resolve_persona_for_role,
+)
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     FragmentBundle,
     LifecyclePromptBuilder,
@@ -403,27 +406,12 @@ class LifecyclePipeline:
     def _resolve_persona(self, role: str) -> str | None:
         """Resolve a step's ``role`` to its Layer-2 persona mandate(s) (AC-2).
 
-        ``role`` is comma-split (a multi-role step such as ``plan_review`` names
-        ``"qa-engineer, software-architect"``); each named role is resolved through the
-        persona loader. ``role == "shared"`` and any role with no persona atom resolve to
-        ``None`` for that name. The result is:
-
-        * ``None`` when no named role resolves to a persona (a ``shared`` / unmapped step —
-          no persona block, keeping the envelope byte-identical);
-        * the single mandate body when exactly one role resolves;
-        * each resolving role's mandate, clearly delimited by a role header, when several
-          do (the multi-role set — the envelope carries every named persona's mandate).
+        Delegates to the shared :func:`resolve_persona_for_role` helper (W1-3, the single
+        source of role→persona resolution) with this pipeline's injectable loader, so the
+        pipeline and every fragment workflow body + the CLI step path resolve personas
+        identically.
         """
-        resolved: list[tuple[str, str]] = []
-        for name in (part.strip() for part in role.split(",")):
-            persona = self._persona_loader.load_optional(name)
-            if persona is not None:
-                resolved.append((name, persona.body))
-        if not resolved:
-            return None
-        if len(resolved) == 1:
-            return resolved[0][1]
-        return "\n\n".join(f"### Persona — {name}\n{body}" for name, body in resolved)
+        return resolve_persona_for_role(role, self._persona_loader)
 
     def _generic_prompt(self, step: PipelineStep) -> str:
         """Generic (no-fragment) step prompt — step-kind-aware (v0.1.32 / C6 / L2 / A4b).

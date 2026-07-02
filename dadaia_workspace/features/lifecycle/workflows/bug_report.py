@@ -62,6 +62,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     StaticInput,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
+from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
 from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     FragmentBundle,
@@ -531,4 +532,5 @@ class BugReportWorkflow:
             prompt=suffix,
             allowed_paths=allowed,
             required_evidence=(GateEvidenceKind.HANDOFF,),
+            persona=resolve_persona_for_role(step.role),
         )

@@ -15,8 +15,8 @@ tags:
 - concurrency
 agent_tier: self-pull
 token_estimate: 885
-last_updated: '2026-06-12'
-release_origin: v0.1.14
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 ## Propósito
@@ -31,7 +31,7 @@ O binding de um Spec Context Project a uma terminal session dispara a cadeia de 
 
 1. **Bind** — a sessão se anexa a um Spec Context Project. O operador executa `dadaia context bind <name>`, que persiste contexto/modo no session record, atualiza o incumbent pointer e escreve o bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — o ÚNICO trigger de injeção de context-memory. `--print-env` é o escape back-compat para o fluxo `eval $(...)` com exports `DADAIA_*`.
 
-2. **Inject** — o binding injeta a `constitution.md` do contexto e sua `memory/` na sessão por **lazy product-feature consumption**: `tech-stack.md` e `catalog.json` carregam up front (~2.400 tokens); feature atoms individuais são pulled on demand pelo agente conforme relevantes à tarefa. Nenhuma sessão paga pelo catálogo inteiro antecipadamente.
+2. **Inject** — o binding injeta a memory do contexto por **lazy product-feature consumption**: um digest bounded de `tech-stack.md` + o tldr-digest do `catalog.json` carregam up front; feature atoms individuais são pulled on demand pelo agente conforme relevantes à tarefa. A `constitution.md` NÃO é injetada — é lida do disco. Nenhuma sessão paga pelo catálogo inteiro antecipadamente.
 
 3. **Enforce** — o SDD lifecycle (constitution §7) é enforced para cada production write sob aquele contexto: nenhuma mudança de produção sem release aprovado e task reservada. O entrypoint PreToolUse único (`python -m dadaia_workspace.hooks.pre_gate`) enforça deterministicamente path-class × lease × fase × modo a cada write, e os chokepoints git (pre-commit lease gate + pre-push security-verdict gate) gateiam commit/push independentemente de hooks de harness. Markers `[-]` e aprovações de spec são disciplina de agente/PM, não mecanismo do gate.
 
@@ -45,7 +45,7 @@ Quando o operador ou o project-manager inicia trabalho num projeto: `dadaia cont
 
 Sem o Spec Context Project como unidade central, um generic agent fleet teria que re-derivar como trabalhar a cada sessão, não teria memória de produto persistente, não teria lifecycle enforcement, e colidiria em projetos paralelos. O Spec Context Project é o que transforma um generic fleet em uma disciplined, parallel, multi-project software team:
 
-- **Context engineering sem re-derivação:** constitution + memory são injetados automaticamente; os agentes nunca começam às cegas.
+- **Context engineering sem re-derivação:** o digest de memory do contexto é injetado automaticamente no bind; os agentes nunca começam às cegas.
 - **SDD enforcement mecânico:** o gate bloqueia writes fora de scope — não é uma convenção, é um PreToolUse hook.
 - **Paralelismo seguro:** a single-lease-per-context invariant (§8) garante exclusividade estrutural para writers MUTATING; writers ADDITIVE correm concorrentemente por design.
 

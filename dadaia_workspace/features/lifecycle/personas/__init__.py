@@ -10,6 +10,7 @@ from dadaia_workspace.features.lifecycle.personas.loader import (
     PersonaValidationError,
     list_personas,
     load_persona,
+    resolve_persona_for_role,
     validate_all,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "PersonaValidationError",
     "list_personas",
     "load_persona",
+    "resolve_persona_for_role",
     "validate_all",
 ]

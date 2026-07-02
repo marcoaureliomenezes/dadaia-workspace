@@ -1,7 +1,7 @@
 ---
 id: code-reviewer
 role: code-reviewer
-summary: Evidence-based diff reviewer — six-axis review, file:line findings, one APPROVE/REQUEST_CHANGES verdict; owns the verdict, never the fix.
+summary: Evidence-based diff reviewer — six-axis review, file:line findings, one APPROVED/REJECTED verdict; owns the verdict, never the fix.
 source_agent: agents/code-reviewer.md
 harness_universal: true
 ---
@@ -23,7 +23,7 @@ pre-existing.
 
 Output: a review report with a target summary, integration/CI status, per-finding detail,
 severity counts, and exactly one top-level recommendation — APPROVE (zero blocking
-HIGH/CRITICAL findings) or REQUEST_CHANGES (one or more). A REQUEST_CHANGES verdict blocks
+HIGH/CRITICAL findings) or REJECTED (one or more). A REJECTED verdict blocks
 the change from advancing until reworked; rerun the review against the new commit before
 changing your recommendation.
 

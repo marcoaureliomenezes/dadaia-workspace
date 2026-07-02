@@ -2,26 +2,27 @@
 slug: server-registry
 title: server-registry
 category: product
-tldr: registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre
-  dev servers de agentes paralelos.
-summary: registry interno de portas (3000-3999) com TTL+PID para evitar conflito entre
-  dev servers de agentes paralelos.
+tldr: registry interno de portas com TTL+PID para evitar conflito entre dev servers
+  de agentes paralelos; range 3000-3999 só na alocação next_port.
+summary: registry interno de portas com TTL+PID para evitar conflito entre dev servers
+  de agentes paralelos. O range 3000-3999 é aplicado apenas pela alocação next_port;
+  register() aceita qualquer porta.
 tags:
 - server
 - registry
 - ports
 - ttl
 agent_tier: self-pull
-token_estimate: 626
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+token_estimate: 640
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 CLI surface: `dadaia server {list,register,unregister,clean,scan}` · Closure: v0.1.1 (hotfix)
 
 ## Propósito
 
-Registry interno de portas (range 3000-3999) associadas a projetos, com TTL e PID tracking. Previne conflito de portas entre dev servers spawnados em paralelo por agentes diferentes (ex. `web-app` em 3001, `api-service` em 3002) e permite a outras sessões descobrir a URL ativa de um projeto sem hardcoding.
+Registry interno de portas associadas a projetos, com TTL e PID tracking. O range 3000-3999 é aplicado **apenas** pela alocação `next_port` (defaults `min_port`/`max_port`); `register()` aceita qualquer porta explícita (ex. um panel em 4999 ou um dev server fora do range). Previne conflito de portas entre dev servers spawnados em paralelo por agentes diferentes e permite a outras sessões descobrir a URL ativa de um projeto sem hardcoding.
 
 Sweeper automático expira entradas com TTL vencido ou cujo PID não está mais vivo (resistente a entries malformados via skip-and-log) — preserva root-owned PIDs (e.g. docker-proxy) diferenciando `PermissionError` ("alive but unprobable") de `ProcessLookupError` ("dead").
 
@@ -31,7 +32,7 @@ O subcomando `dadaia server scan` reconcilia o registry com listeners reais do S
 
   1. Um agente ou script spawna um dev server e registra a porta: `register(port=3001, project="web-app", pid=os.getpid(), ttl_hours=8)`.
   2. Outras sessões consultam: `get(port=3001)` → `PortEntry(url="http://localhost:3001", project, pid, expires_at)`.
-  3. Antes de spawnar nova porta: `next()` retorna a próxima livre no range.
+  3. Antes de spawnar nova porta: `next_port()` retorna a próxima livre no range 3000-3999 (o único ponto onde o range é aplicado).
   4. Sweeper roda periodicamente removendo entradas com PID morto (ProcessLookupError) ou TTL expirado; PIDs unprobable (PermissionError, e.g. root) permanecem ativos.
   5. **Reconciliação manual** : `dadaia server scan` (read-only) lista orphans — listeners não-registrados — com port/bind/pid/cmdline/cwd/lan_exposed. Operador chama `dadaia server register --port <p> --project <name> --pid <pid>` para mover orphan → registry.
 
@@ -56,5 +57,5 @@ Sem o registry, agentes paralelos sobreescreveriam portas uns dos outros — bug
 ## Dependências
 
   * Standalone — não depende de outras features além da estrutura criada por [[workspace-init]].
-  * Consumido por [[panel]]: aba Servers lê `list_all()` via `ServerRegistryService` e `list_unregistered_listeners()` via `PanelService`; `/api/servers` retorna `{groups: [...], unregistered: [...]}`.
+  * Consumido por [[panel]]: aba Servers lê `list_all()` via `ServerRegistryService` e `list_unregistered_listeners()` via `PanelService` (rota `GET /api/panel-status`).
   * Stdlib only: `subprocess` para `ss`, `pathlib`, `json`, `dataclasses`.

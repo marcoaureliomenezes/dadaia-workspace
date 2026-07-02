@@ -10,18 +10,18 @@ tags:
 - css
 - tokens
 agent_tier: self-pull
-token_estimate: 338
-last_updated: '2026-06-01'
-release_origin: memory-markdown-source-v1
+token_estimate: 350
+last_updated: '2026-07-01'
+release_origin: v0.1.47
 ---
 
 ## Propósito
 
-Define a paleta canônica e os tokens CSS do dadaia-workspace panel, garantindo consistência visual entre tabs e modos. Declarada como constante `PALETTE` em `dadaia_workspace/features/panel/views/_assets.py` e consumida via tokens CSS em `PANEL_CSS`.
+Define a paleta canônica e os tokens CSS do dadaia-workspace panel, garantindo consistência visual entre tabs e temas. O home dos tokens é `dadaia_workspace/features/panel/views/assets/css/tokens.py` (spacing, radius, shadows, z-index, motion, dimensions e colors), consumido pelos seletores `[data-theme="mint|sage|warm"]`. (`views/_assets.py` retém apenas constantes de path legadas — as antigas `PALETTE`/`PANEL_CSS` foram removidas.)
 
 ## Brand identity
 
-Paleta canônica e tokens CSS do dadaia-workspace, definidos na release [dadaia-workspace-brand-identity-v1 SPEC](../../releases/dadaia-workspace-brand-identity-v1/SPEC.md). A paleta é declarada como constante `PALETTE` em `dadaia_workspace/features/panel/views/_assets.py` e consumida via tokens CSS em `PANEL_CSS`.
+Paleta canônica e tokens CSS do dadaia-workspace. Os valores vivem em `tokens.py` (home acima); as três paletas do panel ([[panel]]) estendem os tokens base via `[data-theme]`.
 
 ### Paleta canônica (5 cores)
 

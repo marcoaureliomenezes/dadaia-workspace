@@ -9,6 +9,9 @@ output_schema: overlap-report-v1
 max_context_policy: summary
 ---
 
+> Note: this step is a Python-owned gate with a model consult — no persona is
+> injected; the frontmatter `role` records the owning role only.
+
 # Conflict scan — adjudicate a same-anchor merge (model only)
 
 Python owns the conflict boundary. It has already computed the canonical-anchor set

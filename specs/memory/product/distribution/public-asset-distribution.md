@@ -11,22 +11,24 @@ tags:
 - projection
 - privacy
 agent_tier: self-pull
-token_estimate: 678
+token_estimate: 690
 last_updated: '2026-07-01'
-release_origin: v0.1.5
+release_origin: v0.1.47
 ---
 
 ## Propósito
 
 `dadaia public {stage|install|doctor}` distributes the public agentic surface of
-`dadaia-workspace`: agents, skills, workflows, commands, rules, hooks, scripts,
-templates, scoped AGENTS.md files, and runtime adapters.
+`dadaia-workspace`. The live asset types under `dadaia_workspace/public/` are:
+`agents`, `skills`, `rules`, `workflows`, `scripts`, `schemas`, `templates`, `data`,
+`scaffold`, `runtime`, `personas`, `lifecycle_fragments`, and `pi` (there is no
+`public/commands/` or `public/hooks/` — governance hooks are the Python package
+`dadaia_workspace/hooks/`, not a projected asset type).
 
-The canonical source is `dadaia_workspace/public/<type>/`. `public stage` copies
-that source into `.dadaia/agentic/<type>/` with a manifest. `public install`
-projects staged assets into runtime-specific roots: `.claude/`, `.codex/`,
-`.pi/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, and scoped
-runtime rule files.
+`public stage` copies that source into `.dadaia/agentic/<type>/` with a manifest.
+`public install` projects staged assets into runtime-specific roots: `.claude/`,
+`.codex/`, `.pi/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, scoped
+runtime rule files, and the Codex hook wrappers under `.dadaia/hooks/`.
 
 ## Diferencial
 
@@ -79,10 +81,13 @@ Staged temp workspaces remain supported.
 
 ## Dependências
 
-- Claude Code: `.claude/agents`, `.claude/skills`, hooks, commands, rules.
-- Codex: `.codex/config.toml`, `.codex/hooks.json`, `.codex/skills`, reference
-  workflows, and `AGENTS.md` context.
-- PI: `.pi/` Layer-1 extension surface (post-trust executable).
+- Claude Code: `.claude/agents`, `.claude/skills`, `.claude/rules`,
+  `.claude/workflows`, `.claude/settings.json` (hook registration).
+- Codex: `.codex/config.toml`, `.codex/hooks.json` (referencing the `.dadaia/hooks/codex-*`
+  wrappers), `.codex/agents`, `.codex/rules`, `.codex/skills`, reference workflows, and
+  `AGENTS.md` context.
+- PI: `.pi/` Layer-1 surface (`SYSTEM.md`, `settings.json`, `prompts/`, `extensions/` —
+  post-trust executable).
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
 `public doctor` compares canonical source, staging, and projections across three
@@ -90,10 +95,13 @@ passes; filters cache files such as `__pycache__/` and `*.pyc`; and reports drif
 as actionable `[missing]`, `[drift]`, `[ok]`, or reference-only runtime status. A
 non-zero exit code is returned on any source↔staging or staging↔projected mismatch.
 
-Codex hook projection writes the nested Codex hook schema under `.codex/hooks.json`.
-`PreToolUse` and `PostToolUse` match write-like tools (`apply_patch`, `Edit`,
-`Write`), and `UserPromptSubmit` runs `ctx-inject.sh` with
-`DADAIA_HOOK_OUTPUT=codex-json` so the hook returns valid additional-context JSON.
-Forced Codex installs remove stale generated `.codex/agents/*.toml` and
-`.codex/workflows/*.workflow.md` files that no longer exist in canonical public
+Codex hook projection writes the nested Codex hook schema under `.codex/hooks.json`,
+whose command strings point at the self-locating executable wrappers
+`.dadaia/hooks/codex-{pre-gate,post-gate,ctx-inject,ctx-inject-session-start}`
+(Codex direct-execs hook strings; each wrapper resolves the workspace venv Python
+relative to its own path and carries its env, e.g. `DADAIA_HOOK_OUTPUT=codex-json`).
+`PreToolUse` matches `^(apply_patch|Edit|Write|Bash)$`; PostToolUse is matcher-less
+(Codex match-all); ctx-inject registers on `SessionStart` (`startup|resume`) and
+`UserPromptSubmit`. Forced Codex installs remove stale generated `.codex/agents/*.toml`
+and `.codex/workflows/*.workflow.md` files that no longer exist in canonical public
 assets.

@@ -1,15 +1,12 @@
-# closure — scaffolded, deferred
+# closure — no step fragments (generic worker)
 
-This workflow directory is scaffolded but carries no step fragments yet. The
-`closure` workflow is deferred to a follow-up release; only its directory and this
-stub ship now.
+The `closure` workflow runs today: `dadaia lifecycle close` advances a release from
+CODE_REVIEW to CLOSURE via a single generic product-engineer worker step, followed by a
+Python-owned removal gate that applies residual-aware backlog removal over the
+consumed-ledger. That close step is **generic** — it carries no fragment — so this
+directory ships no step fragment. This stub exists only because the fragment loader
+requires the workflow directory to be present.
 
-When implemented, this workflow collects evidence, writes the closure record,
-updates memory, and archives the release. Planned steps (see the epic, §6.4):
-`closure_evidence_collect`, `closure_write` (product-engineer), `memory_update`
-(product-engineer), `archive_release`, `closure_verify`. Memory writes are permitted
-only in the closure phase and are Python-gated; archive and verify are
-Python-decided from doctor evidence.
-
-Do not reference fragments from this directory in any shipped workflow until the step
-fragments exist — the loader and workflow checks will fail on a dangling fragment id.
+The authoritative step definition lives in the `dadaia lifecycle close` verb and the
+workflow catalog, not here. Author a per-step closure fragment in this directory only if
+the close step is ever migrated off the generic prompt.

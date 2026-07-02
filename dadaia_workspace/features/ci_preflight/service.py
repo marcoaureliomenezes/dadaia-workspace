@@ -163,9 +163,16 @@ def _pytest_check(
     python_executable: str | None = None,
     dadaia_bin: str | None = None,
 ) -> Check:
-    """Build the pytest check, resolving the pytest executable via ``_resolve_tool``."""
+    """Build the pytest check, resolving the pytest executable via ``_resolve_tool``.
+
+    W1-5 de-flake: ``tests/performance`` is excluded from BOTH quick and full preflight runs.
+    Those tests assert on wall-clock budgets (e.g. a 90s ceiling) and fail under machine load,
+    turning the pre-push gate into a load-dependent flake
+    (bug ``prepush-gate-blocked-by-loadsensitive-perf-test-wallclock-bound``). Performance
+    tests remain runnable directly and in any perf-specific CI selection.
+    """
     pytest = _resolve_tool("pytest", python_executable=python_executable, dadaia_bin=dadaia_bin)
-    base = (*pytest, "-q", "-p", "no:cacheprovider")
+    base = (*pytest, "-q", "-p", "no:cacheprovider", "--ignore=tests/performance")
     if quick:
         return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
     return Check("pytest", base)

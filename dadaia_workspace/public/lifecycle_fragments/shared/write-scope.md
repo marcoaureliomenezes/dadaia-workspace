@@ -13,9 +13,8 @@ max_context_policy: exact-files-only
 
 This step has a declared write set: the exact files and directories it is permitted
 to create or modify, supplied as `declared_write_set` for the active `task_group`.
-Every change you make must fall inside that set. The boundary is enforced by the
-workflow after the fact (changed paths are compared against the declared set), so a
-change outside the set is not a near-miss — it blocks the step.
+Every change you make must fall inside that set; a change outside it is out of
+contract, not a near-miss.
 
 ## Discipline
 
@@ -43,8 +42,3 @@ Reserve the task (`[ ]` → `[-]`) before editing, and leave it `[-]` until the
 review evidence the workflow requires has cleared. Never flip a task to `[x]`
 yourself on the strength of your own work; completion is a gate decision made from
 review evidence, not a self-grant.
-
-## In one line
-
-Touch only what `declared_write_set` allows, change only what the task asks for, and
-let the gate — not your own judgment — decide when the task is done.

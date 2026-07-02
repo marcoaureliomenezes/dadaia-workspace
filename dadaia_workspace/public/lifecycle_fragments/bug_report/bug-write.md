@@ -23,12 +23,12 @@ additive by construction: a new file appears, nothing else changes.
 
 ## Procedure
 
-1. **Write only to the bug channel.** Create exactly one new bug record file in the
-   bug channel. Do not touch memory, specs, source, or any existing bug — additive
-   only.
+1. **Write only to the bug channel.** Produce exactly one additive bug record for the
+   bug channel (the store is event-sourced: a single `reported` event, appended by the
+   Python gate — you produce the content, never the write). Do not touch memory,
+   specs, source, or any existing bug.
 2. **Carry the normalized fields.** The record carries the symptom, repro,
-   expected/actual, severity, surface, status `Open`, and the reported date from the
-   intake step.
+   expected/actual, severity, surface, and the reported date from the intake step.
 3. **Stay redaction-clean.** No operator-local absolute path, IP, hostname, private
    repo name, or secret in the committed record.
 

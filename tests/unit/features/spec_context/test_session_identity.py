@@ -291,3 +291,102 @@ def test_iter_bind_epochs_skips_invalid_names(tmp_path: Path) -> None:
     bad = si.bind_epoch_dir(ws, create=True) / "bad name!"
     bad.write_text("x", encoding="utf-8")
     assert dict(si.iter_bind_epochs(ws)).keys() == {"good"}
+
+
+# W1-7/W1-8 (v0.1.47): bind-epoch session attribution — the marker file CONTENT carries the
+# bind process's nearest-first ANCESTRY PID CHAIN (one decimal pid per line) so the
+# ctx-inject hook and the specs resolver attribute it by MEMBERSHIP, surviving the ephemeral
+# harness shell that dies between calls.
+
+
+def test_write_bind_epoch_records_ancestry_chain_as_content(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pids=[4242, 5353, 6464])
+    # One decimal pid per line, nearest-first.
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == "4242\n5353\n6464\n"
+    assert si.read_bind_epoch_pids(ws, CTX) == [4242, 5353, 6464]
+    # The single-pid compat reader returns the FIRST (nearest) chain entry.
+    assert si.read_bind_epoch_pid(ws, CTX) == 4242
+
+
+def test_write_bind_epoch_single_pid_chain_is_legacy_shape(tmp_path: Path) -> None:
+    # A one-element chain reproduces the pre-v0.1.47 single-line marker exactly.
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pids=[4242])
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8").strip() == "4242"
+    assert si.read_bind_epoch_pids(ws, CTX) == [4242]
+    assert si.read_bind_epoch_pid(ws, CTX) == 4242
+
+
+def test_write_bind_epoch_caps_chain_length(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    long_chain = list(range(100, 100 + 20))  # 20 > the 8-entry cap
+    si.write_bind_epoch(ws, CTX, pids=long_chain)
+    got = si.read_bind_epoch_pids(ws, CTX)
+    assert got == long_chain[:8]
+    assert len(got) == 8
+
+
+def test_write_bind_epoch_filters_nonpositive_pids(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pids=[0, -7, 4242, 5353])
+    assert si.read_bind_epoch_pids(ws, CTX) == [4242, 5353]
+
+
+def test_write_bind_epoch_with_chain_refreshes_mtime(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pids=[4242, 5353])
+    marker = si.bind_epoch_path(ws, CTX)
+    base = marker.stat().st_mtime
+    os.utime(marker, (base - 100, base - 100))
+    backdated = marker.stat().st_mtime
+    si.write_bind_epoch(ws, CTX, pids=[9999, 8888])
+    assert marker.stat().st_mtime > backdated
+    assert si.read_bind_epoch_pids(ws, CTX) == [9999, 8888]
+
+
+def test_read_bind_epoch_pids_empty_for_legacy_empty_marker(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX)  # legacy shape: pids=None ⇒ EMPTY marker
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == ""
+    # (d) empty marker ⇒ never attributable: no pids, no single-pid.
+    assert si.read_bind_epoch_pids(ws, CTX) == []
+    assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pids_empty_for_empty_or_none_pids(tmp_path: Path) -> None:
+    # An explicit empty list is unattributable, exactly like ``pids=None``.
+    ws = _ws(tmp_path)
+    si.write_bind_epoch(ws, CTX, pids=[])
+    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == ""
+    assert si.read_bind_epoch_pids(ws, CTX) == []
+
+
+def test_read_bind_epoch_pids_empty_for_absent_marker(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    assert si.read_bind_epoch_pids(ws, CTX) == []
+    assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pids_skips_blank_and_garbage_lines(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    marker = si.bind_epoch_dir(ws, create=True) / CTX
+    marker.write_text("4242\n\ngarbage\n-1\n0\n5353\n", encoding="utf-8")
+    assert si.read_bind_epoch_pids(ws, CTX) == [4242, 5353]
+    assert si.read_bind_epoch_pid(ws, CTX) == 4242
+
+
+def test_read_bind_epoch_pid_none_for_all_garbage_marker(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    marker = si.bind_epoch_dir(ws, create=True) / CTX
+    for bad in ("not-a-pid", "0", "-7", ""):
+        marker.write_text(bad, encoding="utf-8")
+        assert si.read_bind_epoch_pids(ws, CTX) == []
+        assert si.read_bind_epoch_pid(ws, CTX) is None
+
+
+def test_read_bind_epoch_pids_empty_for_traversal_name(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    # A traversal ctx name never resolves to a marker path ⇒ fail-soft, never raises.
+    assert si.read_bind_epoch_pids(ws, "../escape") == []
+    assert si.read_bind_epoch_pid(ws, "../escape") is None

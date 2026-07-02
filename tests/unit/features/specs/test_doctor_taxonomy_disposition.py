@@ -135,3 +135,98 @@ def test_empty_audit_archive_is_clean(tmp_path: Path) -> None:
     _seed_archives(specs)
     (specs / "audits" / "_archive" / ".gitkeep").write_text("", encoding="utf-8")
     assert _codes(specs, "SPEC-DOC-036") == []
+
+
+# --- SPEC-DOC-037: constitution must not enumerate AgentRuntimeKind members -----------
+
+
+def _write_constitution(specs: Path, body: str) -> None:
+    specs.mkdir(parents=True, exist_ok=True)
+    (specs / "constitution.md").write_text(body, encoding="utf-8")
+
+
+def test_clean_constitution_no_runtime_enum_is_clean(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    # Cites the roster single-source and even the Layer model set {claude, codex, pi} — none
+    # of which is an AgentRuntimeKind ENUM member, so no SPEC-DOC-037.
+    _write_constitution(
+        specs,
+        "# Constitution\n\n"
+        "Runtime kinds are the roster single-source in [[tech-stack]]; the constitution "
+        "states only the invariant. Layer 1 = {claude, codex, pi}; Layer 2 = {pi, codex}.\n"
+        "The word fake in lowercase prose is fine.\n",
+    )
+    assert _codes(specs, "SPEC-DOC-037") == []
+
+
+def test_constitution_enumerating_runtime_members_reports_doc_037_error(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    _write_constitution(
+        specs,
+        "# Constitution\n\n"
+        "§8: the AgentRuntimeKind enum members are FAKE, CODEX_EXEC, CLAUDE_SDK, "
+        "PI_HEADLESS, OPENCODE_RUN.\n",
+    )
+    errs = _codes(specs, "SPEC-DOC-037")
+    assert len(errs) == 1
+    assert errs[0].severity is Severity.ERROR
+    # The finding names the offending tokens it found.
+    for tok in ("FAKE", "CODEX_EXEC", "CLAUDE_SDK", "PI_HEADLESS", "OPENCODE_RUN"):
+        assert tok in errs[0].description
+
+
+def test_constitution_single_runtime_token_still_reports_doc_037(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    _write_constitution(specs, "# Constitution\n\nWorkers default to CODEX_EXEC today.\n")
+    errs = _codes(specs, "SPEC-DOC-037")
+    assert len(errs) == 1 and errs[0].severity is Severity.ERROR
+
+
+def test_constitution_absent_is_not_doc_037(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir(parents=True)
+    # No constitution.md — SPEC-DOC-001 owns absence; SPEC-DOC-037 stays silent.
+    assert _codes(specs, "SPEC-DOC-037") == []
+
+
+# --- SPEC-DOC-038: loose (unarchived) audit directories -------------------------------
+
+
+def _loose_audit(specs: Path, name: str) -> None:
+    audit_dir = specs / "audits" / name
+    audit_dir.mkdir(parents=True)
+    (audit_dir / "report.md").write_text("# Audit\n\nFindings.\n", encoding="utf-8")
+
+
+def test_loose_audit_dir_warns_doc_038(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    _loose_audit(specs, "20260701T201136Z-0bcd6c19")
+    warns = _codes(specs, "SPEC-DOC-038")
+    assert len(warns) == 1
+    assert warns[0].severity is Severity.WARNING
+    assert "20260701T201136Z-0bcd6c19" in warns[0].description
+
+
+def test_multiple_loose_audit_dirs_warn_one_each_doc_038(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    _loose_audit(specs, "20260701T201136Z-0bcd6c19")
+    _loose_audit(specs, "20260612T001813Z-deadbeef")
+    warns = _codes(specs, "SPEC-DOC-038")
+    assert len(warns) == 2
+
+
+def test_archived_only_audits_are_clean_doc_038(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    # Only _archive/ under audits/ — nothing loose ⇒ no SPEC-DOC-038.
+    _archived_audit(
+        specs,
+        "20260701T135346Z-6145b869",
+        "# Audit\n\n**Disposition:** v0.1.47\n",
+    )
+    assert _codes(specs, "SPEC-DOC-038") == []
+
+
+def test_absent_audits_dir_is_not_doc_038(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir(parents=True)
+    assert _codes(specs, "SPEC-DOC-038") == []
