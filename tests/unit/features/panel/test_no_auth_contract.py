@@ -155,7 +155,6 @@ _TELEMETRY_ROUTE_PATHS = [
     "/api/agents",
     "/api/agents/software-engineer/sessions",
     "/api/sessions",
-    "/api/sessions/claude/abc123",
 ]
 
 

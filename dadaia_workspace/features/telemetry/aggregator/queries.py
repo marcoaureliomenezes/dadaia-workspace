@@ -25,11 +25,15 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentSummary,
     ContextBreakdown,
     RecentSession,
-    SessionDetail,
-    SessionListResult,
-    SessionRow,
+    SessionAggregate,
     TokenTotals,
+    TopAgent,
 )
+
+# Runtimes that do not track token cost. Their aggregate cost is always
+# unknown regardless of any stray stored value (SPEC v0.1.52 FR1, matrix case 1;
+# mirrors the client ``isCostUnknownRuntime``).
+_COST_UNKNOWN_RUNTIMES: frozenset[str] = frozenset({"codex", "pi"})
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -663,277 +667,101 @@ class TelemetryAggregator:
         return result
 
     # ------------------------------------------------------------------
-    # Session-level queries (panel-r5-v1 FR1)
+    # Session aggregate (panel-plumbing v0.1.52 FR1)
     # ------------------------------------------------------------------
 
-    def list_sessions(
-        self,
-        runtime: str,
-        project: str | None = None,
-        limit: int | None = None,
-    ) -> SessionListResult:
-        """Return SessionListResult for the requested runtime.
+    def aggregate_sessions(self, runtime: str) -> SessionAggregate:
+        """Return the server-side aggregate cost summary for a runtime.
 
-        Filters:
-        - runtime: matched against sessions.provider.
-        - project: optional sub_slug filter (sessions.sub_slug = project).
-        - limit: caps the number of rows returned.
+        Rolls the store up into the Sessions dashboard's four numbers plus the
+        cost summary (SPEC v0.1.52 FR1). The cost semantics mirror the client
+        ``computeStats`` this endpoint replaced:
 
-        Ordered by sessions.last_event_at DESC.
+        * a session contributes to ``total_cost_usd`` only when it is fully
+          cost-known (every event has a known cost) with a non-None cumulative
+          cost;
+        * ``total_cost_usd`` is None when no session contributes;
+        * ``cost_known`` is True iff at least one session contributes;
+        * codex/pi are cost-unknown runtimes: cost is forced None / False.
 
-        For each session the most recent assistant event supplies:
-        - model
-        - context_size_tokens = input + cache_creation + cache_read of that event
-        - message_count = COUNT(events) for the session
+        Cost-unknown sessions still count toward ``total_sessions``,
+        ``active_sessions``, ``total_messages`` and ``top_agent``.
 
-        Status is stored in sessions.status (values may be 'closed', 'active', etc.)
-        and mapped to the API Literal: closed → ended, active → active; any other
-        value → idle.  The RuntimeAdapter (PR5-A3) may override this at call time.
+        Privacy invariant (T1): no content fields are read or returned.
         """
         conn: sqlite3.Connection = self._dao._conn
         conn.row_factory = sqlite3.Row
 
-        # Build session query with optional project filter.
-        # NOTE: 'project' maps to sessions.sub_slug (the nearest project slug).
-        where_clauses = ["s.provider = ?"]
-        params: list[Any] = [runtime]
-
-        if project is not None:
-            where_clauses.append("s.sub_slug = ?")
-            params.append(project)
-
-        where_sql = " AND ".join(where_clauses)
-
-        session_rows = conn.execute(
-            f"""
-            SELECT s.session_id, s.provider, s.agent_name, s.ai_title,
-                   s.cwd, s.sub_slug, s.first_event_at, s.last_event_at, s.status
+        # Per-session roll-up: message_count, non-null cost sum, null-cost count.
+        # A session is "fully cost-known" iff it has >= 1 event and 0 null-cost
+        # events; only those sessions contribute their cost_sum to the total.
+        rows = conn.execute(
+            """
+            SELECT
+                s.status                       AS status,
+                s.agent_name                   AS agent_name,
+                s.last_event_at                AS last_event_at,
+                COALESCE(e.message_count, 0)   AS message_count,
+                e.cost_sum                     AS cost_sum,
+                COALESCE(e.null_cost_count, 0) AS null_cost_count
             FROM sessions s
-            WHERE {where_sql}
+            LEFT JOIN (
+                SELECT
+                    session_id,
+                    COUNT(*) AS message_count,
+                    SUM(cost_micro_usd) AS cost_sum,
+                    SUM(CASE WHEN cost_micro_usd IS NULL THEN 1 ELSE 0 END) AS null_cost_count
+                FROM events
+                GROUP BY session_id
+            ) e ON e.session_id = s.session_id
+            WHERE s.provider = ?
             ORDER BY s.last_event_at DESC
             """,
-            params,
+            (runtime,),
         ).fetchall()
 
-        total_count = len(session_rows)
+        total_sessions = len(rows)
+        active_sessions = sum(1 for r in rows if r["status"] == "active")
+        total_messages = sum(int(r["message_count"]) for r in rows)
 
-        # Apply limit after counting total.
-        if limit is not None:
-            session_rows = session_rows[:limit]
+        # Cost aggregation — forced unknown for codex/pi (never track cost).
+        total_cost_usd: float | None = None
+        cost_known = False
+        if runtime not in _COST_UNKNOWN_RUNTIMES:
+            total_micro = 0
+            for r in rows:
+                msg_count = int(r["message_count"])
+                null_cost_count = int(r["null_cost_count"])
+                cost_sum = r["cost_sum"]
+                # cost_known filter: only fully cost-known sessions contribute.
+                if msg_count > 0 and null_cost_count == 0 and cost_sum is not None:
+                    total_micro += int(cost_sum)
+                    cost_known = True
+            if cost_known:
+                total_cost_usd = _micro_to_usd(total_micro)
 
-        if not session_rows:
-            return SessionListResult(
-                sessions=[],
-                runtime=runtime,
-                project=project,
-                limit=limit,
-                generated_at=_now_iso(),
-                total_count=total_count,
-            )
+        # Top agent — sessions with no agent_name bucket under "operator".
+        # Rows arrive last_event_at DESC; first-inserted key wins ties (mirrors
+        # the client Object.keys insertion order + strict-greater scan).
+        agent_counts: dict[str, int] = {}
+        for r in rows:
+            name = r["agent_name"] or "operator"
+            agent_counts[name] = agent_counts.get(name, 0) + 1
 
-        session_ids = [r["session_id"] for r in session_rows]
-        placeholders = ",".join("?" * len(session_ids))
+        top_agent: TopAgent | None = None
+        top_count = 0
+        for name, count in agent_counts.items():
+            if count > top_count:
+                top_agent = TopAgent(name=name, session_count=count)
+                top_count = count
 
-        # Per-session: message_count and most-recent event metrics.
-        # One query: aggregate + most-recent event via subquery.
-        event_stats = conn.execute(
-            f"""
-            SELECT
-                e.session_id,
-                COUNT(*) AS message_count,
-                SUM(e.tokens_input + e.tokens_cache_create + e.tokens_cache_read) AS context_tokens_sum,
-                SUM(e.cost_micro_usd) AS cost_sum,
-                SUM(CASE WHEN e.cost_micro_usd IS NULL THEN 1 ELSE 0 END) AS null_cost_count
-            FROM events e
-            WHERE e.session_id IN ({placeholders})
-            GROUP BY e.session_id
-            """,
-            session_ids,
-        ).fetchall()
-
-        stat_by_session: dict[str, dict[str, Any]] = {}
-        for row in event_stats:
-            stat_by_session[row["session_id"]] = {
-                "message_count": row["message_count"],
-                "context_tokens_sum": row["context_tokens_sum"] or 0,
-                "cost_sum": row["cost_sum"],
-                "null_cost_count": row["null_cost_count"],
-            }
-
-        # Most recent event per session for model + context_size_tokens formula.
-        # context_size_tokens = input + cache_creation + cache_read of MOST RECENT event.
-        recent_events = conn.execute(
-            f"""
-            SELECT e.session_id, e.model,
-                   e.tokens_input + e.tokens_cache_create + e.tokens_cache_read AS context_size_tokens
-            FROM events e
-            INNER JOIN (
-                SELECT session_id, MAX(occurred_at) AS max_occ
-                FROM events
-                WHERE session_id IN ({placeholders})
-                GROUP BY session_id
-            ) latest ON e.session_id = latest.session_id AND e.occurred_at = latest.max_occ
-            WHERE e.session_id IN ({placeholders})
-            """,
-            session_ids + session_ids,
-        ).fetchall()
-
-        recent_by_session: dict[str, dict[str, Any]] = {}
-        for row in recent_events:
-            recent_by_session[row["session_id"]] = {
-                "model": row["model"],
-                "context_size_tokens": row["context_size_tokens"] or 0,
-            }
-
-        result_rows: list[SessionRow] = []
-        for sr in session_rows:
-            sid = sr["session_id"]
-            stats = stat_by_session.get(sid, {})
-            recent = recent_by_session.get(sid, {})
-
-            msg_count = stats.get("message_count", 0)
-            ctx_tokens = recent.get("context_size_tokens", 0)
-            model = recent.get("model", None)
-
-            cost_sum = stats.get("cost_sum")
-            null_cost_count = stats.get("null_cost_count", 0)
-            total_events = msg_count
-
-            if total_events == 0 or null_cost_count == total_events:
-                cumulative_cost_usd: float | None = None
-                cost_known = total_events == 0  # no events → unknown; all null → False
-            elif cost_sum is not None:
-                cumulative_cost_usd = _micro_to_usd(cost_sum)
-                cost_known = null_cost_count == 0
-            else:
-                cumulative_cost_usd = None
-                cost_known = False
-
-            # Status mapping: sessions.status is 'closed'/'active'/etc.
-            raw_status = sr["status"] or "closed"
-            if raw_status == "active":
-                status: str = "active"
-            elif raw_status == "closed":
-                status = "ended"
-            else:
-                status = "idle"
-
-            result_rows.append(
-                SessionRow(
-                    session_id=sid,
-                    runtime=sr["provider"],
-                    project=sr["sub_slug"],
-                    cwd=sr["cwd"],
-                    model=model,
-                    started_at=sr["first_event_at"],
-                    last_activity_at=sr["last_event_at"],
-                    message_count=msg_count,
-                    context_size_tokens=ctx_tokens,
-                    cumulative_cost_usd=cumulative_cost_usd,
-                    cost_known=cost_known,
-                    status=status,  # type: ignore[arg-type]
-                    agent_name=sr["agent_name"],
-                    ai_title=sr["ai_title"],
-                )
-            )
-
-        return SessionListResult(
-            sessions=result_rows,
+        return SessionAggregate(
             runtime=runtime,
-            project=project,
-            limit=limit,
-            generated_at=_now_iso(),
-            total_count=total_count,
-        )
-
-    def get_session(
-        self,
-        runtime: str,
-        session_id: str,
-    ) -> SessionDetail | None:
-        """Return enriched SessionDetail for a single session, or None on miss.
-
-        The runtime discriminator is applied: if the stored provider does not
-        match runtime, the method returns None (not found for that runtime).
-        """
-        conn: sqlite3.Connection = self._dao._conn
-        conn.row_factory = sqlite3.Row
-
-        sr = conn.execute(
-            """
-            SELECT session_id, provider, agent_name, ai_title, cwd, sub_slug,
-                   first_event_at, last_event_at, status
-            FROM sessions
-            WHERE session_id = ? AND provider = ?
-            """,
-            (session_id, runtime),
-        ).fetchone()
-
-        if sr is None:
-            return None
-
-        # All events for this session.
-        ev_rows = conn.execute(
-            """
-            SELECT occurred_at, model,
-                   tokens_input, tokens_cache_create, tokens_cache_read,
-                   cost_micro_usd
-            FROM events
-            WHERE session_id = ?
-            ORDER BY occurred_at ASC
-            """,
-            (session_id,),
-        ).fetchall()
-
-        msg_count = len(ev_rows)
-        event_timestamps: tuple[str, ...] = tuple(r["occurred_at"] for r in ev_rows)
-
-        # Most-recent event for model + context_size_tokens.
-        if ev_rows:
-            last_ev = ev_rows[-1]
-            model: str | None = last_ev["model"]
-            ctx_tokens = (
-                last_ev["tokens_input"]
-                + last_ev["tokens_cache_create"]
-                + last_ev["tokens_cache_read"]
-            )
-        else:
-            model = None
-            ctx_tokens = 0
-
-        # Cumulative cost.
-        null_count = sum(1 for r in ev_rows if r["cost_micro_usd"] is None)
-        cost_sum = sum(r["cost_micro_usd"] for r in ev_rows if r["cost_micro_usd"] is not None)
-
-        if msg_count == 0 or null_count == msg_count:
-            cumulative_cost_usd: float | None = None
-            cost_known = msg_count == 0
-        else:
-            cumulative_cost_usd = _micro_to_usd(cost_sum)
-            cost_known = null_count == 0
-
-        raw_status = sr["status"] or "closed"
-        if raw_status == "active":
-            status: str = "active"
-        elif raw_status == "closed":
-            status = "ended"
-        else:
-            status = "idle"
-
-        return SessionDetail(
-            session_id=sr["session_id"],
-            runtime=sr["provider"],
-            project=sr["sub_slug"],
-            cwd=sr["cwd"],
-            model=model,
-            started_at=sr["first_event_at"],
-            last_activity_at=sr["last_event_at"],
-            message_count=msg_count,
-            context_size_tokens=ctx_tokens,
-            cumulative_cost_usd=cumulative_cost_usd,
+            total_sessions=total_sessions,
+            active_sessions=active_sessions,
+            total_cost_usd=total_cost_usd,
             cost_known=cost_known,
-            status=status,  # type: ignore[arg-type]
-            agent_name=sr["agent_name"],
-            ai_title=sr["ai_title"],
-            event_timestamps=event_timestamps,
+            total_messages=total_messages,
+            top_agent=top_agent,
+            generated_at=_now_iso(),
         )

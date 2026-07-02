@@ -152,7 +152,7 @@ class SessionDetail(SessionRow):
 
 @dataclass(frozen=True)
 class SessionListResult:
-    """Top-level response for list_sessions().
+    """Top-level response shape for a session-list query.
 
     sessions: ordered by last_activity_at DESC.
     runtime: the runtime filter that was applied.
@@ -168,3 +168,44 @@ class SessionListResult:
     limit: int | None
     generated_at: str
     total_count: int
+
+
+# ---------------------------------------------------------------------------
+# Session-aggregate dataclasses (panel-plumbing v0.1.52 FR1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TopAgent:
+    """The busiest agent in a runtime's aggregate — no cost, no content."""
+
+    name: str  # agent_name, or "operator" when the session has no agent_name
+    session_count: int
+
+
+@dataclass(frozen=True)
+class SessionAggregate:
+    """Server-side aggregate cost summary for GET /api/sessions.
+
+    Replaces the per-session list/detail payload with the 4-card dashboard's
+    numbers computed server-side (panel-plumbing v0.1.52 FR1). No content
+    fields — privacy invariant preserved.
+
+    total_cost_usd: sum over sessions that are *fully* cost-known (every event
+        has a known cost) with a non-None cumulative cost; None when no session
+        contributes (rendered '—' for a cost-tracking runtime, distinct from the
+        client 'N/A' for cost-unknown runtimes).
+    cost_known: True iff at least one session contributes a known cost. Forced
+        False for cost-unknown runtimes (codex/pi), which never track cost.
+    active_sessions / total_messages / top_agent: computed from every session in
+        the runtime, including cost-unknown ones.
+    """
+
+    runtime: str
+    total_sessions: int
+    active_sessions: int
+    total_cost_usd: float | None
+    cost_known: bool
+    total_messages: int
+    top_agent: TopAgent | None
+    generated_at: str  # ISO UTC timestamp

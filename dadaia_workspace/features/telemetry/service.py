@@ -38,8 +38,7 @@ from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     RecentSession,
-    SessionDetail,
-    SessionListResult,
+    SessionAggregate,
     WorkflowListResult,
 )
 
@@ -461,23 +460,10 @@ class TelemetryService:
             ),
         )
 
-    def list_sessions(
-        self,
-        runtime: str,
-        project: str | None = None,
-        limit: int | None = None,
-    ) -> SessionListResult:
-        """Return sessions for the given runtime. Triggers lazy refresh."""
+    def aggregate_sessions(self, runtime: str) -> SessionAggregate:
+        """Return the server-side aggregate cost summary. Triggers lazy refresh."""
         self.refresh()
         return cast(
-            SessionListResult,
-            self._aggregator.list_sessions(runtime=runtime, project=project, limit=limit),
-        )
-
-    def get_session(self, runtime: str, session_id: str) -> SessionDetail | None:
-        """Return detail for a single session, or None on miss. Triggers lazy refresh."""
-        self.refresh()
-        return cast(
-            "SessionDetail | None",
-            self._aggregator.get_session(runtime=runtime, session_id=session_id),
+            SessionAggregate,
+            self._aggregator.aggregate_sessions(runtime=runtime),
         )
