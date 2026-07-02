@@ -18,7 +18,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W1 — FR1 lease identity (write set: `core/lock_liveness.py`, `features/spec_context/lease.py`, `hooks/sdd_gate.py`, unit tests)
 
-- [ ] T-50-10 TDD: failing rotated-sid self-block regression as its OWN red commit
+- [-] T-50-10 TDD: failing rotated-sid self-block regression as its OWN red commit
   (same recorded harness pid + new sid ⇒ currently `LockHeldError`); then the third
   identity rung (RENEW) at the acquire ladder in `lease.py`; sid precedence fixed
   ONCE in `hooks/_common.resolve_session_id` (`DADAIA_SESSION_ID` override stays
