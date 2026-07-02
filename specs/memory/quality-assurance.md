@@ -17,7 +17,7 @@ tags:
 agent_tier: self-pull
 token_estimate: 1250
 last_updated: '2026-07-02'
-release_origin: v0.1.48
+release_origin: v0.1.51
 ---
 
 ## Purpose
@@ -36,11 +36,20 @@ dependencies). The default local invocation (`pytest`) does not run coverage; th
 dir), keeping local runs fast and avoiding coverage inflation that hides weak
 contracts.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.3k tests (4,300–4,400 as of
-v0.1.47; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.4k tests (4,424 as of
+v0.1.51; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
+
+**Named-journey coverage (v0.1.51):** the e2e top includes the master lifecycle
+journey (`context create → alive → real-subprocess bind → cross-process ctx-inject →
+lease/gate no-steal`, one narrative chain), the consumer specs-upgrade path
+(`upgrade → init → doctor-green` + at-target no-op idempotence), and a panel
+OPERATION journey (registry mutation observed as a DOM delta) beyond rendering /
+API-200 assertions. New E2Es are born falsifiable: each was demonstrated to FAIL
+under a one-line sabotage of its guarded behavior before shipping (mutation-sanity,
+v0.1.51 AC-7).
 
 ```mermaid
 flowchart TB
