@@ -61,8 +61,14 @@ sets are disjoint (PLAN §Write sets).
 
 ## W5 — gates + ship (flat release: single ship gate)
 
-- [ ] T-50-20 QA review (ship gate): diff vs SPEC §5; land verdict as a review
-  commit. Owner: qa-engineer.
+- [x] T-50-20 QA review (ship gate): REJECT → fix → APPROVE (qa-engineer,
+  2026-07-02). REJECT caught: 5 old-contract pins left red at the gate (BLOCKER —
+  incl. 2 surfaced only by the reviewer), a `pytest | tail` exit-code mask
+  (MAJOR — suite re-run UNPIPED: 4,411 passed / 0 failed, real exit 0), and a
+  PLAN write-set omission (MINOR). All remediated on stable HEAD `1c8dc70b`;
+  APPROVE verified: frozen 9-path suite zero-diff, all ACs pass, ADR fidelity
+  confirmed, refusal-message redaction now regression-tested. Verdict landed as
+  this review commit. Owner: qa-engineer.
 - [ ] T-50-21 Security review (push gate): APPROVE handoff with `metrics.commit_sha`
   = pushed sha; push; CI green; PR; merge. Owner: security-reviewer + orchestrator.
 
