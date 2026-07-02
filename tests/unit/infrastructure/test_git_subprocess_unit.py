@@ -78,19 +78,27 @@ def test_push_sets_upstream_when_tracking_missing(monkeypatch: pytest.MonkeyPatc
     assert ["git", "push", "-u", "origin", "main"] in calls
 
 
-def test_push_uses_plain_push_when_tracking_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_push_uses_explicit_refspec_when_tracking_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """v0.1.50 FR3: tracking set ⇒ rev-list ahead-check, then push <remote> HEAD:<branch>."""
     calls: list[list[str]] = []
 
     def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
         calls.append(args)
-        return _result(stdout="origin/main\n" if "--abbrev-ref" in args else "")
+        if "--abbrev-ref" in args:
+            return _result(stdout="origin/main\n")
+        if "rev-list" in args:
+            return _result(stdout="1\n")
+        return _result(stdout="")
 
     monkeypatch.setattr(git_subprocess, "_run", fake_run)
 
     GitSubprocessClient().push(Path("/repo"))
 
-    assert ["git", "push"] in calls
+    assert ["git", "push", "origin", "HEAD:main"] in calls
     assert not any(call[:3] == ["git", "push", "-u"] for call in calls)
+    assert ["git", "push"] not in calls
 
 
 def test_checkout_raises_sync_error_on_git_failure(monkeypatch: pytest.MonkeyPatch) -> None:

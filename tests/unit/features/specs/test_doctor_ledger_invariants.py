@@ -457,6 +457,13 @@ def test_incoherent_lease_session_via_production_writers_reports_doc_029(
 
     # Production writer #1: the real lease record + incumbent ptr, both naming S1.
     lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
+    # v0.1.50 FR2 (holder-confirmation): a REAL acquire leaves same-CAS index
+    # evidence, so ptr drift alone is no longer forgery. Forge the record
+    # out-of-band (no index entry) to reproduce the true 029 ERROR shape.
+    rec = lease.read_record(tmp_path, ctx)
+    assert rec is not None
+    rec["session_id"] = "sessForged"
+    lease._write_record(lease._record_path(tmp_path, ctx), rec)
     # Production writer #2: drift the incumbent ptr to S2 and persist S2's session record.
     session_identity.set_incumbent(tmp_path, ctx, "sessS2")
     session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
@@ -624,8 +631,14 @@ def test_live_incoherent_lease_reports_doc_029_error_with_forgery_wording(
     ctx = "ctx-live"
 
     # Live holder: fresh acquire (heartbeat now, pid = this process, alive). Wire a probe
-    # so the live pid is honoured even if TTL math is borderline.
+    # so the live pid is honoured even if TTL math is borderline. v0.1.50 FR2: forge
+    # the holder sid out-of-band (no same-CAS index entry) — a confirmed holder with
+    # ptr drift is coherent now; only the evidence-less shape is forgery.
     lease.acquire(tmp_path, ctx, "sessLive", "rel-1", "implementation")
+    rec = lease.read_record(tmp_path, ctx)
+    assert rec is not None
+    rec["session_id"] = "sessForgedLive"
+    lease._write_record(lease._record_path(tmp_path, ctx), rec)
     session_identity.set_incumbent(tmp_path, ctx, "sessOther")
     session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
 

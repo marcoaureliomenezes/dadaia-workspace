@@ -44,7 +44,7 @@ sets are disjoint (PLAN §Write sets).
 
 ## W4 — FR4 bound-session resolution (write set: `cli/commands/bugs.py` + sibling `resolve_specs_dir` callers + `core/specs_resolver.py` cwd guard + tests + this task's root-cause line)
 
-- [-] T-50-13 VERIFY-PINNED-CAUSE-THEN-FIX: red integration test on a bound-session
+- [x] T-50-13 VERIFY-PINNED-CAUSE-THEN-FIX: red integration test on a bound-session
   fixture proving `bugs append` falls to cwd (verifies the definition-review pin);
   record the verification result on the line below; then CENTRALIZE
   ancestry-threading in one shared CLI seam consumed by all five
@@ -52,7 +52,12 @@ sets are disjoint (PLAN §Write sets).
   `newartifacts` — reference behavior: `newartifacts.py:94`), add the cwd fallback
   root-law guard (redaction-safe refusal message). Halt path per SPEC §5 AC-4
   (expected unused). Owner: software-engineer.
-  - Root cause (pinned 2026-07-02 definition review; W4 verification): _pending_.
+  - Root cause (pinned 2026-07-02 definition review; W4 verification): **VERIFIED
+    by red test** `test_bugs_append_resolves_bound_context_via_ancestry_chain` —
+    a deep-ancestor bind marker misses under getppid-only degraded attribution
+    (bugs.py omitted `ancestry_pids`); green after the shared seam
+    `cli/_specs_resolution.resolve_specs_dir_for_cli` (all five wrappers consume
+    it — the omission class is structurally impossible). Halt path unused.
 
 ## W5 — gates + ship (flat release: single ship gate)
 
