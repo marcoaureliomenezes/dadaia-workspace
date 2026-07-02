@@ -131,9 +131,10 @@ Invariantes de paridade (parity contract com os hooks bash anteriores):
 - Fail-open: qualquer erro não-PROTECTED → ALLOW. PROTECTED é o único fail-closed path.
 
 `runtime_config.py` emite o comando Python para `.claude/settings.json`; para o Codex,
-emite **wrappers executáveis self-locating** em `.dadaia/hooks/codex-*` referenciados por
-`.codex/hooks.json` (Codex direct-execs strings de hook — o wrapper resolve o venv Python
-relativo ao próprio path, cross-platform). `workspace/service.py` reconhece tanto o
+emite wrappers executáveis em `.dadaia/hooks/codex-*` — the platform angle is that each
+wrapper resolves the venv Python **relative to its own path**, cross-platform; the
+registration/matcher mechanics are owned by [[public-asset-distribution]].
+`workspace/service.py` reconhece tanto o
 caminho `.sh` antigo quanto o novo comando Python para evitar dupla-registro em
 workspaces migrados.
 

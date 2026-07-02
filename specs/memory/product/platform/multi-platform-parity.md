@@ -44,9 +44,9 @@ agentic model"):
 - **Layer 1 (this atom) — entry-harness projection parity.** Source
   (`dadaia_workspace/public/`) → `.claude/`, `.codex/`, `.pi/` asset trees via
   `dadaia public install` (targets `{agents, claude, codex, pi}`). Each tree is
-  truthful about its runtime. PI's `.pi/` projection (target `pi`) is **minimal**:
-  `.pi/SYSTEM.md` POINTS AT `AGENTS.md` (no law restatement) + a generic
-  `.pi/settings.json` + `.pi/prompts/` + `.pi/extensions/`.
+  truthful about its runtime. PI's `.pi/` projection (target `pi`) is **minimal** —
+  `.pi/SYSTEM.md` POINTS AT `AGENTS.md` (no law restatement); the `.pi/` surface
+  inventory is owned by [[public-asset-distribution]].
 - **Layer 2 — worker-runtime parity (NOT projection parity).** The lifecycle engine's
   per-step worker harnesses behind `AgentRuntimePort` (the four-member
   `AgentRuntimeKind` roster is single-sourced in [[tech-stack]] §Agent runtimes). These
@@ -101,12 +101,8 @@ Codex receives:
   mandated venv-path invocation form (`.dadaia/.venv/bin/dadaia ...`), proven by
   real-form `match=` examples. Markdown files under `public/rules/*.md` remain
   behavioral protocols and are not projected as executable Codex Rules.
-- `.codex/hooks.json` with a SINGLE `PreToolUse` command (anchored matcher
-  `^(apply_patch|Edit|Write|Bash)$`), `PostToolUse` (matcher-less match-all), and
-  `UserPromptSubmit`/`SessionStart` entries — each command string pointing at a
-  self-locating executable wrapper `.dadaia/hooks/codex-*` that resolves the
-  workspace venv Python and delegates to the `dadaia_workspace.hooks.*` module
-  (Codex direct-execs hook strings; a bare `python -m` string is not reliable).
+- `.codex/hooks.json` hook registration via the `.dadaia/hooks/codex-*` wrappers —
+  wrapper and matcher registration mechanics are owned by [[public-asset-distribution]].
   **Honesty boundary (live-verified, codex-cli 0.139.0):** Codex executes command
   hooks ONLY in interactive (TUI) sessions — `codex exec` (headless) never fires
   them, so hook enforcement on Codex is interactive-only and the headless
@@ -126,9 +122,9 @@ strongest hook/runtime reference, but shared docs must not assume Claude-only
 mechanisms exist in Codex or PI. The only shell assets in the product are the two git
 chokepoints (`pre-commit-lease-gate.sh`, `pre-push-ci-gate.sh`).
 
-PI receives a `.pi/` projection (`SYSTEM.md`, `settings.json`,
-`prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts`) via `dadaia public
-install --target pi`. PI reads `AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace
+PI receives the `.pi/` projection via `dadaia public install --target pi` (surface
+inventory: [[public-asset-distribution]]).
+PI reads `AGENTS.md`/`CLAUDE.md` natively up the tree, so workspace
 law rides for free; the `.pi/extensions/dadaia-sdd-gate.ts`
 extension adds a real Layer-1 **Ring-1** pre-disk gate — its `tool_call` handler maps
 write→Write/edit→Edit and delegates to the same Python `pre_gate` the other harnesses use,
@@ -152,6 +148,5 @@ run, the same class as the `pi --mode json` live test).
 - All staged SHA256 hashes match projected files (`[ok]` for every asset; `[drift]` on mismatch).
 
 `dadaia public install --target all` propagates source → all runtimes (`{agents, claude,
-codex, pi}`; an unknown target errors); no `--force` needed for ordinary source edits
-(plain install overwrites on hash mismatch). `--force` is only for clobbering a
-locally-diverged projection.
+codex, pi}`; an unknown target errors). Hash-compare overwrite and `--force` semantics
+are owned by [[public-asset-distribution]].

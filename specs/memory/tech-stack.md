@@ -21,7 +21,7 @@ release_origin: v0.1.47
 Linguagem| Versão| Uso
 ---|---|---
 Python| ^3.12| CLI inteira, features, infrastructure, container, testes pytest.
-Bash| 4+ POSIX-compatível| Shell assets no produto: apenas os git chokepoints `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (git hooks, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança de harness são o pacote Python `dadaia_workspace/hooks/`. Python hooks injetam payload lean (digest bounded de tech-stack.md + tldr-digest de catalog.json) **uma vez por sessão** — Codex via `SessionStart`, Claude Code via first-message sentinel keyed num `SESSION_ID` estável (env ou `session_id` do stdin; sem fallback de PID). PI lê a law nativamente up-tree (sem hook de injeção de Layer 1).
+Bash| 4+ POSIX-compatível| Shell assets no produto: apenas os git chokepoints `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (git hooks, deliberadamente shell; git-for-Windows ships bash) — todos os hooks de governança de harness são o pacote Python `dadaia_workspace/hooks/` (context-injection mechanics: [[context-management]]).
 HTML5 + Mermaid| fences `mermaid` em Markdown| Reports em `.dadaia/reports/<ctx>/<agent>/*.html`; memory atoms são `.md` renderizados in-memory. O panel NÃO carrega Mermaid de CDN (CSP `script-src 'self'`): fences viram `<pre class="mermaid">` exibidos como source
 Markdown| CommonMark| Memory atoms atômicos em `specs/memory/*.md` (frontmatter `memory-frontmatter-v1` + corpo Markdown); SPEC/PLAN/TASKS/CLOSURE, constitution, backlog, skill/agent definitions
 YAML frontmatter| YAML 1.2| Frontmatter de agents/skills/workflows e memory atoms (`memory-frontmatter-v1`: `additionalProperties: false`)
@@ -50,7 +50,7 @@ de roster; SPEC-DOC-037 impede a constitution de enumerá-lo). O roster:
 Por harness (verdade per-runtime em `specs/memory/product/harness/` — [[harness-claude-code]], [[harness-codex]], [[harness-pi]]):
 
   * **Claude (Anthropic)** : runtime Layer-1 nativo; agents projetados verbatim para `.claude/agents/` via `dadaia public install --target claude`. O `ClaudeSdkAdapter` (`infrastructure/claude_sdk_runtime.py`) permanece por trás de `AgentRuntimePort`; depende do extra **opcional** `claude-agent-sdk` (optional extra `claude-sdk` in `pyproject.toml`/`poetry.lock` — lazy-imported, not a base dependency, never installed by default; build offline-first preservado; ausência ⇒ resultado FAILED com `pip install claude-agent-sdk` acionável).
-  * **Codex (OpenAI)** : Layer 1 (TUI) e Layer 2 (`CODEX_EXEC` via `codex exec`). Doctor checks D-CX-1..8 (D-CX-4 lint inclui tool-names Claude e tier-names Anthropic). 9 agentes core TOML em `.codex/agents/` com tiering registry-derived (model id × `model_reasoning_effort` via `core/model_registry.codex_tier_views()`; deep→high, dispatch→medium; collapse guard loud-fail). Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks (codex-cli 0.139.0, live-verified; harness opt-in `tests/integration/codex_live/`, `DADAIA_CODEX_LIVE=1`). Workflows em `.codex/workflows/` (reference-only). Modelos Layer-2: `(gpt-5.5,high)` / `(gpt-5.5,medium)`.
+  * **Codex (OpenAI)** : Layer 1 (TUI) e Layer 2 (`CODEX_EXEC` via `codex exec`). Doctor checks D-CX-1..8. 12 agentes TOML em `.codex/agents/` (9 core + 3 plugin stubs) com tiering registry-derived — tier-view mechanics, o lint D-CX-4 e o live-verification harness são owned por [[harness-codex]]. Zero leak `claude-*`/Opus/Sonnet/Haiku. Command policy `.codex/rules/*.rules` em `prefix_rule(...)` com paths venv-form. **Hooks executam só em sessão interativa** — `codex exec` headless não dispara hooks ([[harness-codex]]). Workflows em `.codex/workflows/` (reference-only). Modelos Layer-2: `(gpt-5.5,high)` / `(gpt-5.5,medium)`.
   * **PI (`@earendil-works/pi-coding-agent`)** : Layer 1 (harness de entrada) **e** Layer 2 (`PI_HEADLESS`), selecionável por step via `--harness pi` / `--step-harness x=pi`. O `PiHeadlessAdapter` (`infrastructure/pi_runtime.py`) dirige um worker PI via `pi --mode json` (subprocess, runner injetável, sem PI client em module-load). PI é um **runtime CLI externo OPCIONAL instalado pelo operador**, invocado como binário externo — **NUNCA** dependência travada/pinned: it is not a Python dependency at all (absent from the lockfile), não é importado em build/test, e o build permanece offline-first sem ele. **Auth: PI roda sob a subscrição Codex do operador via `~/.pi/agent/auth.json`** (provider openai-codex) — nenhuma chave Anthropic é requerida. **Modelos Layer-2 (4):** `(gpt-5.5,high)` / `(gpt-5.5,low)` / `(gpt-5.3-codex,medium)` / **`kimi-2.7:high`** — o id OpenRouter curado via `LAYER2_EXTRA_MODEL_IDS` (`core/harness_models.py`), selecionável pelo profile built-in `pi-openrouter-kimi-high`; ids `kimi-*` não têm pricing row no registry (custo `None`, nunca fabricado). O schema do event stream `pi --mode json` é verificado pelos testes opt-in `DADAIA_PI_LIVE=1` / `DADAIA_E2E_REAL_WORKER=1` (`tests/integration/pi_live/`, **não** CI-gated). Build live-verificado: `pi` **0.79.3**. **Telemetria PI:** `features/telemetry/reader/pi.py` ingere **só metadata** de `~/.pi/agent/sessions/` (invariant T1 — nenhum body/conteúdo; custo nunca fakeado); degrada idle em falha de IO/parse.
   * **Versões CLI:** `pi` 0.79.3 live-verificado; a versão verificada de `codex` ainda não foi capturada (não inventar).
 
@@ -104,7 +104,9 @@ Plugin| Status| Escopo
 
 ## Schema handoff-v1.1
 
-O contrato de sidecar JSON entre agentes é versionado em `dadaia_workspace/public/schemas/handoff-v1.schema.json`. A versão corrente é **v1.1**. Campos obrigatórios novos: `findings[].detail_md`, `findings[].fix_recommendation`, `scope`, `metrics`. Campo `artifact.path` tornou-se opcional. `schema_version` aceita `"handoff-v1"` e `"handoff-v1.1"`. Validação via `dadaia reports validate`; lint orphan/oversized/missing-fields via `dadaia reports lint <dir>`. Default de emissão dos 9 agentes core: sidecar-only; HTML apenas sob `--with-report` ou `next_handoff.agent == "human"`.
+O contrato de sidecar JSON entre agentes é versionado em
+`dadaia_workspace/public/schemas/handoff-v1.schema.json`; versão corrente **v1.1**.
+Field-level contract, validation CLI e emission defaults: [[agent-comms]].
 
 ## Dependências aprovadas
 
@@ -120,15 +122,15 @@ types-PyYAML| >=6| dev| Type stubs para mypy
 pytest-randomly| ^4.1.0| dev| Ordem de testes aleatória por run — flusha dependências de ordem entre testes
 hypothesis| >=6.100| dev| Property-based testing (database redirecionado fora do repo — repo-hygiene)
 jinja2| ^3.1| features/specs/| Dependência **direta** de runtime: `features/specs/scaffolder.py` renderiza os templates de scaffold SDD via `SandboxedEnvironment`. NÃO é usada para memory rendering (memory atoms são `.md` renderizados por mistune).
-import-linter| >=2.11| dev| Contratos de camada em `setup.cfg` (`features → infrastructure` ban; `core → OS-primitives` ban). **Definidos mas NÃO rodam em CI** — nenhum job invoca `lint-imports`; vários contratos estão vermelhos. Wiring em CI + fix das chains é o backlog `import-boundary-enforcement`.
+import-linter| >=2.11| dev| Contratos de camada em `setup.cfg` — full enforcement-status statement single-sourced em [[architecture]] §Enforcement.
 
 **Pins de tooling do workspace (não são deps do projeto):** `poetry` ≥ 2.3.4 e
 `dulwich` ≥ 1.2.5 nos ambientes de operação (CVEs nomeados em comentário no
 `pyproject.toml`); não entram em `poetry.lock` — o build-backend é `poetry-core`.
 
 Onde cada dependência vive, e os bans de import que os contratos do `import-linter`
-descrevem (camadas hexagonais — seta = direção de import permitida; contratos ainda
-não CI-enforced, ver a row acima):
+descrevem (camadas hexagonais — seta = direção de import permitida; enforcement
+status: [[architecture]]):
 
 ```mermaid
 graph TD
@@ -153,7 +155,7 @@ puro: zero I/O, zero OS primitive — por isso é testável e cross-platform.
   * NÃO adicionar dependências fora desta lista sem release aprovada que justifique.
   * NÃO usar libs com network em build/test (offline-first).
   * `claude-agent-sdk` is an **optional extra** (`claude-sdk`, `pyproject.toml`), NOT a base dependency: it appears in `poetry.lock` as `optional = true`, is never installed by default, is not imported at module-load, and is lazy-imported only by the `ClaudeSdkAdapter` when the operator chooses to run a step on the Claude SDK harness. Build and tests stay offline-first without it.
-  * `pi` / `@earendil-works/pi-coding-agent` é um **runtime CLI externo OPCIONAL instalado pelo operador**, invocado como binário externo pelo `PiHeadlessAdapter` via subprocess — **NÃO** uma dependência Python/Node travada/pinned: it is not a Python dependency at all (absent from the lockfile), não é importado em module-load, e os testes são totalmente faked (offline-first preservado). Auth via `~/.pi/agent/auth.json` (subscrição Codex do operador) — ver `#Agent runtimes`.
+  * `pi` é um runtime CLI externo opcional instalado pelo operador — nunca uma dependência Python travada. Runtime/auth facts stated once in `#Agent runtimes`.
   * NÃO usar threading/multiprocessing nas features — orquestração concorrente fica em `features/orchestration/`.
   * NÃO chamar `os.system`/`subprocess` fora de `infrastructure/` — features usam protocols.
   * NÃO importar Python <3.12 backports — runtime mínimo é 3.12 (match/case, generic types nativos, type statement).

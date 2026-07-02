@@ -55,8 +55,9 @@ avalia as policies registradas em ordem fixa, **first-block-wins**:
 3. **SDD gate** — a política em `features/spec_context/gate_policy.py`; o hook delega,
    nunca re-deriva.
 
-Allow exige que toda policy permita; cada policy é fail-open (uma policy que crasha
-nunca bloqueia o harness); PROTECTED segue o único caminho fail-closed. Um interpreter
+Allow exige que toda policy permita; cada policy é fail-open — uma policy que crasha
+nunca bloqueia o harness, e um write MUTATING sem contexto resolvível também passa
+fail-open; PROTECTED segue o único caminho fail-closed. Um interpreter
 spawn por tool call (seed-5: um comando PreToolUse registrado por runtime).
 
 O classificador SDD é **context-relative**: para um path sob `repos/<slug>/...`, o
@@ -68,7 +69,7 @@ mais restritivo vence — um arquivo FROZEN/PROTECTED/bloqueado bloqueia o patch
 
 | Classe | Paths | Decisão |
 |--------|-------|---------|
-| PROTECTED | `.dadaia/sessions/**` (workspace-root) | Block sempre — único caminho fail-closed (SEC-01); avaliado primeiro |
+| PROTECTED | `.dadaia/sessions/**` (workspace-root) | Block sempre — único caminho fail-closed (SEC-01); avaliado primeiro; o subtree é CLI-owned e o block incondicional protege o `.ptr` de forgery |
 | FROZEN (R-2: antes de ADDITIVE) | `specs/backlog/_archive/`, `specs/audits/_archive/`, `specs/bugs/_archive/` (root **e** in-repo; trailing `/` load-bearing) | Block sempre para file tools — os `_archive` per-artifact são matchados ANTES dos prefixes ADDITIVE (senão `specs/bugs/` engoliria `specs/bugs/_archive/` como ADDITIVE); moves de archive rodam via `git mv` (Bash), fora do envelope file-tool |
 | ADDITIVE | `specs/backlog/**`, `specs/bugs/**`, `specs/audits/**` (root **e** in-repo); `.dadaia/reports/**`, `.dadaia/handoff/**`, `.dadaia/tmp/**` (root) | Allow — zero leitura/escrita de lease |
 | MEMORY | `specs/memory/**` (root **e** in-repo) | Allow apenas em fase DEFINITION ou CLOSURE; block caso contrário |
@@ -93,7 +94,9 @@ disparou:
   morto** (não se pode ser descendente de processo morto — pid-veto canon) ⇒ **ALLOW
   com WARN logado** — zero-false-block domina; o chokepoint degrada para advisory
   nessa plataforma. Block APENAS em lease estrangeiro vivo com non-match positivo.
-  Contexto derivado do path do repo, nunca first-ALIVE.
+  Contexto derivado do path do repo, nunca first-ALIVE. The same
+  `dadaia ci pre-commit-check` backend also runs the scoped BL-* backlog doctor on
+  staged `specs/backlog/` paths ([[sdd-bug-backlog-governance]]).
 - **pre-push gate** — o mesmo hook pre-push roda o CI preflight E o check mecânico de
   verdict de security: para cada `<local-sha>` non-zero das ref lines do stdin, deve
   existir um handoff `security-reviewer` com `"verdict": "APPROVED"` cujo
@@ -116,14 +119,14 @@ não verifica `**Status:** Aprovado`, não verifica markers `[-]`, e não valida
 (workspace-protocol, dadaia-task-manager) com verificação post-hoc por reviewers e
 `dadaia specs doctor`.
 
-**Regras da policy SDD:**
-- **RULE A (memory atomicity):** `specs/memory/**` fora de DEFINITION/CLOSURE → block. O gate classifica apenas por **path**, nunca por formato/extensão.
-- **RULE B (archive read-only):** `specs/_archive/**` → block sempre — inclusive in-repo.
-- **RULE READ (mode channel):** sessão com modo resolvido READ/BOUND_READ é non-acquiring — write MUTATING bloqueado **antes** de qualquer chamada ao lease; ADDITIVE flui. Resolução de modo: `DADAIA_MODE` env (escape de operador) → `mode` do session record keyed pelo sid harness-native → modo do **incumbent do contexto** (`sessions/runtime/<ctx>.ptr`, atualizado pelo `bind`; ignorado se um lease vivo nomeia outro sid, anti-downgrade guard) → default `IMPLEMENTATION`.
-- **PROTECTED (SEC-01):** `.dadaia/sessions/**` é CLI-owned; block incondicional protege o `.ptr` de forgery.
-
-Fail-open permanece para crashes internos do hook e para MUTATING sem contexto
-resolvível; PROTECTED é a única classe fail-closed.
+**Mode-resolution chain (READ non-acquiring):** a session whose resolved mode is
+READ/BOUND_READ is non-acquiring — a MUTATING write is blocked **before** any lease
+call; ADDITIVE flows. Resolution order: `DADAIA_MODE` env (operator escape) → the
+session record's `mode` keyed by the harness-native sid → the **context incumbent's**
+mode (`sessions/runtime/<ctx>.ptr`, refreshed by `bind`; ignored when a live lease
+names another sid — anti-downgrade guard) → default `IMPLEMENTATION`. The gate
+classifies by **path** only, never by format/extension; each path-class decision is
+stated once in the table above.
 
 **ctx-inject com atribuição de sessão:** o hook `ctx_inject` (mesmo pacote) honra um
 bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) apenas quando o marker's recorded
@@ -178,6 +181,14 @@ exit 0. No Claude Code o matcher é match-all `*`; no Codex o bloco PostToolUse 
 **sem** matcher (forma canônica match-all) — heartbeat após **todo** tool, incl. Bash;
 uma única call acima do TTL é coberta pelo PID veto (pid harness vivo ⇒ block, não
 steal).
+
+**Steal and GC:** a TTL-stale lease whose holder pid is dead/absent is reclaimed
+automatically by the next acquire (reclaim-iff-stale). `dadaia lock steal <ctx>` is the
+manual emergency reclaim, **probe-gated**: it refuses while the holder's recorded pid is
+alive, even past-TTL (a pre-`pid` record follows the pure TTL rule; `lease._main`
+threads the same probe — no probe-less acquire/steal path exists). `dadaia doctor --fix`
+reclaims via **LOCK-GC** the TTL-expired leases whose holder is dead or unprobeable —
+a holder with a live pid is NEVER reclaimed — and cleans orphan sentinel files.
 
 **Canonical unblock:** se o gate bloqueia com live-foreign lease, a sessão aguarda o
 holder terminar ou morrer — um holder morto é liberado por TTL+probe no próximo acquire.

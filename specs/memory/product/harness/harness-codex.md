@@ -13,7 +13,7 @@ tags:
 - layer-2
 - projection
 agent_tier: self-pull
-token_estimate: 450
+token_estimate: 545
 last_updated: '2026-07-01'
 release_origin: v0.1.47
 ---
@@ -35,7 +35,10 @@ Layer-2 harness to `codex` unless the operator overrides to `pi`.
    `^(apply_patch|Edit|Write|Bash)$`) + matcher-less PostToolUse heartbeat, registered
    in `.codex/hooks.json` via self-locating wrappers under `.dadaia/hooks/codex-*`.
 3. **Headless asymmetry (honesty):** `codex exec` fires NO hooks (upstream codex-cli
-   defect, live-verified) — headless enforcement is chokepoints-only.
+   defect, live-verified) — headless enforcement is chokepoints-only. The live
+   verification harness is `tests/integration/codex_live/` (opt-in
+   `DADAIA_CODEX_LIVE=1`): it drives a real Codex binary against a throwaway trusted
+   workspace under `.dadaia/tmp/` and re-proves these contract facts repeatably.
 4. As a Layer-2 worker: the engine builds the exec argv (model `(id, effort)` discrete;
    no approval flag — exec never prompts), pipes the fragment+persona prompt, and
    extracts the result via the shared strict-schema-first extraction.
@@ -57,7 +60,12 @@ hook fired in an exec run.
 
 Scaffold projected by `dadaia public install --target codex`: `.codex/config.toml`
 (header + per-agent config blocks only — no inert keys), `.codex/hooks.json`,
-`.codex/agents/` (12 TOML personas, registry-derived tiering), `.codex/rules/`
+`.codex/agents/` (12 TOML personas — tier identity is Codex-native
+`(model id × model_reasoning_effort)`, registry-derived via
+`core/model_registry.codex_tier_views()`: deep→high, dispatch→medium reasoning
+effort, and rendering fails loudly when two tiers collapse to one `(id, effort)`
+pair; doctor lint D-CX-4 blocks Anthropic tier names (Opus/Sonnet/Haiku) and Claude
+model/path/tool-name leaks in Codex-projected artifacts), `.codex/rules/`
 (Starlark command policy), `.codex/skills/` (context adapters), `.codex/workflows/`
 (reference-only). Wrappers in `.dadaia/hooks/codex-*`. A Codex-only workspace =
 `--target codex` (+ shared `--target agents`).

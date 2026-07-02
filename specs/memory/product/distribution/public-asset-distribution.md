@@ -86,8 +86,9 @@ Staged temp workspaces remain supported.
 - Codex: `.codex/config.toml`, `.codex/hooks.json` (referencing the `.dadaia/hooks/codex-*`
   wrappers), `.codex/agents`, `.codex/rules`, `.codex/skills`, reference workflows, and
   `AGENTS.md` context.
-- PI: `.pi/` Layer-1 surface (`SYSTEM.md`, `settings.json`, `prompts/`, `extensions/` —
-  post-trust executable).
+- PI: `.pi/` Layer-1 surface — exactly `SYSTEM.md`, `settings.json`,
+  `prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts` (post-trust
+  executable). This atom is the sole owner of the `.pi/` surface inventory.
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
 `public doctor` compares canonical source, staging, and projections across three

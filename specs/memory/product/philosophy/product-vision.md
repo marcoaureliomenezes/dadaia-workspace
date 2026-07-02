@@ -192,7 +192,7 @@ sobrescrita; o conteúdo §13 de visão/usuários/capacidades/limites vive AQUI)
 ## Dependências
 
 - [[spec-context-project]] — the keystone concept whose definition this vision originates.
-- [[agent-sdd-alignment]] — the nine-core agent roster this vision specifies.
+- [[agent-orchestration]] — the nine-core agent roster this vision specifies.
 - [[sdd-gate-v3]] — the mechanical enforcement of the SDD pillar.
 - [[public-asset-distribution]] — the multi-harness projection pipeline this vision requires.
 - Constitution §0 names this vision (`docs/01_medium_codex.md`) as the document the

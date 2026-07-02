@@ -10,14 +10,13 @@ summary: multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context
   (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight
   genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate;
   locking = ONE cross-platform TTL-lease per context
-  (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL
-  piso de kernel_tunables + PID veto, stable-session-identity via .ptr, by-session
-  index `ctx_locks/by-session/<sid>.json` escrito na MESMA transação CAS) plus
+  (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC
+  mechanics owned by sdd-gate-v3) plus
   port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context
   release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por
   bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o
-  heartbeat jamais ressuscita lease de sessão released; lock steal e doctor LOCK-GC
-  probe-gated (holder com pid vivo nunca é reclaimed); bind records renovados por
+  heartbeat jamais ressuscita lease de sessão released;
+  bind records renovados por
   heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via
   origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
   files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2);
@@ -108,6 +107,15 @@ marker pré-existente nunca binda sessão fresca (sem sentinel ⇒ preflight gen
 estampa o sentinel). Bind permanece non-blocking para trabalho ADDITIVE — o fluxo
 nunca para para exigir um bind.
 
+**Hook execution detail (`hooks/ctx_inject.py`):** the hook resolves a stable
+`SESSION_ID` in the order `DADAIA_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` →
+`CODEX_SESSION_ID` → the stdin payload's `session_id` (no PID fallback), sanitized
+before becoming a filename component. On injection it stamps the sentinel (session
+pointer via `session_identity`) and emits the payload inside bounded markers
+(`=== workspace memory (tech + catalog) === … === end memory bootstrap ===`).
+Per-runtime hook event registration (which events/matchers each harness wires):
+[[public-asset-distribution]].
+
 **Resolução de specs_dir em shell bound (CLI):** `core/specs_resolver.py` resolve o
 `specs_dir` de comandos como `dadaia specs doctor`/`bugs`/`backlog` na ordem env →
 **bind persistido de uma sessão atribuível/viva** (o incumbent do contexto) → cwd —
@@ -119,7 +127,7 @@ Três camadas de lock garantem operações concorrentes seguras:
 |------|---------|------|--------|
 | Lock 1 (workspace) | `.dadaia/states/.ws_lock` | `WorkspaceLock` protocol; POSIX adapter (`infrastructure/file_lock_posix.py`) uses `fcntl LOCK_EX`, 5s timeout | Toda mutação em `spec_contexts.json` (`alive()`, `dead()`, `create()`, `delete()`, `DoctorService.fix()`, `context bind`, `context release`) |
 | Lock 2 (per-context) | `.dadaia/states/ctx_locks/<slug>.lock` | `ContextLock` protocol; POSIX adapter uses `fcntl LOCK_EX`, 5s timeout | `git clone` e `shutil.rmtree` por context (fora do Lock 1; L1>L2 é a única direção safe) |
-| TTL-lease (per-context) | `.dadaia/states/ctx_locks/<ctx>.lock.json` | JSON O_EXCL CAS | Mutex de MUTATING release para o context; TTL 120s piso + PID veto; heartbeat renovado pelo PostToolUse hook (todo tool no Claude) e nos próprios writes MUTATING |
+| TTL-lease (per-context) | `.dadaia/states/ctx_locks/<ctx>.lock.json` | JSON TTL-lease (mechanics: [[sdd-gate-v3]]) | Mutex de MUTATING release para o context |
 
 Lock-1 e Lock-2 operam através dos protocolos `WorkspaceLock` e `ContextLock`
 (`core/protocols/file_lock.py`), com o adapter POSIX em `infrastructure/file_lock_posix.py`.
@@ -137,17 +145,19 @@ protocol é injetado via `container.py`.
 | `review` | `BOUND_REVIEW` | Requer `--release <id>`; lease-taking, tratado como implementation no gate. |
 | (sem bind) | — | Default IMPLEMENTATION no gate: pode adquirir lease **livre**, nunca takeover de holder vivo (D-3). ADDITIVE sempre flui. |
 
-### TTL-lease: acquire e liveness
+### TTL-lease: bind/release lifecycle (mechanics owned by [[sdd-gate-v3]])
 
-O lease é adquirido inline pelo gate no primeiro write MUTATING da sessão (não em `context bind`). Schema: `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`.
+O lease é adquirido inline pelo gate no primeiro write MUTATING da sessão (não em
+`context bind`). Schema: `{context, release, session_id, mode, pid, acquired_at,
+heartbeat, ttl}`. The full acquire/liveness mechanics — O_EXCL CAS sentinel, the
+by-session index written in the same CAS transaction, TTL floor + PID veto, PostToolUse
+heartbeat renewal, stable-session-identity via `.ptr`, yield-iff-live-foreign,
+probe-gated `dadaia lock steal`, and doctor LOCK-GC reclaim — are owned by
+[[sdd-gate-v3]] and are not restated here. This atom owns the lifecycle around the
+lease: bind, explicit release, and session/bind-record decay.
 
-- **Acquire e renew:** O_EXCL CAS via sentinel file — fecha o TOCTOU gap; o renew roda dentro do mesmo CAS (sem interleave com acquire estrangeiro). `acquire`/`steal`/`release` escrevem/removem a entrada do **by-session index** (`ctx_locks/by-session/<sid>.json`) dentro da MESMA transação CAS — record e index não podem divergir; o PostToolUse renova heartbeat via index sem full scan do lock dir (fallback full-scan quando o dir do index está ausente, janela de migração).
-- **TTL + PID veto:** `LEASE_TTL_SECONDS` (single home `core/kernel_tunables.py`; piso 120s; re-export em `lease` por uma release) é o piso; um record TTL-stale cujo `pid` proba vivo é tratado como live (block, não takeover). Heartbeat renovado pelo hook PostToolUse (session id do stdin; todo tool no Claude Code) e nos próprios writes MUTATING; holder confirmado renova mesmo past-TTL.
-- **Release explícito:** `dadaia context release` solta o(s) lease(s) que a sessão segura ANTES de remover o session record. Predicados por fluxo: (a) **eval flow** (`--print-env`, `DADAIA_SESSION_ID` exportado) — solta todo lock record que nomeia o sid do env; (b) **default flow** (sid do CLI ≠ sid do harness) — resolve o contexto bound do session record e solta o lease daquele contexto apenas se o pid do holder está morto OU casa com a ancestralidade do processo chamador (port `ProcessAncestry`); um lease de holder estrangeiro vivo NUNCA é solto por nome de contexto. Pós-release, `renew_heartbeat` não ressuscita o lease (nunca recria record ausente/foreign-sid; DP-3: não há guard de renovação baseado em session record — holder unbound continua renovando, invariante v0.1.10 FR-R2-01). `context dead <ctx>` procede após um release bem-sucedido.
-- **Stable-session-identity (D1):** `.dadaia/sessions/runtime/<ctx>.ptr` contém o `session_id` incumbente (I/O via `session_identity`). Se `.ptr` match a sessão atual, o lease é RENEWED incondicionalmente (mesmo após relaunch — elimina freeze root cause).
-- **Reclaim-iff-stale:** lease TTL-stale com holder morto/ausente é reclaimed automaticamente pelo próximo acquire. `dadaia lock steal <ctx>` é o reclaim manual de emergência, **probe-gated**: recusa quando o pid registrado do holder está vivo, mesmo past-TTL; record sem `pid` (pré-pid) segue a regra TTL pura. O acquire de `lease._main` threads o mesmo probe — não existe caminho de acquire/steal sem probe.
-- **Yield-iff-live-foreign:** lease estrangeiro vivo (TTL-fresh ou pid vivo) → LockHeldError com yield message informativa. A mensagem **nunca** instrui rebind, relaunch, ou steal.
-- **GC:** `dadaia doctor --fix` reclama via `LOCK-GC` os leases TTL-expirados cujo holder está morto ou é unprobeable (records pré-`pid` inclusos — TTL-only reclaimable); um holder com pid vivo NUNCA é reclaimed; orphan sentinel files também são limpos. Bind/session records decaem por TTL medido contra `last_seen_at`, renovado pelo heartbeat PostToolUse a cada tool use — um READ bind de sessão ativa nunca decai (sem READ→IMPLEMENTATION silencioso); record sem `last_seen_at` mantém TTL-from-creation; o pid do session record (bind-CLI, morto por construção) não é consultado. O doctor de specs valida coerência lease↔session com triagem em 3 estados (SPEC-DOC-029: stale-dead ⇒ WARN com remediação; live-incoerente ⇒ ERR; coerente ⇒ ok).
+- **Release explícito:** `dadaia context release` solta o(s) lease(s) que a sessão segura ANTES de remover o session record. Predicados por fluxo: (a) **eval flow** (`--print-env`, `DADAIA_SESSION_ID` exportado) — solta todo lock record que nomeia o sid do env; (b) **default flow** (sid do CLI ≠ sid do harness) — resolve o contexto bound do session record e solta o lease daquele contexto apenas se o pid do holder está morto OU casa com a ancestralidade do processo chamador (port `ProcessAncestry`); um lease de holder estrangeiro vivo NUNCA é solto por nome de contexto. Pós-release, o heartbeat jamais ressuscita o lease ([[sdd-gate-v3]], DP-3). `context dead <ctx>` procede após um release bem-sucedido.
+- **Decay de bind/session records:** bind/session records decaem por TTL medido contra `last_seen_at`, renovado pelo heartbeat PostToolUse a cada tool use — um READ bind de sessão ativa nunca decai (sem READ→IMPLEMENTATION silencioso); record sem `last_seen_at` mantém TTL-from-creation; o pid do session record (bind-CLI, morto por construção) não é consultado. O doctor de specs valida coerência lease↔session com triagem em 3 estados (SPEC-DOC-029: stale-dead ⇒ WARN com remediação; live-incoerente ⇒ ERR; coerente ⇒ ok).
 
 ### Migração v1→v2 (`dadaia migrate`)
 
@@ -202,8 +212,8 @@ Sem context management v2, múltiplos agentes em paralelo podem editar a mesma r
   * `.dadaia/states/spec_contexts.json` — registro de todos os contexts (`schema_version: "2"`; state ALIVE/DEAD; `alive_since`; `dead_since`; sem flag global)
   * `.dadaia/states/.ws_lock` — fcntl workspace lock (gitignored; criado em runtime)
   * `.dadaia/states/ctx_locks/<slug>.lock` — fcntl per-context lock (gitignored)
-  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease com `pid` (criado inline no primeiro write MUTATING; TTL piso 120s via `kernel_tunables` + PID veto)
-  * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index (escrito/removido na mesma transação CAS do lock record; renovação O(1) sem full scan)
+  * `.dadaia/states/ctx_locks/<ctx>.lock.json` — single-record JSON TTL-lease (criado inline no primeiro write MUTATING; mechanics: [[sdd-gate-v3]])
+  * `.dadaia/states/ctx_locks/by-session/<sid>.json` — by-session heartbeat index ([[sdd-gate-v3]])
   * `.dadaia/states/bind_epoch/<ctx>` — bind-epoch marker escrito por `context bind` (trigger e fonte de descoberta da injeção bind-driven; content = the bind process's ancestry pid chain, one decimal pid per line, nearest-first, capped at 8 — consumers attribute a marker to a session by MEMBERSHIP of the session's harness pid in the chain)
   * `.dadaia/sessions/<id>.json` — session record CLI-owned escrito por `bind` via `session_identity` (`context`, `mode`, `release`, `pid`, `last_seen_at`); lido pelo gate (modo)
   * `.dadaia/sessions/runtime/<ctx>.ptr` — stable-session-identity pointer (escrito em acquire; I/O via `session_identity`)

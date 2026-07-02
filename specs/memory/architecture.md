@@ -57,7 +57,7 @@ Um **Spec Context Project** é uma canonical specs folder bound to one repositor
 - `spec_artifacts` — scaffolders de artefatos SDD (`release|backlog|bug new`, `memory product add`).
 - `spec_context` — contexts ALIVE/DEAD, `lease.py` (contrato de locking central), `gate_policy.py` (classifier do gate), `session_identity.py` (single owner de pointers/session records), doctor de workspace ([[context-management]], [[workspace-doctor]]).
 - `specs` — specs doctor + catalog generation ([[specs-doctor]]).
-- `telemetry` — telemetria local de sessões Claude/Codex/PI com `RuntimeAdapter` registry `{claude, codex, pi}` ([[agent-monitoring]]).
+- `telemetry` — telemetria local de sessões dos entry harnesses com `RuntimeAdapter` registry `{claude, codex, pi}` (runtime roster single-source: [[tech-stack]]) ([[agent-monitoring]]).
 - `workflows` — `WorkflowsService` (workflow docs reference-only) + `dadaia_catalog.py` (o catálogo governado dos dadaia-workflows) + `dag.py` (SVG renderer server-side).
 - `workspace` — init/bootstrap ([[workspace-init]]).
 - `workspace_clean` — `dadaia clean`: reclaim TTL-based das zonas efêmeras de `.dadaia/` (dry-run default; nunca fora de `.dadaia/`).
@@ -88,11 +88,11 @@ A topologia pública default é definida na constitution §14. Dois papéis de d
 
 **Dispatcher purity (§9):** apenas PM e project-auditor despacham sub-agentes; worker→worker dispatch é impossibilidade estrutural. **Sub-agent model:** PE e SE rodam sob o single lease do PM — o lease nunca muda de mãos.
 
-## Modelo de concorrência e lease (v0.1.14)
+## Modelo de concorrência e lease
 
 Constitution §8 define os invariantes; a MECÂNICA (lease record/CAS/pid-veto, cadeia de modo, session identity, heartbeat, chokepoints) é owned por [[sdd-gate-v3]] (gate + chokepoints) e [[context-management]] (bind/lease/session lifecycle) — este atom mantém só o mapa de classes e as fronteiras.
 
-**Classificação context-relative:** o path-classifier (`features/spec_context/gate_policy.classify_path`) computa a classe sobre o caminho relativo ao contexto — para `repos/<slug>/...`, o prefixo é removido e a taxonomia `specs/` se aplica ao restante, idêntica à do workspace-root. Ordem de avaliação com o R-2 fix: os `_archive` per-artifact são checados ANTES dos prefixes ADDITIVE.
+**Classificação context-relative:** o path-classifier (`features/spec_context/gate_policy.classify_path`) computa a classe sobre o caminho relativo ao contexto — a mesma taxonomia `specs/` no workspace-root e in-repo; ordem de avaliação e mecânica em [[sdd-gate-v3]].
 
 | Classe | Paths (root e in-repo, salvo nota) | Decisão |
 |--------|------------------------------------|---------|
@@ -100,10 +100,10 @@ Constitution §8 define os invariantes; a MECÂNICA (lease record/CAS/pid-veto, 
 | FROZEN | `specs/_archive/**` **e** `specs/{backlog,audits,bugs}/_archive/` (avaliados antes de ADDITIVE) | Block sempre (file tools; moves de archive rodam via `git mv`) |
 | ADDITIVE | `specs/backlog/**`, `specs/bugs/**`, `specs/audits/**`; `.dadaia/reports\|handoff\|tmp/**` (root) | Allow — zero lease I/O |
 | MEMORY | `specs/memory/**` | Allow só em fase DEFINITION/CLOSURE |
-| MUTATING | `specs/releases/**`, production tree, todo in-repo path sem classe | READ-mode ⇒ block non-acquiring; senão acquire do TTL-lease (O_EXCL CAS + pid veto) |
+| MUTATING | `specs/releases/**`, production tree, todo in-repo path sem classe | READ-mode ⇒ block non-acquiring; senão acquire do TTL-lease ([[sdd-gate-v3]]) |
 | UNGATED | demais paths workspace-root | Allow |
 
-Exatamente um MUTATING lease por contexto; um holder foreign vivo (TTL-fresh ou pid vivo) nunca é roubado; ADDITIVE nunca toca o lease. Os desfechos commit/push são gated pelos **chokepoints git** (pre-commit lease gate zero-false-block; pre-push CI + security-verdict por sha), que rodam sem hook de harness; `--no-verify` os bypassa — postura deterministic-at-the-chokepoint, backstop SPEC-DOC-029. O gate NÃO lê TASKS.md, `Aprovado`, markers ou write-allowlists — disciplina, não mecanismo.
+Exatamente um MUTATING lease por contexto; ADDITIVE nunca toca o lease. Os desfechos commit/push são gated pelos **chokepoints git**, que rodam sem hook de harness (mecânica e postura: [[sdd-gate-v3]]). O gate NÃO lê TASKS.md, `Aprovado`, markers ou write-allowlists — disciplina, não mecanismo.
 
 ## Os 3 canais de reporte/comunicação (constitution §11)
 
@@ -175,7 +175,7 @@ git chokepoints| `pre-commit-lease-gate.sh` / `pre-push-ci-gate.sh` → `dadaia 
 features/spec_context/lease.py| `.dadaia/states/ctx_locks/*`| Single-record JSON TTL-lease; O_EXCL CAS| TTL piso + PID veto ([[context-management]])
 features/spec_context/session_identity.py| `.dadaia/sessions/**` + `bind_epoch/`| Single-owner module| Único reader/writer de pointers, session records e bind-epoch markers
 hooks/* + spec_context + ci backends| `core/kernel_tunables.py`| Leaf de constantes| Single home dos tunables do kernel
-features/telemetry/aggregator| `runtimes.py` RuntimeAdapter registry| Protocol + registry| Enrichment per row + liveness per runtime `{claude, codex, pi}`
+features/telemetry/aggregator| `runtimes.py` RuntimeAdapter registry| Protocol + registry| Enrichment per row + liveness per runtime (set stated once in Camadas → `telemetry`)
 
 ## Estado runtime
 
@@ -209,7 +209,7 @@ Locais canônicos de estado em disco:
   * `specs/memory/*.md` + `specs/memory/product/catalog.json` — memory atômica + índice gerado.
   * `specs/_archive/releases/<id>/` — releases arquivadas; `specs/_archive/<release-id>/consumed_backlog.json` + `consumed-backlog/<slug>.md` — ledger e cópias duráveis do removal-on-release.
 
-**Stores que não existem (não recriar):** `.dadaia/locks/implementation/*` (Lock 3), `<ctx>.semaphore.json` (Lock 4), `semaphore-reclaims.jsonl`, marcador global de contexto, scripts bash de gate em `.dadaia/scripts/`. O mutex MUTATING é exclusivamente o TTL-lease.
+O mutex MUTATING é exclusivamente o single-record TTL-lease acima — nenhum outro lock/semaphore store legado existe nem deve ser recriado.
 
 ## Memory injection subsystem
 
@@ -221,11 +221,11 @@ O bootstrap injetado é um **digest**: digest bounded de `tech-stack.md` (com po
 
 ### ctx_inject hook (Claude Code + Codex)
 
-Em Codex roda no `SessionStart` (matcher `startup|resume`); em Claude Code no `UserPromptSubmit`. A injeção completa ocorre uma vez por sessão lógica. A injeção é **bind-driven**: `dadaia context bind` escreve o marker `.dadaia/states/bind_epoch/<ctx>` e é o ÚNICO trigger de context-memory. O hook:
-
-1. Resolve o contexto: `DADAIA_CONTEXT` env → session record self-keyed → **marker bind-epoch mais novo que o sentinel desta sessão E cuja ancestry pid chain gravada CONTÉM o harness pid do hook (membership)** (atribuição de sessão: um bind de outra sessão nunca rouba a injeção desta; marker legado/vazio (empty chain) ⇒ não-atribuível ⇒ ignorado) → **preflight genérico apenas** (preflight de dispatcher + lista de contexts ALIVE; sem context memory).
-2. Resolve um `SESSION_ID` estável (`DADAIA_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` → `CODEX_SESSION_ID` → `session_id` do payload stdin; sem fallback de PID), sanitizado antes de virar componente de filename. Re-injeta quando não há sentinel para o sid ou quando um marker atribuível é mais novo que o sentinel; marker pré-existente nunca binda sessão fresca.
-3. Estampa o sentinel (pointer de sessão via `session_identity`) e emite o payload dentro de bounded markers (`=== workspace memory (tech + catalog) === … === end memory bootstrap ===`).
+A injeção completa ocorre uma vez por sessão lógica e é **bind-driven**: `dadaia
+context bind` escreve o marker `.dadaia/states/bind_epoch/<ctx>` e é o ÚNICO trigger de
+context-memory; uma sessão unbound recebe só o preflight genérico. Resolution chain,
+session-id resolution, sentinel/re-injection mechanics: [[context-management]];
+per-runtime hook event registration: [[public-asset-distribution]].
 
 ### catalog.json generation pipeline
 
@@ -239,15 +239,15 @@ Verifica que o conjunto de slugs em `catalog.json` casa com os `*.md` (excluindo
 
 Memory atoms são `.md` com YAML frontmatter (`memory-frontmatter-v1`, `additionalProperties: false`; required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `agent_tier`, `token_estimate`, `last_updated`, `release_origin`) + corpo Markdown com `##` heading allowlist (`## Changelog`/`Histórico`/`History`/`Versions` são hard errors). HTML é efêmero — o panel renderiza `.md` in-memory via `mistune~=3.0` (mermaid fence → `<pre class="mermaid">` exibido como source, sem CDN; wikilink → anchor; sanitiser XSS), cacheado por mtime; nenhum `.html` em disco. `lint-memory-atoms.py` valida frontmatter/headings/wikilinks/token-drift e é invocado pelo check LINT-1 ([[specs-doctor]]).
 
-## Backlog-consistency subsystem (`features/backlog/`, v0.1.25)
+## Backlog-consistency subsystem (`features/backlog/`)
 
 O backlog é mantido como um SET deduplicado, conflict-free e não-stale, **enforçado mecanicamente**: registry canônico de subjects auto-derivado da árvore viva (5 kinds: code/cli/catalog/doc/invariant; `panel`/`api` só via alias map), classifier determinístico fail-closed (same-anchor + differing-change ⇒ `DIVERGENT_CONFLICT`), `dadaia backlog doctor` (BL-SCHEMA/DUP/CONFLICT/STALE) rodando no pre-commit chokepoint (escopado a commits que tocam `specs/backlog/**`) e em CI, e o loop removal-on-release (`**Consumes:**` no SPEC → ledger `consumed_backlog.json` no define → removal residual-aware no close, com cópia durável antes do unlink). Mecânica completa, schema de intents e contratos: [[sdd-bug-backlog-governance]].
 
-## Workflow control plane subsystem (v0.1.28 + v0.1.29)
+## Workflow control plane subsystem
 
 A governança de modelo E harness do Layer 2: profile registry (built-ins + perfis operador-locais) → overlay validado (`workflow_model_policy.json`, com `extends` por contexto) → o único `WorkflowExecutionPolicyResolver` (precedência CLI > overlay > catalog; harness efetivo por step; `apply_resolved_policy` único autor de `runtime_kind`) → snapshot congelado por run antes do step 1 → panel routes + `WMP-*` doctor. CLI e panel consomem o MESMO resolver via container. Mecânica completa: [[lifecycle-foundation]]; superfície do operador: [[panel]].
 
-## Workflow-step handoff data plane (v0.1.30)
+## Workflow-step handoff data plane
 
 Steps de um dadaia-workflow comunicam por um ledger producer→consumer run-scoped: control plane em `LifecycleRun.workflow_steps`, payloads imutáveis em `.dadaia/runs/lifecycle/<run_id>/steps/`, resolver que bloqueia em required-upstream ausente, consumption state machine, retention TTL-based e `handoffs doctor`. Separado do contrato `handoff-v1.1` (evidência externa durável em `.dadaia/handoff/`). Mecânica completa: [[lifecycle-foundation]].
 
@@ -258,7 +258,7 @@ Steps de um dadaia-workflow comunicam por um ledger producer→consumer run-scop
 dadaia-workspace roda agentes em **duas layers**, e "harness" significa coisa diferente em cada uma. O roster concreto (Layer-1 set, Layer-2 workers, membros de `AgentRuntimeKind`) é single-sourced em [[tech-stack]] §Agent runtimes; a verdade per-harness vive em [[harness-claude-code]], [[harness-codex]], [[harness-pi]].
 
 - **Layer 1 — entry harness (terminal).** O harness que o operador lança no terminal. Governança: `AGENTS.md` up-tree + as projeções `.claude/`/`.codex/`/`.pi/` + hooks deterministicamente onde suportados + chokepoints git.
-- **Layer 2 — worker harness (dentro do lifecycle engine).** Os workers bounded que `dadaia lifecycle` dirige por step atrás de `AgentRuntimePort` (`container.build_agent_runtime(kind, *, cwd, model)`), selecionáveis via `--harness`/`--step-harness`. **LAW 1:** workers de workflow são exatamente `{pi, codex, fake}`; `claude` é rejeitado com pointer de Layer 1 (cost bound; o adapter SDK fica importável + testado). Transports: SDK in-process (Claude, único com Ring-1 real via `core/scope_match`) e CLI-headless one-shot (`codex exec`, `pi --mode json`).
+- **Layer 2 — worker harness (dentro do lifecycle engine).** Os workers bounded que `dadaia lifecycle` dirige por step atrás de `AgentRuntimePort` (`container.build_agent_runtime(kind, *, cwd, model)`), selecionáveis via `--harness`/`--step-harness`. The selectable worker roster and the runtime-kind enum are single-sourced in [[tech-stack]] §Agent runtimes — this atom does not enumerate them; posture per harness is summarized below.
 - **LAW 2 — catálogo discreto de modelo por harness** (`core/harness_models.py`): pi → 4 opções (incl. o id OpenRouter `kimi-2.7` via `LAYER2_EXTRA_MODEL_IDS`), codex → 2; allowlist-validated; nenhum id `claude-*` jamais selecionável no Layer 2. Detalhe em [[tech-stack]].
 - **Persona** — role mandate harness-universal do Layer 2 (equivalente codex/pi de um sub-agent Claude): 8 arquivos em `public/personas/<role>.md`, carregados por `PersonaLoader`, injetados no prompt de TODO step model-driven de TODO verb como diretiva operativa de role (sem `model`/`tier` — o modelo é binding por step). Detalhe em [[agent-orchestration]].
 - **dadaia-workflows** — os corpos Python que montam fragment + persona + contexto dinâmico por step e avançam gates Python-validados. Roster, invocabilidade e contrato de output: [[dadaia-workflows]].
@@ -274,14 +274,14 @@ dadaia-workspace roda agentes em **duas layers**, e "harness" significa coisa di
 
 ### Layer-2 worker-runtime posture (`AgentRuntimePort`)
 
-| AgentRuntimeKind | Adapter | Transport | Ring-1 write boundary | Layer-2 workflow harness? |
-|------------------|---------|-----------|------------------------|---------------------------|
-| `FAKE` | `fake_runtime.py` | in-process | n/a (test/offline) | sim (`fake`) |
-| `CODEX_EXEC` | `codex_runtime.py` | CLI-headless (`codex exec`) | não | sim (`codex`) |
-| `PI_HEADLESS` | `pi_runtime.py` | CLI-headless (`pi --mode json`) | não | sim (`pi`) |
-| `CLAUDE_SDK` | `claude_sdk_runtime.py` | SDK (in-process) | **sim** — `core/scope_match` | **não** — kept/tested; `claude` rejeitado (LAW 1) |
-
-Workers headless são one-shot por step com Ring-2 (git-diff `changed_paths`) + chokepoints.
+Roster and runtime-kind enum: single-sourced in [[tech-stack]] §Agent runtimes
+(constitution §0 — never re-enumerated here). Posture by harness name: **codex** and
+**pi** workers run as one-shot CLI-headless subprocesses per step with no Ring-1
+pre-write boundary — they are bounded by Ring-2 (git-diff `changed_paths`) plus the git
+chokepoints. **claude** is the only runtime with a real Ring-1 write boundary
+(`core/scope_match`; in-process SDK transport), kept importable and tested but not
+selectable as a workflow worker — Layer-1 use only. A test-only in-process fake worker
+covers offline runs.
 
 **path-scope (disciplina, não gate)** — `paths.write_allowlist` do frontmatter dos agentes é convenção de instrução (workspace-protocol §6), não enforcement: nenhum hook conhece a persona do processo que escreve.
 

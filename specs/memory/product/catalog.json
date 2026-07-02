@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-01T23:44:58Z",
+  "generated_at": "2026-07-02T03:06:36Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -47,8 +47,8 @@
       "slug": "agent-orchestration",
       "title": "agent-orchestration",
       "category": "product",
-      "tldr": "9-core + 3-plugin agent topology; two dispatchers (PM + project-auditor); coordinator+sub-agent architecture; dispatcher purity; Layer-2 personas.",
-      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), ADDITIVE vs MUTATING activity classes, and the Layer-2 persona surface.",
+      "tldr": "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas.",
+      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, and the Layer-2 persona surface.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -60,111 +60,13 @@
       "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
-        "dadaia-workflows"
+        "dadaia-workflows",
+        "harness-codex",
+        "harness-pi"
       ]
     },
     {
       "rank": 4,
-      "slug": "agent-sdd-alignment",
-      "title": "agent-sdd-alignment",
-      "category": "product",
-      "tldr": "9-core agents aligned to constitution §7 lifecycle phases; sub-agent model; dispatcher purity; Markdown memory protocol.",
-      "summary": "Defines how the 9-core agent roster maps to lifecycle phases (constitution §7 and §14), the sub-agent model (PE + software-engineer under PM lease), dispatcher purity (only PM and project-auditor dispatch), and SDD memory protocol.",
-      "path": "specs/memory/product/agents/agent-sdd-alignment.md",
-      "tags": [
-        "sdd",
-        "agents",
-        "memory",
-        "release-lifecycle"
-      ],
-      "token_estimate": 690,
-      "agent_tier": "self-pull",
-      "depends_on": [
-        "sdd-gate-v3"
-      ]
-    },
-    {
-      "rank": 5,
-      "slug": "ai-context-engineering",
-      "title": "ai-context-engineering",
-      "category": "product",
-      "tldr": "Deep ai-engineer skill covering token economy, instruction hierarchy, persona-consistency invariants, model-tier selection, and scope-drift detection.",
-      "summary": "Harness-agnostic context-engineering craft for ai-engineer. Covers token economy (cost-per-line discipline, tables vs prose compression, link vs inline decision), the canonical 10-section instruction hierarchy and attention ordering, five persona-consistency invariants (frontmatter schema, body order, [SCOPE ERROR] format, TDD flow, handoff contract), model-tier selection decision table (Opus/Sonnet/Haiku rubric), and recursive scope-drift detection with three detection rules and topology guard protocol. Extracted and expanded from the ai-engineer persona. Restricted to ai-engineer.",
-      "path": "specs/memory/product/agents/ai-context-engineering.md",
-      "tags": [
-        "ai-engineer",
-        "context-engineering",
-        "token-economy",
-        "persona-consistency",
-        "model-tier"
-      ],
-      "token_estimate": 468,
-      "agent_tier": "self-pull",
-      "depends_on": []
-    },
-    {
-      "rank": 6,
-      "slug": "ai-harness-claude-code",
-      "title": "ai-harness-claude-code",
-      "category": "product",
-      "tldr": "Deep ai-engineer skill for Claude Code: agentic loop, context hierarchy, rules, skills, hooks, subagents, tools, MCP, and composition decision tree.",
-      "summary": "Provides ai-engineer with actionable, protocol-oriented mastery of the Claude Code harness — covering the agentic loop and compaction boundary, the 8-layer context hierarchy decision protocol, rules enforcement (always_on vs path-scoped), skills mechanics and listing-budget management, hooks lifecycle and matcher semantics, subagent dispatch authority, tool permission model, MCP tool injection, and a composition decision tree encoding academy findings F1-F8 as protocol constraints. Restricted to ai-engineer by harness-skill-scope rule.",
-      "path": "specs/memory/product/agents/ai-harness-claude-code.md",
-      "tags": [
-        "ai-engineer",
-        "harness",
-        "claude-code",
-        "skill",
-        "decision-protocol"
-      ],
-      "token_estimate": 520,
-      "agent_tier": "self-pull",
-      "depends_on": []
-    },
-    {
-      "rank": 7,
-      "slug": "ai-harness-codex",
-      "title": "ai-harness-codex",
-      "category": "product",
-      "tldr": "Deep ai-engineer Codex skill — AGENTS.md law, rules collision, trust model, live-verified hook facts.",
-      "summary": "Provides ai-engineer with actionable mastery of the Codex harness — covering AGENTS.md as the scoped constitution, the naming-collision disambiguation between Codex Starlark .rules and dadaia workflow-protocols, Codex skill discovery, subagent fan-out model, config trust layers (global vs project), customization decision table, SDD phase integration, and hooks. Carries live-verified contract facts (codex-cli 0.139.0, evidence-level annotated) — hooks fire only in interactive sessions, never under headless codex exec. Restricted to ai-engineer by harness-skill-scope rule.",
-      "path": "specs/memory/product/agents/ai-harness-codex.md",
-      "tags": [
-        "ai-engineer",
-        "harness",
-        "codex",
-        "skill",
-        "decision-protocol"
-      ],
-      "token_estimate": 890,
-      "agent_tier": "self-pull",
-      "depends_on": []
-    },
-    {
-      "rank": 8,
-      "slug": "harness-primitives",
-      "title": "harness-primitives",
-      "category": "product",
-      "tldr": "Middle-depth harness literacy for all agents: primitive definitions, Claude Code vs Codex deltas, dadaia projection mechanics, and ai-engineer defer checklist.",
-      "summary": "Available to all 9 core agents. Defines at middle depth what each AI harness primitive is (agent persona, subagent, skill, rule, hook, AGENTS.md, MCP), how Claude Code and Codex differ in naming and enforcement for each primitive, how dadaia stages and projects them (public/ -> stage -> install -> .claude/.codex/.pi/.agents; manifest SHA256; doctor checks), and a decision checklist for when to defer deeper questions to ai-engineer. Complements the ai-engineer-only deep skills without duplicating their protocol depth.",
-      "path": "specs/memory/product/agents/harness-primitives.md",
-      "tags": [
-        "harness",
-        "primitives",
-        "all-agents",
-        "claude-code",
-        "codex",
-        "literacy"
-      ],
-      "token_estimate": 620,
-      "agent_tier": "self-pull",
-      "depends_on": [
-        "architecture",
-        "tech-stack"
-      ]
-    },
-    {
-      "rank": 9,
       "slug": "academy",
       "title": "academy",
       "category": "product",
@@ -184,7 +86,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 5,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
@@ -203,7 +105,7 @@
       "depends_on": []
     },
     {
-      "rank": 11,
+      "rank": 6,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -226,7 +128,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 7,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
@@ -240,7 +142,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 450,
+      "token_estimate": 545,
       "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
@@ -250,7 +152,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 8,
       "slug": "harness-pi",
       "title": "Harness — PI (pi-coding-agent)",
       "category": "product",
@@ -275,7 +177,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 9,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -295,7 +197,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 10,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -325,7 +227,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 11,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -361,31 +263,11 @@
         "workspace-portability",
         "cross-platform-portability",
         "server-registry",
-        "agent-sdd-alignment"
+        "agent-orchestration"
       ]
     },
     {
-      "rank": 17,
-      "slug": "repos-catalog",
-      "title": "repos-catalog",
-      "category": "product",
-      "tldr": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
-      "summary": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
-      "path": "specs/memory/product/philosophy/repos-catalog.md",
-      "tags": [
-        "repos",
-        "catalog",
-        "discovery"
-      ],
-      "token_estimate": 212,
-      "agent_tier": "self-pull",
-      "depends_on": [
-        "workspace-init",
-        "context-management"
-      ]
-    },
-    {
-      "rank": 18,
+      "rank": 12,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -408,12 +290,12 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 13,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
       "tldr": "multi-context ALIVE/DEAD; bind persiste modo e escreve o bind-epoch marker; TTL+PID-veto lease; `context release` solta o lease; dead() exige tree limpa.",
-      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker `.dadaia/states/bind_epoch/<ctx>` — o ÚNICO trigger de injeção de context-memory (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`, O_EXCL CAS em acquire e renew, TTL piso de kernel_tunables + PID veto, stable-session-identity via .ptr, by-session index `ctx_locks/by-session/<sid>.json` escrito na MESMA transação CAS) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o heartbeat jamais ressuscita lease de sessão released; lock steal e doctor LOCK-GC probe-gated (holder com pid vivo nunca é reclaimed); bind records renovados por heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog/bug new, dadaia memory product add.",
+      "summary": "multi-context lifecycle ALIVE/DEAD (no global primary); `dadaia context bind` (--mode opcional, default read) persiste contexto/modo/pid no session record CLI-owned via session_identity, atualiza o incumbent pointer E escreve o marker `.dadaia/states/bind_epoch/<ctx>` — o ÚNICO trigger de injeção de context-memory (first-ALIVE deletado da cadeia de injeção; sessão unbound recebe só preflight genérico + lista de contexts ALIVE); sessões READ são non-acquiring no gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC mechanics owned by sdd-gate-v3) plus port/adapter Lock-1 (workspace) e Lock-2 (per-context git ops); `dadaia context release` solta o(s) lease(s) da sessão (eval flow por sid; default flow por bound-context + dead-pid-ou-ancestry, nunca solta holder estrangeiro vivo) e o heartbeat jamais ressuscita lease de sessão released; bind records renovados por heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin em alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files sem --commit e roda secret scan antes do push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug registration is the event-sourced `dadaia bugs append`).",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -421,17 +303,19 @@
         "session",
         "locking"
       ],
-      "token_estimate": 2750,
+      "token_estimate": 3325,
       "agent_tier": "self-pull",
       "depends_on": [
-        "workspace-init",
+        "sdd-bug-backlog-governance",
+        "public-asset-distribution",
         "sdd-gate-v3",
+        "workspace-init",
         "workspace-doctor",
         "agent-orchestration"
       ]
     },
     {
-      "rank": 20,
+      "rank": 14,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -451,6 +335,7 @@
       "token_estimate": 1400,
       "agent_tier": "self-pull",
       "depends_on": [
+        "public-asset-distribution",
         "workspace-init",
         "context-management",
         "sdd-gate-v3",
@@ -458,7 +343,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 15,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -477,12 +362,33 @@
       "depends_on": [
         "tech-stack",
         "architecture",
+        "public-asset-distribution",
         "lifecycle-foundation",
         "dadaia-workflows"
       ]
     },
     {
-      "rank": 22,
+      "rank": 16,
+      "slug": "repos-catalog",
+      "title": "repos-catalog",
+      "category": "product",
+      "tldr": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
+      "summary": "lookup do repos.xlsx para discovery rápida de repos conhecidos com slug + URL.",
+      "path": "specs/memory/product/platform/repos-catalog.md",
+      "tags": [
+        "repos",
+        "catalog",
+        "discovery"
+      ],
+      "token_estimate": 212,
+      "agent_tier": "self-pull",
+      "depends_on": [
+        "workspace-init",
+        "context-management"
+      ]
+    },
+    {
+      "rank": 17,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -503,7 +409,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 18,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -525,7 +431,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 19,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -538,12 +444,15 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 640,
+      "token_estimate": 786,
       "agent_tier": "self-pull",
-      "depends_on": []
+      "depends_on": [
+        "public-asset-distribution",
+        "sdd-gate-v3"
+      ]
     },
     {
-      "rank": 25,
+      "rank": 20,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -564,7 +473,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 21,
       "slug": "dadaia-workflows",
       "title": "dadaia-workflows",
       "category": "product",
@@ -588,12 +497,12 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 22,
       "slug": "lifecycle-foundation",
       "title": "lifecycle-foundation",
       "category": "product",
       "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the four-member AgentRuntimeKind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; CLAUDE_SDK kept/tested for Layer-1). LAW 2: a discrete per-harness GPT model catalog selected on the CLI (--model/--step-model; pi-3 / codex-2). The verbs are dadaia-workflows: Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates; the release-definition workflow is the first fully fragment-driven workflow. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. v0.1.28 adds the workflow model governance control plane: a built-in WorkflowModelProfile registry over harness_models, an atomic operator overlay (missing != invalid), one shared WorkflowExecutionPolicyResolver, a per-run policy snapshot resolved once before step 1, and WMP-* governance doctor checks. v0.1.29 makes harness a first-class governed dimension: an effective-harness precedence chain (CLI step > CLI default > overlay step > overlay default_harness > catalog default), profile validated against the effective harness, auto-profile-on-harness-override, apply_resolved_policy as the single runtime_kind author (FAKE preserved), overlay default_harness/harnesses fields. v0.1.30 ships operator-added PI profiles (a never-projected local store merged with built-ins), per-context overlay `extends` inheritance (the D-2 collapse removed), a run-scoped workflow-step handoff data plane (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor), and real audit/research/bug_report fragment+gate workflow bodies (DEFERRED_WORKFLOWS emptied) plus ctx-inject dehydration. Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--model/--step-model). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_resolved_policy as the single runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",
@@ -607,11 +516,12 @@
       "depends_on": [
         "architecture",
         "tech-stack",
+        "dadaia-workflows",
         "panel"
       ]
     },
     {
-      "rank": 28,
+      "rank": 23,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -631,7 +541,6 @@
       "agent_tier": "self-pull",
       "depends_on": [
         "specs-doctor",
-        "sdd-hotfix-track",
         "sdd-gate-v3",
         "lifecycle-foundation",
         "dadaia-workflows",
@@ -639,7 +548,7 @@
       ]
     },
     {
-      "rank": 29,
+      "rank": 24,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -656,39 +565,17 @@
       "token_estimate": 3250,
       "agent_tier": "self-pull",
       "depends_on": [
+        "sdd-bug-backlog-governance",
         "context-management",
         "agent-orchestration"
       ]
     },
     {
-      "rank": 30,
-      "slug": "sdd-hotfix-track",
-      "title": "sdd-hotfix-track",
-      "category": "product",
-      "tldr": "SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog).",
-      "summary": "SemVer vMAJOR.MINOR.PATCH em specs/releases/ com PATCH≥1 reservado para hotfix release (fluxo condensado, origem via ## Hotfixes pendentes do backlog).",
-      "path": "specs/memory/product/sdd/sdd-hotfix-track.md",
-      "tags": [
-        "sdd",
-        "hotfix",
-        "semver",
-        "superseded"
-      ],
-      "token_estimate": 852,
-      "agent_tier": "self-pull",
-      "depends_on": [
-        "sdd-bug-backlog-governance",
-        "sdd-gate-v3",
-        "specs-doctor",
-        "public-asset-distribution"
-      ]
-    },
-    {
-      "rank": 31,
+      "rank": 25,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
-      "tldr": "Valida invariantes SDD: SPEC-DOC 001..009/012/016/022-024/026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix repara TREE-4 e SPEC-DOC-034.",
+      "tldr": "Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034.",
       "summary": "Checks estruturais SDD: SPEC-DOC IDs não-sequenciais (001..009, 012, 016; 022/023 embutidos no check de backlog 012) cobrindo memory .md via LINT-1 + CAT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (fase↔markers), 026/027 (ids/naming de release), 028 (refs da constitution), 029 (coerência lease↔session em 3 estados), 030 (naming de audits), 031/035 (disposição de backlog), 032 (status legado de bug), 033 (event store JSONL de bugs), 034 (_archive dirs, auto-fix), 036 (audit arquivado nomeia release), 037 (constitution não enumera runtime kinds), 038 (audit loose sem disposição, WARN); SPECS-VERSION (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repara TREE-4 E SPEC-DOC-034.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [

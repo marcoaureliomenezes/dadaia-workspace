@@ -132,7 +132,9 @@ o lease single-session por Spec Context. Enforcement de consistência é o docto
 - Uma release é `v<M>.<m>.<p>` numa branch única `feature/{version}`, maturando por
   segmentos `alpha-N → rc-N` (cada segmento com SPEC/PLAN/TASKS/CLOSURE quando usado;
   `ACTIVE.md` carrega `segment:` opcional). Hotfix é uma release normal que ships do
-  `alpha-1` (PATCH ≥ 1; [[sdd-hotfix-track]] é referência superseded).
+  `alpha-1` (PATCH ≥ 1). Coexistence: `dadaia specs hotfix open` exists as the
+  scaffolding verb — the scaffolder enforces PATCH ≥ 1, and `hotfix/v*` branches
+  trigger CI.
 - **Commits** nunca são review-blocked (só o pre-commit lease gate + backlog-doctor
   escopado). **Push** é gated mecanicamente: o pre-push hook roda `dadaia ci
   preflight` (ruff format/check, mypy --strict, pytest — excluindo

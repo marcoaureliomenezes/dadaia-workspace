@@ -33,15 +33,14 @@ warning_bg | `#ddd9ab` | Fundo do banner de aviso de preço desatualizado. Texto
 alert | `#f7af63` | Ícone/border de alerta inline. Nunca como cor de texto (ratio insuficiente sobre branco).
 cost | `#633d2e` | Valores monetários (ex: `$1.84`), wordmark do topbar. Ratio ~8:1 sobre branco (WCAG AAA).
 
-### Mapeamento token CSS → PALETTE
+### Mapeamento token CSS → paleta
 
-Token CSS | PALETTE key | Hex | Valor anterior
----|---|---|---
-`--color-accent` | accent | `#9cddc8` | `#7ec8e3` (atualizado)
-`--color-primary-ring` | accent | `#9cddc8` | `#7ec8e3` (atualizado)
-`--color-primary-bg` | — | `#f0fbf7` | `#f0faff` (atualizado, derivado de accent)
-`--color-accent-secondary` | accent_secondary | `#bfd8ad` | (novo)
-`--color-warning-bg` | warning_bg | `#ddd9ab` | (novo)
-`--color-alert` | alert | `#f7af63` | (novo)
-`--color-cost` | cost | `#633d2e` | (novo)
-`--color-cost` (wordmark) | cost | `#633d2e` | `--color-heading` (atualizado via T-BR-07)
+Token CSS | Nome na paleta | Hex
+---|---|---
+`--color-accent` | accent | `#9cddc8`
+`--color-primary-ring` | accent | `#9cddc8`
+`--color-primary-bg` | — (derivado de accent) | `#f0fbf7`
+`--color-accent-secondary` | accent_secondary | `#bfd8ad`
+`--color-warning-bg` | warning_bg | `#ddd9ab`
+`--color-alert` | alert | `#f7af63`
+`--color-cost` (incl. wordmark do topbar) | cost | `#633d2e`

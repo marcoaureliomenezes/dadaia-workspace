@@ -63,11 +63,10 @@ governadas do catálogo com corpos reais mas **nenhum verbo CLI os invoca ainda*
    fragment bundle + contexto dinâmico + contrato de output** — a injeção de persona
    vale para TODOS os verbos (helper compartilhado threaded nos 5 corpos de workflow
    E no `_run_phase_step` da CLI), não só no pipeline.
-4. O worker responde com o payload `schema: agent-run-result-v1`; o gate typed
-   (review-only) decide: review steps exigem `verdict == APPROVED`; create steps
-   exigem payload estrutural + `artifact_refs`; Ring-2 valida `changed_paths`.
-5. Steps comunicam via o workflow-step handoff ledger; um required upstream ausente
-   BLOQUEIA antes do próximo prompt.
+4. O worker responde com o payload `schema: agent-run-result-v1`; o typed gate decide
+   o avanço (gate mechanics: [[lifecycle-foundation]] §"Gating note").
+5. Steps comunicam via o workflow-step handoff ledger ([[lifecycle-foundation]]
+   §"Workflow-step handoff data plane"); um required upstream ausente BLOQUEIA.
 
 ## Trigger típico
 

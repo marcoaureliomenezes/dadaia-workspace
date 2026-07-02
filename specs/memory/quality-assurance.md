@@ -7,7 +7,7 @@ summary: >-
   Enforced five-layer test architecture (unit/contract/integration/e2e/tmp) with
   machine-readable pytest markers, a CI split into 10 quality jobs (plus 5 governance
   jobs) with explicit timeouts, conftest safety guards, a CI-only 80% coverage gate,
-  and a no-slop policy. This atom is the single source of truth for test design.
+  and a no-slop policy.
 tags:
   - testing
   - pytest
@@ -93,7 +93,7 @@ normative vision §6.
 3. Local fast path: `pytest -q -m "unit and not slow" tests/unit` — runs in under
    10 seconds without coverage instrumentation.
 4. CI runs 10 quality jobs: importability-smoke, lint (ruff only — import-linter
-   contracts are NOT wired into any CI job; backlog `import-boundary-enforcement`),
+   enforcement status stated once in [[architecture]] §Enforcement),
    typecheck, unit-fast, unit-fast-cross, contract-coverage, contract-coverage-cross,
    integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
    marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;
@@ -102,9 +102,6 @@ normative vision §6.
    jobs (pr-title, repo-hygiene, backlog-doctor, hotfix-branch-name, verdict-gate)
    gate PR shape, repo/backlog hygiene, and the security push verdict; a separate
    secret-scan workflow runs gitleaks.
-5. One-off debugging reproductions go to `tests/tmp/` with an expiry note; they
-   are never counted toward coverage or release closure and are excluded from
-   default collection.
 
 ## Trigger típico
 
@@ -126,8 +123,7 @@ the no-slop policy (prevents re-accumulation).
 Files the test suite reads or writes at runtime:
 
 - `pyproject.toml` — pytest configuration (`-p no:cacheprovider`), marker
-  declarations, `norecursedirs`, `tmp_path_retention_policy = "failed"`; coverage in
-  CI redirects its data file via the `COVERAGE_FILE` env (runner temp dir).
+  declarations, `norecursedirs`, `tmp_path_retention_policy = "failed"`.
 - `tests/unit/**` — pure or near-pure fast tests; forbidden: CLI runner,
   subprocess, server threads, public stage/install, full workspace init, sleeps.
 - `tests/contract/**` — public CLI/API/schema/security/projection contracts;
@@ -136,8 +132,8 @@ Files the test suite reads or writes at runtime:
   service wiring; forbidden: browser, real remotes, duplicate unit matrices.
 - `tests/e2e/**` — named user journeys and process-boundary flows; forbidden:
   micro assertions, implementation internals, exhaustive branch matrices.
-- `tests/tmp/**` — one-off debugging reproductions only; excluded from default
-  collection, CI, and coverage. Each subdirectory must include an expiry note.
+- `tests/tmp/**` — the `tmp`-layer quarantine (rules stated once in Propósito and
+  the no-slop policy).
 - `.github/workflows/ci.yml` — 10 quality jobs (importability-smoke, lint,
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
