@@ -92,9 +92,7 @@ def test_upgrade_then_init_reaches_doctor_green(tmp_path: Path) -> None:
     assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
 
     # Backup-first: specs_bkp/<from>→<to>-<UTC>/ beside the tree.
-    backups = list((specs / "specs_bkp").glob("*")) + list(
-        (specs.parent / "specs_bkp").glob("*")
-    )
+    backups = list((specs / "specs_bkp").glob("*")) + list((specs.parent / "specs_bkp").glob("*"))
     assert backups, "upgrade must create the backup dir before mutating"
 
     # Re-stamp: constitution frontmatter carries the canonical version.
@@ -124,9 +122,7 @@ def test_upgrade_at_target_is_a_no_op(tmp_path: Path) -> None:
     assert first.returncode == 0, first.stderr or first.stdout
 
     def _backups() -> set[Path]:
-        return set((specs / "specs_bkp").glob("*")) | set(
-            (specs.parent / "specs_bkp").glob("*")
-        )
+        return set((specs / "specs_bkp").glob("*")) | set((specs.parent / "specs_bkp").glob("*"))
 
     before = _backups()
     assert before, "first upgrade must have produced a backup"
