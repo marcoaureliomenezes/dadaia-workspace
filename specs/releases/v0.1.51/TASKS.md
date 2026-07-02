@@ -1,0 +1,99 @@
+# TASKS — v0.1.51 — E2E Journey Canon
+
+**Status:** Aprovado
+
+Markers: `[ ]` open · `[-]` in progress · `[x]` done. One `[-]` per owner unless write
+sets are disjoint (PLAN §Write sets).
+
+## W0 — definition
+
+- [x] T-51-01 ACTIVE → v0.1.51 DEFINITION; SPEC/PLAN/TASKS authored (definition-time
+  inspection resolved all grill questions from code); dual definition review:
+  software-architect REJECT (BLOCKER: flat-tree→doctor-green unsatisfiable — upgrade
+  is move+re-stamp only, atoms never auto-created ⇒ FR2 input redefined as
+  below-canonical structurally-complete + `init` step restored; onboarding
+  Assertion-4 rationale stated; bash-hook file carries TWO live invariants) +
+  qa-engineer REJECT (BLOCKER: residue set is 5 files not 2 ⇒ discriminator stated,
+  `test_session_bound_context_residue.py` added to the delete set, compliant files
+  recorded; BLOCKER: mutation-sanity AC-7 added; ship-contract exactly-once made
+  decidable with single home `test_public_source_hygiene.py`; AC-5 pair-set
+  inventory; AC-4 post-push evidence path pinned). ALL amendments landed; all three
+  `Aprovado`; definition commit. Owner: product-engineer (orchestrated).
+
+## W1 — FR1 master journey (write set: `tests/e2e/features/test_lifecycle_journey_e2e.py`, additive helpers in `tests/e2e/lease_rendezvous.py`)
+
+- [ ] T-51-10 Narrative lifecycle E2E: sandboxed workspace + local bare fixture
+  remote; create → alive (real clone) → bind (real subprocess, own sid) → ctx_inject
+  (second subprocess, different sid, ancestry-attributed marker) asserts the bound
+  context's memory marker → pre_gate MUTATING write acquires the lease (record names
+  the journey context) → foreign-sid MUTATING attempt blocked. Bounded rendezvous
+  only; actor stdout/stderr captured. AC-7 mutation-sanity: demonstrate the journey
+  FAILS under a one-line sabotage of bind attribution; record sabotage + failure on
+  this line; revert before commit. Any product failure ⇒ `dadaia bugs append`, never
+  an inline fix. Owner: software-engineer.
+
+## W2 — FR2 upgrade E2E (write set: `tests/e2e/features/test_specs_upgrade_e2e.py`)
+
+- [ ] T-51-11 Below-canonical, structurally-complete tree (unstamped constitution +
+  all required memory atoms + mandatory dirs + legacy `foundation/` + root `SPEC.md`
+  + one legacy bug markdown) → real `dadaia specs upgrade` → `dadaia init` → assert:
+  backup dir created; re-stamp to `CANONICAL_SPECS_VERSION`; `releases/legacy/`
+  relocation trips no doctor ERROR; legacy bug converted; `specs doctor` 0 errors.
+  Scenario 2: at-target rerun is a no-op (no new backup). AC-7 mutation-sanity:
+  demonstrate failure under a one-line sabotage of the re-stamp; record on this
+  line; revert. Owner: software-engineer.
+
+## W3 — FR3 residue disposition (write set: three deletions + `tests/integration/test_onboarding_tree_v2_e2e.py` + `tests/contract/test_public_source_hygiene.py`)
+
+- [ ] T-51-12 Land the SINGLE explicit ship assertion (`pre-push-ci-gate.sh` present
+  in the `public/scripts/` listing) in `test_public_source_hygiene.py` (decision
+  recorded here per the definition review: the explicit assertion is kept as the one
+  canonical home; `test_pre_push_gate_venv_probe.py`'s execution coverage is a
+  behavior test, not a ship assertion); confirm the bytecode invariant is already
+  covered by `test_no_bytecode_committed_under_public`; DELETE
+  `test_retired_model_id_residue.py`, `test_bash_hook_residue.py`, and
+  `test_session_bound_context_residue.py`; strip ONLY the legacy-YAML/HTML
+  Assertion-5 group from `test_ac_o1_copytree_scaffold_produces_valid_v2_tree`
+  (Assertion 4 stays — live v2-shape contract backed by TREE-1/TREE-2). Full suite
+  green after. Owner: software-engineer.
+
+## W4 — FR4 panel journey (write set: `tests/e2e/panel/spec-context-operation-journey.spec.ts`)
+
+- [ ] T-51-13 Verification-first: confirm the Spec Context Projects tab re-reads
+  `spec_contexts.json` per request (if startup-cached: `dadaia bugs append` + the
+  documented restart fallback). Then the pinned journey: seed contexts X (ALIVE) +
+  Y (DEAD) → assert X's badge ALIVE → flip X to DEAD in `spec_contexts.json` →
+  reload → assert the pinned DOM delta (X's badge ALIVE→DEAD). Sessions specs
+  untouched. AC-7 mutation-sanity: demonstrate failure under a one-line sabotage of
+  the seeded state; record on this line; revert. Verified in the `e2e-panel` CI job.
+  Owner: software-engineer.
+
+## W5 — FR5 parametrization (write set: the 5 named unit files)
+
+- [ ] T-51-14 Parametrize true shape-duplicates of the `assert … == []` pattern in
+  `test_public_assets.py` (30), `test_doctor.py` (24), `test_scaffolder.py` (14),
+  `test_doctor_taxonomy_disposition.py` (11), `test_session_identity.py` (8);
+  before/after `(callable-under-test, fixture-state)` pair inventory recorded on
+  this line at completion; the pair-set must be preserved (semantic diff, not
+  node-id diff). Owner: software-engineer.
+
+## W6 — gates + ship (flat release: single ship gate)
+
+- [ ] T-51-20 QA review (ship gate): verify every AC live — incl. AC-3's per-surface
+  decidable checks, AC-5's independent pair-set re-derivation, and AC-7's
+  mutation-sanity evidence on T-51-10/11/13; suite run UNPIPED with the real exit
+  code recorded. AC-4's evidence is the post-push green `e2e-panel` run URL — the
+  AC-4 verdict is finalized against that run, not blocked on a local Playwright run.
+  Verdict lands as a review commit. Owner: qa-engineer.
+- [ ] T-51-21 Security review (push gate): APPROVE handoff with `metrics.commit_sha`
+  = pushed sha; push; CI green (incl. `e2e-panel`); PR; merge.
+  Owner: security-reviewer + orchestrator.
+
+## W7 — closure (CLOSURE phase)
+
+- [ ] T-51-30 CLOSURE.md (incl. `## Validations` + `## Drifts` — SPEC-DOC-006);
+  consumed entry `e2e-journey-coverage-and-test-canon` removed with durable copy +
+  `consumed_backlog.json`; memory: refresh `quality-assurance.md` coverage
+  description ONLY if now understated (no law change; closure-phase MEMORY write);
+  catalog + lint; archive; ACTIVE → none; candidates.md R3 row marked shipped.
+  Owner: product-engineer.
