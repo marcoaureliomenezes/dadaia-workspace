@@ -116,12 +116,18 @@ sets are disjoint (PLAN §Write sets).
 
 ## W6 — gates + ship (flat release: single ship gate)
 
-- [ ] T-51-20 QA review (ship gate): verify every AC live — incl. AC-3's per-surface
-  decidable checks, AC-5's independent pair-set re-derivation, and AC-7's
-  mutation-sanity evidence on T-51-10/11/13; suite run UNPIPED with the real exit
-  code recorded. AC-4's evidence is the post-push green `e2e-panel` run URL — the
-  AC-4 verdict is finalized against that run, not blocked on a local Playwright run.
-  Verdict lands as a review commit. Owner: qa-engineer.
+- [x] T-51-20 QA review (ship gate): **APPROVE** (qa-engineer, 2026-07-02, on
+  `6794266c`). Certified live: commit hygiene (7 commits, zero `dadaia_workspace/**`
+  bytes — test-only holds mechanically); AC-1 journey 1 passed + inspection (real
+  subprocess seams, no sleeps, no-steal asserted); AC-2 both scenarios; AC-3
+  per-surface checks incl. exactly-once ship assertion; AC-5 pair-set independently
+  re-derived from the diff (all 19 cases matched; 3 untouched files byte-identical;
+  scaffolder no-duplicate claim spot-checked); AC-6 full suite **4,407 passed / 17
+  skipped, exit 0 via PIPESTATUS** + ruff/mypy clean; AC-7 all three sabotage
+  records verified concrete + absent from the tree. AC-4 PASS by inspection with
+  the stated remaining-evidence condition: finalized against the PR's green
+  `e2e-panel` run (T-51-21 confirms before merge). MINOR-1 (docstring drift item 5
+  in the onboarding acceptance) fixed in this review commit. Owner: qa-engineer.
 - [ ] T-51-21 Security review (push gate): APPROVE handoff with `metrics.commit_sha`
   = pushed sha; push; CI green (incl. `e2e-panel`); PR; merge.
   Owner: security-reviewer + orchestrator.

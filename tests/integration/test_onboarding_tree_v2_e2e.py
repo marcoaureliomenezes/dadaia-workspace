@@ -36,10 +36,9 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
       2. Contain the born-markdown memory atoms (architecture.md, tech-stack.md,
          product/index.md), each with valid YAML frontmatter.
       3. Contain specs/AGENTS.md (the SDD workflow contract).
-      4. NOT contain specs/foundation/ or specs/SPEC.md at the tree root.
-      5. NOT contain legacy YAML stubs (.yaml) or rendered HTML files (.html) for
-         memory atoms — the .md-only scaffold is the source of truth (T-MMS-10/11).
-      6. Produce 0 TREE-* ERROR-severity issues when SpecsDoctor.check() is run.
+      4. NOT contain specs/foundation/ or specs/SPEC.md at the tree root (the
+         positive v2 tree-shape contract, backed by doctor TREE-1/TREE-2).
+      5. Produce 0 TREE-* ERROR-severity issues when SpecsDoctor.check() is run.
     """
     specs_dir = tmp_path / "specs"
 
