@@ -55,6 +55,24 @@ class DeadSecretFoundError(DadaiaError):
     """
 
 
+def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
+    """`shutil.rmtree` onexc handler: chmod-and-retry (v0.1.50 FR3).
+
+    Git loose objects under ``.git/objects/`` are read-only (0444) by design;
+    grant owner write on the failing path (and its parent dir, where the unlink
+    permission actually lives) and retry the failed operation once.
+    """
+    import os
+    import stat
+
+    target = Path(path)
+    with contextlib.suppress(OSError):
+        os.chmod(target.parent, target.parent.stat().st_mode | stat.S_IWUSR | stat.S_IXUSR)
+    with contextlib.suppress(OSError):
+        os.chmod(target, stat.S_IWUSR | stat.S_IRUSR)
+    func(path)  # type: ignore[operator]
+
+
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
 
@@ -557,7 +575,6 @@ class SpecContextService:
         # Git sync + rmtree under Lock 2 (OUTSIDE Lock 1)
         if repo_path.exists():
             import contextlib
-            import os
 
             with context_lock(self._workspace_root, ctx.repo_slug):
                 with contextlib.suppress(Exception):
@@ -579,20 +596,12 @@ class SpecContextService:
                                 f"Git push failed for context '{name}' at '{repo_path}'. "
                                 "Resolve the issue and retry dead()."
                             ) from exc
-                # Detect non-writable files before calling rmtree
-                non_writable = [
-                    str(f)
-                    for f in repo_path.rglob("*")
-                    if f.is_file() and not os.access(f, os.W_OK)
-                ]
-                if non_writable:
-                    sample = non_writable[:3]
-                    raise GitSyncError(
-                        f"Cannot remove '{repo_path}': {len(non_writable)} non-writable "
-                        f"file(s) found (e.g. {sample}). "
-                        f"Run: sudo chown -R $USER '{repo_path}'"
-                    )
-                shutil.rmtree(repo_path)
+                # v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-
+                # git-objects): git loose objects are 0444 BY DESIGN, and POSIX
+                # unlink needs parent-dir write, not file write — the old rglob
+                # non-writable pre-scan refused every repo with a local commit.
+                # rmtree with a chmod-and-retry handler is the canonical pattern.
+                shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
 
         # Lock 1: load → mutate → dump (JSON write only)
         with workspace_lock(self._workspace_root):

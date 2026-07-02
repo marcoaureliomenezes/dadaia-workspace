@@ -29,14 +29,14 @@ sets are disjoint (PLAN §Write sets).
 
 ## W2 — FR2 coherence + index hygiene (write set: `session_identity.py`, doctor state-dir seam, tests)
 
-- [-] T-50-11 TDD: SPEC-DOC-029 holder-confirmation coherence (a confirmed live
+- [x] T-50-11 TDD: SPEC-DOC-029 holder-confirmation coherence (a confirmed live
   holder is coherent despite `.ptr` drift; NO by-session schema change); RENEW-branch
   dangling-entry cleanup (`_index_remove` for the replaced sid); doctor `--specs-dir`
   isolated `workspace_state_dir`. Owner: software-engineer.
 
 ## W3 — FR3 dead-exit path (write set: `git_subprocess.py`, `spec_context/service.py`, tests)
 
-- [ ] T-50-12 TDD: explicit-refspec push (`HEAD:<upstream-branch>`) + empty-push skip
+- [-] T-50-12 TDD: explicit-refspec push (`HEAD:<upstream-branch>`) + empty-push skip
   (`rev-list @{u}..HEAD`); drop the non-writable rglob scan for
   `shutil.rmtree(onexc=chmod-and-retry)`; move surviving refusal pre-checks BEFORE
   the push phase. Fixture repos: 0444 git objects, mismatched upstream, nothing-to-

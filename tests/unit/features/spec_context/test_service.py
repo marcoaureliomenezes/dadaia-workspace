@@ -17,7 +17,7 @@ pytest.importorskip("fcntl")
 import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from dadaia_workspace.core.exceptions import GitSyncError  # noqa: E402
+from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     _SCAFFOLD_SRC,
     SpecContextService,
@@ -65,17 +65,15 @@ def service(
 # ---------------------------------------------------------------------------
 
 
-def test_dead_raises_gitsyncerror_on_non_writable_files(
+def test_dead_succeeds_on_non_writable_files(
     service: SpecContextService,
     store: FakeContextStore,
     git: FakeGitClient,
     workspace_root: Path,
 ) -> None:
-    """When the repo directory contains non-writable files, dead() must raise
-    GitSyncError with an actionable message instead of allowing PermissionError
-    to propagate unhandled.
-
-    Updated for T-10b: deactivate() → dead().
+    """v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-git-objects):
+    read-only files (git loose objects are 0444 BY DESIGN) no longer refuse dead() —
+    rmtree runs with a chmod-and-retry handler, replacing the old GitSyncError guard.
     """
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
@@ -83,23 +81,13 @@ def test_dead_raises_gitsyncerror_on_non_writable_files(
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
 
-    # Create a file inside the repo then make it non-writable
     locked_file = repo / "locked.txt"
     locked_file.write_text("content")
-    locked_file.chmod(stat.S_IRUSR | stat.S_IRGRP)  # read-only
+    locked_file.chmod(stat.S_IRUSR | stat.S_IRGRP)  # read-only, like a loose object
 
-    try:
-        with pytest.raises(GitSyncError) as exc_info:
-            service.dead("proj")
-
-        msg = str(exc_info.value)
-        assert "non-writable" in msg.lower() or "chown" in msg.lower(), (
-            f"Error message must be actionable. Got: {msg!r}"
-        )
-        assert str(repo) in msg or "locked.txt" in msg
-    finally:
-        # Restore permissions so tmp_path cleanup can proceed
-        locked_file.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+    result = service.dead("proj")
+    assert result.state is ContextState.DEAD
+    assert not repo.exists()
 
 
 def test_dead_succeeds_when_all_files_are_writable(

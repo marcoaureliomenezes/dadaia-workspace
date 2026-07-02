@@ -219,3 +219,35 @@ def test_dead_clean_tree_unchanged_real_git(tmp_path: Path, workspace_root: Path
     ctx = service.dead("proj")
     assert ctx.state == ContextState.DEAD
     assert not repo.exists()
+
+
+def test_dead_succeeds_with_readonly_git_objects_real_git(
+    workspace_root: Path, tmp_path: Path
+) -> None:
+    """v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-git-objects):
+    0444 loose objects are git-normal — dead() now rmtree-chmod-retries with the
+    PLAIN GitSubprocessClient (no _WritableObjectsGitClient workaround needed)."""
+    import os
+
+    remote = _bare_remote(tmp_path)
+    dest = workspace_root / "repos" / "proj"
+    _clone_with_initial_commit(remote, dest)
+
+    store = FakeContextStore()
+    service = SpecContextService(
+        context_store=store,
+        git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+    )
+    _alive_ctx(store, "proj")
+
+    readonly = [
+        p
+        for p in (dest / ".git" / "objects").rglob("*")
+        if p.is_file() and not os.access(p, os.W_OK)
+    ]
+    assert readonly, "precondition: git wrote read-only loose objects"
+
+    result = service.dead("proj", commit=False)
+    assert result.state is ContextState.DEAD
+    assert not dest.exists()

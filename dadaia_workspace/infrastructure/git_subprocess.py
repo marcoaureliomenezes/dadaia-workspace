@@ -121,7 +121,17 @@ class GitSubprocessClient:
             branch = self.current_branch(path)
             result = _run(["git", "push", "-u", "origin", branch], cwd=path)
         else:
-            result = _run(["git", "push"], cwd=path)
+            # v0.1.50 FR3 (bug context-dead-plain-git-push-fails-mismatched-upstream):
+            # skip entirely when there is nothing to push, and push with an EXPLICIT
+            # refspec ``HEAD:<upstream-branch>`` — plain ``git push`` fails under
+            # ``push.default=simple`` whenever the upstream branch name differs from
+            # the local one.
+            ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
+            if ahead.returncode == 0 and ahead.stdout.strip() == "0":
+                return
+            upstream = tracking.stdout.strip()  # e.g. "origin/main"
+            remote, _, remote_branch = upstream.partition("/")
+            result = _run(["git", "push", remote, f"HEAD:{remote_branch}"], cwd=path)
 
         if result.returncode != 0:
             raise GitSyncError(f"git push failed in {path}: {result.stderr.strip()}")
