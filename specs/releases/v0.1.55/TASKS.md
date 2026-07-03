@@ -476,7 +476,21 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W6 — gates + ship (flat release: single ship gate)
 
-- [ ] T-55-60 Full gates + consumed-backlog archival at SHIP + ship. Checklist:
+- [x] T-55-60 DONE (gates + archival + QA APPROVE; security/push follows as the
+  same task's push half). Archival `869e0897` (single atomic: R100 rename +
+  consumed_backlog.json + candidates prune; backlog doctor clean; invariants i+ii
+  verified — no W1-W5 commit staged specs/backlog). QA ship gate: **APPROVE 11/11**
+  (handoff 2026-07-03T215930Z-qa-engineer-v0155-ship-gate, validated): both goldens
+  real + pre-refactor-captured (W3's <WS> fix adjudicated sound); coordinator 224
+  lines w/ zero _check_* bodies; doctor_* ≤516, api_* ≤429; deletions verified
+  (api.py, reports_* triplet, zero old-path refs); contracts 8 kept/0 broken, cap
+  26 = 9/4/13 self-counted; 6 sabotages zero-residue; FR4 staleness guard REAL
+  (lock_liveness.is_stale); FR5 E2E + README complete; drift-guard genuinely
+  introspective; gitignore opt-in .md-only (every binary IGNORED); frozen suite
+  4/4 zero-diff; unpiped 4354 passed/17 skipped exit 0 + ruff/mypy/specs/backlog/
+  public doctors all clean; 6/6 deviations adjudicated SOUND. LOW advisory →
+  W7 CLOSURE: test_panel.py:204,215 stale "views/api.py" prose comments.
+  Original checklist: Full gates + consumed-backlog archival at SHIP + ship:
   - **Gates (AC-6):** unpiped `pytest` + `ruff format --check` + `ruff check --no-cache` + `mypy
     --strict` + `lint-imports --no-cache` (`8 kept, 0 broken`; cap 26 = 9/4/13) + `dadaia specs
     doctor` (exit 0) + **`dadaia backlog doctor` (exit 0, zero BL-SCHEMA)** + `dadaia public
