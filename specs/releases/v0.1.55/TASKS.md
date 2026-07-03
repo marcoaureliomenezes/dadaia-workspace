@@ -186,7 +186,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W3 — FR2 panel api.py per-domain decomposition (delete api.py; no facade)
 
-- [ ] T-55-30 Split `features/panel/views/api.py` (24 fns / 8 domains) into per-domain view
+- [-] T-55-30 Split `features/panel/views/api.py` (24 fns / 8 domains) into per-domain view
   modules; DELETE api.py. Checklist:
   - **Golden PRE-split (R6 pattern):** each route's `(status, content_type, body)` on a fixture
     panel state → committed golden fixture.
