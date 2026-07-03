@@ -269,7 +269,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W4 — FR4 + FR5 + FR6 bug fixes + scope docstring (independent)
 
-- [ ] T-55-40 Fix `bugs-append-ignores-persisted-bind` (FR4), `backlog-new-stub-readme-lag-
+- [-] T-55-40 Fix `bugs-append-ignores-persisted-bind` (FR4), `backlog-new-stub-readme-lag-
   intents-schema` (FR5), and add the `workspace_clean` scope docstring (FR6). Checklist:
   - **FR4 fix channel (R-6, DECIDED):** at `bind` (`cli/commands/context.py`), persist the
     harness-native session id (`CODEX_SESSION_ID`/`CLAUDE_CODE_SESSION_ID`, via
