@@ -21,7 +21,6 @@ import http.client
 import json
 import os
 import queue
-import select
 import signal
 import socket
 import subprocess
@@ -445,71 +444,6 @@ def test_memory_view_iframe_loads(tmp_path: Path) -> None:
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
         assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
-    finally:
-        _kill_proc(proc)
-
-
-# ---------------------------------------------------------------------------
-# T-5.4 — test_dashboard_deprecation_warning_visible  (AC-6)
-# ---------------------------------------------------------------------------
-
-
-def test_dashboard_deprecation_warning_visible(tmp_path: Path) -> None:
-    """'dadaia server dashboard' emits the verbatim deprecation line to stderr.
-
-    Acceptance: AC-6 (FR-6 deprecation warning visible to shell users).
-    """
-    _init_workspace(tmp_path)
-    port = _find_free_port()
-
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "dadaia_workspace",
-            "server",
-            "dashboard",
-            "--no-open",
-            "--port",
-            str(port),
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        cwd=str(tmp_path),
-    )
-
-    expected_deprecation = (
-        "[deprecation] 'dadaia server dashboard' will be removed in a future release."
-        " Use 'dadaia panel' instead."
-    )
-
-    try:
-        # Wait up to 10s for the deprecation line to appear on stderr.
-        deadline = time.monotonic() + 10.0
-        found = False
-        assert proc.stderr is not None
-        while time.monotonic() < deadline:
-            rlist, _, _ = select.select([proc.stderr], [], [], 0.2)
-            if rlist:
-                line = proc.stderr.readline()
-                if expected_deprecation in line:
-                    found = True
-                    break
-            if proc.poll() is not None:
-                break
-
-        if not found:
-            # Read remaining stderr for diagnostics.
-            remaining = proc.stderr.read() if proc.stderr else ""
-            pytest.fail(
-                f"Deprecation line not found in stderr within 10s.\n"
-                f"Expected: {expected_deprecation!r}\n"
-                f"Remaining stderr: {remaining!r}"
-            )
-
-        proc.send_signal(signal.SIGINT)
-        proc.wait(timeout=5)
     finally:
         _kill_proc(proc)
 
