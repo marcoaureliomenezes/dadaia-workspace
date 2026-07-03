@@ -59,7 +59,7 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
 
 ## W3 — FR3 telemetry reliability (write set: PLAN §W3)
 
-- [ ] T-52-12 TDD: `test(T-52-12): distinct-connection RED` commit
+- [x] T-52-12 TDD: `test(T-52-12): distinct-connection RED` commit
   (Barrier(2)-synchronized structural assertion — two concurrent panel query calls
   must use DISTINCT connections; fails by construction on the shared
   `check_same_thread=False` design), then the fix commit: `open_connection` +=
@@ -72,6 +72,19 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
   `schema.py:137` itself). AC-7 sabotages (b) factory bypass ⇒ contract FAILS and
   (c) `cost_known` filter dropped ⇒ matrix case 4/6 FAILS (captured outputs on
   this line; reverted). Owner: software-engineer.
+  - DONE — RED `0794dae3` (structural TypeError: no `connection_factory`;
+    contract flags panel.py:52 + service.py:295; quarantine red) → fix
+    `93e8b75e`. Shape: factory CALLABLE on `TelemetryAggregator`, per-method
+    open/finally-close (`_open_conn`/`_impl` pattern); DAO untouched (aggregator
+    is the sole connection consumer); `check_same_thread=False` GONE; integrity
+    probe via `open_connection(read_only=True)` (ro skips WAL); quarantine moves
+    `-wal`/`-shm`. Scope: **935 passed exit 0**; ruff/mypy clean. AC-7(b)
+    captured: bare connect restored ⇒ contract FAILS (panel.py:[67], exit 1);
+    AC-7(c): cost_known filter dropped ⇒ 6 matrix tests FAIL (case4/6/3/7 +
+    top_agent, exit 1); both reverted, re-run green. Foreign readers CONFIRMED
+    untouched (`runtimes.py`, `codex.py`, `store/dao.py` absent from the diff).
+    Collateral: `test_service.py::test_cost_backfill` → file-backed (refresh now
+    correctly closes its connection). Marked [x].
 
 ## W4 — FR4 catalog (write set: PLAN §W4; sequential after W1/W3 — shared files)
 
