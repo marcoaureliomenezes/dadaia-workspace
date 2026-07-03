@@ -6,7 +6,6 @@ tldr: Uma frase descrevendo o que esta feature faz.
 summary: Uma a duas frases expandindo o tldr. Responde "devo fazer self-pull deste atom?".
 tags:
   - feature
-agent_tier: self-pull
 token_estimate: 0
 last_updated: "2026-01-01"
 release_origin: RELEASE_PLACEHOLDER

@@ -24,10 +24,9 @@ tags:
 - hooks
 - enforcement
 - chokepoints
-agent_tier: self-pull
 token_estimate: 3425
-last_updated: '2026-07-02'
-release_origin: v0.1.50
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
 Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, single entrypoint) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + advisory reconciler) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (installed via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). The `sdd_gate` and `root_whitelist` modules are thin policy modules consumed by `pre_gate` (`evaluate_payload()`); their legacy `main()`s are kept for one release.
@@ -139,8 +138,8 @@ context). Bind/injection mechanics: [[context-management]].
 
 **Tunables and telemetry:** all kernel constants (lease TTL, GC TTLs, CAS retries,
 sentinel TTL, reconciler throttle) live in `core/kernel_tunables.py` (pure constants,
-zero I/O); hooks and lease import from there (`lease.LEASE_TTL_SECONDS` remains as a
-re-export for one release). Each `pre_gate` invocation appends a
+zero I/O); hooks and lease import them from there directly — the transitional
+`lease.LEASE_TTL_SECONDS` re-export is gone; `kernel_tunables.LEASE_TTL_SECONDS` is the single name. Each `pre_gate` invocation appends a
 `{ts, hook, event, duration_ms}` record to `.dadaia/logs/hook-latency.jsonl`
 (best-effort, fail-open — a missing/non-writable logs dir never changes the verdict or
 the exit code; no payload, paths, or session ids).

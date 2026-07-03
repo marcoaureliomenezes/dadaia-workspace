@@ -18,7 +18,6 @@ tags:
 - doctor
 - validation
 - sdd
-agent_tier: self-pull
 token_estimate: 2150
 last_updated: '2026-07-02'
 release_origin: v0.1.50

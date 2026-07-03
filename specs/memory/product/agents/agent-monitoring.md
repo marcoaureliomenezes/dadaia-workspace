@@ -13,7 +13,6 @@ tags:
 - monitoring
 - telemetry
 - sessions
-agent_tier: self-pull
 token_estimate: 1450
 last_updated: '2026-07-02'
 release_origin: v0.1.48

@@ -11,7 +11,6 @@ tags:
 - claude-code
 - layer-1
 - projection
-agent_tier: self-pull
 token_estimate: 475
 last_updated: '2026-07-02'
 release_origin: v0.1.48

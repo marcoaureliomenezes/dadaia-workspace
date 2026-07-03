@@ -14,10 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-agent_tier: self-pull
 token_estimate: 1250
-last_updated: '2026-07-02'
-release_origin: v0.1.51
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
 ## Purpose
@@ -36,8 +35,8 @@ dependencies). The default local invocation (`pytest`) does not run coverage; th
 dir), keeping local runs fast and avoiding coverage inflation that hides weak
 contracts.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.4k tests (4,424 as of
-v0.1.51; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.3k tests (4,339 as of
+v0.1.53, after the legacy purge trimmed dead-code tests; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -86,6 +85,13 @@ no test may be named after a PR, release, or task id; no test may assert that
 deleted code remains deleted; private constants must not be duplicated into test
 code as the source of truth; one-off debugging tests go to `tests/tmp/` only with
 an expiry note.
+
+The frozen no-steal suite (the lease/gate test files pinned since v0.1.50) protects
+the no-steal **invariant** — its assertions, the TTL floor, and the pid veto — not the
+file bytes: a symbol-forced repoint that leaves the invariant identical (e.g.
+re-pointing a deleted re-export to its canonical home, or driving the production hook
+entrypoint after a `main()` deletion) is legitimate and is adjudicated at the QA ship
+gate, not blocked as a freeze breach.
 
 This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
