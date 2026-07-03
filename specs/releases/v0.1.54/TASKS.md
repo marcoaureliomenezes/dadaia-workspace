@@ -27,7 +27,7 @@ includes `tests/`.
 
 ## W1 — FR1 red-chain remediation
 
-- [ ] T-54-10 Fix the 5 red chains (4 edges) → `features-no-infrastructure` +
+- [-] T-54-10 Fix the 5 red chains (4 edges) → `features-no-infrastructure` +
   `features-no-subprocess` GREEN. Checklist:
   - **(a) json_wmp_store — relocate types + lean port (architect A1):** move
     `WorkflowModelPolicyOverlay`, `WorkflowModelPolicyStoreError`, `DEFAULT_CONTEXT` from
