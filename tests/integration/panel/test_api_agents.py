@@ -36,6 +36,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     RecentSession,
     TokenTotals,
 )
+from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
@@ -160,7 +161,7 @@ def _build_agents_server(
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
         workspace_root=workspace_root,
         telemetry=stub_telemetry,
-        agents_provider=FileSystemAgentsProvider(),
+        agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
 
     def _stub_html(**kw: Any) -> tuple[int, str, bytes]:

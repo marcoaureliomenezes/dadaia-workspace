@@ -52,8 +52,15 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 
+from dadaia_workspace.core.models.workflow_execution import (
+    DEFAULT_CONTEXT,
+    WorkflowModelPolicyOverlay,
+    WorkflowModelPolicyStoreError,
+)
+from dadaia_workspace.core.protocols.workflow_model_policy_store import (
+    WorkflowModelPolicyStorePort,
+)
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     FragmentError,
@@ -64,12 +71,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     WorkflowCatalog,
     WorkflowExecutionPolicyResolver,
-)
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    DEFAULT_CONTEXT,
-    JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
-    WorkflowModelPolicyStoreError,
 )
 
 #: Layer-2 harness names a profile / step may legitimately declare (LAW 1).
@@ -280,12 +281,16 @@ def _check_profile_registry() -> list[Finding]:
 
 
 def _check_overlay(
-    workspace_root: Path,
     catalog: WorkflowCatalog,
-    store: JsonWorkflowModelPolicyStore | None,
+    store: WorkflowModelPolicyStorePort,
 ) -> list[Finding]:
-    """WMP-6 + WMP-8: the persisted overlay resolves, or fails actionably (no crash)."""
-    store = store or JsonWorkflowModelPolicyStore(workspace_root)
+    """WMP-6 + WMP-8: the persisted overlay resolves, or fails actionably (no crash).
+
+    The overlay store is injected (the container composes the concrete
+    :class:`JsonWorkflowModelPolicyStore`); the doctor only reads it through the
+    :class:`WorkflowModelPolicyStorePort` seam, so this feature never imports the JSON
+    adapter under ``infrastructure/`` (FR1a).
+    """
     try:
         overlay = store.load()
     except WorkflowModelPolicyStoreError as exc:
@@ -389,20 +394,23 @@ def _check_persona_resolution() -> list[Finding]:
 
 def run_policy_doctor(
     *,
-    workspace_root: Path,
+    store: WorkflowModelPolicyStorePort,
     catalog: WorkflowCatalog | None = None,
     loader: FragmentLoader | None = None,
-    store: JsonWorkflowModelPolicyStore | None = None,
 ) -> list[Finding]:
     """Run every ``WMP-*`` governance check and return all findings.
 
     Pure catalog/profile checks run against the governed catalog + built-in registry;
-    the overlay check loads ``.dadaia/states/workflow_model_policy.json`` (missing ⇒
-    defaults; invalid ⇒ an actionable WMP-STATE error, never a crash). ``catalog`` /
-    ``loader`` / ``store`` are injectable for deterministic fixture testing.
+    the overlay check loads ``.dadaia/states/workflow_model_policy.json`` through the
+    injected ``store`` (missing ⇒ defaults; invalid ⇒ an actionable WMP-STATE error, never a
+    crash). The ``store`` is the :class:`WorkflowModelPolicyStorePort` the container composes
+    (``build_workflow_model_policy_store``), so this feature never imports the JSON adapter
+    directly (FR1a). ``catalog`` / ``loader`` are injectable for deterministic fixture testing.
     """
     if catalog is None:
-        from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+        # v0.1.54 FR2: import the governed catalog intra-lifecycle (its canonical home),
+        # removing the former lifecycle -> workflows edge that closed the import cycle.
+        from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
 
         catalog = governed_workflow_catalog()
     loader = loader or FragmentLoader()
@@ -411,7 +419,7 @@ def run_policy_doctor(
     findings.extend(_check_workflow_step_ids(catalog))
     findings.extend(_check_step_invariants(catalog, loader))
     findings.extend(_check_profile_registry())
-    findings.extend(_check_overlay(workspace_root, catalog, store))
+    findings.extend(_check_overlay(catalog, store))
     findings.extend(_check_persona_resolution())
     return findings
 

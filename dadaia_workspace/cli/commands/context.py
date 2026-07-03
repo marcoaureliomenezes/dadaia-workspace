@@ -35,6 +35,7 @@ from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
     SpecContextService,
 )
+from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 console = Console()
@@ -511,7 +512,7 @@ def release_cmd(
             ctx_name = str(session_data.get("context", ""))
             if ctx_name:
                 with contextlib.suppress(Exception):
-                    pid_probe = container._build_pid_probe()
+                    pid_probe = build_pid_probe()
                     ancestry_probe = container.build_process_ancestry()
 
                     def _is_ancestor(holder_pid: int, caller_pid: int) -> bool:

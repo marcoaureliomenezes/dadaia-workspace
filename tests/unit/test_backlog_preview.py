@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 import pytest
-import typer
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.preview import (
@@ -42,7 +41,7 @@ def _registry(tmp_path: Path) -> object:
         catalog_path=catalog,
         alias_map_path=alias,
         specs_dir=tmp_path / "specs",
-        cli_app=typer.Typer(),
+        cli_anchors=frozenset(),
     )
 
 

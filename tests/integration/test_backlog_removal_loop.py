@@ -69,6 +69,7 @@ def _plant(tmp_path: Path) -> tuple[Path, Path, Registry]:
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=tmp_path / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs,
+        cli_anchors=frozenset(),
     )
     return backlog, specs / "_archive", registry
 
@@ -81,6 +82,7 @@ def _doctor(tmp_path: Path) -> list:
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=tmp_path / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         archive_root=specs / "_archive",
+        cli_anchors=frozenset(),
     )
 
 

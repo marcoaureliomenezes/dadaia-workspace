@@ -19,8 +19,9 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from dadaia_workspace.core.models.agent import (
     AgentDTO,
@@ -29,7 +30,6 @@ from dadaia_workspace.core.models.agent import (
     InvalidAgentIdError,
 )
 from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
-from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 
 # AgentDTO / AgentPromptResult / the error types now live in core/models/agent.py
 # (NEW-02 boundary). Re-exported here so existing
@@ -47,6 +47,25 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class _AgentStore(Protocol):
+    """Structural surface of the injected agent store (see ``MarkdownAgentStore``).
+
+    Depending on this feature-local Protocol — rather than importing the concrete
+    ``infrastructure.markdown_agent_store.MarkdownAgentStore`` — keeps
+    ``features/agents/reader.py`` free of any ``features -> infrastructure`` edge
+    (v0.1.54 FR5 DI completion). The composition root (``container.py``) supplies the
+    concrete store class as the ``store_factory``.
+    """
+
+    def list_raw(self) -> list[dict[str, Any]]: ...
+
+
+#: Builds an agent store for a resolved agents directory. ``container.py`` passes the
+#: concrete ``MarkdownAgentStore`` class; the feature never imports infrastructure.
+AgentStoreFactory = Callable[[Path], _AgentStore]
+
 
 # Allowlist of frontmatter keys that map to AgentDTO fields.
 # Keys absent from this set are silently dropped after a warning log.
@@ -319,17 +338,27 @@ def get_prompt(agent_id: str, workspace_root: Path) -> tuple[str, Path]:
     return body, resolved_candidate
 
 
-def read_canonical_agents(workspace_root: Path) -> list[AgentDTO]:
+def read_canonical_agents(
+    workspace_root: Path, *, store_factory: AgentStoreFactory | None = None
+) -> list[AgentDTO]:
     """Read all canonical agent definitions and return a list of AgentDTOs.
 
     Resolution order: $DADAIA_AGENTS_DIR → .dadaia/agentic/agents/ → .claude/agents/
     Malformed files are skipped with a warning. Unknown frontmatter fields are dropped.
+
+    The concrete agent store is injected via ``store_factory`` (FR5 DI completion) so this
+    feature module carries no ``features -> infrastructure`` import edge. The composition
+    root wires ``MarkdownAgentStore``; when no factory is injected (unwired) the reader
+    yields no agents.
     """
     agents_dir = _resolve_agents_dir(workspace_root)
     if agents_dir is None:
         return []
+    if store_factory is None:
+        logger.debug("agent_reader: no store factory injected — returning no agents")
+        return []
 
-    store = MarkdownAgentStore(agents_dir)
+    store = store_factory(agents_dir)
     raw_list = store.list_raw()
 
     result: list[AgentDTO] = []
@@ -353,10 +382,17 @@ class FileSystemAgentsProvider(AgentsProvider):
     on the `core/protocols/agents_provider.AgentsProvider` protocol instead of
     importing these functions concretely (NEW-02 boundary). Wired in
     `container.build_panel_service`.
+
+    Holds the injected ``store_factory`` (the concrete ``MarkdownAgentStore`` class,
+    supplied by the composition root) and threads it into ``read_canonical_agents`` so
+    the feature module never imports infrastructure (v0.1.54 FR5).
     """
 
+    def __init__(self, store_factory: AgentStoreFactory | None = None) -> None:
+        self._store_factory = store_factory
+
     def read_canonical_agents(self, workspace_root: Path) -> list[AgentDTO]:
-        return read_canonical_agents(workspace_root)
+        return read_canonical_agents(workspace_root, store_factory=self._store_factory)
 
     def get_prompt(self, agent_id: str, workspace_root: Path) -> AgentPromptResult:
         body, source_path = get_prompt(agent_id, workspace_root)

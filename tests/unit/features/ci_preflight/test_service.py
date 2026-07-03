@@ -37,7 +37,8 @@ def test_checks_for_quick_swaps_in_no_e2e_pytest() -> None:
 
 def test_run_preflight_all_pass() -> None:
     results = run_preflight(checks_for(), _pass)
-    assert len(results) == 4
+    # ruff format, ruff check, mypy, lint-imports (FR4), pytest.
+    assert len(results) == 5
     assert all_passed(results)
     assert failed_names(results) == []
 
@@ -65,7 +66,8 @@ def test_no_fail_fast_runs_every_check() -> None:
 
     results = run_preflight(checks_for(), runner, fail_fast=False)
 
-    assert len(results) == 4
+    # ruff format, ruff check, mypy, lint-imports (FR4), pytest.
+    assert len(results) == 5
     assert not all_passed(results)
     assert failed_names(results) == ["mypy --strict"]
 

@@ -1,0 +1,29 @@
+{
+  "release": "v0.1.54",
+  "consumed": [
+    {
+      "slug": "import-boundary-enforcement",
+      "shipped_anchors": [
+        "dadaia_workspace/features/lifecycle/policy_resolver.py#WorkflowExecutionPolicyResolver",
+        "dadaia_workspace/features/lifecycle/governed_catalog.py#governed_workflow_catalog",
+        "dadaia_workspace/core/models/workflow_execution.py#WorkflowModelPolicyOverlay"
+      ],
+      "note": "fully consumed by W1-W5: 5 red chains fixed (types relocated to core/models, lean WorkflowModelPolicyStore port, cli_anchors composition seam); workflows<->lifecycle cycle broken via the governed_catalog seam + lifecycle-no-workflows contract; features-no-cross-feature independence contract documents the 13 surviving module-pair edges; lint-imports CI-wired (GitHub lint job + dadaia ci preflight fail-closed => pre-push enforced); core file-I/O purity dispositioned as an AST ratchet guard with 4 authorized modules"
+    },
+    {
+      "slug": "features-import-infrastructure-direct-debt",
+      "shipped_anchors": [
+        "dadaia_workspace/features/workflows/service.py#WorkflowsService",
+        "dadaia_workspace/features/agents/reader.py#read_canonical_agents"
+      ],
+      "note": "the two markdown-store edges removed via DI completion (feature-local consumer-owned store protocols; container injects); ignore-cap lowered 28->26 in the same commit; the third intent's edge (panel.service -> workflow_launcher_adapter) was consumed-elsewhere by v0.1.53 (launcher chain deleted). The 4 subprocess_runner lazy-fallback edges and 4 ADR-1 lock/telemetry edges remain SEPARATE tracked debt per the entry's own note"
+    },
+    {
+      "slug": "pid-probe-seam-consolidation",
+      "shipped_anchors": [
+        "dadaia_workspace/infrastructure/process_probe_adapter.py#build_pid_probe"
+      ],
+      "note": "archived at ship (R4 process law): both original anchors (hooks/sdd_gate.py#_build_pid_probe and container.py#_build_pid_probe) were DELETED by W4 — the private name no longer exists anywhere in the tree; one public builder in the process-probe infrastructure adapter serves all 6 former consumer sites; lease._main_pid_probe stays dynamic (static graph clean); no-steal invariant preserved (frozen suite: 2 files zero-diff, 1 monkeypatch-target-only diff adjudicated, test_lease_main_probe.py zero-diff)"
+    }
+  ]
+}

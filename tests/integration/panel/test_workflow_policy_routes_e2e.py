@@ -18,6 +18,9 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
+from dadaia_workspace.core.models.workflow_execution import (
+    WorkflowModelPolicyOverlay,
+)
 from dadaia_workspace.features.lifecycle.policy_resolver import (
     WorkflowExecutionPolicyResolver,
 )
@@ -35,7 +38,6 @@ from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
 )
 
 

@@ -229,11 +229,14 @@ def run_backlog_doctor(
     catalog_path: Path,
     alias_map_path: Path,
     archive_root: Path,
+    cli_anchors: frozenset[str],
 ) -> list[Finding]:
     """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog and return all findings.
 
-    All roots are injected (SPEC §3.8 #6). The registry is recomputed from live truth; the
-    ledger read is a no-op when absent. The four checks are driven by one parameterized engine
+    All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
+    ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
+    feature never imports ``cli.main``. The registry is recomputed from live truth; the ledger
+    read is a no-op when absent. The four checks are driven by one parameterized engine
     (``_CHECKS``) — the engine maps the same loop over each check, never copy-pasting bodies.
     Findings are returned in check order then file order; an empty list ⇒ a clean backlog.
     """
@@ -242,6 +245,7 @@ def run_backlog_doctor(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=specs_dir,
+        cli_anchors=cli_anchors,
     )
     items = load_backlog_items(specs_dir / "backlog")
     consumed = read_consumed(archive_root)

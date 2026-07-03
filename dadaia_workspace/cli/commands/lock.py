@@ -9,7 +9,8 @@ from rich.console import Console
 
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import lease as _lease
-from dadaia_workspace.hooks.sdd_gate import _active_field, _build_pid_probe
+from dadaia_workspace.hooks.sdd_gate import _active_field
+from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 app = typer.Typer(help="Manage SDD implementation lease records.")
 console = Console()
@@ -74,7 +75,7 @@ def steal(
     """
     workspace = resolve_workspace_root()
     session_id = _caller_session_id()
-    pid_probe = _build_pid_probe()
+    pid_probe = build_pid_probe()
     active_release = _active_release_for(workspace, ctx)
 
     ok, rec = _lease.steal(

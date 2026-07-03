@@ -180,6 +180,7 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
             err=True,
         )
         return
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
 
     # Code refs in committed intents are REPO-ROOT-relative (e.g.
@@ -195,6 +196,7 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=alias_map_path,
         archive_root=specs_dir / "_archive",
+        cli_anchors=derive_cli_anchors(),
     )
     errors = [f for f in findings if f.severity is Severity.ERROR]
     if errors:

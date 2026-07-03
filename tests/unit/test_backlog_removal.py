@@ -65,6 +65,7 @@ def _build(tmp_path: Path) -> tuple[Path, Path, object]:
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=tmp_path / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs,
+        cli_anchors=frozenset(),
     )
     return backlog, specs / "_archive", registry
 

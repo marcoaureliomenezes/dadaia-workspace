@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+    from dadaia_workspace.core.models.workflow_execution import (
+        WorkflowModelPolicyOverlay,
+        WorkflowPolicySnapshot,
+    )
+    from dadaia_workspace.core.protocols.workflow_model_policy_store import (
+        WorkflowModelPolicyStorePort,
+    )
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
@@ -29,10 +35,6 @@ if TYPE_CHECKING:
     )
     from dadaia_workspace.infrastructure.json_local_model_profile_store import (
         JsonLocalModelProfileStore,
-    )
-    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-        JsonWorkflowModelPolicyStore,
-        WorkflowModelPolicyOverlay,
     )
 
 from dadaia_workspace.core.exceptions import (
@@ -108,12 +110,14 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
+from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
     LinuxProcAncestry,
     PsProcessAncestry,
     WindowsToolhelpAncestry,
 )
-from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
@@ -234,27 +238,6 @@ def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
-def _build_pid_probe() -> Callable[[int], bool] | None:
-    """Composition-root PID-liveness probe wiring for the DoctorService LOCK-GC sweep.
-
-    The container is the composition root: it may reach into the hook layer's canonical
-    probe builder (``hooks/sdd_gate._build_pid_probe``, which wires the container's
-    ``OsProcessProbe``) and inject the resulting ``(pid) -> alive?`` callable into the
-    ``DoctorService``. Without it, ``dadaia doctor --fix`` runs LOCK-GC TTL-only and would
-    reclaim a TTL-expired lease whose holder pid is STILL ALIVE — violating the no-steal
-    invariant (FR-W1-02: a live-pid holder is NEVER reclaimed). This mirrors the
-    ``SpecsDoctor`` seam in ``cli/commands/specs.py``: ``features/spec_context/doctor.py``
-    never imports the infrastructure adapter. Any failure ⇒ ``None`` ⇒ TTL-only liveness
-    (Windows-safe / legacy-record-safe), exactly as the gate degrades.
-    """
-    try:
-        from dadaia_workspace.hooks.sdd_gate import _build_pid_probe as _hook_build_probe
-
-        return _hook_build_probe()
-    except Exception:  # noqa: BLE001 — probe wiring must never break `dadaia doctor`.
-        return None
-
-
 def build_process_ancestry() -> ProcessAncestry:
     """Composition-root selection of the read-only ``ProcessAncestry`` adapter (T-014-06).
 
@@ -333,7 +316,7 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
-        pid_probe=_build_pid_probe(),
+        pid_probe=build_pid_probe(),
     )
 
 
@@ -440,7 +423,11 @@ def build_orchestration_catalog_service(workspace_root: Path) -> WorkflowsServic
     surface did. Guards initialization so an uninitialized workspace still exits non-zero.
     """
     _guard_initialized(workspace_root)
-    return WorkflowsService(workspace_root, agent_catalog=_agent_catalog(workspace_root))
+    return WorkflowsService(
+        workspace_root,
+        agent_catalog=_agent_catalog(workspace_root),
+        store_factory=MarkdownWorkflowStore,
+    )
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
@@ -454,7 +441,7 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 
 def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
     """Compose a ``WorkflowsService`` for the given workspace root."""
-    return WorkflowsService(workspace_root)
+    return WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
 
 
 def build_panel_service(
@@ -471,7 +458,7 @@ def build_panel_service(
         workflows_service=build_workflow_catalog_service(workspace_root),
         report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),
-        agents_provider=FileSystemAgentsProvider(),
+        agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
 
 
@@ -725,14 +712,16 @@ def build_workflow_handoff_resolver(
 def build_workflow_model_profile_registry() -> "WorkflowCatalog":
     """Compose the governed workflow catalog the policy resolver reads (T-28-B-01).
 
-    Wave B promotes :mod:`dadaia_workspace.features.workflows.dadaia_catalog` to **the**
-    governed source: every worker step carries a default harness + a default model profile
-    per supported harness (validated at import time against the built-in :mod:`model_profiles`
-    registry). :func:`governed_workflow_catalog` projects that single source onto the
-    resolver's :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same*
-    catalog (no second table). The function is pure (no I/O), so it takes no ``workspace_root``.
+    Wave B promotes the governed catalog to **the** governed source: every worker step
+    carries a default harness + a default model profile per supported harness (validated at
+    import time against the built-in :mod:`model_profiles` registry).
+    :func:`governed_workflow_catalog` projects that single source onto the resolver's
+    :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same* catalog (no
+    second table). The function is pure (no I/O), so it takes no ``workspace_root``. v0.1.54
+    FR2: the governed catalog now lives in ``features/lifecycle/governed_catalog`` (the
+    cycle-break home); import it directly from the canonical lifecycle module.
     """
-    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+    from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
 
     return governed_workflow_catalog()
 
@@ -750,12 +739,15 @@ def build_fragment_loader() -> "FragmentLoader":
     return FragmentLoader()
 
 
-def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
+def build_workflow_model_policy_store(workspace_root: Path) -> "WorkflowModelPolicyStorePort":
     """Compose the workflow-model-policy overlay store (T-28-A-08).
 
-    Reads/writes ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and
-    a ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults);
-    a present-but-invalid file raises (missing != invalid).
+    Returns the store typed as the :class:`WorkflowModelPolicyStorePort` seam (FR1a): the
+    consumers (``policy_doctor``, ``panel.views.workflow_policy``) depend on the port in
+    ``core``, never the concrete JSON adapter. Reads/writes
+    ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and a
+    ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults); a
+    present-but-invalid file raises (missing != invalid).
     """
     from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
         JsonWorkflowModelPolicyStore,
@@ -1043,6 +1035,7 @@ def build_backlog_definition_workflow(
     backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
     Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.subject_registry import build_registry
     from dadaia_workspace.features.lifecycle.context_selector import (
         ContextSelector,
@@ -1063,14 +1056,19 @@ def build_backlog_definition_workflow(
         specs_dir = workspace_root / "specs"
         source_root = workspace_root
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    # cli-kind anchors derived at the composition boundary (FR1b) — the selector's
+    # ``backlog_index`` resolution and the ``subject_bind`` registry both bind cli subjects.
+    cli_anchors = derive_cli_anchors()
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir),
+        cli_anchors=cli_anchors,
     )
     registry = build_registry(
         source_root=source_root,
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs_dir,
+        cli_anchors=cli_anchors,
     )
     return BacklogDefinitionWorkflow(
         context=context,
@@ -1131,6 +1129,7 @@ def build_backlog_removal_lifecycle(
     caller can write the ``consumed_backlog`` ledger at release-definition and apply the
     residual-aware removal hook at closure. All roots are derived from ``workspace_root``.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.removal_lifecycle import BacklogRemovalLifecycle
     from dadaia_workspace.features.backlog.subject_registry import build_registry
 
@@ -1141,6 +1140,7 @@ def build_backlog_removal_lifecycle(
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs_dir,
+        cli_anchors=derive_cli_anchors(),
     )
     return BacklogRemovalLifecycle(
         backlog_dir=specs_dir / "backlog",

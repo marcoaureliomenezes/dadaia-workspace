@@ -14,15 +14,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core.models.workflow_execution import (
+    DEFAULT_CONTEXT,
+    WorkflowModelPolicyOverlay,
+)
 from dadaia_workspace.features.lifecycle import policy_resolver
 from dadaia_workspace.features.lifecycle.policy_doctor import run_policy_doctor
 from dadaia_workspace.features.panel.views.workflow_policy import _semantic_check
 from dadaia_workspace.features.workflows import dadaia_catalog
 from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    DEFAULT_CONTEXT,
-    WorkflowModelPolicyOverlay,
-)
 
 
 def test_default_profile_map_has_one_home() -> None:
@@ -74,13 +74,24 @@ def test_semantic_check_covers_harness_only_workflow() -> None:
 
 
 class _FakeOverlayStore:
-    """A WMP-doctor store stand-in returning a fixed in-memory overlay (no disk)."""
+    """A WMP-doctor store stand-in returning a fixed in-memory overlay (no disk).
+
+    Implements the full :class:`WorkflowModelPolicyStorePort` surface so it is structurally
+    assignable to the injected ``store`` param; the doctor only calls :meth:`load`, so
+    :meth:`parse` / :meth:`save` are unreachable stubs.
+    """
 
     def __init__(self, overlay: WorkflowModelPolicyOverlay) -> None:
         self._overlay = overlay
 
     def load(self) -> WorkflowModelPolicyOverlay:
         return self._overlay
+
+    def parse(self, raw: dict[str, object]) -> WorkflowModelPolicyOverlay:
+        raise NotImplementedError  # pragma: no cover - unused by the doctor
+
+    def save(self, overlay: WorkflowModelPolicyOverlay) -> None:
+        raise NotImplementedError  # pragma: no cover - unused by the doctor
 
 
 def test_semantic_check_agrees_with_wmp_doctor_on_invalid_harness_only_overlay(
@@ -104,8 +115,6 @@ def test_semantic_check_agrees_with_wmp_doctor_on_invalid_harness_only_overlay(
     # Doctor half: the WMP doctor's _resolve_overlay visits the SAME 3-map union and flags
     # the same workflow. We inject the in-memory overlay via a fake store so both halves see
     # the identical overlay object (the on-disk to_dict round-trip is exercised elsewhere).
-    findings = run_policy_doctor(
-        workspace_root=tmp_path, catalog=catalog, store=_FakeOverlayStore(overlay)
-    )
+    findings = run_policy_doctor(catalog=catalog, store=_FakeOverlayStore(overlay))
     overlay_findings = [f for f in findings if "no-such-workflow" in f.message]
     assert overlay_findings, f"WMP doctor must also flag the unknown workflow: {findings}"

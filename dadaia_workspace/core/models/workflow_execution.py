@@ -23,9 +23,20 @@ The four types:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
+
+#: The overlay serialization schema version (``workflow-model-policy-v1``). It is a property
+#: of the overlay data format: :meth:`WorkflowModelPolicyOverlay.to_dict` stamps it and the
+#: infrastructure store's parser validates against it — single-sourced here so the on-disk
+#: contract cannot drift between the model and its store.
+_SCHEMA_VERSION = "workflow-model-policy-v1"
+
+#: The inheritance-root context. A non-``default`` context resolves through its ``extends``
+#: chain up to ``default`` (WS-OVERLAYS); ``default`` itself may not declare ``extends``.
+DEFAULT_CONTEXT = "default"
 
 
 class PolicySource(StrEnum):
@@ -226,9 +237,156 @@ class WorkflowPolicySnapshot:
         )
 
 
+# ---------------------------------------------------------------------------
+# Workflow-model-policy overlay data types — relocated from
+# ``infrastructure/json_workflow_model_policy_store`` in v0.1.54 (FR1a). These are pure,
+# I/O-free data objects: the overlay carries the parsed per-context/-workflow/-step policy
+# and the ``extends`` resolution chain; the error is the typed store failure. The JSON store
+# under ``infrastructure/`` imports them (a legal ``infrastructure -> core`` edge) and the
+# feature layer resolves the types here (a legal ``features -> core`` edge), so the resolver
+# / doctor / panel no longer reach into ``infrastructure`` for them.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class WorkflowModelPolicyStoreError(Exception):
+    """Actionable workflow-model-policy overlay failure."""
+
+    message: str
+    path: Path | None = None
+
+    def __str__(self) -> str:
+        if self.path is None:
+            return self.message
+        return f"{self.message}: {self.path}"
+
+
+@dataclass(frozen=True)
+class WorkflowModelPolicyOverlay:
+    """Parsed, validated overlay (in-memory).
+
+    ``contexts`` maps a context name to ``{workflow_id -> {step_label -> profile_id}}``.
+    ``default_harness_overlay`` (v0.1.29 / D-3) maps a context to
+    ``{workflow_id -> harness}`` (a per-workflow default harness override) and
+    ``step_harness_overlay`` to ``{workflow_id -> {step_label -> harness}}`` (a per-step
+    harness override). ``extends`` maps a context name to its parent context (WS-OVERLAYS).
+
+    **Per-context inheritance (WS-OVERLAYS).** A non-``default`` context is now honored: the
+    accessors walk ``context → extends… → default`` and return the first level that defines
+    the requested value. ``default`` is the inheritance root. The ``extends`` graph is
+    validated at parse time (every parent exists; no cycles; ``default`` declares no parent),
+    so the accessors can walk safely without re-validating.
+
+    **Back-compat (L7):** ``extends`` defaults to empty and the harness overlays default to
+    empty, so a v0.1.28/29 overlay (no ``extends`` / no harness field) parses and resolves
+    byte-identically; :meth:`to_dict` omits the harness fields when empty and ``extends``
+    when a context declares none (byte-stable round-trip).
+    """
+
+    policy_id: str
+    contexts: dict[str, dict[str, dict[str, str]]]
+    default_harness_overlay: dict[str, dict[str, str]] = field(default_factory=dict)
+    step_harness_overlay: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
+    extends: dict[str, str] = field(default_factory=dict)
+
+    def _resolution_chain(self, context: str) -> list[str]:
+        """Return the ordered context lookup chain ``[context, parent…, default]``.
+
+        Walks ``extends`` from *context* toward ``default``. The graph is parse-validated
+        (no cycles, every parent present), so this terminates; a defensive ``seen`` guard
+        breaks any pathological case rather than looping. ``default`` is always the tail
+        even when *context* is unknown (an unknown context simply inherits the root).
+        """
+        chain: list[str] = []
+        seen: set[str] = set()
+        current: str | None = context
+        while current is not None and current not in seen:
+            chain.append(current)
+            seen.add(current)
+            current = self.extends.get(current)
+        if DEFAULT_CONTEXT not in chain:
+            chain.append(DEFAULT_CONTEXT)
+        return chain
+
+    def step_profile(self, context: str, workflow_id: str, step: str) -> str | None:
+        """Return the overridden profile id for a step, walking the ``extends`` chain.
+
+        Returns the first level (nearest the requested context) that defines the step's
+        profile; ``None`` when no level in the chain overrides it.
+        """
+        for level in self._resolution_chain(context):
+            value = self.contexts.get(level, {}).get(workflow_id, {}).get(step)
+            if value is not None:
+                return value
+        return None
+
+    def workflow_default_harness(self, context: str, workflow_id: str) -> str | None:
+        """Return the per-workflow default harness, walking the ``extends`` chain (D-3)."""
+        for level in self._resolution_chain(context):
+            value = self.default_harness_overlay.get(level, {}).get(workflow_id)
+            if value is not None:
+                return value
+        return None
+
+    def step_harness(self, context: str, workflow_id: str, step: str) -> str | None:
+        """Return the per-step harness override, walking the ``extends`` chain (D-3)."""
+        for level in self._resolution_chain(context):
+            value = self.step_harness_overlay.get(level, {}).get(workflow_id, {}).get(step)
+            if value is not None:
+                return value
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        # Serialize the UNION of all three context maps plus declared `extends`
+        # parents, so a save/load round-trip is identity even for harness-only
+        # workflows (named only in default_harness_overlay / step_harness_overlay
+        # with no profile `steps` entry) and extends-only contexts. Mirrors the
+        # union the WMP doctor (`_resolve_overlay`) and panel `_semantic_check` use.
+        ctx_keys = (
+            set(self.contexts)
+            | set(self.default_harness_overlay)
+            | set(self.step_harness_overlay)
+            | set(self.extends)
+        )
+        contexts: dict[str, Any] = {}
+        for ctx in sorted(ctx_keys):
+            workflows = self.contexts.get(ctx, {})
+            ctx_default_harness = self.default_harness_overlay.get(ctx, {})
+            ctx_step_harness = self.step_harness_overlay.get(ctx, {})
+            wf_keys = set(workflows) | set(ctx_default_harness) | set(ctx_step_harness)
+            wf_out: dict[str, Any] = {}
+            for wf in sorted(wf_keys):
+                entry: dict[str, Any] = {}
+                steps = workflows.get(wf, {})
+                if steps:
+                    entry["steps"] = dict(steps)
+                default_harness = ctx_default_harness.get(wf)
+                if default_harness is not None:
+                    entry["default_harness"] = default_harness
+                harnesses = ctx_step_harness.get(wf, {})
+                if harnesses:
+                    entry["harnesses"] = dict(harnesses)
+                wf_out[wf] = entry
+            ctx_out: dict[str, Any] = {}
+            if wf_out:
+                ctx_out["workflows"] = wf_out
+            parent = self.extends.get(ctx)
+            if parent is not None:
+                ctx_out["extends"] = parent
+            contexts[ctx] = ctx_out
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "policy_id": self.policy_id,
+            "contexts": contexts,
+        }
+
+
 __all__ = [
+    "DEFAULT_CONTEXT",
     "PolicySource",
     "ResolvedModelConfig",
+    "WorkflowModelPolicyOverlay",
+    "WorkflowModelPolicyStoreError",
     "WorkflowModelProfile",
     "WorkflowPolicySnapshot",
     "WorkflowPolicyStepEntry",

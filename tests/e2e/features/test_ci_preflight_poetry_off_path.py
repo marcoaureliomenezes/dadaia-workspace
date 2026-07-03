@@ -38,10 +38,11 @@ def _stub_exe(directory: Path, name: str, *, exit_code: int = 0) -> Path:
 
 
 def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
-    """Build a fake venv bin dir with python + ruff/mypy/pytest stubs."""
+    """Build a fake venv bin dir with python + ruff/mypy/pytest/lint-imports stubs."""
     venv_bin = tmp_path / "fakevenv" / "bin"
     _stub_exe(venv_bin, "python")
-    for tool in ("ruff", "mypy", "pytest"):
+    # lint-imports (FR4) resolves through the same venv-sibling seam as the other tools.
+    for tool in ("ruff", "mypy", "pytest", "lint-imports"):
         _stub_exe(venv_bin, tool, exit_code=exit_code)
     return venv_bin
 
@@ -112,10 +113,17 @@ def test_missing_tool_everywhere_fails_closed(
         python_executable=str(venv_bin / "python"),
         dadaia_bin=None,
     )
-    # Every tool falls back to ("poetry", "run", ...) since no sibling exists.
-    assert all(c.argv[0] == "poetry" for c in checks), [c.argv for c in checks]
+    # ruff/mypy/pytest fall back to ("poetry", "run", ...) since no sibling exists.
+    # lint-imports (FR4) is a REQUIRED tool: instead of a poetry fallback it FAILS CLOSED
+    # to an actionable command naming the missing binary + poetry group (architect A10).
+    non_required = [c for c in checks if c.name != "lint-imports"]
+    assert all(c.argv[0] == "poetry" for c in non_required), [c.argv for c in checks]
+    lint_imports = next(c for c in checks if c.name == "lint-imports")
+    assert lint_imports.argv[0] != "poetry", lint_imports.argv
+    assert "poetry install --with dev" in " ".join(lint_imports.argv), lint_imports.argv
 
     results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
     assert not all_passed(results)
+    # fail-fast stops at the first check (ruff format --check → poetry fallback → 127).
     assert results[0].exit_code == 127
     assert "command not found" in results[0].output

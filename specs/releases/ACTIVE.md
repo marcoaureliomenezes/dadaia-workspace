@@ -1,18 +1,19 @@
 ---
-release: none
-phase: none
+release: v0.1.54
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.54 — Import Boundaries
 
-No release is currently active. The operator-approved R1→R5 sequence
-(grilled 2026-07-02) is **complete**: v0.1.49 intake integrity, v0.1.50
-kernel hardening, v0.1.51 e2e journey canon, v0.1.52 panel plumbing, and
-v0.1.53 legacy purge are all shipped, closed, and archived under
-`specs/_archive/releases/`.
+Sequence position: **R6 of the operator-approved 12-release plan** (grilled
+2026-07-02); first release of the operator's R6→R8 continuation mandate
+(2026-07-03). Contracts green + CI-wired + the `workflows ↔ lifecycle` cycle
+broken, so all later structure (R7 decomposition, R8 verb governance, R9
+injection canon) lands under enforcement. Consumes `import-boundary-enforcement`
++ `features-import-infrastructure-direct-debt` + `pid-probe-seam-consolidation`.
+The `panel.service → workflow_launcher_adapter` edge of the direct-debt entry
+was already consumed by v0.1.53 (launcher chain deleted) — marked
+consumed-elsewhere, not redone.
 
 Previous: **v0.1.53** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.53/`
-(merged `d3f46360`, PR #95).
-
-Next release definition starts from `specs/backlog/candidates.md` under the
-`release-governance` rule (PM dispatches product-engineer; grill mandatory).
+(merged `d3f46360`; closure `d48ef6db`).

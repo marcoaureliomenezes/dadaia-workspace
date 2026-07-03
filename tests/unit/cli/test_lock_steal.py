@@ -6,9 +6,10 @@ AC-W1-01 (CLI half): ``dadaia lock steal`` consults the pid-liveness probe.
     TTL-expired record + recorded pid DEAD   -> steal, exit 0
     record with NO ``pid`` field             -> TTL rule (steals when stale)
 
-The probe is built from the production wiring (``hooks.sdd_gate._build_pid_probe``,
-the container's ``OsProcessProbe``). These tests monkeypatch that builder so the
-liveness verdict is deterministic and platform-seamed (no real ``os.kill``).
+The probe is built from the production wiring
+(``infrastructure.process_probe_adapter.build_pid_probe``, the platform-seamed
+``OsProcessProbe``). These tests monkeypatch that builder so the liveness verdict is
+deterministic and platform-seamed (no real ``os.kill``).
 """
 
 from __future__ import annotations
@@ -60,7 +61,7 @@ def _seed_stale_record(ws: Path, *, pid: int | None) -> None:
 
 def _patch_workspace_and_probe(monkeypatch: pytest.MonkeyPatch, ws: Path, *, alive: bool) -> None:
     monkeypatch.setattr(lock_cmd, "resolve_workspace_root", lambda: ws)
-    monkeypatch.setattr(lock_cmd, "_build_pid_probe", lambda: lambda _pid: alive)
+    monkeypatch.setattr(lock_cmd, "build_pid_probe", lambda: lambda _pid: alive)
 
 
 def test_steal_refuses_when_recorded_pid_alive(

@@ -11,7 +11,6 @@ import typer
 
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import lease
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor import _read_active_md
 from dadaia_workspace.features.specs.scaffolder import (
@@ -23,6 +22,7 @@ from dadaia_workspace.infrastructure.bug_reporter import (
     load_open_bugs,
     mark_bugs_in_release,
 )
+from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -63,25 +63,6 @@ def _resolve_workspace_state_dir() -> Path | None:
     try:
         return resolve_workspace_root() / ".dadaia"
     except WorkspaceNotInitializedError:
-        return None
-
-
-def _build_pid_probe() -> lease.PidProbe | None:
-    """Composition-root probe wiring for the SPEC-DOC-029 three-state triage (T-011-03).
-
-    The CLI is a composition root: it may reach into the hook layer's canonical probe
-    builder (``hooks/sdd_gate._build_pid_probe``, which wires the container's
-    ``OsProcessProbe``) and inject the resulting ``(pid) -> alive?`` callable into the
-    ``SpecsDoctor``. This keeps the probe seam composition-root-wired (like
-    ``workspace_state_dir``) — ``features/specs/doctor.py`` never imports the
-    infrastructure adapter. Any failure ⇒ ``None`` ⇒ TTL-only liveness (Windows-safe,
-    legacy-record-safe), exactly as the gate degrades.
-    """
-    try:
-        from dadaia_workspace.hooks.sdd_gate import _build_pid_probe as _hook_build_probe
-
-        return _hook_build_probe()
-    except Exception:  # noqa: BLE001 — probe wiring must never break `specs doctor`.
         return None
 
 
@@ -153,7 +134,7 @@ def doctor(
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
         workspace_state_dir=workspace_state_dir,
-        pid_probe=_build_pid_probe(),
+        pid_probe=build_pid_probe(),
     )
     issues = doctor_svc.check()
 

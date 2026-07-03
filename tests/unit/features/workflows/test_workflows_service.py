@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.workflows.service import WorkflowsService, _cache
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 
 _SIMPLE_WF = """\
 ---
@@ -64,7 +65,7 @@ def test_reference_read_path_still_functions(
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     assert [s.name for s in summaries] == ["simple-wf"]
     detail = svc.get_detail("simple-wf")
@@ -111,7 +112,7 @@ def test_governed_catalog_authority_needs_no_markdown_store(
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     # No workflows dir created — the Markdown read path returns empty.
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     assert svc.list_summaries() == []
     assert svc.get_detail("simple-wf") is None
 
