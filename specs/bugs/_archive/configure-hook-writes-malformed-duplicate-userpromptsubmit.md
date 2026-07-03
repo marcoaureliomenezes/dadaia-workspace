@@ -82,7 +82,7 @@ Entry index 1 lacks the required `hooks` array, so
    `hooks.UserPromptSubmit.1.hooks: Expected array, but received undefined`.
 
 Observed live 2026-06-07 in this instance at
-`/home/marco/workspace/dadaia/.claude/settings.json`.
+`/home/[REDACTED]/workspace/dadaia/.claude/settings.json`.
 
 ## Environment
 

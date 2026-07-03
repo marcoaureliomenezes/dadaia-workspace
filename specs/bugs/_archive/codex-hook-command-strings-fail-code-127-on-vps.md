@@ -16,15 +16,15 @@ session_id: sess_0bac2bc0
 
 The project `.codex/hooks.json` contains the expected generated commands pointing at
 the VPS-local workspace Python, for example
-`/home/ubuntu/workspace/.dadaia/.venv/bin/python -m dadaia_workspace.hooks.pre_gate`.
+`/home/[REDACTED]/workspace/.dadaia/.venv/bin/python -m dadaia_workspace.hooks.pre_gate`.
 The interpreter exists and direct imports work. Running the exact commands through
 `/bin/sh -c` exits `0`, including the env-prefixed `ctx_inject` command.
 
 **Repro evidence supplied by operator (VPS):**
 
 ```text
-pwd -> /home/ubuntu/workspace
-.codex/hooks.json command -> /home/ubuntu/workspace/.dadaia/.venv/bin/python -m ...
+pwd -> /home/[REDACTED]/workspace
+.codex/hooks.json command -> /home/[REDACTED]/workspace/.dadaia/.venv/bin/python -m ...
 ls -l .dadaia/.venv/bin/python -> exists, executable
 .dadaia/.venv/bin/python --version -> Python 3.12.3
 import dadaia_workspace -> .dadaia/.venv/lib/python3.12/site-packages/dadaia_workspace/__init__.py

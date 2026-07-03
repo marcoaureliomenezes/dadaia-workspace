@@ -28,24 +28,24 @@ PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/python -m dadaia_workspace lifecycle
 Observed:
 
 ```text
-LifecycleRunStoreError: refusing to create lifecycle state inside a repository tree: /home/marco/workspace/dadaia
+LifecycleRunStoreError: refusing to create lifecycle state inside a repository tree: /home/[REDACTED]/workspace/dadaia
 ```
 
-The workspace root `/home/marco/workspace/dadaia` is the initialized
+The workspace root `/home/[REDACTED]/workspace/dadaia` is the initialized
 self-hosting workspace and contains `.dadaia/`, `repos/`, and `.git/`. The guard
 must reject Spec Context Project repo trees such as `repos/dadaia-workspace/**`,
 but must not reject the initialized workspace root itself.
 
 ## Expected
 
-`JsonLifecycleRunStore(/home/marco/workspace/dadaia)` should write under the
+`JsonLifecycleRunStore(/home/[REDACTED]/workspace/dadaia)` should write under the
 workspace runtime state:
 
 ```text
 .dadaia/states/lifecycle/
 ```
 
-`JsonLifecycleRunStore(/home/marco/workspace/dadaia/repos/dadaia-workspace)` and
+`JsonLifecycleRunStore(/home/[REDACTED]/workspace/dadaia/repos/dadaia-workspace)` and
 subdirectories under that repo must still be rejected.
 
 ## Resolution
