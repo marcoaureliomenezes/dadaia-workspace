@@ -269,7 +269,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W4 — FR4 + FR5 + FR6 bug fixes + scope docstring (independent)
 
-- [-] T-55-40 Fix `bugs-append-ignores-persisted-bind` (FR4), `backlog-new-stub-readme-lag-
+- [x] T-55-40 Fix `bugs-append-ignores-persisted-bind` (FR4), `backlog-new-stub-readme-lag-
   intents-schema` (FR5), and add the `workspace_clean` scope docstring (FR6). Checklist:
   - **FR4 fix channel (R-6, DECIDED):** at `bind` (`cli/commands/context.py`), persist the
     harness-native session id (`CODEX_SESSION_ID`/`CLAUDE_CODE_SESSION_ID`, via
@@ -309,6 +309,78 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
     multi-session safety, the stub generator + README contract, the idea-status gate,
     `workspace_clean`'s scope; dead: none — restorative fixes + one scoped doctor semantics
     refinement). NO `specs/backlog`. Owner: software-engineer.
+  - **DONE (software-engineer, 2026-07-03).** Commits: FR4 RED `4f964b1c`
+    (`test(T-55-40)` — folds the `[-]` reservation), FR4 fix `e95f145f` (`fix(T-55-40)`),
+    FR5 E2E RED `98077727` (`test(T-55-40)`), FR5+FR6 fix `e71edb06` (`fix(T-55-40)`),
+    closeout `<this commit>` (`chore(T-55-40)`).
+    **FR4 — harness-native bind channel (bug bugs-append-ignores-persisted-bind).** Root
+    cause: a codex `dadaia bugs append` is not a process-descendant of the bind, so its
+    ancestry is disjoint from the bind-epoch marker → `_persisted_bind_context` misses →
+    `BadParameter`. Fix (per-session-deterministic, no blind fallback): new leaf
+    `core/session_env.py` = single source of the harness env-name list
+    (`CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`); `hooks/_common.resolve_session_id`
+    consumes it (no duplicated literal); `bind` (`cli/commands/context.py`) also persists a
+    session record keyed by the harness-native id (best-effort; the PostToolUse heartbeat
+    renews `sessions/<harness_id>.json`); `_session_context` (`core/specs_resolver.py`)
+    resolves via that id when `DADAIA_SESSION_ID` is absent, AHEAD of the ancestry path,
+    gated by a **staleness guard** (`core.lock_liveness.is_stale` over
+    `last_seen_at`/`ttl_seconds`, pid_probe=None — the bind pid is dead by construction). No
+    new import edge (all core→core / hooks→core / cli→core). **Four AC-4 regression cases
+    (deterministic, disjoint `ancestry_pids`, no spawned processes; RED tail:
+    `2 failed, 5 passed` — the two harness-channel GREEN-targets fell through to
+    BadParameter / None pre-fix):** (i) disjoint-ancestry marker + LIVE harness record ⇒
+    resolves via the channel (GREEN); (ii) two markers with disjoint chains ⇒ ancestry
+    matching exactly one never cross-attributes; (iii) descendant/same-shell still resolves
+    via the unchanged ancestry path; (iv) STALE (heartbeat-old) harness record ⇒ does NOT
+    resolve, falls through to the actionable BadParameter. **AC-7(d):** sabotaged the
+    harness-channel fix line (`if False and harness_id:`) ⇒ (i) FAILED
+    (`2 failed, 5 passed`); restored ⇒ `7 passed`. Eval-flow + ancestry paths unchanged
+    (existing `test_specs_resolver.py` + `test_cli_bound_session_resolution.py` +
+    `test_sdd_post_gate.py` green).
+    **FR5 — idea-status BL-SCHEMA gate (bug backlog-new-stub-readme-lag-intents-schema, ROOT
+    fix OQ-1 INVERSION).** `backlog/doctor._check_schema` status-gates the resolvable-typed-
+    intents requirement: `status: idea` is EXEMPT from "no intents[] declared" + the
+    unresolved-subject errors; both mandatory at `candidate`+. NOT blanket — malformed
+    `intents:` and invalid status still fire at any status. `_BACKLOG_STUB` keeps
+    `status: idea`, gains a `description:` field + a COMMENTED `intents[]` teaching template
+    (five subject kinds + non-Python-repo note; no live dummy subject). PUBLIC asset
+    `public/scaffold/backlog/README.md` documents idea-freedom, intents@candidate+, the five
+    subject kinds, `dadaia backlog subjects`, and the non-Python-repo note; re-projected
+    (`stage`+`install --target all`+`doctor` → `[ok] public-privacy`, exit 0). **E2E RED tail:
+    `1 failed, 1 passed` — the fresh stub fired BL-SCHEMA "no intents[] declared" pre-fix.**
+    **AC-7(e):** flipping the fresh stub `idea`→`candidate` FIRES BL-SCHEMA (permanent guard
+    `test_fresh_stub_flipped_to_candidate_fires_bl_schema`, PASSED alongside the clean-idea
+    E2E). Existing BL-SCHEMA plants that used `status: idea` (integration
+    `test_backlog_doctor._plant_schema`, `test_precommit_backlog_scoping`, e2e
+    `test_backlog_precommit`) moved to `candidate` — the SPEC's only intentional behavior
+    change; live-backlog error count UNCHANGED by FR5 (pre-FR5 baseline 1 → post-FR5 1).
+    **FR6:** one-line STANDS-ALONE scope docstring on `features/workspace_clean/__init__.py`
+    (WorkspaceCleanService reclaim vs workspace WorkspaceService bootstrap — create-vs-reclaim).
+    **Projection state:** `dadaia public doctor` exit 0, `[ok] public-privacy`; no runtime
+    projection of the scaffold README (it is a scaffold asset, staged to `.dadaia/agentic/`).
+    **Gates:** full unpiped `pytest` (tests/ --ignore=tests/e2e/panel) **4350 passed / 17
+    skipped (exit 0)**; `ruff format --check` exit 0; `ruff check --no-cache` exit 0;
+    `mypy --strict dadaia_workspace` (302 files) exit 0; `lint-imports --no-cache`
+    **`8 kept, 0 broken`**; cap test `== 26` + per-family `9/4/13` (4 passed — FR4 adds only
+    core→core/hooks→core/cli→core edges, zero ignore edges); `dadaia specs doctor` exit 0
+    (10 warns, 0 errors); `dadaia public doctor` exit 0 (`[ok] public-privacy`).
+    **`dadaia backlog doctor` = exit 1 with EXACTLY ONE BL-SCHEMA error** —
+    `architecture-uml-decomposition` (status `candidate`) references the dead anchor
+    `api.py#render_api_agents_canonical` KILLED by W3. This is the SPEC §6 archival-at-SHIP
+    condition (the live consuming entry references its own dead anchor mid-branch), owned by
+    **T-55-60** (consumed-backlog archival in the single atomic SHIP commit); it pre-exists
+    W4 (the ref was in the entry at the W3 tip `f8aa799b`), is a `candidate` (not `idea`) so
+    unaffected by FR5, and W4 stages NO `specs/backlog`. NOT a W4 defect.
+    **AC-8 ledger — surviving:** codex bound-context resolution via the harness-id channel
+    (incl. the unchanged ancestry-membership path for descendants); concurrent multi-session
+    safety (disjoint chains never cross-attribute); the `backlog new` stub generator +
+    README contract; the idea-status BL-SCHEMA gate + candidate-and-beyond enforcement;
+    `features/workspace_clean`'s STANDS-ALONE scope. **dead:** the disjoint-ancestry
+    resolution hole (a bound codex session could not resolve its context for a non-descendant
+    CLI call) and the idea-stage BL-SCHEMA false-positive (a fresh `idea` stub failed
+    `backlog doctor`) — both are restorative removals; plus one scoped doctor semantics
+    refinement (idea entries exempt from typed-intents). Every move/grep swept `tests/` AND
+    textual refs (the stub's commented template, the README). NO `specs/backlog` staged.
 
 ## W5 — FR7 UML assets (LAST — diagram the post-split shape)
 
