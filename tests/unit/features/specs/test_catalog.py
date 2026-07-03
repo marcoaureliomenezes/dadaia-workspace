@@ -126,6 +126,7 @@ class TestGenerateCatalogValidParse:
         assert len(catalog["features"]) == 3
 
     def test_each_entry_has_all_required_fields(self, tmp_path: Path) -> None:
+        # agent_tier dropped from catalog output in v0.1.53 (FR3) — zero runtime consumers.
         required_fields = {
             "rank",
             "slug",
@@ -137,7 +138,6 @@ class TestGenerateCatalogValidParse:
             "path",
             "tags",
             "token_estimate",
-            "agent_tier",
             "depends_on",
         }
         specs = _make_specs_dir(tmp_path)
@@ -146,6 +146,7 @@ class TestGenerateCatalogValidParse:
             assert set(entry.keys()) >= required_fields, (
                 f"Entry is missing fields: {required_fields - set(entry.keys())}"
             )
+            assert "agent_tier" not in entry, "agent_tier must not be emitted (FR3 drop)"
 
     def test_rank_is_one_based_and_sequential(self, tmp_path: Path) -> None:
         specs = _make_specs_dir(tmp_path)

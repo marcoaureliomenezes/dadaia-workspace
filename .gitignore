@@ -25,6 +25,10 @@ coverage.xml
 # Type checking / linting
 .mypy_cache/
 .ruff_cache/
+# import-linter default cache — a repo-hygiene violation in the working tree
+# (v0.1.53 FR3). Run lint-imports with --no-cache (see setup.cfg header); this
+# entry is defence-in-depth only, not a licence to create the directory.
+.import_linter_cache/
 
 # Environment files
 .env

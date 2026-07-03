@@ -30,7 +30,6 @@ Schema of the returned dict
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [],
       "token_estimate": 413,
-      "agent_tier": "self-pull",
       "depends_on": []
     },
     ...
@@ -65,6 +64,11 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 # Required frontmatter fields for catalog generation.
+# ``agent_tier`` was removed here in v0.1.53 (FR3): it has zero runtime consumers, so the
+# catalog neither requires it as input (tolerate) nor emits it in output (drop). The two
+# renderers move in lockstep — the byte-identical twin is
+# ``public/scripts/generate-memory-catalog.py`` (pinned by
+# tests/contract/test_memory_catalog_render_contract.py).
 _REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
@@ -72,7 +76,6 @@ _REQUIRED_FIELDS: tuple[str, ...] = (
     "tldr",
     "summary",
     "tags",
-    "agent_tier",
     "token_estimate",
 )
 
@@ -201,7 +204,6 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
                 "path": rel_path,
                 "tags": list(fm.get("tags") or []),
                 "token_estimate": int(fm.get("token_estimate", 0)),
-                "agent_tier": str(fm.get("agent_tier", "self-pull")),
                 "depends_on": depends_on,
             }
         )

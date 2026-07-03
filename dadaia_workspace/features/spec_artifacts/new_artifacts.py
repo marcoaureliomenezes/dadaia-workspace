@@ -16,22 +16,24 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+
 # ── slug validation patterns ──────────────────────────────────────────────────
 # Shared pattern for backlog/bug slugs (and the legacy release-id form):
 # must start with a lowercase letter, followed by lowercase letters, digits, or hyphens.
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
 # Canonical release-dir SemVer form REQUIRED by `specs doctor` SPEC-DOC-027 for a live
-# release dir (mirrors `features/specs/scaffolder._RELEASE_SEMVER_RE`). A release id must
-# satisfy EITHER this SemVer canon (preferred) OR the legacy slug — closing the bug
-# `release-new-rejects-semver-but-doctor-requires-it`, where the old slug-only validator
-# rejected the very `vX.Y.Z` form the doctor mandates.
-_RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+# release dir. The compiled pattern is the shared canon (RELEASE_SEMVER_RE, imported from
+# core.specs_version — v0.1.53 FR3 centralised the previously-triplicated literal). A
+# release id must satisfy EITHER this SemVer canon (preferred) OR the legacy slug — closing
+# the bug `release-new-rejects-semver-but-doctor-requires-it`, where the old slug-only
+# validator rejected the very `vX.Y.Z` form the doctor mandates.
 
 
 def _is_valid_release_id(release_id: str) -> bool:
     """A release id is valid if it is the SemVer canon (``vX.Y.Z``) or the legacy slug."""
-    return bool(_RELEASE_SEMVER_RE.match(release_id) or _SLUG_RE.match(release_id))
+    return bool(RELEASE_SEMVER_RE.match(release_id) or _SLUG_RE.match(release_id))
 
 
 def _today() -> str:

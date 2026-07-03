@@ -185,6 +185,49 @@ def test_both_implementations_emit_identical_features_json(tmp_path: Path) -> No
     assert lib_cat["context"] == script_cat["context"]
 
 
+def test_neither_renderer_emits_agent_tier(tmp_path: Path) -> None:
+    """v0.1.53 FR3 'drop': agent_tier is NOT emitted by either renderer.
+
+    The fixture atoms still CARRY ``agent_tier`` in their frontmatter (the schema retains
+    it as an optional/tolerated property until the CLOSURE strip), yet neither renderer may
+    surface it in the generated catalog — the field has zero runtime consumers.
+    """
+    lib_cat, script_cat = _both_catalogs(tmp_path)
+    for name, cat in (("lib", lib_cat), ("script", script_cat)):
+        features = cat["features"]
+        assert isinstance(features, list) and features
+        for feat in features:
+            assert isinstance(feat, dict)
+            assert "agent_tier" not in feat, (
+                f"[{name}] entry {feat.get('slug')!r} still emits 'agent_tier' — FR3 requires "
+                "it dropped from catalog output"
+            )
+
+
+def test_both_renderers_tolerate_atom_without_agent_tier(tmp_path: Path) -> None:
+    """v0.1.53 FR3 'tolerate': an atom missing agent_tier still generates cleanly.
+
+    After the CLOSURE strip the atoms lose the field entirely; the renderers (frozen here in
+    W3) must already tolerate its absence — no required-field error, byte-identical output.
+    """
+    specs = tmp_path / "no-tier" / "specs"
+    product = specs / "memory" / "product"
+    product.mkdir(parents=True)
+    atom = _ATOM_TEMPLATE.format(slug="tierless-atom", dep="tierless-atom").replace(
+        "agent_tier: self-pull\n", ""
+    )
+    (product / "tierless-atom.md").write_text(atom, encoding="utf-8")
+
+    lib_cat = lib_catalog_mod.generate_catalog(specs)
+    script_cat, errors = _script_mod.generate_catalog(specs / "memory", context="no-tier")
+    assert not errors, f"standalone script rejected a tier-less atom: {errors}"
+    assert script_cat is not None
+    lib_features = json.dumps(lib_cat["features"], ensure_ascii=False, indent=2)
+    script_features = json.dumps(script_cat["features"], ensure_ascii=False, indent=2)
+    assert lib_features == script_features
+    assert "agent_tier" not in lib_features
+
+
 def test_both_implementations_emit_same_timestamp_shape(tmp_path: Path) -> None:
     lib_cat, script_cat = _both_catalogs(tmp_path)
     for name, cat in (("lib", lib_cat), ("script", script_cat)):

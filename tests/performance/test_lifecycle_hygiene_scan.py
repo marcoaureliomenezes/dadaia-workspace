@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 import resource
-import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -19,7 +18,15 @@ NOW = dt.datetime(2026, 6, 18, 12, 0, tzinfo=dt.UTC)
 REPORT_FILES = 122
 HANDOFF_FILES = 295
 TMP_FILES = 437_724
-MAX_SCAN_SECONDS = 90.0
+TOTAL_FILES = REPORT_FILES + HANDOFF_FILES + TMP_FILES
+# Op-count budget (v0.1.53 FR3): the previous 90s wall-clock ceiling was load-sensitive —
+# it false-failed the pre-push gate under CPU contention even though the scan's cost profile
+# was unchanged. The real invariants a perf guard must hold are algorithmic and
+# deterministic under load: (1) each candidate file is stat()'d EXACTLY once (no O(n^2)
+# re-scan storm) and (2) ONLY handoff bodies are read (report/tmp bodies are never opened).
+# Both are counted directly below, so the budget no longer depends on wall-clock time.
+MAX_STAT_OPS = TOTAL_FILES  # exactly one stat per file — no repeated stat of any file
+MAX_CONTENT_READS = HANDOFF_FILES * 2  # only handoff bodies, each at most twice
 MAX_PEAK_BYTES = 96 * 1024 * 1024
 
 
@@ -147,13 +154,20 @@ def test_hygiene_status_scans_synthetic_baseline_tree_with_bounded_content_reads
         read_paths.append(self.rel_path)
         return original_read_text(self, encoding=encoding)
 
+    original_stat = _SyntheticPath.stat
+    stat_calls = 0
+
+    def counting_stat(self: _SyntheticPath) -> _SyntheticStat:
+        nonlocal stat_calls
+        stat_calls += 1
+        return original_stat(self)
+
     monkeypatch.setattr(Path, "rglob", synthetic_rglob)
     monkeypatch.setattr(_SyntheticPath, "read_text", counting_read_text)
+    monkeypatch.setattr(_SyntheticPath, "stat", counting_stat)
 
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    start = time.perf_counter()
     counters = LifecycleHygieneService(tmp_path, now=NOW).status()
-    elapsed = time.perf_counter() - start
     rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     rss_delta_bytes = max(rss_after - rss_before, 0) * 1024
 
@@ -167,10 +181,15 @@ def test_hygiene_status_scans_synthetic_baseline_tree_with_bounded_content_reads
         HygieneZone.HANDOFF: HANDOFF_FILES - 1,
         HygieneZone.TMP: TMP_FILES - 5,
     }
-    assert counters.cleanup_candidate_count == REPORT_FILES + HANDOFF_FILES + TMP_FILES - 7
+    assert counters.cleanup_candidate_count == TOTAL_FILES - 7
     assert counters.scan_elapsed_ms is not None
     assert counters.scan_elapsed_ms >= 0
+    # Content-read budget: only handoff bodies are opened, never report/tmp bodies.
     assert all(path.parts[:2] == (".dadaia", "handoff") for path in read_paths)
-    assert len(read_paths) <= HANDOFF_FILES * 2
-    assert elapsed < MAX_SCAN_SECONDS
+    assert len(read_paths) <= MAX_CONTENT_READS
+    # Op-count budget (deterministic under load): every file is stat()'d exactly once, so
+    # the total stat count equals the file count — a repeated-scan regression (O(n^2)) or a
+    # per-file double-stat would push this over the file total. This replaces the removed
+    # 90s wall-clock ceiling, which false-failed under CPU contention.
+    assert stat_calls == MAX_STAT_OPS
     assert rss_delta_bytes < MAX_PEAK_BYTES

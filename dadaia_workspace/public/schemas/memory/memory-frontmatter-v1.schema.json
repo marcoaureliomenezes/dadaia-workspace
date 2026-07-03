@@ -12,7 +12,6 @@
     "tldr",
     "summary",
     "tags",
-    "agent_tier",
     "token_estimate",
     "last_updated",
     "release_origin"
@@ -53,7 +52,7 @@
     "agent_tier": {
       "type": "string",
       "enum": ["inject", "self-pull"],
-      "description": "inject = part of the lean session payload; self-pull = read on demand."
+      "description": "DEPRECATED (v0.1.53 FR3): zero runtime consumers. No longer required; still tolerated (retained here so atoms that carry it validate) until the CLOSURE atom strip lands. A later release drops this property entirely."
     },
     "token_estimate": {
       "type": "integer",

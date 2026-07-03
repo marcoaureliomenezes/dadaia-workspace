@@ -24,8 +24,27 @@ CANONICAL_SPECS_VERSION = 2
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
 
+#: Single source of truth for the release-directory SemVer form ``vX.Y.Z`` (v0.1.53 FR3).
+#: This is the ONE compiled home for the ``^v\d+\.\d+\.\d+$`` pattern — previously
+#: triplicated in ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and
+#: ``features/spec_artifacts/new_artifacts.py``. Every consumer imports THIS object; the
+#: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
+#: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
+RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _STAMP_RE = re.compile(r"^specs_pattern_version:\s*(\d+)\s*$", re.MULTILINE)
+
+
+def is_release_semver(value: str) -> bool:
+    """Return ``True`` when ``value`` is the canonical release-dir SemVer form ``vX.Y.Z``.
+
+    The single predicate for "is this string a strict ``v<major>.<minor>.<patch>``
+    release id?" — used by the scaffolder, the doctor's release-folder naming checks, and
+    the ``dadaia release new`` validator. Callers that also accept the legacy slug form
+    compose this with their own slug check.
+    """
+    return RELEASE_SEMVER_RE.match(value) is not None
 
 
 def _constitution_path(specs_dir: Path) -> Path:

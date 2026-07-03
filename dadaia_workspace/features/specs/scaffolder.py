@@ -14,8 +14,7 @@ from pathlib import Path
 import jinja2
 from jinja2.sandbox import SandboxedEnvironment
 
-# SemVer pattern for hotfix release version IDs (v<M>.<m>.<p>).
-_RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 
 
 @dataclass
@@ -256,7 +255,7 @@ def scaffold_hotfix_release(
     result = ScaffoldResult()
 
     # Validate version_id
-    if not _RELEASE_SEMVER_RE.match(version_id):
+    if not RELEASE_SEMVER_RE.match(version_id):
         raise ValueError(
             f"version_id {version_id!r} does not match SemVer pattern ^v\\d+\\.\\d+\\.\\d+$. "
             "Hotfix releases must use a version like v1.2.3."
@@ -411,7 +410,7 @@ def scaffold_release_segment(
     Raises:
         ValueError: If version_id is not SemVer or segment is malformed.
     """
-    if not _RELEASE_SEMVER_RE.match(version_id):
+    if not RELEASE_SEMVER_RE.match(version_id):
         raise ValueError(
             f"version_id {version_id!r} does not match SemVer pattern "
             "^v<MAJOR>.<MINOR>.<PATCH>$ (e.g. v0.1.6)."

@@ -155,7 +155,9 @@ def test_single_atom_catalog_shape(tmp_path: Path) -> None:
     assert feat["summary"] == "One-sentence summary."
     assert feat["tags"] == ["test"]
     assert feat["token_estimate"] == 50
-    assert feat["agent_tier"] == "self-pull"
+    # agent_tier is dropped from catalog output in v0.1.53 (FR3): the input frontmatter
+    # still carries it (schema-tolerated), but the renderer must not surface it.
+    assert "agent_tier" not in feat
     assert feat["rank"] == 1
     assert feat["depends_on"] == []
     assert "path" in feat
