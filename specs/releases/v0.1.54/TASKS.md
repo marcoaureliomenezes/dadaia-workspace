@@ -82,7 +82,7 @@ includes `tests/`.
 
 ## W2 — FR2 + FR3 cycle break + cross-feature contract
 
-- [ ] T-54-11 Break the `workflows ↔ lifecycle` cycle, then add the cross-feature contract.
+- [-] T-54-11 Break the `workflows ↔ lifecycle` cycle, then add the cross-feature contract.
   **FR2 first**, then **FR3**. Checklist:
   - **FR2 RED:** add the directed `forbidden` contract `lifecycle-no-workflows`
     (`features.lifecycle` ⊬ `features.workflows`) to `setup.cfg`; `lint-imports` FAILS on
