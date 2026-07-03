@@ -88,16 +88,27 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
 
 ## W4 — FR4 catalog (write set: PLAN §W4; sequential after W1/W3 — shared files)
 
-- [ ] T-52-13 DELETE the complete kanban chain: handler route + dispatch + 404 line
-  + `_GET_ONLY_API_ROUTES_RE`/405 branch; `views/kanban.py`; the WHOLE
-  `assets/css/kanban.py`; `tokens.py:121-129` kanban tokens; `container.py`
-  unwiring (import :82, views-dict entry :1238-1242, kanban-only provider :339 if
-  orphaned — confirm and record); `session_identity.py` kanban-only API removed or
-  doc fixed (confirm callers, record); kanban tests. `_md_render.block_code`
-  escapes fence content (hostile `<script>` fence test); DELETE the dead
-  `window.mermaid.run()` block (`academy.js:146-147`); DELETE the token
-  drift-check (`service.py:181-197`). Panel must construct (container import
-  sanity test). Owner: software-engineer.
+- [x] T-52-13 DONE — `313661bd` (18 files, +92/−1388; scope run **1,224 passed
+  exit 0**; ruff/mypy clean). Kanban chain FULLY deleted: `grep -rn -i kanban
+  dadaia_workspace/` → zero hits, `find -iname '*kanban*'` → nothing; the
+  GET-only 405 mechanism removed whole (kanban was its sole route). Dispositions
+  RECORDED: provider `_build_alive_contexts_provider`/`AliveContextsProvider`
+  orphaned → deleted (`_build_pid_probe` shared with doctor — kept);
+  `iter_session_records` sole production caller was kanban → API + `__all__`
+  entry deleted, `sessions_dir` docstring fixed to the 2 real consumers; BONUS
+  (grep-surfaced): `core/lock_liveness.py::is_stale_session` (extracted FROM
+  kanban, zero other production callers) → API + its dedicated test file
+  `tests/unit/core/test_lock_liveness_session.py` deleted — NOTE: that file was
+  in v0.1.50's frozen 9-path no-steal suite; the freeze was that release's AC-1,
+  and this is dead-API removal, not a no-steal weakening — flagged for explicit
+  QA-gate adjudication (other 8 frozen files must be diff-clean). Mermaid fences
+  escaped + hostile-fence probes (falsifiability verified); dead
+  `window.mermaid.run()` branch deleted; token drift-check deleted. New container
+  sanity test `test_container_build_panel_views_constructs_without_kanban`.
+  Collateral fixes: mermaid raw-arrow tests inverted to the escaped contract;
+  `test_no_auth_contract`/`test_handler_route_classification` kanban entries
+  removed; orchestrator fixed the flagged `tests/e2e/features/test_panel.py:257`
+  (kanban dropped from the credential-less 200 tuple). Owner: software-engineer.
 
 ## W5 — gates + ship (flat release: single ship gate)
 
