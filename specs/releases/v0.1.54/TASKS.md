@@ -10,7 +10,7 @@ includes `tests/`.
 
 ## W0 — definition
 
-- [ ] T-54-01 SPEC/PLAN/TASKS authored from the 2026-07-03 inspection dossier (ports
+- [x] T-54-01 SPEC/PLAN/TASKS authored from the 2026-07-03 inspection dossier (ports
   verified: `WorkflowProvider`/`AgentsProvider` exist → FR5 is DI completion; no
   `workflow_model_policy_store` port → FR1 creates a lean one; the `json_wmp_store` data
   types are relocatable to `core/models`; cycle confirmed bidirectional; 6 pid-probe sites
