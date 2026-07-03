@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dadaia_workspace.features.panel.views.api import render_api_workflow_detail
+from dadaia_workspace.features.panel.views.api_workflows import render_api_workflow_detail
 from dadaia_workspace.features.workflows.service import (
     StageDTO,
     WorkflowDetailDTO,

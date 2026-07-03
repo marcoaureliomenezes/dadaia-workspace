@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.session_env import HARNESS_SESSION_ID_ENV_VARS
 
 #: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex).
 WRITE_TOOLS: frozenset[str] = frozenset(
@@ -128,14 +129,17 @@ def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
     from a parent shell and stale — the audit F-1 rotated-sid self-block source),
     then ``default``. Shared seam: the gate, the PostToolUse heartbeat, and
     ctx-inject all resolve through here, staying sid-consistent by construction.
+
+    The harness-native env-var list is the single source ``core.session_env.
+    HARNESS_SESSION_ID_ENV_VARS`` (v0.1.55 FR4) — the same list the bind CLI and the
+    ``core`` bound-context resolver read, so the harness id never drifts across layers.
     """
-    candidate = (
-        os.environ.get("DADAIA_SESSION_ID")
-        or str(payload.get("session_id") or "")
-        or os.environ.get("CLAUDE_CODE_SESSION_ID")
-        or os.environ.get("CODEX_SESSION_ID")
-        or ""
-    )
+    candidate = os.environ.get("DADAIA_SESSION_ID") or str(payload.get("session_id") or "")
+    if not candidate:
+        for name in HARNESS_SESSION_ID_ENV_VARS:
+            candidate = os.environ.get(name) or ""
+            if candidate:
+                break
     sanitized = sanitize_session_id(candidate)
     return sanitized or default
 

@@ -43,9 +43,11 @@ _PKG_ROOT = _REPO_ROOT / "dadaia_workspace"
 _CANON_REL = Path("core") / "specs_version.py"
 
 #: Modules that must reuse the canon object, as (import path, attribute name).
+#: v0.1.55 FR1: the SpecsDoctor RELEASE_SEMVER_RE consumer moved off the coordinator into the
+#: ``doctor_release`` validator sibling (the SemVer/naming-canon checks live there now).
 _CONSUMER_MODULES: tuple[str, ...] = (
     "dadaia_workspace.features.specs.scaffolder",
-    "dadaia_workspace.features.specs.doctor",
+    "dadaia_workspace.features.specs.doctor_release",
     "dadaia_workspace.features.spec_artifacts.new_artifacts",
 )
 

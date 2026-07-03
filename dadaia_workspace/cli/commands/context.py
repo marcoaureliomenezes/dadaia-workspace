@@ -25,6 +25,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.spec_context.locking import (
@@ -410,6 +411,25 @@ def bind(
         with workspace_lock(workspace_root):
             session_identity.write_session(workspace_root, session_id, session_data)
             session_identity.set_incumbent(workspace_root, name, session_id)
+            # FR4 (v0.1.55, bug bugs-append-ignores-persisted-bind): ALSO persist the session
+            # record under the harness-native session id, when the harness exports one. The
+            # bind mints a random ``sess_<uuid>`` no harness ever reports, and a codex/claude
+            # CLI call (e.g. ``dadaia bugs append``) is NOT a process-descendant of the bind —
+            # so the ancestry-chain marker below can never attribute it. But the harness
+            # exports a stable ``CODEX_SESSION_ID`` / ``CLAUDE_CODE_SESSION_ID`` for the whole
+            # session, so keying a session-record copy by it lets ``core.specs_resolver``
+            # resolve the bound context deterministically (ahead of the ancestry path). The
+            # PostToolUse heartbeat renews ``sessions/<harness_id>.json`` on every tool use, so
+            # the resolver's staleness guard keeps a live session resolving while rejecting a
+            # stale/inherited id. Best-effort: a pathological id must never break the bind.
+            harness_id = harness_session_id()
+            if harness_id:
+                with contextlib.suppress(ValueError, OSError):
+                    session_identity.write_session(
+                        workspace_root,
+                        harness_id,
+                        {**session_data, "session_id": harness_id},
+                    )
             # FR-W2-02 (ADR-G5): stamp the bind-epoch marker. This is the SOLE trigger for
             # context-memory injection and the ctx-inject hook's harness-real discovery
             # source — the bind CLI's minted sid is invisible to the harness, so the marker's

@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from dadaia_workspace.features.panel.views.api import (
+from dadaia_workspace.features.panel.views.api_workflows import (
     render_api_dadaia_workflow_detail,
     render_api_dadaia_workflows_list,
 )

@@ -25,7 +25,7 @@ import pytest
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import (
+from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agents_canonical,
 )

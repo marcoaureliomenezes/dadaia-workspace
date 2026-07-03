@@ -185,6 +185,31 @@ class TestBacklogNew:
         assert "status: idea" in content
         assert "opened:" in content
 
+    def test_backlog_stub_has_description_and_commented_intents_template(
+        self, tmp_path: Path
+    ) -> None:
+        """v0.1.55 FR5: the stub gains a `description:` frontmatter field and a COMMENTED
+        `intents[]` teaching template — not a live dummy subject (it must stay doctor-clean)."""
+        import yaml
+
+        specs = tmp_path / "specs"
+        specs.mkdir()
+        backlog_new(specs, "cool-idea")
+        content = (specs / "backlog" / "cool-idea.md").read_text(encoding="utf-8")
+
+        # `description:` is in the frontmatter and the frontmatter still parses as YAML.
+        frontmatter = content.split("---", 2)[1]
+        parsed = yaml.safe_load(frontmatter)
+        assert parsed.get("status") == "idea"
+        assert "description" in parsed
+        # The intents template is a COMMENTED teaching block, not a live frontmatter binding.
+        assert "intents:" in content  # inside the HTML comment
+        assert "<!--" in content and "-->" in content
+        assert parsed.get("intents") is None  # no live intents ⇒ idea stays doctor-clean
+        # The five subject kinds are documented in the template.
+        for kind in ("code", "cli", "catalog", "doc", "invariant"):
+            assert kind in content
+
     def test_creates_backlog_dir_if_missing(self, tmp_path: Path) -> None:
         """backlog_new creates backlog/ directory if absent."""
         specs = tmp_path / "specs"

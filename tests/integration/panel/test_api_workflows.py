@@ -27,7 +27,7 @@ import pytest
 
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import (
+from dadaia_workspace.features.panel.views.api_workflows import (
     render_api_workflow_detail,
     render_api_workflows_list,
 )

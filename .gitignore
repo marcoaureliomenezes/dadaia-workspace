@@ -110,6 +110,14 @@ pip-wheel-metadata/
 !/specs/audits/*/
 /specs/audits/*/*
 !/specs/audits/*/*.md
+# Architecture visual evidence is repository truth (v0.1.55 FR7: canonical UML
+# diagrams as fenced ```mermaid blocks committed for GitHub + panel review). Opt in
+# ONLY *.md under specs/assets/<group>/ — privacy backstop still hides any
+# non-markdown artifact (no .svg/.mmd/binary is ever committed here per R-8).
+!/specs/assets/
+!/specs/assets/*/
+/specs/assets/*/*
+!/specs/assets/*/*.md
 # Bug records are repository truth (bug-registration-guardrail mandates
 # registration in specs/bugs/ with redacted content): opt in ONLY *.md.
 !/specs/bugs/

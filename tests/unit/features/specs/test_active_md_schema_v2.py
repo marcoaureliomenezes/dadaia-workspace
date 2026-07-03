@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.specs.doctor import _read_active_md
+from dadaia_workspace.features.specs.doctor_common import read_active_md as _read_active_md
 
 
 def _write(p: Path, body: str) -> Path:

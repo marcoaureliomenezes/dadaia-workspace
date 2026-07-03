@@ -19,11 +19,11 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.reports_doctor import ReportsDoctor
-from dadaia_workspace.features.reports_retention import (
+from dadaia_workspace.features.reports.retention import (
     CleanupCandidate,
     ReportRetentionService,
 )
-from dadaia_workspace.features.reports_validation.service import ValidationResult
+from dadaia_workspace.features.reports.validation import ValidationResult
 
 app = typer.Typer(help="Inspect and validate agent handoff reports.")
 console = Console()

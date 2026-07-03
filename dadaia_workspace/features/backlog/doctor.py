@@ -43,6 +43,14 @@ __all__ = [
 #: Backlog statuses that are terminal — a stale check only flags non-terminal survivors.
 _TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
 
+#: The one status EXEMPT from the resolvable-typed-intents requirement (v0.1.55 FR5, bug
+#: ``backlog-new-stub-readme-lag-intents-schema``). An ``idea`` is an unbound brainstorm: it
+#: carries no bound ``intents[]`` yet, so the "no intents[] declared" and unresolved-subject
+#: BL-SCHEMA errors are held until the item matures to ``candidate`` and beyond. This is a
+#: STATUS gate, NOT a blanket exemption — a malformed ``intents:`` frontmatter and an invalid
+#: status still fire at ANY status.
+_INTENTS_EXEMPT_STATUS = "idea"
+
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
 #: informal — see ``release-governance``). ``None``/empty is the only invalid case here.
 _KNOWN_STATUSES = frozenset(
@@ -111,9 +119,20 @@ class DoctorContext:
 # ── the four checks (each a pure function over the shared context) ───────────────
 
 
+def _is_intents_exempt(status: str | None) -> bool:
+    """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
+
+    An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
+    requirement. Every other status (candidate and beyond, or a missing status) must carry
+    bound, resolvable intents.
+    """
+    return status is not None and status.strip().lower() == _INTENTS_EXEMPT_STATUS
+
+
 def _check_schema(ctx: DoctorContext) -> list[Finding]:
     findings: list[Finding] = []
     for item in ctx.items:
+        # A malformed ``intents:`` frontmatter is always BL-SCHEMA, at ANY status.
         if item.intents_error is not None:
             findings.append(
                 Finding(
@@ -124,15 +143,20 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                 )
             )
             continue
-        if not item.intents:
+        exempt = _is_intents_exempt(item.status)
+        # FR5 status gate: the no-intents and unresolved-subject errors are held for an
+        # ``idea`` (unbound brainstorm) and become mandatory at ``candidate`` and beyond.
+        if not item.intents and not exempt:
             findings.append(
                 Finding(
                     BacklogDoctorCode.BL_SCHEMA,
                     Severity.ERROR,
-                    "no intents[] declared (every backlog item must carry bound intents)",
+                    "no intents[] declared (every backlog item at status 'candidate' or "
+                    "beyond must carry bound intents; 'idea' entries are exempt)",
                     slug=item.slug,
                 )
             )
+        # An invalid status token is always BL-SCHEMA, at ANY status.
         if item.status is not None and item.status.lower() not in _KNOWN_STATUSES:
             findings.append(
                 Finding(
@@ -142,11 +166,12 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                     slug=item.slug,
                 )
             )
-        _, unresolved = ctx.bound[item.slug]
-        for message in unresolved:
-            findings.append(
-                Finding(BacklogDoctorCode.BL_SCHEMA, Severity.ERROR, message, slug=item.slug)
-            )
+        if not exempt:
+            _, unresolved = ctx.bound[item.slug]
+            for message in unresolved:
+                findings.append(
+                    Finding(BacklogDoctorCode.BL_SCHEMA, Severity.ERROR, message, slug=item.slug)
+                )
     return findings
 
 

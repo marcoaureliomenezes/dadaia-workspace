@@ -26,15 +26,15 @@ from pathlib import Path
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import (
+from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
+from dadaia_workspace.features.panel.views.api_reports import (
     delete_report_file,
     mark_report_important,
-    render_api_contexts,
     render_api_reports,
-    render_api_servers,
     unmark_report_important,
 )
-from dadaia_workspace.features.reports_retention.service import ReportRetentionService
+from dadaia_workspace.features.panel.views.api_servers import render_api_servers
+from dadaia_workspace.features.reports.retention import ReportRetentionService
 
 # ---------------------------------------------------------------------------
 # Fakes

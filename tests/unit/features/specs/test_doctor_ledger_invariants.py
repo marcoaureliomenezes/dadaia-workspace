@@ -89,8 +89,14 @@ None.
 
 @pytest.fixture(autouse=True)
 def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep these unit tests focused on in-process structural checks."""
-    monkeypatch.setattr(SpecsDoctor, "_check_lint1_memory_atoms", lambda self: [])
+    """Keep these unit tests focused on in-process structural checks.
+
+    v0.1.55 FR1: LINT-1 moved off the coordinator into ``doctor_memory.MemoryValidator``;
+    stub its public method so the coordinator's ``check()`` never shells out.
+    """
+    from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+
+    monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
@@ -513,7 +519,21 @@ def test_lease_coherence_is_noop_without_workspace_state_dir(tmp_path: Path) -> 
 
 from datetime import UTC, datetime, timedelta  # noqa: E402
 
-from dadaia_workspace.features.specs import doctor as _doctor_mod  # noqa: E402
+# v0.1.55 FR1: the pid_probe seam logic (check_lease_session_coherence) moved off the coordinator
+# into doctor_coherence. The process-probe-adapter-avoidance assertion is re-widened across the
+# coordinator AND every decomposed sibling (built lazily to avoid mid-file import churn) so it
+# cannot silently narrow to coordinator-only.
+_DOCTOR_MODULE_NAMES = (
+    "doctor",
+    "doctor_types",
+    "doctor_common",
+    "doctor_structural",
+    "doctor_memory",
+    "doctor_release",
+    "doctor_closure_audit",
+    "doctor_governance",
+    "doctor_coherence",
+)
 
 _FORGERY_TOKEN = "forgery"
 _STALE_REMEDIATION_TOKENS = ("dadaia doctor --fix", "dadaia lock steal")
@@ -672,16 +692,23 @@ def test_doctor_pid_probe_seam_is_composition_root_wired_not_feature_import() ->
     wired, like ``workspace_state_dir``) — ``features/specs/doctor.py`` must NOT import the
     infrastructure process-probe adapter directly (import-linter / ADR layering law).
     """
+    import importlib
     import inspect
 
     sig = inspect.signature(SpecsDoctor.__init__)
     assert "pid_probe" in sig.parameters, "SpecsDoctor must accept an injected pid_probe seam"
 
-    src = inspect.getsource(_doctor_mod)
-    assert "process_probe_adapter" not in src, (
-        "features/specs/doctor.py must not import the infrastructure process-probe adapter; "
-        "the probe is composition-root-wired via the pid_probe parameter."
-    )
+    # Re-widened (v0.1.55 FR1): the coordinator AND every decomposed validator/leaf module must
+    # be free of the infrastructure process-probe adapter — the probe is composition-root-wired
+    # via the pid_probe parameter. Asserting over the coordinator alone would silently pass now
+    # that the lease/session coherence logic lives in doctor_coherence.
+    for name in _DOCTOR_MODULE_NAMES:
+        mod = importlib.import_module(f"dadaia_workspace.features.specs.{name}")
+        src = inspect.getsource(mod)
+        assert "process_probe_adapter" not in src, (
+            f"{mod.__name__} must not import the infrastructure process-probe adapter; "
+            "the probe is composition-root-wired via the pid_probe parameter."
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

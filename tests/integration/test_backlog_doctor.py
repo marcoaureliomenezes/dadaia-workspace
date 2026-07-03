@@ -78,11 +78,14 @@ def test_clean_tree_has_no_findings(tmp_path: Path) -> None:
 
 
 def _plant_schema(specs: Path, src: Path) -> None:
-    # An item with an UNRESOLVED subject (no such symbol) → BL-SCHEMA.
-    _write_item(
-        specs,
-        "bad-schema",
-        "intents:\n  - subject: { kind: code, ref: pkg/m.py#NoSuchSymbol }\n    change: x\n",
+    # A CANDIDATE item with an UNRESOLVED subject (no such symbol) → BL-SCHEMA.
+    # v0.1.55 FR5: the unresolved-subject error is status-gated — an `idea` is exempt, so the
+    # violation must be planted at `candidate` (or beyond) for the check to fire.
+    (specs / "backlog" / "bad-schema.md").write_text(
+        "---\nstatus: candidate\n"
+        "intents:\n  - subject: { kind: code, ref: pkg/m.py#NoSuchSymbol }\n    change: x\n"
+        "---\n\n# bad-schema\n",
+        encoding="utf-8",
     )
 
 

@@ -10,11 +10,19 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.lock_liveness import is_stale
+from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 #: Path-traversal allowlist (CWE-22/CWE-59). ``DADAIA_SESSION_ID`` becomes a filename
 #: component, so it must be validated before use — mirrors ``session_identity._NAME_RE``.
 _SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+#: Session-record liveness field names (mirrors ``session_identity.SESSION_HEARTBEAT_FIELD`` /
+#: ``SESSION_GC_TTL_FIELD``; re-stated here because ``core`` cannot import that ``features``
+#: owner — constitution §6). Used by the FR4 harness-channel staleness guard below.
+_SESSION_HEARTBEAT_FIELD = "last_seen_at"
+_SESSION_TTL_FIELD = "ttl_seconds"
 
 #: Bind-epoch marker name allowlist (W1-8). A marker's filename IS the context slug and
 #: becomes a ``repos/<slug>/specs`` path component, so it is validated before use
@@ -22,19 +30,17 @@ _SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 _CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
-def _session_context(workspace_root: Path) -> str | None:
-    """Read the ``context`` field of the bound session record (fail-soft).
+def _read_session_record(workspace_root: Path, session_id: str) -> dict[str, object] | None:
+    """Self-contained, read-only, fail-soft read of ``.dadaia/sessions/<session_id>.json``.
 
-    The session-record path schema (``.dadaia/sessions/<id>.json``) is canonically owned
-    by ``features.spec_context.session_identity`` (WS-R3). This ``core`` resolver cannot
-    import that ``features`` module without violating the layering law (constitution §6 —
-    ``core`` imports nothing upward), so it performs a self-contained, read-only,
-    fail-soft read of the same canonical path. It never writes, never opens the pointer
-    namespace, and is recorded as the documented core-layer reader in the
+    The session-record path schema is canonically owned by
+    ``features.spec_context.session_identity`` (WS-R3). This ``core`` resolver cannot import
+    that ``features`` module without violating the layering law (constitution §6 — ``core``
+    imports nothing upward), so it re-reads the same canonical path directly. It never writes,
+    never opens the pointer namespace, and is the documented core-layer reader in the
     ``test_session_store_ownership`` residue contract.
     """
-    session_id = os.environ.get("DADAIA_SESSION_ID")
-    if not session_id or not _SESSION_ID_RE.fullmatch(session_id):
+    if not _SESSION_ID_RE.fullmatch(session_id):
         return None
     session_file = workspace_root / ".dadaia" / "sessions" / f"{session_id}.json"
     if not session_file.is_file():
@@ -43,10 +49,60 @@ def _session_context(workspace_root: Path) -> str | None:
         data = json.loads(session_file.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, ValueError):
         return None
-    if not isinstance(data, dict):
+    return data if isinstance(data, dict) else None
+
+
+def _record_context(record: dict[str, object] | None) -> str | None:
+    """Return the ``context`` field of a session record, or ``None``."""
+    if record is None:
         return None
-    context = data.get("context")
+    context = record.get("context")
     return str(context) if context else None
+
+
+def _session_record_live(record: dict[str, object]) -> bool:
+    """FR4 staleness guard: a harness-keyed session record is live iff its heartbeat is fresh.
+
+    Reuses ``core.lock_liveness.is_stale`` (the canonical TTL predicate) by mapping the
+    session record's ``last_seen_at`` / ``ttl_seconds`` onto its ``heartbeat`` / ``ttl``
+    fields. ``pid_probe`` is intentionally ``None`` (TTL-only): the record's ``pid`` is the
+    transient bind-CLI pid, dead by construction (ADR-8), so heartbeat-freshness — renewed by
+    the PostToolUse heartbeat on ``sessions/<harness_id>.json`` — is the liveness signal. A
+    record with no/old ``last_seen_at`` is stale ⇒ NOT live, so an inherited/stale harness id
+    can never resolve to a foreign bound context.
+    """
+    probe = {
+        "heartbeat": record.get(_SESSION_HEARTBEAT_FIELD),
+        "ttl": record.get(_SESSION_TTL_FIELD),
+    }
+    return not is_stale(probe)
+
+
+def _session_context(workspace_root: Path) -> str | None:
+    """Resolve the bound context from a session record (fail-soft).
+
+    Two channels, in order:
+
+    1. **Eval flow** — an explicit ``DADAIA_SESSION_ID`` addresses the CLI-minted session
+       record directly (unchanged; no liveness gate — the operator exported it deliberately).
+    2. **Harness-native channel (v0.1.55 FR4)** — when ``DADAIA_SESSION_ID`` is absent, resolve
+       via the harness-native session id (``CODEX_SESSION_ID`` / ``CLAUDE_CODE_SESSION_ID``,
+       the single source ``core.session_env``). ``bind`` persists a session record keyed by
+       that id, so a codex/claude CLI call — whose process is NOT a descendant of the bind, so
+       the ancestry-marker path can never attribute it — resolves its bound context
+       deterministically, **ahead of** the ancestry path. Gated by the staleness guard: a
+       harness id resolves ONLY when its record is LIVE (never a blind fallback).
+    """
+    session_id = os.environ.get("DADAIA_SESSION_ID")
+    if session_id:
+        return _record_context(_read_session_record(workspace_root, session_id))
+
+    harness_id = harness_session_id()
+    if harness_id:
+        record = _read_session_record(workspace_root, harness_id)
+        if record is not None and _session_record_live(record):
+            return _record_context(record)
+    return None
 
 
 def _marker_chain(entry: Path) -> list[int]:

@@ -32,8 +32,8 @@ from typing import Any
 
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views import api as api_module
-from dadaia_workspace.features.panel.views.api import render_api_sessions
+from dadaia_workspace.features.panel.views import api_sessions as api_module
+from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 
 # ---------------------------------------------------------------------------

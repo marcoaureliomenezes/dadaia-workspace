@@ -32,7 +32,7 @@ import pytest
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
-from dadaia_workspace.features.panel.views.api import render_api_academy
+from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.static import render_static
 
 # Known shipped modules — the catalog must list at least this set (it ships more, but

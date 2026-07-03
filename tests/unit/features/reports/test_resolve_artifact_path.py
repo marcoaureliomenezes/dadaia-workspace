@@ -20,7 +20,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from dadaia_workspace.features.reports_validation.service import (
+from dadaia_workspace.features.reports.validation import (
     ReportsValidationService,
 )
 from tests.fakes import FakeHandoffValidator

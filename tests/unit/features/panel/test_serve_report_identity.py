@@ -1,6 +1,6 @@
 """Tests for report identity injection at serve time (operator demand 2026-06-11).
 
-Covers ``views/api.py::serve_report_file``:
+Covers ``views/api_reports.py::serve_report_file``:
   - Served HTML reports get the dadaia identity stylesheets injected into <head>.
   - The readability override (reports-doc.css) is present so inheritance wins.
   - Injection is idempotent (no double-inject when re-served).
@@ -16,7 +16,7 @@ from types import SimpleNamespace
 from typing import cast
 
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import serve_report_file
+from dadaia_workspace.features.panel.views.api_reports import serve_report_file
 
 
 def _service(workspace_root: Path) -> PanelService:

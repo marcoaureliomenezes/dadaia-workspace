@@ -32,7 +32,7 @@ grill on the picked set before SPEC.
 | R4 | **SHIPPED — v0.1.52** (merged `fd23ea5e`, PR #93, 2026-07-03) | `panel-sessions-cost-dashboard-only` → `panel-runtime-reliability` (both consumed; archived at ship — dead-anchor BL-SCHEMA) | Operator-elected, fully independent; kills the SQLite corruption bug; reliability lands on the post-removal route surface; every later release runs a smaller suite. |
 | R5 | **SHIPPED — v0.1.53** (merged `d3f46360`, PR #95, 2026-07-03) | `legacy-surface-retirement`; `hygiene-and-dead-code-cleanup`; `centralize-release-semver-canon`; `telemetry-tier2-chmod-unguarded-on-windows` (all consumed; archived at ship — dead-anchor BL-SCHEMA) | Delete before refactoring: shrinks the surface R6–R9 must restructure and the import contracts must cover. |
 | R6 | **SHIPPED — v0.1.54** (merged `aeaa3c66`, PR #97, 2026-07-03) | `import-boundary-enforcement`; `features-import-infrastructure-direct-debt`; `pid-probe-seam-consolidation` (all consumed; archived at ship — dead-anchor BL-SCHEMA) | Contracts green + CI-wired + `workflows ↔ lifecycle` cycle broken; silent erosion stops here so all later structure lands under enforcement. |
-| R7 | Architecture decomposition | `architecture-uml-decomposition` | SpecsDoctor/api.py splits + reports_* merge land under the now-enforced contracts; ships the committed UML assets. |
+| R7 | **Architecture decomposition — IN IMPLEMENTATION — v0.1.55** | `architecture-uml-decomposition` + bugs `bugs-append-ignores-persisted-bind`, `backlog-new-stub-readme-lag-intents-schema` (archived at SHIP) | SpecsDoctor/api.py splits + reports_* merge land under the now-enforced contracts; ships the committed UML assets. |
 | R8 | Lifecycle verb governance | `lifecycle-verb-governance-uniformity` | Settles the runtime/policy seam (resolver on EVERY verb, loop through the runner gate, TRANSITIONS reconciliation) before prompt assembly is rebuilt. |
 | R9 | Injection canon | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup` | The dedup base creates the ONE prompt-assembly seam; the role→atom map + phase threading are implemented at that seam in the same release — five bodies touched once, not twice. |
 | R10 | Harness & projection distribution | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` | `init --harness` profiles + typed harness registry + consumer AGENTS.md fan-out redesign — the projection/install machinery, matured after the structural chain. |
@@ -47,11 +47,6 @@ grill on the picked set before SPEC.
 Policy resolver on EVERY verb; audit/research/bug_report invocability decision;
 implement/review loop fixes (rejection digest, runner gate, CLI caller); TRANSITIONS
 table reconciliation (absorbed the retired `review-rejection-rework-path` idea).
-
-### `architecture-uml-decomposition` — Architecture UML decomposition *(2026-07-02)*
-Split the SpecsDoctor god class (2,820 lines / 54 methods) and panel views/api.py
-(1,402 lines / 24 functions); merge the reports_* feature triplet; commit canonical UML
-assets under `specs/assets/architecture/`.
 
 ### `context-injection-role-phase-canon` — Context-injection role/phase canon *(2026-07-02)*
 Role→memory-atom default map (architect→architecture.md, qa→quality-assurance.md; fix

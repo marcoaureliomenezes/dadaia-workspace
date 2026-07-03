@@ -100,11 +100,17 @@ _RELEASE_SPEC_STUB = """\
 
 # ── backlog entry stub ────────────────────────────────────────────────────────
 
+# The stub is born at ``status: idea`` — an unbound brainstorm. ``backlog doctor`` exempts
+# ``idea`` from the typed-``intents[]`` requirement (v0.1.55 FR5), so a fresh stub is clean; the
+# commented template below TEACHES the shape a maturing entry must adopt at ``candidate`` and
+# beyond (a teaching template, NOT a live dummy subject that would gate-game). No ``.format``
+# field braces appear inside it, so no escaping is needed.
 _BACKLOG_STUB = """\
 ---
 title: {slug}
 status: idea
 opened: {today}
+description: (one-line description of the need)
 ---
 
 # {slug}
@@ -120,6 +126,27 @@ opened: {today}
 ## Acceptance criteria
 
 (List measurable acceptance criteria.)
+
+## Intents (required at `candidate` and beyond)
+
+<!--
+An `idea` needs no `intents[]`. Before promoting this entry to `status: candidate`, add a
+typed `intents[]` frontmatter block binding each change to a canonical subject anchor, then
+move it ABOVE the closing `---` of the frontmatter. Discover bindable anchors with
+`dadaia backlog subjects`. Subject kinds: code | cli | catalog | doc | invariant
+(code anchors are derived from Python sources only — in a non-Python repo bind catalog/doc/
+invariant anchors instead).
+
+intents:
+  - subject:
+      kind: code
+      ref: path/to/module.py#Symbol
+    change: what changes about this subject
+  - subject:
+      kind: cli
+      ref: dadaia some-command
+    change: what changes about this command
+-->
 """
 
 # ── public API ────────────────────────────────────────────────────────────────

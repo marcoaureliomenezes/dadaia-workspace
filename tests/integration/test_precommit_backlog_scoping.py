@@ -46,10 +46,14 @@ def _init_repo(tmp_path: Path) -> Path:
 
 
 def _plant_bl_schema_violation(repo: Path) -> Path:
-    """Write a backlog item whose subject anchor resolves to no symbol (BL-SCHEMA ERROR)."""
+    """Write a backlog item whose subject anchor resolves to no symbol (BL-SCHEMA ERROR).
+
+    v0.1.55 FR5: the unresolved-subject error is status-gated (an `idea` is exempt), so the
+    violation is planted at `candidate` for the check to fire.
+    """
     bad = repo / "specs" / "backlog" / "bad.md"
     bad.write_text(
-        "---\nstatus: idea\nintents:\n"
+        "---\nstatus: candidate\nintents:\n"
         "  - subject: { kind: code, ref: dadaia_workspace/m.py#Ghost }\n"
         "    change: x\n---\n\n# bad\n",
         encoding="utf-8",

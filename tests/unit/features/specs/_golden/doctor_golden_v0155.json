@@ -1,0 +1,141 @@
+{
+  "issues": [
+    {
+      "code": "SPEC-DOC-001",
+      "description": "specs/constitution.md is missing",
+      "path": "<SPECS>/constitution.md",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-002",
+      "description": "memory/architecture.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/architecture.md",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-002",
+      "description": "memory/tech-stack.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/tech-stack.md",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-002",
+      "description": "memory/quality-assurance.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/quality-assurance.md",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-002",
+      "description": "memory/product/index.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/product/index.md",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-009",
+      "description": "ACTIVE.md release='v9.9.9' but no directory at <SPECS>/releases/v9.9.9",
+      "path": "<SPECS>/releases/v9.9.9",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-012",
+      "description": "candidates.md line 5: bullet does not match expected format '- <name> — <one-liner> (owner: <agent>, contexto: <link>)': '- this bullet does not match the required backlog format'",
+      "path": "<SPECS>/backlog/candidates.md",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-012",
+      "description": "candidates.md line 9: hotfix bullet is stale (4680h > 72h). Consider promoting to a hotfix release or moving to ## Histórico (D23).",
+      "path": "<SPECS>/backlog/candidates.md",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-016",
+      "description": "Release folder 'badname-release' does not follow SemVer naming (^v\\d+\\.\\d+\\.\\d+$). Created: 2026-07-10. Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016).",
+      "path": "<SPECS>/releases/badname-release",
+      "severity": "error"
+    },
+    {
+      "code": "TREE-3",
+      "description": "memory/architecture.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/architecture.md",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-3",
+      "description": "memory/tech-stack.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/tech-stack.md",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-3",
+      "description": "memory/quality-assurance.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/quality-assurance.md",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-3",
+      "description": "memory/product/index.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/product/index.md",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-4",
+      "description": "specs/bugs/ is missing — required spec tree directory. No scaffold source available — create manually.",
+      "path": "<SPECS>/bugs",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-5",
+      "description": "specs/AGENTS.md is missing — expected SDD workflow contract. Create it from the canonical template (dadaia_workspace/public/templates/specs-AGENTS.md) or run `dadaia specs init` to scaffold it.",
+      "path": "<SPECS>/AGENTS.md",
+      "severity": "warning"
+    },
+    {
+      "code": "TREE-5M",
+      "description": "specs/memory/AGENTS.md is missing — expected memory ownership contract. Restore it by copying the canonical source dadaia_workspace/public/data/memory-AGENTS.md into specs/memory/AGENTS.md (edit the specs-tree copy directly and keep both source copies — public/data/ and public/scaffold/memory/ — in sync). Note: `dadaia public install` does NOT project this file; it only scaffolds it when missing and never updates an existing copy.",
+      "path": "<SPECS>/memory/AGENTS.md",
+      "severity": "warning"
+    },
+    {
+      "code": "SPECS-VERSION",
+      "description": "specs_pattern_version is 0, below the canonical 2. Run: dadaia specs upgrade",
+      "path": "<SPECS>/constitution.md",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-027",
+      "description": "Release dir 'releases/badname-release' does not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ — rename it (SPEC-DOC-027).",
+      "path": "<SPECS>/releases/badname-release",
+      "severity": "error"
+    },
+    {
+      "code": "SPEC-DOC-030",
+      "description": "Audit dir 'audits/bad-audit-name' does not follow the collision-safe naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) — rename it (SPEC-DOC-030, WARNING).",
+      "path": "<SPECS>/audits/bad-audit-name",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-034",
+      "description": "specs/backlog/_archive/ is missing — the FROZEN landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
+      "path": "<SPECS>/backlog/_archive",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-034",
+      "description": "specs/audits/_archive/ is missing — the FROZEN landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
+      "path": "<SPECS>/audits/_archive",
+      "severity": "warning"
+    },
+    {
+      "code": "SPEC-DOC-038",
+      "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived to specs/audits/_archive/ (one remediation release dispositions every finding, then archives; audit-disposition law). SPEC-DOC-038, WARNING.",
+      "path": "<SPECS>/audits/bad-audit-name",
+      "severity": "warning"
+    }
+  ],
+  "specs_dir": "<SPECS>",
+  "summary": {
+    "errors": 8,
+    "warnings": 14
+  }
+}
