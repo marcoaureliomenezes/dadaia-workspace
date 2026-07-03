@@ -27,7 +27,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W1 — FR1 SpecsDoctor decomposition
 
-- [-] T-55-10 Decompose `features/specs/doctor.py` into a thin `SpecsDoctor` coordinator (owns
+- [x] T-55-10 Decompose `features/specs/doctor.py` into a thin `SpecsDoctor` coordinator (owns
   ORDER) + validator classes; behavior byte-identical. Checklist:
   - **Golden PRE-split, DETERMINISTIC (R-4):** capture `SpecsDoctor.check()` + `dadaia specs
     doctor --json` **in-process on a fixed committed fixture root**; normalize every absolute path
@@ -86,6 +86,29 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
     coordinator, asserted by the golden; the externally-consumed `Severity`/`SpecsDoctorIssue`/
     `read_active_md`; dead: none — pure decomposition). NO `specs/backlog`.
   Owner: software-engineer. (software-architect reviews the class boundaries.)
+  - **DONE (software-engineer, 2026-07-03).** Commits: golden behavior lock `1213dafb`
+    (`test(T-55-10)`), split `8511d0ab` (`refactor(T-55-10)`), closeout `<this commit>`.
+    **Golden verdict:** BYTE-IDENTICAL — `test_doctor_golden.py` GREEN pre- and post-split
+    (22 issues, 8 errors / 14 warnings, six families interleaved, clock frozen 2026-07-15,
+    paths `<SPECS>`-normalized). **AC-7(a):** mutated `doctor_coherence.check_constitution`
+    description ⇒ golden FAILED on the byte diff; reverted → GREEN. **AC-7(c):** added a
+    719-line `doctor_sabotage_tmp.py` ⇒ `test_module_size_ceiling` FAILED; removed → GREEN.
+    **Per-module line counts (all ≤ 700 ceiling; was 2,830):** coordinator `doctor.py` 224;
+    leaves `doctor_types.py` 53, `doctor_common.py` 113; validators `doctor_structural.py`
+    357, `doctor_memory.py` 479, `doctor_release.py` 480, `doctor_closure_audit.py` 312,
+    `doctor_governance.py` 516, `doctor_coherence.py` 464. **Cap/lint:** `lint-imports
+    --no-cache` = `8 kept, 0 broken` (zero "No matches for ignored import"); cap test
+    `== 26` + per-family `9/4/13` GREEN (coordinator holds no `spec_context` edge — PidProbe
+    leaf). **Gates:** full `pytest` 4337 passed / 17 skipped (exit 0); `ruff format --check`
+    exit 0; `ruff check --no-cache` exit 0; `mypy --strict dadaia_workspace` exit 0.
+    **AC-8 ledger — surviving:** every issue code + `check()`/`fix()`/`--json` surface + the
+    interleaved ORDER (golden-pinned); the externally-consumed `Severity`/`SpecsDoctorIssue`
+    (now sourced from `doctor_types`, package-re-exported) + `read_active_md` (public name in
+    `doctor_common`); the coordinator's public `__init__`/`check`/`fix` signatures. **dead:**
+    the 2,830-line god-module shape — the single `SpecsDoctor` class holding all 54
+    validator/helper methods (now a 224-line delegation-only coordinator); no `_check_*` body
+    remains in the coordinator; no re-export shims added. Frozen suite
+    `spec_context/test_doctor_lock_gc.py` untouched (different subsystem — zero-diff).
 
 ## W2 — FR3 reports triplet merge
 
