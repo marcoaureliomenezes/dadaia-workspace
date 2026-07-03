@@ -180,7 +180,7 @@ includes `tests/`.
 
 ## W3 — FR5 + FR7 direct-debt DI + core purity
 
-- [-] T-54-12 Complete `features → infrastructure` DI (remove 2 ignores, lower cap) + core
+- [x] T-54-12 Complete `features → infrastructure` DI (remove 2 ignores, lower cap) + core
   file-I/O AST guard. Checklist:
   - **FR5:** inject `WorkflowProvider` into `WorkflowsService` and `AgentsProvider` into
     `read_canonical_agents` via `container.py`; delete the direct `markdown_workflow_store` /
@@ -199,6 +199,62 @@ includes `tests/`.
     `Path(...).read_text()` ⇒ the AST guard FAILS; revert (delete the probe).
   - `lint-imports --no-cache`: `8 kept, 0 broken`; agent/workflow read behavior unchanged
     (before/after assertion). AC-8 ledger. NO `specs/backlog` staged. Owner: software-engineer.
+  - **DONE (software-engineer):** reservation folded into the FR5 commit `56a51148`
+    (`[ ]`→`[-]` in this file). Commits, in order:
+    `56a51148` FR5 (DI completion, cap 26) · `735950e1` FR7 (core file-I/O AST ratchet).
+    - **FR5 (features→infrastructure DI completion):** genuine `store_factory` DI. Each
+      feature depends on a **feature-local Protocol** for the store surface, not the concrete
+      adapter: `features/workflows/service.py` gains `_WorkflowStore` (`list`/`get`) +
+      `WorkflowStoreFactory`; `features/agents/reader.py` gains `_AgentStore` (`list_raw`) +
+      `AgentStoreFactory`. The concrete `MarkdownWorkflowStore` / `MarkdownAgentStore` is
+      injected from `container.py` (`build_orchestration_catalog_service`,
+      `build_workflow_catalog_service`, `build_panel_service`→`FileSystemAgentsProvider(store_factory=…)`).
+      Both direct `from dadaia_workspace.infrastructure.markdown_*_store import …` lines are
+      DELETED. `setup.cfg`: the 2 `markdown_*_store` ignores removed from
+      `features-no-infrastructure`; header "Current count = 15" → **26 (9/4/13)** and the
+      stale "(still 17)" → **26** corrected in the same edit. Cap test:
+      `_RECORDED_IGNORE_EDGE_CAP` 28→**26**, per-family infra 11→**9** (subprocess 4,
+      cross-feature 13); `test_recorded_cap_is_not_stale_above_reality` GREEN.
+    - **FR7 (core file-I/O purity, architect A9 GUARD):** new
+      `tests/contract/test_core_file_io_purity.py` — AST walker over `core/**/*.py` flagging
+      `open()` / `Path.read_text|write_text|mkdir|exists|glob|iterdir|rglob` /
+      `shutil.copy*|copytree|move` outside `{specs_backup, specs_version, specs_resolver,
+      workspace_resolver}`. Only `ast.Call` nodes (no `d.get("open")` false-fire); shutil tied
+      to a `shutil` receiver; `platform.py` `sys.platform` is attribute access, not flagged
+      (sys-note). **AC-7(c) RED tail:** transient `core/_io_sabotage_probe.py` with
+      `Path(...).read_text()` ⇒ guard FAILED —
+      `dadaia_workspace/core/_io_sabotage_probe.py:11 .read_text(...)` (`1 failed, 1 passed`);
+      probe DELETED ⇒ GREEN (`2 passed`). Probe not committed.
+    - **Per-chain grep (incl. `tests/`):** `service.py` / `reader.py` carry **zero**
+      `features -> infrastructure` import statements (only docstring mentions of the concrete
+      class names, documenting the boundary). Live cap: infra **9** / subprocess **4** /
+      cross-feature **13** = **26**.
+    - **Final gates:** `lint-imports --no-cache` → **8 kept, 0 broken**; full
+      `pytest tests/ --ignore=tests/e2e/panel` → **4327 passed, 17 skipped (exit 0)**;
+      `ruff format --check` + `ruff check --no-cache` + `mypy --strict dadaia_workspace`
+      (288 files) all exit 0.
+    - **AC-8 ledger** — surviving (test now asserts each): workflow definitions listing via
+      the injected store port (`list_summaries`/`get_detail`/`list_definitions`/
+      `get_definition` — workflows service unit + panel `/api/workflows` integration green);
+      canonical agents read via the injected store port (`read_canonical_agents` +
+      `FileSystemAgentsProvider` — reader unit + panel `/api/agents` integration green); core
+      file I/O confined to the 4 authorized modules (AST guard GREEN). Dead (intentionally
+      removed): the 2 direct `features→infrastructure` imports
+      (`workflows.service -> markdown_workflow_store`, `agents.reader -> markdown_agent_store`)
+      — pinned dead by `features-no-infrastructure` (9 ignores) + zero-import grep; the stale
+      "(still 17)" lie (and the collateral "Current count = 15" header) — corrected to 26.
+    - **Deviations (recorded):** (1) the literal "depend on the EXISTING
+      `core/protocols/workflow_provider.py`/`agents_provider.py` port" is unsatisfiable — those
+      ports describe the panel-facing **service** surface (`list_summaries` /
+      `read_canonical_agents`+`get_prompt`), NOT the **store** surface (`list`/`get`,
+      `list_raw`) the feature injects. Per DIP (consumer-owned interface) and to stay inside
+      the W3 write set (which lists `service.py`/`reader.py`/`container.py`/`setup.cfg`/tests,
+      not `core/protocols/`), the store Protocols are defined feature-locally; the existing
+      panel ports are untouched. Result: zero infra edge, no `core/protocols/` edit, no new
+      ignore. (2) Also corrected the setup.cfg header "Current count = 15" (a W2 collateral
+      miss, stale after W2's +13) to 26 alongside the mandated "(still 17)" fix. (3) Test
+      churn: the direct-construction test sites now inject the concrete store class from
+      infrastructure (legal in tests) — anticipated by the task. NO `specs/backlog/**` staged.
 
 ## W4 — FR6 pid-probe single public builder (isolated)
 
