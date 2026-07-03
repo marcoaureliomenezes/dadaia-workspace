@@ -20,10 +20,11 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 
 CTX = "mainctx"
-TTL = lease.LEASE_TTL_SECONDS
+TTL = kernel_tunables.LEASE_TTL_SECONDS
 
 
 def _seed_stale_record(ws: Path, *, pid: int | None) -> None:

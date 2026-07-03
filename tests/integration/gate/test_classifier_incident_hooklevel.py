@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -60,7 +61,7 @@ def _seed_holder_lease(tmp_path: Path, holder: str, heartbeat: datetime) -> None
                 "mode": "IMPLEMENTATION",
                 "acquired_at": heartbeat.isoformat(),
                 "heartbeat": heartbeat.isoformat(),
-                "ttl": lease.LEASE_TTL_SECONDS,
+                "ttl": kernel_tunables.LEASE_TTL_SECONDS,
             }
         ),
         encoding="utf-8",

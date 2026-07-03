@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 from pathlib import Path
 
 from dadaia_workspace.core import lock_liveness
@@ -355,16 +354,3 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         if decision == gate_policy.Decision.BLOCK:
             return reason
     return None
-
-
-def main() -> int:
-    """Run the SDD gate. Returns 0 always (block is signaled via the stdout envelope)."""
-    payload = _common.read_stdin_json()
-    reason = evaluate_payload(payload)
-    if reason is not None:
-        _common.emit_block(reason)
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

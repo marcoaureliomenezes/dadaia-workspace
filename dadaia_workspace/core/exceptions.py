@@ -49,14 +49,6 @@ class WorkflowNotFoundError(DadaiaError):
     """Raised when a workflow name is not present in the workflow store."""
 
 
-class RunNotFoundError(DadaiaError):
-    """Raised when a run_id is not present under .dadaia/runs/."""
-
-
-class OrchestrationUnsupportedError(DadaiaError):
-    """Raised when the selected runtime cannot execute a workflow's required capability."""
-
-
 class PortConflictError(DadaiaError):
     """Raised when a port is already registered as active by a different project."""
 

@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 from tests.e2e.lease_rendezvous import (
     SHORT_TTL_SECONDS,
@@ -316,8 +317,8 @@ def test_disjoint_contexts_no_cross_block(tmp_path: Path) -> None:
     }
 
     # Use the full short-TTL-free default TTL so both stay fresh and live concurrently.
-    proc_a = _start_holder(ws, _SLUG, sid_a, paths_a, ttl=lease.LEASE_TTL_SECONDS)
-    proc_b = _start_holder(ws, _OTHER_SLUG, sid_b, paths_b, ttl=lease.LEASE_TTL_SECONDS)
+    proc_a = _start_holder(ws, _SLUG, sid_a, paths_a, ttl=kernel_tunables.LEASE_TTL_SECONDS)
+    proc_b = _start_holder(ws, _OTHER_SLUG, sid_b, paths_b, ttl=kernel_tunables.LEASE_TTL_SECONDS)
     try:
         journal_a.capture()
         journal_b.capture()

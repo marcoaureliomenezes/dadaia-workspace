@@ -1,7 +1,7 @@
 """CSS design tokens for the Dadaia Workspace Panel.
 
-Phase 1 (SE): contains the :root block of custom properties extracted from
-_assets.py PANEL_CSS.
+Phase 1 (SE): contains the :root block of custom properties (originally part of the panel
+CSS; the legacy _assets.py shim was removed in v0.1.53).
 Phase 2 (FE / PR3-03): adds three theme palettes via [data-theme="mint"|"sage"|"warm"]
 selectors. Mint is the default — its values match :root for zero visual regression.
 

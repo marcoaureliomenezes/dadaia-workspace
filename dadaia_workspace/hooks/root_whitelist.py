@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import sys
 from pathlib import Path
 
 from dadaia_workspace.hooks import _common
@@ -93,15 +92,6 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     return None
 
 
-def main() -> int:
-    """Run the root-whitelist gate. Returns 0 always (block via the stdout envelope)."""
-    payload = _common.read_stdin_json()
-    reason = evaluate_payload(payload)
-    if reason is not None:
-        _common.emit_block(reason)
-    return 0
-
-
 def _root_violation(workspace: Path, raw_path: str) -> str | None:
     """Return a block reason if *raw_path* creates a forbidden new root entry, else ``None``.
 
@@ -155,7 +145,3 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         "required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and "
         "retry. Operator-created files are exempt — add them to root_exceptions.txt."
     )
-
-
-if __name__ == "__main__":
-    sys.exit(main())

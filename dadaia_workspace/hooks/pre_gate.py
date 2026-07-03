@@ -10,8 +10,9 @@ in a fixed order, first-block-wins:
 
 Allow requires every policy to allow; the first policy that returns a block reason
 short-circuits and that reason is emitted via the ``{"decision":"block",...}`` envelope.
-The legacy ``sdd_gate.main`` / ``root_whitelist.main`` entrypoints are retained one release
-for back-compat wiring; their pure ``evaluate_payload`` policy surfaces are reused here so
+``pre_gate`` is the single hook entrypoint; the standalone ``sdd_gate.main`` /
+``root_whitelist.main`` CLI entrypoints (one-release deprecation from v0.1.14) were
+removed in v0.1.53. Their pure ``evaluate_payload`` policy surfaces are reused here so
 there is no third drifting copy of the gate logic.
 
 Parity invariants preserved verbatim from the standalone gates:

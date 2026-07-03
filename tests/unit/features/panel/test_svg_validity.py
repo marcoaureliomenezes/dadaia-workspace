@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 
-from dadaia_workspace.features.panel.views._assets import LOGO_RHINO_16, LOGO_RHINO_24
+from dadaia_workspace.features.panel.views.static import LOGO_RHINO_16, LOGO_RHINO_24
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{3,8}$")
 

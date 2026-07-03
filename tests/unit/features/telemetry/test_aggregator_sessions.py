@@ -28,8 +28,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from tests.fakes import shared_connection_factory
 
 # ---------------------------------------------------------------------------
 # Time constants
@@ -153,9 +153,8 @@ def _insert_event(
 
 
 def _make_aggregator(conn: sqlite3.Connection) -> TelemetryAggregator:
-    dao = TelemetryDao(conn)
     return TelemetryAggregator(
-        dao=dao,
+        connection_factory=shared_connection_factory(conn),
         spec_context_service=_FakeSCS(),
         pricing_module=_FakePricing(),
     )

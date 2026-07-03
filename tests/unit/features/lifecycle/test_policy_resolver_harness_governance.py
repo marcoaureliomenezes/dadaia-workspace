@@ -17,11 +17,11 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     StepHarnessOverride,
     StepOverride,
     WorkflowExecutionPolicyResolver,
-    library_workflow_catalog,
 )
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     WorkflowModelPolicyOverlay,
 )
+from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
 _WORKFLOW = "implementation"
 

@@ -16,8 +16,8 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
 )
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from tests.fakes import shared_connection_factory
 
 # ---------------------------------------------------------------------------
 # Constants — synthetic fixture paths
@@ -274,9 +274,8 @@ def _seed_db(conn: sqlite3.Connection) -> None:
 
 
 def _make_aggregator(conn: sqlite3.Connection, scs: _FakeSCS | None = None) -> TelemetryAggregator:
-    dao = TelemetryDao(conn)
     return TelemetryAggregator(
-        dao=dao,
+        connection_factory=shared_connection_factory(conn),
         spec_context_service=scs or _FakeSCS(),
         pricing_module=_FakePricing(),
     )

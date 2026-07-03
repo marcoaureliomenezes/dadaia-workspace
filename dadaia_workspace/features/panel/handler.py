@@ -728,15 +728,10 @@ def make_handler_class(
 
                 elif route_name == "api_workflows":
                     # PR3-14: canonical workflow list (bearer-only, no telemetry needed).
-                    # Bearer-only dispatch is handled above; this branch is a fallback
-                    # for the legacy telemetry path when api_workflows is NOT in views.
-                    if "api_workflows" in views:
-                        status, content_type, body = views["api_workflows"]()
-                        self._respond(status, content_type, body)
-                    else:
-                        result = _telemetry.list_workflows()
-                        body = _to_json_bytes(result)
-                        self._respond(200, "application/json", body)
+                    # The api_workflows view is always container-wired (the legacy telemetry
+                    # fallback was removed in v0.1.53).
+                    status, content_type, body = views["api_workflows"]()
+                    self._respond(status, content_type, body)
 
                 elif route_name == "api_workflow_detail":
                     # PR3-15: workflow detail endpoint (bearer-only, no telemetry needed).

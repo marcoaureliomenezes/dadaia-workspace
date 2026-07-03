@@ -13,9 +13,9 @@ core is the bottom layer every other layer may legally import (constitution §6)
 features, and cli all hold a legal edge to it. An import-linter contract pins the one-way
 edge (kernel modules → tunables; never the reverse).
 
-Each consumer imports the name it needs from here. ``lease.LEASE_TTL_SECONDS`` is retained
-as a re-export for one release (deprecation note in that module) so external callers and
-tests that import it keep working.
+Each consumer imports the name it needs from here directly. The lease-local
+``lease.LEASE_TTL_SECONDS`` re-export (a one-release deprecation shim) was removed in
+v0.1.53 — import ``LEASE_TTL_SECONDS`` from this module.
 """
 
 from __future__ import annotations

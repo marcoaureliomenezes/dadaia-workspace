@@ -418,8 +418,8 @@ class _PolicyRecordingFake:
 def _snapshot_for_implementation() -> object:
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowExecutionPolicyResolver,
-        library_workflow_catalog,
     )
+    from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
     resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
     return resolver.resolve("implementation", context="default")
@@ -466,8 +466,8 @@ def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
 def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def]
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowExecutionPolicyResolver,
-        library_workflow_catalog,
     )
+    from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
     resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
     return resolver.resolve("implementation", context="default", default_harness=default_harness)

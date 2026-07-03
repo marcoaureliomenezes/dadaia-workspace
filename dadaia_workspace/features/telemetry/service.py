@@ -38,7 +38,6 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     RecentSession,
     SessionAggregate,
-    WorkflowListResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -440,11 +439,6 @@ class TelemetryService:
                 limit=limit,
             ),
         )
-
-    def list_workflows(self) -> WorkflowListResult:
-        """Return workflow list. Triggers lazy refresh."""
-        self.refresh()
-        return cast(WorkflowListResult, self._aggregator.list_workflows())
 
     def list_sessions_by_agent(
         self,

@@ -26,13 +26,14 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import LockHeldError
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.features.spec_context import lease
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 CTX = "pidctx"
-TTL = lease.LEASE_TTL_SECONDS
+TTL = kernel_tunables.LEASE_TTL_SECONDS
 
 
 def fixed(dt: datetime) -> Callable[[], datetime]:

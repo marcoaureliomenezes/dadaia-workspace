@@ -73,7 +73,6 @@ from dadaia_workspace.features.spec_context import session_identity
 PidProbe = Callable[[int], bool]
 
 __all__ = [
-    "LEASE_TTL_SECONDS",
     "PidProbe",
     "acquire",
     "contexts_for_session",
@@ -87,14 +86,10 @@ __all__ = [
     "steal",
 ]
 
-#: Heartbeat TTL in seconds — OQ-1 operator decision 2026-06-06 (short heartbeat).
-#: Every liveness comparison must reference this constant; no inline magic numbers
-#: are permitted anywhere in the liveness path. DP-1 (v0.1.14): the canonical home is now
-#: ``core.kernel_tunables.LEASE_TTL_SECONDS``; this name is a re-export kept for one release
-#: (deprecation note) so external importers (``from ...lease import LEASE_TTL_SECONDS``) and
-#: tests keep working. New code should import from ``core.kernel_tunables``.
-LEASE_TTL_SECONDS = kernel_tunables.LEASE_TTL_SECONDS
-
+#: Heartbeat TTL in seconds lives in ``core.kernel_tunables.LEASE_TTL_SECONDS`` (the single
+#: canonical home, DP-1 v0.1.14). Every liveness comparison references that constant; no
+#: inline magic numbers are permitted anywhere in the liveness path. The lease-local
+#: re-export was removed in v0.1.53 — import ``LEASE_TTL_SECONDS`` from ``core.kernel_tunables``.
 _MAX_RETRIES = kernel_tunables.CAS_MAX_RETRIES
 _INITIAL_BACKOFF = kernel_tunables.CAS_INITIAL_BACKOFF_SECONDS
 #: A sentinel older than this is an orphan (process SIGKILLed between CAS and unlink).
@@ -455,7 +450,7 @@ def _yield_message(ctx: str, holder_id: str, heartbeat: str) -> str:
         f"(last heartbeat: {heartbeat}). "
         "This session will not mutate to avoid a race. "
         "Additive writes (backlog/audit/reports/handoff) are still allowed. "
-        f"The lease auto-reclaims after ~{LEASE_TTL_SECONDS}s without a heartbeat, "
+        f"The lease auto-reclaims after ~{kernel_tunables.LEASE_TTL_SECONDS}s without a heartbeat, "
         "so a finished or dead session frees it automatically and this session "
         "then acquires on its next write. No manual action is needed."
     )
@@ -487,7 +482,7 @@ def acquire(
     mode: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
-    ttl: int = LEASE_TTL_SECONDS,
+    ttl: int = kernel_tunables.LEASE_TTL_SECONDS,
     permission_setter: FilePermissionSetter | None = None,
     pid_probe: PidProbe | None = None,
     pid: int | None = None,
@@ -806,7 +801,7 @@ def steal(
     session_id: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
-    ttl: int = LEASE_TTL_SECONDS,
+    ttl: int = kernel_tunables.LEASE_TTL_SECONDS,
     permission_setter: FilePermissionSetter | None = None,
     pid_probe: PidProbe | None = None,
     pid: int | None = None,

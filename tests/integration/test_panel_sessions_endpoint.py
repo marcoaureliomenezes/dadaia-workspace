@@ -30,7 +30,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+from tests.fakes import shared_connection_factory
 
 # ---------------------------------------------------------------------------
 # Fixture path
@@ -84,9 +84,8 @@ class _FixtureTelemetry:
         # worker threads. The fixture DB is read-only in tests.
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.execute("PRAGMA foreign_keys=ON")
-        dao = TelemetryDao(self._conn)
         self._aggregator = TelemetryAggregator(
-            dao=dao,
+            connection_factory=shared_connection_factory(self._conn),
             spec_context_service=_FakeSpecContextService(),
             pricing_module=_NoPricingModule(),
             workspace_root=None,
