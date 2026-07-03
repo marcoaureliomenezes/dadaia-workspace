@@ -384,7 +384,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W5 — FR7 UML assets (LAST — diagram the post-split shape)
 
-- [ ] T-55-50 Commit the canonical UML diagrams of the post-split shape. Checklist:
+- [x] T-55-50 Commit the canonical UML diagrams of the post-split shape. Checklist:
   - Create `specs/assets/architecture/` with **Markdown files carrying fenced ```mermaid blocks**
     (R-8): (a) a `classDiagram` of the `SpecsDoctor` coordinator + the six validator classes; (b)
     a `classDiagram`/module graph of the panel per-domain view modules; (c) a package graph of the
@@ -398,6 +398,81 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
   - AC-5 assets exist + guarded. (The `architecture.md` "Visual evidence" reference is a
     CLOSURE/memory edit — T-55-70.) AC-8 ledger. NO `specs/backlog`.
   Owner: software-engineer. (software-architect reviews diagram fidelity.)
+  - **DONE (software-engineer, 2026-07-03).** Commit: assets + drift-guard `<this commit>`
+    (`docs(T-55-50)` — folds the `[-]` reservation flip). NO `specs/backlog` staged.
+    **DEVIATION (necessary SPEC-implied enabler):** the repo `.gitignore` `/specs/*` privacy
+    backstop ignored the new `specs/assets/` top-level subtree (every canonical subtree —
+    memory/audits/bugs/backlog/releases — carries an explicit opt-in; assets had none), so the
+    diagrams could not be committed. AC-5 binds them to be COMMITTED + CI-reviewable, so a
+    minimal privacy-preserving opt-in was added mirroring the audits pattern (`!/specs/assets/`,
+    `!/specs/assets/*/`, `/specs/assets/*/*`, `!/specs/assets/*/*.md` — *.md only; no
+    `.svg`/`.mmd`/binary ever tracked, R-8). This is the privacy backstop working as designed
+    (NOT a tooling bug — no bug registered), not enumerated in the literal W5 write set but
+    required to deliver FR7. Verified the `/specs/*` backstop is UNIQUE to this source repo's
+    `.gitignore` (no such pattern in `public/scaffold/`), so there is no consumer-scaffold
+    template to keep in sync — the change is fully local to this repo.
+    **Assets — three fenced-```mermaid `.md` files under `specs/assets/architecture/` (R-8:
+    NO `.mmd`, NO `.svg`, NO mermaid-cli/Node; rendered natively by GitHub + the panel):**
+    (a) `doctor-decomposition.md` — a `classDiagram` of the `SpecsDoctor` coordinator + the
+    six validator siblings (`StructuralValidator`, `MemoryValidator`, `ReleaseValidator`,
+    `ClosureAuditValidator`, `GovernanceValidator`, `CoherenceValidator`) + the two leaf
+    modules (`doctor_types`, `doctor_common`), with the coordinator's "owns ORDER" delegation
+    edges and NOTES pinning the two boundary imports to their sole holders (`spec_context.{lease,
+    session_identity}` → `CoherenceValidator`; lazy `infrastructure.subprocess_runner` →
+    `MemoryValidator`; coordinator holds neither — `pid_probe` typed against the
+    `doctor_types.PidProbe` leaf); (b) `panel-views-decomposition.md` — a `classDiagram`/module
+    graph of the eight per-domain `api_*` view modules + their public render functions +
+    `PanelService`/`container` named-import wiring (no facade; `api.py` deleted); (c)
+    `feature-packages.md` — a `flowchart` package graph of the post-merge **23** feature
+    packages, with the merged `features/reports` (`next`/`retention`/`validation`) submodules,
+    the `governed_catalog` cycle-break seam, and the edge-#7 repoint note. Each file carries a
+    short prose header (what it shows + release origin v0.1.55) + ONE fenced ```mermaid block +
+    a regeneration-law note pointing at the drift-guard.
+    **Introspection drift-guard — NEW `tests/contract/test_architecture_diagrams_current.py`
+    (the SPEC/TASKS-canonical name; operator prompt's `test_architecture_assets_drift.py` is a
+    paraphrase — SPEC FR7 name used so the W6 gate + reviewers resolve it).** Derives EVERY
+    live name by `importlib` + `pkgutil` + `inspect` introspection (a hardcoded expectation
+    list is FORBIDDEN — none present): doctor coordinator = classes defined in
+    `features.specs.doctor`; validators = `*Validator` classes discovered across the
+    `features.specs.doctor_*` modules; api modules + render fns = discovered
+    `features.panel.views.api_*` packages + their public functions; feature packages =
+    `pkgutil.iter_modules(features)` ispkg set (23); reports submodules =
+    `pkgutil.iter_modules(features.reports)`. Parses the sole fenced-```mermaid block per file
+    and asserts, BOTH directions: **Forward** — every live name is mentioned (doctor: as a
+    declared `class` node; panel/features: as a token) → catches a code rename the diagram
+    missed; **Reverse** — every diagram node claiming to be a decomposed class/`api_*` module
+    IS a live importable name → catches a diagram node renamed to a stale name. Also fails if a
+    diagram file goes missing (`_sole_mermaid_block` asserts `is_file()` + exactly one block).
+    4 tests GREEN in isolation and in the full suite.
+    **AC-7(f) sabotage (diagram-side, per operator scope — the bidirectional guard also covers
+    the SPEC's code-side variant via Forward):** renamed `class CoherenceValidator` →
+    `class CohesionValidator` in `doctor-decomposition.md` ONLY (code untouched) ⇒
+    `test_doctor_diagram_matches_live_classes` FAILED —
+    `AssertionError: doctor-decomposition.md does not diagram live doctor class(es):
+    ['CoherenceValidator']` (Forward caught the stranded live name; Reverse would also flag the
+    stale `CohesionValidator` node). Reverted → 4 passed, zero `CohesionValidator` residue.
+    **Doctor state (SPEC §FR7 anticipated the new `specs/assets/` top-level):** `dadaia specs
+    doctor --specs-dir …/specs` = **exit 0, 0 errors / 10 warnings** (all pre-existing legacy:
+    TREE-5 AGENTS.md drift, two SPEC-DOC-027 legacy release dirs, one SPEC-DOC-029 foreign
+    stale lease, six SPEC-DOC-031 slug-mention WARNs) — **no `assets` mention; the new dir is
+    NOT flagged** (memory validator scopes to `specs/memory`; `check_no_orphan_specs` rglobs
+    only SPEC/PLAN/TASKS.md; no top-level allowlist exists). No doctor code change warranted —
+    the SPEC's write set for W5 authorizes one ONLY "if the SPEC says so", and it does not.
+    **Gates:** full unpiped `pytest` (tests/ --ignore=tests/e2e/panel) **4354 passed / 17
+    skipped (exit 0)** (+4 drift-guard tests over the W4 baseline 4350); `ruff format --check`
+    (768 files) exit 0; `ruff check --no-cache` exit 0; `mypy --strict dadaia_workspace` (302
+    files) exit 0; `lint-imports --no-cache` **`8 kept, 0 broken`** (FR7 adds zero import edges
+    — the assets are `.md`, the guard is a test importing existing modules); cap test
+    (`test_import_linter_ignore_cap` + `test_module_size_ceiling`) `== 26` + per-family `9/4/13`
+    + ceilings GREEN (6 passed).
+    **AC-8 ledger — surviving:** the post-split architecture now has committed visual evidence
+    (three canonical fenced-```mermaid `.md` diagrams of the doctor coordinator+validators, the
+    panel per-domain api modules, and the 23-feature package map) + a live introspection drift
+    lock that fails on any diagrammed-name/code-name divergence or a missing diagram file. The
+    `architecture.md` "Visual evidence" reference (Currently-no-assets → the committed diagrams
+    + regeneration law) is a CLOSURE/memory edit deferred to T-55-70 per §SPEC 8. **dead:** the
+    zero-assets state — `specs/assets/` did not exist and `architecture.md` recorded "Currently
+    no assets"; the post-decomposition shape had no committed UML and no drift lock.
 
 ## W6 — gates + ship (flat release: single ship gate)
 
