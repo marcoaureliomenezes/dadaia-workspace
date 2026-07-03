@@ -1,19 +1,15 @@
 ---
-release: v0.1.54
-phase: CLOSURE
+release: none
+phase: none
 ---
 
-# Active release: v0.1.54 — Import Boundaries
+# Active release: none
 
-Sequence position: **R6 of the operator-approved 12-release plan** (grilled
-2026-07-02); first release of the operator's R6→R8 continuation mandate
-(2026-07-03). Contracts green + CI-wired + the `workflows ↔ lifecycle` cycle
-broken, so all later structure (R7 decomposition, R8 verb governance, R9
-injection canon) lands under enforcement. Consumes `import-boundary-enforcement`
-+ `features-import-infrastructure-direct-debt` + `pid-probe-seam-consolidation`.
-The `panel.service → workflow_launcher_adapter` edge of the direct-debt entry
-was already consumed by v0.1.53 (launcher chain deleted) — marked
-consumed-elsewhere, not redone.
+No release is currently active. R6 of the operator's R6→R8 continuation
+mandate is complete: **v0.1.54 — Import Boundaries** is CLOSED and ARCHIVED
+at `specs/_archive/releases/v0.1.54/` (merged `aeaa3c66`, PR #97).
 
-Previous: **v0.1.53** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.53/`
-(merged `d3f46360`; closure `d48ef6db`).
+Next per the mandate: **R7 = architecture decomposition** (consumes
+`architecture-uml-decomposition`) — its definition sets this pointer.
+Open-bug debt for the R7 pick: `bugs-append-ignores-persisted-bind`,
+`backlog-new-stub-readme-lag-intents-schema`.

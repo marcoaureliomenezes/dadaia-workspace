@@ -410,7 +410,17 @@ includes `tests/`.
 
 ## W6 — closure (CLOSURE phase)
 
-- [ ] T-54-30 CLOSURE.md (Summary, Tasks, Validations, Drifts, Memory updates, Dispositions,
+- [x] T-54-30 DONE (closure branch chore/v0.1.54-closure): CLOSURE.md authored (14
+  Validations, 6 Drifts); memory truth updates — architecture.md (8 CI-enforced
+  contracts incl. the exact 6 pre-existing ids + kernel-tunables-is-a-leaf, cap 26 =
+  9/4/13, governed_catalog home, core/models types + lean port, public
+  build_pid_probe, AST-guarded core I/O, cli/anchors seam), quality-assurance.md
+  (R6 frozen-suite precedent; token_estimate 1250→1563), product-vision.md
+  (false "not in CI" limit deleted), dadaia-workflows.md + lifecycle-foundation.md
+  (catalog home); catalog+index regenerated (25 features); lint 28 OK/0 ERROR;
+  stale enforcement narratives retired (dea098bc: setup.cfg header + 2 pointers +
+  cache-hygiene docstring); candidates R6 row SHIPPED; dispositions DELIVERED ×3.
+  Original scope: CLOSURE.md (Summary, Tasks, Validations, Drifts, Memory updates, Dispositions,
   Backlog returns, Archive=MOVE — SPEC-DOC-006). MEMORY edits (CLOSURE phase): update
   `architecture.md` Enforcement-state (CI-wired contracts; new `lifecycle-no-workflows` +
   `features-no-cross-feature`; **cap "17 edges" → 26** with the three-family breakdown 9/4/13;
