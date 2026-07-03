@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 import typer
 
+from dadaia_workspace.cli.anchors import derive_cli_anchors
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.subject_registry import (
     BindStatus,
@@ -125,7 +126,7 @@ def _build(tree: dict[str, Path]) -> object:
         catalog_path=tree["catalog_path"],
         alias_map_path=tree["alias_map_path"],
         specs_dir=tree["specs_dir"],
-        cli_app=_fixture_app(),
+        cli_anchors=derive_cli_anchors(_fixture_app()),
     )
 
 
@@ -302,7 +303,7 @@ def test_absent_alias_map_tolerated(tmp_path: Path) -> None:
         catalog_path=catalog_path,
         alias_map_path=tmp_path / "missing-aliases.txt",
         specs_dir=tmp_path / "missing-specs",
-        cli_app=_fixture_app(),
+        cli_anchors=derive_cli_anchors(_fixture_app()),
     )
     # Code still resolves; an aliased synonym now HALTs (no alias map present).
     assert reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
@@ -332,7 +333,7 @@ def test_live_derivation_reflects_source_changes(tmp_path: Path) -> None:
             catalog_path=catalog_path,
             alias_map_path=alias_map_path,
             specs_dir=specs_dir,
-            cli_app=_fixture_app(),
+            cli_anchors=derive_cli_anchors(_fixture_app()),
         )
 
     # Step 1 — symbol present.

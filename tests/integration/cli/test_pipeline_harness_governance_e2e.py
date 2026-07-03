@@ -177,6 +177,9 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
     no CLI flag) makes a subsequent ``implementation`` run resolve PI for every step and
     record harness=pi in the snapshot. Proves the panel-persisted overlay actually drives
     execution — the same write path the codex/pi toggle uses (validate → atomic write)."""
+    from dadaia_workspace.core.models.workflow_execution import (
+        WorkflowModelPolicyOverlay,
+    )
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowExecutionPolicyResolver,
     )
@@ -184,9 +187,6 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
         render_put_workflow_model_policy,
     )
     from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
-    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-        WorkflowModelPolicyOverlay,
-    )
 
     workspace = _init_workspace(tmp_path)
     store = container.build_workflow_model_policy_store(workspace)

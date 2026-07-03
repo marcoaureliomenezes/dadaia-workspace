@@ -376,7 +376,7 @@ def test_build_workflow_policy_resolver_invalid_overlay_raises(tmp_path: Path) -
     _init_states(tmp_path)
     bad = tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
     bad.write_text("{ not valid json", encoding="utf-8")
-    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+    from dadaia_workspace.core.models.workflow_execution import (
         WorkflowModelPolicyStoreError,
     )
 

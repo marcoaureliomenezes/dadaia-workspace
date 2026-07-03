@@ -27,7 +27,7 @@ includes `tests/`.
 
 ## W1 — FR1 red-chain remediation
 
-- [-] T-54-10 Fix the 5 red chains (4 edges) → `features-no-infrastructure` +
+- [x] T-54-10 Fix the 5 red chains (4 edges) → `features-no-infrastructure` +
   `features-no-subprocess` GREEN. Checklist:
   - **(a) json_wmp_store — relocate types + lean port (architect A1):** move
     `WorkflowModelPolicyOverlay`, `WorkflowModelPolicyStoreError`, `DEFAULT_CONTEXT` from
@@ -54,6 +54,31 @@ includes `tests/`.
   - AC-8 ledger (surviving: policy resolution, cli-subject anchors via injected frozenset,
     panel workflow-policy view; dead: none — pure rewire). NO `specs/backlog` staged.
   Owner: software-engineer.
+  - **DONE (software-engineer):** reservation `2c304dbb` (`chore(tasks): start T-54-10`).
+    Mechanism (a): `WorkflowModelPolicyOverlay`/`WorkflowModelPolicyStoreError`/
+    `DEFAULT_CONTEXT` (+ `_SCHEMA_VERSION`) relocated to `core/models/workflow_execution.py`
+    (no re-export shim; store imports them from core); lean port
+    `core/protocols/workflow_model_policy_store.py` (`load`/`parse`/`save`);
+    `container.build_workflow_model_policy_store` returns the port and is injected into
+    `policy_doctor` (default construction removed) + `panel.views.workflow_policy`;
+    `policy_resolver` imports the types from `core` (no port needed). Mechanism (b):
+    `_derive_cli_anchors`/`_walk_typer` moved to `cli/anchors.py`; `build_registry` takes a
+    pre-derived `cli_anchors: frozenset[str]`; threaded through `run_backlog_doctor` +
+    `ContextSelector` (constructor attr); 6 `build_registry` sites + 2 `run_backlog_doctor`
+    sites updated at composition boundaries. Gates: `lint-imports --no-cache` → **6 kept,
+    0 broken** (`features-no-infrastructure` + `features-no-subprocess` now KEPT);
+    `ruff format --check` + `ruff check --no-cache` + `mypy --strict` all exit 0;
+    full suite `4322 passed, 17 skipped` (exit 0). Per-chain greps (incl. `tests/`) clean:
+    subject_registry has zero runtime `cli.main` import; no module imports the moved types
+    from `infrastructure`. **AC-8 ledger** — surviving: policy resolution (WMP doctor +
+    resolver tests green), cli-subject anchor derivation via injected frozenset (82 real
+    anchors; `test_cli_anchor_resolves_command_id` green), panel workflow-policy view
+    (panel route tests green); dead: none — pure rewire. Deviation: `core/models/
+    workflow_execution.py` already existed (SPEC said "NEW") — added the types to it
+    (its exact semantic home); the `cli_anchors REPLACES cli_app` decision drops the
+    now-unused `TYPE_CHECKING typer` import from `subject_registry` (the SPEC's "keeps only
+    a TYPE_CHECKING typer import" clause is unsatisfiable alongside moving `_derive_cli_anchors`
+    out under the feature-layering law). No `specs/backlog/**` staged.
 
 ## W2 — FR2 + FR3 cycle break + cross-feature contract
 

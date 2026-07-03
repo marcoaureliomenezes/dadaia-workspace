@@ -200,8 +200,13 @@ class _FileRef:
 class ContextSelector:
     """Resolve named dynamic inputs into bounded, auditable content."""
 
-    def __init__(self, context: SpecContext) -> None:
+    def __init__(self, context: SpecContext, *, cli_anchors: frozenset[str] = frozenset()) -> None:
         self._ctx = context
+        # Pre-derived cli-kind anchor set, threaded in from the composition boundary
+        # (FR1b) — only :meth:`sel_backlog_index` uses it (to build the subject registry);
+        # this feature never imports ``cli.main``. Empty when the selector never resolves
+        # ``backlog_index`` (the default).
+        self._cli_anchors = cli_anchors
 
     @property
     def spec_context(self) -> SpecContext:
@@ -430,6 +435,7 @@ class ContextSelector:
             catalog_path=self._catalog_path(),
             alias_map_path=self._alias_map_path(),
             specs_dir=self._ctx.specs_dir,
+            cli_anchors=self._cli_anchors,
         )
 
         blocks: list[str] = []

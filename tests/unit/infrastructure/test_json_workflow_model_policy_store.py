@@ -14,10 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    JsonWorkflowModelPolicyStore,
+from dadaia_workspace.core.models.workflow_execution import (
     WorkflowModelPolicyOverlay,
     WorkflowModelPolicyStoreError,
+)
+from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
+    JsonWorkflowModelPolicyStore,
 )
 
 

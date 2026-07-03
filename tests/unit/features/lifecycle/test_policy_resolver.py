@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import pytest
 
-from dadaia_workspace.core.models.workflow_execution import PolicySource
+from dadaia_workspace.core.models.workflow_execution import (
+    PolicySource,
+    WorkflowModelPolicyOverlay,
+)
 from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     StepOverride,
@@ -20,7 +23,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
 )
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
 )
 from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 

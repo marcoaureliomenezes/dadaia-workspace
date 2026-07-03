@@ -103,6 +103,7 @@ def _registry(tmp_path: Path) -> Registry:
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=tmp_path / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs,
+        cli_anchors=frozenset(),
     )
 
 

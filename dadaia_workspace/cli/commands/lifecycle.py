@@ -1276,13 +1276,15 @@ def workflow_doctor(
     Layer-2 residue. An invalid overlay state file is reported as an actionable error and
     never crashes. Exit 1 if any ERROR finding is present.
     """
+    from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.policy_doctor import (
         Severity,
         run_policy_doctor,
     )
 
     workspace_root = resolve_workspace_root()
-    findings = run_policy_doctor(workspace_root=workspace_root)
+    store = container.build_workflow_model_policy_store(workspace_root)
+    findings = run_policy_doctor(store=store)
     if json_output:
         _emit_json({"findings": [f.to_dict() for f in findings]})
     else:

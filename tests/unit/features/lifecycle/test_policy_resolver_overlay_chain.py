@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import pytest
 
-from dadaia_workspace.core.models.workflow_execution import PolicySource
+from dadaia_workspace.core.models.workflow_execution import (
+    PolicySource,
+    WorkflowModelPolicyOverlay,
+)
 from dadaia_workspace.features.lifecycle.policy_resolver import (
     PolicyResolutionError,
     WorkflowExecutionPolicyResolver,
@@ -21,7 +24,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
 from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
-    WorkflowModelPolicyOverlay,
 )
 
 _WORKFLOW = "implementation"

@@ -173,6 +173,7 @@ def backlog_subjects_cmd(
     binds to a canonical anchor (or UNRESOLVED/AMBIGUOUS + an alias-map suggestion) and exits
     non-zero on a HALT, so the backfill author sees real anchors before authoring intents.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.preview import list_anchors, resolve_one
     from dadaia_workspace.features.backlog.subject_registry import BindStatus, build_registry
 
@@ -188,6 +189,7 @@ def backlog_subjects_cmd(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=target,
+        cli_anchors=derive_cli_anchors(),
     )
 
     if resolve is not None:
@@ -235,6 +237,7 @@ def backlog_doctor_cmd(
     rejects a hand-written divergent twin even though ``specs/backlog/`` is gitignored +
     ADDITIVE. ``--explain`` additionally prints how each item's subjects resolved.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
 
     target = _resolve_specs_dir(specs_dir)
@@ -254,6 +257,7 @@ def backlog_doctor_cmd(
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         archive_root=archive_root,
+        cli_anchors=derive_cli_anchors(),
     )
 
     errors = [f for f in findings if f.severity is Severity.ERROR]
@@ -272,6 +276,7 @@ def backlog_doctor_cmd(
 
 def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
     """Print how each backlog item's subjects bind to canonical anchors (read-only)."""
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.preview import (
         bound_anchor_changes,
         load_backlog_items,
@@ -283,6 +288,7 @@ def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_p
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         specs_dir=specs_dir,
+        cli_anchors=derive_cli_anchors(),
     )
     for item in load_backlog_items(specs_dir / "backlog"):
         anchor_changes, unresolved = bound_anchor_changes(item, registry)

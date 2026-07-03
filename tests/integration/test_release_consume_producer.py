@@ -238,6 +238,7 @@ def test_define_close_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=workspace / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         archive_root=archive,
+        cli_anchors=frozenset(),
     )
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert stale == [], f"unexpected BL-STALE: {[f.to_dict() for f in stale]}"

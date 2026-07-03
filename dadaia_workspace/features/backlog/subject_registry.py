@@ -31,12 +31,8 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.models.backlog import SubjectKind
-
-if TYPE_CHECKING:
-    import typer
 
 __all__ = [
     "Anchor",
@@ -168,34 +164,12 @@ def _derive_code_anchors(source_root: Path) -> set[str]:
     return anchors
 
 
-# ── cli anchors (Typer app tree walk) ───────────────────────────────────────────
-
-
-def _derive_cli_anchors(app: typer.Typer | None) -> set[str]:
-    """Walk the Typer app tree for ``<group> <verb>`` (and nested) command ids.
-
-    A registered command's id is the space-joined path of group names + the command name,
-    e.g. ``backlog doctor``. Top-level commands (no group) are their own bare name.
-    """
-    anchors: set[str] = set()
-    if app is None:
-        return anchors
-    _walk_typer(app, (), anchors, depth=0)
-    return anchors
-
-
-def _walk_typer(app: typer.Typer, prefix: tuple[str, ...], out: set[str], *, depth: int) -> None:
-    if depth > 16:  # defensive recursion guard
-        return
-    for info in app.registered_commands:
-        name = info.name or (info.callback.__name__ if info.callback else None)
-        if name:
-            out.add(" ".join((*prefix, name)))
-    for group in app.registered_groups:
-        sub = group.typer_instance
-        if sub is None or group.name is None:
-            continue
-        _walk_typer(sub, (*prefix, group.name), out, depth=depth + 1)
+# ── cli anchors ──────────────────────────────────────────────────────────────────
+#
+# The ``cli``-kind anchor set (``<group> <verb>`` command ids) is derived at each
+# composition boundary by :func:`dadaia_workspace.cli.anchors.derive_cli_anchors` and threaded
+# in as ``cli_anchors`` — the Typer-tree walk lives in ``cli/`` so this feature never imports
+# ``cli.main`` (FR1b: the ``subject_registry -> cli.main`` red chain is removed).
 
 
 # ── catalog anchors ──────────────────────────────────────────────────────────────
@@ -378,21 +352,20 @@ def build_registry(
     catalog_path: Path,
     alias_map_path: Path,
     specs_dir: Path,
-    cli_app: typer.Typer | None = None,
+    cli_anchors: frozenset[str],
 ) -> Registry:
     """Build the canonical-subject registry from live truth (SPEC §3.2).
 
-    All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_app`` defaults to
-    the live ``dadaia`` Typer app; tests pass a small fixture app. Every call recomputes the
-    anchor set, so a symbol added/removed in source changes resolution with no stored file
-    (acceptance §3.7.5).
+    All roots are **injected** — never ``os.getcwd()`` (SPEC §3.8 #6). ``cli_anchors`` is the
+    pre-derived ``cli``-kind anchor set (``<group> <verb>`` command ids), threaded in from the
+    composition boundary via :func:`dadaia_workspace.cli.anchors.derive_cli_anchors`; this
+    feature never imports ``cli.main`` (FR1b). Every call recomputes the auto-derived anchor
+    kinds (code/catalog/doc/invariant), so a symbol added/removed in source changes resolution
+    with no stored file (acceptance §3.7.5).
     """
-    if cli_app is None:
-        from dadaia_workspace.cli.main import app as cli_app  # local import: avoid cycle
-
     anchors: dict[SubjectKind, set[str]] = {
         SubjectKind.CODE: _derive_code_anchors(source_root),
-        SubjectKind.CLI: _derive_cli_anchors(cli_app),
+        SubjectKind.CLI: set(cli_anchors),
         SubjectKind.CATALOG: _derive_catalog_anchors(catalog_path),
         SubjectKind.DOC: _derive_doc_anchors(specs_dir),
         SubjectKind.INVARIANT: _derive_invariant_anchors(specs_dir),

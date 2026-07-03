@@ -29,15 +29,15 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
+from dadaia_workspace.core.models.workflow_execution import (
+    WorkflowModelPolicyStoreError,
+)
 from dadaia_workspace.features.lifecycle.pipeline import (
     LifecyclePipeline,
     apply_resolved_policy,
     implementation_ladder,
 )
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-    WorkflowModelPolicyStoreError,
-)
 
 
 def _init_workspace(path: Path) -> Path:

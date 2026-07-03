@@ -55,6 +55,7 @@ def _run(specs: Path, src: Path) -> list:
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=specs / "no-aliases.txt",
         archive_root=specs / "_archive",
+        cli_anchors=frozenset(),
     )
 
 

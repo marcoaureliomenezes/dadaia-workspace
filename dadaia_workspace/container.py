@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
+    from dadaia_workspace.core.models.workflow_execution import (
+        WorkflowModelPolicyOverlay,
+        WorkflowPolicySnapshot,
+    )
+    from dadaia_workspace.core.protocols.workflow_model_policy_store import (
+        WorkflowModelPolicyStorePort,
+    )
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
@@ -29,10 +35,6 @@ if TYPE_CHECKING:
     )
     from dadaia_workspace.infrastructure.json_local_model_profile_store import (
         JsonLocalModelProfileStore,
-    )
-    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-        JsonWorkflowModelPolicyStore,
-        WorkflowModelPolicyOverlay,
     )
 
 from dadaia_workspace.core.exceptions import (
@@ -750,12 +752,15 @@ def build_fragment_loader() -> "FragmentLoader":
     return FragmentLoader()
 
 
-def build_workflow_model_policy_store(workspace_root: Path) -> "JsonWorkflowModelPolicyStore":
+def build_workflow_model_policy_store(workspace_root: Path) -> "WorkflowModelPolicyStorePort":
     """Compose the workflow-model-policy overlay store (T-28-A-08).
 
-    Reads/writes ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and
-    a ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults);
-    a present-but-invalid file raises (missing != invalid).
+    Returns the store typed as the :class:`WorkflowModelPolicyStorePort` seam (FR1a): the
+    consumers (``policy_doctor``, ``panel.views.workflow_policy``) depend on the port in
+    ``core``, never the concrete JSON adapter. Reads/writes
+    ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and a
+    ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults); a
+    present-but-invalid file raises (missing != invalid).
     """
     from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
         JsonWorkflowModelPolicyStore,
@@ -1043,6 +1048,7 @@ def build_backlog_definition_workflow(
     backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
     Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.subject_registry import build_registry
     from dadaia_workspace.features.lifecycle.context_selector import (
         ContextSelector,
@@ -1063,14 +1069,19 @@ def build_backlog_definition_workflow(
         specs_dir = workspace_root / "specs"
         source_root = workspace_root
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    # cli-kind anchors derived at the composition boundary (FR1b) — the selector's
+    # ``backlog_index`` resolution and the ``subject_bind`` registry both bind cli subjects.
+    cli_anchors = derive_cli_anchors()
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir),
+        cli_anchors=cli_anchors,
     )
     registry = build_registry(
         source_root=source_root,
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs_dir,
+        cli_anchors=cli_anchors,
     )
     return BacklogDefinitionWorkflow(
         context=context,
@@ -1131,6 +1142,7 @@ def build_backlog_removal_lifecycle(
     caller can write the ``consumed_backlog`` ledger at release-definition and apply the
     residual-aware removal hook at closure. All roots are derived from ``workspace_root``.
     """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.removal_lifecycle import BacklogRemovalLifecycle
     from dadaia_workspace.features.backlog.subject_registry import build_registry
 
@@ -1141,6 +1153,7 @@ def build_backlog_removal_lifecycle(
         catalog_path=specs_dir / "memory" / "product" / "catalog.json",
         alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
         specs_dir=specs_dir,
+        cli_anchors=derive_cli_anchors(),
     )
     return BacklogRemovalLifecycle(
         backlog_dir=specs_dir / "backlog",
