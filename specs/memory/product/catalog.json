@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T17:41:58Z",
+  "generated_at": "2026-07-03T23:07:29Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -16,7 +16,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 1075,
+      "token_estimate": 1140,
       "depends_on": [
         "public-asset-distribution"
       ]
@@ -304,7 +304,7 @@
         "session",
         "locking"
       ],
-      "token_estimate": 3325,
+      "token_estimate": 3560,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "public-asset-distribution",
@@ -538,7 +538,7 @@
         "alpha-rc-model",
         "backlog-ownership"
       ],
-      "token_estimate": 1575,
+      "token_estimate": 1720,
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",
@@ -585,7 +585,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 2150,
+      "token_estimate": 2320,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "tech-stack",

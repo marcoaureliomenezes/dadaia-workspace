@@ -18,9 +18,9 @@ tags:
 - doctor
 - validation
 - sdd
-token_estimate: 2150
-last_updated: '2026-07-02'
-release_origin: v0.1.50
+token_estimate: 2320
+last_updated: '2026-07-03'
+release_origin: v0.1.55
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -34,6 +34,8 @@ Validates structural invariants of the `specs/` directory under the SDD release-
   * **SPECS-VERSION**: WARN when the tree's `specs_pattern_version` is below the library's canonical one — recommends `dadaia specs upgrade`.
   * **TREE-1..7 + TREE-5M**: canonical `specs/` tree v2 shape. TREE-3 requires `specs/memory/quality-assurance.md` at the top level. The `specs/memory/AGENTS.md` check is **TREE-5M**. CAT-1 and SPEC-DOC-002 use `rglob` for nested atoms.
   * **LINT-1 + CAT-1**: memory atoms (lint script) + `catalog.json` sync.
+
+**Module structure (v0.1.55).** `dadaia specs doctor` is implemented as a **thin `SpecsDoctor` coordinator** (`features/specs/doctor.py`, 224 lines) that owns `check()`/`fix()` ORDER and delegates the validation LOGIC to six single-responsibility sibling validator classes — `doctor_structural` (TREE-*, required dirs, agents.md, `fix_tree4`), `doctor_memory` (memory files/atomicity/image-links/mermaid, LINT-1, CAT-1, SPEC-DOC-008 — holds the lazy `infrastructure.subprocess_runner` import), `doctor_release` (ACTIVE.md, active-release artifacts, plan-line limit, phase markers, uniqueness/naming/semver), `doctor_closure_audit` (archive closures, `fix_archive_dir`, audit disposition 036/038, no-orphan-specs), `doctor_governance` (bug-status canon, bugs-JSONL invariant 033, backlog schema 031/035, consumed-backlog disposition), and `doctor_coherence` (constitution refs 028, no-runtime-enum 037, orchestration registry D-OC-1, specs-pattern-version, lease/session coherence 029 — holds the `spec_context.{lease,session_identity}` import) — over two shared leaf modules `doctor_types.py` (`Severity`/`SpecsDoctorIssue`/`_MemoryMdSummary` + the `PidProbe` leaf alias) and `doctor_common.py` (five cross-validator pure helpers). `check()` invokes the validators' public methods in the exact original interleaved order (pinned by a deterministic golden — clock frozen + `<SPECS>`-normalized paths); `fix()` dispatches by issue code (`TREE-4 → structural.fix_tree4`, `SPEC-DOC-034 → closure_audit.fix_archive_dir`). Decomposed in v0.1.55, golden byte-identical; the code inventory below is unchanged. A `test_module_size_ceiling` ratchet caps each `doctor*.py` at 700 lines.
 
 ```mermaid
 flowchart TB
@@ -83,7 +85,7 @@ Code| What it detects| Severity| Notes
 LINT-1| Any `.md` atom in `specs/memory/` or `specs/memory/product/` fails `lint-memory-atoms.py` validation| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN. Heading allowlist = curated groups ∪ the optional workspace file `specs/memory/.heading-allowlist` (v0.1.49: one exact heading per line, `#` comments ignored — consumers extend without editing the lib-originated script; the file is MEMORY-class, so edit in DEFINITION/CLOSURE)
 SPEC-DOC-002| Check #2: memory files exist as `.md`| ERROR| Now requires `.md`, not `.html`; accepts `##` headings per the allowlist
 SPEC-DOC-002L| Stray `.html` present under `specs/memory/`| ERROR| Those files must be deleted; D-4 forbids committed HTML in the memory folder
-SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (`features/specs/doctor.py` check #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008
+SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (LOGIC in the `doctor_memory` validator; coordinator check-order position #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008
 
 ### TREE-1..7 + TREE-5M invariants (canonical tree v2, post v0.2.1)
 

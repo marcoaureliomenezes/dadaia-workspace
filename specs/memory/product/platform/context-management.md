@@ -28,9 +28,9 @@ tags:
 - lifecycle
 - session
 - locking
-token_estimate: 3325
+token_estimate: 3560
 last_updated: '2026-07-03'
-release_origin: v0.1.53
+release_origin: v0.1.55
 ---
 
 CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bugs append` (event-sourced bug intake, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
@@ -76,6 +76,8 @@ A session obtains a binding via:
 ```
 dadaia context bind <name> [--mode read|implementation|review] [--release <id>]
 # → persists {context, mode, release, pid, session_id (sess_<hex8>)} in the session record
+# → (v0.1.55) ALSO persists a session record keyed by the harness-native session id
+#   (CODEX_SESSION_ID / CLAUDE_CODE_SESSION_ID) so a non-descendant CLI call resolves the bind
 # → refreshes the incumbent pointer (sessions/runtime/<ctx>.ptr)
 # → writes the bind-epoch marker .dadaia/states/bind_epoch/<ctx> (injection trigger)
 # --mode is optional (default read); --release is required for implementation/review
@@ -118,9 +120,23 @@ Per-runtime hook event registration (which events/matchers each harness wires):
 
 **specs_dir resolution in a bound shell (CLI):** `core/specs_resolver.py` resolves the
 `specs_dir` of commands like `dadaia specs doctor`/`bugs`/`backlog` in the order env →
-**persisted bind of an attributable/live session** (the context's incumbent, attributed
+**harness-native session id when `DADAIA_SESSION_ID` is absent (v0.1.55, live-record-guarded)**
+→ **persisted bind of an attributable/live session** (the context's incumbent, attributed
 by ancestry-chain MEMBERSHIP) → cwd — a bound workspace shell resolves without the
-`--specs-dir` flag. Since v0.1.50 every specs-dir-taking CLI command consumes the ONE
+`--specs-dir` flag. **Harness-native channel (v0.1.55, `bugs-append-ignores-persisted-bind`):**
+a codex `dadaia bugs append` is not a process-descendant of the `dadaia context bind`
+session, so its ancestry chain is disjoint from the bind-epoch marker and the
+ancestry-membership path misses (fell through to `BadParameter` pre-fix). To close that hole
+without weakening concurrent multi-session safety, `bind` persists a session record keyed by
+the harness-native session id (`CODEX_SESSION_ID`/`CLAUDE_CODE_SESSION_ID`, resolved via the
+`core/session_env.py` single-source env-name list — no duplicated literal), and
+`_session_context` resolves via that id — AHEAD of the ancestry path — **only when
+`DADAIA_SESSION_ID` is absent**. A **staleness guard is non-negotiable**: a harness-id match
+resolves ONLY when its session record is live (`core.lock_liveness.is_stale` over
+`last_seen_at`/`ttl_seconds`; the bind pid is dead by construction, so pid-probe is `None`);
+a stale or inherited id NEVER resolves to a foreign bound context — it falls through to an
+actionable `BadParameter` (pointing at `--specs-dir`/`--print-env`), never a blind
+first-ALIVE guess. Since v0.1.50 every specs-dir-taking CLI command consumes the ONE
 shared seam `cli/_specs_resolution.resolve_specs_dir_for_cli` (which threads the
 invoking process's full `ancestry_pids` into the resolver — a deep-ancestor bind marker
 attributes correctly; the omission class that produced

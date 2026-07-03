@@ -19,9 +19,9 @@ tags:
   - bugs
   - alpha-rc-model
   - backlog-ownership
-token_estimate: 1575
+token_estimate: 1720
 last_updated: '2026-07-03'
-release_origin: v0.1.53
+release_origin: v0.1.55
 ---
 
 Skill: `dadaia-release-definition` · Rules: `release-governance.md`, `backlog-ownership.md`, `bug-registration-guardrail.md` (always-on)
@@ -74,7 +74,18 @@ The backlog is a deduplicated, conflict-free, non-stale SET, mechanically enforc
 - **Item schema:** frontmatter `intents[]`, each intent `Subject{kind, ref} →
   change`; `kind ∈ {code, api, cli, panel, doc, invariant, catalog}`; typed refs,
   never free text (`code` refs are module-relative `path#symbol`; operator-local /
-  private-repo paths rejected).
+  private-repo paths rejected). **Idea-status BL-SCHEMA gate (v0.1.55):** typed
+  `intents[]` are **status-gated** — an entry at `status: idea` (an unbound brainstorm)
+  is EXEMPT from both the "no `intents[]` declared" and the unresolved-subject
+  BL-SCHEMA errors; those become mandatory the moment the item matures to `candidate`
+  and beyond. This is a scoped semantics refinement, **not a blanket exemption**: a
+  malformed `intents:` frontmatter still errors at any status. `dadaia backlog new`
+  scaffolds a `status: idea` stub (with a `description:` field + a **commented**
+  `intents[]` teaching template — no live dummy subject) that is `backlog doctor`-clean
+  out of the box, even in a fresh scaffold without `catalog.json`; the projected
+  `public/scaffold/backlog/README.md` documents idea-stage freedom, the `intents[]`
+  requirement at `candidate`+, the five subject kinds, the `dadaia backlog subjects`
+  pointer, and the non-Python-repo anchor note (code anchors are Python-derived only).
 - **Canonical subject registry** (`subject_registry.py`): auto-derived from the live
   tree on every run (never a stored file) — kinds `code`/`cli`/`catalog`/`doc`/
   `invariant`; `panel`/`api` bind only through the operator's alias map
