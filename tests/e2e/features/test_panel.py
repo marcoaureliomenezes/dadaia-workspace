@@ -201,7 +201,7 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
         )
 
         # --- /api/panel-status (credential-less — no-auth contract) ---
-        # Response shape: {"groups": [...]}  (see views/api.py contract docstring)
+        # Response shape: {"groups": [...]}  (see views/api_servers.py contract docstring)
         with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
@@ -212,7 +212,7 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert isinstance(servers_data["groups"], list), "'groups' must be a list"
 
         # --- /api/contexts (credential-less — no-auth contract) ---
-        # Response shape: {"contexts": [...]}  (see views/api.py contract docstring)
+        # Response shape: {"contexts": [...]}  (see views/api_contexts.py contract docstring)
         with _get(f"http://127.0.0.1:{port}/api/contexts") as resp:
             assert resp.status == 200
             ct = resp.headers.get("Content-Type", "")
