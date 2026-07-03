@@ -349,7 +349,21 @@ includes `tests/`.
 
 ## W5 — FR4 CI wiring + gates + ship (flat release: single ship gate)
 
-- [-] T-54-20 FR4 CI wiring on the green tree, then ship. Checklist:
+- [x] T-54-20 DONE. FR4 `ff883f99` (ci.yml lint-imports step; preflight 5th Check
+  fail-closed; wiring contract test; AC-7(d) captured). Archival `d1f7e988` (single
+  atomic: 3 R100 renames → `_archive/v0.1.54/consumed-backlog/` + ledger + candidates
+  prune; backlog doctor clean; invariants i+ii verified). QA ship gate: **APPROVE
+  10/10** (handoff 2026-07-03T171013Z-qa-engineer-v0154-ship-gate, validated):
+  lint-imports 8 kept/0 broken; cap 26 = 9/4/13 self-counted; RED ancestry genuine
+  ×2; 4 sabotages zero-residue; golden byte-identical (101 KB fixture); **FROZEN
+  SUITE ADJUDICATED HONORED** (2 files zero-diff, test_lease_main_probe zero-diff,
+  test_lock_steal monkeypatch-target+docstring-only 9 lines, AC-4 greps all zero,
+  positive live-probe test, 50-test no-steal suite green); FR4 collateral
+  strengthens; 5 deviations = sound root-cause fixes; unpiped 4333 passed/17
+  skipped exit 0 + ruff/mypy/public doctor/specs doctor 0 errors; no W1-W4 commit
+  staged backlog; bug-ledger commits legitimately ADDITIVE. Routed to W6 closure:
+  architecture.md "17 edges"→26, candidates R6 row → SHIPPED. Original checklist:
+  FR4 CI wiring on the green tree, then ship:
   - **FR4 (first — on the already-green tree, architect A5/A10):** add a step to the existing
     `Lint (ruff)` job in `.github/workflows/ci.yml` (l.62): `poetry run lint-imports --config
     setup.cfg --no-cache` (no extra install). Add a `lint-imports --no-cache` check to
