@@ -50,6 +50,23 @@ class CheckResult:
 _RUFF_PATHS: tuple[str, ...] = ("dadaia_workspace/", "tests/")
 _MYPY_PATHS: tuple[str, ...] = ("dadaia_workspace/",)
 
+# The import-linter (``lint-imports``) config lives in setup.cfg. ``--no-cache`` keeps
+# ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law; see
+# ``tests/contract/test_import_linter_cache_hygiene.py``). This mirrors the CI
+# 'Lint (ruff)' job step ``lint-imports --config setup.cfg --no-cache``.
+_LINT_IMPORTS_CONFIG: str = "setup.cfg"
+
+# Actionable hints for REQUIRED tools that must FAIL CLOSED when absent (architect A10 /
+# FR4). A missing required tool is a hard error naming the binary AND the poetry group
+# that provides it — never a silent skip nor a cryptic ``poetry run`` command-not-found.
+_REQUIRED_TOOL_HINT: dict[str, str] = {
+    "lint-imports": (
+        "lint-imports (import-linter) is not installed in the resolved environment. "
+        "It enforces the import-boundary contracts (setup.cfg) in the CI 'Lint (ruff)' "
+        "job and in `dadaia ci preflight`. Install it with: poetry install --with dev"
+    ),
+}
+
 
 def resolve_mypy_cache_dir(start: Path | None = None) -> Path:
     """Resolve a writable mypy cache dir OUTSIDE any repo working tree.
@@ -86,11 +103,29 @@ def _is_executable_file(path: Path) -> bool:
         return False
 
 
+def _fail_closed_argv(python_executable: str, hint: str) -> tuple[str, ...]:
+    """Build a self-contained argv that fails closed with an actionable message.
+
+    A REQUIRED tool (``_resolve_tool(..., require=True)``) that is absent from every
+    resolved tree must NOT degrade to a ``("poetry", "run", name)`` fallback — that
+    emits a cryptic ``command not found`` and reads like an optional skip. Instead we
+    return a runnable command (the resolved interpreter + ``-c``) that writes ``hint``
+    to stderr and exits non-zero, so the preflight/CI check surfaces the missing binary
+    and the poetry group that provides it. Architect A10 / FR4 fail-closed posture.
+    """
+    return (
+        os.path.abspath(python_executable),
+        "-c",
+        f"import sys; sys.stderr.write({hint!r} + chr(10)); raise SystemExit(1)",
+    )
+
+
 def _resolve_tool(
     name: str,
     *,
     python_executable: str | None = None,
     dadaia_bin: str | None = None,
+    require: bool = False,
 ) -> tuple[str, ...]:
     """Resolve the argv prefix that invokes tool ``name`` (bug B2 fix).
 
@@ -102,9 +137,13 @@ def _resolve_tool(
     2. **DADAIA_BIN-derived bin dir** — ``Path(DADAIA_BIN).parent / name``. The
        pre-push hook exports ``DADAIA_BIN`` pointing at the resolved ``dadaia``
        executable; its sibling tools share the same environment.
-    3. **poetry fallback** — ``("poetry", "run", name)``. Used only when the tool
-       is absent from both trees; the runner then fails closed at execution time
-       (127 + "command not found") if poetry too is missing.
+    3. **absent from both trees** — depends on ``require``:
+       - ``require=False`` (default, ruff/mypy/pytest): **poetry fallback**
+         ``("poetry", "run", name)``; the runner then fails closed at execution time
+         (127 + "command not found") if poetry too is missing.
+       - ``require=True`` (lint-imports / FR4): **fail closed** via
+         :func:`_fail_closed_argv` — a hard, actionable error naming the missing
+         binary and the poetry group (architect A10), never a silent skip.
 
     ``python_executable`` / ``dadaia_bin`` are injectable for testing; in
     production they default to ``sys.executable`` and ``os.environ["DADAIA_BIN"]``.
@@ -124,6 +163,14 @@ def _resolve_tool(
         dadaia_sibling = Path(os.path.abspath(bin_ptr)).parent / name
         if _is_executable_file(dadaia_sibling):
             return (str(dadaia_sibling),)
+
+    if require:
+        hint = _REQUIRED_TOOL_HINT.get(
+            name,
+            f"{name} is not installed in the resolved environment. "
+            "Install it with: poetry install --with dev",
+        )
+        return _fail_closed_argv(py, hint)
 
     return ("poetry", "run", name)
 
@@ -155,6 +202,34 @@ def _lint_type_checks(
             (*mypy, "--strict", "--cache-dir", str(mypy_cache), *_MYPY_PATHS),
         ),
     )
+
+
+def _lint_imports_check(
+    *,
+    python_executable: str | None = None,
+    dadaia_bin: str | None = None,
+) -> Check:
+    """Build the import-linter check enforcing the setup.cfg import-boundary contracts (FR4).
+
+    Mirrors the CI 'Lint (ruff)' job step ``lint-imports --config setup.cfg --no-cache``:
+    ``--config setup.cfg`` selects the contract set; ``--no-cache`` keeps
+    ``.import_linter_cache/`` out of the repo tree (repo-cleanliness law;
+    ``test_import_linter_cache_hygiene.py``). The executable is resolved via the shared
+    ``_resolve_tool`` seam with ``require=True`` — a missing ``lint-imports`` binary FAILS
+    CLOSED with an actionable message (architect A10), never a silent skip. When the tool
+    is absent, ``_resolve_tool`` returns the self-contained fail-closed command (len > 1),
+    so the contract flags are appended ONLY to a truly-resolved single-element prefix.
+    """
+    prefix = _resolve_tool(
+        "lint-imports",
+        python_executable=python_executable,
+        dadaia_bin=dadaia_bin,
+        require=True,
+    )
+    if len(prefix) == 1:
+        return Check("lint-imports", (*prefix, "--config", _LINT_IMPORTS_CONFIG, "--no-cache"))
+    # Fail-closed: ``prefix`` is already the actionable-error command (architect A10).
+    return Check("lint-imports", prefix)
 
 
 def _pytest_check(
@@ -191,8 +266,10 @@ def checks_for(
     ``_resolve_tool``.
     """
     lint = _lint_type_checks(python_executable=python_executable, dadaia_bin=dadaia_bin)
+    lint_imports = _lint_imports_check(python_executable=python_executable, dadaia_bin=dadaia_bin)
     pytest_check = _pytest_check(quick, python_executable=python_executable, dadaia_bin=dadaia_bin)
-    return (*lint, pytest_check)
+    # Import-boundary contracts run with the other lint checks, before the slow pytest step.
+    return (*lint, lint_imports, pytest_check)
 
 
 def subprocess_runner(cwd: Path) -> Runner:
