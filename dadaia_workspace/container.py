@@ -60,23 +60,27 @@ from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportW
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
-from dadaia_workspace.features.panel.views.api import (
-    delete_report_file,
-    mark_report_important,
-    render_api_academy,
+from dadaia_workspace.features.panel.views.api_academy import render_api_academy
+from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agents_canonical,
-    render_api_contexts,
-    render_api_dadaia_workflow_detail,
-    render_api_dadaia_workflows_list,
+)
+from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
+from dadaia_workspace.features.panel.views.api_health import render_health
+from dadaia_workspace.features.panel.views.api_reports import (
+    delete_report_file,
+    mark_report_important,
     render_api_reports,
-    render_api_servers,
-    render_api_sessions,
-    render_api_workflow_detail,
-    render_api_workflows_list,
-    render_health,
     serve_report_file,
     unmark_report_important,
+)
+from dadaia_workspace.features.panel.views.api_servers import render_api_servers
+from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
+from dadaia_workspace.features.panel.views.api_workflows import (
+    render_api_dadaia_workflow_detail,
+    render_api_dadaia_workflows_list,
+    render_api_workflow_detail,
+    render_api_workflows_list,
 )
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory

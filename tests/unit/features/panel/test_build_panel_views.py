@@ -11,7 +11,8 @@ from pathlib import Path
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_contexts, render_api_servers
+from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
+from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static

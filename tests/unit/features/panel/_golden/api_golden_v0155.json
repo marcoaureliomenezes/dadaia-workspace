@@ -36,7 +36,7 @@
     "status": 400
   },
   "api_contexts": {
-    "body": "{\"contexts\": [{\"slug\": \"dadaia-workspace\", \"name\": \"dadaia-workspace\", \"repo_path\": \"/tmp/pytest-of-marco/pytest-256/test_api_routes_are_byte_ident0/repos/dadaia-workspace\", \"branch\": \"main\", \"status\": \"alive\"}]}",
+    "body": "{\"contexts\": [{\"slug\": \"dadaia-workspace\", \"name\": \"dadaia-workspace\", \"repo_path\": \"<WS>/repos/dadaia-workspace\", \"branch\": \"main\", \"status\": \"alive\"}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "contexts",
     "status": 200

@@ -106,7 +106,7 @@ class _FixtureTelemetry:
 def _build_server(token: str, telemetry: _FixtureTelemetry) -> ThreadingHTTPServer:
     from dadaia_workspace.features.panel.handler import make_handler_class
     from dadaia_workspace.features.panel.service import PanelService
-    from dadaia_workspace.features.panel.views.api import render_api_sessions
+    from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
 
     class _FakeRegistry:
         def list_entries(self, project: Any = None, include_stale: bool = True) -> list[Any]:

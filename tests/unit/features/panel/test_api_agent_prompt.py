@@ -30,7 +30,7 @@ from dadaia_workspace.features.agents.reader import (
     _strip_frontmatter,
     get_prompt,
 )
-from dadaia_workspace.features.panel.views.api import render_api_agent_prompt
+from dadaia_workspace.features.panel.views.api_agents import render_api_agent_prompt
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers

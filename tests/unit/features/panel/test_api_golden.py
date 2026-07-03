@@ -49,24 +49,28 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
 from dadaia_workspace.features.panel.service import PanelService
 
-# --- render functions under lock (import source moves in the split; the bytes do not) ---
-from dadaia_workspace.features.panel.views.api import (
-    delete_report_file,
-    mark_report_important,
-    render_api_academy,
+# --- render functions under lock (per-domain modules post-FR2-split; the bytes do not move) ---
+from dadaia_workspace.features.panel.views.api_academy import render_api_academy
+from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agents_canonical,
-    render_api_contexts,
-    render_api_dadaia_workflow_detail,
-    render_api_dadaia_workflows_list,
+)
+from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
+from dadaia_workspace.features.panel.views.api_health import render_health
+from dadaia_workspace.features.panel.views.api_reports import (
+    delete_report_file,
+    mark_report_important,
     render_api_reports,
-    render_api_servers,
-    render_api_sessions,
-    render_api_workflow_detail,
-    render_api_workflows_list,
-    render_health,
     serve_report_file,
     unmark_report_important,
+)
+from dadaia_workspace.features.panel.views.api_servers import render_api_servers
+from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
+from dadaia_workspace.features.panel.views.api_workflows import (
+    render_api_dadaia_workflow_detail,
+    render_api_dadaia_workflows_list,
+    render_api_workflow_detail,
+    render_api_workflows_list,
 )
 from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary, TokenTotals
@@ -344,8 +348,11 @@ def _seed_report_tree(tmp_path: Path) -> None:
     report.write_text("<html><head><title>t</title></head><body>ok</body></html>", encoding="utf-8")
 
 
-def _normalize(body: bytes) -> str:
+def _normalize(body: bytes, workspace_root: Path) -> str:
     text = body.decode("utf-8")
+    # Strip the absolute fixture workspace root (leaks into e.g. /api/contexts repo_path) so the
+    # golden is machine-independent — the fixture lives on a per-run tmp_path.
+    text = text.replace(workspace_root.as_posix(), "<WS>").replace(str(workspace_root), "<WS>")
     text = _TS_RE.sub("<TS>", text)
     text = _VERSION_RE.sub('"version": "<VER>"', text)
     return text
@@ -441,7 +448,7 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
             "domain": domain,
             "status": status,
             "content_type": content_type,
-            "body": _normalize(body),
+            "body": _normalize(body, tmp_path),
         }
     return captured
 

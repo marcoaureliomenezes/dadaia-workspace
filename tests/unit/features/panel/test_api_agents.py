@@ -21,7 +21,7 @@ import pytest
 
 from dadaia_workspace.features.agents.reader import AgentDTO
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_agents_canonical
+from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
 
 
 def _days_ago_iso(days: int) -> str:

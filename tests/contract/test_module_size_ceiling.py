@@ -9,10 +9,8 @@ This contract pins per-module **line-count ceilings** as a ratchet:
 
 * No ``features/specs/doctor*.py`` module exceeds **700 lines** (the FR1 coordinator + validator
   siblings + leaves).
-
-The ``features/panel/views/api*.py`` **450-line** ceiling (AC-1) is added by FR2/W3 when
-``api.py`` is deleted and the per-domain view modules land — asserting it here would fail while
-the monolithic ``api.py`` still exists.
+* No ``features/panel/views/api*.py`` module exceeds **450 lines** (the FR2 per-domain view
+  modules; ``api.py`` is deleted, so the monolith can never re-form).
 
 Lowering a ceiling after a further split is welcome — lower the constant here in the same commit.
 Raising one requires a same-commit justification (a module legitimately grew past the ratchet),
@@ -29,9 +27,11 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPECS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "specs"
+_PANEL_VIEWS_DIR = _REPO_ROOT / "dadaia_workspace" / "features" / "panel" / "views"
 
-# Recorded ceiling (ratchet). Lowering is welcome; raising needs same-commit justification.
+# Recorded ceilings (ratchet). Lowering is welcome; raising needs same-commit justification.
 _DOCTOR_CEILING = 700
+_API_CEILING = 450
 
 
 def _line_count(path: Path) -> int:
@@ -45,6 +45,22 @@ def test_no_doctor_module_exceeds_ceiling() -> None:
     offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > _DOCTOR_CEILING}
     assert not offenders, (
         f"doctor module(s) exceed the {_DOCTOR_CEILING}-line ceiling: {offenders}. "
+        "Split further and lower the ceiling, or justify the growth in the same commit "
+        "(AC-1 anti-erosion ratchet)."
+    )
+
+
+def test_no_api_module_exceeds_ceiling() -> None:
+    """Every features/panel/views/api*.py module stays under the 450-line ratchet (FR2 AC-1)."""
+    modules = sorted(_PANEL_VIEWS_DIR.glob("api*.py"))
+    assert modules, f"no api*.py modules found under {_PANEL_VIEWS_DIR}"
+    # The monolithic api.py is DELETED by FR2 — its re-appearance is itself a regression.
+    assert not any(p.name == "api.py" for p in modules), (
+        "features/panel/views/api.py must stay deleted (FR2 per-domain decomposition; no facade)."
+    )
+    offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > _API_CEILING}
+    assert not offenders, (
+        f"panel api module(s) exceed the {_API_CEILING}-line ceiling: {offenders}. "
         "Split further and lower the ceiling, or justify the growth in the same commit "
         "(AC-1 anti-erosion ratchet)."
     )

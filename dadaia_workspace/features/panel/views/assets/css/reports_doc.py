@@ -2,7 +2,7 @@
 
 Agent-authored reports under ``.dadaia/reports/<ctx>/<agent>/*.html`` carry
 arbitrary inline styles, frequently with unreadable foreground/background colour
-pairs.  ``views/api.py::serve_report_file`` injects this stylesheet into the
+pairs.  ``views/api_reports.py::serve_report_file`` injects this stylesheet into the
 ``<head>`` of every ``text/html`` report at serve time so each report inherits
 the dadaia visual identity regardless of how the authoring agent styled it.
 

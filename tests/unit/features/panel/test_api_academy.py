@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api import render_api_academy
+from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 
 # ---------------------------------------------------------------------------
 # Fakes
