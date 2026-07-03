@@ -85,7 +85,7 @@ import-linter = ">=2.11"
 #   * Operator/devops remediation (rebuild/upgrade the tool venv, NOT a repo lock op):
 #       .dadaia/.venv/bin/pip install --upgrade 'pip>=25.3' 'poetry>=2.3.4' 'dulwich>=1.2.5'
 #     then re-verify: .dadaia/.venv/bin/pip list | grep -Ei '^(pip|poetry|dulwich) '
-hypothesis = ">=6.100"
+hypothesis = ">=6.156.1"
 
 [build-system]
 requires = ["poetry-core"]
