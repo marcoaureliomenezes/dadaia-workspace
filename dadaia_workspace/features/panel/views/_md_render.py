@@ -4,7 +4,9 @@ Design decisions (from SPEC §2.1):
 
 - D-1: renderer = mistune~=3.0 (pure-Python, zero transitive deps).
 - Mermaid fences: ```mermaid block → <pre class="mermaid">…</pre>.
-  Content is NOT HTML-escaped so the Mermaid JS client can process it.
+  Content IS HTML-escaped (OWASP A03 / XSS): no Mermaid client ships on the
+  panel (the CSP forbids the CDN import), so the fence body is inert escaped
+  text and must never inject live HTML.
 - [[wikilink]] → <a href="/memory-view/<slug>/<slug>"> anchor linking to
   the panel's memory route convention.
 - Sanitiser: strip/escape raw inline <script> and <style> from atom content
@@ -26,6 +28,7 @@ from collections.abc import Callable
 import mistune
 from mistune import InlineParser, InlineState, Markdown
 from mistune.renderers.html import HTMLRenderer
+from mistune.util import escape
 
 __all__ = [
     "Markdown",
@@ -106,15 +109,16 @@ class _MemoryHTMLRenderer(HTMLRenderer):
     def block_code(self, code: str, info: str | None = None, **attrs: object) -> str:  # noqa: ARG002
         """Render fenced code blocks.
 
-        Mermaid fences → ``<pre class="mermaid">`` with raw content (not
-        HTML-escaped) so the client-side Mermaid JS can process the diagram.
+        Mermaid fences → ``<pre class="mermaid">`` with HTML-escaped content.
+        The ``mermaid`` class is preserved, but the fence body is entity-escaped
+        (OWASP A03 / XSS): no Mermaid client ships on the panel (the CSP forbids
+        the CDN import), so the content renders as inert escaped text and must
+        never inject live HTML — e.g. a ``<script>`` or ``<img onerror=…>``
+        payload inside a mermaid fence arrives escaped, not executable.
         All other fences → standard escaped ``<pre><code>`` block.
         """
         if info and info.strip().split(None, 1)[0].lower() == "mermaid":
-            # Preserve the diagram source verbatim for the Mermaid client.
-            # We intentionally do NOT html-escape here — escaping would break
-            # arrow operators like --> and ->>.
-            return f'<pre class="mermaid">{code}</pre>\n'
+            return f'<pre class="mermaid">{escape(code)}</pre>\n'
         return super().block_code(code, info)
 
 

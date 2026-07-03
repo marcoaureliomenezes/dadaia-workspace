@@ -31,7 +31,6 @@ import time
 from collections.abc import Callable
 from typing import Any, cast
 
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
 from dadaia_workspace.core.protocols.telemetry_lock import TelemetryRefreshLock
 from dadaia_workspace.features.telemetry import budget as _budget
@@ -176,24 +175,6 @@ class TelemetryService:
                     raise
         else:
             os.chmod(self._state_dir, 0o700)
-
-        # Verify the panel auth token file (written by auth.py) has 0o600 perms.
-        # If permissions have drifted (e.g. umask misconfiguration), log a warning
-        # but do not abort — the operator can remediate without restarting.
-        # Guard with PLATFORM.has_posix_chmod: on Windows chmod is a no-op (CWE-732),
-        # so this drift check would always fire a false alarm (SPEC §5 DEAD-PATTERN REMOVAL).
-        if PLATFORM.has_posix_chmod:
-            _token_path = self._state_dir.parent / "panel.token"
-            if _token_path.exists():
-                actual_mode = _token_path.stat().st_mode & 0o777
-                if actual_mode != 0o600:
-                    logger.warning(
-                        "TelemetryService: auth token file %s has mode 0o%o "
-                        "(expected 0o600). Run: chmod 600 %s",
-                        _token_path,
-                        actual_mode,
-                        _token_path,
-                    )
 
         self._degraded = False
 

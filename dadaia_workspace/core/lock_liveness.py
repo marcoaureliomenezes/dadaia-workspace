@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["is_stale", "is_stale_session"]
+__all__ = ["is_stale"]
 
 #: Fields a lease record must carry for staleness to be evaluable. Anything else
 #: missing makes the record corrupt → stale (fail-open).
@@ -161,36 +161,3 @@ def is_stale(
         )
         return False
     return True
-
-
-def is_stale_session(last_seen_at: str, ttl_seconds: int) -> bool:
-    """Return ``True`` if a session's ``last_seen_at`` is beyond its TTL.
-
-    Single source of truth for session-staleness evaluation in both the
-    Kanban view (``panel/views/kanban.py``) and any other consumer that
-    needs to classify a session file as stale.
-
-    Boundary semantics: uses ``>`` (strictly greater than) to match the
-    original ``_is_stale`` behaviour in ``kanban.py``.
-
-    Parameters
-    ----------
-    last_seen_at:
-        ISO-8601 timestamp string (``Z`` suffix supported).  An empty or
-        missing value is treated as *not stale* (fail-safe default).
-    ttl_seconds:
-        Session time-to-live in seconds.
-
-    Returns
-    -------
-    bool
-        ``True`` when the session should be considered expired/stale.
-    """
-    if not last_seen_at:
-        return False
-    try:
-        last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
-        elapsed = (datetime.now(tz=UTC) - last_seen_dt).total_seconds()
-        return bool(elapsed > ttl_seconds)
-    except Exception:  # noqa: BLE001
-        return False

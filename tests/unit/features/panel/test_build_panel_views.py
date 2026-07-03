@@ -162,3 +162,29 @@ def test_static_unknown_returns_404(tmp_path: Path) -> None:
     views = _build_views(tmp_path)
     status, _, _ = views["static"](name="robots.txt")
     assert status == 404
+
+
+# ---------------------------------------------------------------------------
+# Container-sanity: the REAL container.build_panel_views must wire without the
+# removed kanban view (v0.1.52 T-52-13). Importing container exercises the
+# module-level imports (a dangling render_api_kanban import → ImportError), and
+# calling build_panel_views exercises the views-dict construction (a dangling
+# render_api_kanban(...) reference → NameError). Both must be clean.
+# ---------------------------------------------------------------------------
+
+
+def test_container_build_panel_views_constructs_without_kanban(tmp_path: Path) -> None:
+    """container.build_panel_views wires the panel dict; api_kanban is gone."""
+    from dadaia_workspace import container
+
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text('{"schema_version": "2", "contexts": []}')
+
+    views = container.build_panel_views(tmp_path)
+
+    assert isinstance(views, dict)
+    assert "api_kanban" not in views
+    assert "index" in views
+    assert "api_contexts" in views
+    assert all(callable(v) for v in views.values())
