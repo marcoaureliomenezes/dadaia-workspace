@@ -5,8 +5,7 @@ backlog sanitization + architectural deep review (post-v0.1.48); **pruned 2026-0
 R1–R5 (v0.1.49–v0.1.53) shipped and R6 (v0.1.54 "Import Boundaries") entered definition. This
 index lists **only** surviving open candidates — consumed, superseded, and stale entries were
 removed per removal-on-release and the never-keep-the-past law. The three R6 source entries
-(`import-boundary-enforcement`, `features-import-infrastructure-direct-debt`,
-`pid-probe-seam-consolidation`) remain listed until they archive at R6 SHIP.
+archived at R6 SHIP (2026-07-03) to `specs/_archive/v0.1.54/consumed-backlog/`.
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -43,11 +42,6 @@ grill on the picked set before SPEC.
 ---
 
 ## HIGH
-
-### `import-boundary-enforcement` — Import-boundary enforcement
-Red import-linter chains fixed + CI wiring + features-no-cross-feature contract +
-`workflows ↔ lifecycle` cycle break (shared governed-catalog seam) + core-purity follow-up.
-*(R6 source — IN DEFINITION as v0.1.54; archives at R6 SHIP.)*
 
 ### `lifecycle-verb-governance-uniformity` — Lifecycle verb governance uniformity
 Policy resolver on EVERY verb; audit/research/bug_report invocability decision;
@@ -94,16 +88,3 @@ Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule
 ### `model-tier-efficiency-and-fast-tier-utilization` — Layer-1 model-tier efficiency (P2)
 Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trigger.
 
----
-
-## LOW
-
-### `features-import-infrastructure-direct-debt` — features → infrastructure layering debt
-Remove the 3 documented direct-import `ignore_imports` edges behind ports
-(referenced by name in setup.cfg).
-*(R6 source — IN DEFINITION as v0.1.54; the `panel.service → workflow_launcher_adapter`
-edge was consumed-elsewhere by v0.1.53. Archives at R6 SHIP.)*
-
-### `pid-probe-seam-consolidation` — Consolidate `_build_pid_probe`
-One public composition-root builder instead of the hook-private de-facto seam.
-*(R6 source — IN DEFINITION as v0.1.54; archives at R6 SHIP.)*
