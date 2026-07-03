@@ -349,7 +349,7 @@ includes `tests/`.
 
 ## W5 — FR4 CI wiring + gates + ship (flat release: single ship gate)
 
-- [ ] T-54-20 FR4 CI wiring on the green tree, then ship. Checklist:
+- [-] T-54-20 FR4 CI wiring on the green tree, then ship. Checklist:
   - **FR4 (first — on the already-green tree, architect A5/A10):** add a step to the existing
     `Lint (ruff)` job in `.github/workflows/ci.yml` (l.62): `poetry run lint-imports --config
     setup.cfg --no-cache` (no extra install). Add a `lint-imports --no-cache` check to
