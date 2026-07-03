@@ -17,6 +17,7 @@ NOT asserted; what is asserted is that the run got as far as reporting contract 
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -30,14 +31,18 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 _CACHE_DIR = _REPO_ROOT / ".import_linter_cache"
 
 
-def _lint_imports_bin() -> Path:
-    """Resolve the ``lint-imports`` console script from the active venv."""
-    return Path(sys.executable).parent / "lint-imports"
+def _lint_imports_bin() -> str | None:
+    """Resolve the ``lint-imports`` console script from the active venv.
+
+    ``shutil.which`` scoped to the interpreter's directory handles the Windows
+    executable suffix (``Scripts\\lint-imports.exe``) that a bare path join misses.
+    """
+    return shutil.which("lint-imports", path=str(Path(sys.executable).parent))
 
 
 def test_lint_imports_runs_with_no_cache_and_leaves_no_cache_dir() -> None:
     bin_path = _lint_imports_bin()
-    assert bin_path.exists(), f"lint-imports not found next to interpreter at {bin_path}"
+    assert bin_path is not None, f"lint-imports not found next to interpreter {sys.executable}"
 
     # Guard: the cache must not be present before we start (a stale one would make the
     # post-run assertion pass vacuously and hide a regression).
@@ -47,7 +52,7 @@ def test_lint_imports_runs_with_no_cache_and_leaves_no_cache_dir() -> None:
     )
 
     result = subprocess.run(
-        [str(bin_path), "--config", str(_SETUP_CFG), "--no-cache"],
+        [bin_path, "--config", str(_SETUP_CFG), "--no-cache"],
         cwd=str(_REPO_ROOT),
         capture_output=True,
         text=True,
