@@ -1,0 +1,15 @@
+{
+  "release": "v0.1.55",
+  "consumed": [
+    {
+      "slug": "architecture-uml-decomposition",
+      "shipped_anchors": [
+        "dadaia_workspace/features/specs/doctor.py#SpecsDoctor",
+        "dadaia_workspace/features/panel/views/api_agents.py#render_api_agents_canonical",
+        "dadaia_workspace/features/reports/__init__.py",
+        "specs/assets/architecture/doctor-decomposition.md"
+      ],
+      "note": "archived at ship (R4 process law): intent #2's anchor api.py#render_api_agents_canonical DIED when W3 deleted api.py (the function lives in api_agents.py), so backlog doctor red-flags the live entry mid-branch. Consumed in full: SpecsDoctor 2,830-line god module -> 224-line coordinator + 6 validators + 2 leaves (golden byte-identical); panel api.py -> 8 per-domain modules (24-route golden byte-identical); reports_next/retention/validation -> features/reports (pure renames); canonical fenced-mermaid UML under specs/assets/architecture/ with an introspection drift-guard (no mermaid-cli/Node per review); workspace_clean STANDS-ALONE docstring recorded. The regenerate-at-structural-closure law lands in architecture.md Visual evidence at CLOSURE."
+    }
+  ]
+}
