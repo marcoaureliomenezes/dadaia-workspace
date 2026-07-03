@@ -148,16 +148,37 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
     """
     doctor = SpecsDoctor(_FIXTURE)
     issues = doctor.check()
+
+    def _norm_path(value: str) -> str:
+        # Platform-invariant path rendering: strip the fixture root, then canonicalize
+        # separators so Windows (`\`) and POSIX (`/`) captures are byte-identical. The
+        # golden locks refactor behavior, not OS path rendering.
+        value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
+        return value.replace(os.sep, "/") if os.sep != "/" else value
+
+    issue_dicts = []
+    for i in issues:
+        d = i.to_dict()
+        path_value = d.get("path")
+        if isinstance(path_value, str):
+            d["path"] = _norm_path(path_value)
+        issue_dicts.append(d)
     payload = {
-        "specs_dir": str(_FIXTURE),
-        "issues": [i.to_dict() for i in issues],
+        "specs_dir": "<SPECS>",
+        "issues": issue_dicts,
         "summary": {
             "errors": sum(1 for i in issues if i.severity.value == "error"),
             "warnings": sum(1 for i in issues if i.severity.value == "warning"),
         },
     }
     text = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)
-    normalized = text.replace(str(_FIXTURE), "<SPECS>")
+    # Backstop for absolute fixture paths embedded in free-text messages: cover the raw,
+    # the POSIX, and the JSON-escaped (Windows `\\`) renderings.
+    normalized = (
+        text.replace(json.dumps(str(_FIXTURE))[1:-1], "<SPECS>")
+        .replace(_FIXTURE.as_posix(), "<SPECS>")
+        .replace(str(_FIXTURE), "<SPECS>")
+    )
     return issues, normalized
 
 

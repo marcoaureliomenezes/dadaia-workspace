@@ -351,8 +351,20 @@ def _seed_report_tree(tmp_path: Path) -> None:
 def _normalize(body: bytes, workspace_root: Path) -> str:
     text = body.decode("utf-8")
     # Strip the absolute fixture workspace root (leaks into e.g. /api/contexts repo_path) so the
-    # golden is machine-independent — the fixture lives on a per-run tmp_path.
-    text = text.replace(workspace_root.as_posix(), "<WS>").replace(str(workspace_root), "<WS>")
+    # golden is machine-independent — the fixture lives on a per-run tmp_path. Cover the POSIX,
+    # raw, and JSON-escaped (Windows `\\`) renderings, then canonicalize the separators of any
+    # <WS>-anchored path tail — the golden locks route behavior, not OS path rendering.
+    ws_escaped = json.dumps(str(workspace_root))[1:-1]
+    text = (
+        text.replace(workspace_root.as_posix(), "<WS>")
+        .replace(ws_escaped, "<WS>")
+        .replace(str(workspace_root), "<WS>")
+    )
+    text = re.sub(
+        r"(?<=<WS>)(?:\\\\[^\"\\]+)+",
+        lambda m: m.group(0).replace("\\\\", "/"),
+        text,
+    )
     text = _TS_RE.sub("<TS>", text)
     text = _VERSION_RE.sub('"version": "<VER>"', text)
     return text
