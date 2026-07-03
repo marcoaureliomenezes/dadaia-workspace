@@ -727,14 +727,16 @@ def build_workflow_handoff_resolver(
 def build_workflow_model_profile_registry() -> "WorkflowCatalog":
     """Compose the governed workflow catalog the policy resolver reads (T-28-B-01).
 
-    Wave B promotes :mod:`dadaia_workspace.features.workflows.dadaia_catalog` to **the**
-    governed source: every worker step carries a default harness + a default model profile
-    per supported harness (validated at import time against the built-in :mod:`model_profiles`
-    registry). :func:`governed_workflow_catalog` projects that single source onto the
-    resolver's :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same*
-    catalog (no second table). The function is pure (no I/O), so it takes no ``workspace_root``.
+    Wave B promotes the governed catalog to **the** governed source: every worker step
+    carries a default harness + a default model profile per supported harness (validated at
+    import time against the built-in :mod:`model_profiles` registry).
+    :func:`governed_workflow_catalog` projects that single source onto the resolver's
+    :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same* catalog (no
+    second table). The function is pure (no I/O), so it takes no ``workspace_root``. v0.1.54
+    FR2: the governed catalog now lives in ``features/lifecycle/governed_catalog`` (the
+    cycle-break home); import it directly from the canonical lifecycle module.
     """
-    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+    from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
 
     return governed_workflow_catalog()
 

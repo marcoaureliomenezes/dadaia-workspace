@@ -408,7 +408,9 @@ def run_policy_doctor(
     directly (FR1a). ``catalog`` / ``loader`` are injectable for deterministic fixture testing.
     """
     if catalog is None:
-        from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+        # v0.1.54 FR2: import the governed catalog intra-lifecycle (its canonical home),
+        # removing the former lifecycle -> workflows edge that closed the import cycle.
+        from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
 
         catalog = governed_workflow_catalog()
     loader = loader or FragmentLoader()
