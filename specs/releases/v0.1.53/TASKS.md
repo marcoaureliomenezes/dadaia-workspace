@@ -84,10 +84,25 @@ sets) are sequential — one owner, no parallel `[-]`.
 
 ## W5 — gates + ship (flat release: single ship gate)
 
-- [ ] T-53-20 **Consumed-backlog archival at SHIP** (R4 discovery; invariants verified at definition): ONE ATOMIC commit moves all four entries → durable copies + `consumed_backlog.json` under `specs/_archive/v0.1.53/`; backlog doctor clean after; the ONLY push follows this commit. QA review (ship gate): AC-1 greps per deleted name; AC-2 CLI contract;
-  AC-3/AC-7 sabotage evidence; AC-5 redaction grep + JSONL parse; AC-6 full
-  suite UNPIPED real exit + `public doctor` exit 0. Verdict lands as a review
-  commit. Owner: qa-engineer + orchestrator.
+- [x] T-53-20 DONE. Archival commit `6c08dd25` (single atomic: 4 R100 renames
+  backlog→`_archive/v0.1.53/consumed-backlog/` + `consumed_backlog.json`; backlog
+  doctor clean; no W1-W4 commit staged specs/backlog — invariants i+ii verified).
+  QA ship gate: **APPROVE** (handoff 2026-07-03T051502Z-qa-engineer-v0153-ship-gate,
+  validated exit 0). 7/7 checks: AC-1 16/16 symbols zero LIVE refs (tree+tests+
+  public); AC-2 CLI contract (bug group + server dashboard + run/status/resume
+  absent; orchestrate list/show --json exit 0); AC-3/AC-7 RED `71e187a5` ancestor
+  of feat + both contract tests green + single guarded chmod service.py:205;
+  AC-5 grep EMPTY + 220/220 JSONL lines parse; AC-6 unpiped 4322 passed/17
+  skipped exit 0 + ruff/mypy/public doctor all exit 0. FROZEN-SUITE ADJUDICATED
+  PASS: no-steal invariant 100% intact (identical assertions/TTL 120/pid-veto);
+  3 paths zero-diff; 4 paths value-identical kernel_tunables repoint (forced by
+  FR2); test_two_actor_lease.py pre_gate repoint restores the exercise (was
+  silently no-opping); 1 §5 path stale (absent at merge-base too); dashboard-test
+  deletion legitimate (asserted a deleted command). Routed to W6: MEDIUM record
+  §4↔FR2 freeze tension + stale test_lock_liveness_session.py ref in CLOSURE
+  Drifts; LOW dev-server-registry SKILL.md:69,89 still documents server dashboard
+  (lib-originated public asset — MUST land in W6). Owner: qa-engineer +
+  orchestrator.
 - [ ] T-53-21 Security review (push gate — attention: redaction completeness,
   deleted CLI surfaces, hook-entrypoint wiring, public-asset projection
   integrity): APPROVE handoff `metrics.commit_sha` = pushed sha; push; CI green;
