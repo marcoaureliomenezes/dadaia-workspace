@@ -24,7 +24,7 @@ sets) are sequential — one owner, no parallel `[-]`.
 
 ## W2 — FR2 dead-code sweep
 
-- [ ] T-53-11 Pre-check: grep projections/public for direct
+- [x] T-53-11 DONE `5984a79c` (44 files, +223/−773; scope 4,223 passed/16 skipped exit 0; ruff/mypy clean). 13/13 AC-1 probes OK (incl. the W1-routed run-state infra + dashboard.py + RunNotFoundError collateral); hook-wiring pre-check: zero live invocations of the deleted main()s (pre_gate is the sole wired entrypoint); shared-dao mode was present+production-dead → removed, 6 test sites converted via a non-closing shared_connection_factory fake (zero assertion loss); AC-8 ledger in the W2 handoff (2026-07-03T035654Z); harness_env fixture gained isolated policy drivers. Recorded not fixed: dev-server-registry SKILL.md drift (lib-originated → CLOSURE). Original scope: Pre-check: grep projections/public for direct
   `hooks.sdd_gate`/`hooks.root_whitelist` invocations (record result); DELETE the
   two legacy `main()`s; DELETE the `LEASE_TTL_SECONDS` re-export (lease.py internal uses repointed; __all__ entry dropped; 12 test files — kernel_tunables contract assertion deleted, ==120 assertion repointed); relocate `library_workflow_catalog` to `tests/unit/features/lifecycle/_workflow_catalog.py` (3 modules updated, zero production shim); DELETE `views/_assets.py` (verify zero importers); DELETE
   `TelemetryService.list_workflows` + the unreachable handler fallback; check +
