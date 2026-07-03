@@ -55,8 +55,10 @@ def _write_bytes(tmp_path: Path, slug: str, filename: str, data: bytes) -> Path:
 def test_mermaid_fence_renders_to_pre_mermaid(tmp_path: Path) -> None:
     """A ```mermaid fenced block must render to <pre class="mermaid">...</pre>.
 
-    The Mermaid JS client on the panel page processes this block client-side.
-    Content must NOT be HTML-escaped (e.g. --> must remain --> not &rarr;).
+    The ``mermaid`` class is preserved, but the fence body is HTML-escaped
+    (OWASP A03 / XSS): no Mermaid client ships on the panel (the CSP forbids
+    the CDN import), so arrow operators arrive as escaped entities — e.g.
+    ``A-->B`` becomes ``A--&gt;B``.
     """
     md = "# Diagram\n\n```mermaid\ngraph LR\n  A-->B\n```\n"
     workspace_root = _write_md(tmp_path, "proj", "architecture.md", md)
@@ -67,16 +69,17 @@ def test_mermaid_fence_renders_to_pre_mermaid(tmp_path: Path) -> None:
     assert status == 200
     assert content_type == "text/html; charset=utf-8"
     html = body.decode("utf-8")
-    # Must produce <pre class="mermaid">
+    # Must produce <pre class="mermaid"> (the class is preserved)
     assert '<pre class="mermaid">' in html
-    # Must NOT produce language-mermaid (that is the escaped version)
+    # Must NOT produce language-mermaid (that is the <code> fallback)
     assert "language-mermaid" not in html
-    # Diagram content must be verbatim (not escaped)
-    assert "A-->B" in html
+    # Diagram content is HTML-escaped: --> arrives as --&gt;, not raw -->
+    assert "A--&gt;B" in html
+    assert "A-->B" not in html
 
 
 def test_mermaid_fence_with_sequence_arrows(tmp_path: Path) -> None:
-    """Sequence diagram arrow operators (->> and -->) must survive verbatim."""
+    """Sequence-diagram arrow operators (->> and -->) arrive HTML-escaped."""
     md = "```mermaid\nsequenceDiagram\n  A->>B: hello\n  B-->A: ok\n```\n"
     workspace_root = _write_md(tmp_path, "proj", "seq.md", md)
 
@@ -85,10 +88,11 @@ def test_mermaid_fence_with_sequence_arrows(tmp_path: Path) -> None:
 
     assert status == 200
     html = body.decode("utf-8")
-    assert "A->>B" in html
-    assert "B-->A" in html
-    # Must not appear as HTML entities
-    assert "&gt;&gt;" not in html
+    # Arrows are entity-escaped, not emitted raw.
+    assert "A-&gt;&gt;B" in html
+    assert "B--&gt;A" in html
+    assert "A->>B" not in html
+    assert "B-->A" not in html
 
 
 # ---------------------------------------------------------------------------

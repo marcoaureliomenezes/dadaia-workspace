@@ -1,21 +1,32 @@
-"""Unit tests for TelemetryAggregator.list_sessions and get_session.
+"""Unit tests for TelemetryAggregator.aggregate_sessions (v0.1.52 FR1).
 
-All fixtures are built in-memory via sqlite3 INSERT statements — no live
-telemetry.sqlite is read or touched.
+The Sessions tab became a server-side aggregate cost dashboard: the per-session
+list/detail queries were retired and replaced by ``aggregate_sessions(runtime)``,
+which rolls the seeded store up into a single ``SessionAggregate`` envelope.
+
+These tests encode the SPEC §FR1 cost-known matrix (8 cases) against seeded
+in-memory stores.  The seeding pattern mirrors the retired list/detail tests
+(they knew the store schema); no live telemetry.sqlite is read or touched.
+
+The aggregate's ``cost_known``/``total_cost_usd`` semantics mirror the client
+``computeStats`` that this endpoint replaced:
+  * a session contributes to ``total_cost_usd`` only when it is *fully*
+    cost-known (every event has a known cost) AND its cumulative cost is not
+    None;
+  * ``cost_known`` is True iff at least one session contributes;
+  * ``total_cost_usd`` is None when no session contributes (rendered '—' for a
+    cost-tracking runtime, distinct from the client 'N/A' for codex/pi);
+  * codex/pi are cost-unknown runtimes: total is forced None and cost_known
+    False regardless of stored data.
 """
 
 from __future__ import annotations
 
 import sqlite3
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
-    SessionDetail,
-    SessionListResult,
-)
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
@@ -38,20 +49,20 @@ _T5 = (_NOW - timedelta(minutes=10)).isoformat()
 
 
 class _FakeSCS:
-    def list_all(self) -> list[Any]:
+    def list_all(self) -> list[object]:
         return []
 
 
 class _FakePricing:
-    PRICING_TABLE: dict[str, list[Any]] = {}
+    PRICING_TABLE: dict[str, list[object]] = {}
 
     @staticmethod
-    def pricing_age_days(models_used: list[str], when: Any = None) -> None:
+    def pricing_age_days(models_used: list[str], when: object = None) -> None:
         return None
 
 
 # ---------------------------------------------------------------------------
-# DB helpers
+# DB helpers (schema mirrors the retired list/detail tests)
 # ---------------------------------------------------------------------------
 
 
@@ -75,7 +86,7 @@ def _insert_session(
     conn: sqlite3.Connection,
     session_id: str,
     provider: str,
-    agent_name: str,
+    agent_name: str | None,
     sub_slug: str | None = None,
     cwd: str | None = "/workspace",
     first_event_at: str = _T1,
@@ -109,7 +120,7 @@ def _insert_event(
     conn: sqlite3.Connection,
     event_id: str,
     session_id: str,
-    agent_name: str,
+    agent_name: str | None,
     model: str = "claude-sonnet-4-6",
     occurred_at: str = _T2,
     tokens_input: int = 100,
@@ -151,388 +162,305 @@ def _make_aggregator(conn: sqlite3.Connection) -> TelemetryAggregator:
 
 
 # ---------------------------------------------------------------------------
-# Fixture: seeded DB with Claude + Codex rows across two projects
-#
-#  Claude sessions:
-#    - claude-s1: project=alpha, 2 events (cost known)
-#    - claude-s2: project=alpha, 1 event (cost known)
-#    - claude-s3: project=beta,  1 event (cost known)
-#  Codex sessions:
-#    - codex-s1: project=alpha, 1 event (cost_micro_usd=NULL)
-#    - codex-s2: project=beta,  0 events
+# Shape / type contract
 # ---------------------------------------------------------------------------
 
 
-def _seed_mixed(conn: sqlite3.Connection) -> None:
+def test_aggregate_shape_and_field_types() -> None:
+    """aggregate_sessions returns a SessionAggregate with the FR1 field shape."""
+    conn = _make_conn()
     _insert_agent(conn, "agent-a", "claude")
-    _insert_agent(conn, "agent-b", "codex")
-
-    _insert_session(
-        conn,
-        "claude-s1",
-        "claude",
-        "agent-a",
-        sub_slug="alpha",
-        first_event_at=_T1,
-        last_event_at=_T3,
-    )
-    _insert_session(
-        conn,
-        "claude-s2",
-        "claude",
-        "agent-a",
-        sub_slug="alpha",
-        first_event_at=_T2,
-        last_event_at=_T4,
-    )
-    _insert_session(
-        conn,
-        "claude-s3",
-        "claude",
-        "agent-a",
-        sub_slug="beta",
-        first_event_at=_T2,
-        last_event_at=_T5,
-    )
-    _insert_session(
-        conn,
-        "codex-s1",
-        "codex",
-        "agent-b",
-        sub_slug="alpha",
-        first_event_at=_T1,
-        last_event_at=_T2,
-    )
-    _insert_session(
-        conn, "codex-s2", "codex", "agent-b", sub_slug="beta", first_event_at=_T3, last_event_at=_T4
-    )
-
-    _insert_event(
-        conn,
-        "ev-c1-1",
-        "claude-s1",
-        "agent-a",
-        occurred_at=_T2,
-        tokens_input=500,
-        cost_micro_usd=3000,
-    )
-    _insert_event(
-        conn,
-        "ev-c1-2",
-        "claude-s1",
-        "agent-a",
-        occurred_at=_T3,
-        tokens_input=200,
-        cost_micro_usd=1500,
-    )
-    _insert_event(
-        conn,
-        "ev-c2-1",
-        "claude-s2",
-        "agent-a",
-        occurred_at=_T4,
-        tokens_input=300,
-        cost_micro_usd=2000,
-    )
-    _insert_event(
-        conn,
-        "ev-c3-1",
-        "claude-s3",
-        "agent-a",
-        occurred_at=_T5,
-        tokens_input=100,
-        cost_micro_usd=800,
-    )
-    _insert_event(conn, "ev-x1-1", "codex-s1", "agent-b", occurred_at=_T2, cost_micro_usd=None)
+    _insert_session(conn, "s1", "claude", "agent-a", status="active")
+    _insert_event(conn, "e1", "s1", "agent-a", cost_micro_usd=3000)
     conn.commit()
 
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-# ---------------------------------------------------------------------------
-# Tests — list_sessions basic
-# ---------------------------------------------------------------------------
-
-
-def test_list_sessions_no_filter_returns_claude_only() -> None:
-    """list_sessions(runtime='claude') returns only claude sessions."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("claude")
-
-    assert isinstance(result, SessionListResult)
+    assert type(result).__name__ == "SessionAggregate"
     assert result.runtime == "claude"
-    assert result.project is None
-    assert all(s.runtime == "claude" for s in result.sessions)
-    assert len(result.sessions) == 3
-    assert result.total_count == 3
-
-
-def test_list_sessions_returns_codex_only() -> None:
-    """list_sessions(runtime='codex') returns only codex sessions."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("codex")
-
-    assert result.runtime == "codex"
-    assert all(s.runtime == "codex" for s in result.sessions)
-    assert len(result.sessions) == 2
-    assert result.total_count == 2
-
-
-def test_list_sessions_runtime_discriminator_excludes_opposite() -> None:
-    """Claude rows excluded when runtime='codex' and vice versa."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    claude_ids = {s.session_id for s in agg.list_sessions("claude").sessions}
-    codex_ids = {s.session_id for s in agg.list_sessions("codex").sessions}
-
-    assert claude_ids.isdisjoint(codex_ids)
-    assert "claude-s1" in claude_ids
-    assert "claude-s1" not in codex_ids
-    assert "codex-s1" in codex_ids
-    assert "codex-s1" not in claude_ids
+    assert isinstance(result.total_sessions, int)
+    assert isinstance(result.active_sessions, int)
+    assert isinstance(result.total_messages, int)
+    assert isinstance(result.cost_known, bool)
+    assert result.total_cost_usd is None or isinstance(result.total_cost_usd, float)
+    assert isinstance(result.generated_at, str) and result.generated_at
+    # top_agent is a {name, session_count} object or None.
+    assert result.top_agent is not None
+    assert result.top_agent.name == "agent-a"
+    assert result.top_agent.session_count == 1
 
 
 # ---------------------------------------------------------------------------
-# Tests — project filter
+# Matrix case 1 — codex/pi runtimes ⇒ total null + cost_known false
 # ---------------------------------------------------------------------------
 
 
-def test_list_sessions_project_filter_drops_non_matching() -> None:
-    """project='alpha' returns only alpha sessions; beta sessions excluded."""
+def test_case1_codex_runtime_cost_forced_null_and_unknown() -> None:
+    """codex ⇒ total_cost_usd null, cost_known false — even with a stray cost row."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-x", "codex")
+    _insert_session(conn, "cx1", "codex", "agent-x")
+    _insert_event(conn, "e-cx1", "cx1", "agent-x", cost_micro_usd=None)
+    # A stray non-null cost must NOT flip codex into cost-known territory.
+    _insert_session(conn, "cx2", "codex", "agent-x")
+    _insert_event(conn, "e-cx2", "cx2", "agent-x", cost_micro_usd=999_999)
+    conn.commit()
 
-    result = agg.list_sessions("claude", project="alpha")
+    result = _make_aggregator(conn).aggregate_sessions("codex")
 
-    assert result.project == "alpha"
-    ids = [s.session_id for s in result.sessions]
-    assert "claude-s1" in ids
-    assert "claude-s2" in ids
-    assert "claude-s3" not in ids
+    assert result.total_cost_usd is None
+    assert result.cost_known is False
+    assert result.total_sessions == 2  # rows still counted
 
 
-def test_list_sessions_project_filter_unknown_returns_empty() -> None:
-    """project='unknown' yields empty list."""
+def test_case1_pi_runtime_cost_forced_null_and_unknown() -> None:
+    """pi ⇒ total_cost_usd null, cost_known false."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-p", "pi")
+    _insert_session(conn, "pi1", "pi", "agent-p")
+    _insert_event(conn, "e-pi1", "pi1", "agent-p", cost_micro_usd=None)
+    conn.commit()
 
-    result = agg.list_sessions("claude", project="unknown")
+    result = _make_aggregator(conn).aggregate_sessions("pi")
 
-    assert result.sessions == []
-    assert result.total_count == 0
+    assert result.total_cost_usd is None
+    assert result.cost_known is False
+    assert result.total_sessions == 1
 
 
 # ---------------------------------------------------------------------------
-# Tests — limit
+# Matrix case 2 — claude, empty store ⇒ zeros + total null
 # ---------------------------------------------------------------------------
 
 
-def test_list_sessions_limit_caps_result() -> None:
-    """limit=2 returns at most 2 rows but total_count reflects full set."""
+def test_case2_claude_empty_store() -> None:
+    """claude, empty store ⇒ total_sessions 0, total_cost_usd null, top_agent None."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
 
-    result = agg.list_sessions("claude", limit=2)
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-    assert result.limit == 2
-    assert len(result.sessions) == 2
-    assert result.total_count == 3  # 3 claude sessions in total
-
-
-def test_list_sessions_limit_none_returns_all() -> None:
-    """No limit → all rows returned."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("claude", limit=None)
-
-    assert result.limit is None
-    assert len(result.sessions) == 3
-
-
-def test_list_sessions_ordered_by_last_activity_desc() -> None:
-    """Sessions returned in descending order of last_activity_at."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("claude")
-    times = [s.last_activity_at for s in result.sessions]
-
-    assert times == sorted(times, reverse=True)
+    assert result.total_sessions == 0
+    assert result.active_sessions == 0
+    assert result.total_messages == 0
+    assert result.total_cost_usd is None
+    assert result.cost_known is False
+    assert result.top_agent is None
 
 
 # ---------------------------------------------------------------------------
-# Tests — SessionRow field values
+# Matrix case 3 — claude, all rows cost-unknown ⇒ total null ('—' NOT 'N/A')
 # ---------------------------------------------------------------------------
 
 
-def test_list_sessions_row_fields_populated() -> None:
-    """SessionRow has expected field values from the seeded DB."""
+def test_case3_claude_all_cost_unknown_total_null() -> None:
+    """claude, every session all-unknown ⇒ total null, cost_known false; rows counted."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_session(conn, "s1", "claude", "agent-a")
+    _insert_event(conn, "e1", "s1", "agent-a", cost_micro_usd=None)
+    _insert_session(conn, "s2", "claude", "agent-a")
+    _insert_event(conn, "e2", "s2", "agent-a", cost_micro_usd=None)
+    conn.commit()
 
-    result = agg.list_sessions("claude", project="alpha")
-    # claude-s1 has 2 events; claude-s2 has 1 event.
-    by_id = {s.session_id: s for s in result.sessions}
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-    s1 = by_id["claude-s1"]
-    assert s1.runtime == "claude"
-    assert s1.project == "alpha"
-    assert s1.message_count == 2
-    assert s1.cost_known is True
-    assert s1.cumulative_cost_usd == pytest.approx((3000 + 1500) / 1_000_000)
-    # context_size_tokens from most recent event (ev-c1-2): input=200, cache_create=0, cache_read=0
-    assert s1.context_size_tokens == 200
-
-
-def test_list_sessions_codex_cost_unknown() -> None:
-    """Codex session with all-NULL cost has cost_known=False."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("codex")
-    by_id = {s.session_id: s for s in result.sessions}
-
-    x1 = by_id["codex-s1"]
-    assert x1.cost_known is False
-    assert x1.cumulative_cost_usd is None
-
-
-def test_list_sessions_session_with_no_events() -> None:
-    """Session with zero events has message_count=0, context_size_tokens=0."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_sessions("codex")
-    by_id = {s.session_id: s for s in result.sessions}
-
-    x2 = by_id["codex-s2"]
-    assert x2.message_count == 0
-    assert x2.context_size_tokens == 0
-    assert x2.model is None
+    assert result.total_sessions == 2  # rows still counted
+    assert result.total_cost_usd is None  # '—' (claude-null), NOT 'N/A'
+    assert result.cost_known is False
 
 
 # ---------------------------------------------------------------------------
-# Tests — get_session hit
+# Matrix case 4 — claude, mixed ⇒ partial sum over fully-cost-known rows only
+# (AC-7(c) sabotage target: dropping the cost_known filter changes this sum)
 # ---------------------------------------------------------------------------
 
 
-def test_get_session_hit_returns_detail() -> None:
-    """get_session returns SessionDetail for an existing session."""
+def test_case4_claude_mixed_partial_sum_over_cost_known_rows_only() -> None:
+    """Sum only rows where cost_known AND cumulative_cost_usd IS NOT NULL."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-a", "claude")
+    # s1: fully known (3000 + 1500)
+    _insert_session(conn, "s1", "claude", "agent-a")
+    _insert_event(conn, "e1a", "s1", "agent-a", occurred_at=_T2, cost_micro_usd=3000)
+    _insert_event(conn, "e1b", "s1", "agent-a", occurred_at=_T3, cost_micro_usd=1500)
+    # s2: fully known (2000)
+    _insert_session(conn, "s2", "claude", "agent-a")
+    _insert_event(conn, "e2", "s2", "agent-a", cost_micro_usd=2000)
+    # s3: all-null ⇒ cost_known false ⇒ excluded
+    _insert_session(conn, "s3", "claude", "agent-a")
+    _insert_event(conn, "e3", "s3", "agent-a", cost_micro_usd=None)
+    # s4: mixed within the session (one known, one null) ⇒ cost_known false ⇒ excluded
+    _insert_session(conn, "s4", "claude", "agent-a")
+    _insert_event(conn, "e4a", "s4", "agent-a", occurred_at=_T2, cost_micro_usd=9000)
+    _insert_event(conn, "e4b", "s4", "agent-a", occurred_at=_T3, cost_micro_usd=None)
+    conn.commit()
 
-    detail = agg.get_session("claude", "claude-s1")
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-    assert detail is not None
-    assert isinstance(detail, SessionDetail)
-    assert detail.session_id == "claude-s1"
-    assert detail.runtime == "claude"
-    assert detail.message_count == 2
-    assert len(detail.event_timestamps) == 2
-
-
-def test_get_session_hit_event_timestamps_ordered_asc() -> None:
-    """event_timestamps in SessionDetail are in ascending order."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    detail = agg.get_session("claude", "claude-s1")
-    assert detail is not None
-    ts = list(detail.event_timestamps)
-    assert ts == sorted(ts)
-
-
-def test_get_session_hit_context_size_from_last_event() -> None:
-    """context_size_tokens = input+cache_create+cache_read of the most recent event."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    # claude-s1 events:
-    #   ev-c1-1: occurred_at=_T2, tokens_input=500, cache_create=0, cache_read=0
-    #   ev-c1-2: occurred_at=_T3, tokens_input=200, cache_create=0, cache_read=0
-    # Most recent is ev-c1-2 → context_size = 200
-    detail = agg.get_session("claude", "claude-s1")
-    assert detail is not None
-    assert detail.context_size_tokens == 200
-
-
-def test_get_session_hit_cost_computed() -> None:
-    """get_session computes cumulative_cost_usd correctly."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    detail = agg.get_session("claude", "claude-s1")
-    assert detail is not None
-    assert detail.cost_known is True
-    assert detail.cumulative_cost_usd == pytest.approx((3000 + 1500) / 1_000_000)
+    # Only s1 + s2 contribute; s3 (all-null) and s4 (mixed) are excluded.
+    assert result.total_cost_usd == pytest.approx((3000 + 1500 + 2000) / 1_000_000)
+    assert result.cost_known is True
+    assert result.total_sessions == 4  # every session counted toward totals
 
 
 # ---------------------------------------------------------------------------
-# Tests — get_session miss
+# Matrix case 5 — claude, a known cost of exactly 0 ⇒ 0.0 (not null)
 # ---------------------------------------------------------------------------
 
 
-def test_get_session_miss_returns_none() -> None:
-    """get_session returns None for an unknown session_id."""
+def test_case5_claude_zero_known_cost_is_zero_not_null() -> None:
+    """A known cost of 0 ⇒ total_cost_usd 0.0 ('$0.00' — 0 ≠ null)."""
     conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_session(conn, "s1", "claude", "agent-a")
+    _insert_event(conn, "e1", "s1", "agent-a", cost_micro_usd=0)
+    conn.commit()
 
-    result = agg.get_session("claude", "nonexistent-session-id")
-    assert result is None
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-
-def test_get_session_wrong_runtime_returns_none() -> None:
-    """get_session returns None when session exists but runtime doesn't match."""
-    conn = _make_conn()
-    _seed_mixed(conn)
-    agg = _make_aggregator(conn)
-
-    # claude-s1 is a Claude session; querying with runtime='codex' → None.
-    result = agg.get_session("codex", "claude-s1")
-    assert result is None
+    assert result.total_cost_usd == 0.0
+    assert result.total_cost_usd is not None
+    assert result.cost_known is True
 
 
 # ---------------------------------------------------------------------------
-# Tests — empty DB edge cases
+# Matrix case 6 — a cost_known=1 / cumulative=null row (a 0-event session)
+# contributes NOTHING and does not flip cost-known-ness
 # ---------------------------------------------------------------------------
 
 
-def test_list_sessions_empty_db_returns_empty_result() -> None:
-    """list_sessions on empty DB returns empty SessionListResult."""
+def test_case6_zero_event_session_contributes_nothing_and_does_not_flip() -> None:
+    """A 0-event session (session-level cost_known, cumulative None) adds nothing."""
     conn = _make_conn()
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-a", "claude")
+    # A qualifying session establishes cost-known-ness.
+    _insert_session(conn, "s1", "claude", "agent-a")
+    _insert_event(conn, "e1", "s1", "agent-a", cost_micro_usd=5000)
+    # A 0-event session: session-level cost_known True, cumulative None.
+    _insert_session(conn, "s0", "claude", "agent-a")  # no events
+    conn.commit()
 
-    result = agg.list_sessions("claude")
+    result = _make_aggregator(conn).aggregate_sessions("claude")
 
-    assert isinstance(result, SessionListResult)
-    assert result.sessions == []
-    assert result.total_count == 0
+    # s0 contributes nothing to the sum and does not flip cost_known.
+    assert result.total_cost_usd == pytest.approx(5000 / 1_000_000)
+    assert result.cost_known is True
+    assert result.total_sessions == 2  # s0 still counted toward totals
 
 
-def test_get_session_empty_db_returns_none() -> None:
-    """get_session on empty DB returns None."""
+def test_case6_zero_event_session_alone_yields_null_cost() -> None:
+    """A store of only 0-event sessions ⇒ total null, cost_known false; still counted."""
     conn = _make_conn()
-    agg = _make_aggregator(conn)
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_session(conn, "s0", "claude", "agent-a")  # no events
+    conn.commit()
 
-    result = agg.get_session("claude", "anything")
-    assert result is None
+    result = _make_aggregator(conn).aggregate_sessions("claude")
+
+    assert result.total_cost_usd is None
+    assert result.cost_known is False
+    assert result.total_sessions == 1
+    assert result.total_messages == 0
+
+
+# ---------------------------------------------------------------------------
+# Matrix case 7 — cost_known=false rows still count toward totals/active/top-agent
+# ---------------------------------------------------------------------------
+
+
+def test_case7_cost_unknown_rows_still_count_toward_totals() -> None:
+    """A cost-unknown session still counts for sessions/messages/active/top-agent."""
+    conn = _make_conn()
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_session(conn, "s1", "claude", "agent-a", status="active")
+    _insert_event(conn, "e1a", "s1", "agent-a", cost_micro_usd=None)
+    _insert_event(conn, "e1b", "s1", "agent-a", cost_micro_usd=None)
+    _insert_event(conn, "e1c", "s1", "agent-a", cost_micro_usd=None)
+    conn.commit()
+
+    result = _make_aggregator(conn).aggregate_sessions("claude")
+
+    assert result.total_sessions == 1
+    assert result.active_sessions == 1  # counted despite unknown cost
+    assert result.total_messages == 3  # counted despite unknown cost
+    assert result.top_agent is not None
+    assert result.top_agent.name == "agent-a"  # counted toward top-agent
+    assert result.top_agent.session_count == 1
+    assert result.total_cost_usd is None
+    assert result.cost_known is False
+
+
+# ---------------------------------------------------------------------------
+# Matrix case 8 — ?runtime= filtering scopes every figure
+# ---------------------------------------------------------------------------
+
+
+def test_case8_runtime_filter_scopes_every_figure() -> None:
+    """Each aggregate figure is scoped to the requested runtime."""
+    conn = _make_conn()
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_agent(conn, "agent-b", "codex")
+    # 2 claude sessions, both fully cost-known.
+    _insert_session(conn, "c1", "claude", "agent-a", status="active")
+    _insert_event(conn, "ec1", "c1", "agent-a", cost_micro_usd=4000)
+    _insert_session(conn, "c2", "claude", "agent-a")
+    _insert_event(conn, "ec2", "c2", "agent-a", cost_micro_usd=1000)
+    # 3 codex sessions.
+    _insert_session(conn, "x1", "codex", "agent-b")
+    _insert_event(conn, "ex1", "x1", "agent-b", cost_micro_usd=None)
+    _insert_session(conn, "x2", "codex", "agent-b")
+    _insert_session(conn, "x3", "codex", "agent-b")
+    conn.commit()
+
+    agg = _make_aggregator(conn)
+    claude = agg.aggregate_sessions("claude")
+    codex = agg.aggregate_sessions("codex")
+
+    assert claude.total_sessions == 2
+    assert claude.active_sessions == 1
+    assert claude.total_cost_usd == pytest.approx((4000 + 1000) / 1_000_000)
+    assert claude.cost_known is True
+
+    assert codex.total_sessions == 3
+    assert codex.active_sessions == 0
+    assert codex.total_cost_usd is None
+    assert codex.cost_known is False
+
+    # The two runtimes yield distinct figures — scoping is real.
+    assert claude.total_sessions != codex.total_sessions
+
+
+# ---------------------------------------------------------------------------
+# Top-agent selection
+# ---------------------------------------------------------------------------
+
+
+def test_top_agent_picks_agent_with_most_sessions() -> None:
+    """top_agent is the agent with the highest session_count."""
+    conn = _make_conn()
+    _insert_agent(conn, "agent-a", "claude")
+    _insert_agent(conn, "agent-b", "claude")
+    for sid in ("a1", "a2", "a3"):
+        _insert_session(conn, sid, "claude", "agent-a")
+    _insert_session(conn, "b1", "claude", "agent-b")
+    conn.commit()
+
+    result = _make_aggregator(conn).aggregate_sessions("claude")
+
+    assert result.top_agent is not None
+    assert result.top_agent.name == "agent-a"
+    assert result.top_agent.session_count == 3
+
+
+def test_top_agent_null_agent_name_bucketed_as_operator() -> None:
+    """Sessions with no agent_name bucket under the 'operator' label."""
+    conn = _make_conn()
+    _insert_session(conn, "x1", "codex", None)
+    _insert_session(conn, "x2", "codex", None)
+    conn.commit()
+
+    result = _make_aggregator(conn).aggregate_sessions("codex")
+
+    assert result.top_agent is not None
+    assert result.top_agent.name == "operator"
+    assert result.top_agent.session_count == 2

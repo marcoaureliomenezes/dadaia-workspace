@@ -46,7 +46,7 @@ Security headers (T-AM-14, T8):
 404 body (T-2.3, constitution error contract — updated for T-AM-15):
   "Route not found. The panel exposes / /api/panel-status /api/contexts
    /api/agents /api/agents/<id>/sessions /api/workflows
-   /api/sessions /api/sessions/<runtime>/<session_id>
+   /api/sessions
    /health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>.
    Open / for the index."
 """
@@ -120,8 +120,7 @@ _NOT_FOUND_BODY = (
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
     b"/api/workflows /api/workflows/<name> "
-    b"/api/sessions /api/sessions/<runtime>/<session_id> "
-    b"/api/kanban "
+    b"/api/sessions "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -194,7 +193,6 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     ),
     # BEARER-only routes (auth required; no telemetry dependency)
     (r"^/api/academy$", "api_academy", AuthClass.BEARER),
-    (r"^/api/kanban$", "api_kanban", AuthClass.BEARER),
     (r"^/api/reports$", "api_reports", AuthClass.BEARER),
     # /api/reports/<path>/important must come before /api/reports/<path> (more specific first)
     (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
@@ -240,12 +238,6 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
         AuthClass.BEARER_TELEMETRY,
     ),
     (r"^/api/agents$", "api_agents", AuthClass.BEARER_TELEMETRY),
-    # /api/sessions/<runtime>/<session_id> before /api/sessions
-    (
-        r"^/api/sessions/(?P<runtime>[^/]+)/(?P<session_id>[^/]+)$",
-        "api_session_detail",
-        AuthClass.BEARER_TELEMETRY,
-    ),
     (r"^/api/sessions$", "api_sessions", AuthClass.BEARER_TELEMETRY),
 ]
 
@@ -289,9 +281,6 @@ _SECOND_LOOP_AUTH_ROUTES = _SECOND_LOOP_AUTH_ROUTE_NAMES
 
 # Backward-compatible flat raw routes list (pattern, name) — consumed by some tests.
 _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TABLE]
-
-# Routes that are GET-only and must return 405 Method Not Allowed on POST.
-_GET_ONLY_API_ROUTES_RE = re.compile(r"^/api/kanban$")
 
 # Control-plane GET routes (Wave C) that read the parsed query string. Only these
 # receive the ``qs`` kwarg in GET dispatch; every other view keeps its captured-groups
@@ -442,7 +431,6 @@ def make_handler_class(
         "api_agents",
         "api_agent_prompt",
         "api_agent_sessions",
-        "api_kanban",
         "api_report_delete",
         "api_report_mark_important",
         "api_report_unmark_important",
@@ -452,7 +440,6 @@ def make_handler_class(
         "api_dadaia_workflows",
         "api_dadaia_workflow_detail",
         "api_sessions",
-        "api_session_detail",
     )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(pat), name) for pat, name in _RAW_ROUTES if name in _BEARER_AUTH_ROUTE_NAMES
@@ -569,15 +556,6 @@ def make_handler_class(
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
 
-            # Return 405 for GET-only API routes.
-            if _GET_ONLY_API_ROUTES_RE.match(path):
-                self._respond(
-                    405,
-                    "application/json",
-                    b'{"error": "method not allowed"}',
-                )
-                return
-
             for pattern, route_name in self._tel_patterns:
                 m_api = pattern.match(path)
                 if m_api is None or route_name not in {
@@ -674,14 +652,6 @@ def make_handler_class(
                     # T-P5-25: academy course list (bearer-only, no telemetry needed).
                     if "api_academy" in views:
                         status, content_type, body = views["api_academy"]()
-                        self._respond(status, content_type, body)
-                    else:
-                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
-
-                elif route_name == "api_kanban":
-                    # K-1: Kanban board (bearer-only, no telemetry needed).
-                    if "api_kanban" in views:
-                        status, content_type, body = views["api_kanban"]()
                         self._respond(status, content_type, body)
                     else:
                         self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
@@ -783,19 +753,6 @@ def make_handler_class(
                     # PR5-B2: session list endpoint — requires telemetry.
                     if "api_sessions" in views:
                         status, content_type, body = views["api_sessions"](qs=qs)
-                        self._respond(status, content_type, body)
-                    else:
-                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
-
-                elif route_name == "api_session_detail":
-                    # PR5-B2: session detail endpoint — requires telemetry.
-                    runtime = groups.get("runtime", "claude")
-                    session_id = groups.get("session_id", "")
-                    if "api_session_detail" in views:
-                        status, content_type, body = views["api_session_detail"](
-                            runtime=runtime,
-                            session_id=session_id,
-                        )
                         self._respond(status, content_type, body)
                     else:
                         self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)

@@ -807,11 +807,10 @@ def render_api_dadaia_workflow_detail(
 
 
 # ---------------------------------------------------------------------------
-# Sessions endpoints (panel-r5-v1 FR3)
+# Sessions aggregate endpoint (panel-plumbing v0.1.52 FR1)
 # ---------------------------------------------------------------------------
 
 _DEFAULT_SESSIONS_RUNTIME = "claude"
-_DEFAULT_SESSIONS_LIMIT = 50
 
 
 def render_api_sessions(
@@ -821,27 +820,26 @@ def render_api_sessions(
 
     Query parameters:
     - runtime: "claude" | "codex" | "pi" (default: "claude")
-    - project: optional project slug filter
-    - limit:   max rows to return (default 50, must be positive int)
 
-    Response envelope:
+    Response envelope (server-side aggregate — panel-plumbing v0.1.52 FR1):
         {
-            "generated_at": str,         # ISO-8601
-            "runtime":      str,
-            "project":      str | null,
-            "limit":        int | null,
-            "total_count":  int,
-            "sessions":     [SessionRow, ...]
+            "runtime":         str,
+            "total_sessions":  int,
+            "active_sessions": int,
+            "total_cost_usd":  float | null,
+            "cost_known":      bool,
+            "total_messages":  int,
+            "top_agent":       {"name": str, "session_count": int} | null,
+            "generated_at":    str,           # ISO-8601
         }
 
     Status codes:
         200 — success
-        401 — missing / invalid Bearer (enforced by handler, not this view)
         503 — telemetry unavailable
 
     Security (OWASP A03, A06):
-    - limit is validated as a positive integer; invalid values fall back to default.
     - No user-controlled input is reflected verbatim in error messages.
+    - No content fields are read or returned (privacy invariant T1).
     """
 
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
@@ -851,148 +849,27 @@ def render_api_sessions(
 
         # Parse query-string kwargs forwarded by the handler.
         qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
-
         runtime_vals = qs.get("runtime")
         runtime = runtime_vals[0] if runtime_vals else _DEFAULT_SESSIONS_RUNTIME
 
-        project_vals = qs.get("project")
-        project: str | None = project_vals[0] if project_vals else None
-
-        limit_vals = qs.get("limit")
-        limit: int | None = None
-        if limit_vals:
-            try:
-                parsed = int(limit_vals[0])
-                if parsed > 0:
-                    limit = parsed
-            except (ValueError, IndexError):
-                pass
-
         try:
-            result = service.telemetry.list_sessions(
-                runtime=runtime,
-                project=project,
-                limit=limit,
-            )
+            result = service.telemetry.aggregate_sessions(runtime=runtime)
         except Exception:  # noqa: BLE001
-            logger.warning("render_api_sessions: telemetry.list_sessions() failed")
+            logger.warning("render_api_sessions: telemetry.aggregate_sessions() failed")
             body = json.dumps({"error": "telemetry unavailable"}).encode("utf-8")
             return (503, "application/json; charset=utf-8", body)
 
-        # Apply runtime adapter enrichment per row.
-        adapter = service.get_session_adapter(runtime)
-        enriched_sessions = []
-        for row in result.sessions:
-            if adapter is not None:
-                row = adapter.enrich_row(row)
-            enriched_sessions.append(
-                {
-                    "session_id": row.session_id,
-                    "runtime": row.runtime,
-                    "project": row.project,
-                    "cwd": row.cwd,
-                    "model": row.model,
-                    "started_at": row.started_at,
-                    "last_activity_at": row.last_activity_at,
-                    "message_count": row.message_count,
-                    "context_size_tokens": row.context_size_tokens,
-                    "cumulative_cost_usd": row.cumulative_cost_usd,
-                    "cost_known": row.cost_known,
-                    "status": row.status,
-                    "agent_name": row.agent_name,
-                    "ai_title": row.ai_title,
-                }
-            )
-
+        top = result.top_agent
+        top_agent = None if top is None else {"name": top.name, "session_count": top.session_count}
         payload = {
-            "generated_at": result.generated_at,
             "runtime": result.runtime,
-            "project": result.project,
-            "limit": result.limit,
-            "total_count": result.total_count,
-            "sessions": enriched_sessions,
-        }
-        body = json.dumps(payload).encode("utf-8")
-        return (200, "application/json; charset=utf-8", body)
-
-    return _view
-
-
-def render_api_session_detail(
-    service: PanelService,
-) -> Callable[..., tuple[int, str, bytes]]:
-    """Return a closure that serves GET /api/sessions/<runtime>/<session_id>.
-
-    Path parameters (forwarded as kwargs by the handler):
-    - runtime:    "claude" | "codex" | "pi"
-    - session_id: full session identifier
-
-    Response envelope on success (200): same fields as SessionRow plus
-    ``event_timestamps`` (list of ISO-8601 strings, ascending).
-
-    Status codes:
-        200 — found
-        404 — runtime/session_id combination not found
-        401 — missing / invalid Bearer (enforced by handler)
-        503 — telemetry unavailable
-
-    Security (OWASP A03, A06):
-    - session_id is passed directly to the aggregator which uses a parameterised
-      SQL query; no string interpolation occurs.
-    - Error messages do not expose internal paths or stack traces.
-    """
-
-    def _view(
-        runtime: str = _DEFAULT_SESSIONS_RUNTIME,
-        session_id: str = "",
-        **_kwargs: object,
-    ) -> tuple[int, str, bytes]:
-        if service.telemetry is None:
-            body = json.dumps({"error": "telemetry not configured"}).encode("utf-8")
-            return (503, "application/json; charset=utf-8", body)
-
-        try:
-            detail = service.telemetry.get_session(
-                runtime=runtime,
-                session_id=session_id,
-            )
-        except Exception:  # noqa: BLE001
-            logger.warning(
-                "render_api_session_detail: telemetry.get_session() failed "
-                "runtime=%r session_id=%r",
-                runtime,
-                session_id,
-            )
-            body = json.dumps({"error": "telemetry unavailable"}).encode("utf-8")
-            return (503, "application/json; charset=utf-8", body)
-
-        if detail is None:
-            body = json.dumps({"error": "not_found", "message": "Session not found."}).encode(
-                "utf-8"
-            )
-            return (404, "application/json; charset=utf-8", body)
-
-        # Apply runtime adapter enrichment.
-        adapter = service.get_session_adapter(runtime)
-        if adapter is not None:
-            detail = adapter.enrich_detail(detail)
-
-        payload = {
-            "session_id": detail.session_id,
-            "runtime": detail.runtime,
-            "project": detail.project,
-            "cwd": detail.cwd,
-            "model": detail.model,
-            "started_at": detail.started_at,
-            "last_activity_at": detail.last_activity_at,
-            "message_count": detail.message_count,
-            "context_size_tokens": detail.context_size_tokens,
-            "cumulative_cost_usd": detail.cumulative_cost_usd,
-            "cost_known": detail.cost_known,
-            "status": detail.status,
-            "agent_name": detail.agent_name,
-            "ai_title": detail.ai_title,
-            "event_timestamps": list(detail.event_timestamps),
+            "total_sessions": result.total_sessions,
+            "active_sessions": result.active_sessions,
+            "total_cost_usd": result.total_cost_usd,
+            "cost_known": result.cost_known,
+            "total_messages": result.total_messages,
+            "top_agent": top_agent,
+            "generated_at": result.generated_at,
         }
         body = json.dumps(payload).encode("utf-8")
         return (200, "application/json; charset=utf-8", body)

@@ -143,9 +143,6 @@
         c.querySelector('.academy-back-btn').addEventListener('click', function () {
           renderLessons(modules, mod);
         });
-        if (window.mermaid && typeof window.mermaid.run === 'function') {
-          try { window.mermaid.run({ querySelector: '.academy-lesson-body .mermaid' }); } catch (e) { /* noop */ }
-        }
       })
       .catch(function (err) {
         var c = getContainer();

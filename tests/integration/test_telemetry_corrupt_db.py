@@ -203,6 +203,43 @@ class TestCorruptDatabaseDegradation:
         svc.refresh()
         assert not svc.is_degraded
 
+    def test_quarantine_moves_wal_and_shm_siblings(self, tmp_path: pathlib.Path) -> None:
+        """Quarantine moves the -wal/-shm siblings with the corrupt DB (v0.1.52 FR3).
+
+        A WAL-mode store is three files: telemetry.sqlite, telemetry.sqlite-wal,
+        telemetry.sqlite-shm.  Stranding the -wal/-shm siblings after quarantining
+        only the main file leaves partial state that a fresh writer can pick up as
+        phantom WAL frames.  Quarantine must move ALL THREE.
+        """
+        state_dir = tmp_path / "telemetry"
+        state_dir.mkdir(parents=True)
+        db_path = state_dir / "telemetry.sqlite"
+        wal_path = state_dir / "telemetry.sqlite-wal"
+        shm_path = state_dir / "telemetry.sqlite-shm"
+
+        # Corrupt main DB + real-looking WAL/SHM siblings.
+        db_path.write_bytes(b"\x00" * 16)  # invalid SQLite header
+        wal_path.write_bytes(b"WAL-FRAME-BYTES")
+        shm_path.write_bytes(b"SHM-INDEX-BYTES")
+
+        svc = _make_service(state_dir, tmp_path)
+        svc.refresh()
+
+        assert svc.is_degraded, "corrupt DB must trigger degraded mode"
+        # All three originals must be gone (moved into quarantine).
+        assert not db_path.exists(), "telemetry.sqlite must be quarantined"
+        assert not wal_path.exists(), "telemetry.sqlite-wal sibling must be quarantined too"
+        assert not shm_path.exists(), "telemetry.sqlite-shm sibling must be quarantined too"
+
+        # A quarantined counterpart must exist for each of the three files.
+        main_q = list(state_dir.glob("telemetry.sqlite.corrupt.*"))
+        main_q = [p for p in main_q if not p.name.endswith(("-wal", "-shm"))]
+        wal_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-wal"))
+        shm_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-shm"))
+        assert main_q, "no quarantined main DB file found"
+        assert wal_q, "no quarantined -wal sibling found"
+        assert shm_q, "no quarantined -shm sibling found"
+
 
 # ---------------------------------------------------------------------------
 # Tests: handler returns correct HTTP status codes

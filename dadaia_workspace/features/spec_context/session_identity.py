@@ -73,7 +73,6 @@ __all__ = [
     "coherence",
     "iter_bind_epochs",
     "iter_ptr_files",
-    "iter_session_records",
     "liveness_timestamp",
     "ptr_path",
     "read_bind_epoch_pid",
@@ -167,26 +166,13 @@ def session_record_pid(workspace: Path, session_id: str) -> int | None:
 def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     """Path of the session-record directory ``.dadaia/sessions/`` (T-011-05 / FR-W1-05).
 
-    The single accessor for the session-store directory. The 3 legal consumers
-    (``cli/commands/context.py``, ``spec_context/doctor.py``, ``panel/views/kanban.py``)
-    call this instead of constructing the ``.dadaia/sessions`` path themselves (ADR-12);
+    The single accessor for the session-store directory. The 2 legal consumers
+    (``cli/commands/context.py``, ``spec_context/doctor.py``) call this instead of
+    constructing the ``.dadaia/sessions`` path themselves (ADR-12);
     ``core/specs_resolver.py`` stays the documented allowlist exception because ``core``
     cannot import this features-layer owner (constitution §6).
     """
     return _sessions_dir(workspace, create=create)
-
-
-def iter_session_records(workspace: Path) -> list[Path]:
-    """Return all top-level ``<id>.json`` session-record files (sorted; empty if absent).
-
-    Excludes the ``runtime/`` incumbent-pointer subdir (it holds ``.ptr`` files, not
-    records). Used by the Kanban view to enumerate sessions without constructing the
-    sessions-dir path itself (T-011-05 / FR-W1-05).
-    """
-    base = _sessions_dir(workspace)
-    if not base.exists():
-        return []
-    return sorted(p for p in base.glob("*.json") if p.is_file())
 
 
 def iter_ptr_files(workspace: Path) -> list[Path]:

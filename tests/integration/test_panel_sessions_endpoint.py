@@ -1,17 +1,19 @@
-"""Integration tests for /api/sessions and /api/sessions/<runtime>/<session_id>.
+"""Integration tests for GET /api/sessions — the server-side aggregate (v0.1.52 FR1).
 
-Uses a deterministic seeded SQLite fixture at
+Uses the deterministic seeded SQLite fixture at
 tests/fixtures/telemetry/sessions_seeded.sqlite (created by _seed_sessions.py).
 
-Spins up a ThreadingHTTPServer on port 0 with the real TelemetryAggregator
-wired against the fixture.  Exercises:
-  - Runtime filter: ?runtime=claude returns only Claude rows
-  - Runtime filter: ?runtime=codex returns only Codex rows with
-    cumulative_cost_usd=None and cost_known=False
-  - Project filter: ?project=<slug> narrows to sessions in that project
-  - Detail endpoint: returns full SessionDetail with event_timestamps
-  - Detail miss: unknown session_id → 404
-  - Auth: missing/wrong token → 401
+Spins up a ThreadingHTTPServer on port 0 with the real TelemetryAggregator wired
+against the fixture and exercises the aggregate envelope end-to-end:
+  - claude aggregate figures (sessions / active / messages / cost)
+  - codex aggregate (cost forced null + cost_known false)
+  - default runtime = claude
+  - the DELETED detail route /api/sessions/<runtime>/<id> ⇒ standard 404
+
+Fixture facts (see _seed_sessions.py):
+  claude: 3 sessions — 1 active, 1 idle(open), 1 ended(closed); 3+2+2 = 7 events,
+          all fully cost-known; cost_sum micro = 178000 + 84000 + 43000 = 305000.
+  codex:  2 sessions — 0 active; 2+1 = 3 events, all cost NULL; agent_name None.
 """
 
 from __future__ import annotations
@@ -27,10 +29,6 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
-    SessionDetail,
-    SessionListResult,
-)
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 
@@ -42,24 +40,33 @@ _FIXTURE_DB = (
     pathlib.Path(__file__).parents[1] / "fixtures" / "telemetry" / "sessions_seeded.sqlite"
 )
 
+_CLAUDE_SESSION_ID = "claude-session-aaa111bbb222ccc3"
+
+# Expected claude aggregate (fixture-derived).
+_CLAUDE_TOTAL_SESSIONS = 3
+_CLAUDE_ACTIVE_SESSIONS = 1
+_CLAUDE_TOTAL_MESSAGES = 7
+_CLAUDE_TOTAL_COST_USD = (178000 + 84000 + 43000) / 1_000_000  # 0.305
+
+# Expected codex aggregate (fixture-derived).
+_CODEX_TOTAL_SESSIONS = 2
+_CODEX_TOTAL_MESSAGES = 3
+
+
 # ---------------------------------------------------------------------------
 # Minimal DAO / spec-context stubs for TelemetryAggregator
 # ---------------------------------------------------------------------------
 
 
 class _FakeSpecContextService:
-    """Returns empty context list — sessions are 'unassigned' but still returned."""
-
-    def list_all(self) -> list:
+    def list_all(self) -> list[Any]:
         return []
 
 
 class _NoPricingModule:
-    """Minimal pricing stub that returns zero cost age."""
+    PRICING_TABLE: dict[str, Any] = {}
 
-    PRICING_TABLE: dict = {}
-
-    def pricing_age_days(self, models: list, when: Any = None) -> None:
+    def pricing_age_days(self, models: list[str], when: Any = None) -> None:
         return None
 
     def compute_cost(self, *_args: Any, **_kwargs: Any) -> None:
@@ -67,18 +74,15 @@ class _NoPricingModule:
 
 
 class _FixtureTelemetry:
-    """Wraps TelemetryAggregator over the seeded fixture database.
+    """Wraps TelemetryAggregator over the seeded fixture DB.
 
-    Implements the minimal interface needed by render_api_sessions /
-    render_api_session_detail:  list_sessions() + get_session().
+    Implements the minimal interface render_api_sessions needs: aggregate_sessions().
     """
 
     def __init__(self, db_path: pathlib.Path) -> None:
-        # check_same_thread=False is needed because ThreadingHTTPServer dispatches
-        # requests in worker threads different from the thread that opened the
-        # connection. The fixture database is read-only in tests.
+        # check_same_thread=False because ThreadingHTTPServer dispatches requests on
+        # worker threads. The fixture DB is read-only in tests.
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         dao = TelemetryDao(self._conn)
         self._aggregator = TelemetryAggregator(
@@ -88,27 +92,8 @@ class _FixtureTelemetry:
             workspace_root=None,
         )
 
-    def list_sessions(
-        self,
-        runtime: str,
-        project: str | None = None,
-        limit: int | None = None,
-    ) -> SessionListResult:
-        return self._aggregator.list_sessions(
-            runtime=runtime,
-            project=project,
-            limit=limit,
-        )
-
-    def get_session(
-        self,
-        runtime: str,
-        session_id: str,
-    ) -> SessionDetail | None:
-        return self._aggregator.get_session(
-            runtime=runtime,
-            session_id=session_id,
-        )
+    def aggregate_sessions(self, runtime: str) -> Any:
+        return self._aggregator.aggregate_sessions(runtime=runtime)
 
     def close(self) -> None:
         self._conn.close()
@@ -119,21 +104,17 @@ class _FixtureTelemetry:
 # ---------------------------------------------------------------------------
 
 
-def _build_server(token: str, telemetry: _FixtureTelemetry):
-    """Build a ThreadingHTTPServer with the panel handler + sessions views."""
+def _build_server(token: str, telemetry: _FixtureTelemetry) -> ThreadingHTTPServer:
     from dadaia_workspace.features.panel.handler import make_handler_class
     from dadaia_workspace.features.panel.service import PanelService
-    from dadaia_workspace.features.panel.views.api import (
-        render_api_session_detail,
-        render_api_sessions,
-    )
+    from dadaia_workspace.features.panel.views.api import render_api_sessions
 
     class _FakeRegistry:
-        def list_entries(self, project=None, include_stale=True):
+        def list_entries(self, project: Any = None, include_stale: bool = True) -> list[Any]:
             return []
 
     class _FakeSCS:
-        def list_all(self):
+        def list_all(self) -> list[Any]:
             return []
 
     service = PanelService(
@@ -156,17 +137,14 @@ def _build_server(token: str, telemetry: _FixtureTelemetry):
         "memory_view": lambda **kw: (200, "text/html; charset=utf-8", b"ok"),
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
         "api_sessions": render_api_sessions(service),
-        "api_session_detail": render_api_session_detail(service),
     }
 
     HandlerClass = make_handler_class(stub_views, token=token, telemetry=telemetry)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), HandlerClass)
-    return server
+    return ThreadingHTTPServer(("127.0.0.1", 0), HandlerClass)
 
 
 @pytest.fixture(scope="module")
-def sessions_server():
-    """Start panel with fixture telemetry; yield (base_url, token, telemetry)."""
+def sessions_server() -> Any:
     if not _FIXTURE_DB.exists():
         pytest.fail(
             f"Fixture database not found: {_FIXTURE_DB}\n"
@@ -199,427 +177,137 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req) as resp:  # noqa: S310 — loopback test server
             return resp.status, resp.read()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read()
 
 
 # ---------------------------------------------------------------------------
-# Auth tests
+# No-auth contract
 # ---------------------------------------------------------------------------
 
 
 class TestSessionsAuth:
-    """Sessions routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
-
-    def test_sessions_list_200_without_token(self, sessions_server) -> None:
-        """GET /api/sessions without token → 200."""
-        base, token, _ = sessions_server
+    def test_sessions_200_without_token(self, sessions_server: Any) -> None:
+        base, _token, _ = sessions_server
         status, _ = _get(f"{base}/api/sessions")
         assert status == 200
 
-    def test_sessions_list_stray_auth_header_ignored(self, sessions_server) -> None:
-        """A stray Authorization header is ignored — the route still serves 200."""
-        base, _, _ = sessions_server
+    def test_stray_auth_header_ignored(self, sessions_server: Any) -> None:
+        base, _token, _ = sessions_server
         status, _ = _get(f"{base}/api/sessions", token="wrong-token")
         assert status == 200
 
-    def test_sessions_detail_serves_without_token(self, sessions_server) -> None:
-        """GET /api/sessions/claude/<id> without token → not an auth error (404 for unknown id is fine)."""
+
+# ---------------------------------------------------------------------------
+# Claude aggregate
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeAggregate:
+    def test_envelope_keys(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
-        status, _ = _get(f"{base}/api/sessions/claude/any-id")
-        assert status in (200, 404)
+        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
+        data = json.loads(body)
+        assert set(data.keys()) == {
+            "runtime",
+            "total_sessions",
+            "active_sessions",
+            "total_cost_usd",
+            "cost_known",
+            "total_messages",
+            "top_agent",
+            "generated_at",
+        }
 
+    def test_no_sessions_array(self, sessions_server: Any) -> None:
+        base, token, _ = sessions_server
+        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
+        assert "sessions" not in json.loads(body)
 
-# ---------------------------------------------------------------------------
-# Runtime filter tests
-# ---------------------------------------------------------------------------
-
-
-class TestSessionsRuntimeFilter:
-    def test_claude_filter_returns_claude_rows_only(self, sessions_server) -> None:
-        """?runtime=claude returns only sessions with runtime='claude'."""
+    def test_claude_aggregate_values(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
         status, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
         assert status == 200
         data = json.loads(body)
-        assert "sessions" in data
-        for row in data["sessions"]:
-            assert row["runtime"] == "claude", (
-                f"Non-claude row in runtime=claude response: {row['runtime']}"
-            )
+        assert data["runtime"] == "claude"
+        assert data["total_sessions"] == _CLAUDE_TOTAL_SESSIONS
+        assert data["active_sessions"] == _CLAUDE_ACTIVE_SESSIONS
+        assert data["total_messages"] == _CLAUDE_TOTAL_MESSAGES
+        assert data["cost_known"] is True
+        assert data["total_cost_usd"] == pytest.approx(_CLAUDE_TOTAL_COST_USD)
 
-    def test_codex_filter_returns_codex_rows_only(self, sessions_server) -> None:
-        """?runtime=codex returns only sessions with runtime='codex'."""
+    def test_claude_top_agent(self, sessions_server: Any) -> None:
+        base, token, _ = sessions_server
+        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
+        data = json.loads(body)
+        assert data["top_agent"] is not None
+        assert data["top_agent"]["session_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Codex aggregate
+# ---------------------------------------------------------------------------
+
+
+class TestCodexAggregate:
+    def test_codex_cost_null_and_unknown(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
         status, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
         assert status == 200
         data = json.loads(body)
-        assert "sessions" in data
-        for row in data["sessions"]:
-            assert row["runtime"] == "codex", (
-                f"Non-codex row in runtime=codex response: {row['runtime']}"
-            )
+        assert data["runtime"] == "codex"
+        assert data["total_cost_usd"] is None
+        assert data["cost_known"] is False
 
-    def test_claude_returns_at_least_3_sessions(self, sessions_server) -> None:
-        """Fixture has ≥3 Claude sessions."""
-        base, token, _ = sessions_server
-        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
-        data = json.loads(body)
-        assert len(data["sessions"]) >= 3, (
-            f"Expected ≥3 Claude sessions, got {len(data['sessions'])}"
-        )
-
-    def test_codex_returns_at_least_2_sessions(self, sessions_server) -> None:
-        """Fixture has ≥2 Codex sessions."""
+    def test_codex_counts(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
         _, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
         data = json.loads(body)
-        assert len(data["sessions"]) >= 2, (
-            f"Expected ≥2 Codex sessions, got {len(data['sessions'])}"
-        )
+        assert data["total_sessions"] == _CODEX_TOTAL_SESSIONS
+        assert data["active_sessions"] == 0
+        assert data["total_messages"] == _CODEX_TOTAL_MESSAGES
 
-    def test_codex_rows_have_null_cost(self, sessions_server) -> None:
-        """All Codex rows must have cumulative_cost_usd=None and cost_known=False.
-
-        Per SPEC FR3, FR6, NFR: Codex cost is not tracked; CodexRuntimeAdapter
-        forces cumulative_cost_usd=None and cost_known=False.
-        """
+    def test_codex_top_agent_is_operator(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
         _, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
         data = json.loads(body)
-        assert data["sessions"], "Expected Codex sessions but got empty list"
-        for row in data["sessions"]:
-            assert row["cumulative_cost_usd"] is None, (
-                f"Codex row should have cumulative_cost_usd=None, got {row['cumulative_cost_usd']}"
-            )
-            assert row["cost_known"] is False, (
-                f"Codex row should have cost_known=False, got {row['cost_known']}"
-            )
+        assert data["top_agent"] == {"name": "operator", "session_count": 2}
 
-    def test_default_runtime_is_claude(self, sessions_server) -> None:
-        """GET /api/sessions with no ?runtime= param defaults to claude."""
+
+# ---------------------------------------------------------------------------
+# Default runtime
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultRuntime:
+    def test_default_runtime_is_claude(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
         status, body = _get(f"{base}/api/sessions", token=token)
         assert status == 200
         data = json.loads(body)
-        # All returned rows must be claude (default runtime = claude)
-        for row in data["sessions"]:
-            assert row["runtime"] == "claude"
-
-    def test_codex_rows_have_null_cost_and_cost_known_false(self, sessions_server) -> None:
-        """Codex rows expose unknown cost end-to-end.
-
-        Codex cost tracking is not supported, so cumulative_cost_usd is None
-        and cost_known is False from the fixture DB through the HTTP response.
-        """
-        base, token, _ = sessions_server
-        status, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
-        assert status == 200
-        data = json.loads(body)
-        codex_rows = data["sessions"]
-        assert codex_rows, "Expected at least one Codex session in the fixture"
-        for row in codex_rows:
-            assert row["cumulative_cost_usd"] is None, (
-                f"Codex row {row['session_id']!r} must have "
-                f"cumulative_cost_usd=None, got {row['cumulative_cost_usd']!r}"
-            )
-            assert row["cost_known"] is False, (
-                f"Codex row {row['session_id']!r} must have "
-                f"cost_known=False, got {row['cost_known']!r}"
-            )
+        assert data["runtime"] == "claude"
+        assert data["total_sessions"] == _CLAUDE_TOTAL_SESSIONS
 
 
 # ---------------------------------------------------------------------------
-# Project filter test
+# Deleted detail route
 # ---------------------------------------------------------------------------
 
 
-class TestSessionsProjectFilter:
-    def test_project_filter_narrows_results(self, sessions_server) -> None:
-        """?project=dadaia-workspace returns only sessions for that project."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions?runtime=claude&project=dadaia-workspace",
-            token=token,
-        )
-        data = json.loads(body)
-        assert data["sessions"], "Expected sessions for dadaia-workspace"
-        for row in data["sessions"]:
-            assert row["project"] == "dadaia-workspace", (
-                f"Wrong project in response: {row['project']}"
-            )
-
-    def test_project_filter_sample_project(self, sessions_server) -> None:
-        """?project=sample-project returns only sessions for that project."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions?runtime=claude&project=sample-project",
-            token=token,
-        )
-        data = json.loads(body)
-        assert data["sessions"], "Expected sessions for sample-project"
-        for row in data["sessions"]:
-            assert row["project"] == "sample-project"
-
-    def test_unknown_project_returns_empty(self, sessions_server) -> None:
-        """?project=nonexistent returns empty sessions list (not an error)."""
-        base, token, _ = sessions_server
-        status, body = _get(
-            f"{base}/api/sessions?runtime=claude&project=nonexistent-project",
-            token=token,
-        )
-        assert status == 200
-        data = json.loads(body)
-        assert data["sessions"] == []
-
-
-# ---------------------------------------------------------------------------
-# Detail endpoint tests
-# ---------------------------------------------------------------------------
-
-_CLAUDE_SESSION_ID = "claude-session-aaa111bbb222ccc3"
-# First Codex session from tests/fixtures/telemetry/sessions_seeded.sqlite
-_CODEX_SESSION_ID = "codex-session-jjj000kkk111lll2"
-
-
-class TestSessionDetail:
-    def test_detail_hit_returns_200(self, sessions_server) -> None:
-        """GET /api/sessions/claude/<id> with valid id → 200."""
+class TestDeletedDetailRoute:
+    def test_detail_route_returns_standard_404(self, sessions_server: Any) -> None:
+        """GET /api/sessions/<runtime>/<id> is no longer a route ⇒ standard 404."""
         base, token, _ = sessions_server
         status, body = _get(
             f"{base}/api/sessions/claude/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
-        assert status == 200
-
-    def test_detail_has_required_keys(self, sessions_server) -> None:
-        """Detail response has all SessionRow keys plus event_timestamps."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/claude/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        required = {
-            "session_id",
-            "runtime",
-            "project",
-            "cwd",
-            "model",
-            "started_at",
-            "last_activity_at",
-            "message_count",
-            "context_size_tokens",
-            "cumulative_cost_usd",
-            "cost_known",
-            "status",
-            "agent_name",
-            "ai_title",
-            "event_timestamps",
-        }
-        missing = required - set(data.keys())
-        assert not missing, f"Missing detail keys: {missing}"
-
-    def test_detail_event_timestamps_non_empty(self, sessions_server) -> None:
-        """event_timestamps is a non-empty list of ISO strings."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/claude/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        assert isinstance(data["event_timestamps"], list)
-        assert len(data["event_timestamps"]) > 0
-
-    def test_detail_session_id_matches_request(self, sessions_server) -> None:
-        """Detail response session_id matches requested session_id."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/claude/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        assert data["session_id"] == _CLAUDE_SESSION_ID
-
-    def test_detail_context_size_tokens_non_zero(self, sessions_server) -> None:
-        """context_size_tokens is non-trivially computed (> 0) for seeded events."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/claude/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        # Most recent event: tokens_input=12000 + cache_create=4000 + cache_read=22000 = 38000
-        assert data["context_size_tokens"] > 0, (
-            "context_size_tokens should be non-trivially computed from event rows"
-        )
-
-    def test_detail_miss_returns_404(self, sessions_server) -> None:
-        """GET /api/sessions/claude/nonexistent → 404."""
-        base, token, _ = sessions_server
-        status, body = _get(
-            f"{base}/api/sessions/claude/nonexistent-session-id-xyz",
             token=token,
         )
         assert status == 404
-        data = json.loads(body)
-        assert data.get("error") == "not_found"
+        assert b"Route not found" in body
 
-    def test_detail_wrong_runtime_returns_404(self, sessions_server) -> None:
-        """Querying a Claude session_id with runtime=codex → 404."""
+    def test_detail_route_unknown_id_also_404(self, sessions_server: Any) -> None:
         base, token, _ = sessions_server
-        status, _ = _get(
-            f"{base}/api/sessions/codex/{_CLAUDE_SESSION_ID}",
-            token=token,
-        )
+        status, _ = _get(f"{base}/api/sessions/claude/nonexistent-id", token=token)
         assert status == 404
-
-
-# ---------------------------------------------------------------------------
-# Codex detail endpoint assertions
-# ---------------------------------------------------------------------------
-
-
-class TestCodexDetailEndpoint:
-    """/api/sessions/codex/<id> returns unknown cost fields.
-
-    Picks one Codex session_id from the seeded fixture and asserts the
-    cost contract end-to-end: fixture DB → aggregator → HTTP response.
-    """
-
-    def test_codex_detail_endpoint_returns_none_cost(self, sessions_server) -> None:
-        """GET /api/sessions/codex/<id> returns cumulative_cost_usd=None and cost_known=False.
-
-        Cost tracking is disabled for Codex. The adapter must set both fields
-        to None/False on the single-session detail path, not only on the list path.
-        """
-        base, token, _ = sessions_server
-        status, body = _get(
-            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
-            token=token,
-        )
-        assert status == 200, f"Expected 200 for Codex detail {_CODEX_SESSION_ID!r}, got {status}"
-        data = json.loads(body)
-
-        assert data["cumulative_cost_usd"] is None, (
-            f"Codex detail must have cumulative_cost_usd=None, got {data['cumulative_cost_usd']!r}"
-        )
-        assert data["cost_known"] is False, (
-            f"Codex detail must have cost_known=False, got {data['cost_known']!r}"
-        )
-
-    def test_codex_detail_has_all_required_keys(self, sessions_server) -> None:
-        """GET /api/sessions/codex/<id> response carries all SessionDetail keys."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        required = {
-            "session_id",
-            "runtime",
-            "project",
-            "cwd",
-            "model",
-            "started_at",
-            "last_activity_at",
-            "message_count",
-            "context_size_tokens",
-            "cumulative_cost_usd",
-            "cost_known",
-            "status",
-            "agent_name",
-            "ai_title",
-            "event_timestamps",
-        }
-        missing = required - set(data.keys())
-        assert not missing, f"Missing Codex detail keys: {missing}"
-
-    def test_codex_detail_runtime_is_codex(self, sessions_server) -> None:
-        """GET /api/sessions/codex/<id> returns runtime='codex'."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        assert data["runtime"] == "codex", f"Expected runtime='codex', got {data['runtime']!r}"
-
-    def test_codex_detail_session_id_matches(self, sessions_server) -> None:
-        """Detail response session_id matches the requested Codex session_id."""
-        base, token, _ = sessions_server
-        _, body = _get(
-            f"{base}/api/sessions/codex/{_CODEX_SESSION_ID}",
-            token=token,
-        )
-        data = json.loads(body)
-        assert data["session_id"] == _CODEX_SESSION_ID
-
-
-# ---------------------------------------------------------------------------
-# Envelope shape tests
-# ---------------------------------------------------------------------------
-
-
-class TestSessionsEnvelope:
-    def test_envelope_top_level_keys(self, sessions_server) -> None:
-        """List response has all required top-level envelope keys."""
-        base, token, _ = sessions_server
-        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
-        data = json.loads(body)
-        required = {"generated_at", "runtime", "project", "limit", "total_count", "sessions"}
-        missing = required - set(data.keys())
-        assert not missing, f"Missing envelope keys: {missing}"
-
-    def test_session_row_has_required_keys(self, sessions_server) -> None:
-        """Each session row in the list has all required SessionRow keys."""
-        base, token, _ = sessions_server
-        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
-        data = json.loads(body)
-        assert data["sessions"]
-        row = data["sessions"][0]
-        required = {
-            "session_id",
-            "runtime",
-            "project",
-            "cwd",
-            "model",
-            "started_at",
-            "last_activity_at",
-            "message_count",
-            "context_size_tokens",
-            "cumulative_cost_usd",
-            "cost_known",
-            "status",
-            "agent_name",
-            "ai_title",
-        }
-        missing = required - set(row.keys())
-        assert not missing, f"Missing session row keys: {missing}"
-
-    def test_total_count_reflects_all_matches(self, sessions_server) -> None:
-        """total_count reports unfiltered matching row count."""
-        base, token, _ = sessions_server
-        _, body = _get(f"{base}/api/sessions?runtime=claude", token=token)
-        data = json.loads(body)
-        assert data["total_count"] >= len(data["sessions"])
-        assert data["total_count"] >= 3  # fixture has ≥3 Claude sessions
-
-    def test_limit_respected(self, sessions_server) -> None:
-        """?limit=1 returns at most 1 session."""
-        base, token, _ = sessions_server
-        _, body = _get(f"{base}/api/sessions?runtime=claude&limit=1", token=token)
-        data = json.loads(body)
-        assert len(data["sessions"]) <= 1
-
-    def test_content_type_is_json(self, sessions_server) -> None:
-        """Content-Type is application/json; charset=utf-8."""
-        base, token, _ = sessions_server
-        req = urllib.request.Request(f"{base}/api/sessions?runtime=claude")
-        req.add_header("Authorization", f"Bearer {token}")
-        with urllib.request.urlopen(req) as resp:
-            ct = resp.headers.get("Content-Type", "")
-        assert "application/json" in ct

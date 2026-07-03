@@ -427,7 +427,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 }
 
 /* ── Ops consolidated tab — stacked sub-sections ─────────────────────────────
-   T-016-P09: Agents + Workflows + Kanban merged into one "Ops" nav tab.
+   T-016-P09: Agents + Workflows merged into one "Ops" nav tab.
    Each sub-section is stacked vertically inside #section-ops with a labelled
    header and compact cards.
    ─────────────────────────────────────────────────────────────────────────── */

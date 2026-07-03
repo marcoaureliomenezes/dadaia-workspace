@@ -117,16 +117,6 @@ TOKENS_CSS: str = """
   /* ── Dimensions ───────────────────────────────────── */
   --modal-max-w:  720px;
   --modal-max-h:  80vh;
-
-  /* ── Kanban board tokens (panel-kanban-v1 K-2) ───────────────────── */
-  --color-kanban-separator:      #888888;   /* 3.54:1 on --color-bg #fafafa — WCAG 1.4.11 pass */
-  --color-kanban-lane-header-bg: #f0fbf7;  /* mirrors --color-primary-bg default (brand-identity-v1) */
-  --color-kanban-locked-overlay: #fafafa;  /* mirrors --color-bg default */
-  --opacity-kanban-locked:       0.40;
-  --kanban-col-min-w:            200px;
-  --kanban-card-min-h:           72px;
-  --kanban-card-gap:             0.6rem;   /* mirrors --space-sm default */
-  --kanban-lane-gap:             0.3rem;   /* mirrors --space-xs default */
 }
 
 /* ── Theme: Mint (default) ───────────────────────────────────────────────────

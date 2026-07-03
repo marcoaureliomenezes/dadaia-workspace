@@ -70,7 +70,6 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_dadaia_workflows_list,
     render_api_reports,
     render_api_servers,
-    render_api_session_detail,
     render_api_sessions,
     render_api_workflow_detail,
     render_api_workflows_list,
@@ -79,7 +78,6 @@ from dadaia_workspace.features.panel.views.api import (
     unmark_report_important,
 )
 from dadaia_workspace.features.panel.views.index import render_index
-from dadaia_workspace.features.panel.views.kanban import render_api_kanban
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.workflow_policy import (
@@ -331,34 +329,6 @@ def build_ancestry_pid_chain(start_pid: int, *, cap: int = _ANCESTRY_CHAIN_CAP) 
     except Exception:  # noqa: BLE001 — attribution is best-effort; bind/resolve never fail on it.
         return chain
     return chain
-
-
-def _build_alive_contexts_provider(
-    workspace_root: Path,
-) -> Callable[[], list[tuple[str, str]]]:
-    """Composition-root provider of ALIVE Spec Contexts for the Kanban view (kanban-v2).
-
-    Returns a callable yielding ``(context_name, repo_slug)`` for every ALIVE context in
-    the registry, so the Kanban board's swimlanes are the live-project set (not "whatever
-    has session files"). ``features/panel/views/kanban.py`` never imports the context
-    store adapter — the container injects this callable, mirroring the ``pid_probe`` seam.
-    Fail-soft: any registry error ⇒ empty list (the view falls back to session-derived
-    lanes only).
-    """
-    from dadaia_workspace.core.models.spec_context import ContextState
-
-    def _provider() -> list[tuple[str, str]]:
-        try:
-            store = JsonContextStore(_states_dir(workspace_root))
-            return [
-                (ctx.name, ctx.repo_slug)
-                for ctx in store.list_all()
-                if ctx.state == ContextState.ALIVE
-            ]
-        except Exception:  # noqa: BLE001 — registry read must never break the panel.
-            return []
-
-    return _provider
 
 
 def build_doctor_service(workspace_root: Path) -> DoctorService:
@@ -1235,11 +1205,6 @@ def build_panel_views(
         "api_panel_status": render_api_servers(service),
         "health": render_health(),
         "api_contexts": render_api_contexts(service),
-        "api_kanban": render_api_kanban(
-            workspace_root,
-            alive_contexts=_build_alive_contexts_provider(workspace_root),
-            pid_probe=_build_pid_probe(),
-        ),
         "api_academy": render_api_academy(service),
         "academy_lesson": render_academy_lesson(academy),
         "api_reports": render_api_reports(service),
@@ -1271,7 +1236,6 @@ def build_panel_views(
         "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
         "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),
-        "api_session_detail": render_api_session_detail(service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),
         "static": render_static(),

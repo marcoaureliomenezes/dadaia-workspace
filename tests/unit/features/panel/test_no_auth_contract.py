@@ -83,7 +83,6 @@ _ALL_VIEW_NAMES = [
     "memory_view",
     "reports_serve",
     "api_academy",
-    "api_kanban",
     "api_reports",
     "api_report_delete",
     "api_report_mark_important",
@@ -131,7 +130,6 @@ _VIEW_ROUTE_CASES = [
     ("/memory-view/foo/bar.md", "memory_view"),
     ("/reports/sub/report.html", "reports_serve"),
     ("/api/academy", "api_academy"),
-    ("/api/kanban", "api_kanban"),
     ("/api/reports", "api_reports"),
     ("/api/agents/software-engineer/prompt", "api_agent_prompt"),
     ("/api/workflows", "api_workflows"),
@@ -155,7 +153,6 @@ _TELEMETRY_ROUTE_PATHS = [
     "/api/agents",
     "/api/agents/software-engineer/sessions",
     "/api/sessions",
-    "/api/sessions/claude/abc123",
 ]
 
 

@@ -42,22 +42,40 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
         from dadaia_workspace.features.telemetry.reader import pi as _pi_reader
         from dadaia_workspace.features.telemetry.service import TelemetryService
         from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-        from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+        from dadaia_workspace.features.telemetry.store.schema import (
+            apply_migrations,
+            open_connection,
+        )
 
         state_dir = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
         state_dir.mkdir(parents=True, exist_ok=True)
+        db_path = state_dir / "telemetry.sqlite"
 
-        def _dao_factory() -> TelemetryDao:
-            db_path = state_dir / "telemetry.sqlite"
-            conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        def _write_dao_factory() -> TelemetryDao:
+            # Writable per-refresh connection through the pragma'd factory (WAL +
+            # busy_timeout). Used only inside TelemetryService._do_refresh, which
+            # closes it in finally. Single-thread use → no check_same_thread.
+            conn = open_connection(db_path)
             apply_migrations(conn)
             return TelemetryDao(conn)
+
+        def _read_conn_factory() -> sqlite3.Connection:
+            # Per-call read-only connection for aggregator queries. Each panel
+            # request thread opens and closes its OWN connection — never shared
+            # across ThreadingHTTPServer worker threads (v0.1.52 FR3). Read-only
+            # (mode=ro) skips the WAL write; busy_timeout absorbs transient locks.
+            return open_connection(db_path, read_only=True)
+
+        # Materialise + migrate the store once at boot so the per-call read-only
+        # factory always has a database to open (mode=ro cannot create a file).
+        _boot_dao = _write_dao_factory()
+        _boot_dao._conn.close()
 
         # We need a SpecContextService for context resolution.
         spec_context = container.build_spec_context_service(workspace_root)
 
         aggregator = TelemetryAggregator(
-            dao=_dao_factory(),
+            connection_factory=_read_conn_factory,
             spec_context_service=spec_context,
             pricing_module=_pricing,
             workspace_root=workspace_root,
@@ -67,7 +85,7 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
             return (_claude_reader, _codex_reader, _pi_reader)
 
         return TelemetryService(
-            dao_factory=_dao_factory,
+            dao_factory=_write_dao_factory,
             aggregator=aggregator,
             reader_factory=_reader_factory,
             pricing_module=_pricing,

@@ -182,3 +182,38 @@ class TestWikilinkRendererParamBySlug:
         result: str = md("[[product]]")  # type: ignore[assignment]
         assert "/memory-view/some-context/product.md" in result
         assert "product.html" not in result
+
+
+# ---------------------------------------------------------------------------
+# Mermaid fence escaping (v0.1.52 FR4 — OWASP A03 / XSS)
+#
+# block_code emits <pre class="mermaid"> for mermaid fences. No Mermaid client
+# ships on the panel (the CSP forbids the CDN import; the dead window.mermaid.run()
+# block was removed), so the fence body must arrive HTML-ESCAPED — never as live
+# HTML. These tests exercise block_code directly via the renderer (bypassing the
+# view's outer _sanitise defence-in-depth) so they probe the escape itself: an
+# UNescaped block_code emits raw <script>/<img> and FAILS these assertions.
+# The hostile-fence test is this wave's falsifiability probe (SPEC §5 AC-7).
+# ---------------------------------------------------------------------------
+
+
+class TestMermaidFenceEscaping:
+    """block_code must HTML-escape mermaid fence content (XSS defence)."""
+
+    def test_hostile_script_fence_arrives_escaped(self) -> None:
+        """A <script> payload inside a mermaid fence arrives escaped, not executable."""
+        md = build_renderer("proj")
+        result: str = md("```mermaid\n<script>alert(1)</script>\n```\n")  # type: ignore[assignment]
+        # The mermaid class is preserved.
+        assert '<pre class="mermaid">' in result
+        # The payload is entity-escaped, not a live <script> tag.
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in result
+        assert "<script>alert(1)</script>" not in result
+
+    def test_hostile_img_onerror_fence_arrives_escaped(self) -> None:
+        """An <img onerror> payload (not caught by the script/style sanitiser) is escaped."""
+        md = build_renderer("proj")
+        result: str = md("```mermaid\n<img src=x onerror=alert(1)>\n```\n")  # type: ignore[assignment]
+        assert '<pre class="mermaid">' in result
+        assert "&lt;img src=x onerror=alert(1)&gt;" in result
+        assert "<img src=x onerror=alert(1)>" not in result

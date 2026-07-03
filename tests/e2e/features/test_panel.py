@@ -254,7 +254,7 @@ def test_credentialless_loopback_request_to_api_is_200(tmp_path: Path) -> None:
     try:
         _wait_for_ready(proc, port)
 
-        for path in ("/", "/health", "/api/panel-status", "/api/contexts", "/api/kanban"):
+        for path in ("/", "/health", "/api/panel-status", "/api/contexts"):
             with _get(f"http://127.0.0.1:{port}{path}") as resp:
                 assert resp.status == 200, f"{path} must serve 200 credential-less"
 

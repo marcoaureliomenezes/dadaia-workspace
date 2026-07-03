@@ -192,11 +192,6 @@ def test_api_contexts_requires_second_loop_auth() -> None:
     assert _get_auth("api_contexts") == AuthClass.BEARER_SECOND_LOOP
 
 
-def test_api_kanban_requires_bearer() -> None:
-    """api_kanban must require BEARER (no telemetry needed)."""
-    assert _get_auth("api_kanban") == AuthClass.BEARER
-
-
 def test_api_workflow_fragment_route_registered_and_bearer() -> None:
     """GET /api/workflow-fragments/<id> resolves to api_workflow_fragment under BEARER (Wave D)."""
     assert _get_auth("api_workflow_fragment") == AuthClass.BEARER
@@ -247,9 +242,9 @@ def test_api_sessions_requires_bearer_telemetry() -> None:
     assert _get_auth("api_sessions") == AuthClass.BEARER_TELEMETRY
 
 
-def test_api_session_detail_requires_bearer_telemetry() -> None:
-    """api_session_detail must require BEARER_TELEMETRY."""
-    assert _get_auth("api_session_detail") == AuthClass.BEARER_TELEMETRY
+def test_api_session_detail_route_removed() -> None:
+    """The per-session detail route was deleted (v0.1.52 FR1) — no longer registered."""
+    assert _get_auth("api_session_detail") is None
 
 
 def test_api_agent_sessions_requires_bearer_telemetry() -> None:

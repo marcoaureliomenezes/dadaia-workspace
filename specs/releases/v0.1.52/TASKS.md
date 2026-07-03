@@ -1,0 +1,142 @@
+# TASKS — v0.1.52 — Panel Plumbing
+
+**Status:** Aprovado
+
+Markers: `[ ]` open · `[-]` in progress · `[x]` done. One `[-]` per owner unless write
+sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequential only).
+
+## W0 — definition
+
+- [x] T-52-01 SPEC/PLAN/TASKS authored from the 2026-07-02 inspection; dual
+  definition review REJECT×2 — architect BLOCKERs: `TelemetryService` facade +
+  dead-facade deletion (W1 gains service.py; AC-2 grep extended), factory contract
+  re-scoped to store-writable connections with an ENUMERATED exempt allowlist
+  (foreign ro `~/.codex` readers must never see the WAL factory; integrity probe →
+  ro factory mode), container.py unwiring added (ImportError-at-startup caught),
+  FR4 residue enumeration (405 regex, tokens, whole CSS file, dead mermaid.run(),
+  session_identity API), three-way shared-file note, `active_sessions` added to
+  the aggregate, badge-extraction note; QA BLOCKERs: commit convention (greppable
+  RED commits; AC-7 evidence as task-line artifact), same allowlist scope,
+  8-case cost-known matrix + coverage-inventory contract, deterministic structural
+  red (Barrier + distinct-connection assertion, not probabilistic), third sabotage
+  (cost_known filter), comprehensive multi-site greps. ALL landed; three files
+  `Aprovado`; definition commit. Owner: product-engineer (orchestrated).
+
+## W1 — FR1 aggregate endpoint (write set: PLAN §W1)
+
+- [x] T-52-10 DONE. RED `72caa6cc` (32 failed for the right reasons —
+  `aggregate_sessions` missing / envelope mismatch / 503) → feat `21cb8158`.
+  Landed: `aggregate_sessions` SQL + facade (dead facades deleted; grep-proof: the
+  only surviving hit is a kept dataclass docstring; `list_sessions_by_agent`
+  intact at 4 sites); `/api/sessions` aggregate envelope; detail endpoint deleted
+  at ALL handler sites + `container.py` `api_session_detail` unwiring (caught
+  beyond the SPEC enumeration); 2 collateral tests updated
+  (`test_handler_route_classification`, `test_no_auth_contract`). Scope run: 38
+  passed (3 reworked files) + **915 passed, exit 0** (panel+telemetry+contract) +
+  ruff/mypy clean. COVERAGE INVENTORY recorded in the W1 handoff
+  (`2026-07-02T234313Z-software-engineer-T-52-10.handoff.json`): every surviving
+  behavior mapped to a named successor (matrix cases 1-8, auth/503/Host-guard,
+  deleted-route 404); list/detail-only behaviors (pagination, ordering, per-row
+  fields, event_timestamps) intentionally dead; `/api/agents/<id>/sessions`
+  coverage confirmed intact (10 named tests). Design note for QA: codex/pi cost
+  forced null/false via `_COST_UNKNOWN_RUNTIMES` even against stray stored data.
+  Owner: software-engineer.
+
+## W2 — FR2 dashboard-only view (write set: PLAN §W2)
+
+- [x] T-52-11 DONE — `3d66016c` (7 files, +472/−1736; after `feat(T-52-10)` ⇒
+  AC-1 order holds). sessions.js 710→211 (−499), scaffold 116→65, CSS 509→94
+  (−415); badge extracted; runtime switcher + `#section-sessions` preserved
+  (response-guard assumptions intact); `#sessions-meta` dropped (no updater, no
+  test references). New `sessions-dashboard.spec.ts` E2E-SES-DASH-01..04 green
+  against a local sandbox (mocked aggregate; console-error-free); list spec
+  deleted. AC-7 sabotage (a-variant, endpoint mocked so the JS mapping is the
+  gated surface) RECORDED: one line `var costVal = true ? 'N/A'` ⇒ DASH-01/02
+  FAIL exactly on the cost mapping (`Expected "$1.73" Received "N/A"`; exit 1);
+  reverted; 4 passed exit 0. Unit scope 583 passed exit 0; ruff/mypy clean.
+  Collateral fix: `test_views_index.py:161` repointed from the deleted
+  `sessions-tbody` to `sessions-dashboard`. Owner: software-engineer.
+
+## W3 — FR3 telemetry reliability (write set: PLAN §W3)
+
+- [x] T-52-12 TDD: `test(T-52-12): distinct-connection RED` commit
+  (Barrier(2)-synchronized structural assertion — two concurrent panel query calls
+  must use DISTINCT connections; fails by construction on the shared
+  `check_same_thread=False` design), then the fix commit: `open_connection` +=
+  busy_timeout + `read_only` mode (ro skips the WAL pragma); `_dao_factory` and
+  store query/refresh paths per-call through the factory (finally-closed);
+  integrity probe → `open_connection(read_only=True)`; `_quarantine_db` moves
+  `-wal`/`-shm`; bounded smoke (8 readers × 25 iterations vs live writer,
+  Barrier-started, no sleeps); allowlist-scoped factory contract test
+  (`tests/contract/` — exempt: `aggregator/runtimes.py`, `reader/codex.py`,
+  `schema.py:137` itself). AC-7 sabotages (b) factory bypass ⇒ contract FAILS and
+  (c) `cost_known` filter dropped ⇒ matrix case 4/6 FAILS (captured outputs on
+  this line; reverted). Owner: software-engineer.
+  - DONE — RED `0794dae3` (structural TypeError: no `connection_factory`;
+    contract flags panel.py:52 + service.py:295; quarantine red) → fix
+    `93e8b75e`. Shape: factory CALLABLE on `TelemetryAggregator`, per-method
+    open/finally-close (`_open_conn`/`_impl` pattern); DAO untouched (aggregator
+    is the sole connection consumer); `check_same_thread=False` GONE; integrity
+    probe via `open_connection(read_only=True)` (ro skips WAL); quarantine moves
+    `-wal`/`-shm`. Scope: **935 passed exit 0**; ruff/mypy clean. AC-7(b)
+    captured: bare connect restored ⇒ contract FAILS (panel.py:[67], exit 1);
+    AC-7(c): cost_known filter dropped ⇒ 6 matrix tests FAIL (case4/6/3/7 +
+    top_agent, exit 1); both reverted, re-run green. Foreign readers CONFIRMED
+    untouched (`runtimes.py`, `codex.py`, `store/dao.py` absent from the diff).
+    Collateral: `test_service.py::test_cost_backfill` → file-backed (refresh now
+    correctly closes its connection). Marked [x].
+
+## W4 — FR4 catalog (write set: PLAN §W4; sequential after W1/W3 — shared files)
+
+- [x] T-52-13 DONE — `313661bd` (18 files, +92/−1388; scope run **1,224 passed
+  exit 0**; ruff/mypy clean). Kanban chain FULLY deleted: `grep -rn -i kanban
+  dadaia_workspace/` → zero hits, `find -iname '*kanban*'` → nothing; the
+  GET-only 405 mechanism removed whole (kanban was its sole route). Dispositions
+  RECORDED: provider `_build_alive_contexts_provider`/`AliveContextsProvider`
+  orphaned → deleted (`_build_pid_probe` shared with doctor — kept);
+  `iter_session_records` sole production caller was kanban → API + `__all__`
+  entry deleted, `sessions_dir` docstring fixed to the 2 real consumers; BONUS
+  (grep-surfaced): `core/lock_liveness.py::is_stale_session` (extracted FROM
+  kanban, zero other production callers) → API + its dedicated test file
+  `tests/unit/core/test_lock_liveness_session.py` deleted — NOTE: that file was
+  in v0.1.50's frozen 9-path no-steal suite; the freeze was that release's AC-1,
+  and this is dead-API removal, not a no-steal weakening — flagged for explicit
+  QA-gate adjudication (other 8 frozen files must be diff-clean). Mermaid fences
+  escaped + hostile-fence probes (falsifiability verified); dead
+  `window.mermaid.run()` branch deleted; token drift-check deleted. New container
+  sanity test `test_container_build_panel_views_constructs_without_kanban`.
+  Collateral fixes: mermaid raw-arrow tests inverted to the escaped contract;
+  `test_no_auth_contract`/`test_handler_route_classification` kanban entries
+  removed; orchestrator fixed the flagged `tests/e2e/features/test_panel.py:257`
+  (kanban dropped from the credential-less 200 tuple). Owner: software-engineer.
+
+## W5 — gates + ship (flat release: single ship gate)
+
+- [x] T-52-20 QA review (ship gate): **APPROVE** (qa-engineer, 2026-07-03, on
+  `e47e6eb3`). AC-1 verified by per-commit CONTENT (aggregate + server deletion in
+  `21cb8158`, client deletion after in `3d66016c`); AC-2/AC-4 greps zero (facades
+  gone, `list_sessions_by_agent` at 7 sites, kanban zero, mermaid hostile-fence
+  passing, drift-check gone); AC-3 RED verified in a detached WORKTREE at
+  `0794dae3` (structural TypeError) + 16 reliability tests green on HEAD +
+  `check_same_thread` gone; AC-5 inventory re-derived (matrix 1-8, 404, agents
+  coverage intact); AC-6 full suite independently re-run **4,360 passed / 17
+  skipped, exit 0** + ruff/mypy clean; AC-7 three concrete sabotage artifacts, no
+  residue. SPECIAL ADJUDICATION cleared: `is_stale_session` deletion is
+  legitimate dead-code removal — kanban-only caller (verified pre-W4 at
+  `93e8b75e`), the deleted test exercised ONLY the session-TTL predicate (never
+  the pid-veto/no-steal invariant), all 8 other frozen files diff-clean vs main;
+  v0.1.50 no-steal freeze preserved. Condition for merge: green `e2e-panel` run
+  on the PR (T-52-21 confirms). Owner: qa-engineer.
+- [ ] T-52-21 Security review (push gate): APPROVE handoff with
+  `metrics.commit_sha` = pushed sha (attention: foreign-DB allowlist integrity,
+  mermaid escape, deleted auth-era drift-check); push; CI green (incl.
+  `e2e-panel`); PR; merge. Owner: security-reviewer + orchestrator.
+
+## W6 — closure (CLOSURE phase)
+
+- [ ] T-52-30 CLOSURE.md (Validations + Drifts — SPEC-DOC-006); consumed entries
+  (`panel-sessions-cost-dashboard-only`, `panel-runtime-reliability`) removed with
+  durable copies + `consumed_backlog.json`; memory `panel.md` refreshed (tab
+  inventory, route table incl. deleted kanban/detail routes, flowchart, usage
+  flow) + catalog + lint; archive; ACTIVE → none; candidates R4 row shipped; note
+  the deferred SQLite bug chain remediated. Owner: product-engineer.
