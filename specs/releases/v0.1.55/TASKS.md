@@ -112,7 +112,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W2 — FR3 reports triplet merge
 
-- [-] T-55-20 Merge `reports_next` / `reports_retention` / `reports_validation` into one
+- [x] T-55-20 Merge `reports_next` / `reports_retention` / `reports_validation` into one
   `features/reports/` package. Checklist:
   - Create `features/reports/{next,retention,validation}.py` (current service + result classes;
     optional `__init__` re-exports to minimize consumer churn); **delete** the three
@@ -137,6 +137,52 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
     merged package; dead: the three top-level `reports_*` packages — pinned by the zero-import grep
     + `modules =` + the corrected docstrings). NO `specs/backlog`.
   Owner: software-engineer.
+  - **DONE (software-engineer, 2026-07-03).** Commits: relocation `8f918dcf`
+    (`refactor(T-55-20)`), closeout `<this commit>` (`chore(T-55-20)`). **Pure relocation —
+    zero behavior change; no golden needed (rides existing reports consumer suites).**
+    **Move (git mv, history-preserving):** `reports_next/service.py`→`reports/next.py`,
+    `reports_retention/service.py`→`reports/retention.py`,
+    `reports_validation/service.py`→`reports/validation.py`; new `reports/__init__.py`
+    (package docstring, NO re-export barrel); three old packages DELETED. **Production
+    repoints:** `container.py` l.97-99 imports; `cli/commands/reports.py` l.22/26 imports;
+    `lifecycle/report_workflow.py` l.17; `core/protocols/handoff_validator.py:4` docstring
+    (`reports_validation`→`reports.validation`). Factory NAMES `build_reports_*_service`
+    UNCHANGED by design (identifiers, not module paths — SPEC repoints imports only, not
+    l.57/316/643/465/484/514/835). **`setup.cfg` SAME commit:** `modules =` −3 reports_* /
+    +1 `features.reports`; edge #7 1:1 target repoint
+    `lifecycle.report_workflow -> features.reports.validation`. **Tests:**
+    `reports_{next,retention,validation}/` merged → `tests/unit/features/reports/`
+    (the two `test_service.py` collisions disambiguated →
+    `test_next_service.py`/`test_retention_service.py`; `test_resolve_artifact_path.py`
+    kept); imports repointed in `test_reports_validation_service.py`,
+    `test_reports_retention_cleanup.py`, `panel/test_api_contract.py`;
+    `tests/contract/README.md` asymmetry-map three rows collapsed to one live `reports` row
+    (drives `test_lifecycle_asymmetry_map.py`). **Cap/lint:** `lint-imports --no-cache` =
+    `8 kept, 0 broken` (zero "No matches for ignored import"); cap test `== 26` + per-family
+    `9/4/13` GREEN (1:1 repoint, no count change; `modules =` is not edge-counted).
+    **Grep evidence:** zero `features.reports_*` / `reports_*/` module-path references remain
+    anywhere in `dadaia_workspace/`, `tests/`, `setup.cfg` (only the surviving factory
+    identifiers `build_reports_*_service` + the unchanged contract filenames
+    `test_reports_retention_cleanup.py`/`test_reports_validation_service.py` match a naive
+    substring grep; memory/spec/archive refs deferred to W7 CLOSURE per §SPEC 8).
+    **AC-7 (mutation-sanity, FR3):** planted a cross-feature import
+    `features.reports.validation -> features.backlog.doctor` ⇒ `features-no-cross-feature`
+    BROKEN (`7 kept, 1 broken`) — proves the merged package is enforced by the independence
+    contract; reverted → `8 kept, 0 broken`. **Gates:** full `pytest` (tests/
+    --ignore=tests/e2e/panel) 4337 passed / 17 skipped (exit 0); `ruff format --check`
+    exit 0; `ruff check --no-cache` exit 0; `mypy --strict dadaia_workspace` exit 0;
+    `specs doctor` exit 0. **AC-8 ledger — surviving:** report next-pointer discovery
+    (`tests/unit/features/reports/test_next_service.py`), report retention
+    (`tests/unit/features/reports/test_retention_service.py` +
+    `tests/contract/test_reports_retention_cleanup.py`), handoff validation
+    (`tests/unit/test_reports_validation_service.py` +
+    `tests/unit/features/reports/test_resolve_artifact_path.py`) — all via the merged
+    `features.reports` package; consumers green
+    (`tests/integration/test_lifecycle_push_preflight.py`,
+    `tests/unit/features/panel/test_api_contract.py`,
+    `tests/contract/test_lifecycle_asymmetry_map.py`). **dead:** the three top-level
+    `features/reports_{next,retention,validation}` packages (deleted, no facade/shim) —
+    pinned by the zero-module-path grep + the `modules =` list + the corrected docstrings.
 
 ## W3 — FR2 panel api.py per-domain decomposition (delete api.py; no facade)
 
