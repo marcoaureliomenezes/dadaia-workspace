@@ -49,14 +49,6 @@ class WorkflowNotFoundError(DadaiaError):
     """Raised when a workflow name is not present in the workflow store."""
 
 
-class RunNotFoundError(DadaiaError):
-    """Raised when a run_id is not present under .dadaia/runs/."""
-
-
-class OrchestrationUnsupportedError(DadaiaError):
-    """Raised when the selected runtime cannot execute a workflow's required capability."""
-
-
 class PortConflictError(DadaiaError):
     """Raised when a port is already registered as active by a different project."""
 
@@ -131,20 +123,6 @@ class LockHeldError(LockConflictError):
     """Raised when a second bind --mode implementation is attempted while a lock is already HELD.
 
     The message includes the owner session_id and last_seen_at.
-    """
-
-
-class ReviewBlockedByImplementationError(LockConflictError):
-    """Raised when bind --mode review is attempted while an implementation lock is HELD.
-
-    The message includes the owner session_id.
-    """
-
-
-class ImplementationBlockedByReviewError(LockConflictError):
-    """Raised when bind --mode implementation is attempted while a non-stale BOUND_REVIEW session exists.
-
-    The message lists the blocking review session IDs.
     """
 
 

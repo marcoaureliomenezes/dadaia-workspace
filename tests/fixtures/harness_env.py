@@ -161,6 +161,21 @@ HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
 )
 
+#: Policy modules whose standalone ``main()`` CLI entrypoint was removed in v0.1.53 (the
+#: merged ``pre_gate`` is the sole harness entrypoint). They are still driven in ISOLATION
+#: for behavior tests via their pure ``evaluate_payload`` surface (see :func:`run_hook_subprocess`).
+_POLICY_ONLY_MODULES: Final[frozenset[str]] = frozenset({"sdd_gate", "root_whitelist"})
+
+#: Subprocess driver that reproduces the removed ``main()``: read the stdin JSON envelope,
+#: run the named policy's ``evaluate_payload``, and emit the block envelope on a reason.
+_POLICY_DRIVER: Final[str] = (
+    "from dadaia_workspace.hooks import _common, {module} as _h\n"
+    "p = _common.read_stdin_json()\n"
+    "r = _h.evaluate_payload(p)\n"
+    "if r is not None:\n"
+    "    _common.emit_block(r)\n"
+)
+
 
 def _base_env() -> dict[str, str]:
     """A copy of the operator shell env with every harness-never-set var scrubbed.
@@ -292,8 +307,18 @@ def run_hook_subprocess(
             f"{hook_module!r} is not a known hook entrypoint; expected one of "
             f"{sorted(HOOK_MODULES)}."
         )
+    if hook_module in _POLICY_ONLY_MODULES:
+        # v0.1.53: the standalone ``sdd_gate`` / ``root_whitelist`` CLI ``main()`` entrypoints
+        # were removed — ``pre_gate`` is the single merged harness entrypoint. To keep
+        # exercising each policy IN ISOLATION (a merged ``pre_gate`` run would also apply the
+        # other policies and change ALLOW outcomes), drive the policy's ``evaluate_payload``
+        # in a real subprocess exactly as the removed ``main()`` did: read stdin JSON →
+        # ``evaluate_payload`` → emit the block envelope on a reason.
+        cmd = [sys.executable, "-c", _POLICY_DRIVER.format(module=hook_module)]
+    else:
+        cmd = [sys.executable, "-m", f"dadaia_workspace.hooks.{hook_module}"]
     proc = subprocess.run(
-        [sys.executable, "-m", f"dadaia_workspace.hooks.{hook_module}"],
+        cmd,
         input=json.dumps(payload),
         capture_output=True,
         text=True,

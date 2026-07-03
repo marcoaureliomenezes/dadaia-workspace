@@ -39,18 +39,20 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # RAISING this requires a new documented edge in setup.cfg + justification in the SAME
 # commit (a new ignored edge = a new suppressed layering violation; see module docstring).
 #
-# Breakdown at the recorded count (v0.1.10, after T-010-24's documented model-resolution
-# edge): features-no-infrastructure = 12, features-no-subprocess = 5, total = 17.
+# Breakdown at the recorded count (v0.1.53 FR3): features-no-infrastructure = 11,
+# features-no-subprocess = 4, total = 15.
 #
-# SHRINK NOTE (arch A4 + T-010-33): the cap stays at 17 — none of the 17 suppressed edges
-# is yet retired. The container-DI cleanup that retires them is tracked in backlog
-# `features-import-infrastructure-direct-debt`; when it lands, drop the corresponding
-# `ignore_imports` edges from setup.cfg AND lower this cap in the same commit (the
-# `test_recorded_cap_is_not_stale_above_reality` test re-pins it). T-010-33's
-# reverse-direction `forbidden` contracts (core-no-upper-layers,
+# SHRINK NOTE (arch A4 + T-010-33): v0.1.53 lowered the cap 17 -> 15. W1 deleted the panel
+# workflow-launcher chain (workflow_launcher_adapter), which retired BOTH
+# `panel.service -> workflow_launcher_adapter` ignore edges (one per contract) — they no
+# longer matched any import and made `lint-imports` error. The remaining container-DI
+# cleanup is still tracked in backlog `features-import-infrastructure-direct-debt`; when it
+# lands, drop the corresponding `ignore_imports` edges from setup.cfg AND lower this cap in
+# the same commit (the `test_recorded_cap_is_not_stale_above_reality` test re-pins it).
+# T-010-33's reverse-direction `forbidden` contracts (core-no-upper-layers,
 # infrastructure-no-upper-layers) add ZERO ignore edges — they freeze layers verified
 # clean — so they do not move this number.
-_RECORDED_IGNORE_EDGE_CAP = 17
+_RECORDED_IGNORE_EDGE_CAP = 15
 
 
 def _ignore_edges_by_contract() -> dict[str, list[str]]:

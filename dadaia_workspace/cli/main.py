@@ -28,7 +28,6 @@ from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.cli.commands.memory import app as memory_app
 from dadaia_workspace.cli.commands.newartifacts import (
     backlog_app,
-    bug_app,
     release_app,
 )
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
@@ -66,7 +65,6 @@ app.add_typer(panel.app, name="panel")
 app.add_typer(memory_app, name="memory")
 app.add_typer(release_app, name="release")
 app.add_typer(backlog_app, name="backlog")
-app.add_typer(bug_app, name="bug")
 app.add_typer(bugs_app, name="bugs")
 
 

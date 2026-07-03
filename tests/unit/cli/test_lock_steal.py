@@ -21,12 +21,13 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import lock as lock_cmd
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 
 runner = CliRunner()
 
 CTX = "probectx"
-TTL = lease.LEASE_TTL_SECONDS
+TTL = kernel_tunables.LEASE_TTL_SECONDS
 
 
 def _seed_stale_record(ws: Path, *, pid: int | None) -> None:

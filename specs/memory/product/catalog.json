@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T01:55:57Z",
+  "generated_at": "2026-07-03T04:20:26Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -17,7 +17,6 @@
         "schema"
       ],
       "token_estimate": 1075,
-      "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution"
       ]
@@ -37,7 +36,6 @@
         "sessions"
       ],
       "token_estimate": 1450,
-      "agent_tier": "self-pull",
       "depends_on": [
         "panel",
         "context-management",
@@ -60,7 +58,6 @@
         "dispatch"
       ],
       "token_estimate": 1700,
-      "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
         "dadaia-workflows",
@@ -83,7 +80,6 @@
         "courses"
       ],
       "token_estimate": 775,
-      "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
         "panel"
@@ -106,7 +102,6 @@
         "privacy"
       ],
       "token_estimate": 875,
-      "agent_tier": "self-pull",
       "depends_on": []
     },
     {
@@ -125,7 +120,6 @@
         "projection"
       ],
       "token_estimate": 475,
-      "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
         "sdd-gate-v3",
@@ -150,7 +144,6 @@
         "projection"
       ],
       "token_estimate": 550,
-      "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
         "lifecycle-foundation",
@@ -175,7 +168,6 @@
         "projection"
       ],
       "token_estimate": 500,
-      "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
         "lifecycle-foundation",
@@ -200,7 +192,6 @@
         "tokens"
       ],
       "token_estimate": 375,
-      "agent_tier": "self-pull",
       "depends_on": [
         "panel"
       ]
@@ -221,7 +212,6 @@
         "dashboard"
       ],
       "token_estimate": 5275,
-      "agent_tier": "self-pull",
       "depends_on": [
         "agent-orchestration",
         "architecture",
@@ -253,7 +243,6 @@
         "anti-slop"
       ],
       "token_estimate": 1700,
-      "agent_tier": "self-pull",
       "depends_on": [
         "spec-context-project",
         "tech-stack",
@@ -293,7 +282,6 @@
         "concurrency"
       ],
       "token_estimate": 900,
-      "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -317,7 +305,6 @@
         "locking"
       ],
       "token_estimate": 3325,
-      "agent_tier": "self-pull",
       "depends_on": [
         "sdd-bug-backlog-governance",
         "public-asset-distribution",
@@ -347,7 +334,6 @@
         "security"
       ],
       "token_estimate": 1750,
-      "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution",
         "workspace-init",
@@ -373,7 +359,6 @@
         "multi-platform"
       ],
       "token_estimate": 1600,
-      "agent_tier": "self-pull",
       "depends_on": [
         "tech-stack",
         "architecture",
@@ -397,7 +382,6 @@
         "discovery"
       ],
       "token_estimate": 325,
-      "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
         "context-management"
@@ -419,7 +403,6 @@
         "ttl"
       ],
       "token_estimate": 750,
-      "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
         "panel"
@@ -441,7 +424,6 @@
         "repair"
       ],
       "token_estimate": 1300,
-      "agent_tier": "self-pull",
       "depends_on": [
         "workspace-init",
         "specs-doctor",
@@ -464,7 +446,6 @@
         "idempotent"
       ],
       "token_estimate": 850,
-      "agent_tier": "self-pull",
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3"
@@ -486,7 +467,6 @@
         "backup"
       ],
       "token_estimate": 400,
-      "agent_tier": "self-pull",
       "depends_on": [
         "context-management",
         "workspace-init"
@@ -508,7 +488,6 @@
         "layer-2"
       ],
       "token_estimate": 750,
-      "agent_tier": "self-pull",
       "depends_on": [
         "lifecycle-foundation",
         "agent-orchestration",
@@ -534,7 +513,6 @@
         "gates"
       ],
       "token_estimate": 5225,
-      "agent_tier": "self-pull",
       "depends_on": [
         "architecture",
         "tech-stack",
@@ -561,7 +539,6 @@
         "backlog-ownership"
       ],
       "token_estimate": 1575,
-      "agent_tier": "self-pull",
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",
@@ -587,7 +564,6 @@
         "chokepoints"
       ],
       "token_estimate": 3425,
-      "agent_tier": "self-pull",
       "depends_on": [
         "sdd-bug-backlog-governance",
         "context-management",
@@ -610,7 +586,6 @@
         "sdd"
       ],
       "token_estimate": 2150,
-      "agent_tier": "self-pull",
       "depends_on": [
         "sdd-bug-backlog-governance",
         "tech-stack",

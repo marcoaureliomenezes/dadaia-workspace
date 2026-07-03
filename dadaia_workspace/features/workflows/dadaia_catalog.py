@@ -17,8 +17,8 @@ introspected directly from its authoritative definition:
   two steps are fragment-driven, the rest still carry the generic suffix);
 - ``backlog_definition`` → :data:`...workflows.backlog_definition._SEQUENCE` (available —
   the v0.1.26 R2 §4 workflow body with Python-owned gates);
-- ``audit`` / ``research`` / ``bug_report`` →
-  :data:`...workflows._deferred.DEFERRED_WORKFLOWS` (deferred — entry points raise).
+- ``audit`` / ``research`` / ``bug_report`` → real fragment+gate bodies (v0.1.30 Wave E);
+  no workflow remains deferred (:data:`DEFERRED_WORKFLOWS`, inlined here, is empty).
 
 The per-step harness/model options come from the single discrete Layer-2 catalog
 (:mod:`dadaia_workspace.core.harness_models`, LAW 2 / ADR-B): a model step may run on
@@ -56,7 +56,6 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     CatalogWorkflow,
     WorkflowCatalog,
 )
-from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
 from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE as _AUDIT_SEQUENCE
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     _SEQUENCE as _BACKLOG_SEQUENCE,
@@ -81,6 +80,12 @@ AVAILABILITY_AVAILABLE = "available"
 AVAILABILITY_PARTIAL = "partial"
 #: The workflow is scaffolded only; its entry point raises and it cannot run yet.
 AVAILABILITY_DEFERRED = "deferred"
+
+#: Deferred-workflow names, in catalog order. Empty since v0.1.30 Wave E — every workflow
+#: ships a real fragment+gate body. Kept as the declared seam ``_all_workflows`` iterates so
+#: a future deferred workflow is enumerated honestly without a code change. Inlined here in
+#: v0.1.53 when the standalone ``_deferred`` module was retired.
+DEFERRED_WORKFLOWS: tuple[str, ...] = ()
 
 #: The Layer-2 harness names a model step may run on. ``fake`` is the deterministic
 #: test adapter (no model); the two real workers come from the discrete catalog.

@@ -27,11 +27,12 @@ import json  # noqa: E402
 from datetime import UTC, datetime, timedelta  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.core import kernel_tunables  # noqa: E402
 from dadaia_workspace.features.spec_context import lease  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
-TTL = lease.LEASE_TTL_SECONDS
+TTL = kernel_tunables.LEASE_TTL_SECONDS
 CTX = "gcctx"
 
 

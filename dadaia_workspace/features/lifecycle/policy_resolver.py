@@ -21,10 +21,10 @@ catalog from
 via ``container.build_workflow_model_profile_registry``) — that is the single governed
 source of truth, with one home for the per-harness default-by-purpose map
 (:data:`DEFAULT_PROFILE_BY_HARNESS_PURPOSE`, which the catalog imports from here).
-:func:`library_workflow_catalog` here is a Wave-A-independent **fallback/standalone**
-catalog built by introspecting the implementation pipeline (``implementation_ladder``); it
-shares the same profile defaults but is NOT the production source consumed by the
-container.
+A Wave-A-independent standalone catalog builder (introspecting the implementation
+pipeline, sharing these profile defaults) lives in the tests as
+``tests/unit/features/lifecycle/_workflow_catalog.py`` — it was never the production
+source consumed by the container, so it was relocated out of this module in v0.1.53.
 
 Validation: every override (overlay or CLI) must reference a catalog step id, a known
 profile id (:mod:`model_profiles`), and a profile whose harness matches the step's
@@ -45,7 +45,6 @@ from dadaia_workspace.core.models.workflow_execution import (
 )
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
-from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     DEFAULT_CONTEXT,
     WorkflowModelPolicyOverlay,
@@ -149,9 +148,8 @@ _IMPLEMENTATION_STEP_PROFILE: dict[str, str] = {
 
 # Per-harness default profile by step purpose — the **single shared home** (T-30-C-05 nit i;
 # previously a verbatim twin in ``dadaia_catalog``). ``"standard"`` = a producing worker
-# step, ``"deep"`` = a review/gate worker step. Both the library catalog
-# (:func:`library_workflow_catalog`) and the governed catalog
-# (:func:`dadaia_catalog.governed_workflow_catalog`, which imports this map) populate each
+# step, ``"deep"`` = a review/gate worker step. The governed catalog
+# (:func:`dadaia_catalog.governed_workflow_catalog`, which imports this map) populates each
 # ``CatalogStep.default_profiles`` from it so the resolver can auto-select a profile per
 # effective harness (D-1). Governance is enforced by
 # ``dadaia_catalog._assert_catalog_defaults_resolve`` at import time (every profile id
@@ -161,49 +159,6 @@ DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
     "codex": {"standard": "codex-implementation-standard", "deep": "codex-review-deep"},
     "pi": {"standard": "pi-implementation-standard", "deep": "pi-reasoning-high"},
 }
-
-
-def library_workflow_catalog() -> WorkflowCatalog:
-    """Build the Wave-A library workflow catalog from the pipeline + ``model_profiles``.
-
-    The implementation pipeline (``implementation_ladder``) is the D-4 demo path and the
-    only governed workflow Wave A needs. Each step's default profile is named from
-    ``_IMPLEMENTATION_STEP_PROFILE`` and validated against the profile registry; the
-    fragments + output schema are carried from the pipeline step for snapshot fidelity.
-    """
-    ladder = implementation_ladder(AgentRuntimeKind.CODEX_EXEC)
-    steps: list[CatalogStep] = []
-    for pstep in ladder:
-        harness = _KIND_TO_HARNESS.get(pstep.runtime_kind, "codex")
-        profile_id = _IMPLEMENTATION_STEP_PROFILE.get(pstep.label, "codex-implementation-standard")
-        # Validate the default profile exists and matches the step harness at build time.
-        profile = model_profiles.resolve(profile_id)
-        if profile.harness != harness:
-            raise PolicyResolutionError(
-                f"library default profile {profile_id!r} (harness {profile.harness!r}) "
-                f"does not match step {pstep.label!r} harness {harness!r}"
-            )
-        # T-29-A-01: per-harness default profiles so the resolver can auto-select a profile
-        # for an effective-harness override. Review/gate steps default to the deep profile.
-        purpose = "deep" if pstep.label.startswith("review") else "standard"
-        default_profiles = {
-            h: by_purpose[purpose] for h, by_purpose in DEFAULT_PROFILE_BY_HARNESS_PURPOSE.items()
-        }
-        fragments = (pstep.fragment_id, *pstep.shared_fragment_ids) if pstep.fragment_id else ()
-        steps.append(
-            CatalogStep(
-                label=pstep.label,
-                role=pstep.role,
-                default_harness=harness,
-                default_profile=profile_id,
-                default_profiles=default_profiles,
-                fragments=fragments,
-                output_schema="agent-run-result-v1",
-            )
-        )
-    return WorkflowCatalog(
-        workflows=(CatalogWorkflow(workflow_id="implementation", steps=tuple(steps)),)
-    )
 
 
 class WorkflowExecutionPolicyResolver:
@@ -498,5 +453,4 @@ __all__ = [
     "StepOverride",
     "WorkflowCatalog",
     "WorkflowExecutionPolicyResolver",
-    "library_workflow_catalog",
 ]

@@ -61,6 +61,7 @@ from pathlib import Path
 import yaml
 
 from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
+from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.spec_context import lease, session_identity
 
 #: SPEC-DOC-029: a ``<ctx>.lock.json`` filename component must be a real context name
@@ -132,7 +133,8 @@ _PLAYBOOK_HEADING_RE = re.compile(
 # that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
 # every release created after the cutoff (v0.1.44 onward). See specs/bugs/
 # specs-doctor-errors-on-frozen-nonsemver-archives.md (v0.1.45).
-RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+# RELEASE_SEMVER_RE is the shared canon (core.specs_version), imported above — v0.1.53 FR3
+# centralised the pattern; the module-level name is preserved for the call sites below.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
 RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
 RELEASE_VINTAGE_CUTOFF = date(2026, 6, 4)  # releases on/before this are excluded

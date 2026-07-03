@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 from tests.e2e.lease_rendezvous import (
     SHORT_TTL_SECONDS,
@@ -316,8 +317,8 @@ def test_disjoint_contexts_no_cross_block(tmp_path: Path) -> None:
     }
 
     # Use the full short-TTL-free default TTL so both stay fresh and live concurrently.
-    proc_a = _start_holder(ws, _SLUG, sid_a, paths_a, ttl=lease.LEASE_TTL_SECONDS)
-    proc_b = _start_holder(ws, _OTHER_SLUG, sid_b, paths_b, ttl=lease.LEASE_TTL_SECONDS)
+    proc_a = _start_holder(ws, _SLUG, sid_a, paths_a, ttl=kernel_tunables.LEASE_TTL_SECONDS)
+    proc_b = _start_holder(ws, _OTHER_SLUG, sid_b, paths_b, ttl=kernel_tunables.LEASE_TTL_SECONDS)
     try:
         journal_a.capture()
         journal_b.capture()
@@ -392,11 +393,11 @@ def test_dead_holder_takeover(tmp_path: Path) -> None:
 # (v) HOOK-ACQUIRED HOLDER NO-STEAL (NF-1, rc-2) — the production process model.
 #
 # Production never acquires in-process: the holder is the harness, and the lease is acquired
-# by the EPHEMERAL ``sdd_gate`` hook child the harness spawns. The hook child dies in
+# by the EPHEMERAL ``pre_gate`` hook child the harness spawns. The hook child dies in
 # milliseconds; the no-steal pid-veto can only work if the recorded pid is the LONG-LIVED
 # harness (``getppid()``), not the dead hook child. This scenario reproduces exactly that:
 #
-#   * a long-lived DRIVER process (the stand-in harness) spawns the REAL ``sdd_gate`` hook as
+#   * a long-lived DRIVER process (the stand-in harness) spawns the REAL ``pre_gate`` hook as
 #     a child, which acquires the lease recording the driver's pid (``getppid()``);
 #   * the driver then stays alive (no renewal) until told to stop, so the record ages past the
 #     short TTL while the driver pid is demonstrably alive;
@@ -406,9 +407,10 @@ def test_dead_holder_takeover(tmp_path: Path) -> None:
 # This is the falsification the rc-1 e2e lacked (it only had in-process direct-API holders).
 # --------------------------------------------------------------------------------------
 
-#: Long-lived DRIVER (stand-in harness): invoke the REAL sdd_gate hook as a child so the hook
-#: records the driver's pid via getppid(), confirm the lease names the driver, then idle until
-#: stopped. Bounded so a leaked child self-terminates. Writes its own pid for the test.
+#: Long-lived DRIVER (stand-in harness): invoke the REAL pre_gate hook (the single merged
+#: harness entrypoint since v0.1.53) as a child so the hook records the driver's pid via
+#: getppid(), confirm the lease names the driver, then idle until stopped. Bounded so a
+#: leaked child self-terminates. Writes its own pid for the test.
 _HOOK_DRIVER = textwrap.dedent(
     """
     import json, os, subprocess, sys, time
@@ -430,7 +432,7 @@ _HOOK_DRIVER = textwrap.dedent(
     # Spawn the REAL gate hook as a CHILD of this driver. The hook records getppid() == this
     # driver's pid, then exits. This is the production topology (harness spawns ephemeral hook).
     proc = subprocess.run(
-        [sys.executable, "-m", "dadaia_workspace.hooks.sdd_gate"],
+        [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"],
         input=json.dumps(payload), capture_output=True, text=True, env=env, timeout=30,
     )
     pidfile.write_text(str(os.getpid()))

@@ -7,11 +7,11 @@ assert three things:
 1. **Single-home (AST/import check, NOT a digit grep).** Each kernel module that consumes a
    tunable imports its name from ``core.kernel_tunables`` rather than redeclaring the magic
    number inline. We parse the module source and assert the import edge exists.
-2. **Behavioral observation.** Monkeypatching a tunable that the lease references at call
-   time (``lease.LEASE_TTL_SECONDS`` re-export) is observed by the lease's own liveness
-   logic — the constant is a live single source, not a copy.
-3. **Re-export back-compat.** ``lease.LEASE_TTL_SECONDS`` is still importable (one-release
-   deprecation note) and equals the kernel-tunables value.
+2. **Behavioral observation.** Re-stamping ``kernel_tunables.LEASE_TTL_SECONDS`` is observed
+   by the lease's own liveness predicate — the constant is a live single source, not a copy.
+
+The lease-local ``lease.LEASE_TTL_SECONDS`` re-export (a one-release deprecation shim) was
+removed in v0.1.53; ``LEASE_TTL_SECONDS`` is imported from ``core.kernel_tunables`` directly.
 """
 
 from __future__ import annotations
@@ -125,42 +125,27 @@ def test_doctor_imports_sentinel_orphan_age_from_kernel_tunables() -> None:
 
 
 def test_lease_renew_default_ttl_observes_kernel_constant(monkeypatch) -> None:
-    """The lease ``renew_heartbeat``/``acquire`` TTL default is the centralized constant.
+    """The lease liveness path observes the centralized ``kernel_tunables`` TTL constant.
 
-    Monkeypatch the kernel TTL value re-exported on ``lease`` to a sentinel and assert the
-    lease's default-TTL argument observes it (the functions default ``ttl=LEASE_TTL_SECONDS``
-    via the module-level name) — proving the constant is a live single source, not a copy.
+    Re-stamp ``kernel_tunables.LEASE_TTL_SECONDS`` to a sentinel and assert the
+    ``lock_liveness`` predicate judges a record against that very ttl field — wiring the
+    constant end-to-end through the liveness predicate, proving it is a live single source,
+    not a copy.
     """
     import inspect
-
-    from dadaia_workspace.features.spec_context import lease
-
-    monkeypatch.setattr(lease, "LEASE_TTL_SECONDS", 7)
-    # The default value of the ``ttl`` parameter is bound at definition to the name object,
-    # so we read it through the module-level constant the signature references.
-    sig = inspect.signature(lease.acquire)
-    # The default is captured at def-time; assert the module constant is the live source by
-    # confirming both reference the same int value after the constant is re-stamped.
-    assert lease.LEASE_TTL_SECONDS == 7
-    # A record stamped with the lease's current TTL is judged by lock_liveness against that
-    # very ttl field — wiring the constant end-to-end through the liveness predicate.
     from datetime import UTC, datetime, timedelta
 
     from dadaia_workspace.core import lock_liveness
-
-    old_hb = (datetime.now(tz=UTC) - timedelta(seconds=lease.LEASE_TTL_SECONDS + 10)).isoformat()
-    fresh_hb = datetime.now(tz=UTC).isoformat()
-    assert lock_liveness.is_stale({"heartbeat": old_hb, "ttl": lease.LEASE_TTL_SECONDS}) is True
-    assert lock_liveness.is_stale({"heartbeat": fresh_hb, "ttl": lease.LEASE_TTL_SECONDS}) is False
-    assert "ttl" in sig.parameters
-
-
-# --------------------------------------------------------------------------- #
-# 4. Re-export back-compat (one-release deprecation note).
-# --------------------------------------------------------------------------- #
-
-
-def test_lease_reexports_lease_ttl_seconds() -> None:
     from dadaia_workspace.features.spec_context import lease
 
-    assert lease.LEASE_TTL_SECONDS == kernel_tunables.LEASE_TTL_SECONDS
+    monkeypatch.setattr(kernel_tunables, "LEASE_TTL_SECONDS", 7)
+    assert kernel_tunables.LEASE_TTL_SECONDS == 7
+    sig = inspect.signature(lease.acquire)
+    assert "ttl" in sig.parameters
+    # A record stamped with the current TTL is judged by lock_liveness against that very ttl
+    # field — wiring the constant end-to-end through the liveness predicate.
+    ttl = kernel_tunables.LEASE_TTL_SECONDS
+    old_hb = (datetime.now(tz=UTC) - timedelta(seconds=ttl + 10)).isoformat()
+    fresh_hb = datetime.now(tz=UTC).isoformat()
+    assert lock_liveness.is_stale({"heartbeat": old_hb, "ttl": ttl}) is True
+    assert lock_liveness.is_stale({"heartbeat": fresh_hb, "ttl": ttl}) is False

@@ -11,9 +11,9 @@ R3 (PR3-02 activation):
 
   Cache-Control is set in the handler layer (handler.py) for the /static/ prefix.
 
-T-P5-02: LOGO_RHINO_24 and LOGO_RHINO_16 module-level constants added here so
-that index.py can import logo content from this module instead of _assets.py.
-_assets.py will be deleted once all imports are migrated (Phase B).
+T-P5-02: LOGO_RHINO_24 and LOGO_RHINO_16 are module-level constants defined here; index.py
+imports the logo content from this module. (The legacy ``_assets.py`` shim was removed in
+v0.1.53.)
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ _JS_DIR = _ASSETS_DIR / "js"
 
 # ---------------------------------------------------------------------------
 # Logo constants — loaded once at import time for inline HTML embedding.
-# T-P5-02: moved from _assets.py to this module. Import from here instead.
+# T-P5-02: these logo constants are canonical here (the legacy _assets.py shim is gone).
 # ---------------------------------------------------------------------------
 LOGO_RHINO_24: str = (_ASSETS_DIR / "logo-rhino-24.svg").read_text(encoding="utf-8")
 LOGO_RHINO_36: str = (_ASSETS_DIR / "logo-rhino-36.svg").read_text(encoding="utf-8")

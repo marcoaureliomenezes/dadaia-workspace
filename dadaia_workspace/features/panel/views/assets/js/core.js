@@ -1,8 +1,9 @@
-// Hash navigation grammar (as implemented by the initial-load router below):
-//   #workflows | #reports | #academy  — bare tab activation (prefix match, so a
-//   trailing ?key=val is tolerated but not parsed).
-// No other hash routes exist (the former #memories/#agents/#servers routes and the
-// #agents?filter= / #workflows?detail= params were never wired — v0.1.48 F-truth fix).
+// Hash navigation grammar. The initial-load router (below) maps three hash routes to a
+// bare tab activation on page load: #workflows | #reports | #academy (prefix match, so a
+// trailing ?key=val is tolerated but not parsed). The Sessions tab is click-activated,
+// not an initial-load hash route. No other hash routes exist (the former
+// #memories/#agents/#servers routes and the #agents?filter= / #workflows?detail= params
+// were never wired — v0.1.48 F-truth fix).
 
 (function () {
   'use strict';

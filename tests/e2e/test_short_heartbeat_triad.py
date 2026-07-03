@@ -28,8 +28,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import LockHeldError
+from dadaia_workspace.core.kernel_tunables import LEASE_TTL_SECONDS
 from dadaia_workspace.features.spec_context import lease
-from dadaia_workspace.features.spec_context.lease import LEASE_TTL_SECONDS
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 CTX = "triad-ctx"

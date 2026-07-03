@@ -78,17 +78,17 @@ def test_agent_catalog_returns_sorted_agent_names(tmp_path: Path) -> None:
     assert result == ("product-engineer", "software-architect")
 
 
-def test_build_orchestration_service_raises_when_not_initialized(tmp_path: Path) -> None:
+def test_build_orchestration_catalog_service_raises_when_not_initialized(tmp_path: Path) -> None:
     with pytest.raises(WorkspaceNotInitializedError):
-        container.build_orchestration_service(tmp_path)
+        container.build_orchestration_catalog_service(tmp_path)
 
 
-def test_build_orchestration_service_succeeds_when_initialized(tmp_path: Path) -> None:
+def test_build_orchestration_catalog_service_succeeds_when_initialized(tmp_path: Path) -> None:
     _init_states(tmp_path)
-    from dadaia_workspace.features.orchestration.service import OrchestrationService
+    from dadaia_workspace.features.workflows.service import WorkflowsService
 
-    svc = container.build_orchestration_service(tmp_path)
-    assert isinstance(svc, OrchestrationService)
+    svc = container.build_orchestration_catalog_service(tmp_path)
+    assert isinstance(svc, WorkflowsService)
 
 
 def test_build_export_service_succeeds_when_initialized(tmp_path: Path) -> None:
@@ -126,7 +126,7 @@ def test_build_repos_service_returns_service() -> None:
 # --fix. The fix wires _build_pid_probe() into the DoctorService.
 # ---------------------------------------------------------------------------
 
-from dadaia_workspace.features.spec_context import lease  # noqa: E402
+from dadaia_workspace.core import kernel_tunables  # noqa: E402
 
 _GC_CTX = "containergcctx"
 
@@ -143,7 +143,9 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     """Plant a TTL-expired lease record under ctx_locks/. Returns its path."""
     ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
     ctx_locks.mkdir(parents=True, exist_ok=True)
-    hb = (datetime.now(tz=UTC) - timedelta(seconds=lease.LEASE_TTL_SECONDS + 600)).isoformat()
+    hb = (
+        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.LEASE_TTL_SECONDS + 600)
+    ).isoformat()
     rec: dict[str, object] = {
         "context": _GC_CTX,
         "release": "v0.1.11",
@@ -151,7 +153,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
         "mode": "IMPLEMENTATION",
         "acquired_at": hb,
         "heartbeat": hb,
-        "ttl": lease.LEASE_TTL_SECONDS,
+        "ttl": kernel_tunables.LEASE_TTL_SECONDS,
     }
     if pid is not None:
         rec["pid"] = pid

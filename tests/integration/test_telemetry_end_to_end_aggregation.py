@@ -19,6 +19,7 @@ from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggr
 from dadaia_workspace.features.telemetry.reader.claude import read_session_file
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from tests.fakes import shared_connection_factory
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -176,7 +177,7 @@ class TestEndToEndAggregation:
 
         # Aggregate
         aggregator = TelemetryAggregator(
-            dao=dao,
+            connection_factory=shared_connection_factory(dao._conn),
             spec_context_service=_StubSCS(),
             pricing_module=_StubPricing(),
         )
@@ -209,7 +210,7 @@ class TestEndToEndAggregation:
             read_session_file(jsonl_path, dao, _NOW_ISO)
 
         aggregator = TelemetryAggregator(
-            dao=dao,
+            connection_factory=shared_connection_factory(dao._conn),
             spec_context_service=_StubSCS(),
             pricing_module=_StubPricing(),
         )
@@ -246,7 +247,7 @@ class TestEndToEndAggregation:
         )
 
         aggregator = TelemetryAggregator(
-            dao=dao,
+            connection_factory=shared_connection_factory(dao._conn),
             spec_context_service=_StubSCS(),
             pricing_module=_StubPricing(),
         )

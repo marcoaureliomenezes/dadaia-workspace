@@ -20,7 +20,7 @@ contract violations:
 
 **Repro:**
 ```
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/lint-imports ; echo $?   # -> 1
+/home/[REDACTED]/workspace/dadaia/.dadaia/.venv/bin/lint-imports ; echo $?   # -> 1
 ```
 (Note: piping `lint-imports | tail` masks the real exit with `tail`'s 0 — read `$?` directly.)
 

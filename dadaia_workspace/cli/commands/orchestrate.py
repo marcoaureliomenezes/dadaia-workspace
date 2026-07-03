@@ -1,11 +1,12 @@
 """dadaia orchestrate subcommands.
 
-Read-only catalog/run-status surface over the markdown workflow definitions plus
-reference-only ``run``/``resume`` shims. Workflow *execution* has moved to the
-lifecycle engine (``dadaia lifecycle``); the ``.workflow.md`` files are reference
-documents only. ``run``/``resume`` keep working (and exit 0) so the panel workflow
-launcher — which spawns ``python -m dadaia_workspace orchestrate <workflow>`` — still
-terminates cleanly.
+Read-only catalog surface over the markdown workflow definitions. Workflow
+*execution* lives in the lifecycle engine (``dadaia lifecycle``); the ``.workflow.md``
+files are reference documents only. The ``list``/``show`` verbs read the shared
+``MarkdownWorkflowStore`` (via a ``features/workflows`` accessor that preserves
+``stage.gate.kind`` and every ``WorkflowInput`` field). The former ``run``/``status``/
+``resume`` verbs — honest no-ops backed by the retired ``features/orchestration``
+package — were removed in v0.1.53.
 """
 
 import typer
@@ -14,23 +15,20 @@ from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import (
-    OrchestrationUnsupportedError,
-    RunNotFoundError,
     WorkflowNotFoundError,
-    WorkflowSchemaError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.orchestration.service import OrchestrationService
+from dadaia_workspace.features.workflows.service import WorkflowsService
 
 app = typer.Typer(help="Inspect multi-agent workflow reference docs (execution: dadaia lifecycle).")
 console = Console()
 err_console = Console(stderr=True)
 
 
-def _service() -> OrchestrationService:
+def _service() -> WorkflowsService:
     try:
-        return container.build_orchestration_service(resolve_workspace_root())
+        return container.build_orchestration_catalog_service(resolve_workspace_root())
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
@@ -42,7 +40,7 @@ def _service() -> OrchestrationService:
 def list_workflows(json_out: bool = typer.Option(False, "--json")) -> None:
     """List installed workflows."""
     service = _service()
-    workflows = service.list_workflows()
+    workflows = service.list_definitions()
     if json_out:
         payload = [
             {"name": w.name, "version": w.version, "description": w.description} for w in workflows
@@ -69,7 +67,7 @@ def show(
     """Show a workflow's declared inputs, stages, and exit criteria."""
     service = _service()
     try:
-        wf = service.show_workflow(name)
+        wf = service.get_definition(name)
     except WorkflowNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(2) from None
@@ -120,134 +118,3 @@ def show(
         if s.gate:
             bits.append(f"gate={s.gate.kind}")
         console.print("  - " + "  ".join(bits))
-
-
-@app.command()
-def run(
-    workflow: str = typer.Argument(..., help="Workflow name"),
-    context: str = typer.Option("", "--context", help="Spec context name"),
-    runtime: str = typer.Option(
-        "",
-        "--runtime",
-        help="(retained for compatibility; inert — execution moved to `dadaia lifecycle`)",
-    ),
-    input_kv: list[str] = typer.Option([], "--input", help="(retained; inert)"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Validate the workflow exists only"),
-) -> None:
-    """Reference-only: workflow execution has moved to ``dadaia lifecycle``.
-
-    ``orchestrate run`` no longer dispatches any agent — the ``.workflow.md`` files are
-    reference documents only. This command validates the workflow name, prints the
-    "moved to lifecycle" notice, and exits 0 so callers (including the panel workflow
-    launcher) terminate cleanly.
-    """
-    _ = (context, runtime, input_kv)  # accepted for compatibility; inert.
-    service = _service()
-    if dry_run:
-        try:
-            service.show_workflow(workflow)
-        except (WorkflowNotFoundError, WorkflowSchemaError) as e:
-            err_console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(2) from None
-        console.print("[green]✓[/green] dry-run validated")
-        return
-    try:
-        outcome = service.start_run(workflow)
-    except (WorkflowNotFoundError, WorkflowSchemaError, OrchestrationUnsupportedError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(2) from None
-    console.print(f"[yellow]•[/yellow] {outcome.message}")
-
-
-@app.command()
-def status(
-    run_id: str = typer.Argument("", help="Run id (omit to list all runs)"),
-    json_out: bool = typer.Option(False, "--json"),
-) -> None:
-    """Show run state without mutating any file."""
-    service = _service()
-    if not run_id:
-        runs = service.list_runs()
-        if json_out:
-            console.print_json(
-                data=[
-                    {
-                        "run_id": r.run_id,
-                        "workflow": r.workflow_name,
-                        "status": r.status.value,
-                        "started_at": r.started_at,
-                    }
-                    for r in runs
-                ]
-            )
-            return
-        if not runs:
-            console.print("Sem runs registradas.")
-            return
-        table = Table(title="Runs")
-        table.add_column("Run id", style="bold")
-        table.add_column("Workflow")
-        table.add_column("Status")
-        table.add_column("Started")
-        for r in runs:
-            table.add_row(r.run_id, r.workflow_name, r.status.value, r.started_at)
-        console.print(table)
-        return
-
-    try:
-        manifest = service.get_run_status(run_id)
-    except RunNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(2) from None
-    if json_out:
-        console.print_json(
-            data={
-                "run_id": manifest.run_id,
-                "workflow": manifest.workflow_name,
-                "status": manifest.status.value,
-                "context": manifest.context,
-                "runtime": manifest.runtime,
-                "started_at": manifest.started_at,
-                "finished_at": manifest.finished_at,
-                "stages": [
-                    {
-                        "id": s.id,
-                        "agent": s.agent,
-                        "status": s.status.value,
-                        "started_at": s.started_at,
-                        "finished_at": s.finished_at,
-                        "output_path": s.output_path,
-                    }
-                    for s in manifest.stages
-                ],
-            }
-        )
-        return
-
-    console.print(
-        f"[bold]{manifest.workflow_name}[/bold]  run={manifest.run_id}  "
-        f"status={manifest.status.value}  runtime={manifest.runtime}"
-    )
-    table = Table()
-    table.add_column("Stage")
-    table.add_column("Agent")
-    table.add_column("Status")
-    table.add_column("Started")
-    table.add_column("Finished")
-    for s in manifest.stages:
-        table.add_row(
-            s.id,
-            s.agent,
-            s.status.value,
-            s.started_at or "—",
-            s.finished_at or "—",
-        )
-    console.print(table)
-
-
-@app.command()
-def resume(run_id: str = typer.Argument(..., help="Run id (retained for compatibility)")) -> None:
-    """Reference-only: there is nothing to resume — execution moved to ``dadaia lifecycle``."""
-    service = _service()
-    outcome = service.resume_run(run_id)
-    console.print(f"[yellow]•[/yellow] {outcome.message}")

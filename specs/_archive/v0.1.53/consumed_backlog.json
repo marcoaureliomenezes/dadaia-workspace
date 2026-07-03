@@ -1,0 +1,39 @@
+{
+  "release": "v0.1.53",
+  "consumed": [
+    {
+      "slug": "legacy-surface-retirement",
+      "shipped_anchors": [
+        "dadaia_workspace/cli/commands/newartifacts.py#bug_new_cmd",
+        "dadaia_workspace/cli/commands/server.py#dashboard",
+        "dadaia_workspace/container.py#build_orchestration_service",
+        "dadaia_workspace/core/exceptions.py#ReviewBlockedByImplementationError"
+      ],
+      "note": "archived at ship (R4 process law): every anchored symbol was DELETED by this release (W1), so the fail-closed BL-SCHEMA registry stops resolving them; migrate-audit inspection recorded keep-both-steps (no deletion)"
+    },
+    {
+      "slug": "hygiene-and-dead-code-cleanup",
+      "shipped_anchors": [
+        "dadaia_workspace/hooks/sdd_gate.py#main",
+        "dadaia_workspace/features/specs/catalog.py#generate_catalog"
+      ],
+      "note": "archived at ship: hooks main()s / lease re-export / library_workflow_catalog / _assets.py / core.js comments / import_linter_cache / perf ceiling / agent_tier schema-side / list_workflows + handler fallback consumed by W2+W3; academy.js mermaid branch + kanban CSS consumed-elsewhere by v0.1.52 (not redone); the workspace-doctor repos-.dadaia WARN intent was REJECTED-stale at definition review (T-53-01); agent_tier atom strip completes in W6 CLOSURE (MEMORY phase)"
+    },
+    {
+      "slug": "centralize-release-semver-canon",
+      "shipped_anchors": [
+        "dadaia_workspace/core/specs_version.py#RELEASE_SEMVER_RE",
+        "dadaia_workspace/core/specs_version.py#is_release_semver"
+      ],
+      "note": "archived at ship: the three literal copies (scaffolder/doctor/new_artifacts) were deleted by W3, so the entry's original anchors no longer resolve; agreement/contract test locks the canon (zero literal compiles outside core/specs_version.py)"
+    },
+    {
+      "slug": "telemetry-tier2-chmod-unguarded-on-windows",
+      "shipped_anchors": [
+        "dadaia_workspace/features/telemetry/service.py#TelemetryService",
+        "dadaia_workspace/core/protocols/platform_services.py#FilePermissionSetter"
+      ],
+      "note": "consumed by W4: both chmod sites routed through the injected FilePermissionSetter with PlatformSecurityError -> Tier-2 INFO degrade; single os.chmod fallback remains under PLATFORM.has_posix_chmod; source-scan contract test guards regressions"
+    }
+  ]
+}

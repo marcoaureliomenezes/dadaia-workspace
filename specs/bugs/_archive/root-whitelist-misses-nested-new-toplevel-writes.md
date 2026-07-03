@@ -13,17 +13,17 @@ root entry not in the whitelist." In practice `_root_violation` only blocks a wr
 **immediate parent resolves to exactly the workspace root**. A write to a path *nested*
 under a new forbidden top-level dir is ALLOWED, even though it creates that top-level dir.
 
-Verified (v0.1.24, WORKSPACE_ROOT=/home/marco/workspace/dadaia):
-- `Write /home/marco/workspace/dadaia/.opencode`            → BLOCK ✓ (direct, parent == root)
-- `Write /home/marco/workspace/dadaia/.opencode/agents/foo.md` → ALLOW ✗ (parent == `.opencode`, not root) — but this write DOES create the forbidden top-level `.opencode/`.
+Verified (v0.1.24, WORKSPACE_ROOT=/home/[REDACTED]/workspace/dadaia):
+- `Write /home/[REDACTED]/workspace/dadaia/.opencode`            → BLOCK ✓ (direct, parent == root)
+- `Write /home/[REDACTED]/workspace/dadaia/.opencode/agents/foo.md` → ALLOW ✗ (parent == `.opencode`, not root) — but this write DOES create the forbidden top-level `.opencode/`.
 - Same for any `<root>/<forbidden-dir>/<subpath>`.
 
 **Repro:**
 ```
 cd repos/dadaia-workspace
-WORKSPACE_ROOT=/home/marco/workspace/dadaia .dadaia/.venv/bin/python - <<'PY'
+WORKSPACE_ROOT=/home/[REDACTED]/workspace/dadaia .dadaia/.venv/bin/python - <<'PY'
 from dadaia_workspace.hooks import root_whitelist as rw
-print(rw.evaluate_payload({"tool_name":"Write","tool_input":{"file_path":"/home/marco/workspace/dadaia/.opencode/agents/foo.md","content":"x"}}))  # -> None (ALLOW)
+print(rw.evaluate_payload({"tool_name":"Write","tool_input":{"file_path":"/home/[REDACTED]/workspace/dadaia/.opencode/agents/foo.md","content":"x"}}))  # -> None (ALLOW)
 PY
 ```
 

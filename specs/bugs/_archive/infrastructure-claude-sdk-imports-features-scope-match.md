@@ -21,7 +21,7 @@ An upward layering edge: `infrastructure/` imports `features/`, which the
 
 **Repro:**
 ```
-/home/marco/workspace/dadaia/.dadaia/.venv/bin/lint-imports
+/home/[REDACTED]/workspace/dadaia/.dadaia/.venv/bin/lint-imports
 # -> Contracts: 5 kept, 1 broken.
 ```
 Confirmed present on clean HEAD (0fd888d) via `git stash -u` before any WS-6

@@ -4,8 +4,12 @@ The test verifies that:
 1. PanelService accepts workflows_service as a constructor parameter.
 2. PanelService does NOT construct WorkflowsService internally (no
    self._workflows_service = WorkflowsService(...) in __init__).
-3. When a workflows_service is injected, list_workflow_summaries() and
-   run_workflow() use it (not an internally-created instance).
+3. When a workflows_service is injected, list_workflow_summaries() uses it
+   (not an internally-created instance).
+
+(The former ``run_workflow`` delegation test was removed in v0.1.53 when the dead panel
+workflow-launcher chain was retired; the surviving ``workflows_service`` DI assertions
+above stay.)
 """
 
 from __future__ import annotations
@@ -91,22 +95,3 @@ def test_list_workflow_summaries_uses_injected_service() -> None:
     assert fake.list_summaries_called == 1
     assert len(summaries) == 2
     assert summaries[0].name == "workflow-a"
-
-
-def test_injected_service_is_used_by_run_workflow() -> None:
-    """run_workflow must look up workflow names via the injected service."""
-    fake = _FakeWorkflowsService(["my-workflow"])
-
-    class _FakeLauncher:
-        def launch(self, workflow_name: str, workspace_root: str, *, python_executable: str) -> int:
-            return 42
-
-        def is_alive(self, pid: int) -> bool:
-            return False
-
-    service = _build_service(workflows_service=fake)
-    service._workflow_launcher = _FakeLauncher()  # type: ignore[attr-defined]
-
-    result = service.run_workflow("my-workflow")
-    assert result["pid"] == 42
-    assert result["workflow"] == "my-workflow"

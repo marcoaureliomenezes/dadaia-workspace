@@ -31,9 +31,9 @@ from collections.abc import Callable  # noqa: E402
 from datetime import UTC, datetime, timedelta  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from dadaia_workspace.core.kernel_tunables import LEASE_TTL_SECONDS  # noqa: E402
 from dadaia_workspace.features.spec_context import lease  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
-from dadaia_workspace.features.spec_context.lease import LEASE_TTL_SECONDS  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)

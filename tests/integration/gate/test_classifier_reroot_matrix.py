@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.features.spec_context import lease
 from dadaia_workspace.features.spec_context.gate_policy import Decision, evaluate
 
@@ -40,7 +41,7 @@ def _seed_lease(
     ctx: str,
     session_id: str,
     heartbeat: datetime,
-    ttl: int = lease.LEASE_TTL_SECONDS,
+    ttl: int = kernel_tunables.LEASE_TTL_SECONDS,
 ) -> None:
     lease._record_path(workspace, ctx).write_text(
         json.dumps(

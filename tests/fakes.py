@@ -1,20 +1,12 @@
 """In-memory fakes for all protocols — enable unit tests without I/O."""
 
-from collections.abc import Iterable
+import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.exceptions import (
-    RunNotFoundError,
-    WorkflowNotFoundError,
-)
-from dadaia_workspace.core.models.run_state import (
-    RunEvent,
-    RunManifest,
-)
 from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
-from dadaia_workspace.core.models.workflow import WorkflowDefinition
 
 
 class FakeContextStore:
@@ -154,52 +146,30 @@ class FakeExcelReader:
         return self._rows
 
 
-class FakeWorkflowStore:
-    def __init__(self, workflows: Iterable[WorkflowDefinition] | None = None) -> None:
-        self._by_name: dict[str, WorkflowDefinition] = {w.name: w for w in (workflows or ())}
+def shared_connection_factory(conn: sqlite3.Connection) -> Callable[[], Any]:
+    """Return a per-call connection factory that yields a non-closing view of *conn*.
 
-    def add(self, workflow: WorkflowDefinition) -> None:
-        self._by_name[workflow.name] = workflow
+    ``TelemetryAggregator`` (per-call mode) closes each connection it opens; an in-memory
+    sqlite DB used by the aggregator tests cannot be reopened, so the factory hands back a
+    proxy whose ``close()`` is a no-op — keeping the seeded connection alive across the
+    queries of a single test (the seam the removed shared-``dao`` mode used to provide).
+    """
 
-    def list(self) -> tuple[WorkflowDefinition, ...]:
-        return tuple(self._by_name.values())
+    class _NonClosing:
+        # Transparent proxy: forward every attribute get AND set to the real connection
+        # (queries mutate e.g. ``conn.row_factory``), but neutralize ``close()`` so the
+        # seeded connection survives the aggregator's per-call ``finally: conn.close()``.
+        def __getattr__(self, name: str) -> Any:
+            return getattr(conn, name)
 
-    def get(self, name: str) -> WorkflowDefinition:
-        if name not in self._by_name:
-            raise WorkflowNotFoundError(f"workflow '{name}' not found")
-        return self._by_name[name]
+        def __setattr__(self, name: str, value: Any) -> None:
+            setattr(conn, name, value)
 
-    def validate(self, name: str) -> tuple[str, ...]:
-        if name not in self._by_name:
-            return (f"workflow '{name}' not found",)
-        return ()
+        def close(self) -> None:
+            return None
 
-
-class FakeRunStateStore:
-    def __init__(self) -> None:
-        self.manifests: dict[str, RunManifest] = {}
-        self.events: dict[str, list[RunEvent]] = {}
-
-    def create_run(self, manifest: RunManifest) -> None:
-        self.manifests[manifest.run_id] = manifest
-        self.events.setdefault(manifest.run_id, [])
-
-    def load_run(self, run_id: str) -> RunManifest:
-        if run_id not in self.manifests:
-            raise RunNotFoundError(f"run '{run_id}' not found")
-        return self.manifests[run_id]
-
-    def update_manifest(self, manifest: RunManifest) -> None:
-        self.manifests[manifest.run_id] = manifest
-
-    def append_event(self, event: RunEvent) -> None:
-        self.events.setdefault(event.run_id, []).append(event)
-
-    def list_runs(self) -> tuple[RunManifest, ...]:
-        return tuple(self.manifests.values())
-
-    def iter_events(self, run_id: str) -> Iterable[RunEvent]:
-        return list(self.events.get(run_id, []))
+    proxy = _NonClosing()
+    return lambda: proxy
 
 
 class FakeFilePermissionSetter:

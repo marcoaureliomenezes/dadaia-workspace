@@ -19,7 +19,7 @@ import sqlite3
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
@@ -59,19 +59,14 @@ class TelemetryAggregator:
 
     Parameters
     ----------
-    dao:
-        A TelemetryDao instance (provides the sqlite3.Connection).  LEGACY /
-        shared mode: the held connection is reused by every query and is owned
-        by the caller (never closed here).  Mutually exclusive with
-        ``connection_factory``.
     connection_factory:
-        ``Callable[[], sqlite3.Connection]`` — PER-CALL mode (v0.1.52 FR3): each
-        public query opens its OWN connection via the factory and closes it in
-        ``finally``.  This is how the panel serves concurrent
-        ThreadingHTTPServer requests without ever sharing a connection across
-        worker threads.  Provide a read-only factory
-        (``schema.open_connection(db_path, read_only=True)``) — the aggregator
-        only reads.  Mutually exclusive with ``dao``.
+        ``Callable[[], sqlite3.Connection]`` — each public query opens its OWN
+        connection via the factory and closes it in ``finally`` (v0.1.52 FR3).
+        This is how the panel serves concurrent ThreadingHTTPServer requests
+        without ever sharing a connection across worker threads.  Provide a
+        read-only factory (``schema.open_connection(db_path, read_only=True)``)
+        — the aggregator only reads.  (The legacy shared-``dao`` mode was
+        removed in v0.1.53; it had no production caller.)
     spec_context_service:
         Any object exposing ``list_all() -> list`` where each item has
         ``.name`` (str), ``.repo_slug`` (str), and the workspace root is
@@ -89,18 +84,11 @@ class TelemetryAggregator:
 
     def __init__(
         self,
-        dao: Any = None,
+        connection_factory: Callable[[], sqlite3.Connection],
         spec_context_service: Any = None,
         pricing_module: Any = None,
         workspace_root: Any = None,
-        connection_factory: Callable[[], sqlite3.Connection] | None = None,
     ) -> None:
-        if (dao is None) == (connection_factory is None):
-            raise ValueError(
-                "TelemetryAggregator requires exactly one of dao= (legacy shared "
-                "connection) or connection_factory= (per-call connections)."
-            )
-        self._dao = dao
         self._connection_factory = connection_factory
         self._scs = spec_context_service
         self._pricing = pricing_module
@@ -111,23 +99,12 @@ class TelemetryAggregator:
     # ------------------------------------------------------------------
 
     def _open_conn(self) -> sqlite3.Connection:
-        """Return the connection a query should use.
-
-        Per-call factory mode opens a fresh connection; legacy shared mode
-        returns the caller-owned DAO connection.
-        """
-        if self._connection_factory is not None:
-            return self._connection_factory()
-        return cast("sqlite3.Connection", self._dao._conn)
+        """Open a fresh connection via the injected per-call factory."""
+        return self._connection_factory()
 
     def _close_conn(self, conn: sqlite3.Connection) -> None:
-        """Close a factory-opened connection; leave a shared DAO connection open.
-
-        In legacy shared mode the connection is owned by the caller (the DAO)
-        and must outlive the query, so it is never closed here.
-        """
-        if self._connection_factory is not None:
-            conn.close()
+        """Close the factory-opened connection (per-call ownership)."""
+        conn.close()
 
     # ------------------------------------------------------------------
     # Context resolution helpers

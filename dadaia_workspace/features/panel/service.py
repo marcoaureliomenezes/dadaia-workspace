@@ -18,23 +18,10 @@ Dataclasses
                 rows).
 - PanelContext — one alive Spec Context Project (slug, name, repo_path, branch,
                  status).
-
-WorkflowLauncher DI (T-016-P06)
----------------------------------
-PanelService no longer calls subprocess.Popen or os.kill directly.
-Instead, it delegates to an injected WorkflowLauncher
-(core/protocols/workflow_launcher.py).  The production implementation
-(infrastructure/workflow_launcher_adapter.SubprocessWorkflowLauncher) lives in
-the infrastructure layer where subprocess use is permitted.
-
-PID state is persisted via an optional JsonWorkflowStateStore so that the
-running-workflow registry survives panel restarts.  When no state store is
-injected, state is kept in-memory only (backward-compatible default for tests).
 """
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -46,7 +33,6 @@ from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
 from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
 from dadaia_workspace.core.protocols.context_project_provider import ContextProjectProvider
 from dadaia_workspace.core.protocols.server_registry_provider import ServerRegistryProvider
-from dadaia_workspace.core.protocols.workflow_launcher import WorkflowLauncher
 from dadaia_workspace.core.protocols.workflow_provider import WorkflowProvider
 
 
@@ -106,12 +92,6 @@ class PanelService:
         Absolute path to the workspace root directory.  Used to construct
         repo_path in PanelContext without reaching into SpecContextService
         private attributes.
-    workflow_launcher:
-        Optional WorkflowLauncher instance (injected, T-016-P06).
-        When None, a SubprocessWorkflowLauncher is built lazily on first use.
-    workflow_state_store:
-        Optional state store for persisting running-workflow PIDs.
-        When None, state is kept in-memory only (survives current process only).
     report_retention:
         Optional ReportRetentionService instance (injected, T-017-08).
         When None, a RuntimeError is raised on first use.  The container always
@@ -129,8 +109,6 @@ class PanelService:
         workspace_root: Path,
         telemetry: Any = None,
         academy: Any = None,
-        workflow_launcher: WorkflowLauncher | None = None,
-        workflow_state_store: Any = None,
         workflows_service: WorkflowProvider | None = None,
         report_retention: Any = None,
         adapter_registry: dict[str, Any] | None = None,
@@ -156,12 +134,6 @@ class PanelService:
         academy:
             Optional AcademyService instance (injected).  When None,
             the Academy tab returns an empty course list.
-        workflow_launcher:
-            WorkflowLauncher protocol implementation (T-016-P06).
-            When None, a SubprocessWorkflowLauncher is created on first use.
-        workflow_state_store:
-            State store for persisted PID tracking.
-            When None, an in-memory dict is used (state lost on restart).
         workflows_service:
             WorkflowProvider instance (injected via DI, T-017-06/07).
             When None, a WorkflowsService is constructed lazily from
@@ -182,10 +154,6 @@ class PanelService:
         # workflows_service is injected; fallback to lazy construction preserves
         # backward compatibility (T-017-06: no self-construction in __init__).
         self._workflows_service: WorkflowProvider | None = workflows_service
-        self._workflow_launcher = workflow_launcher
-        self._workflow_state_store = workflow_state_store
-        # In-memory fallback when no persistent state store is injected.
-        self._running_workflows: dict[str, int] = {}
         # AR-03: injected dependencies for report retention and adapter registry.
         self._report_retention = report_retention
         self._adapter_registry: dict[str, Any] = (
@@ -363,44 +331,6 @@ class PanelService:
         """
         return self._adapter_registry.get(runtime)
 
-    def run_workflow(self, workflow_name: str) -> dict[str, object]:
-        """Spawn ``dadaia orchestrate <workflow_name>`` in the background.
-
-        Delegates subprocess launch to the injected WorkflowLauncher
-        (T-016-P06 — no subprocess.Popen in the features layer).
-
-        State is persisted via the injected workflow_state_store so that the
-        running-workflow registry survives panel restarts.
-
-        Raises RuntimeError with "not found" if the workflow doesn't exist,
-        or "already running" if a tracked PID is still alive.
-        Returns {"pid": int, "workflow": str} on success.
-        """
-        override = getattr(self, "_workflows_service_override", None)
-        svc = override if override is not None else self._workflows_svc()
-        known = {s.name for s in svc.list_summaries()}
-        if workflow_name not in known:
-            raise RuntimeError(f"workflow not found: {workflow_name!r}")
-
-        # Load persisted state if a store is available, otherwise use in-memory.
-        running = self._load_running()
-        existing_pid = running.get(workflow_name)
-        if existing_pid is not None:
-            if self._launcher().is_alive(existing_pid):
-                raise RuntimeError(f"already running: {workflow_name!r} (PID {existing_pid})")
-            # PID is dead — evict stale entry.
-            del running[workflow_name]
-            self._persist_running(running)
-
-        pid = self._launcher().launch(
-            workflow_name,
-            str(self._workspace_root),
-            python_executable=sys.executable,
-        )
-        running[workflow_name] = pid
-        self._persist_running(running)
-        return {"pid": pid, "workflow": workflow_name}
-
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -420,33 +350,6 @@ class PanelService:
                 "provides one; pass a fake for tests."
             )
         return self._workflows_service
-
-    def _launcher(self) -> WorkflowLauncher:
-        """Return the injected launcher, or build a SubprocessWorkflowLauncher lazily."""
-        if self._workflow_launcher is not None:
-            return self._workflow_launcher
-        # Lazy import to avoid a hard dependency at module level.
-        from dadaia_workspace.infrastructure.workflow_launcher_adapter import (
-            SubprocessWorkflowLauncher,
-        )
-
-        launcher = SubprocessWorkflowLauncher()
-        self._workflow_launcher = launcher
-        return launcher
-
-    def _load_running(self) -> dict[str, int]:
-        """Return the current running-workflow PID map."""
-        if self._workflow_state_store is not None:
-            loaded: dict[str, int] = self._workflow_state_store.load()
-            return loaded
-        return dict(self._running_workflows)
-
-    def _persist_running(self, state: dict[str, int]) -> None:
-        """Persist *state* back to the store and update the in-memory dict."""
-        if self._workflow_state_store is not None:
-            self._workflow_state_store.save(state)
-        else:
-            self._running_workflows = dict(state)
 
     def _active_contexts(self) -> list[SpecContextProject]:
         """Return contexts with state == alive."""

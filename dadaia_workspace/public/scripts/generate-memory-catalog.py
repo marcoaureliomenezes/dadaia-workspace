@@ -32,7 +32,6 @@ identical here by tests/contract/test_memory_catalog_render_contract.py):
           "path": "specs/memory/product/<area>/<slug>.md",
           "tags": ["<tag>", ...],
           "token_estimate": <int>,
-          "agent_tier": "<inject|self-pull>",
           "depends_on": ["<slug>", ...]
         },
         ...
@@ -71,6 +70,10 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 # Required frontmatter fields for catalog generation.
+# ``agent_tier`` was removed here in v0.1.53 (FR3): it has zero runtime consumers, so the
+# catalog neither requires it as input (tolerate) nor emits it in output (drop). Kept in
+# lockstep with the production twin ``features/specs/catalog.py`` (pinned by
+# tests/contract/test_memory_catalog_render_contract.py).
 _REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
@@ -78,7 +81,6 @@ _REQUIRED_FIELDS: tuple[str, ...] = (
     "tldr",
     "summary",
     "tags",
-    "agent_tier",
     "token_estimate",
 )
 
@@ -184,7 +186,6 @@ def _build_feature_entry(
         "path": rel_path,
         "tags": list(fm.get("tags") or []),
         "token_estimate": int(fm.get("token_estimate", 0)),
-        "agent_tier": str(fm.get("agent_tier", "self-pull")),
         "depends_on": depends_on,
     }
 
