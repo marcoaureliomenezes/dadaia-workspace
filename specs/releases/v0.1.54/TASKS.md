@@ -180,7 +180,7 @@ includes `tests/`.
 
 ## W3 — FR5 + FR7 direct-debt DI + core purity
 
-- [ ] T-54-12 Complete `features → infrastructure` DI (remove 2 ignores, lower cap) + core
+- [-] T-54-12 Complete `features → infrastructure` DI (remove 2 ignores, lower cap) + core
   file-I/O AST guard. Checklist:
   - **FR5:** inject `WorkflowProvider` into `WorkflowsService` and `AgentsProvider` into
     `read_canonical_agents` via `container.py`; delete the direct `markdown_workflow_store` /

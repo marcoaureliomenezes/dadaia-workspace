@@ -39,14 +39,18 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # RAISING this requires a new documented edge in setup.cfg + justification in the SAME
 # commit (a new ignored edge = a new suppressed layering violation; see module docstring).
 #
-# Breakdown at the recorded count (v0.1.54 W2 / FR3): features-no-infrastructure = 11,
-# features-no-subprocess = 4, features-no-cross-feature = 13, total = 28.
+# Breakdown at the recorded count (v0.1.54 W3 / FR5): features-no-infrastructure = 9,
+# features-no-subprocess = 4, features-no-cross-feature = 13, total = 26.
 #
 # W2 NOTE (v0.1.54 FR3): the new `features-no-cross-feature` independence contract documents
 # the 13 surviving post-FR2 cross-feature module-pair edges as ignores (each a suppressed
 # cross-feature composition-debt exception — a feature reaching a sibling feature instead of
-# composing via the container). W2 raises the cap 15 -> 28 (+13). W3 (FR5) then completes the
-# two `markdown_*_store` DI cleanups and lowers it 28 -> 26 (-2) in the same commit.
+# composing via the container). W2 raised the cap 15 -> 28 (+13).
+#
+# W3 NOTE (v0.1.54 FR5): the two `markdown_*_store` direct-debt edges
+# (`workflows.service -> markdown_workflow_store`, `agents.reader -> markdown_agent_store`)
+# were removed via container `store_factory` DI completion, lowering the cap 28 -> 26 (-2)
+# and the features-no-infrastructure family 11 -> 9 in the same commit.
 #
 # SHRINK NOTE (arch A4 + T-010-33): v0.1.53 lowered the cap 17 -> 15. W1 deleted the panel
 # workflow-launcher chain (workflow_launcher_adapter), which retired BOTH
@@ -58,12 +62,12 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # T-010-33's reverse-direction `forbidden` contracts (core-no-upper-layers,
 # infrastructure-no-upper-layers) add ZERO ignore edges — they freeze layers verified
 # clean — so they do not move this number.
-_RECORDED_IGNORE_EDGE_CAP = 28
+_RECORDED_IGNORE_EDGE_CAP = 26
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-infrastructure": 11,
+    "features-no-infrastructure": 9,
     "features-no-subprocess": 4,
     "features-no-cross-feature": 13,
 }
@@ -134,7 +138,7 @@ def test_ignore_edge_count_matches_recorded_per_family_breakdown() -> None:
     The grand-total cap alone would not catch a silent shift *between* families (e.g. a
     dropped ``features-no-infrastructure`` DI edge quietly re-spent as a new
     ``features-no-cross-feature`` erosion at the same total). Pinning each family separately
-    makes the exact v0.1.54 W2 shape falsifiable: features-no-infrastructure = 11,
+    makes the exact v0.1.54 W3 shape falsifiable: features-no-infrastructure = 9,
     features-no-subprocess = 4, features-no-cross-feature = 13.
     """
     by_family = {

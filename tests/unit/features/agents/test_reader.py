@@ -24,6 +24,7 @@ from dadaia_workspace.features.agents.reader import (
     _strip_frontmatter,
     get_prompt,
 )
+from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 
 _FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -56,7 +57,9 @@ def _write_agent(
 def test_env_var_branch_loads_agents(monkeypatch: pytest.MonkeyPatch) -> None:
     """When DADAIA_AGENTS_DIR points at the fixtures dir, agents are loaded."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     names = {a.id for a in agents}
     # malformed.md is skipped; software-engineer, frontend-engineer,
     # with-unknown-keys (backend-engineer name) must be present
@@ -68,7 +71,9 @@ def test_env_var_branch_loads_agents(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_env_var_branch_skips_malformed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Malformed YAML frontmatter causes the file to be skipped, not raised."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     # The malformed.md file has name: malformed but bad YAML so it is skipped.
     # We should not see "malformed" in the resulting IDs.
     names = {a.id for a in agents}
@@ -86,7 +91,7 @@ def test_env_var_branch_supersedes_fallback_dirs(
         "# Sentinel\n",
     )
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "sentinel-agent" not in names
 
@@ -97,7 +102,7 @@ def test_agentic_branch_loads_agents(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     _write_agent(
         _agentic_dir(tmp_path), "alpha.md", "name: alpha\ntier: 3\ndescription: Alpha agent.\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     assert any(a.id == "alpha" for a in agents)
 
 
@@ -112,7 +117,7 @@ def test_agentic_branch_preferred_over_claude(
     _write_agent(
         _claude_dir(tmp_path), "beta.md", "name: beta\ntier: 3\ndescription: Beta agent.\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "alpha" in names
     assert "beta" not in names
@@ -126,7 +131,7 @@ def test_claude_branch_used_when_agentic_missing(
     _write_agent(
         _claude_dir(tmp_path), "gamma.md", "name: gamma\ntier: 3\ndescription: Gamma agent.\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     assert any(a.id == "gamma" for a in agents)
 
 
@@ -139,7 +144,7 @@ def test_claude_branch_used_when_agentic_empty(
     _write_agent(
         _claude_dir(tmp_path), "delta.md", "name: delta\ntier: 3\ndescription: Delta agent.\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     assert any(a.id == "delta" for a in agents)
 
 
@@ -149,14 +154,16 @@ def test_returns_empty_list_when_no_dir_found(
     """Returns an empty list when no agent directory can be resolved."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     # neither .dadaia/agentic/agents/ nor .claude/agents/ exist
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     assert agents == []
 
 
 def test_unknown_keys_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fields not in the allowlist are silently dropped; known fields are preserved."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     backend = next((a for a in agents if a.id == "backend-engineer"), None)
     assert backend is not None
     # unknown_field and another_unknown must NOT appear as attributes
@@ -170,7 +177,9 @@ def test_unknown_keys_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_known_fields_all_present(monkeypatch: pytest.MonkeyPatch) -> None:
     """All canonical AgentDTO fields are populated on a well-formed agent."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     se = next((a for a in agents if a.id == "software-engineer"), None)
     assert se is not None
     assert se.id == "software-engineer"
@@ -195,7 +204,7 @@ def test_optional_fields_default_to_none_or_empty(
         "name: minimal\ntier: 3\ndescription: Minimal agent.\n",
         "# Minimal\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     minimal = next((a for a in agents if a.id == "minimal"), None)
     assert minimal is not None
     assert minimal.skills == []
@@ -208,7 +217,9 @@ def test_optional_fields_default_to_none_or_empty(
 def test_malformed_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
     """A file with malformed YAML is skipped; other files in the dir are still parsed."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     names = {a.id for a in agents}
     # malformed.md must be skipped
     assert "malformed" not in names
@@ -226,7 +237,7 @@ def test_missing_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     _write_agent(
         agentic_dir, "valid.md", "name: valid\ntier: 3\ndescription: Valid agent.\n", "# Valid\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "no-frontmatter" not in names
     assert "valid" in names
@@ -240,7 +251,7 @@ def test_empty_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     _write_agent(
         agentic_dir, "valid.md", "name: valid\ntier: 3\ndescription: Valid agent.\n", "# Valid\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "empty-fm" not in names
     assert "valid" in names
@@ -249,7 +260,9 @@ def test_empty_frontmatter_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 def test_agent_dto_is_dataclass_or_typed(monkeypatch: pytest.MonkeyPatch) -> None:
     """AgentDTO is importable and instances have the expected field set."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_FIXTURES))
-    agents = read_canonical_agents(workspace_root=Path("/does/not/matter"))
+    agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
     assert len(agents) > 0
     dto = agents[0]
     assert isinstance(dto, AgentDTO)
@@ -278,7 +291,7 @@ def test_raw_to_dto_missing_name_returns_empty_agent_list(
         "tier: 3\ndescription: Agent without a name field.\n",
         "# Nameless\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "nameless" not in names
 
@@ -289,7 +302,7 @@ def test_raw_to_dto_empty_name_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path
     _write_agent(
         _agentic_dir(tmp_path), "empty-name.md", "name: ''\ndescription: Empty name.\n", "# Empty\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     assert all(a.id != "" for a in agents)
 
 
@@ -301,7 +314,7 @@ def test_raw_to_dto_missing_description_defaults_empty(
     _write_agent(
         _agentic_dir(tmp_path), "no-desc.md", "name: no-desc\ntier: 3\n", "# No description\n"
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "no-desc"), None)
     assert agent is not None
     assert agent.description == ""
@@ -316,7 +329,7 @@ def test_raw_to_dto_bad_max_turns_ignored(monkeypatch: pytest.MonkeyPatch, tmp_p
         "name: bad-turns\ntier: 3\ndescription: Bad maxTurns.\nmaxTurns: 'not-a-number'\n",
         "# Bad\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "bad-turns"), None)
     assert agent is not None
     assert agent.max_turns is None
@@ -331,7 +344,7 @@ def test_raw_to_dto_max_turns_snake_case(monkeypatch: pytest.MonkeyPatch, tmp_pa
         "name: snake-turns\ntier: 3\ndescription: Snake case turns.\nmax_turns: 42\n",
         "# Snake\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "snake-turns"), None)
     assert agent is not None
     assert agent.max_turns == 42
@@ -348,7 +361,7 @@ def test_raw_to_dto_maxtturns_camelcase_priority(
         "name: both-turns\ntier: 3\ndescription: Both maxTurns and max_turns.\nmaxTurns: 10\nmax_turns: 99\n",
         "# Both\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "both-turns"), None)
     assert agent is not None
     assert agent.max_turns == 10  # camelCase takes priority
@@ -365,7 +378,7 @@ def test_raw_to_dto_non_dict_input_contract_ignored(
         "name: bad-contract\ntier: 3\ndescription: Bad contract.\ninput_contract: just-a-string\n",
         "# Bad\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "bad-contract"), None)
     assert agent is not None
     assert agent.input_contract is None
@@ -381,7 +394,7 @@ def test_raw_to_dto_unicode_emoji_name(monkeypatch: pytest.MonkeyPatch, tmp_path
         "# Unicode\n",
         encoding="utf-8",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "unicode-agent"), None)
     assert agent is not None
     assert "🤖" in agent.description
@@ -521,7 +534,7 @@ def test_paths_field_loaded_when_present(monkeypatch: pytest.MonkeyPatch, tmp_pa
         "",
         "# Pathed\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "pathed-agent"), None)
     assert agent is not None
     assert agent.paths is not None
@@ -542,7 +555,7 @@ def test_paths_field_defaults_to_none_when_absent(
         "name: no-paths\ntier: 3\ndescription: No paths field.\n",
         "# NoPaths\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "no-paths"), None)
     assert agent is not None
     assert agent.paths is None
@@ -559,7 +572,7 @@ def test_paths_field_non_dict_defaults_to_none(
         "name: bad-paths\ntier: 3\ndescription: Bad paths.\npaths: just-a-string\n",
         "# BadPaths\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     agent = next((a for a in agents if a.id == "bad-paths"), None)
     assert agent is not None
     assert agent.paths is None
@@ -572,7 +585,11 @@ _PUBLIC_AGENTS_DIR = (
 
 @lru_cache(maxsize=1)
 def _public_agents() -> tuple[AgentDTO, ...]:
-    return tuple(read_canonical_agents(workspace_root=Path("/does/not/matter")))
+    return tuple(
+        read_canonical_agents(
+            workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+        )
+    )
 
 
 def _is_plugin_stub(agent: "AgentDTO") -> bool:  # noqa: F821
@@ -728,7 +745,7 @@ def test_invalid_tier_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
         "name: bad-tier-agent\ndescription: Invalid tier.\ntier: 99\n",
         "# BadTier\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "bad-tier-agent" not in names
 
@@ -753,7 +770,7 @@ def test_missing_tier_defaults_to_3(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         "name: no-tier-agent\ndescription: Missing tier.\n",
         "# NoTier\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
     assert "no-tier-agent" in names
     agent = next(a for a in agents if a.id == "no-tier-agent")
@@ -805,7 +822,7 @@ def test_plugin_stub_frontmatter_maps_to_dto(
         'name: design-specialist\ndescription: "[PLUGIN] stub."\nplugin: true\n',
         "# stub\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     dto = next(a for a in agents if a.id == "design-specialist")
     assert dto.plugin is True
 
@@ -824,7 +841,7 @@ def test_non_plugin_agent_defaults_plugin_false(
         ),
         "# se\n",
     )
-    agents = read_canonical_agents(workspace_root=tmp_path)
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     dto = next(a for a in agents if a.id == "software-engineer")
     assert dto.plugin is False
     assert dto.gate_role == "implementer"
@@ -841,6 +858,6 @@ def test_plugin_stub_missing_tier_does_not_warn(
         'name: frontend-engineer\ndescription: "[PLUGIN] stub."\nplugin: true\n',
         "# stub\n",
     )
-    read_canonical_agents(workspace_root=tmp_path)
+    read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     captured = capsys.readouterr()
     assert "missing the 'tier'" not in captured.err

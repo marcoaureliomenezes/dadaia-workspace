@@ -24,6 +24,7 @@ from dadaia_workspace.features.workflows.service import (
     WorkflowSummaryDTO,
     _cache,
 )
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 
 # ---------------------------------------------------------------------------
 # Fixtures — minimal .workflow.md files written to tmp_path
@@ -113,7 +114,7 @@ def test_list_returns_all_workflows(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
     (wf_dir / "parallel-wf.workflow.md").write_text(_PARALLEL_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
 
     names = {s.name for s in summaries}
@@ -124,7 +125,7 @@ def test_list_returns_empty_when_no_dir(monkeypatch: pytest.MonkeyPatch, tmp_pat
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     # no workflows dir under tmp_path
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     assert svc.list_summaries() == []
 
 
@@ -134,7 +135,7 @@ def test_summary_shape_matches_spec(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     assert len(summaries) == 1
     s = summaries[0]
@@ -164,7 +165,7 @@ def test_summary_detects_parallel_and_gates(
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "parallel-wf.workflow.md").write_text(_PARALLEL_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     p = summaries[0]
 
@@ -202,7 +203,7 @@ stages:
 # two-stage
 """
     (wf_dir / "two-stage.workflow.md").write_text(two_stage)
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     s = svc.list_summaries()[0]
     assert s.agent_ids == ["software-engineer"]
 
@@ -220,7 +221,7 @@ def test_get_detail_returns_none_for_unknown(
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     assert svc.get_detail("nonexistent-workflow") is None
 
 
@@ -229,7 +230,7 @@ def test_get_detail_returns_none_when_no_dir(
 ) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     assert svc.get_detail("simple-wf") is None
 
 
@@ -239,7 +240,7 @@ def test_detail_shape_matches_spec(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("simple-wf")
 
     assert detail is not None
@@ -265,7 +266,7 @@ def test_detail_stage_dto_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("simple-wf")
     assert detail is not None
     stage = detail.stages[0]
@@ -288,7 +289,7 @@ def test_detail_stage_gate_bool_true(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "parallel-wf.workflow.md").write_text(_PARALLEL_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("parallel-wf")
     assert detail is not None
 
@@ -304,7 +305,7 @@ def test_detail_parallel_stage_fields(monkeypatch: pytest.MonkeyPatch, tmp_path:
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "parallel-wf.workflow.md").write_text(_PARALLEL_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("parallel-wf")
     assert detail is not None
 
@@ -325,7 +326,7 @@ def test_detail_inputs_mapped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("simple-wf")
     assert detail is not None
     assert len(detail.inputs) == 1
@@ -347,7 +348,7 @@ def test_cache_hit_on_second_call(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     wf_file = wf_dir / "simple-wf.workflow.md"
     wf_file.write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail_first = svc.get_detail("simple-wf")
     detail_second = svc.get_detail("simple-wf")
 
@@ -362,7 +363,7 @@ def test_cache_invalidated_on_mtime_change(monkeypatch: pytest.MonkeyPatch, tmp_
     wf_file = wf_dir / "simple-wf.workflow.md"
     wf_file.write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail_first = svc.get_detail("simple-wf")
     assert detail_first is not None
 
@@ -384,7 +385,7 @@ def test_cache_eviction_on_file_deletion(monkeypatch: pytest.MonkeyPatch, tmp_pa
     wf_file = wf_dir / "simple-wf.workflow.md"
     wf_file.write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     assert svc.get_detail("simple-wf") is not None
 
     # Delete the file — subsequent lookup should return None
@@ -399,7 +400,7 @@ def test_env_var_overrides_default_dir(monkeypatch: pytest.MonkeyPatch, tmp_path
     (custom_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
     monkeypatch.setenv("DADAIA_WORKFLOWS_DIR", str(custom_dir))
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     assert any(s.name == "simple-wf" for s in summaries)
 
@@ -419,7 +420,7 @@ def test_claude_workflows_dir_used_when_agentic_missing(
     claude_dir.mkdir(parents=True)
     (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     assert any(s.name == "simple-wf" for s in summaries)
 
@@ -437,7 +438,7 @@ def test_claude_workflows_dir_used_when_agentic_empty(
     claude_dir.mkdir(parents=True)
     (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     assert any(s.name == "simple-wf" for s in summaries)
 
@@ -454,7 +455,7 @@ def test_agentic_dir_preferred_over_claude(monkeypatch: pytest.MonkeyPatch, tmp_
     claude_dir.mkdir(parents=True)
     (claude_dir / "claude-wf.workflow.md").write_text(_SIMPLE_WF.replace("simple-wf", "claude-wf"))
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     summaries = svc.list_summaries()
     names = {s.name for s in summaries}
     assert "agentic-wf" in names
@@ -480,7 +481,7 @@ def test_malformed_workflow_yaml_raises(monkeypatch: pytest.MonkeyPatch, tmp_pat
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "bad.workflow.md").write_text("---\n: invalid: yaml: [\n---\n# Bad\n")
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     with pytest.raises(WorkflowSchemaError):
         svc.list_summaries()
 
@@ -499,7 +500,7 @@ def test_empty_workflow_file_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     wf_dir = _make_workflows_dir(tmp_path)
     (wf_dir / "empty.workflow.md").write_text("")
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     with pytest.raises(WorkflowSchemaError):
         svc.list_summaries()
 
@@ -517,7 +518,7 @@ def test_get_detail_from_claude_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     claude_dir.mkdir(parents=True)
     (claude_dir / "simple-wf.workflow.md").write_text(_SIMPLE_WF)
 
-    svc = WorkflowsService(workspace_root=tmp_path)
+    svc = WorkflowsService(workspace_root=tmp_path, store_factory=MarkdownWorkflowStore)
     detail = svc.get_detail("simple-wf")
     assert detail is not None
     assert detail.name == "simple-wf"

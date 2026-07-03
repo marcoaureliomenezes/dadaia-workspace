@@ -32,6 +32,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_workflows_list,
 )
 from dadaia_workspace.features.workflows.service import WorkflowsService
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 # ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ def _build_server(
     token: str,
     workspace_root: Path,
 ) -> ThreadingHTTPServer:
-    workflows_service = WorkflowsService(workspace_root)
+    workflows_service = WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
     panel_service = PanelService(
         registry=_StubRegistry(),  # type: ignore[arg-type]
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]

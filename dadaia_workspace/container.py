@@ -110,6 +110,8 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
+from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
+from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
     LinuxProcAncestry,
     PsProcessAncestry,
@@ -442,7 +444,11 @@ def build_orchestration_catalog_service(workspace_root: Path) -> WorkflowsServic
     surface did. Guards initialization so an uninitialized workspace still exits non-zero.
     """
     _guard_initialized(workspace_root)
-    return WorkflowsService(workspace_root, agent_catalog=_agent_catalog(workspace_root))
+    return WorkflowsService(
+        workspace_root,
+        agent_catalog=_agent_catalog(workspace_root),
+        store_factory=MarkdownWorkflowStore,
+    )
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
@@ -456,7 +462,7 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 
 def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
     """Compose a ``WorkflowsService`` for the given workspace root."""
-    return WorkflowsService(workspace_root)
+    return WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
 
 
 def build_panel_service(
@@ -473,7 +479,7 @@ def build_panel_service(
         workflows_service=build_workflow_catalog_service(workspace_root),
         report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),
-        agents_provider=FileSystemAgentsProvider(),
+        agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
 
 

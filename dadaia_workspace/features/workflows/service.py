@@ -1,6 +1,7 @@
 """WorkflowsService — features/workflows/service.py.
 
-Wraps MarkdownWorkflowStore and provides DTO-mapped list + detail accessors
+Wraps an injected workflow store (the concrete ``MarkdownWorkflowStore`` is supplied by
+``container.py`` via ``store_factory``) and provides DTO-mapped list + detail accessors
 with a per-process in-memory mtime cache.
 
 Cache keyed by (path, mtime, size); cache size bounded by file count in source
@@ -20,13 +21,12 @@ dir; ETag header is P2 follow-up.
 
 import logging
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from dadaia_workspace.features.workflows.dadaia_catalog import DadaiaWorkflowDTO
 
 from dadaia_workspace.core.exceptions import WorkflowNotFoundError
@@ -37,9 +37,29 @@ from dadaia_workspace.core.models.workflow import (
     WorkflowSummaryDTO as WorkflowSummaryDTO,  # re-export
 )
 from dadaia_workspace.features.workflows.dag import render_dag_svg
-from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 
 logger = logging.getLogger(__name__)
+
+
+class _WorkflowStore(Protocol):
+    """Structural surface of the injected workflow store (see ``MarkdownWorkflowStore``).
+
+    Depending on this feature-local Protocol — rather than importing the concrete
+    ``infrastructure.markdown_workflow_store.MarkdownWorkflowStore`` — keeps
+    ``features/workflows/service.py`` free of any ``features -> infrastructure`` edge
+    (v0.1.54 FR5 DI completion). The composition root (``container.py``) supplies the
+    concrete store class as the ``store_factory``.
+    """
+
+    def list(self) -> tuple[WorkflowDefinition, ...]: ...
+
+    def get(self, name: str) -> WorkflowDefinition: ...
+
+
+#: Builds a workflow store for a resolved workflows directory + agent catalog.
+#: ``container.py`` passes the concrete ``MarkdownWorkflowStore`` class; the feature never
+#: imports infrastructure.
+WorkflowStoreFactory = Callable[[Path, Iterable[str] | None], _WorkflowStore]
 
 # Cache key: (absolute path str, mtime float, size int) → WorkflowDetailDTO
 _CacheKey = tuple[str, float, int]
@@ -155,9 +175,11 @@ def _cache_key(path: Path) -> _CacheKey | None:
 
 
 class WorkflowsService:
-    """Wraps MarkdownWorkflowStore; provides list_summaries() and get_detail().
+    """Wraps an injected workflow store; provides list_summaries() and get_detail().
 
-    Per-process in-memory cache keyed by (path, mtime, size).
+    The concrete store (``MarkdownWorkflowStore``) is injected via ``store_factory`` by the
+    composition root, so this feature module holds no ``features -> infrastructure`` edge
+    (v0.1.54 FR5). Per-process in-memory cache keyed by (path, mtime, size).
 
     **Reference/doc-only Markdown path (v0.1.28).** The ``*.workflow.md`` accessors
     (:meth:`list_summaries`, :meth:`get_detail`) are kept for the legacy reference view but
@@ -166,19 +188,28 @@ class WorkflowsService:
     single authoritative source (T-28-B-02 / AC-15).
     """
 
-    def __init__(self, workspace_root: Path, agent_catalog: "Iterable[str] | None" = None) -> None:
+    def __init__(
+        self,
+        workspace_root: Path,
+        agent_catalog: Iterable[str] | None = None,
+        *,
+        store_factory: WorkflowStoreFactory | None = None,
+    ) -> None:
         self._workspace_root = workspace_root
         self._agent_catalog = tuple(agent_catalog) if agent_catalog is not None else None
         self._workflows_dir: Path | None = None
-        self._store: MarkdownWorkflowStore | None = None
+        self._store_factory = store_factory
+        self._store: _WorkflowStore | None = None
 
-    def _ensure_store(self) -> tuple[Path, MarkdownWorkflowStore] | None:
+    def _ensure_store(self) -> tuple[Path, _WorkflowStore] | None:
         workflows_dir = _resolve_workflows_dir(self._workspace_root)
         if workflows_dir is None:
             return None
+        if self._store_factory is None:
+            return None
         if self._workflows_dir != workflows_dir:
             self._workflows_dir = workflows_dir
-            self._store = MarkdownWorkflowStore(workflows_dir, agent_catalog=self._agent_catalog)
+            self._store = self._store_factory(workflows_dir, self._agent_catalog)
         assert self._store is not None
         return workflows_dir, self._store
 
