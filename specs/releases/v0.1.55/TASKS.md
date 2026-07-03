@@ -27,7 +27,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W1 — FR1 SpecsDoctor decomposition
 
-- [ ] T-55-10 Decompose `features/specs/doctor.py` into a thin `SpecsDoctor` coordinator (owns
+- [-] T-55-10 Decompose `features/specs/doctor.py` into a thin `SpecsDoctor` coordinator (owns
   ORDER) + validator classes; behavior byte-identical. Checklist:
   - **Golden PRE-split, DETERMINISTIC (R-4):** capture `SpecsDoctor.check()` + `dadaia specs
     doctor --json` **in-process on a fixed committed fixture root**; normalize every absolute path
