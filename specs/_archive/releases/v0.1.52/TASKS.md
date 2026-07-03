@@ -127,16 +127,30 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
   the pid-veto/no-steal invariant), all 8 other frozen files diff-clean vs main;
   v0.1.50 no-steal freeze preserved. Condition for merge: green `e2e-panel` run
   on the PR (T-52-21 confirms). Owner: qa-engineer.
-- [ ] T-52-21 Security review (push gate): APPROVE handoff with
-  `metrics.commit_sha` = pushed sha (attention: foreign-DB allowlist integrity,
-  mermaid escape, deleted auth-era drift-check); push; CI green (incl.
-  `e2e-panel`); PR; merge. Owner: security-reviewer + orchestrator.
+- [x] T-52-21 Security review (push gate): APPROVED for `a76d0735` (0 findings
+  above INFO; foreign-DB allowlist verified at the wiring level — read-only mode
+  never runs the WAL pragma, `~/.codex` readers absent from the diff, AST contract
+  enumerates exactly 3 legitimate bare-connect sites; every JS sink through
+  `escHtml`; CSP hashes byte-identical; aggregate payload drops per-session
+  cwd/ai_title/session_id). First CI run went RED on `Backlog consistency` — the
+  fail-closed BL-SCHEMA registry correctly flagged the dead anchor
+  `render_api_session_detail` (deleted by this very release) in the still-live
+  consuming entry; ROOT FIX `50de94fb`: consumed-backlog archival moved forward to
+  ship (durable copies + ledger under `specs/_archive/v0.1.52/`); verdict EXTENDED
+  to `50de94fb` after specs-only delta re-review; handoff re-keyed + VALID;
+  second CI run ALL GREEN (35 pass / 3 skipping; `e2e-panel` pass ×2 = the QA
+  merge condition); squash-merged as `fd23ea5e` (PR #93).
+  Owner: security-reviewer + orchestrator.
 
 ## W6 — closure (CLOSURE phase)
 
-- [ ] T-52-30 CLOSURE.md (Validations + Drifts — SPEC-DOC-006); consumed entries
-  (`panel-sessions-cost-dashboard-only`, `panel-runtime-reliability`) removed with
-  durable copies + `consumed_backlog.json`; memory `panel.md` refreshed (tab
-  inventory, route table incl. deleted kanban/detail routes, flowchart, usage
-  flow) + catalog + lint; archive; ACTIVE → none; candidates R4 row shipped; note
-  the deferred SQLite bug chain remediated. Owner: product-engineer.
+- [x] T-52-30 CLOSURE.md authored (Validations + Drifts — SPEC-DOC-006; the
+  dead-anchor process discovery recorded as a Drift, not a bug); consumed-backlog
+  archival had ALREADY landed at ship (`50de94fb` — see T-52-21); memory
+  `panel.md` refreshed (Sessions = dashboard-only w/ aggregate envelope + cost
+  mapping; kanban DELETED in tab inventory/route table/views list/state reads;
+  per-call ro factory connections; mermaid escape note) + catalog regenerated +
+  lint all-pass (the gate blocked the memory edit until the phase flip — working
+  as designed); archive; ACTIVE → none; candidates R4 row marked shipped; the
+  deferred SQLite bug chain noted remediated in CLOSURE (stream stays terminal).
+  Owner: product-engineer.

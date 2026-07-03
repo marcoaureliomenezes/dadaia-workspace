@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T20:07:24Z",
+  "generated_at": "2026-07-03T01:55:57Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -212,7 +212,7 @@
       "category": "product",
       "area": "panel",
       "tldr": "local control surface (dadaia panel); 6 tabs; Workflows leads with server-SVG diagram-cards + inline per-step model pickers (v0.1.45).",
-      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions table with 8 columns and per-cell min-width, 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune. NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban served with no UI consumer; /api/lifecycle-runs served with no dedicated UI.",
+      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions is an aggregated-cost DASHBOARD ONLY (v0.1.52: 4 stat cards + cost-unknown banner from the server-side /api/sessions aggregate; the list/drawer/detail endpoint are gone), 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune; telemetry SQLite through the pragma'd factory (WAL+busy_timeout, per-call ro connections). NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban DELETED in v0.1.52 (view+route+CSS+tokens+container wiring); /api/lifecycle-runs served with no dedicated UI.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
