@@ -103,9 +103,10 @@ def test_clean_backlog_commit_passes(tmp_path: Path) -> None:
 
 
 def _plant_schema(repo: Path) -> None:
-    # An UNRESOLVED subject (no such symbol) → BL-SCHEMA.
+    # An UNRESOLVED subject (no such symbol) → BL-SCHEMA. v0.1.55 FR5: status-gated, so the
+    # unresolved-subject violation is planted at `candidate` (an `idea` is exempt).
     (repo / "specs" / "backlog" / "bad.md").write_text(
-        "---\nstatus: idea\nintents:\n"
+        "---\nstatus: candidate\nintents:\n"
         "  - subject: { kind: code, ref: dadaia_workspace/m.py#Ghost }\n"
         "    change: x\n---\n\n# bad\n",
         encoding="utf-8",
