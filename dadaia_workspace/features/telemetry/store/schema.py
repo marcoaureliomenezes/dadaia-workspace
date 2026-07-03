@@ -126,18 +126,42 @@ _MIGRATIONS: list[str] = [
 ]
 
 
-def open_connection(db_path: pathlib.Path) -> sqlite3.Connection:
-    """Open a SQLite connection to *db_path* with recommended PRAGMAs set.
+# Milliseconds a connection waits on a locked table before raising
+# ``sqlite3.OperationalError: database is locked``.  WAL keeps readers and the
+# single writer off each other's backs; busy_timeout covers the brief exclusive
+# lock a checkpoint takes so bursty concurrent access degrades to a short wait
+# rather than a hard error.
+_BUSY_TIMEOUT_MS: int = 5000
 
-    PRAGMAs applied:
+
+def open_connection(db_path: pathlib.Path, *, read_only: bool = False) -> sqlite3.Connection:
+    """Open a pragma'd SQLite connection to *db_path*.
+
+    This is the single sanctioned way to open a telemetry-store connection
+    (v0.1.52 FR3).  Two modes:
+
+    Writable (default) — applies the recommended write PRAGMAs:
         - journal_mode = WAL       (concurrent readers, one writer)
         - synchronous  = NORMAL    (durability trade-off, safe with WAL)
         - foreign_keys = ON        (referential integrity enforced)
+        - busy_timeout = 5000 ms   (wait, don't fail, on a transient lock)
+
+    Read-only (``read_only=True``) — opens ``file:{db_path}?mode=ro`` via a URI
+    and applies ONLY ``busy_timeout``.  WAL is a *write* (it flips journal mode),
+    so a read-only open must never set it; ``synchronous``/``foreign_keys`` are
+    write-durability / mutation concerns irrelevant to a pure reader.  Read-only
+    connections are what the panel's per-call store queries use so concurrent
+    ThreadingHTTPServer worker threads never share a connection.
     """
+    if read_only:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+        return conn
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
     return conn
 
 

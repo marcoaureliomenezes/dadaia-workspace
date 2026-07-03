@@ -269,6 +269,14 @@ class TelemetryService:
         quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
         try:
             os.replace(db_path, quarantine_path)
+            # A WAL store is three files (telemetry.sqlite + -wal + -shm). Move
+            # the siblings WITH the corrupt main DB so a fresh writer never
+            # picks up phantom WAL frames stranded next to a clean file
+            # (v0.1.52 FR3).
+            for suffix in ("-wal", "-shm"):
+                sibling = self._state_dir / f"{_DEFAULT_SQLITE_FILENAME}{suffix}"
+                if sibling.exists():
+                    os.replace(sibling, self._state_dir / f"{quarantine_path.name}{suffix}")
             logger.warning(
                 "TelemetryService: corrupt database quarantined as %s. "
                 "Service is now in degraded mode. "
@@ -286,13 +294,21 @@ class TelemetryService:
 
     def _do_refresh(self) -> None:
         """Inner refresh: open DAO, run readers, backfill costs."""
+        from dadaia_workspace.features.telemetry.store.schema import (
+            apply_migrations,
+            open_connection,
+        )
+
         # --- Integrity check on existing DB (T-AM-21 / devops T10) ---
-        # Open a temporary connection to check the existing file BEFORE
-        # the DAO factory opens it (which would apply migrations).
+        # Open a temporary READ-ONLY connection to check the existing file
+        # BEFORE the DAO factory opens it (which would apply migrations). The
+        # probe routes through the pragma'd factory in read-only mode — an
+        # integrity check is a read; it must never flip the corrupt file into
+        # WAL (v0.1.52 FR3).
         db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
         if db_path.exists():
             try:
-                _check_conn = sqlite3.connect(str(db_path))
+                _check_conn = open_connection(db_path, read_only=True)
                 try:
                     intact = self._integrity_check(_check_conn)
                 finally:
@@ -305,61 +321,67 @@ class TelemetryService:
                 self._degraded = True
                 return  # Skip all readers — service stays alive in degraded mode.
 
+        # The write DAO is opened per refresh and MUST be closed in finally so
+        # its connection (and any WAL/-shm handles) never leaks across refreshes
+        # (v0.1.52 FR3).
         dao = self._dao_factory()
-
-        # Apply migrations (idempotent).
-        from dadaia_workspace.features.telemetry.store.schema import apply_migrations
-
-        apply_migrations(dao._conn)
-
-        # Harden SQLite file permissions to 0o600 (owner read/write only).
-        # This is done after every refresh since the DAO may create the file on
-        # first connection. os.chmod is idempotent and cheap. (T-AM-20 / devops T2)
-        if db_path.exists():
-            os.chmod(db_path, 0o600)
-
-        # The reader factory returns (claude, codex) historically, or
-        # (claude, codex, pi) once the PI reader is wired (WS-PI-6). Unpack
-        # tolerantly so legacy 2-tuple callers keep working unchanged.
-        readers = self._reader_factory()
-        claude_reader, codex_reader = readers[0], readers[1]
-        pi_reader = readers[2] if len(readers) > 2 else None
-        now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
-
-        # --- Claude reader ---
-        claude_projects = _CLAUDE_PROJECTS_DIR
-        if claude_projects.is_dir():
-            for project_dir in claude_projects.iterdir():
-                if not project_dir.is_dir():
-                    continue
-                for jsonl_file in project_dir.glob("*.jsonl"):
-                    try:
-                        claude_reader.read_session_file(jsonl_file, dao, now_iso)
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("TelemetryService: error reading %s: %s", jsonl_file, exc)
-
-        # --- Codex reader ---
-        codex_path_env = os.environ.get("DADAIA_CODEX_DB_PATH")
-        codex_path = pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
         try:
-            codex_reader.read_codex_db(codex_path, dao, now_iso)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("TelemetryService: codex reader error: %s", exc)
+            # Apply migrations (idempotent).
+            apply_migrations(dao._conn)
 
-        # --- PI reader (WS-PI-6) ---
-        # Ingests PI session metadata from ~/.pi/agent/sessions/ (env override:
-        # DADAIA_PI_SESSIONS_DIR). Degrades to a no-op when the dir is absent or
-        # any IO/parse failure occurs (the reader itself is graceful).
-        if pi_reader is not None:
-            pi_dir_env = os.environ.get("DADAIA_PI_SESSIONS_DIR")
-            pi_dir = pathlib.Path(pi_dir_env) if pi_dir_env else _DEFAULT_PI_SESSIONS_DIR
+            # Harden SQLite file permissions to 0o600 (owner read/write only).
+            # This is done after every refresh since the DAO may create the file
+            # on first connection. os.chmod is idempotent and cheap.
+            # (T-AM-20 / devops T2)
+            if db_path.exists():
+                os.chmod(db_path, 0o600)
+
+            # The reader factory returns (claude, codex) historically, or
+            # (claude, codex, pi) once the PI reader is wired (WS-PI-6). Unpack
+            # tolerantly so legacy 2-tuple callers keep working unchanged.
+            readers = self._reader_factory()
+            claude_reader, codex_reader = readers[0], readers[1]
+            pi_reader = readers[2] if len(readers) > 2 else None
+            now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
+
+            # --- Claude reader ---
+            claude_projects = _CLAUDE_PROJECTS_DIR
+            if claude_projects.is_dir():
+                for project_dir in claude_projects.iterdir():
+                    if not project_dir.is_dir():
+                        continue
+                    for jsonl_file in project_dir.glob("*.jsonl"):
+                        try:
+                            claude_reader.read_session_file(jsonl_file, dao, now_iso)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "TelemetryService: error reading %s: %s", jsonl_file, exc
+                            )
+
+            # --- Codex reader ---
+            codex_path_env = os.environ.get("DADAIA_CODEX_DB_PATH")
+            codex_path = pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
             try:
-                pi_reader.read_pi_sessions(pi_dir, dao, now_iso)
+                codex_reader.read_codex_db(codex_path, dao, now_iso)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("TelemetryService: pi reader error: %s", exc)
+                logger.warning("TelemetryService: codex reader error: %s", exc)
 
-        # --- Cost backfill ---
-        self._backfill_costs(dao, now_iso)
+            # --- PI reader (WS-PI-6) ---
+            # Ingests PI session metadata from ~/.pi/agent/sessions/ (env
+            # override: DADAIA_PI_SESSIONS_DIR). Degrades to a no-op when the dir
+            # is absent or any IO/parse failure occurs (the reader is graceful).
+            if pi_reader is not None:
+                pi_dir_env = os.environ.get("DADAIA_PI_SESSIONS_DIR")
+                pi_dir = pathlib.Path(pi_dir_env) if pi_dir_env else _DEFAULT_PI_SESSIONS_DIR
+                try:
+                    pi_reader.read_pi_sessions(pi_dir, dao, now_iso)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("TelemetryService: pi reader error: %s", exc)
+
+            # --- Cost backfill ---
+            self._backfill_costs(dao, now_iso)
+        finally:
+            dao._conn.close()
 
     def _backfill_costs(self, dao: Any, now_iso: str) -> None:
         """Fill cost_micro_usd for events where it is NULL and model is known."""

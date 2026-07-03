@@ -20,7 +20,7 @@ module is the deterministic, structural regression for that change:
 * ``test_bounded_reader_writer_smoke_has_no_lock_errors`` — a bounded
   Barrier-started smoke: 8 reader threads × 25 iterations through the new
   read-only factory path against a live WAL writer loop, with zero sleeps.  No
-  ``database is locked``, no exceptions.  (Lands with the FR3 fix.)
+  ``database is locked``, no exceptions.
 
 No real ``telemetry.sqlite`` is read: every store is seeded under ``tmp_path``.
 """
@@ -142,3 +142,79 @@ def test_two_concurrent_aggregate_calls_open_distinct_connections(tmp_path: Path
         "object — the shared-connection design leaks a single connection across "
         "ThreadingHTTPServer worker threads."
     )
+
+
+def test_bounded_reader_writer_smoke_has_no_lock_errors(tmp_path: Path) -> None:
+    """8 readers × 25 iterations through the read-only factory vs a live WAL writer.
+
+    Barrier-started, zero sleeps.  WAL + busy_timeout + per-call read-only
+    connections must sustain concurrent readers against a single writer with no
+    ``database is locked`` and no exceptions.
+    """
+    db_path = tmp_path / "telemetry.sqlite"
+    _seed(db_path, sessions=1)
+
+    reader_threads = 8
+    reader_iters = 25
+    errors: list[tuple[str, str]] = []
+    stop = threading.Event()
+    barrier = threading.Barrier(reader_threads + 1)
+
+    def _writer() -> None:
+        barrier.wait(timeout=10)
+        wconn = open_connection(db_path)
+        try:
+            i = 0
+            while not stop.is_set() and i <= 5000:
+                wconn.execute(
+                    "INSERT OR REPLACE INTO sessions"
+                    " (session_id, provider, agent_name, ai_title, entrypoint, cwd,"
+                    "  git_branch, is_sidechain, sub_slug, first_event_at, last_event_at,"
+                    "  status)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        f"w{i}",
+                        "claude",
+                        "agent-a",
+                        None,
+                        "cli",
+                        "/ws",
+                        "main",
+                        0,
+                        None,
+                        _T1,
+                        _T2,
+                        "closed",
+                    ),
+                )
+                wconn.commit()
+                i += 1
+        except Exception as exc:  # noqa: BLE001
+            errors.append(("writer", repr(exc)))
+        finally:
+            wconn.close()
+
+    def _reader(n: int) -> None:
+        barrier.wait(timeout=10)
+        try:
+            for _ in range(reader_iters):
+                rconn = open_connection(db_path, read_only=True)
+                try:
+                    rconn.execute("SELECT COUNT(*) FROM sessions").fetchone()
+                    rconn.execute("SELECT COUNT(*) FROM events").fetchone()
+                finally:
+                    rconn.close()
+        except Exception as exc:  # noqa: BLE001
+            errors.append((f"reader-{n}", repr(exc)))
+
+    writer = threading.Thread(target=_writer)
+    readers = [threading.Thread(target=_reader, args=(n,)) for n in range(reader_threads)]
+    writer.start()
+    for r in readers:
+        r.start()
+    for r in readers:
+        r.join(timeout=30)
+    stop.set()
+    writer.join(timeout=30)
+
+    assert not errors, f"reader/writer smoke hit errors (expected none): {errors!r}"

@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import sqlite3
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
@@ -59,7 +60,18 @@ class TelemetryAggregator:
     Parameters
     ----------
     dao:
-        A TelemetryDao instance (provides the sqlite3.Connection).
+        A TelemetryDao instance (provides the sqlite3.Connection).  LEGACY /
+        shared mode: the held connection is reused by every query and is owned
+        by the caller (never closed here).  Mutually exclusive with
+        ``connection_factory``.
+    connection_factory:
+        ``Callable[[], sqlite3.Connection]`` — PER-CALL mode (v0.1.52 FR3): each
+        public query opens its OWN connection via the factory and closes it in
+        ``finally``.  This is how the panel serves concurrent
+        ThreadingHTTPServer requests without ever sharing a connection across
+        worker threads.  Provide a read-only factory
+        (``schema.open_connection(db_path, read_only=True)``) — the aggregator
+        only reads.  Mutually exclusive with ``dao``.
     spec_context_service:
         Any object exposing ``list_all() -> list`` where each item has
         ``.name`` (str), ``.repo_slug`` (str), and the workspace root is
@@ -77,15 +89,45 @@ class TelemetryAggregator:
 
     def __init__(
         self,
-        dao: Any,
-        spec_context_service: Any,
-        pricing_module: Any,
+        dao: Any = None,
+        spec_context_service: Any = None,
+        pricing_module: Any = None,
         workspace_root: Any = None,
+        connection_factory: Callable[[], sqlite3.Connection] | None = None,
     ) -> None:
+        if (dao is None) == (connection_factory is None):
+            raise ValueError(
+                "TelemetryAggregator requires exactly one of dao= (legacy shared "
+                "connection) or connection_factory= (per-call connections)."
+            )
         self._dao = dao
+        self._connection_factory = connection_factory
         self._scs = spec_context_service
         self._pricing = pricing_module
         self._workspace_root = workspace_root
+
+    # ------------------------------------------------------------------
+    # Connection lifecycle (v0.1.52 FR3)
+    # ------------------------------------------------------------------
+
+    def _open_conn(self) -> sqlite3.Connection:
+        """Return the connection a query should use.
+
+        Per-call factory mode opens a fresh connection; legacy shared mode
+        returns the caller-owned DAO connection.
+        """
+        if self._connection_factory is not None:
+            return self._connection_factory()
+        return cast("sqlite3.Connection", self._dao._conn)
+
+    def _close_conn(self, conn: sqlite3.Connection) -> None:
+        """Close a factory-opened connection; leave a shared DAO connection open.
+
+        In legacy shared mode the connection is owned by the caller (the DAO)
+        and must outlive the query, so it is never closed here.
+        """
+        if self._connection_factory is not None:
+            conn.close()
 
     # ------------------------------------------------------------------
     # Context resolution helpers
@@ -149,6 +191,25 @@ class TelemetryAggregator:
     ) -> AgentListResult:
         """Return AgentListResult with per-agent aggregated metrics.
 
+        Opens a per-call connection (FR3) and closes it in ``finally``.
+        """
+        conn = self._open_conn()
+        try:
+            return self._list_agents_impl(
+                conn, window_days=window_days, context_slug=context_slug, limit=limit
+            )
+        finally:
+            self._close_conn(conn)
+
+    def _list_agents_impl(
+        self,
+        conn: sqlite3.Connection,
+        window_days: int = 180,
+        context_slug: str | None = None,
+        limit: int = 50,
+    ) -> AgentListResult:
+        """Build AgentListResult against *conn*.
+
         Steps:
         1. Collect all sessions in the window, resolved to context buckets.
         2. Group events by agent_name within the window.
@@ -159,7 +220,6 @@ class TelemetryAggregator:
         7. Apply limit.
         8. Compute pricing_age_days across all models seen.
         """
-        conn: sqlite3.Connection = self._dao._conn
         conn.row_factory = sqlite3.Row
 
         # ------------------------------------------------------------------
@@ -587,9 +647,25 @@ class TelemetryAggregator:
     ) -> list[RecentSession]:
         """Return paginated RecentSession list for a specific agent.
 
-        Used by P7 endpoint ``/api/agents/{id}/sessions``.
+        Used by P7 endpoint ``/api/agents/{id}/sessions``.  Opens a per-call
+        connection (FR3) and closes it in ``finally``.
         """
-        conn: sqlite3.Connection = self._dao._conn
+        conn = self._open_conn()
+        try:
+            return self._list_sessions_by_agent_impl(
+                conn, agent_id=agent_id, limit=limit, offset=offset
+            )
+        finally:
+            self._close_conn(conn)
+
+    def _list_sessions_by_agent_impl(
+        self,
+        conn: sqlite3.Connection,
+        agent_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[RecentSession]:
+        """Build the paginated RecentSession list against *conn*."""
         conn.row_factory = sqlite3.Row
 
         # Sessions for agent, most recent first.
@@ -688,8 +764,17 @@ class TelemetryAggregator:
         ``active_sessions``, ``total_messages`` and ``top_agent``.
 
         Privacy invariant (T1): no content fields are read or returned.
+
+        Opens a per-call connection (FR3) and closes it in ``finally``.
         """
-        conn: sqlite3.Connection = self._dao._conn
+        conn = self._open_conn()
+        try:
+            return self._aggregate_sessions_impl(conn, runtime=runtime)
+        finally:
+            self._close_conn(conn)
+
+    def _aggregate_sessions_impl(self, conn: sqlite3.Connection, runtime: str) -> SessionAggregate:
+        """Build the SessionAggregate against *conn*."""
         conn.row_factory = sqlite3.Row
 
         # Per-session roll-up: message_count, non-null cost sum, null-cost count.

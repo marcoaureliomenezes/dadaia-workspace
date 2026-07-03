@@ -256,24 +256,28 @@ def test_list_agents_passthrough(tmp_path: pathlib.Path) -> None:
 
 def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     """refresh() fills cost_micro_usd for events with known model and NULL cost."""
+    # File-backed store: refresh() now owns+closes its write DAO connection in
+    # finally (v0.1.52 FR3), so we seed and verify through our OWN connections
+    # rather than sharing the service's connection object.
+    db_file = tmp_path / "backfill.sqlite"
 
-    conn = sqlite3.connect(":memory:")
-    conn.execute("PRAGMA foreign_keys=ON")
-    apply_migrations(conn)
+    seed = sqlite3.connect(str(db_file))
+    seed.execute("PRAGMA foreign_keys=ON")
+    apply_migrations(seed)
 
     # Seed a session + agent + event with NULL cost.
-    conn.execute(
+    seed.execute(
         "INSERT OR REPLACE INTO agents (name, provider, is_subagent, first_seen_at, last_seen_at)"
         " VALUES ('claude (main)', 'claude', 0, '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
     )
-    conn.execute(
+    seed.execute(
         "INSERT OR REPLACE INTO sessions"
         " (session_id, provider, agent_name, ai_title, entrypoint, cwd, git_branch,"
         "  is_sidechain, sub_slug, first_event_at, last_event_at, status)"
         " VALUES ('sess-abc', 'claude', 'claude (main)', NULL, 'cli', '/tmp', NULL,"
         "  0, NULL, '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', 'closed')"
     )
-    conn.execute(
+    seed.execute(
         "INSERT OR IGNORE INTO events"
         " (event_id, session_id, agent_name, model, occurred_at,"
         "  tokens_input, tokens_cache_read, tokens_cache_create, tokens_output,"
@@ -281,12 +285,14 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
         " VALUES ('ev-abc', 'sess-abc', 'claude (main)', 'claude-sonnet-4-6',"
         "  '2026-01-01T00:00:00+00:00', 100, 0, 0, 50, NULL, NULL, 0)"
     )
-    conn.commit()
-
-    dao_instance = TelemetryDao(conn)
+    seed.commit()
+    seed.close()
 
     def _dao_factory() -> TelemetryDao:
-        return dao_instance
+        # Fresh writable connection per refresh; the service closes it in finally.
+        conn = sqlite3.connect(str(db_file))
+        conn.execute("PRAGMA foreign_keys=ON")
+        return TelemetryDao(conn)
 
     svc = TelemetryService(
         dao_factory=_dao_factory,
@@ -300,8 +306,14 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
 
     svc.refresh()
 
-    # Check that cost_micro_usd is now set.
-    row = conn.execute("SELECT cost_micro_usd FROM events WHERE event_id = 'ev-abc'").fetchone()
+    # Check that cost_micro_usd is now set — via our own fresh connection.
+    check = sqlite3.connect(str(db_file))
+    try:
+        row = check.execute(
+            "SELECT cost_micro_usd FROM events WHERE event_id = 'ev-abc'"
+        ).fetchone()
+    finally:
+        check.close()
     assert row[0] is not None
     assert row[0] > 0
 
