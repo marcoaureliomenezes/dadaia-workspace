@@ -30,6 +30,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import re
 from datetime import date, datetime, tzinfo
 from pathlib import Path
 
@@ -156,12 +157,28 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
         value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
         return value.replace(os.sep, "/") if os.sep != "/" else value
 
+    def _norm_text(value: str) -> str:
+        # Free-text messages may embed the fixture path RELATIVE tail with os.sep (Windows
+        # renders "at <SPECS>\releases\v9.9.9"). Canonicalize ONLY <SPECS>-anchored tails —
+        # a blanket backslash replace would corrupt legit regex content in other messages
+        # (e.g. the SPEC-DOC-016 SemVer pattern's \d): "\d" and "\dir" are byte-identical
+        # shapes at this level, so anchoring is the only safe disambiguation.
+        value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
+        return re.sub(
+            r"(?<=<SPECS>)(?:\\[^\s\"\\]+)+",
+            lambda m: m.group(0).replace("\\", "/"),
+            value,
+        )
+
     issue_dicts = []
     for i in issues:
         d = i.to_dict()
         path_value = d.get("path")
         if isinstance(path_value, str):
             d["path"] = _norm_path(path_value)
+        desc_value = d.get("description")
+        if isinstance(desc_value, str):
+            d["description"] = _norm_text(desc_value)
         issue_dicts.append(d)
     payload = {
         "specs_dir": "<SPECS>",

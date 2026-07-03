@@ -360,9 +360,14 @@ def _normalize(body: bytes, workspace_root: Path) -> str:
         .replace(ws_escaped, "<WS>")
         .replace(str(workspace_root), "<WS>")
     )
+    # Canonicalize Windows path separators anywhere in the JSON body text. At this
+    # (single-decoded) level a separator is EXACTLY two backslash chars (the JSON escape
+    # of `\`), while an escaped newline (`\n`) is one backslash + `n` — so a two-backslash
+    # match between path-ish characters is unambiguous (covers <WS>-anchored tails AND
+    # relative paths like `.claude\agents\<name>.md` nested in stringified JSON bodies).
     text = re.sub(
-        r"(?<=<WS>)(?:\\\\[^\"\\]+)+",
-        lambda m: m.group(0).replace("\\\\", "/"),
+        r"(?<=[\w.>\-])\\\\(?=[\w.\-])",
+        "/",
         text,
     )
     text = _TS_RE.sub("<TS>", text)
