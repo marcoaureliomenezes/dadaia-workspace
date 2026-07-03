@@ -158,7 +158,7 @@ def _button_fragment(html: str, tab_id: str) -> str:
     [
         ("section-servers", ">Servers<"),
         ("section-memories", ">Projects<"),
-        ("section-sessions", "sessions-tbody"),
+        ("section-sessions", "sessions-dashboard"),
         ("section-reports", "reports-list"),
         ("section-academy", "academy-content"),
     ],
