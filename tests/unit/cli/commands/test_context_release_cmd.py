@@ -57,8 +57,14 @@ def _patch_workspace(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:
 
 
 def _patch_probes(monkeypatch: pytest.MonkeyPatch, *, alive: bool, ancestry: Ancestry) -> None:
-    """Seam the default-flow ownership probes the CLI builds from the container."""
-    monkeypatch.setattr(container, "_build_pid_probe", lambda: lambda _pid: alive)
+    """Seam the default-flow ownership probes the CLI builds.
+
+    v0.1.54 FR6: ``context release`` now calls the single public
+    ``infrastructure.process_probe_adapter.build_pid_probe`` bound in the command module's
+    namespace (``context_cmd.build_pid_probe``); the ancestry probe still comes from the
+    container.
+    """
+    monkeypatch.setattr(context_cmd, "build_pid_probe", lambda: lambda _pid: alive)
 
     class _FakeAncestry:
         def is_ancestor(self, _holder: int, _caller: int) -> Ancestry:

@@ -258,7 +258,7 @@ includes `tests/`.
 
 ## W4 — FR6 pid-probe single public builder (isolated)
 
-- [ ] T-54-13 One public `infrastructure/process_probe_adapter.build_pid_probe()`; repoint 6
+- [-] T-54-13 One public `infrastructure/process_probe_adapter.build_pid_probe()`; repoint 6
   sites; preserve the no-steal invariant (frozen-suite partition). Checklist:
   - Add public `build_pid_probe()` to `infrastructure/process_probe_adapter.py` (lazy
     `OsProcessProbe` wiring moves here). **Delete** the two private wrappers

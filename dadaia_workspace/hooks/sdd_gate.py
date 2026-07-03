@@ -27,38 +27,13 @@ from pathlib import Path
 from dadaia_workspace.core import lock_liveness
 from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
 from dadaia_workspace.hooks import _common
+from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 _SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
 #: Default mode when neither the env override nor a session record resolves one. Missing-mode
 #: sessions stay IMPLEMENTATION-capable (free-lease acquire OK) — Decision D-3 / FR-R4-04.
 _DEFAULT_MODE = "IMPLEMENTATION"
-
-
-def _build_pid_probe() -> lease.PidProbe | None:
-    """Build the PID-liveness probe injected into the lease (WS-R2 FR-R2-03).
-
-    Sources the container's ``OsProcessProbe`` and adapts it to the lease's
-    ``(pid) -> alive?`` callable. The hook layer owns this wiring so ``features/lease.py``
-    never imports ``infrastructure/process_probe_adapter`` (no new import-linter ignore).
-
-    Returns ``None`` if the probe cannot be constructed — the lease then degrades to
-    TTL-only (Windows-safe). Any construction error fails open (probe absent ⇒ TTL
-    fallback), never blocks the gate. ``OsProcessProbe`` is itself platform-seamed
-    (``PLATFORM.has_os_kill_liveness`` selects ``os.kill`` vs the Windows ``OpenProcess``
-    existence check), so a single probe instance is correct on every host.
-
-    The container (``dadaia_workspace.container``) is the canonical composition root that
-    binds ``OsProcessProbe`` for the app; the hook imports the same adapter here so the
-    feature layer (``features/lease.py``) never imports infrastructure (import-linter law).
-    """
-    try:
-        from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
-
-        probe = OsProcessProbe()
-        return lambda pid: probe.is_pid_alive(pid)
-    except Exception:  # noqa: BLE001 — never let probe wiring break the gate; TTL fallback.
-        return None
 
 
 def _resolve_holder_pid(payload: dict[str, object]) -> int:
@@ -290,7 +265,7 @@ def _evaluate_target(
     # Single probe construction point (R8 dedup): the PID-liveness probe is built once here
     # and threaded into both the incumbent-staleness check (via ``_resolve_mode``) and the
     # final ``gate_policy.evaluate`` call below — never re-instantiated per call site.
-    pid_probe = _build_pid_probe()
+    pid_probe = build_pid_probe()
     # Mode resolution order (WS-R4 + NF-2): DADAIA_MODE env override → self-keyed session
     # record → context-incumbent record → default. Passing ``ctx`` enables the incumbent
     # fallback so a default `dadaia context bind --mode read` (which mints a sid the harness

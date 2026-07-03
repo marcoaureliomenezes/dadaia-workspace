@@ -123,7 +123,7 @@ def test_build_repos_service_returns_service() -> None:
 # constructed without pid_probe -> None -> TTL-only LOCK-GC), the live-pid case
 # below would FAIL: a TTL-expired record whose holder is os.getpid() (this very
 # test process, demonstrably alive) would be reported reclaimable and deleted by
-# --fix. The fix wires _build_pid_probe() into the DoctorService.
+# --fix. The fix wires build_pid_probe() into the DoctorService.
 # ---------------------------------------------------------------------------
 
 from dadaia_workspace.core import kernel_tunables  # noqa: E402

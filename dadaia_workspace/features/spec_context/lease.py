@@ -876,22 +876,23 @@ def _main_pid_probe() -> PidProbe | None:
     foreign holder whose pid is still alive is never taken over via this side door
     (residual R1; bug ``doctor-stale-lease-misdiagnosed-as-forgery``).
 
-    The concrete probe is the container's ``OsProcessProbe``. ``features/`` must not
-    import ``infrastructure/`` — not even transitively through the hook layer
-    (import-linter law). The canonical builder lives in the hook layer
-    (``hooks/sdd_gate._build_pid_probe``, which itself wires the adapter); we resolve it
-    here through a **dynamic** ``importlib`` lookup at the composition boundary (this
-    entrypoint is the lease's own composition root, analogous to the doctor's
-    composition-root-wired probe seam — never a static feature→infrastructure import).
-    The dynamic resolution keeps the static import graph clean: ``features/lease.py`` has
-    zero static edge into ``infrastructure`` or ``hooks``. Any failure ⇒ ``None`` ⇒
-    TTL-only fallback (Windows-safe, legacy-record-safe), exactly as the gate degrades.
+    The concrete probe is the ``OsProcessProbe``. ``features/`` must not import
+    ``infrastructure/`` statically (import-linter law). The single public builder lives in
+    the infrastructure adapter (``infrastructure.process_probe_adapter.build_pid_probe`` —
+    v0.1.54 FR6, the sole successor to the three deleted private probe-builder wrappers); we
+    resolve it here through a **dynamic** ``importlib`` lookup at the
+    composition boundary (this entrypoint is the lease's own composition root, analogous to
+    the doctor's composition-root-wired probe seam — never a static feature→infrastructure
+    import). The dynamic resolution keeps the static import graph clean: ``features/lease.py``
+    has zero static edge into ``infrastructure`` or ``hooks``, so the ignore-cap stays 26.
+    Any failure ⇒ ``None`` ⇒ TTL-only fallback (Windows-safe, legacy-record-safe), exactly
+    as the gate degrades.
     """
     try:
         import importlib
 
-        sdd_gate = importlib.import_module("dadaia_workspace.hooks.sdd_gate")
-        builder: Callable[[], PidProbe | None] = sdd_gate._build_pid_probe
+        adapter = importlib.import_module("dadaia_workspace.infrastructure.process_probe_adapter")
+        builder: Callable[[], PidProbe | None] = adapter.build_pid_probe
         return builder()
     except Exception:  # noqa: BLE001 — probe wiring must never deadlock the gate side door.
         return None
