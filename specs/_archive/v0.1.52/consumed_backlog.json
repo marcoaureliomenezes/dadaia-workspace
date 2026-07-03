@@ -1,0 +1,20 @@
+{
+  "release": "v0.1.52",
+  "consumed": [
+    {
+      "slug": "panel-sessions-cost-dashboard-only",
+      "shipped_anchors": [
+        "dadaia_workspace/features/panel/views/sessions.py#render_sessions_section",
+        "dadaia_workspace/features/panel/views/api.py#render_api_sessions"
+      ],
+      "note": "archived at ship (not closure): the intent's anchored target render_api_session_detail was deleted by the release itself, so the fail-closed BL-SCHEMA registry correctly stopped resolving it"
+    },
+    {
+      "slug": "panel-runtime-reliability",
+      "shipped_anchors": [
+        "dadaia_workspace/features/telemetry/store/schema.py#open_connection",
+        "panel"
+      ]
+    }
+  ]
+}
