@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 1250
+token_estimate: 1563
 last_updated: '2026-07-03'
-release_origin: v0.1.53
+release_origin: v0.1.54
 ---
 
 ## Purpose
@@ -91,7 +91,14 @@ the no-steal **invariant** — its assertions, the TTL floor, and the pid veto �
 file bytes: a symbol-forced repoint that leaves the invariant identical (e.g.
 re-pointing a deleted re-export to its canonical home, or driving the production hook
 entrypoint after a `main()` deletion) is legitimate and is adjudicated at the QA ship
-gate, not blocked as a freeze breach.
+gate, not blocked as a freeze breach. A **symbol-forced monkeypatch-target repoint**
+adjudicates the same way as an import repoint (v0.1.54: `test_lock_steal.py` renamed its
+monkeypatch target `_build_pid_probe → build_pid_probe` when the private builder was
+collapsed into the one public `process_probe_adapter.build_pid_probe`, every assertion /
+TTL / seed byte-identical — a diff of target + docstring only). And **new coverage goes
+in a new sibling file, never by expanding a frozen file** (v0.1.54 added
+`test_lease_pid_probe_public_builder.py` alongside the frozen `test_lease_main_probe.py`
+rather than growing it).
 
 This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the
@@ -107,8 +114,9 @@ normative vision §6.
    `@pytest.mark.slow`.
 3. Local fast path: `pytest -q -m "unit and not slow" tests/unit` — runs in under
    10 seconds without coverage instrumentation.
-4. CI runs 10 quality jobs: importability-smoke, lint (ruff only — import-linter
-   enforcement status stated once in [[architecture]] §Enforcement),
+4. CI runs 10 quality jobs: importability-smoke, lint (ruff + `lint-imports` — the
+   import-boundary contracts are now CI-enforced; full status single-sourced in
+   [[architecture]] §Enforcement),
    typecheck, unit-fast, unit-fast-cross, contract-coverage, contract-coverage-cross,
    integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
    marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;

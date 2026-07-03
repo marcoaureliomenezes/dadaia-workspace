@@ -18,7 +18,7 @@ tags:
 - backlog
 token_estimate: 4350
 last_updated: '2026-07-03'
-release_origin: v0.1.53
+release_origin: v0.1.54
 ---
 
 ## Overview
@@ -56,15 +56,15 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 - `spec_context` — ALIVE/DEAD contexts, `lease.py` (the central locking contract), `gate_policy.py` (the gate's classifier), `session_identity.py` (single owner of pointers/session records), workspace doctor ([[context-management]], [[workspace-doctor]]).
 - `specs` — specs doctor + catalog generation ([[specs-doctor]]).
 - `telemetry` — local session telemetry of the entry harnesses with the `RuntimeAdapter` registry `{claude, codex, pi}` (runtime roster single-source: [[tech-stack]]) ([[agent-monitoring]]).
-- `workflows` — `WorkflowsService` (reference-only workflow docs; also backs `dadaia orchestrate list/show` via `list_definitions`/`get_definition` over `MarkdownWorkflowStore`, preserving each `stage.gate.kind`) + `dadaia_catalog.py` (the governed dadaia-workflows catalog) + `dag.py` (server-side SVG renderer).
+- `workflows` — `WorkflowsService` (reference-only workflow docs; also backs `dadaia orchestrate list/show` via `list_definitions`/`get_definition` — the store surface is injected via a feature-local store Protocol, no direct `infrastructure` import) + `dadaia_catalog.py` (the **presentation layer**: `DadaiaWorkflowDTO`, `list_dadaia_workflows`, `get_dadaia_workflow`; imports exactly one lifecycle module and re-exports `governed_workflow_catalog` on the stable public path) + `dag.py` (server-side SVG renderer). The **governed dadaia-workflows catalog is defined in `features/lifecycle/governed_catalog.py`** (imports only lifecycle internals + core), so the `workflows ↔ lifecycle` cycle is broken and pinned by the `lifecycle-no-workflows` contract.
 - `workspace` — init/bootstrap ([[workspace-init]]).
 - `workspace_clean` — `dadaia clean`: TTL-based reclaim of the ephemeral `.dadaia/` zones (dry-run default; never outside `.dadaia/`).
 
 **Panel HTTP (summary).** `handler.py` declares the route table with route classes; ALL routes are served **with no credential** — the guards are the loopback bind (`127.0.0.1` hard-coded) and the Host-header allowlist (`127.0.0.1`/`localhost`/`[::1]`, anti-DNS-rebinding, answering 403 to a foreign Host). Mutations (`PUT`/`POST`/`DELETE`) go through the same guards (Host-guard first) + payload validation before any atomic write. The `GET /api/kanban` endpoint and the `views/kanban.py` view **remain served** (read-only over `.dadaia/sessions/*.json`) but have **zero UI consumers** since the Agentic tab removal; the endpoint's fate is tracked in the `panel-runtime-reliability` backlog. `window.Panel` (`core.js`) registers the `sessions`, `academy`, and `reports` modules; the Workflows tab is server-rendered (SVG via `render_dag_svg`) with `window.WorkflowPolicy` (`workflow_policy.js`) for the model pickers — there is no `workflows.js` and no `panel.js`. Full detail in [[panel]].
 
-**core/** — `models/` (pure dataclasses), `protocols/` (Protocols for DI), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`. The rule is zero I/O — the current **authorized exceptions** (I/O or filesystem walk inside `core/`), pending the `import-boundary-enforcement` backlog, are: `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`. `core/specs_version.py` is the single release-SemVer canon: `RELEASE_SEMVER_RE` + `is_release_semver()` are the only compiled `^v\d+\.\d+\.\d+$` pattern — `features/specs/scaffolder.py`, `features/specs/doctor.py`, and `features/spec_artifacts/new_artifacts.py` import them, and an identity+scan agreement test fails on any literal copy compiled outside this module.
+**core/** — `models/` (pure dataclasses; `models/workflow_execution.py` also holds the relocated `WorkflowModelPolicyOverlay`/`WorkflowModelPolicyStoreError`/`DEFAULT_CONTEXT` policy types), `protocols/` (Protocols for DI, incl. the lean `workflow_model_policy_store.py` — `load`/`parse`/`save`), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`. The rule is zero I/O — the **authorized exceptions** (I/O or filesystem walk inside `core/`) are exactly `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`, and this set is now **pinned by an AST ratchet guard** (`tests/contract/test_core_file_io_purity.py` walks `core/*.py` and flags `open`/`Path.read_text|write_text|mkdir|exists|glob|iterdir|rglob`/`shutil.copy*|copytree|move` outside those four modules; `platform.py` does no file-I/O and is covered by the `sys` note). `core/specs_version.py` is the single release-SemVer canon: `RELEASE_SEMVER_RE` + `is_release_semver()` are the only compiled `^v\d+\.\d+\.\d+$` pattern — `features/specs/scaffolder.py`, `features/specs/doctor.py`, and `features/spec_artifacts/new_artifacts.py` import them, and an identity+scan agreement test fails on any literal copy compiled outside this module.
 
-**infrastructure/** — concrete implementations of the protocols: `git_subprocess` (includes `diff_name_only` — the source of Ring-2 `changed_paths`), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `headless_adapter_base` (security-relevant invariants shared by the headless adapters: redaction, env-allowlist filter, Ring-2 git-diff override, strict-schema-first payload extraction), the agent-runtime adapters behind `AgentRuntimePort` (`codex_runtime`, `claude_sdk_runtime` with Ring-1 via `core/scope_match`, `pi_runtime`), `runtime_config` (per-runtime hook registration — Python commands for `.claude/settings.json`; **self-locating executable wrappers** `.dadaia/hooks/codex-*` for `.codex/hooks.json`), `subprocess_runner` (the production `ProcessRunner`), `excel_reader`, `python_env`, and the platform adapters (`file_lock_*`, `telemetry_lock_*`, `file_permission_*`, `process_probe_adapter`, `signal_shutdown_*`). All adapter I/O lives here.
+**infrastructure/** — concrete implementations of the protocols: `git_subprocess` (includes `diff_name_only` — the source of Ring-2 `changed_paths`), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `headless_adapter_base` (security-relevant invariants shared by the headless adapters: redaction, env-allowlist filter, Ring-2 git-diff override, strict-schema-first payload extraction), the agent-runtime adapters behind `AgentRuntimePort` (`codex_runtime`, `claude_sdk_runtime` with Ring-1 via `core/scope_match`, `pi_runtime`), `runtime_config` (per-runtime hook registration — Python commands for `.claude/settings.json`; **self-locating executable wrappers** `.dadaia/hooks/codex-*` for `.codex/hooks.json`), `subprocess_runner` (the production `ProcessRunner`), `excel_reader`, `python_env`, and the platform adapters (`file_lock_*`, `telemetry_lock_*`, `file_permission_*`, `process_probe_adapter` — home of `OsProcessProbe` **and** the single public `build_pid_probe()` factory that all former `_build_pid_probe` consumers now call, `signal_shutdown_*`). All adapter I/O lives here.
 
 **container.py** — sole composition root. Reads `PLATFORM`, selects adapters (POSIX vs Windows), and injects via `build_*_service(workspace_root)` factories.
 
@@ -128,15 +128,31 @@ flowchart TB
 
 **Forbidden:** core does not import from features/infrastructure/cli; features do not import from cli; features do not import other features (composition via container); features do not import `infrastructure/` directly — OS-sensitive dependency is injected via Protocol.
 
-**Declared exception — hooks:** the `hooks/` package imports `core` **and** `features/spec_context` (gate_policy/lease/session_identity), plus a lazy import of the probe from `infrastructure/process_probe_adapter` inside `sdd_gate` — the hook is the pid-probe injector because it runs outside the container.
+**Declared exception — hooks:** the `hooks/` package imports `core` **and** `features/spec_context` (gate_policy/lease/session_identity), plus an import of the probe from `infrastructure/process_probe_adapter` inside `sdd_gate` — the hook is the pid-probe injector because it runs outside the container. It now calls the single public `process_probe_adapter.build_pid_probe()` factory (the private `_build_pid_probe` hook seam is extinct); `features/spec_context/lease._main_pid_probe` reaches the same factory through a dynamic `importlib.import_module` lookup, keeping the static graph free of any `features → infrastructure` edge.
 
 **Layering invariant:**
-- `core/` — zero I/O and zero OS-primitives, with the authorized exceptions named in "Layers → core/" (`specs_backup`, `specs_version`, `specs_resolver`, `workspace_resolver`; `platform.py` for `sys.platform`), pending the `import-boundary-enforcement` backlog.
+- `core/` — zero I/O and zero OS-primitives, with the authorized exceptions named in "Layers → core/" (`specs_backup`, `specs_version`, `specs_resolver`, `workspace_resolver`; `platform.py` for `sys.platform`), now pinned by the `test_core_file_io_purity.py` AST ratchet guard.
 - `infrastructure/` — all OS adapters (`fcntl`, `os.kill`, `subprocess`, `/proc`, `msvcrt`) behind Protocols.
 - `features/` — business logic; OS capability via injected Protocol.
 
 **Enforcement (actual state):**
-- `import-linter` (`setup.cfg`): the `features → infrastructure` ban, `features → subprocess` ban, and `core → OS-primitives` ban contracts are **DEFINED but do NOT run in CI** — no job invokes `lint-imports` and 5 chains are red. Wiring + fix is the `import-boundary-enforcement` backlog. The `ignore_imports` cap (17 edges) is pinned by `tests/contract/test_import_linter_ignore_cap.py`.
+- `import-linter` (`setup.cfg`): **8 contracts, all KEPT, and CI-enforced.**
+  `lint-imports --no-cache` runs in the GitHub `Lint (ruff)` job **and** inside
+  `dadaia ci preflight` (via the `_resolve_tool` seam, which **fails closed** when the tool
+  is absent), so the pre-push hook enforces the contracts on every push. The set is the six
+  pre-existing contracts (`features-no-infrastructure`, `features-no-subprocess`,
+  `core-no-upper-layers`, `core-no-os-primitives`, `infrastructure-no-upper-layers`, and
+  `kernel-tunables-is-a-leaf`) plus two added by v0.1.54: the directed `forbidden`
+  **`lifecycle-no-workflows`** (`features.lifecycle ⊬ features.workflows` — the falsifiable
+  `workflows ↔ lifecycle` cycle-break guard) and the `independence`
+  **`features-no-cross-feature`** (freezes the surviving cross-feature surface;
+  `independence` because import-linter 2.11 rejects a self-referential `forbidden`). The
+  `ignore_imports` cap is **26 module-pairs** — infra **9** / subprocess **4** /
+  cross-feature **13** — pinned by `tests/contract/test_import_linter_ignore_cap.py` with
+  per-family per-contract-section assertions (`test_recorded_cap_is_not_stale_above_reality`);
+  a new cross-feature edge from any feature cannot be added silently. `features → cli` is
+  closed at the composition boundary: `cli/anchors.py` derives the `cli_anchors` frozenset
+  and threads it into `build_registry`, so no feature imports `cli.main`.
 - `dadaia doctor` grep check: fails with `[ERROR]` on `import fcntl` / `os.chmod` / `os.kill` / `os.open` in `features/**/*.py`.
 
 ## Data flow — asset chain pipeline

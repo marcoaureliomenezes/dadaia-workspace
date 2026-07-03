@@ -10,9 +10,9 @@ is ``lint-imports --no-cache``.
 This probe does exactly what FR3 mandates: it RUNS ``lint-imports`` with the project config
 and ``--no-cache``, then asserts the cache directory is absent from the repo tree. The run
 must reach contract evaluation (proving the config is valid and not merely erroring out
-before any caching would occur) — the two documented layering contracts are still red
-(deferred to backlog ``import-boundary-enforcement``), so a non-zero exit is expected and
-NOT asserted; what is asserted is that the run got as far as reporting contract results.
+before any caching would occur). Since v0.1.54 the contracts are green and CI-enforced,
+but this probe intentionally does NOT assert the exit code — its subject is cache
+hygiene, not contract state (the lint job and preflight own that gate).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def test_lint_imports_runs_with_no_cache_and_leaves_no_cache_dir() -> None:
 
     # The run must reach contract evaluation — proving the config parsed and the graph
     # built (a config error would abort before this line is ever printed). Exit code is
-    # intentionally NOT asserted: the two deferred layering contracts are still red.
+    # intentionally NOT asserted: contract state is the lint job's gate, not this probe's.
     assert "Contracts:" in combined, (
         f"lint-imports did not reach contract evaluation — config or graph-build error:\n{combined}"
     )

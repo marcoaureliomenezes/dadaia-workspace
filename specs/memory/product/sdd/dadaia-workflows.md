@@ -19,8 +19,8 @@ tags:
 - lifecycle
 - layer-2
 token_estimate: 750
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-03'
+release_origin: v0.1.54
 ---
 
 ## Purpose
@@ -33,8 +33,9 @@ selects dynamic context, calls a discrete `(harness, model)` worker, and advance
 transition. This atom is the single source of the ROSTER and of INVOCABILITY; the
 engine mechanics (pipeline, gates, run store, data plane) are [[lifecycle-foundation]].
 
-**The 7 workflows of the governed catalog** (`features/workflows/dadaia_catalog.py` —
-`governed_workflow_catalog()`):
+**The 7 workflows of the governed catalog** (defined in
+`features/lifecycle/governed_catalog.py` — `governed_workflow_catalog()`; re-exported for
+presentation on the stable public path `features/workflows/dadaia_catalog.py`):
 
 | Workflow | Body | Availability | CLI verb today |
 |----------|------|--------------|----------------|

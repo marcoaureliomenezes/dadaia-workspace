@@ -17,8 +17,8 @@ tags:
   - lifecycle
   - anti-slop
 token_estimate: 1700
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-03'
+release_origin: v0.1.54
 ---
 
 ## Purpose
@@ -173,8 +173,6 @@ overwritten; the §13 vision/users/capabilities/limits content lives HERE).
 - Deterministic enforcement covers file-write tools + git chokepoints; arbitrary
   Bash writes between chokepoints are discipline + the advisory reconciler
   ([[sdd-gate-v3]]).
-- The import-linter contracts exist but do not run in CI (backlog
-  `import-boundary-enforcement`).
 - The panel is a loopback-only dev tool with no authentication; never expose it
   beyond the machine ([[panel]]).
 - Plugin packs (frontend-design, devops) are not yet distributed.

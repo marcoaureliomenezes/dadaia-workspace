@@ -39,8 +39,8 @@ tags:
 - hygiene
 - gates
 token_estimate: 5225
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-03'
+release_origin: v0.1.54
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
@@ -129,9 +129,16 @@ CLI and the panel (see [[panel]] for the panel control plane).
   `WorkflowModelProfile`, `ResolvedModelConfig` (`profile_id, harness, model, reasoning,
   source`), and `WorkflowPolicySnapshot` (`workflow_id, policy_id, resolved_at,
   source_precedence[], steps{step → {harness, model_profile, model, reasoning, fragments[],
-  output_schema}}`). Zero I/O, core-clean.
+  output_schema}}`). Since v0.1.54 it is also the home of the relocated overlay data types
+  `WorkflowModelPolicyOverlay`, `WorkflowModelPolicyStoreError`, and `DEFAULT_CONTEXT` (moved
+  out of `infrastructure/json_workflow_model_policy_store.py` so `policy_resolver` imports
+  them as a legal `features → core` edge and needs no store port). Zero I/O, core-clean.
 - `infrastructure/json_workflow_model_policy_store.py` — the atomic overlay store over the
-  FIXED path `.dadaia/states/workflow_model_policy.json` (schema `workflow-model-policy-v1`).
+  FIXED path `.dadaia/states/workflow_model_policy.json` (schema `workflow-model-policy-v1`);
+  since v0.1.54 it implements the lean `core/protocols/workflow_model_policy_store.py` port
+  (`load`/`parse`/`save`) and is injected by `container.build_workflow_model_policy_store`
+  into `policy_doctor` + `panel.views.workflow_policy` (its pure data types moved to
+  `core/models/workflow_execution.py`).
   Reuses the `JsonLifecycleRunStore` atomic temp+rename pattern (`mkstemp` 0600 in target dir
   → `os.replace`); `load()` returns `None` on missing (⇒ library defaults); raises a typed
   error on invalid JSON / unknown top-level field; `save()` writes `.last-good.json` from the
@@ -167,7 +174,9 @@ CLI and the panel (see [[panel]] for the panel control plane).
   with an actionable message. `--show-policy` + `--json` print the resolved policy.
   Read-only `dadaia lifecycle workflow policy show <workflow> --context --json` and
   `workflow profiles list --harness --json` make the governance scriptable.
-- **Governed catalog (Wave B).** `features/workflows/dadaia_catalog.py` carries each step's
+- **Governed catalog (Wave B).** `features/lifecycle/governed_catalog.py` (relocated from
+  `features/workflows/dadaia_catalog.py` in v0.1.54 to break the `workflows ↔ lifecycle`
+  cycle; `dadaia_catalog.py` re-exports it for presentation) carries each step's
   `default_harness` + `default_profile` per supported harness + fragment ids, and is the
   single governed source the resolver and panel both read (`_assert_catalog_defaults_resolve`
   ties every default profile to the registry at import). The old `*.workflow.md`
