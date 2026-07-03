@@ -258,7 +258,7 @@ includes `tests/`.
 
 ## W4 — FR6 pid-probe single public builder (isolated)
 
-- [-] T-54-13 One public `infrastructure/process_probe_adapter.build_pid_probe()`; repoint 6
+- [x] T-54-13 One public `infrastructure/process_probe_adapter.build_pid_probe()`; repoint 6
   sites; preserve the no-steal invariant (frozen-suite partition). Checklist:
   - Add public `build_pid_probe()` to `infrastructure/process_probe_adapter.py` (lazy
     `OsProcessProbe` wiring moves here). **Delete** the two private wrappers
@@ -288,6 +288,64 @@ includes `tests/`.
     re-scoped).
   - AC-8 ledger (surviving: pid-liveness probe, TTL degrade, no-steal; dead: the 3 private
     builders). NO `specs/backlog` staged. Owner: software-engineer.
+  - **DONE (software-engineer):** reservation `[ ]`→`[-]` folded into the feat commit
+    `d5e21494`. Commits, in order: `d5e21494` feat (public `build_pid_probe` + 6 repoints +
+    3 deletions + lease dynamic retarget + existing-test repoints) · `1a9a0fd2` test (positive
+    `_main_pid_probe` probe test) · this `[x]` mark.
+    - **New public builder:** `infrastructure/process_probe_adapter.build_pid_probe() ->
+      Callable[[int], bool] | None` — the SPEC-named home already existed (`OsProcessProbe`
+      lives there), so the factory landed in-module (no parallel module; cohesion). Lazy
+      `OsProcessProbe` wiring preserved; any construction error ⇒ `None` ⇒ TTL-only degrade.
+      Typed `Callable[[int], bool] | None` (NOT `lease.PidProbe`) so the adapter keeps zero
+      `infrastructure → features` edge (`infrastructure-no-upper-layers` KEPT).
+    - **Deleted the 3 private builders:** `hooks/sdd_gate.py:38`, `container.py:237`,
+      `cli/commands/specs.py:69`. Repoints: `sdd_gate` l.293 (top-level infra import; hooks→infra
+      declared exception) · `container.build_doctor_service` (import extended to
+      `OsProcessProbe, build_pid_probe`) · `specs doctor` l.137 (`lease` import dropped — became
+      unused) · `lock.py:12` (keeps `_active_field` from `sdd_gate`, takes `build_pid_probe` from
+      infra) · `context.py:514` (infra factory bound in `context_cmd`'s namespace) ·
+      `lease._main_pid_probe` l.882-897 (dynamic `importlib.import_module(
+      "dadaia_workspace.infrastructure.process_probe_adapter")` → `build_pid_probe`; **stays
+      dynamic** ⇒ zero new static features→infra edge ⇒ no ignore, cap stays 26).
+    - **AC-4 extended grep (incl. `tests/`) — ALL ZERO:** (i) `hooks.sdd_gate._build_pid_probe`
+      → 0; (ii) `import_module("dadaia_workspace.hooks.sdd_gate")` → 0; (iii)
+      `sdd_gate._build_pid_probe` attribute access → 0; (iv) bare `_build_pid_probe` ANYWHERE →
+      0. The private name no longer exists in the tree (prose docstrings reworded to
+      "private probe-builder wrappers" to keep the grep truly clean).
+    - **Positive test (A8):** `tests/unit/features/spec_context/test_lease_pid_probe_public_builder.py`
+      (NEW sibling — `test_lease_main_probe.py` is frozen, not expanded). 4 tests: resolves the
+      public builder (RED pre-retarget: `AttributeError`/wrong-identity; GREEN after), live probe
+      (`probe(os.getpid()) is True`), builder→None degrade, builder-raises fail-open. **RED tail
+      captured pre-change:** `3 failed, 1 passed`; **GREEN after:** `4 passed`.
+    - **Frozen-suite discipline (vs `777f0e0c`):** `test_two_actor_lease.py` +
+      `test_doctor_lock_gc.py` — **zero diff** (verified `git diff 777f0e0c -- …` empty).
+      Adjudicated: `test_lock_steal.py` — diff is monkeypatch-target (`_build_pid_probe` →
+      `build_pid_probe`) + docstring pointer ONLY; every assertion / TTL / seed record
+      byte-identical. `test_lease_main_probe.py` — **zero diff** (it monkeypatches
+      `lease._main_pid_probe` wholesale; the function name/signature are unchanged, so no
+      symbol repoint was needed — trivially target-only).
+    - **Gates:** `lint-imports --config setup.cfg --no-cache` → **8 kept, 0 broken** (no new
+      cycle/edge; `features-no-cross-feature` + `lifecycle-no-workflows` still GREEN);
+      `test_import_linter_ignore_cap.py` → **4 passed** (cap 26 intact); full
+      `pytest tests/ --ignore=tests/e2e/panel` (unpiped) → **4331 passed, 17 skipped (exit 0)**;
+      `ruff format --check` + `ruff check --no-cache` + `mypy --strict dadaia_workspace`
+      (288 files) all exit 0.
+    - **AC-8 ledger** — surviving (test now asserts each): pid-liveness probe via the one
+      public builder (`test_lease_pid_probe_public_builder` + `test_lock_steal` +
+      `test_context_release_cmd` + `test_container` LOCK-GC green); no-steal pid-veto
+      (TTL-expired + live pid ⇒ never stolen — frozen invariants byte-identical); `None ⇒
+      TTL-only` degrade (unit test); doctor LOCK-GC gating (container end-to-end test). Dead
+      (intentionally removed): the three private `_build_pid_probe` wrappers + the de-facto
+      `hooks.sdd_gate._build_pid_probe` shared seam — pinned dead by the AC-4 extended grep
+      (name absent everywhere).
+    - **Deviations (recorded):** (1) SPEC/task said "check whether an infra module for
+      `OsProcessProbe` already exists" — it did (`process_probe_adapter.py`), so `build_pid_probe`
+      landed there (matches the SPEC-named home; no parallel module). (2) `specs.py`'s
+      `from …spec_context import lease` import was removed (it became unused once the wrapper —
+      its only `lease.PidProbe` user — was deleted); ruff would else flag F401. (3) `sdd_gate`
+      + `context.py` gained top-level infra imports (previously the sdd_gate probe import was
+      lazy) — clean under import-linter (no `hooks`/`cli`-no-infrastructure contract). NO
+      `specs/backlog/**` staged; the pre-existing `specs/bugs/*.jsonl` change is not this task's.
 
 ## W5 — FR4 CI wiring + gates + ship (flat release: single ship gate)
 
