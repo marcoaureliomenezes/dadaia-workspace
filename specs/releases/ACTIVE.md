@@ -1,6 +1,6 @@
 ---
 release: v0.1.53
-phase: IMPLEMENTATION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.53 — Legacy Purge
