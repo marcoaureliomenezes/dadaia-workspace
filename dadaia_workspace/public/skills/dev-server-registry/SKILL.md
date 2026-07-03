@@ -61,12 +61,12 @@ Or to release all ports for a project at once:
 dadaia server release --project <project-name>
 ```
 
-## Dashboard
+## Panel
 
-To see all active servers in the browser (bookmarkable URL `http://localhost:4999`):
+To see all registered servers in the browser, open the workspace panel (Servers tab):
 
 ```bash
-dadaia server dashboard
+dadaia panel
 ```
 
 ## Conflict handling
@@ -86,4 +86,4 @@ If `register` returns a `PortConflictError`:
 | `dadaia server release --port N` | Release a port |
 | `dadaia server show --project <name>` | Show URL for a project |
 | `dadaia server clean [--dry-run]` | Remove stale entries |
-| `dadaia server dashboard` | Open browser index at http://localhost:4999 |
+| `dadaia panel` | Browser view of registered servers (Servers tab) |

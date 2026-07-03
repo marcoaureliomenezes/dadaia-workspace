@@ -10,10 +10,9 @@ tags:
 - dependencies
 - toolchain
 - constraints
-agent_tier: inject
 token_estimate: 2325
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
 ## Languages
@@ -156,7 +155,7 @@ pure: zero I/O, zero OS primitives — which is why it is testable and cross-pla
   * DO NOT use libs with network access in build/test (offline-first).
   * `claude-agent-sdk` is an **optional extra** (`claude-sdk`, `pyproject.toml`), NOT a base dependency: it appears in `poetry.lock` as `optional = true`, is never installed by default, is not imported at module-load, and is lazy-imported only by the `ClaudeSdkAdapter` when the operator chooses to run a step on the Claude SDK harness. Build and tests stay offline-first without it.
   * `pi` is an optional external CLI runtime installed by the operator — never a locked Python dependency. Runtime/auth facts stated once in `#Agent runtimes`.
-  * DO NOT use threading/multiprocessing in features — concurrent orchestration stays in `features/orchestration/`.
+  * DO NOT use threading/multiprocessing in features — any process-level concurrency runs through the lifecycle engine's bounded worker subprocesses (injected `ProcessRunner`), never spawned inside a feature.
   * DO NOT call `os.system`/`subprocess` outside `infrastructure/` — features use protocols.
   * DO NOT import Python <3.12 backports — minimum runtime is 3.12 (match/case, native generic types, type statement).
   * DO NOT write into `.claude/`, `.codex/`, `.pi/`, `.agents/` directly — only via `dadaia public install` from `public/`.

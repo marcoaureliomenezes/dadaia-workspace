@@ -46,9 +46,11 @@ dadaia memory catalog generate
 
 - YAML frontmatter validated against `memory-frontmatter-v1`
   (`dadaia_workspace/public/schemas/memory/memory-frontmatter-v1.schema.json`).
-  All 10 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
-  `tags`, `agent_tier`, `token_estimate`, `last_updated`, `release_origin` —
-  and `additionalProperties: false` makes any stray field a hard error.
+  All 9 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
+  `tags`, `token_estimate`, `last_updated`, `release_origin` — and
+  `additionalProperties: false` makes any stray field a hard error.
+  `agent_tier` is deprecated-optional since v0.1.53: the schema tolerates it,
+  nothing emits it, and atoms no longer carry it.
 - Body uses curated headings only — the `lint-memory-atoms` allowlist governs
   which h2 sections are valid.
 - `[[slug]]` wikilinks resolve by slug at any depth; do not hardcode paths.

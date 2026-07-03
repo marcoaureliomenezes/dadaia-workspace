@@ -16,10 +16,9 @@ tags:
 - adr
 - agents
 - backlog
-agent_tier: self-pull
 token_estimate: 4350
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
 ## Overview
@@ -34,9 +33,9 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 
 ## Layers
 
-**cli/** — typer app + 23 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `lifecycle`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bug`, `bugs` (the last two coexist: `bug new` is the legacy Markdown scaffolder; `bugs append|status|stats` is the JSONL event store — [[sdd-bug-backlog-governance]]). Thin wrapper over features; no business logic.
+**cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `lifecycle`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bugs` (`bugs append|status|stats` is the JSONL event store and the sole bug-intake surface — there is no `bug` command group — [[sdd-bug-backlog-governance]]). Thin wrapper over features; no business logic.
 
-**features/** — each feature is a folder with `service.py` + optionally `doctor.py`, `resolver.py`, `runner.py`. Current features (26):
+**features/** — each feature is a folder with `service.py` + optionally `doctor.py`, `resolver.py`, `runner.py`. Current features (25):
 
 - `academy` — navigable knowledge basis (panel tab + CLI).
 - `agents` — canonical agent reader over `MarkdownAgentStore`.
@@ -48,29 +47,28 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 - `export` / `import_` — workspace portability ([[workspace-portability]]).
 - `lifecycle` — the multi-harness procedural lifecycle engine: state machine, semantic gates, hygiene/anti-slop, prompt builder + fragments + personas, workflow bodies, run store, policy resolver, workflow-step handoff data plane. Detail in [[lifecycle-foundation]] and [[dadaia-workflows]].
 - `migrate` — v1→v2 and tree-v2 migrations.
-- `orchestration` — read-only reference (`list`/`show`); `run`/`status`/`resume` are inert compat stubs (dispatch retired; execution moved to `dadaia lifecycle`).
 - `panel` — local HTTP control surface ([[panel]]).
 - `public` — model resolution and asset-chain services ([[public-asset-distribution]]).
 - `reports_next` / `reports_retention` / `reports_validation` — discovery of the next expected handoff; reports retention; stdlib-only handoff JSON validation ([[agent-comms]]).
 - `repos` — catalog of known repos.
 - `server_registry` — dev-server port registry ([[server-registry]]).
-- `spec_artifacts` — SDD artifact scaffolders (`release|backlog|bug new`, `memory product add`).
+- `spec_artifacts` — SDD artifact scaffolders (`release|backlog new`, `memory product add`).
 - `spec_context` — ALIVE/DEAD contexts, `lease.py` (the central locking contract), `gate_policy.py` (the gate's classifier), `session_identity.py` (single owner of pointers/session records), workspace doctor ([[context-management]], [[workspace-doctor]]).
 - `specs` — specs doctor + catalog generation ([[specs-doctor]]).
 - `telemetry` — local session telemetry of the entry harnesses with the `RuntimeAdapter` registry `{claude, codex, pi}` (runtime roster single-source: [[tech-stack]]) ([[agent-monitoring]]).
-- `workflows` — `WorkflowsService` (reference-only workflow docs) + `dadaia_catalog.py` (the governed dadaia-workflows catalog) + `dag.py` (server-side SVG renderer).
+- `workflows` — `WorkflowsService` (reference-only workflow docs; also backs `dadaia orchestrate list/show` via `list_definitions`/`get_definition` over `MarkdownWorkflowStore`, preserving each `stage.gate.kind`) + `dadaia_catalog.py` (the governed dadaia-workflows catalog) + `dag.py` (server-side SVG renderer).
 - `workspace` — init/bootstrap ([[workspace-init]]).
 - `workspace_clean` — `dadaia clean`: TTL-based reclaim of the ephemeral `.dadaia/` zones (dry-run default; never outside `.dadaia/`).
 
 **Panel HTTP (summary).** `handler.py` declares the route table with route classes; ALL routes are served **with no credential** — the guards are the loopback bind (`127.0.0.1` hard-coded) and the Host-header allowlist (`127.0.0.1`/`localhost`/`[::1]`, anti-DNS-rebinding, answering 403 to a foreign Host). Mutations (`PUT`/`POST`/`DELETE`) go through the same guards (Host-guard first) + payload validation before any atomic write. The `GET /api/kanban` endpoint and the `views/kanban.py` view **remain served** (read-only over `.dadaia/sessions/*.json`) but have **zero UI consumers** since the Agentic tab removal; the endpoint's fate is tracked in the `panel-runtime-reliability` backlog. `window.Panel` (`core.js`) registers the `sessions`, `academy`, and `reports` modules; the Workflows tab is server-rendered (SVG via `render_dag_svg`) with `window.WorkflowPolicy` (`workflow_policy.js`) for the model pickers — there is no `workflows.js` and no `panel.js`. Full detail in [[panel]].
 
-**core/** — `models/` (pure dataclasses), `protocols/` (Protocols for DI), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`. The rule is zero I/O — the current **authorized exceptions** (I/O or filesystem walk inside `core/`), pending the `import-boundary-enforcement` backlog, are: `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`.
+**core/** — `models/` (pure dataclasses), `protocols/` (Protocols for DI), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`. The rule is zero I/O — the current **authorized exceptions** (I/O or filesystem walk inside `core/`), pending the `import-boundary-enforcement` backlog, are: `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`. `core/specs_version.py` is the single release-SemVer canon: `RELEASE_SEMVER_RE` + `is_release_semver()` are the only compiled `^v\d+\.\d+\.\d+$` pattern — `features/specs/scaffolder.py`, `features/specs/doctor.py`, and `features/spec_artifacts/new_artifacts.py` import them, and an identity+scan agreement test fails on any literal copy compiled outside this module.
 
 **infrastructure/** — concrete implementations of the protocols: `git_subprocess` (includes `diff_name_only` — the source of Ring-2 `changed_paths`), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `headless_adapter_base` (security-relevant invariants shared by the headless adapters: redaction, env-allowlist filter, Ring-2 git-diff override, strict-schema-first payload extraction), the agent-runtime adapters behind `AgentRuntimePort` (`codex_runtime`, `claude_sdk_runtime` with Ring-1 via `core/scope_match`, `pi_runtime`), `runtime_config` (per-runtime hook registration — Python commands for `.claude/settings.json`; **self-locating executable wrappers** `.dadaia/hooks/codex-*` for `.codex/hooks.json`), `subprocess_runner` (the production `ProcessRunner`), `excel_reader`, `python_env`, and the platform adapters (`file_lock_*`, `telemetry_lock_*`, `file_permission_*`, `process_probe_adapter`, `signal_shutdown_*`). All adapter I/O lives here.
 
 **container.py** — sole composition root. Reads `PLATFORM`, selects adapters (POSIX vs Windows), and injects via `build_*_service(workspace_root)` factories.
 
-**hooks/** — the `dadaia_workspace/hooks/` Python package (8 modules: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) — the single implementation of the harness governance hooks. PreToolUse runs through ONE merged entrypoint (`pre_gate`): root-whitelist (classification by **first path component** — a write nested under a new non-whitelisted top-level also blocks) → venv-guard (Bash only) → SDD gate, first-block-wins. Full mechanics in [[sdd-gate-v3]]. Shell assets: exclusively the git chokepoints (`pre-commit-lease-gate.sh`, `pre-push-ci-gate.sh`), installed by `dadaia ci install-hook`.
+**hooks/** — the `dadaia_workspace/hooks/` Python package (8 modules: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`) — the single implementation of the harness governance hooks. PreToolUse runs through ONE merged entrypoint (`pre_gate`): root-whitelist (classification by **first path component** — a write nested under a new non-whitelisted top-level also blocks) → venv-guard (Bash only) → SDD gate, first-block-wins. `pre_gate` is the SOLE hook entrypoint: `sdd_gate` and `root_whitelist` are import-only policy bodies (their standalone `main()`s were deleted), never invoked directly. Full mechanics in [[sdd-gate-v3]]. Shell assets: exclusively the git chokepoints (`pre-commit-lease-gate.sh`, `pre-push-ci-gate.sh`), installed by `dadaia ci install-hook`.
 
 **public/** — versioned canonical assets: `agents/`, `skills/`, `rules/`, `workflows/`, `scripts/`, `schemas/`, `templates/`, `data/`, `scaffold/`, `runtime/`, `personas/`, `lifecycle_fragments/`, `pi/`. `public_assets.py` stage/install/doctor. The `_install_workspace_guardrail_pair` function fans out `data/AGENTS.md` byte-identically to the `AGENTS.md` + `CLAUDE.md` pair at the workspace root and in each consumer repo.
 
@@ -238,7 +236,7 @@ Verifies that the set of slugs in `catalog.json` matches the `*.md` files (exclu
 
 ## Structured-memory-source subsystem (memory-markdown-source-v1)
 
-Memory atoms are `.md` with YAML frontmatter (`memory-frontmatter-v1`, `additionalProperties: false`; required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `agent_tier`, `token_estimate`, `last_updated`, `release_origin`) + a Markdown body with a `##` heading allowlist (`## Changelog`/`Histórico`/`History`/`Versions` are hard errors). HTML is ephemeral — the panel renders `.md` in-memory via `mistune~=3.0` (mermaid fence → `<pre class="mermaid">` displayed as source, no CDN; wikilink → anchor; XSS sanitiser), cached by mtime; no `.html` on disk. `lint-memory-atoms.py` validates frontmatter/headings/wikilinks/token-drift and is invoked by the LINT-1 check ([[specs-doctor]]).
+Memory atoms are `.md` with YAML frontmatter (`memory-frontmatter-v1`, `additionalProperties: false`; required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `token_estimate`, `last_updated`, `release_origin`; the schema retains a deprecated optional `agent_tier` property with zero consumers, slated for removal) + a Markdown body with a `##` heading allowlist (`## Changelog`/`Histórico`/`History`/`Versions` are hard errors). HTML is ephemeral — the panel renders `.md` in-memory via `mistune~=3.0` (mermaid fence → `<pre class="mermaid">` displayed as source, no CDN; wikilink → anchor; XSS sanitiser), cached by mtime; no `.html` on disk. `lint-memory-atoms.py` validates frontmatter/headings/wikilinks/token-drift and is invoked by the LINT-1 check ([[specs-doctor]]).
 
 ## Backlog-consistency subsystem (`features/backlog/`)
 

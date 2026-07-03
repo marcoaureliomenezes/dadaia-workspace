@@ -9,7 +9,6 @@ tags:
 - design
 - css
 - tokens
-agent_tier: self-pull
 token_estimate: 375
 last_updated: '2026-07-02'
 release_origin: v0.1.48

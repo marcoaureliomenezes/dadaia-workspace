@@ -21,20 +21,19 @@ summary: multi-context ALIVE/DEAD lifecycle (no global primary); `dadaia context
   origin on alive/dead, context update --url, CTX-URL-1); dead() refuses untracked
   files without --commit and runs a secret scan before the push; dadaia migrate (v1→v2);
   scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory
-  product add (dadaia bug new is a LEGACY Markdown-stub path — canonical bug
-  registration is the event-sourced `dadaia bugs append`).
+  product add; bug intake is exclusively the event-sourced `dadaia bugs append`
+  (there is no Markdown bug scaffolder).
 tags:
 - context
 - lifecycle
 - session
 - locking
-agent_tier: self-pull
 token_estimate: 3325
-last_updated: '2026-07-02'
-release_origin: v0.1.50
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
-CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bug new` (LEGACY — canonical bug path is `dadaia bugs append`, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
+CLI surface: `dadaia context {create|list|show|alive|dead|bind|release|update|heartbeat|delete}` · `dadaia migrate [--dry-run] [--yes]` · `dadaia {release|backlog} new` · `dadaia bugs append` (event-sourced bug intake, see [[sdd-bug-backlog-governance]]) · `dadaia memory product add` · `dadaia migrate tree-v2`
 
 ## Purpose
 
@@ -193,7 +192,7 @@ Doctor TREE-1..7 enforces and repairs this tree: `dadaia specs doctor` on a fres
 
   * `dadaia release new <id>` — creates the `specs/releases/<id>/SPEC.md` stub with canonical frontmatter.
   * `dadaia backlog new <slug>` — creates the `specs/backlog/<slug>.md` stub.
-  * `dadaia bug new <slug>` — **LEGACY**: creates the `specs/bugs/<slug>.md` Markdown stub with `session_id: null`. The canonical bug-registration path is the event-sourced `dadaia bugs append` (JSONL, `bug-event-v1`) — see [[sdd-bug-backlog-governance]].
+  * `dadaia bugs append` — the **only** bug-intake path: appends an event-sourced `bug-event-v1` JSON line to `specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl` (there is no Markdown bug scaffolder) — see [[sdd-bug-backlog-governance]].
   * `dadaia memory product add <slug>` — creates the feature Markdown at `specs/memory/product/<slug>.md` and regenerates `catalog.json` idempotently.
 
 ## Usage flow

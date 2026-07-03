@@ -1,20 +1,18 @@
 ---
-release: v0.1.53
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.53 — Legacy Purge
+# Active release: none
 
-Sequence position: **R5 of the operator-approved 12-release plan** — the FINAL
-release of the operator's R1→R5 mandate (grilled 2026-07-02). Delete before
-refactoring: the operator's no-legacy-code law applied across the CLI (legacy
-`bug new`, overdue `server dashboard`), the inert `features/orchestration` stubs,
-dead exceptions, the audit-C dead-code inventory, the SemVer-canon triplication,
-and the Windows chmod silent no-op. Consumes `legacy-surface-retirement` +
-`hygiene-and-dead-code-cleanup` + `centralize-release-semver-canon` +
-`telemetry-tier2-chmod-unguarded-on-windows`. Items already consumed by v0.1.52
-(academy.js mermaid branch, kanban CSS, drift-check, connection factory) are
-marked consumed-elsewhere, not redone.
+No release is currently active. The operator-approved R1→R5 sequence
+(grilled 2026-07-02) is **complete**: v0.1.49 intake integrity, v0.1.50
+kernel hardening, v0.1.51 e2e journey canon, v0.1.52 panel plumbing, and
+v0.1.53 legacy purge are all shipped, closed, and archived under
+`specs/_archive/releases/`.
 
-Previous: **v0.1.52** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.52/`
-(merged `fd23ea5e`; closure `8627fdec`).
+Previous: **v0.1.53** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.53/`
+(merged `d3f46360`, PR #95).
+
+Next release definition starts from `specs/backlog/candidates.md` under the
+`release-governance` rule (PM dispatches product-engineer; grill mandatory).

@@ -38,7 +38,6 @@ tags:
 - multi-harness
 - hygiene
 - gates
-agent_tier: self-pull
 token_estimate: 5225
 last_updated: '2026-07-02'
 release_origin: v0.1.48

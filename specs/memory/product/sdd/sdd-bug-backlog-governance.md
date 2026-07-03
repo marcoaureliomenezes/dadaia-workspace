@@ -19,10 +19,9 @@ tags:
   - bugs
   - alpha-rc-model
   - backlog-ownership
-agent_tier: self-pull
 token_estimate: 1575
-last_updated: '2026-07-02'
-release_origin: v0.1.49
+last_updated: '2026-07-03'
+release_origin: v0.1.53
 ---
 
 Skill: `dadaia-release-definition` · Rules: `release-governance.md`, `backlog-ownership.md`, `bug-registration-guardrail.md` (always-on)
@@ -64,9 +63,9 @@ command exits non-zero.
 - **Mechanical invariant:** SPEC-DOC-033 ([[specs-doctor]]) validates per-line schema,
   the rotation ceiling, and event coherence (terminal without a prior `reported` ⇒
   ERROR; double terminal ⇒ ERROR).
-- **Coexistence:** `dadaia bug new` (the legacy Markdown scaffolder) still exists in
-  the CLI, but the canonical registration path is `dadaia bugs append` — no new
-  workflow writes a bug as `.md`.
+- **Sole intake path:** `dadaia bugs append` is the only bug-intake surface; there is
+  no Markdown bug scaffolder, so every bug enters the store as a schema-validated
+  JSONL event — no workflow writes a bug as `.md`.
 
 ### Backlog-consistency engine (`features/backlog/`)
 
@@ -153,6 +152,10 @@ enforcement is the doctor above.
   gates the dadaia-workflows consume ([[lifecycle-foundation]]).
 - **Blocked/resume:** when an external action cannot execute, `dadaia lifecycle
   preflight` returns a typed BLOCKED with the exact command + resume token.
+- **Deprecation-expiry law:** every deprecation carries a release-stamped expiry; a
+  surface promised for removal at release N+1 is DEBT by N+2 and is deleted by the
+  next release that touches its area. Deprecations do not accumulate — the
+  never-drop law's forward-looking twin.
 
 ## Typical trigger
 

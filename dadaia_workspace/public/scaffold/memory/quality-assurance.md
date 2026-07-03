@@ -8,7 +8,6 @@ tags:
   - quality-assurance
   - testing
   - anti-slop
-agent_tier: self-pull
 token_estimate: 0
 last_updated: "2026-01-01"
 release_origin: v0.2.1

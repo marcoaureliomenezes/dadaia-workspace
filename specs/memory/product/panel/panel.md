@@ -26,7 +26,6 @@ tags:
 - ui
 - http
 - dashboard
-agent_tier: self-pull
 token_estimate: 5275
 last_updated: '2026-07-03'
 release_origin: v0.1.52

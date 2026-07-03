@@ -18,7 +18,6 @@ tags:
 - workflows
 - lifecycle
 - layer-2
-agent_tier: self-pull
 token_estimate: 750
 last_updated: '2026-07-02'
 release_origin: v0.1.48
