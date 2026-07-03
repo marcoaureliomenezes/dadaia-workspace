@@ -15,7 +15,7 @@ sets) are sequential — one owner, no parallel `[-]`.
 
 ## W1 — FR1 legacy CLI + package retirement
 
-- [ ] T-53-10 DELETE bug-new chain (command + cli/main.py registration +
+- [x] T-53-10 DONE `9d537d69` (28 files, 8 deletions; affected scope 150 passed; unit+integration 4,080 passed/16 skipped exit 0; ruff/mypy clean). 14/14 AC-1 per-symbol probes OK; golden fixtures byte-identical (3 SHA256 matches; gate=<kind> preserved via new WorkflowsService.list_definitions/get_definition over MarkdownWorkflowStore); launcher argv gone; workflow_state_store CONFIRMED orphaned → JsonWorkflowStateStore deleted too; AC-8 ledger in the W1 handoff (2026-07-03T030549Z). Migrate audit: keep both steps. Findings routed to W2: orphaned run-state infra (WorkflowStore protocol, JsonRunStateStore+model, OrchestrationUnsupportedError) + orphaned server_registry/dashboard.py + SKILL.md doc drift. Original scope: DELETE bug-new chain (command + cli/main.py registration +
   spec_artifacts backing + tests); DELETE `server dashboard` (+tests); RETIRE
   `features/orchestration` (package + `build_orchestration_service`;
   `orchestrate.py list/show` rewired onto `features/workflows` with the same
