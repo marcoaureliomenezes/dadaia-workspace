@@ -44,14 +44,18 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
 
 ## W2 — FR2 dashboard-only view (write set: PLAN §W2)
 
-- [ ] T-52-11 Extract `#sessions-last-updated` from the toolbar, THEN delete
-  toolbar/table/drawer/skeleton; `sessions.js` → aggregate fetch + 4 cards
-  ("N active" + top-agent sub-labels preserved; 'N/A'/'—'/'$X.XX' mapping per the
-  FR1 matrix) + banner + `dadaia:runtime-change` re-fetch; CSS prune; DELETE
-  `test_panel_sessions_tab.spec.ts`; ADD `sessions-dashboard.spec.ts` (mocked
-  aggregate per matrix case, no console errors). AC-7 sabotage (a): aggregate →
-  zeros ⇒ dashboard spec FAILS (captured output on this line; reverted). CSP
-  inline scripts untouched. Owner: software-engineer.
+- [x] T-52-11 DONE — `3d66016c` (7 files, +472/−1736; after `feat(T-52-10)` ⇒
+  AC-1 order holds). sessions.js 710→211 (−499), scaffold 116→65, CSS 509→94
+  (−415); badge extracted; runtime switcher + `#section-sessions` preserved
+  (response-guard assumptions intact); `#sessions-meta` dropped (no updater, no
+  test references). New `sessions-dashboard.spec.ts` E2E-SES-DASH-01..04 green
+  against a local sandbox (mocked aggregate; console-error-free); list spec
+  deleted. AC-7 sabotage (a-variant, endpoint mocked so the JS mapping is the
+  gated surface) RECORDED: one line `var costVal = true ? 'N/A'` ⇒ DASH-01/02
+  FAIL exactly on the cost mapping (`Expected "$1.73" Received "N/A"`; exit 1);
+  reverted; 4 passed exit 0. Unit scope 583 passed exit 0; ruff/mypy clean.
+  Collateral fix: `test_views_index.py:161` repointed from the deleted
+  `sessions-tbody` to `sessions-dashboard`. Owner: software-engineer.
 
 ## W3 — FR3 telemetry reliability (write set: PLAN §W3)
 
