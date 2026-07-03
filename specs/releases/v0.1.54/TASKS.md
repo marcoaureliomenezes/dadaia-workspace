@@ -358,6 +358,28 @@ includes `tests/`.
     `tests/contract/test_ci_preflight_includes_lint_imports.py` asserting the preflight tuple
     contains it AND covers the `_resolve_tool` fail-closed path. **AC-7(d):** delete the
     `lint-imports` Check from `checks_for()` ⇒ the test FAILS; revert.
+    - **FR4 DONE (marker stays `[-]` — ship gate + archival complete the task).** software-engineer
+      2026-07-03. Reservation `bf124922`; FR4 code `ff883f99`. **ci.yml:** `Lint (ruff)` job gains a
+      `lint-imports (import-boundary contracts)` step running `poetry run lint-imports --config
+      setup.cfg --no-cache` (no extra install — import-linter is in the dev group). **preflight:**
+      `checks_for()` now returns 5 checks; `dadaia ci preflight` →
+      `Running 5 preflight check(s)… [PASS] ruff format --check / [PASS] ruff check /
+      [PASS] mypy --strict / [PASS] lint-imports / [PASS] pytest → All preflight checks passed.`
+      (exit 0). Fail-closed: `_resolve_tool(..., require=True)` returns an actionable error argv
+      (names `lint-imports` + `poetry install --with dev`) when the binary is absent — never a
+      silent skip (architect A10). **AC-7(d):** deleting the `lint-imports` Check from
+      `checks_for()` ⇒ contract test FAILS at
+      `assert "lint-imports" in by_name` (check list collapses to
+      `['ruff format --check', 'ruff check', 'mypy --strict', 'pytest']`); reverted. **Gates (AC-6):**
+      `ruff format --check` + `ruff check --no-cache` + `mypy --strict` exit 0; `lint-imports`
+      `8 kept, 0 broken`; full `dadaia ci preflight` exit 0 (covers full pytest); `dadaia specs doctor`
+      exit 0 (12 pre-existing SPEC-DOC-031 WARNs, dispositioned at closure); `dadaia public doctor`
+      `[ok] public-privacy`, exit 0. Consequence: the pre-push hook runs `dadaia ci preflight`, so
+      every push now enforces the import contracts. Collateral test-side edits (AC-8 grep-tests
+      discipline): `tests/unit/features/ci_preflight/test_service.py` (count 4→5) and
+      `tests/e2e/features/test_ci_preflight_poetry_off_path.py` (fake-venv lint-imports stub +
+      actionable fail-closed distinction) — flagged for qa ship-gate review. Remaining on this task:
+      consumed-backlog archival at SHIP, QA ship gate, security push gate, push, PR, merge.
   - **Gates (AC-6):** unpiped `pytest` + `ruff format --check` + `ruff check` +
     `mypy --strict` + `lint-imports --no-cache` (`8 kept, 0 broken`) +
     `dadaia specs doctor` + `dadaia public doctor` all exit 0, locally and in CI.
