@@ -112,12 +112,21 @@ sets are disjoint (PLAN §Write sets; service.py/handler.py shared — sequentia
 
 ## W5 — gates + ship (flat release: single ship gate)
 
-- [ ] T-52-20 QA review (ship gate): every AC live — AC-1 commit order + content;
-  AC-2/AC-4 comprehensive greps (incl. service.py facades and all handler.py
-  kanban/detail sites); AC-3 red-commit checkout verification; AC-5 inventory
-  re-derivation; AC-7 three captured-output artifacts on the task lines; suite
-  UNPIPED with the real exit code. AC-5's final evidence is the PR's green
-  `e2e-panel` run. Verdict lands as a review commit. Owner: qa-engineer.
+- [x] T-52-20 QA review (ship gate): **APPROVE** (qa-engineer, 2026-07-03, on
+  `e47e6eb3`). AC-1 verified by per-commit CONTENT (aggregate + server deletion in
+  `21cb8158`, client deletion after in `3d66016c`); AC-2/AC-4 greps zero (facades
+  gone, `list_sessions_by_agent` at 7 sites, kanban zero, mermaid hostile-fence
+  passing, drift-check gone); AC-3 RED verified in a detached WORKTREE at
+  `0794dae3` (structural TypeError) + 16 reliability tests green on HEAD +
+  `check_same_thread` gone; AC-5 inventory re-derived (matrix 1-8, 404, agents
+  coverage intact); AC-6 full suite independently re-run **4,360 passed / 17
+  skipped, exit 0** + ruff/mypy clean; AC-7 three concrete sabotage artifacts, no
+  residue. SPECIAL ADJUDICATION cleared: `is_stale_session` deletion is
+  legitimate dead-code removal — kanban-only caller (verified pre-W4 at
+  `93e8b75e`), the deleted test exercised ONLY the session-TTL predicate (never
+  the pid-veto/no-steal invariant), all 8 other frozen files diff-clean vs main;
+  v0.1.50 no-steal freeze preserved. Condition for merge: green `e2e-panel` run
+  on the PR (T-52-21 confirms). Owner: qa-engineer.
 - [ ] T-52-21 Security review (push gate): APPROVE handoff with
   `metrics.commit_sha` = pushed sha (attention: foreign-DB allowlist integrity,
   mermaid escape, deleted auth-era drift-check); push; CI green (incl.
