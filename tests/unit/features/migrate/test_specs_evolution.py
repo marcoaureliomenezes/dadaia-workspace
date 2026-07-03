@@ -182,7 +182,7 @@ def test_upgrade_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_doctor_warns_on_below_version_tree(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs.doctor import Severity, SpecsDoctor
+    from dadaia_workspace.features.specs import Severity, SpecsDoctor
 
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n")  # unstamped → version 0

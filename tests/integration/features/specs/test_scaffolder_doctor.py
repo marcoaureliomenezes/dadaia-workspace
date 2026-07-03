@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs.doctor import Severity, SpecsDoctor
+from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = [

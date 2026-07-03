@@ -12,7 +12,7 @@ import typer
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.doctor import _read_active_md
+from dadaia_workspace.features.specs.doctor_common import read_active_md
 from dadaia_workspace.features.specs.scaffolder import (
     scaffold,
     scaffold_hotfix_release,
@@ -513,7 +513,7 @@ def segment_open(
     ACTIVE.md's ``segment:`` to it (phase reset to SPEC).
     """
     target = _resolve_specs_dir(specs_dir)
-    release, _segment, _phase, err = _read_active_md(target / "releases" / "ACTIVE.md")
+    release, _segment, _phase, err = read_active_md(target / "releases" / "ACTIVE.md")
     if err is not None or not release or release == "none":
         typer.echo(
             f"[error] no active release in ACTIVE.md ({err or 'release: none'}). "

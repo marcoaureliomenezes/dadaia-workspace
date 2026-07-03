@@ -7,8 +7,8 @@ for every consumer and is staged/projected verbatim. Two failure modes must stay
 1. **Regeneration.** Running the public scripts (``lint-memory-atoms.py`` /
    ``generate-memory-catalog.py``) must NOT drop a ``__pycache__/*.pyc`` under
    ``dadaia_workspace/public/``. The scripts set ``sys.dont_write_bytecode = True`` so the
-   guard fires for any invocation style; ``features/specs/doctor.py`` additionally passes
-   ``-B`` at the LINT-1 subprocess call site. This test executes the scripts WITHOUT
+   guard fires for any invocation style; ``features/specs/doctor_memory.py`` additionally
+   passes ``-B`` at the LINT-1 subprocess call site. This test executes the scripts WITHOUT
    ``-B`` so it proves the in-script guard, not just the call-site flag.
 
 2. **Packaging.** The built wheel/sdist must contain no ``.pyc``. ``poetry-core`` honours

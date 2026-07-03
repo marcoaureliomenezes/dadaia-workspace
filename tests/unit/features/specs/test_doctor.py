@@ -95,8 +95,14 @@ Python, Go.
 
 @pytest.fixture(autouse=True)
 def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep SpecsDoctor unit tests focused on in-process structural checks."""
-    monkeypatch.setattr(SpecsDoctor, "_check_lint1_memory_atoms", lambda self: [])
+    """Keep SpecsDoctor unit tests focused on in-process structural checks.
+
+    v0.1.55 FR1: LINT-1 moved off the coordinator into ``doctor_memory.MemoryValidator``;
+    stub its public method so the coordinator's ``check()`` never shells out.
+    """
+    from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+
+    monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
@@ -582,7 +588,7 @@ def test_semver_folder_name_produces_no_doc_016(
     )
     from datetime import date as _date
 
-    with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
+    with patch("dadaia_workspace.features.specs.doctor_release.date") as mock_date:
         mock_date.today.return_value = _date(*today)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)
         issues = SpecsDoctor(specs).check()
@@ -600,7 +606,7 @@ def test_semver_folder_name_non_semver_new_release_warns(tmp_path: Path) -> None
     )
     from datetime import date as _date
 
-    with patch("dadaia_workspace.features.specs.doctor.date") as mock_date:
+    with patch("dadaia_workspace.features.specs.doctor_release.date") as mock_date:
         mock_date.today.return_value = _date(2026, 6, 15)
         mock_date.side_effect = lambda *a, **kw: _date(*a, **kw)
         issues = SpecsDoctor(specs).check()
