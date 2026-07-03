@@ -16,9 +16,9 @@ tags:
 - adr
 - agents
 - backlog
-token_estimate: 4350
+token_estimate: 4650
 last_updated: '2026-07-03'
-release_origin: v0.1.54
+release_origin: v0.1.55
 ---
 
 ## Overview
@@ -35,7 +35,7 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 
 **cli/** — typer app + 22 subcommands: `init`, `export`, `import`, `clean`, `context`, `lock`, `lifecycle`, `ci`, `repos`, `public`, `doctor`, `academy`, `orchestrate`, `reports`, `specs`, `server`, `migrate`, `panel`, `memory`, `release`, `backlog`, `bugs` (`bugs append|status|stats` is the JSONL event store and the sole bug-intake surface — there is no `bug` command group — [[sdd-bug-backlog-governance]]). Thin wrapper over features; no business logic.
 
-**features/** — each feature is a folder with `service.py` + optionally `doctor.py`, `resolver.py`, `runner.py`. Current features (25):
+**features/** — each feature is a folder with `service.py` + optionally `doctor.py`, `resolver.py`, `runner.py`. Current features (23):
 
 - `academy` — navigable knowledge basis (panel tab + CLI).
 - `agents` — canonical agent reader over `MarkdownAgentStore`.
@@ -49,20 +49,20 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 - `migrate` — v1→v2 and tree-v2 migrations.
 - `panel` — local HTTP control surface ([[panel]]).
 - `public` — model resolution and asset-chain services ([[public-asset-distribution]]).
-- `reports_next` / `reports_retention` / `reports_validation` — discovery of the next expected handoff; reports retention; stdlib-only handoff JSON validation ([[agent-comms]]).
+- `reports` — the single agent-comms reports package with flat submodules `next` / `retention` / `validation`: discovery of the next expected handoff, reports retention, and stdlib-only handoff JSON validation. Merged from the former `reports_next` / `reports_retention` / `reports_validation` top-level triplet (v0.1.55; behavior-preserving relocation) ([[agent-comms]]).
 - `repos` — catalog of known repos.
 - `server_registry` — dev-server port registry ([[server-registry]]).
 - `spec_artifacts` — SDD artifact scaffolders (`release|backlog new`, `memory product add`).
 - `spec_context` — ALIVE/DEAD contexts, `lease.py` (the central locking contract), `gate_policy.py` (the gate's classifier), `session_identity.py` (single owner of pointers/session records), workspace doctor ([[context-management]], [[workspace-doctor]]).
-- `specs` — specs doctor + catalog generation ([[specs-doctor]]).
+- `specs` — specs doctor + catalog generation. `features/specs/doctor.py` is a **224-line `SpecsDoctor` coordinator** that owns `check()`/`fix()` ORDER and delegates validation LOGIC to six single-responsibility sibling validator classes — `doctor_structural`, `doctor_memory`, `doctor_release`, `doctor_closure_audit`, `doctor_governance`, `doctor_coherence` — over two shared leaf modules: `doctor_types.py` (`Severity`/`SpecsDoctorIssue`/`_MemoryMdSummary` + the leaf alias `PidProbe = Callable[[int], bool]`) and `doctor_common.py` (the five cross-validator pure release-dir/active-md helpers). Each suppressed boundary import lives in exactly one validator — `spec_context.{lease,session_identity}` only in `doctor_coherence`, the lazy `infrastructure.subprocess_runner` only in `doctor_memory`; the coordinator imports neither (its `pid_probe` is typed against the `doctor_types.PidProbe` leaf, keeping the coordinator off any `spec_context` edge). Decomposed in v0.1.55, behavior byte-identical (golden-pinned) ([[specs-doctor]]).
 - `telemetry` — local session telemetry of the entry harnesses with the `RuntimeAdapter` registry `{claude, codex, pi}` (runtime roster single-source: [[tech-stack]]) ([[agent-monitoring]]).
 - `workflows` — `WorkflowsService` (reference-only workflow docs; also backs `dadaia orchestrate list/show` via `list_definitions`/`get_definition` — the store surface is injected via a feature-local store Protocol, no direct `infrastructure` import) + `dadaia_catalog.py` (the **presentation layer**: `DadaiaWorkflowDTO`, `list_dadaia_workflows`, `get_dadaia_workflow`; imports exactly one lifecycle module and re-exports `governed_workflow_catalog` on the stable public path) + `dag.py` (server-side SVG renderer). The **governed dadaia-workflows catalog is defined in `features/lifecycle/governed_catalog.py`** (imports only lifecycle internals + core), so the `workflows ↔ lifecycle` cycle is broken and pinned by the `lifecycle-no-workflows` contract.
 - `workspace` — init/bootstrap ([[workspace-init]]).
 - `workspace_clean` — `dadaia clean`: TTL-based reclaim of the ephemeral `.dadaia/` zones (dry-run default; never outside `.dadaia/`).
 
-**Panel HTTP (summary).** `handler.py` declares the route table with route classes; ALL routes are served **with no credential** — the guards are the loopback bind (`127.0.0.1` hard-coded) and the Host-header allowlist (`127.0.0.1`/`localhost`/`[::1]`, anti-DNS-rebinding, answering 403 to a foreign Host). Mutations (`PUT`/`POST`/`DELETE`) go through the same guards (Host-guard first) + payload validation before any atomic write. The `GET /api/kanban` endpoint and the `views/kanban.py` view **remain served** (read-only over `.dadaia/sessions/*.json`) but have **zero UI consumers** since the Agentic tab removal; the endpoint's fate is tracked in the `panel-runtime-reliability` backlog. `window.Panel` (`core.js`) registers the `sessions`, `academy`, and `reports` modules; the Workflows tab is server-rendered (SVG via `render_dag_svg`) with `window.WorkflowPolicy` (`workflow_policy.js`) for the model pickers — there is no `workflows.js` and no `panel.js`. Full detail in [[panel]].
+**Panel HTTP (summary).** `handler.py` declares the route table with route classes; ALL routes are served **with no credential** — the guards are the loopback bind (`127.0.0.1` hard-coded) and the Host-header allowlist (`127.0.0.1`/`localhost`/`[::1]`, anti-DNS-rebinding, answering 403 to a foreign Host). Mutations (`PUT`/`POST`/`DELETE`) go through the same guards (Host-guard first) + payload validation before any atomic write. The `GET /api/kanban` endpoint and the `views/kanban.py` view **remain served** (read-only over `.dadaia/sessions/*.json`) but have **zero UI consumers** since the Agentic tab removal; the endpoint's fate is tracked in the `panel-runtime-reliability` backlog. `window.Panel` (`core.js`) registers the `sessions`, `academy`, and `reports` modules; the Workflows tab is server-rendered (SVG via `render_dag_svg`) with `window.WorkflowPolicy` (`workflow_policy.js`) for the model pickers — there is no `workflows.js` and no `panel.js`. The JSON/HTML route renderers are split across **eight per-domain view modules** `features/panel/views/api_{servers,contexts,agents,workflows,sessions,academy,reports,health}.py` (each ≤ 429 lines, importing only `features.panel.service`); the former 1,279-line `views/api.py` monolith is **deleted** (v0.1.55) — `container.build_panel_views` wires each `render_api_*` via explicit named imports, no facade or barrel. Full detail in [[panel]].
 
-**core/** — `models/` (pure dataclasses; `models/workflow_execution.py` also holds the relocated `WorkflowModelPolicyOverlay`/`WorkflowModelPolicyStoreError`/`DEFAULT_CONTEXT` policy types), `protocols/` (Protocols for DI, incl. the lean `workflow_model_policy_store.py` — `load`/`parse`/`save`), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`. The rule is zero I/O — the **authorized exceptions** (I/O or filesystem walk inside `core/`) are exactly `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`, and this set is now **pinned by an AST ratchet guard** (`tests/contract/test_core_file_io_purity.py` walks `core/*.py` and flags `open`/`Path.read_text|write_text|mkdir|exists|glob|iterdir|rglob`/`shutil.copy*|copytree|move` outside those four modules; `platform.py` does no file-I/O and is covered by the `sys` note). `core/specs_version.py` is the single release-SemVer canon: `RELEASE_SEMVER_RE` + `is_release_semver()` are the only compiled `^v\d+\.\d+\.\d+$` pattern — `features/specs/scaffolder.py`, `features/specs/doctor.py`, and `features/spec_artifacts/new_artifacts.py` import them, and an identity+scan agreement test fails on any literal copy compiled outside this module.
+**core/** — `models/` (pure dataclasses; `models/workflow_execution.py` also holds the relocated `WorkflowModelPolicyOverlay`/`WorkflowModelPolicyStoreError`/`DEFAULT_CONTEXT` policy types), `protocols/` (Protocols for DI, incl. the lean `workflow_model_policy_store.py` — `load`/`parse`/`save`), `exceptions.py`, `platform.py` (the only authorized `sys.platform` site), `kernel_tunables.py` (single home of the kernel constants; leaf), `scope_match.py` (pure classifier shared Ring-1/Ring-2), `lock_liveness.py`, `model_registry.py`, `harness_models.py`, `session_env.py` (v0.1.55 — the single source of the harness-native session-id env-name list `CLAUDE_CODE_SESSION_ID`/`CODEX_SESSION_ID`, consumed by `hooks/_common.resolve_session_id` and by the `bind`/`_session_context` resolution channel with no duplicated literal). The rule is zero I/O — the **authorized exceptions** (I/O or filesystem walk inside `core/`) are exactly `core/specs_backup.py`, `core/specs_version.py`, `core/specs_resolver.py` (resolution env → **harness-native session id when `DADAIA_SESSION_ID` is absent, resolved only against a live/heartbeat-fresh session record — a stale/inherited id never resolves to a foreign bound context** → persisted bind of a live/attributable session → cwd) and `core/workspace_resolver.py`, and this set is now **pinned by an AST ratchet guard** (`tests/contract/test_core_file_io_purity.py` walks `core/*.py` and flags `open`/`Path.read_text|write_text|mkdir|exists|glob|iterdir|rglob`/`shutil.copy*|copytree|move` outside those four modules; `platform.py` does no file-I/O and is covered by the `sys` note). `core/specs_version.py` is the single release-SemVer canon: `RELEASE_SEMVER_RE` + `is_release_semver()` are the only compiled `^v\d+\.\d+\.\d+$` pattern — `features/specs/scaffolder.py`, `features/specs/doctor.py`, and `features/spec_artifacts/new_artifacts.py` import them, and an identity+scan agreement test fails on any literal copy compiled outside this module.
 
 **infrastructure/** — concrete implementations of the protocols: `git_subprocess` (includes `diff_name_only` — the source of Ring-2 `changed_paths`), `json_*_store`, `public_assets`, `markdown_workflow_store`, `markdown_agent_store`, `headless_adapter_base` (security-relevant invariants shared by the headless adapters: redaction, env-allowlist filter, Ring-2 git-diff override, strict-schema-first payload extraction), the agent-runtime adapters behind `AgentRuntimePort` (`codex_runtime`, `claude_sdk_runtime` with Ring-1 via `core/scope_match`, `pi_runtime`), `runtime_config` (per-runtime hook registration — Python commands for `.claude/settings.json`; **self-locating executable wrappers** `.dadaia/hooks/codex-*` for `.codex/hooks.json`), `subprocess_runner` (the production `ProcessRunner`), `excel_reader`, `python_env`, and the platform adapters (`file_lock_*`, `telemetry_lock_*`, `file_permission_*`, `process_probe_adapter` — home of `OsProcessProbe` **and** the single public `build_pid_probe()` factory that all former `_build_pid_probe` consumers now call, `signal_shutdown_*`). All adapter I/O lives here.
 
@@ -150,9 +150,23 @@ flowchart TB
   `ignore_imports` cap is **26 module-pairs** — infra **9** / subprocess **4** /
   cross-feature **13** — pinned by `tests/contract/test_import_linter_ignore_cap.py` with
   per-family per-contract-section assertions (`test_recorded_cap_is_not_stale_above_reality`);
-  a new cross-feature edge from any feature cannot be added silently. `features → cli` is
+  a new cross-feature edge from any feature cannot be added silently. The cap is
+  **unchanged at 26 (9/4/13) across v0.1.55's three structural moves** — every move repoints
+  its suppressed edges 1:1, never splitting one: the doctor decomposition moved
+  `spec_context.{lease,session_identity}` to `specs.doctor_coherence` and
+  `infrastructure.subprocess_runner` to `specs.doctor_memory` (the coordinator holds **no**
+  `spec_context` edge — the `doctor_types.PidProbe` leaf alias keeps a `pid_probe` annotation
+  off `spec_context`, so cross-feature stays 13, not 14); the reports merge repointed edge #7
+  (`lifecycle.report_workflow → reports.validation`) and the `modules =` list (−3 `reports_*` /
+  +1 `reports`); the panel api decomposition changed **zero** edges (each `api_*` module imports
+  only `features.panel.service`). `features → cli` is
   closed at the composition boundary: `cli/anchors.py` derives the `cli_anchors` frozenset
   and threads it into `build_registry`, so no feature imports `cli.main`.
+- **Module-size anti-erosion ratchet** (v0.1.55): `tests/contract/test_module_size_ceiling.py`
+  caps `features/specs/doctor*.py` at **700 lines** and `features/panel/views/api*.py` at
+  **450 lines** (recorded ceilings — lowering welcome, raising needs same-commit
+  justification), so neither former god module can silently re-grow; the guard also pins
+  `views/api.py` as deleted.
 - `dadaia doctor` grep check: fails with `[ERROR]` on `import fcntl` / `os.chmod` / `os.kill` / `os.open` in `features/**/*.py`.
 
 ## Data flow — asset chain pipeline
@@ -181,7 +195,7 @@ From| To| Contract type| Notes
 ---|---|---|---
 cli/commands/*| container.build_*_service| Factory call| Each command resolves workspace_root and calls the factory
 features/*| core/protocols/*| Protocol / ABC| Injected via constructor
-features/specs/doctor| specs/ filesystem| Path-based, read-only| Receives an absolute specs_dir; check inventory in [[specs-doctor]]
+features/specs/doctor| specs/ filesystem| Path-based, read-only| Thin `SpecsDoctor` coordinator (owns check/fix ORDER) delegating validation LOGIC to six sibling validators over the `doctor_types`/`doctor_common` leaves; receives an absolute specs_dir; check inventory in [[specs-doctor]]
 infrastructure/public_assets| public/ ↔ .dadaia/agentic/ ↔ projections| Manifest + file copy| manifest.json is the cache of what was propagated
 PreToolUse hook| `hooks.pre_gate` → `gate_policy.py` + `lease.py`| JSON stdin (read once) / stdout| First-block-wins; fail-open except PROTECTED; mechanics in [[sdd-gate-v3]]
 PostToolUse hook| `hooks.sdd_post_gate` + `lease.py`| JSON stdin (harness-native sid)| Heartbeat via by-session index + advisory reconciler; fail-open exit 0
@@ -304,4 +318,10 @@ covers offline runs.
 
 ## Visual evidence
 
-Class diagrams and CLI screenshots go under `specs/assets/architecture/`. Currently no assets.
+Canonical UML lives under `specs/assets/architecture/` as **fenced ```mermaid blocks in Markdown files** (rendered natively by GitHub and the panel; no mermaid-cli/Node, no `.svg`/binary — only `.md` is git-tracked, via a privacy-preserving `.gitignore` opt-in mirroring the audits pattern). Three diagrams record the post-v0.1.55 decomposition shape:
+
+- `specs/assets/architecture/doctor-decomposition.md` — `classDiagram` of the `SpecsDoctor` coordinator + the six validator siblings + the two leaf modules, with NOTES pinning each boundary import to its sole holder.
+- `specs/assets/architecture/panel-views-decomposition.md` — `classDiagram`/module graph of the eight per-domain `api_*` view modules and their `container` named-import wiring (`api.py` deleted).
+- `specs/assets/architecture/feature-packages.md` — `flowchart` package graph of the 23 feature packages, incl. the merged `features/reports` submodules and the `governed_catalog` cycle-break seam.
+
+**Regeneration law (REGENERATE-AT-STRUCTURAL-CLOSURE):** these diagrams are re-verified at the CLOSURE of every structural release; between releases the introspection drift-guard `tests/contract/test_architecture_diagrams_current.py` enforces name-liveness continuously — it derives every live name by importing `doctor_*`, the per-domain api modules, and `features.reports` (a hardcoded expectation list is forbidden) and asserts, bidirectionally, that each diagram mentions every live name and every diagrammed class/`api_*` module name is a live importable name. A code rename that skips the diagram, or a diagram node renamed to a stale name, fails the guard.

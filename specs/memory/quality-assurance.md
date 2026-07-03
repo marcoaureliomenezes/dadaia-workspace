@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 1563
+token_estimate: 1940
 last_updated: '2026-07-03'
-release_origin: v0.1.54
+release_origin: v0.1.55
 ---
 
 ## Purpose
@@ -99,6 +99,34 @@ TTL / seed byte-identical — a diff of target + docstring only). And **new cove
 in a new sibling file, never by expanding a frozen file** (v0.1.54 added
 `test_lease_pid_probe_public_builder.py` alongside the frozen `test_lease_main_probe.py`
 rather than growing it).
+
+**Golden-authoring law (v0.1.55) — normalize platform-variant path rendering at capture.**
+A byte-golden captured on Linux will diverge on the Windows CI matrix because absolute
+paths render with `\` instead of `/`. A new golden MUST canonicalize every platform-variant
+path at capture time, at three levels: (1) **payload-level for structured fields** —
+normalize each JSON path field (e.g. a doctor issue `path` and the CLI top-level
+`specs_dir`) to a stable token (`<SPECS>` / `<WS>`) before serialization; (2) **anchored
+canonicalization for free text** — path tails embedded inside free-text issue messages must
+be replaced ANCHORED on the `<SPECS>` / `<WS>` boundary, never by a bare `\d`-style regex (a
+naive `\d` digit matcher is ambiguous with a literal `\dir` Windows path segment, so the
+replacement is anchored at the message level); (3) **the two-backslash rule for JSON-nested
+paths** — a path serialized inside a nested JSON value carries escaped `\\` separators, so
+its normalization must match the double-backslash form. v0.1.55 shipped only after **two
+Windows golden-normalization CI rounds** (the FR1 doctor issue-code golden and the FR2
+panel route-response golden each needed a normalization fix after the first Linux-green CI
+run went red on the `-cross` matrix); those two rounds are the precedent — assume nothing
+renders identically cross-platform until the golden is proven byte-stable on the `-cross`
+jobs. Also freeze any clock the captured output depends on (v0.1.55 froze `date.today` +
+`datetime.now(tz=UTC)` to 2026-07-15 so the release-semver and hotfix-date-gated checks were
+deterministic).
+
+**Module-size anti-erosion ratchet (v0.1.55).** `tests/contract/test_module_size_ceiling.py`
+is a test-side ratchet that caps `features/specs/doctor*.py` at **700 lines** and
+`features/panel/views/api*.py` at **450 lines** (and pins `views/api.py` deleted). It is the
+durable guard that a decomposed god module stays decomposed — a raised ceiling requires a
+same-commit justification; lowering is always welcome. It complements the import-linter
+`ignore_imports` cap (full enforcement status single-sourced in [[architecture]]
+§Enforcement).
 
 This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the

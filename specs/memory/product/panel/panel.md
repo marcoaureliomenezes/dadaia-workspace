@@ -28,7 +28,7 @@ tags:
 - dashboard
 token_estimate: 5275
 last_updated: '2026-07-03'
-release_origin: v0.1.52
+release_origin: v0.1.55
 ---
 
 CLI surface: `dadaia panel [--port 4999] [--no-open] [--bind 127.0.0.1]`
@@ -74,16 +74,16 @@ flowchart LR
     SRV -->|regex dispatch do_GET| H[PanelHandler]
     SRV -->|do_DELETE| H
     H -->|/| IDX[views/index.py]
-    H -->|/api/servers| API1[views/api.py]
-    H -->|/api/contexts| API2[views/api.py]
-    H -->|/api/agents telemetry-only| API3[views/api.py]
-    H -->|/api/workflows| API5[views/api.py]
+    H -->|/api/servers| API1[views/api_servers.py]
+    H -->|/api/contexts| API2[views/api_contexts.py]
+    H -->|/api/agents telemetry-only| API3[views/api_agents.py]
+    H -->|/api/workflows| API5[views/api_workflows.py]
     H -->|/api/workflow-model-policy| WFP[views/workflow_policy.py]
-    H -->|/api/sessions| API7[views/api.py]
-    H -->|/api/academy| ACAD[views/api.py render_api_academy]
-    H -->|/api/reports| REP[views/api.py render_api_reports]
-    H -->|/reports/path| REPS[views/api.py + traversal guard]
-    H -->|DELETE /api/reports/path| REPD[views/api.py delete_report_file]
+    H -->|/api/sessions| API7[views/api_sessions.py]
+    H -->|/api/academy| ACAD[views/api_academy.py render_api_academy]
+    H -->|/api/reports| REP[views/api_reports.py render_api_reports]
+    H -->|/reports/path| REPS[views/api_reports.py + traversal guard]
+    H -->|DELETE /api/reports/path| REPD[views/api_reports.py delete_report_file]
     API7 -.delegates.- AGG[telemetry/aggregator queries + RuntimeAdapter]
     H -->|/memory/slug/file| MEM[views/memory.py verbatim bytes]
     H -->|/memory-view/slug/file| WRAP[views/wrapper.py iframe host]
@@ -168,7 +168,7 @@ Without this panel, the workspace is invisible to the casual operator: one must 
   * **do_DELETE handler**: `PanelHandler.do_DELETE` mirrors the `do_GET` guards; dispatches `api_report_delete` via `container.py build_panel_views()`.
   * Asset modules: `features/panel/views/assets/css/` and `features/panel/views/assets/js/` are Python modules with string constants. SVGs read from the filesystem at import-time via `static.py`. `_assets.py` retains only legacy path constants (no `PANEL_CSS`, `PANEL_JS`, `PALETTE` — removed). The `static.py _ASSETS` dict: central registry of every file served by `/static/<name>`, including `logo-rhino-36.svg` and `logo-rhino-24.svg` (read at import-time).
   * **window.Panel registry** in `core.js`: object `{ register(name, mod), activate(name, opts) }` defined before the tab loading logic. Registered modules: `sessions`, `academy`, `reports` (registered by `core.js` on `DOMContentLoaded`) + `workflow_policy` (self-registers via `workflow_policy.js`, which also exposes `window.WorkflowPolicy`). The Workflows tab is server-rendered — **there is no `workflows.js` or `panel.js`**; the real JS files are `core.js`, `runtime.js`, `themes.js`, `sessions.js`, `reports.js`, `academy.js`, `workflow_policy.js`. `window.escHtml` is a global in `core.js`.
-  * View composition: `container.py build_panel_views()` instantiates the view callables including `api_reports`, `reports_serve`, `api_report_delete` and the workflow-policy views. View modules: `views/index.py` (SSR HTML), `views/api.py` (JSON/HTML endpoints), `views/workflows.py` (diagram-cards), `views/workflow_policy.py` (policy editor + inline model pickers), `views/sessions.py` (Sessions section markup + runtime switcher), `views/academy.py`, `views/reports.py`, `views/memory.py`, `views/_md_render.py` (shared Markdown→HTML render; mermaid fences entity-escaped since v0.1.52 — no client renderer exists), `views/wrapper.py`, `views/static.py`. (`views/kanban.py` deleted in v0.1.52.)
+  * View composition: `container.py build_panel_views()` instantiates the view callables including `api_reports`, `reports_serve`, `api_report_delete` and the workflow-policy views. View modules: `views/index.py` (SSR HTML), the eight per-domain JSON/HTML endpoint modules `views/api_{servers,contexts,agents,workflows,sessions,academy,reports,health}.py` (the monolithic `views/api.py` was decomposed per-domain and **deleted** in v0.1.55; `container.build_panel_views` wires each `render_api_*` via named imports, no facade), `views/workflows.py` (diagram-cards), `views/workflow_policy.py` (policy editor + inline model pickers), `views/sessions.py` (Sessions section markup + runtime switcher), `views/academy.py`, `views/reports.py`, `views/memory.py`, `views/_md_render.py` (shared Markdown→HTML render; mermaid fences entity-escaped since v0.1.52 — no client renderer exists), `views/wrapper.py`, `views/static.py`. (`views/kanban.py` deleted in v0.1.52.)
   * **Guards + headers**: no-auth model (stated once in Purpose; the loopback guard is evaluated on the server's bind address). **CSP (strict):** `script-src 'self'` + exactly **two inline sha256 hashes** (`_CSP_SCRIPT_HASH_1/2` in `handler.py`, covering the index's only two inline scripts — theme pre-paint + runtime-detect); no `'unsafe-inline'` for scripts, no external/CDN origin. Every real script is external `/static/*.js`. A falsifiable test (`test_security_headers.py::TestInlineScriptCspCoverage`) renders the real index, extracts each inline `<script>`, recomputes base64(sha256) and asserts the CSP covers it. `X-Content-Type-Options: nosniff` on JSON.
   * Bind: `--bind` option, default `127.0.0.1`, loopback-validated (`_LOOPBACK_ONLY` in `cli/commands/panel.py` — non-loopback rejected). Theme persistence: `localStorage["dadaia-panel-theme"]` receives `"mint" | "sage" | "warm"`. Runtime persistence: **a single global key** `localStorage["dadaia-panel-runtime"]` (`window.Runtime` in `runtime.js`; default `claude`) — the per-tab toggles read/write the same key.
   * CSS tokens: `tokens.py` carries the semantic set — spacing, border-radius, shadows, z-index, motion, dimensions and colors — consumed by `[data-theme="mint|sage|warm"]`. **v0.1.45 token-anchored restyle (arch finding #4 — falsifiable by `grep`):** every restyled control style consumes `var(--…)` from `tokens.py`, with no ad-hoc literals (hex/px/radius/font-size). New redesign tokens: `--radius-lg`, `--shadow-card-rest`, `--shadow-card-hover`, `--lift-hover` — applied as card elevation + motion-guarded hover lift (`prefers-reduced-motion`) + soft radius on the Workflows diagram-cards and accent pills on the gate markers; 3 palettes + brand tokens ([[brand-identity]]) + WCAG AA preserved, no row-wrap/overflow at 1024/1440px. (The Kanban and agent-modal tokens became dead with the removal of the Agentic tab.)
