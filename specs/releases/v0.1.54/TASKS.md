@@ -82,7 +82,7 @@ includes `tests/`.
 
 ## W2 — FR2 + FR3 cycle break + cross-feature contract
 
-- [-] T-54-11 Break the `workflows ↔ lifecycle` cycle, then add the cross-feature contract.
+- [x] T-54-11 Break the `workflows ↔ lifecycle` cycle, then add the cross-feature contract.
   **FR2 first**, then **FR3**. Checklist:
   - **FR2 RED:** add the directed `forbidden` contract `lifecycle-no-workflows`
     (`features.lifecycle` ⊬ `features.workflows`) to `setup.cfg`; `lint-imports` FAILS on
@@ -116,6 +116,67 @@ includes `tests/`.
     per-contract-section assertions** (infra 11 / subprocess 4 / cross-feature 13);
     `test_recorded_cap_is_not_stale_above_reality` GREEN.
   - AC-8 ledger. NO `specs/backlog` staged. Owner: software-engineer.
+  - **DONE (software-engineer):** reservation folded into the FR2 RED commit `f3a968a0`
+    (`test(T-54-11): lifecycle-no-workflows RED`). Commits, in order:
+    `f3a968a0` FR2 RED · `05578415` FR2 fix (governed_catalog seam) · `cd852932` FR3 RED ·
+    `60e43c09` FR3 fix (13 ignores, cap 28).
+    - **FR2 RED tail** (`lint-imports --no-cache`): `6 kept, 1 broken` —
+      `lifecycle.policy_doctor -> workflows.dadaia_catalog (l.411)` (the direct edge, W1
+      having already removed `subject_registry -> cli.main`).
+    - **FR2 fix (R-1 seam split):** new `features/lifecycle/governed_catalog.py` (imports
+      only lifecycle internals + core; ZERO `features/workflows`) holds
+      `DadaiaWorkflowStepDTO`/`DadaiaWorkflowDTO`, the purpose/display dicts, every
+      `_*_steps` builder, the SVG-free `_all_workflows` (via `_svg_free_workflow`),
+      `_governed_step`, `governed_workflow_catalog`, `_assert_catalog_defaults_resolve`,
+      the availability constants, and a `resolve_default_model_id` seam helper.
+      `features/workflows/dadaia_catalog.py` shrunk to a presentation shim importing EXACTLY
+      ONE lifecycle module (`governed_catalog`) and re-exporting the public names — 9
+      `governed_workflow_catalog` test importers + panel + service unchanged (ZERO edits).
+      Repoints: `container.py` + `policy_doctor.py:411` → `lifecycle.governed_catalog`.
+      `lifecycle-no-workflows` GREEN (`7 kept, 0 broken`).
+      **Deviation (recorded):** `DadaiaWorkflowDTO` is *defined* in `governed_catalog` and
+      *re-exported* by `dadaia_catalog` (not defined-in-dadaia_catalog as the literal SPEC
+      wording reads) — the cycle constraint is absolute (governed_catalog cannot import
+      `workflows`), so the shared DTO must live on the lifecycle side; the public path
+      `dadaia_catalog.DadaiaWorkflowDTO` is preserved by re-export (zero importer edits).
+      Likewise `_node_meta_for_steps` stays in `dadaia_catalog` but resolves model ids via
+      the `resolve_default_model_id` seam helper instead of a direct
+      `lifecycle.model_profiles` import — otherwise a 14th cross-feature edge would leak.
+    - **AC-7(a) sabotage:** planted `from dadaia_workspace.features.workflows import
+      dadaia_catalog` atop `policy_doctor.py` ⇒ `lifecycle-no-workflows` FAILED
+      (`policy_doctor -> dadaia_catalog (l.1)`, `6 kept, 1 broken`); reverted (tree clean).
+    - **Golden test:** `tests/unit/features/workflows/test_dadaia_catalog_golden.py` +
+      `_golden/dadaia_catalog_v0154.json` (captured PRE-split) — `list_dadaia_workflows()`
+      output + all 7 diagram SVGs (30464 SVG bytes) byte-identical before/after: **PASS**.
+    - **FR3 RED tail** (`lint-imports --no-cache`): `7 kept, 1 broken` —
+      `features-no-cross-feature` (`independence`, 25 modules, NO ignores) BROKEN on
+      exactly the SPEC FR3 list #1–#13. **SPEC-vs-tree:** the tree's 13 cross-feature edges
+      matched SPEC #1–#13 **exactly (0 missing, 0 extra)** — no discrepancy; FR2 leaked no
+      edge. Seam edge #13 (`workflows.dadaia_catalog -> lifecycle.governed_catalog`) present.
+    - **FR3 fix:** added the exact 13 `ignore_imports` (full prefixes, no wildcards, grouped
+      rationale comments: panel→lifecycle 4, panel→workflows 1, workflows→lifecycle 1,
+      lifecycle→reports_validation 1, lifecycle→backlog 4, specs→spec_context 2) ⇒
+      `8 kept, 0 broken`.
+    - **AC-7(b) sabotage:** planted `from dadaia_workspace.features.spec_context import
+      lease` atop `backlog/subject_registry.py` ⇒ `features-no-cross-feature` FAILED
+      (`backlog.subject_registry -> spec_context.lease (l.1)`, `7 kept, 1 broken`);
+      reverted (tree clean).
+    - **Cap:** `_RECORDED_IGNORE_EDGE_CAP = 28` (15 + 13); broadened
+      `test_every_ignored_edge_is_a_features_layering_exception` docstring; ADDED
+      `test_ignore_edge_count_matches_recorded_per_family_breakdown` (infra 11 / subprocess 4
+      / cross-feature 13); `test_recorded_cap_is_not_stale_above_reality` counts across all
+      three sections and stays GREEN.
+    - **Final gates:** `lint-imports --no-cache` → `8 kept, 0 broken`; full `pytest tests/
+      --ignore=tests/e2e/panel` → **4325 passed, 17 skipped (exit 0)**; `ruff format --check`
+      + `ruff check --no-cache` + `mypy --strict dadaia_workspace` (288 files) all exit 0.
+    - **AC-8 ledger** — surviving (test now asserts each): governed catalog data
+      (`governed_workflow_catalog` resolver projection — `test_policy_doctor` + resolver
+      tests green); panel Workflows view (`list_dadaia_workflows` presentation DTOs +
+      diagram SVG — `test_workflows_api` green); policy_doctor governed checks (WMP-* over
+      the intra-lifecycle governed catalog); list/get presentation DTOs (byte-identical via
+      the golden test). Dead (intentionally removed): the bidirectional
+      `workflows ↔ lifecycle` import cycle — lifecycle no longer imports workflows (pinned
+      dead by the `lifecycle-no-workflows` forbidden contract). NO `specs/backlog/**` staged.
 
 ## W3 — FR5 + FR7 direct-debt DI + core purity
 
