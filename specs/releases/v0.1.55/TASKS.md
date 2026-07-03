@@ -11,7 +11,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W0 — definition
 
-- [ ] T-55-01 SPEC/PLAN/TASKS authored from the 2026-07-03 inspection dossier (live shapes
+- [x] T-55-01 SPEC/PLAN/TASKS authored from the 2026-07-03 inspection dossier (live shapes
   re-derived: doctor 2,830 / 54 methods; api 1,279 / 24 fns / 8 domains — audit's 1,402 stale;
   reports 845; post-split edge enumeration reconstructed — cap invariant 26 = 9/4/13; frozen-suite
   misattribution recorded). Mandatory release-definition grill on the picked set (1 backlog + 2

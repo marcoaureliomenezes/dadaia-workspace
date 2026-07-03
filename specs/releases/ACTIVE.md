@@ -1,6 +1,6 @@
 ---
 release: v0.1.55
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.55 — Architecture Decomposition
