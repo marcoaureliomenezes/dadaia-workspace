@@ -57,7 +57,7 @@ ruff = ">=0.15"
 mypy = ">=1.10,<3.0"
 types-PyYAML = ">=6"
 pytest-randomly = "^4.1.0"
-import-linter = ">=2.11"
+import-linter = ">=2.13"
 
 # Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10;
 # re-verified T-011-17 / residual R9, 2026-06-10).
