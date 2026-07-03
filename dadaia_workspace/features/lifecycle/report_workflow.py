@@ -14,7 +14,7 @@ from dadaia_workspace.features.lifecycle.hygiene import (
     HygieneCleanupResult,
     LifecycleHygieneService,
 )
-from dadaia_workspace.features.reports_validation.service import (
+from dadaia_workspace.features.reports.validation import (
     ReportsValidationService,
     ValidationResult,
 )

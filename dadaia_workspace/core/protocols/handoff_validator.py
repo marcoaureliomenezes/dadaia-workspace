@@ -1,7 +1,7 @@
 """Protocol definition for handoff document validators.
 
 Defines the ``ValidatorPort`` contract that infrastructure adapters must implement.
-Keeps the feature layer ``reports_validation`` decoupled from any concrete validator.
+Keeps the feature layer ``reports.validation`` decoupled from any concrete validator.
 
 Per constitution L69: all dependencies used by ``features/`` must pass through a
 Protocol defined in ``core/``.

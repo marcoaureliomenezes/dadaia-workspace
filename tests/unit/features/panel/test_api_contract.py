@@ -34,7 +34,7 @@ from dadaia_workspace.features.panel.views.api import (
     render_api_servers,
     unmark_report_important,
 )
-from dadaia_workspace.features.reports_retention.service import ReportRetentionService
+from dadaia_workspace.features.reports.retention import ReportRetentionService
 
 # ---------------------------------------------------------------------------
 # Fakes

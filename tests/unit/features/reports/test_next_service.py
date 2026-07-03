@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
-from dadaia_workspace.features.reports_next.service import (
+from dadaia_workspace.features.reports.next import (
     CANONICAL_AGENTS,
     ReportsNextService,
 )

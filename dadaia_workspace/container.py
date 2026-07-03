@@ -94,9 +94,9 @@ from dadaia_workspace.features.panel.views.workflow_policy import (
 )
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.reports_next.service import ReportsNextService
-from dadaia_workspace.features.reports_retention.service import ReportRetentionService
-from dadaia_workspace.features.reports_validation.service import ReportsValidationService
+from dadaia_workspace.features.reports.next import ReportsNextService
+from dadaia_workspace.features.reports.retention import ReportRetentionService
+from dadaia_workspace.features.reports.validation import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService

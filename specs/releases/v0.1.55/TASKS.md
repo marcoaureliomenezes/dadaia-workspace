@@ -112,7 +112,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W2 — FR3 reports triplet merge
 
-- [ ] T-55-20 Merge `reports_next` / `reports_retention` / `reports_validation` into one
+- [-] T-55-20 Merge `reports_next` / `reports_retention` / `reports_validation` into one
   `features/reports/` package. Checklist:
   - Create `features/reports/{next,retention,validation}.py` (current service + result classes;
     optional `__init__` re-exports to minimize consumer churn); **delete** the three
