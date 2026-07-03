@@ -25,8 +25,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from dadaia_workspace.features.workflows.dadaia_catalog import DadaiaWorkflowDTO
 
+from dadaia_workspace.core.exceptions import WorkflowNotFoundError
+from dadaia_workspace.core.models.workflow import (
+    WorkflowDefinition,
+)
 from dadaia_workspace.core.models.workflow import (
     WorkflowSummaryDTO as WorkflowSummaryDTO,  # re-export
 )
@@ -160,8 +166,9 @@ class WorkflowsService:
     single authoritative source (T-28-B-02 / AC-15).
     """
 
-    def __init__(self, workspace_root: Path) -> None:
+    def __init__(self, workspace_root: Path, agent_catalog: "Iterable[str] | None" = None) -> None:
         self._workspace_root = workspace_root
+        self._agent_catalog = tuple(agent_catalog) if agent_catalog is not None else None
         self._workflows_dir: Path | None = None
         self._store: MarkdownWorkflowStore | None = None
 
@@ -171,9 +178,41 @@ class WorkflowsService:
             return None
         if self._workflows_dir != workflows_dir:
             self._workflows_dir = workflows_dir
-            self._store = MarkdownWorkflowStore(workflows_dir)
+            self._store = MarkdownWorkflowStore(workflows_dir, agent_catalog=self._agent_catalog)
         assert self._store is not None
         return workflows_dir, self._store
+
+    def list_definitions(self) -> tuple[WorkflowDefinition, ...]:
+        """Return the raw parsed :class:`WorkflowDefinition` objects (gate-kind preserving).
+
+        Unlike :meth:`list_summaries` / :meth:`get_detail` — which map onto DTOs that
+        collapse ``stage.gate`` to a boolean and drop every non-summary
+        :class:`WorkflowInput` field — this accessor returns the underlying definitions
+        verbatim. The read-only ``dadaia orchestrate list`` CLI consumes it so its
+        ``--json`` contract keeps ``gate=<kind>`` and the full input shape (AC-2). Returns
+        an empty tuple when no workflows directory is resolved.
+        """
+        result = self._ensure_store()
+        if result is None:
+            return ()
+        _workflows_dir, store = result
+        return store.list()
+
+    def get_definition(self, name: str) -> WorkflowDefinition:
+        """Return one raw :class:`WorkflowDefinition` by name (gate-kind preserving).
+
+        The gate-kind-preserving counterpart of :meth:`get_detail` — it does not collapse
+        ``stage.gate`` to a boolean. Raises :class:`WorkflowNotFoundError` when no workflows
+        directory is resolved or the name is unknown, matching the contract the retired
+        ``OrchestrationService.show_workflow`` gave the ``dadaia orchestrate show`` CLI.
+        """
+        result = self._ensure_store()
+        if result is None:
+            raise WorkflowNotFoundError(
+                f"workflow '{name}' not found. Use `dadaia orchestrate list`."
+            )
+        _workflows_dir, store = result
+        return store.get(name)
 
     def list_summaries(self) -> list[WorkflowSummaryDTO]:
         """List the legacy ``*.workflow.md`` summaries (reference/doc-only — AC-15).

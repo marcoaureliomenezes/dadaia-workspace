@@ -1,11 +1,13 @@
-"""CLI command groups: ``dadaia release``, ``dadaia backlog``, ``dadaia bug``.
+"""CLI command groups: ``dadaia release``, ``dadaia backlog``.
 
 Implements:
 - dadaia release new <id>    → specs/releases/<id>/SPEC.md stub
 - dadaia backlog new <slug>  → specs/backlog/<slug>.md stub
-- dadaia bug new <slug>      → specs/bugs/<slug>.md stub (session_id: null)
 - dadaia backlog subjects    → read-only resolve/preview of canonical subjects (v0.1.25 R1)
 - dadaia backlog doctor      → BL-SCHEMA/DUP/CONFLICT/STALE backlog-consistency check (R1)
+
+The legacy ``dadaia bug new`` Markdown scaffolder was retired in v0.1.53 — bugs are
+event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon).
 """
 
 from __future__ import annotations
@@ -19,7 +21,6 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
-    bug_new,
     release_new,
 )
 
@@ -56,7 +57,6 @@ def _default_alias_map_path(specs_dir: Path) -> Path:
 
 release_app = typer.Typer(help="Release management commands.")
 backlog_app = typer.Typer(help="Backlog entry management commands.")
-bug_app = typer.Typer(help="Bug report management commands.")
 
 
 # ── helper: resolve specs_dir ─────────────────────────────────────────────────
@@ -136,44 +136,6 @@ def backlog_new_cmd(
 
     try:
         result = backlog_new(target, slug)
-    except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
-    except FileExistsError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
-
-    typer.echo(f"[ok] created: {result.path}")
-
-
-# ── dadaia bug new ────────────────────────────────────────────────────────────
-
-
-@bug_app.command("new")
-def bug_new_cmd(
-    slug: str = typer.Argument(
-        ...,
-        help="Bug slug (e.g. login-crash). Must match ^[a-z][a-z0-9-]+$.",
-    ),
-    specs_dir: str | None = typer.Option(
-        None,
-        "--specs-dir",
-        help="Path to specs/ directory. Default: resolve from bound context session.",
-    ),
-) -> None:
-    """Create specs/bugs/<slug>.md with session_id: null in frontmatter.
-
-    Per R1 spec: does NOT block when no session is bound (that is an R2 feature).
-    The file is always created with session_id: null.
-    """
-    target = _resolve_specs_dir(specs_dir)
-
-    if not target.is_dir():
-        typer.echo(f"[error] specs_dir not found: {target}", err=True)
-        sys.exit(1)
-
-    try:
-        result = bug_new(target, slug)
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)

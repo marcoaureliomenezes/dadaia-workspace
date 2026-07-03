@@ -264,8 +264,12 @@ def test_catalog_enumerates_all_seven_workflows() -> None:
 
 
 def test_no_workflow_remains_deferred() -> None:
-    """Wave E: DEFERRED_WORKFLOWS is empty — no workflow is cataloged as deferred."""
-    from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
+    """Wave E: DEFERRED_WORKFLOWS is empty — no workflow is cataloged as deferred.
+
+    v0.1.53: the standalone ``_deferred`` module was retired; the empty seam is now inlined
+    in ``dadaia_catalog`` (and, for the lifecycle package, in ``workflows/__init__``).
+    """
+    from dadaia_workspace.features.workflows.dadaia_catalog import DEFERRED_WORKFLOWS
 
     assert DEFERRED_WORKFLOWS == ()
     deferred = [

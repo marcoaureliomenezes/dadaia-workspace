@@ -13,7 +13,6 @@ the deferred set — :data:`DEFERRED_WORKFLOWS` is now empty.
 
 from __future__ import annotations
 
-from dadaia_workspace.features.lifecycle.workflows._deferred import DEFERRED_WORKFLOWS
 from dadaia_workspace.features.lifecycle.workflows.audit import (
     AuditResult,
     AuditStepResult,
@@ -40,6 +39,13 @@ from dadaia_workspace.features.lifecycle.workflows.research import (
     ResearchStepResult,
     ResearchWorkflow,
 )
+
+#: Deferred-workflow names, in catalog order. Empty since v0.1.30 Wave E — every workflow
+#: now ships a real fragment+gate body. Kept as the declared seam the panel catalog and
+#: tests read, so a future deferral is enumerated without a code change. Inlined here in
+#: v0.1.53 when the standalone ``_deferred`` module was retired.
+DEFERRED_WORKFLOWS: tuple[str, ...] = ()
+
 
 __all__ = [
     "DEFERRED_WORKFLOWS",

@@ -134,20 +134,6 @@ class LockHeldError(LockConflictError):
     """
 
 
-class ReviewBlockedByImplementationError(LockConflictError):
-    """Raised when bind --mode review is attempted while an implementation lock is HELD.
-
-    The message includes the owner session_id.
-    """
-
-
-class ImplementationBlockedByReviewError(LockConflictError):
-    """Raised when bind --mode implementation is attempted while a non-stale BOUND_REVIEW session exists.
-
-    The message lists the blocking review session IDs.
-    """
-
-
 class WorkspaceLockTimeoutError(DadaiaError):
     """Raised when the workspace-wide fcntl lock cannot be acquired within the timeout.
 

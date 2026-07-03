@@ -3,9 +3,10 @@
 Implements:
 - release_new:  creates specs/releases/<id>/SPEC.md stub
 - backlog_new:  creates specs/backlog/<slug>.md stub
-- bug_new:      creates specs/bugs/<slug>.md stub (session_id: null)
 
-All three validate the slug/id and refuse to clobber existing artifacts.
+Both validate the slug/id and refuse to clobber existing artifacts. The legacy
+``bug_new`` Markdown scaffolder was retired in v0.1.53 — bugs are event-sourced JSONL
+via ``dadaia bugs append`` (the v0.1.46 canon).
 """
 
 from __future__ import annotations
@@ -119,40 +120,6 @@ opened: {today}
 (List measurable acceptance criteria.)
 """
 
-# ── bug report stub ───────────────────────────────────────────────────────────
-
-_BUG_STUB = """\
----
-title: {slug}
-severity: TBD
-opened: {today}
-session_id: null
----
-
-# Bug: {slug}
-
-## Description
-
-(Describe the bug, its symptoms, and its impact.)
-
-## Steps to reproduce
-
-1. (Step 1)
-2. (Step 2)
-3. (Expected vs. actual behaviour)
-
-## Environment
-
-- dadaia version: (TBD)
-- OS: (TBD)
-- Python: (TBD)
-
-## Root cause hypothesis
-
-(Optional — fill in after investigation.)
-"""
-
-
 # ── public API ────────────────────────────────────────────────────────────────
 
 
@@ -228,46 +195,6 @@ def backlog_new(specs_dir: Path, slug: str) -> NewArtifactResult:
 
     target.write_text(
         _BACKLOG_STUB.format(slug=slug, today=_today()),
-        encoding="utf-8",
-    )
-    return NewArtifactResult(path=target, created=True)
-
-
-def bug_new(specs_dir: Path, slug: str) -> NewArtifactResult:
-    """Create ``specs/bugs/<slug>.md`` with ``session_id: null`` in frontmatter.
-
-    Per R1 spec: does NOT block when no session is bound — that is an R2 feature.
-    The file is always created with ``session_id: null``.
-
-    Args:
-        specs_dir: Absolute path to the ``specs/`` directory.
-        slug:      Bug slug.  Must match ``^[a-z][a-z0-9-]+$``.
-
-    Returns:
-        :class:`NewArtifactResult` with the path to the created file.
-
-    Raises:
-        ValueError:    If ``slug`` does not match the slug pattern.
-        FileExistsError: If the file already exists (no-clobber).
-    """
-    if not _SLUG_RE.match(slug):
-        raise ValueError(
-            f"Invalid slug {slug!r}. "
-            "Must match ^[a-z][a-z0-9-]+$ "
-            "(lowercase letters, digits, and hyphens; must start with a letter)."
-        )
-
-    bugs_dir = specs_dir / "bugs"
-    bugs_dir.mkdir(parents=True, exist_ok=True)
-    target = bugs_dir / f"{slug}.md"
-    if target.exists():
-        raise FileExistsError(
-            f"Bug report already exists: {target}. "
-            "Remove the existing file or use a different slug."
-        )
-
-    target.write_text(
-        _BUG_STUB.format(slug=slug, today=_today()),
         encoding="utf-8",
     )
     return NewArtifactResult(path=target, created=True)

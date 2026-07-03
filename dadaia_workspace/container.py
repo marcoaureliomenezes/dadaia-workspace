@@ -56,7 +56,6 @@ from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
 from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
-from dadaia_workspace.features.orchestration.service import OrchestrationService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
 from dadaia_workspace.features.panel.views.api import (
@@ -108,10 +107,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
-from dadaia_workspace.infrastructure.json_run_state_store import JsonRunStateStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
-from dadaia_workspace.infrastructure.json_workflow_state_store import JsonWorkflowStateStore
-from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
     LinuxProcAncestry,
     PsProcessAncestry,
@@ -122,7 +118,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
-from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 
 def _build_permission_setter() -> Any:
@@ -433,25 +428,19 @@ def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
     return tuple(sorted(p.stem for p in agents_dir.glob("*.md")))
 
 
-def build_orchestration_service(
-    workspace_root: Path, runtime: str | None = None
-) -> OrchestrationService:
-    """Compose the read-only orchestration catalog/run-status surface.
+def build_orchestration_catalog_service(workspace_root: Path) -> WorkflowsService:
+    """Compose the read-only orchestration catalog surface for ``dadaia orchestrate``.
 
-    Workflow execution moved to the lifecycle engine (WS-3); this service no longer
-    takes a dispatcher. The ``runtime`` parameter is retained for CLI call-site
-    compatibility (it is now inert — no agent runtime is selected here).
+    Since v0.1.53 the retired ``features/orchestration`` package (whose
+    ``start_run``/``resume_run`` were honest no-ops and whose ``run``/``status``/``resume``
+    verbs are gone) is replaced by a ``WorkflowsService`` accessor over the shared
+    ``MarkdownWorkflowStore``. The service returns raw ``WorkflowDefinition`` objects
+    (gate-kind preserving) so the ``list``/``show`` ``--json`` contract is unchanged. The
+    workflow files are validated against the projected agent catalog exactly as the old
+    surface did. Guards initialization so an uninitialized workspace still exits non-zero.
     """
     _guard_initialized(workspace_root)
-    _ = runtime  # retained for CLI compatibility; no dispatcher is selected.
-    workflows_dir = workspace_root / ".dadaia" / "agentic" / "workflows"
-    runs_dir = workspace_root / ".dadaia" / "runs"
-    return OrchestrationService(
-        workflow_store=MarkdownWorkflowStore(
-            workflows_dir, agent_catalog=_agent_catalog(workspace_root)
-        ),
-        run_state_store=JsonRunStateStore(runs_dir),
-    )
+    return WorkflowsService(workspace_root, agent_catalog=_agent_catalog(workspace_root))
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
@@ -473,15 +462,12 @@ def build_panel_service(
     telemetry: object | None = None,
     academy: object | None = None,
 ) -> PanelService:
-    states = _states_dir(workspace_root)
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
         academy=academy,
-        workflow_launcher=SubprocessWorkflowLauncher(),
-        workflow_state_store=JsonWorkflowStateStore(states),
         workflows_service=build_workflow_catalog_service(workspace_root),
         report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),

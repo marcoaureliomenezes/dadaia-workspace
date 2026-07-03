@@ -1,4 +1,4 @@
-"""Integration tests for `dadaia release new`, `dadaia backlog new`, `dadaia bug new`.
+"""Integration tests for `dadaia release new` and `dadaia backlog new`.
 
 Tests use Typer's CliRunner on a real tmp_path filesystem.
 
@@ -6,9 +6,11 @@ Covers:
 - AC-T7-1: release new creates SPEC.md with Draft frontmatter
 - AC-T7-2: release new exits non-zero when dir exists
 - AC-T7-3: backlog new creates slug.md with canonical frontmatter
-- AC-T7-4: bug new creates slug.md with session_id: null
 - AC-T7-5: release new exits non-zero for invalid slug
 - AC-C-1..AC-C-5
+
+(The legacy ``dadaia bug new`` command was retired in v0.1.53 — bugs are event-sourced
+JSONL via ``dadaia bugs append``.)
 """
 
 from __future__ import annotations
@@ -138,65 +140,5 @@ class TestBacklogNew:
         result = _runner.invoke(
             app,
             ["backlog", "new", "cool-idea", "--specs-dir", str(tmp_path / "nope")],
-        )
-        assert result.exit_code != 0
-
-
-# ── dadaia bug new ────────────────────────────────────────────────────────────
-
-
-class TestBugNew:
-    def test_creates_bug_md_with_session_id_null(self, specs: Path) -> None:
-        """AC-T7-4 / AC-C-4: creates specs/bugs/login-crash.md with session_id: null."""
-        result = _runner.invoke(
-            app,
-            ["bug", "new", "login-crash", "--specs-dir", str(specs)],
-        )
-
-        assert result.exit_code == 0, result.output
-        target = specs / "bugs" / "login-crash.md"
-        assert target.is_file()
-        content = target.read_text(encoding="utf-8")
-        assert "session_id: null" in content
-
-    def test_bug_md_contains_required_frontmatter(self, specs: Path) -> None:
-        """Bug report contains title, severity, opened, session_id."""
-        _runner.invoke(
-            app,
-            ["bug", "new", "login-crash", "--specs-dir", str(specs)],
-        )
-        content = (specs / "bugs" / "login-crash.md").read_text(encoding="utf-8")
-        assert "title:" in content
-        assert "severity: TBD" in content
-        assert "opened:" in content
-        assert "session_id: null" in content
-
-    def test_no_session_env_does_not_block(
-        self, specs: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """AC-T7-4: R1 spec — command succeeds without DADAIA_SESSION_ID."""
-        monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-
-        result = _runner.invoke(
-            app,
-            ["bug", "new", "login-crash", "--specs-dir", str(specs)],
-        )
-
-        assert result.exit_code == 0, result.output
-        assert (specs / "bugs" / "login-crash.md").is_file()
-
-    def test_invalid_slug_exits_nonzero(self, specs: Path) -> None:
-        """Invalid slug causes non-zero exit."""
-        result = _runner.invoke(
-            app,
-            ["bug", "new", "INVALID", "--specs-dir", str(specs)],
-        )
-        assert result.exit_code != 0
-
-    def test_missing_specs_dir_exits_nonzero(self, tmp_path: Path) -> None:
-        """Non-existent specs_dir causes non-zero exit."""
-        result = _runner.invoke(
-            app,
-            ["bug", "new", "login-crash", "--specs-dir", str(tmp_path / "nope")],
         )
         assert result.exit_code != 0

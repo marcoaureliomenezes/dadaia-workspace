@@ -78,17 +78,17 @@ def test_agent_catalog_returns_sorted_agent_names(tmp_path: Path) -> None:
     assert result == ("product-engineer", "software-architect")
 
 
-def test_build_orchestration_service_raises_when_not_initialized(tmp_path: Path) -> None:
+def test_build_orchestration_catalog_service_raises_when_not_initialized(tmp_path: Path) -> None:
     with pytest.raises(WorkspaceNotInitializedError):
-        container.build_orchestration_service(tmp_path)
+        container.build_orchestration_catalog_service(tmp_path)
 
 
-def test_build_orchestration_service_succeeds_when_initialized(tmp_path: Path) -> None:
+def test_build_orchestration_catalog_service_succeeds_when_initialized(tmp_path: Path) -> None:
     _init_states(tmp_path)
-    from dadaia_workspace.features.orchestration.service import OrchestrationService
+    from dadaia_workspace.features.workflows.service import WorkflowsService
 
-    svc = container.build_orchestration_service(tmp_path)
-    assert isinstance(svc, OrchestrationService)
+    svc = container.build_orchestration_catalog_service(tmp_path)
+    assert isinstance(svc, WorkflowsService)
 
 
 def test_build_export_service_succeeds_when_initialized(tmp_path: Path) -> None:

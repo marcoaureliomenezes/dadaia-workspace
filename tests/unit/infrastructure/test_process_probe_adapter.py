@@ -3,9 +3,8 @@
 All 7 tests from tests/unit/core/test_process_probe.py are migrated here now
 that OsProcessProbe lives in infrastructure/process_probe_adapter.py.
 
-Two new tests are added:
+One new test is added:
   - test_probe_returns_false_for_process_lookup_error  (covers ProcessLookupError)
-  - test_workflow_launcher_delegates_is_alive_to_probe (T-018-11 delegation)
 """
 
 from __future__ import annotations
@@ -17,7 +16,6 @@ import pytest
 
 from dadaia_workspace.core.platform import detect
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
-from dadaia_workspace.infrastructure.workflow_launcher_adapter import SubprocessWorkflowLauncher
 
 # These tests exercise the POSIX os.kill(pid, 0) liveness semantics by mocking
 # os.kill. On Windows the probe takes the OpenProcess branch instead (os.kill is
@@ -198,56 +196,3 @@ def test_probe_returns_false_for_process_lookup_error() -> None:
     probe = OsProcessProbe()
     with _FORCE_POSIX, patch("os.kill", side_effect=ProcessLookupError()):
         assert probe.is_pid_alive(42) is False
-
-
-# ---------------------------------------------------------------------------
-# New test 9: SubprocessWorkflowLauncher.is_alive delegates to OsProcessProbe
-# ---------------------------------------------------------------------------
-
-
-def test_workflow_launcher_delegates_is_alive_to_probe() -> None:
-    """T-018-11: is_alive must delegate to OsProcessProbe, not re-implement os.kill."""
-    launcher = SubprocessWorkflowLauncher()
-
-    # Monkeypatch the module-level _probe in the adapter module so we can
-    # observe delegation.
-    import dadaia_workspace.infrastructure.workflow_launcher_adapter as _wla
-
-    class _TracingProbe:
-        def __init__(self) -> None:
-            self.calls: list[int] = []
-
-        def is_pid_alive(self, pid: int) -> bool:
-            self.calls.append(pid)
-            return True
-
-    tracer = _TracingProbe()
-    original_probe = _wla._probe
-    _wla._probe = tracer  # type: ignore[assignment]
-    try:
-        result = launcher.is_alive(12345)
-    finally:
-        _wla._probe = original_probe
-
-    assert result is True
-    assert tracer.calls == [12345], "is_alive must delegate to the probe with the given pid"
-
-
-@pytest.mark.skipif(
-    not hasattr(os, "kill"),
-    reason="os.kill not available on this platform",
-)
-def test_workflow_launcher_is_alive_true_for_self() -> None:
-    """is_alive must return True for the current process's PID."""
-    launcher = SubprocessWorkflowLauncher()
-    assert launcher.is_alive(os.getpid()) is True
-
-
-@pytest.mark.skipif(
-    not hasattr(os, "kill"),
-    reason="os.kill not available on this platform",
-)
-def test_workflow_launcher_is_alive_false_for_dead_pid() -> None:
-    """is_alive must return False for a PID that definitely doesn't exist."""
-    launcher = SubprocessWorkflowLauncher()
-    assert launcher.is_alive(2**22 - 1) is False

@@ -4,9 +4,11 @@ Covers:
 - AC-T7-1: release_new creates SPEC.md with Draft frontmatter
 - AC-T7-2: release_new exits non-zero (raises FileExistsError) when dir exists
 - AC-T7-3: backlog_new creates slug.md with canonical frontmatter
-- AC-T7-4: bug_new creates slug.md with session_id: null
 - AC-T7-5: release_new raises ValueError for invalid slug
 - AC-C-1..AC-C-5: per acceptance criteria
+
+(The legacy ``bug_new`` scaffolder was retired in v0.1.53 — bugs are event-sourced JSONL
+via ``dadaia bugs append``.)
 """
 
 from __future__ import annotations
@@ -17,7 +19,6 @@ import pytest
 
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
-    bug_new,
     release_new,
 )
 
@@ -209,83 +210,3 @@ class TestBacklogNew:
 
         with pytest.raises(ValueError, match=r"Invalid slug"):
             backlog_new(specs, "UPPERCASE SLUG")
-
-
-# ── bug_new ───────────────────────────────────────────────────────────────────
-
-
-class TestBugNew:
-    """Tests for bug_new()."""
-
-    def test_creates_bug_md(self, tmp_path: Path) -> None:
-        """AC-T7-4 / AC-C-4: creates specs/bugs/<slug>.md."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        result = bug_new(specs, "login-crash")
-
-        target = specs / "bugs" / "login-crash.md"
-        assert target.is_file(), "login-crash.md must be created (AC-T7-4)"
-        assert result.path == target
-        assert result.created is True
-
-    def test_bug_md_has_session_id_null(self, tmp_path: Path) -> None:
-        """AC-T7-4 / AC-C-4: session_id: null must appear in the file."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        bug_new(specs, "login-crash")
-        content = (specs / "bugs" / "login-crash.md").read_text(encoding="utf-8")
-        assert "session_id: null" in content, "Bug file must contain session_id: null (AC-T7-4)"
-
-    def test_bug_md_contains_frontmatter(self, tmp_path: Path) -> None:
-        """Bug report must contain required frontmatter fields."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        bug_new(specs, "login-crash")
-        content = (specs / "bugs" / "login-crash.md").read_text(encoding="utf-8")
-        assert "title:" in content
-        assert "severity: TBD" in content
-        assert "opened:" in content
-        assert "session_id: null" in content
-
-    def test_creates_bugs_dir_if_missing(self, tmp_path: Path) -> None:
-        """bug_new creates bugs/ directory if absent."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        bug_new(specs, "login-crash")
-        assert (specs / "bugs" / "login-crash.md").is_file()
-
-    def test_existing_file_raises(self, tmp_path: Path) -> None:
-        """Raises FileExistsError when file already exists."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-        (specs / "bugs").mkdir()
-        (specs / "bugs" / "login-crash.md").write_text("existing", encoding="utf-8")
-
-        with pytest.raises(FileExistsError, match=r"already exists"):
-            bug_new(specs, "login-crash")
-
-    def test_invalid_slug_raises(self, tmp_path: Path) -> None:
-        """Invalid slug raises ValueError."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        with pytest.raises(ValueError, match=r"Invalid slug"):
-            bug_new(specs, "UPPERCASE")
-
-    def test_no_session_id_env_var_does_not_block(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """AC-T7-4: R1 spec — bug_new does NOT block when DADAIA_SESSION_ID is absent."""
-        monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-        specs = tmp_path / "specs"
-        specs.mkdir()
-
-        # Must NOT raise regardless of session state
-        result = bug_new(specs, "no-session-bug")
-        assert result.path.is_file()
-        content = result.path.read_text(encoding="utf-8")
-        assert "session_id: null" in content
