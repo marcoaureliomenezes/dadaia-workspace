@@ -186,7 +186,7 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
 
 ## W3 — FR2 panel api.py per-domain decomposition (delete api.py; no facade)
 
-- [-] T-55-30 Split `features/panel/views/api.py` (24 fns / 8 domains) into per-domain view
+- [x] T-55-30 Split `features/panel/views/api.py` (24 fns / 8 domains) into per-domain view
   modules; DELETE api.py. Checklist:
   - **Golden PRE-split (R6 pattern):** each route's `(status, content_type, body)` on a fixture
     panel state → committed golden fixture.
@@ -212,6 +212,60 @@ Every move/rename/repoint grep **includes `tests/` AND non-import textual refere
   - AC-8 ledger (surviving: every route response via the per-domain modules — golden; dead: the
     monolithic `api.py` module — deleted, no facade). NO `specs/backlog`.
   Owner: software-engineer.
+  - **DONE (software-engineer, 2026-07-03).** Commits: golden behavior lock `e72c49ef`
+    (`test(T-55-30)`), split `5cde83b4` (`refactor(T-55-30)`), closeout `<this commit>`
+    (`chore(T-55-30)`). **Golden verdict:** BYTE-IDENTICAL — `test_api_golden.py` GREEN
+    pre- and post-split (24 routes across all 8 domains captured; timestamps `<TS>`-,
+    version `<VER>`-, and fixture workspace_root `<WS>`-normalized; determinism confirmed
+    across separate pytest invocations). Pre==post proven by regenerating the golden
+    against the restored monolith `api.py`, then reproducing it byte-identically from the
+    per-domain modules. **AC-7(b):** mutated `api_academy` route body (`"modules"` →
+    `"MODULES"`) ⇒ golden FAILED on the byte diff; reverted → GREEN. **AC-1 ceiling
+    (≤ 450):** all `api_*.py` ≤ 429 — `api_agents.py` 429, `api_reports.py` 354,
+    `api_workflows.py` 326, `api_sessions.py` 85, `api_servers.py` 67, `api_contexts.py`
+    50, `api_academy.py` 49, `api_health.py` 23 (was one 1,279-line module);
+    `test_module_size_ceiling.py` extended with the api ceiling + an `api.py`-stays-deleted
+    guard. **Wiring (R-5):** `container.py` imports each `render_api_*` from its per-domain
+    module via explicit named imports; `build_panel_views` route→function table UNCHANGED
+    (no facade, no barrel; `api.py` DELETED). **14 test importers repointed** (verbatim):
+    `tests/integration/panel/{test_academy_route,test_api_agents,test_api_workflows,
+    test_workflows_api}.py`, `tests/integration/test_panel_sessions_endpoint.py`,
+    `tests/unit/features/panel/{test_api_academy,test_api_agent_prompt,test_api_agents,
+    test_api_contract,test_api_workflows_detail,test_api_workflows_list,test_build_panel_views,
+    test_serve_report_identity,test_views_api_sessions}.py` (the last re-homes both its
+    `views import api as api_module` and `views.api import render_api_sessions` to
+    `api_sessions`). **Textual refs swept (AC-8/A9):**
+    `features/panel/views/assets/css/reports_doc.py:5` and
+    `tests/unit/features/panel/test_serve_report_identity.py:3` (`views/api.py` →
+    `views/api_reports.py`). Zero `panel.views.api`-non-`api_` references remain in
+    `dadaia_workspace/` or `tests/`. **Cap/lint:** `setup.cfg` UNTOUCHED (FR2 changes zero
+    edges — each new module imports only `features.panel.service`); `lint-imports
+    --no-cache` = `8 kept, 0 broken`; cap test `== 26` + per-family `9/4/13` GREEN. **Gates:**
+    full unpiped `pytest` (tests/ --ignore=tests/e2e/panel) 4340 passed / 17 skipped (exit 0);
+    `ruff format --check` (764 files) exit 0; `ruff check --no-cache` exit 0; `mypy --strict
+    dadaia_workspace` (301 files) exit 0; `dadaia specs doctor` exit 0.
+    **AC-8 ledger — surviving (route behaviors preserved via the per-domain modules, golden-
+    pinned + per-domain suites):** servers = `render_api_servers`
+    (`test_api_contract.py`/`test_build_panel_views.py`); contexts = `render_api_contexts`
+    (same); agents = `render_api_agents_canonical`+`render_api_agent_prompt`
+    (`unit/.../test_api_agents.py`, `test_api_agent_prompt.py`, `integration/panel/test_api_agents.py`);
+    workflows = `render_api_workflows_list`/`render_api_workflow_detail`/
+    `render_api_dadaia_workflows_list`/`render_api_dadaia_workflow_detail`
+    (`test_api_workflows_list.py`, `test_api_workflows_detail.py`,
+    `integration/panel/test_api_workflows.py`, `test_workflows_api.py`); sessions =
+    `render_api_sessions` (`test_views_api_sessions.py`,
+    `integration/test_panel_sessions_endpoint.py`); academy = `render_api_academy`
+    (`test_api_academy.py`, `integration/panel/test_academy_route.py`); reports =
+    `render_api_reports`/`serve_report_file`/`mark`/`unmark`/`delete_report_file`
+    (`test_api_contract.py`, `test_serve_report_identity.py`, `test_views_reports.py`);
+    health = `render_health` (`test_api_golden.py`, panel handler tests) — all cross-cut by
+    `test_api_golden.py` (24-route golden) + `test_build_panel_views.py` (real
+    `container.build_panel_views` wiring). **dead:** the 1,279-line monolithic
+    `features/panel/views/api.py` (deleted, no facade/shim) AND the
+    `panel.views.api` import path (pinned by the zero-`views.api` grep + the
+    `api.py`-stays-deleted ceiling guard); the anchor
+    `api.py#render_api_agents_canonical` DIES (archival-at-SHIP, T-55-60). NO
+    `specs/backlog` staged in any W3 commit.
 
 ## W4 — FR4 + FR5 + FR6 bug fixes + scope docstring (independent)
 
