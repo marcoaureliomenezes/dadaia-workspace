@@ -243,16 +243,35 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+_DCX9_WRAPPER_RE = re.compile(
+    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
+)
+
+
+def _canon_env_line(line: str) -> str:
+    """Canonicalize OS-dependent doctor line text (platform-invariant law).
+
+    The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is the
+    host OS's phrasing (Linux: "exited 127 ... missing executable .../python";
+    Windows: "launch failed ... [WinError 193] ..."). The invariant is that the
+    probe errored for that wrapper — not the OS's words. Keep the wrapper path,
+    canonicalize the reason.
+    """
+    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
+
+
 def _sort_line_lists(obj: object) -> object:
     """Sort every list-of-strings in the captured object (platform-invariant law).
 
     Directory-iteration order differs across OSes (Windows yielded
     ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse),
     and iteration order is not a product contract. The golden locks the exact
-    MULTISET of lines per key — order-insensitive, count-preserving.
+    MULTISET of lines per key — order-insensitive, count-preserving. String
+    lines are additionally canonicalized for OS-dependent probe text
+    (:func:`_canon_env_line`).
     """
     if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
-        return sorted(obj)
+        return sorted(_canon_env_line(x) for x in obj)
     if isinstance(obj, dict):
         return {k: _sort_line_lists(v) for k, v in obj.items()}
     return obj
