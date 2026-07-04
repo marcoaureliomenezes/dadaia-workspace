@@ -45,7 +45,30 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
     golden diff. **(Q2) byte-identity holds through end-of-W1 only** — W2/W3 intentionally re-baseline
     the affected goldens (record which + why in the T-57-20/T-57-30 AC-12 ledgers).
 
-- [ ] T-57-11 Extract `FragmentGateWorkflow` + `_FragmentAssemblyMixin` and migrate the bodies.
+- [x] T-57-11 Extract `FragmentGateWorkflow` + `_FragmentAssemblyMixin` and migrate the bodies.
+  **Done (evidence):** base `workflows/_fragment_gate.py` (`FragmentGateWorkflow[StepT: FragmentGateStep, ResultT]`
+  PEP-695 + `_FragmentAssemblyMixin`); 4 bodies now thin subclasses; backlog mixes in the assembly helpers +
+  converged `_scope` (Problem #8 RED-first proven). **AC-1** goldens byte-identical post-extraction (7 passed).
+  **AC-2** custom-`_SEQUENCE` run-scoping + backlog `resolved_model is not None` + shared-members-once grep evidence
+  (`test_fragment_gate_base.py`, 5 passed). Gates: ruff format/check clean, `mypy --strict` (303 files) clean,
+  `lint-imports` 8 kept/0 broken (cap 26 UNCHANGED — base lives inside features/lifecycle, no new edge),
+  FULL pytest 4415 passed / 17 skipped / 0 failed.
+  **AC-10(a) evidence:** sabotage — repoint `_fragment_gate._produce_payload` at `release_definition._SEQUENCE`
+  (module-global) instead of the run-threaded `sequence` ⇒ FAIL
+  `test_fragment_gate_base.py::test_base_iterates_run_scoped_sequence_not_module_global`
+  (`declared_consumers == ()` vs `('cs_b',)`) → reverted.
+  **AC-12 ledger** — NEW: `workflows/_fragment_gate.py` (base + `_FragmentAssemblyMixin` + `AssemblyStep`/
+  `FragmentGateStep` Protocols + `_StepOutcome`); SURVIVING (thin subclasses onto base):
+  `ReleaseDefinitionWorkflow`/`AuditWorkflow`/`ResearchWorkflow`/`BugReportWorkflow`, + `BacklogDefinitionWorkflow`
+  (mixin consumer); each keeps its Step/Result dataclasses + module-global `_SEQUENCE`; `bug_report` keeps its
+  `_scope` override. DEAD (folded into base/mixin, one copy each): `_run_model_step`, `_run_commit_gate`/
+  `_run_disposition_gate`/`_run_synthesis_gate`/`_run_record_gate` (→ base `_run_terminal_gate`), `_resolve_upstream`,
+  `_record_consumptions`, `_produce_payload`, `_graph_completeness_block`, `_payload_from_result`,
+  `_with_step_outcome`, `_prefix_with_static_inputs`, `_collect_static_inputs`, `_fragment_bundle`,
+  `_select_context`, `_render_selection`, and (release/audit/research) `_scope` (×4-copy → 1); `run` bodies →
+  thin wrappers over base `_run_sequence`. Test fate: 3 guardrail suites UNCHANGED; SURVIVE/EXTEND
+  `test_audit_workflow.py` (+`sequence` arg on the direct `_graph_completeness_block` call) &
+  `test_suffix_is_review_threading.py` (caller-enum updated: 4 bodies → base). No `specs/backlog/**` staged.
   **AC-10(a) evidence:** point `_produce_payload` back at a module-global `_SEQUENCE` ⇒ the
   custom-`_SEQUENCE` iteration test FAILS → reverted. **AC-12 ledger** — NEW:
   `workflows/_fragment_gate.py`; SURVIVING: `ReleaseDefinitionWorkflow`/`AuditWorkflow`/
