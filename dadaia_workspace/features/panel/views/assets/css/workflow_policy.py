@@ -20,29 +20,30 @@ WORKFLOW_POLICY_CSS: str = """
 .wfp-save-btn {
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  padding: var(--space-2xs) var(--space-md);
-  border-radius: var(--radius);
-  border: var(--border-width) solid var(--color-accent, #9cddc8);
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border-radius: var(--control-radius);
+  border: var(--border-width) solid var(--color-accent);
   background: var(--color-surface);
   color: var(--color-heading);
-  transition: background var(--duration-fast) var(--easing-standard);
+  transition: background var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
 }
 .wfp-save-btn {
-  background: var(--color-accent, #9cddc8);
+  background: var(--color-accent);
 }
 .wfp-validate-btn:hover,
 .wfp-save-btn:hover {
-  background: var(--color-card-hover, #f8feff);
+  background: var(--color-card-hover);
 }
 .wfp-save-btn:hover {
-  background: var(--color-accent-secondary, #bfd8ad);
+  background: var(--color-accent-secondary);
 }
 .wfp-validate-btn:focus-visible,
 .wfp-save-btn:focus-visible {
-  outline: 2px solid var(--color-accent-dark, #2d7d9a);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: var(--focus-ring-offset);
 }
 .wfp-banner {
   flex: 1 1 100%;
@@ -99,31 +100,54 @@ WORKFLOW_POLICY_CSS: str = """
   font: inherit;
   font-size: var(--text-xs);
   color: var(--color-text);
+  transition: background var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard);
+}
+.wfp-seg-btn:hover {
+  background: var(--color-row-hover);
 }
 .wfp-seg-btn--active {
-  background: var(--color-accent, #9cddc8);
+  background: var(--color-accent);
   color: var(--color-heading);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
+}
+.wfp-seg-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: calc(-1 * var(--focus-ring-offset));
 }
 .wfp-profile-select {
   max-width: 18rem;
   font: inherit;
   font-size: var(--text-sm);
   padding: var(--space-2xs) var(--space-xs);
-  border-radius: var(--radius);
+  border-radius: var(--control-radius);
   border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
+}
+.wfp-profile-select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: var(--focus-ring-offset);
 }
 .wfp-reset-btn {
   font: inherit;
   font-size: var(--text-2xs);
   cursor: pointer;
   padding: var(--space-2xs) var(--space-sm);
-  border-radius: var(--radius);
+  border-radius: var(--control-radius);
   border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-muted);
+  transition: background var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard);
+}
+.wfp-reset-btn:hover:not([disabled]) {
+  background: var(--color-row-hover);
+  color: var(--color-text);
+}
+.wfp-reset-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: var(--focus-ring-offset);
 }
 .wfp-reset-btn[disabled] { opacity: 0.4; cursor: default; }
 """

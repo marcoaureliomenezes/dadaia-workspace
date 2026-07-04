@@ -86,18 +86,20 @@ ACADEMY_CSS: str = """
   margin-top: auto;
   padding: 0.35em 0.9em;
   background: transparent;
-  border: 1px solid var(--color-accent, #9cddc8);
-  border-radius: var(--radius, 4px);
-  color: var(--color-accent-dark, #2d7d9a);
-  font-size: 0.82rem;
-  font-weight: 500;
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--control-radius);
+  color: var(--color-accent-dark);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  transition: background var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
 }
 
 .academy-card__cta:hover,
 .academy-card__cta:focus-visible {
-  background: var(--color-primary-bg, #f0fbf7);
+  background: var(--color-primary-bg);
+  border-color: var(--color-accent-dark);
 }
 
 /* ── Detail view ──────────────────────────────────────────────────── */
@@ -116,15 +118,16 @@ ACADEMY_CSS: str = """
   align-self: flex-start;
   background: transparent;
   border: none;
-  color: var(--color-accent-dark, #2d7d9a);
-  font-size: 0.85rem;
+  color: var(--color-accent-dark);
+  font-size: var(--text-base);
   cursor: pointer;
   padding: 0;
-  margin-bottom: var(--space-sm, 0.6rem);
+  margin-bottom: var(--space-sm);
 }
 
 .academy-back-btn:hover,
 .academy-back-btn:focus-visible {
+  color: var(--color-cost);
   text-decoration: underline;
 }
 

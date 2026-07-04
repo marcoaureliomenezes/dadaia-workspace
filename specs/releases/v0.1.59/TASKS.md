@@ -112,7 +112,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W2 — FR2 controls / buttons restyle from tokens
 
-- [ ] T-59-20 Restyle all interactive controls uniformly from `TOKENS_CSS`. Checklist:
+- [x] T-59-20 Restyle all interactive controls uniformly from `TOKENS_CSS`. Checklist:
   - **Restyle controls** — nav tabs (`.nav-tab` in `structure.css`), theme button (`.theme-btn` + popover rows
     in `structure.css`), runtime buttons (`.runtime-btn` in `tokens.py` — sequential after W1), workflows
     per-step pickers (`.wfp-picker`/`.wfp-profile-select` in `workflows.css`/`workflow_policy.css`), report +
@@ -135,6 +135,46 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
   - **existing-test fate ledger:** SURVIVE — `tests/e2e/panel/*.spec.ts` (selectors preserved — restyle, not
     re-structure); `test_panel_css_contrast.py` (WCAG preserved). AC-11 ledger — EDITED: the control-styling
     CSS modules. No `specs/backlog/**` staged.
+  - **W2 EVIDENCE (T-59-20 DONE 2026-07-04, software-engineer).**
+    - **AC-3** `test_control_tokens.py` GREEN (3 tests): allowlist `{.nav-tab, .theme-btn, .runtime-btn,
+      .wfp-picker, .wfp-profile-select, .academy-card__cta, .academy-back-btn, .reports-row__trash,
+      .reports-back-btn, .reports-confirm-delete, .reports-confirm-cancel}`; each matched rule body extracted
+      from the served surfaces (`structure.py`/`workflows.py`/`workflow_policy.py`/`reports.py`/`academy.py`,
+      EXCLUDING `tokens.py`) is `var(--…)`-anchored with zero reject-literals; control-state coverage asserts
+      `:hover` + `:focus-visible` + active/selected (`.active`/`:active`/`[aria-checked]`) for the button subset
+      `{.nav-tab, .theme-btn, .runtime-btn}`.
+    - **AC-9(c) sabotage:** `sed -i 's/  border-bottom-color: var(--color-accent, var(--color-accent-dark));/
+      border-bottom-color: #9cddc8;/' .../css/structure.py` (into `.nav-tab.active`) ⇒
+      `test_control_tokens.py::test_control_rules_are_token_anchored` FAILED
+      (`AssertionError: ad-hoc hex literal in structure.py :: .nav-tab.active … #9cddc8`; `re.Match '#9cddc8'`)
+      while the other 2 tests passed ⇒ reverted via inverse `sed`; re-ran GREEN.
+    - **Design deviation (recorded):** the `.runtime-switcher`/`.runtime-btn`/`.runtime-btn-icon` COMPONENT
+      rules were relocated from `tokens.py` → `structure.py` so the allowlist (`.runtime-btn`) and the
+      `tokens.py` exclusion stay self-consistent; the `--color-runtime-*` token defs + `[data-runtime]` overrides
+      remain in `tokens.py`. Both files are in the W2 write set. `views/assets/css/workflows.py` needed NO edit —
+      its per-step picker CSS (`.wf-step-picker*`, `.dadaia-wf-step-model*`) was already fully token-anchored.
+    - **Fate verified:** SURVIVE green in the same full run — `test_panel_css_contrast.py` (WCAG AA/AAA preserved:
+      0 palette-hex changes; brand tokens in PANEL_CSS use nested-var fallbacks, not bare, not hex),
+      `test_palette.py`, `test_theme_palettes.py` (warm focus-visible override untouched),
+      `test_theme_switcher.py`, `test_runtime_switcher_pi.py` (`id="sessions-runtime-btn-pi"` HTML intact),
+      `test_static.py`/`test_views_static.py`, `test_svg_validity.py`, `test_views_index.py`. INVARIANT
+      byte-identical — `test_api_golden.py` + `api_golden_v0155.json` (no `render_api_*` edit),
+      `test_index_dom_contract.py` (never re-baselined — no index HTML/selector changed; runtime-btn HTML
+      unchanged, only its CSS relocated), `test_security_headers.py` incl. the W1 CSP equality lock (no
+      inline-script edit; `_CSP_SCRIPT_HASH_1/2` unchanged). e2e `tests/e2e/panel/*.spec.ts` SURVIVE (touched
+      selectors `.wfp-picker`/`.wfp-profile-select`/`.wfp-seg-btn`/`.theme-btn`/`.runtime-btn`/`.nav-tab` all
+      preserved — bodies restyled, no selector renamed, no HTML change).
+    - **AC-11 ledger** — NEW: `tests/unit/features/panel/test_control_tokens.py`; EDITED:
+      `views/assets/css/structure.py` (`.nav-tab` + `.theme-btn` restyle + relocated runtime-switcher block),
+      `views/assets/css/tokens.py` (runtime-switcher component rules removed — relocated; token defs retained),
+      `views/assets/css/workflow_policy.py` (`.wfp-*` picker controls token-cleaned + added select/reset/seg
+      focus-visible + hovers), `views/assets/css/reports.py` (trash/back/confirm buttons),
+      `views/assets/css/academy.py` (card CTA + back-btn). No `specs/backlog/**` staged.
+    - **Gates:** `ruff format --check` clean · `ruff check --no-cache` passed · `mypy --strict` 309 files clean ·
+      `lint-imports --no-cache` 8 kept / 0 broken · full unpiped `pytest -p no:cacheprovider` 4596 passed / 17
+      skipped (exit 0). `git status --short`: no `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, repo-local
+      `.dadaia/`, `playwright-report/`, or `test-results/` (Q7); no `public/**` diff (AC-12: panel is package
+      code — no re-projection needed).
 
 ## W3 — FR3 single-line header / control-row layout (width e2e authored HERE — Q2/Option A)
 

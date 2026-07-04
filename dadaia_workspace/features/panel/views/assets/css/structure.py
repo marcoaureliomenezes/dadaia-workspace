@@ -64,27 +64,39 @@ code {
   gap: 0;
 }
 
+/* ── Controls · one button language (v0.1.59 / FR2) ──────────────────────────
+   Nav tabs, the theme button, and the runtime switcher share the token-anchored
+   control vocabulary from tokens.py (--control-*, --focus-ring-*, --text-*,
+   --font-weight-*). No ad-hoc hex / px / rem-font-size / px-radius literals in
+   these rules — grep-enforced by test_control_tokens.py. Brand tokens that need a
+   defensive fallback (test_panel_css_contrast) use a nested var() fallback rather
+   than a hex, so the rule is both fallback-safe AND literal-free. */
 .nav-tab {
   display: inline-block;
-  padding: 0.75rem 1.1rem;
-  font-size: 0.92rem;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
   color: var(--color-muted);
-  border-bottom: 3px solid transparent;
+  border-bottom: var(--border-width-accent) solid transparent;
   cursor: pointer;
   background: none;
   border-top: none;
   border-left: none;
   border-right: none;
   font-family: inherit;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
   white-space: nowrap;
 }
 .nav-tab:hover { color: var(--color-text); }
-.nav-tab:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
+.nav-tab:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: -2px;
+}
 .nav-tab.active {
   color: var(--color-heading);
-  font-weight: 600;
-  border-bottom-color: var(--color-accent, #9cddc8);
+  font-weight: var(--font-weight-semibold);
+  border-bottom-color: var(--color-accent, var(--color-accent-dark));
 }
 
 /* ── Main content ───────────────────────────────── */
@@ -281,37 +293,39 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
    IDs and data-theme-value attributes are unchanged (e2e selectors preserved).
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* Button — compact icon-pill in topbar */
+/* Button — compact icon-pill in topbar (token-anchored, one button language) */
 .theme-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.22rem 0.55rem 0.22rem 0.45rem;
+  gap: var(--control-gap);
+  padding: var(--control-pad-y) var(--control-pad-x);
   background: transparent;
-  border: 1px solid var(--color-border, #dddddd);
-  border-radius: 20px;            /* pill shape — compact and tidy */
-  color: var(--color-muted, #666666);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);   /* pill shape — compact and tidy */
+  color: var(--color-muted);
   font-family: var(--font-stack);
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background 0.13s, border-color 0.13s, color 0.13s;
+  transition: background var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard);
   white-space: nowrap;
-  line-height: 1.3;
+  line-height: var(--line-height-snug);
 }
 .theme-btn:hover {
-  background: var(--color-primary-bg, #f0fbf7);
-  border-color: var(--color-accent, #9cddc8);
-  color: var(--color-text, #222222);
+  background: var(--color-primary-bg, var(--color-surface));
+  border-color: var(--color-accent, var(--color-accent-dark));
+  color: var(--color-text);
 }
 .theme-btn:active {
-  background: var(--color-accent, #9cddc8);
-  border-color: var(--color-accent, #9cddc8);
-  color: var(--color-heading, #111111);
+  background: var(--color-accent, var(--color-accent-dark));
+  border-color: var(--color-accent, var(--color-accent-dark));
+  color: var(--color-heading);
 }
 .theme-btn:focus-visible {
-  outline: 2px solid var(--color-accent-dark, #2d7d9a);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Half-circle icon (◑) + caret */
@@ -423,6 +437,61 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   content: "✓";
   color: var(--color-accent-dark, #2d7d9a);
   font-size: 0.82em;
+  line-height: 1;
+}
+
+/* ── Runtime switcher — segmented control (PR5-D4; relocated from tokens.py in
+   v0.1.59 / FR2 so the component rules live in a served control-surface stylesheet,
+   not the token-definition file). The --color-runtime-* tokens and per-theme
+   [data-runtime] overrides remain defined in tokens.py. Token-anchored to the one
+   button language (--control-*, --focus-ring-*, --text-*) — no ad-hoc literals. */
+.runtime-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2xs);
+}
+
+.runtime-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--control-gap);
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-stack);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
+  white-space: nowrap;
+}
+
+.runtime-btn[aria-checked="true"] {
+  background: var(--color-runtime-active);
+  color: var(--color-surface);
+  border-color: transparent;
+}
+
+.runtime-btn[aria-checked="false"]:hover {
+  background: var(--color-row-hover);
+  color: var(--color-text);
+}
+
+.runtime-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-runtime-active);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.runtime-btn-icon {
+  font-size: 0.75em;
   line-height: 1;
 }
 

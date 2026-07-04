@@ -343,53 +343,11 @@ html[data-theme="warm"][data-runtime="pi"] {
   --color-runtime-active: var(--color-runtime-pi); /* #6d5694 */
 }
 
-/* ── PR5-D4 — Runtime switcher component styles ──────────────────────────────── */
-
-.runtime-switcher {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 0.15rem;
-}
-
-.runtime-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius) - 1px);
-  background: transparent;
-  color: var(--color-muted);
-  font-family: var(--font-stack);
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-
-.runtime-btn[aria-checked="true"] {
-  background: var(--color-runtime-active);
-  color: #ffffff;
-  border-color: transparent;
-}
-
-.runtime-btn[aria-checked="false"]:hover {
-  background: var(--color-row-hover);
-  color: var(--color-text);
-}
-
-.runtime-btn:focus-visible {
-  outline: 2px solid var(--color-runtime-active);
-  outline-offset: 2px;
-}
-
-.runtime-btn-icon {
-  font-size: 0.75em;
-  line-height: 1;
-}
+/* NOTE (v0.1.59 / FR2): the runtime-switcher COMPONENT rules (.runtime-switcher,
+   .runtime-btn and its states, .runtime-btn-icon) were relocated to structure.py
+   so tokens.py stays a pure token-DEFINITION file. This lets the FR2 control-token
+   grep (test_control_tokens.py) scan the .runtime-btn rule body in a served
+   control-surface stylesheet while legitimately excluding tokens.py (where the
+   `--color-*: #hex` definitions live). The `--color-runtime-*` tokens and the
+   per-theme [data-runtime] overrides above remain here as definitions. */
 """
