@@ -14,10 +14,14 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
+
 _SCHEMA_VERSION = "1"
 
-# Shared layout constants for the install/stage pipeline.
-_VALID_TARGETS = {"all", "agents", "claude", "codex", "pi"}
+# Shared layout constants for the install/stage pipeline. The valid ``--target``
+# vocabulary is single-sourced in ``core/harness_registry`` (v0.1.58 FR1); this name is
+# a back-compat re-export for tests/consumers that import ``_VALID_TARGETS`` from here.
+_VALID_TARGETS = INSTALL_TARGETS
 _COPY_DIRS = (
     "rules",
     "skills",

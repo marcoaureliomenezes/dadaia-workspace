@@ -36,6 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from dadaia_workspace.core.harness_registry import L2_WORKER_HARNESSES
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.models.workflow_execution import (
     DEFAULT_CONTEXT,
@@ -133,7 +134,8 @@ _KIND_TO_HARNESS: dict[AgentRuntimeKind, str] = {
 #: The Layer-2 worker harnesses an effective-harness override may name (LAW 1, v0.1.29).
 #: ``claude``/``opencode`` are NOT Layer-2 workers; ``fake`` is the test adapter and is
 #: never a *resolved* (governed) harness — it is handled at the pipeline/runtime layer.
-_LAYER2_HARNESSES: frozenset[str] = frozenset({"codex", "pi"})
+#: Sourced from the single ``core/harness_registry`` roster (v0.1.58 FR1) — no fork.
+_LAYER2_HARNESSES: frozenset[str] = frozenset(L2_WORKER_HARNESSES)
 
 # Default profile id per implementation-pipeline step (M3 — sourced from model_profiles).
 # Implementation runs the standard worker profile; review/gate steps run the deep profile.

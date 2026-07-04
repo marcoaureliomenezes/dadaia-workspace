@@ -53,7 +53,20 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
   - **AC-11 ledger** — NEW: `test_install_target_goldens.py` + install/panel/**doctor** goldens. No
     `specs/backlog/**` staged.
 
-- [-] T-58-11 Add `core/harness_registry.py` and consume it in the roster-encoding literals. Checklist:
+- [x] T-58-11 Add `core/harness_registry.py` and consume it in the roster-encoding literals. Checklist:
+  - **Evidence:** NEW `dadaia_workspace/core/harness_registry.py` (pure core leaf, stdlib-only —
+    lint-imports 8 kept / 0 broken, core contract intact) + `tests/unit/core/test_harness_registry.py`
+    (30 tests). **AC-1:** the T-58-10 goldens (install/panel/doctor) replay BYTE-IDENTICAL post-refactor
+    (test_install_target_goldens.py 4/4 green, no regeneration). **AC-9(a):** reverted `api_workflows.py:70`
+    to a hard-coded `("claude", "codex")` tuple (omits pi) ⇒ `test_roster_literal_absent_and_registry_consumed
+    [api_workflows.py]` FAILED (`'"claude","codex"'` found) ⇒ reverted, green. **AC-9(a′):** reverted
+    `policy_resolver.py:136` to bare `frozenset({"codex", "pi"})` ⇒ same grep test FAILED for
+    `policy_resolver.py` ⇒ reverted, green. **Contract test (R1):** `frozenset(L2_WORKER_HARNESSES) ==
+    frozenset(harness_models.harnesses())` passes (order-independent; harnesses() PI-first). **Fate ledger:**
+    `test_api_golden.py`+`api_golden_v0155.json` SURVIVE byte-identical INVARIANT (no regen);
+    `test_api_workflows.py`/`test_api_agents.py`/`test_public_assets.py`/`test_policy_doctor.py`/
+    `test_policy_resolver.py`/`test_json_workflow_model_policy_store.py` all SURVIVE (277 green).
+    Full gates: ruff format+check, mypy --strict (306 files), lint-imports (8/0), full pytest 4524 passed.
   - **NEW `dadaia_workspace/core/harness_registry.py`** — pure `core` leaf (stdlib only, no upward import):
     `L1_ENTRY_HARNESSES = ("claude","codex","pi")`, `L2_WORKER_HARNESSES = ("codex","pi")`, capability
     predicates (`is_l1`/`is_l2`/`can_be_workflow_worker`), `PROJECTION_TARGETS`/`INSTALL_TARGETS` (the

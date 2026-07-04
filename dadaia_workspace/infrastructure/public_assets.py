@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.harness_registry import PROJECTION_TARGETS
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -272,7 +273,7 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        targets = ("agents", "claude", "codex", "pi") if target == "all" else (target,)
+        targets = PROJECTION_TARGETS if target == "all" else (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
             guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
