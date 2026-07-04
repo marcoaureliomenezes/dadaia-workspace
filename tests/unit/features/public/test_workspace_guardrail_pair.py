@@ -17,6 +17,7 @@ Seven cases covering:
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,36 @@ from dadaia_workspace.infrastructure.public_assets import (
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
 
+def _register_context(workspace_root: Path, slug: str, state: str = "alive") -> None:
+    """Register a consumer repo in ``spec_contexts.json`` (v0.1.58 FR4 registry detection).
+
+    Detection moved off the dead in-repo ``.dadaia/agentic/`` marker onto the
+    workspace registry (Ruling G); this appends a schema-v2 context row so
+    ``_consumer_repos_for_root`` derives ``repos/<slug>/`` on disk.
+    """
+    states_dir = workspace_root / ".dadaia" / "states"
+    states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    data = (
+        json.loads(registry.read_text(encoding="utf-8"))
+        if registry.exists()
+        else {"schema_version": "2", "contexts": []}
+    )
+    data["contexts"].append(
+        {
+            "name": slug,
+            "state": state,
+            "repo_slug": slug,
+            "repo_url": f"https://example.test/{slug}.git",
+            "created_at": "2026-07-04T00:00:00Z",
+            "alive_since": "2026-07-04T00:00:00Z" if state == "alive" else None,
+            "dead_since": None if state == "alive" else "2026-07-04T00:00:00Z",
+            "current_branch": "main",
+        }
+    )
+    registry.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Case 1 — 4-target projection write
 # ---------------------------------------------------------------------------
@@ -42,8 +73,9 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
     Given:
       - A source file at `<agentic_dir>/data/AGENTS.md` with known content.
       - A workspace root directory.
-      - One consumer repo directory under `repos/` with `.dadaia/agentic/` markers
-        and a distinct `package_version` (so it is NOT self-skipped).
+      - One consumer repo registered in `spec_contexts.json` (v0.1.58 FR4
+        registry-based detection — INVERT of the dead in-repo marker, Ruling G),
+        marker-less on disk (so it is NOT self-skipped).
 
     When:
       - `_install_workspace_guardrail_pair` is called with force=True.
@@ -64,12 +96,10 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
+    # Registry-listed, marker-less consumer (v0.1.58 FR4).
     consumer = workspace_root / "repos" / "some-consumer"
     consumer.mkdir(parents=True)
-    (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-    (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
-        '{"package_version": "0.0.0"}\n', encoding="utf-8"
-    )
+    _register_context(workspace_root, "some-consumer")
 
     installed: list[str] = []
     _install_workspace_guardrail_pair(source, workspace_root, force=True, installed=installed)
@@ -113,22 +143,18 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Case 2 — Skip variant: no `.dadaia/` marker
+# Case 2 — INVERT: an unregistered on-disk repo is not written (registry detection)
 # ---------------------------------------------------------------------------
+# (Case 3 — "no .dadaia/agentic/ marker" — DELETED at v0.1.58 W4: the in-repo
+#  marker distinction it exercised no longer exists; detection is registry-based,
+#  so it has no invertible assertion distinct from this inverted Case 2.)
 
 
-def test_skip_no_dadaia_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Consumer dir without `.dadaia/` is silently skipped.
-
-    Given:
-      - A consumer repo directory that has NO `.dadaia/` subdirectory.
-
-    When:
-      - `_install_workspace_guardrail_pair` processes that consumer.
-
-    Then:
-      - The consumer directory is not written to.
-      - The installer logs: `[skip] <path> (no .dadaia/ marker)` to stderr.
+def test_unregistered_repo_not_written(tmp_path: Path) -> None:
+    """A repo present on disk under `repos/` but NOT registered in
+    `spec_contexts.json` is not written to (v0.1.58 FR4 registry-based
+    detection, Ruling G — INVERT of the old marker-skip). The old
+    `[skip] ... (no .dadaia/ marker)` stderr line no longer exists.
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -137,68 +163,20 @@ def test_skip_no_dadaia_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
-    # Consumer has NO .dadaia/ directory — must be skipped
-    consumer = workspace_root / "repos" / "no-marker-repo"
+    # On-disk but NOT registered → invisible to the fan-out.
+    consumer = workspace_root / "repos" / "unregistered-repo"
     consumer.mkdir(parents=True)
 
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
     assert not (consumer / "AGENTS.md").exists(), (
-        "Installer must NOT write to a consumer lacking a .dadaia/ marker."
+        "Installer must NOT write to a repo that is not registered in spec_contexts.json."
     )
-
-    captured = capsys.readouterr()
-    combined = captured.out + captured.err
-    assert "[skip]" in combined and "no .dadaia/ marker" in combined, (
-        f"Expected skip log line not found in output.\n  Output: {combined!r}"
-    )
+    assert not (consumer / "CLAUDE.md").exists()
 
 
 # ---------------------------------------------------------------------------
-# Case 3 — Skip variant: no `.dadaia/agentic/` marker
-# ---------------------------------------------------------------------------
-
-
-def test_skip_no_agentic_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Consumer dir with `.dadaia/` but no `.dadaia/agentic/` is silently skipped.
-
-    Given:
-      - A consumer repo directory that has `.dadaia/` but NOT `.dadaia/agentic/`.
-
-    When:
-      - `_install_workspace_guardrail_pair` processes that consumer.
-
-    Then:
-      - The consumer directory is not written to.
-      - The installer logs: `[skip] <path> (no .dadaia/ marker)` to stderr.
-    """
-    source = tmp_path / "data" / "AGENTS.md"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(b"# AGENTS\n")
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
-    # Consumer has .dadaia/ but NO .dadaia/agentic/ subdirectory
-    consumer = workspace_root / "repos" / "no-agentic-repo"
-    consumer.mkdir(parents=True)
-    (consumer / ".dadaia").mkdir()
-
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    assert not (consumer / "AGENTS.md").exists(), (
-        "Installer must NOT write to a consumer lacking a .dadaia/agentic/ marker."
-    )
-
-    captured = capsys.readouterr()
-    combined = captured.out + captured.err
-    assert "[skip]" in combined and "no .dadaia/ marker" in combined, (
-        f"Expected skip log line not found in output.\n  Output: {combined!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Case 4 — Skip variant: self-slug (R14, package_version match)
+# Case 4 — Skip variant: self-slug (R14, package_version match) — RETAINED
 # ---------------------------------------------------------------------------
 
 
@@ -232,13 +210,16 @@ def test_skip_self_slug_package_version_match(
 
     own_version = _package_version()
 
-    # Consumer manifests the same package_version — this is the "self" repo
+    # Registry-listed self repo whose manifest package_version matches the
+    # installed version — detected via the registry (v0.1.58 FR4) then self-skipped
+    # via the RETAINED _is_self_repo package_version match (R14).
     consumer = workspace_root / "repos" / "dadaia-workspace"
     consumer.mkdir(parents=True)
     (consumer / ".dadaia" / "agentic").mkdir(parents=True)
     (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
         f'{{"package_version": "{own_version}"}}\n', encoding="utf-8"
     )
+    _register_context(workspace_root, "dadaia-workspace")
 
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
@@ -342,12 +323,10 @@ def test_doctor_four_line_output(tmp_path: Path) -> None:
     workspace_root.mkdir()
 
     slug = "some-consumer"
+    # Registry-listed, marker-less consumer (v0.1.58 FR4).
     consumer = workspace_root / "repos" / slug
     consumer.mkdir(parents=True)
-    (consumer / ".dadaia" / "agentic").mkdir(parents=True)
-    (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
-        '{"package_version": "0.0.0"}\n', encoding="utf-8"
-    )
+    _register_context(workspace_root, slug)
 
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 

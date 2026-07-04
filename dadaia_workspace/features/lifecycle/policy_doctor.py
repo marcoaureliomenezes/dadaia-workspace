@@ -53,6 +53,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
+from dadaia_workspace.core.harness_registry import L2_WORKER_HARNESSES
 from dadaia_workspace.core.models.workflow_execution import (
     DEFAULT_CONTEXT,
     WorkflowModelPolicyOverlay,
@@ -73,8 +74,9 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
     WorkflowExecutionPolicyResolver,
 )
 
-#: Layer-2 harness names a profile / step may legitimately declare (LAW 1).
-_LAYER2_HARNESSES = frozenset({"codex", "pi"})
+#: Layer-2 harness names a profile / step may legitimately declare (LAW 1). Sourced from
+#: the single ``core/harness_registry`` roster (v0.1.58 FR1) so this check can never fork.
+_LAYER2_HARNESSES = frozenset(L2_WORKER_HARNESSES)
 #: Harness names that MUST NEVER appear as a Layer-2 worker choice (residue check).
 _FORBIDDEN_LAYER2 = frozenset({"claude", "claude_sdk", "claude-sdk", "opencode", "open-code"})
 

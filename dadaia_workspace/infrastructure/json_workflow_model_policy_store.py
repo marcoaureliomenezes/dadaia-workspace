@@ -34,6 +34,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from dadaia_workspace.core.harness_registry import L2_WORKER_HARNESSES
 from dadaia_workspace.core.models.workflow_execution import (
     _SCHEMA_VERSION,
     DEFAULT_CONTEXT,
@@ -51,7 +52,8 @@ _ALLOWED_CONTEXT_KEYS = frozenset({"workflows", "extends"})
 _ALLOWED_WORKFLOW_KEYS = frozenset({"steps", "default_harness", "harnesses"})
 #: The Layer-2 worker harnesses an overlay may name (LAW 1). ``claude``/``opencode`` are
 #: rejected at parse time so an invalid harness never persists (mirrors the schema enum).
-_LAYER2_HARNESSES = frozenset({"codex", "pi"})
+#: Sourced from the single ``core/harness_registry`` roster (v0.1.58 FR1) — no fork.
+_LAYER2_HARNESSES = frozenset(L2_WORKER_HARNESSES)
 
 
 class JsonWorkflowModelPolicyStore:

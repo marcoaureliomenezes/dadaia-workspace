@@ -1,14 +1,16 @@
 ---
-release: none
-phase: none
+release: v0.1.58
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.58 — Harness & Projection Distribution
 
-No release is currently active. R9 of the operator's R9→R12 continuation
-mandate (2026-07-04) is complete: **v0.1.57 — Injection Canon** is CLOSED and
-ARCHIVED at `specs/_archive/releases/v0.1.57/` (merged `8bab315a`, PR #104).
+Sequence position: **R10 of the operator-approved 12-release plan**; second
+release of the operator's R9→R12 continuation mandate (2026-07-04). The
+projection/install machinery matures after the structural chain: harness
+isolation profiles (`init --harness`, typed harness registry) + the consumer
+AGENTS.md fan-out redesign. Consumes `harness-isolation-profiles` +
+`consumer-agents-md-fanout-redesign`. Open-bug debt at pick: none (ledger 0).
 
-Next in the mandate: R10 — Harness & projection distribution
-(`harness-isolation-profiles` + `consumer-agents-md-fanout-redesign`), then
-R11 (panel UX), R12 (capability tail). Open-bug ledger: 0.
+Previous: **v0.1.57** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.57/`
+(merged `8bab315a`; closure `20ad7f59`).

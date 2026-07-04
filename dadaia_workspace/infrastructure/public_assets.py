@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -44,6 +45,7 @@ from dadaia_workspace.infrastructure.install_helpers import (
     validate_workflows,
     write_generated,
 )
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 
 # Several names below are imported purely for re-export, so tests and other
 # consumers can keep importing them from public_assets after the T-017-11 split.
@@ -102,6 +104,12 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
     _is_self_repo,
     _is_source_repo_root,
 )
+
+#: Non-silent doctor line for a runtime whose directory physically exists on disk but is
+#: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
+#: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
+#: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
+_OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift unchecked)"
 
 
 class FileSystemPublicAssetManager:
@@ -195,6 +203,18 @@ class FileSystemPublicAssetManager:
     def _codex_hooks(self, workspace_root: Path) -> dict[str, object]:
         return _build_codex_hooks(workspace_root)
 
+    def _profile_harnesses(self, workspace_root: Path) -> set[str] | None:
+        """Return the persisted harness set, or ``None`` when no profile file exists.
+
+        Reads ``.dadaia/states/harness_profile.json`` via the same-layer
+        ``JsonHarnessProfileStore`` adapter (infrastructure consuming infrastructure). An
+        absent profile ⇒ ``None``, and every consumer treats ``None`` as the full all-four
+        install/doctor scope (back-compat with pre-v0.1.58 workspaces).
+        """
+        states_dir = workspace_root / ".dadaia" / "states"
+        profile = JsonHarnessProfileStore().read(states_dir)
+        return set(profile.harnesses) if profile is not None else None
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -272,7 +292,17 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        targets = ("agents", "claude", "codex", "pi") if target == "all" else (target,)
+        # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
+        # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
+        # An explicit --target X always overrides (it never reaches this branch).
+        if target == "all":
+            profile_harnesses = self._profile_harnesses(workspace_root)
+            if profile_harnesses is None:
+                targets: tuple[str, ...] = PROJECTION_TARGETS
+            else:
+                targets = ("agents", *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses))
+        else:
+            targets = (target,)
         data_agents_md = agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
             guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
@@ -336,6 +366,17 @@ class FileSystemPublicAssetManager:
             except (json.JSONDecodeError, OSError):
                 reports.append("[drift] stage:agents.index.json (invalid JSON)")
 
+        # Resolve the profile-scoped active harness set FIRST — it scopes BOTH the
+        # runtime_expectations projection loop below (its claude:* projection lines) AND the
+        # inline generated-config block further down. Absent profile ⇒ all-four (back-compat,
+        # byte-identical to the W1 all-four doctor golden). An out-of-profile runtime whose
+        # directory physically EXISTS on disk is never silent (A3): a `[warn]` line from the
+        # inline block replaces the scoped drift block so a stale/hand-installed runtime
+        # cannot read green-with-zero-lines.
+        profile_harnesses = self._profile_harnesses(workspace_root)
+        active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
+        claude_active = "claude" in active
+
         for expected_src, dst, label, transform in runtime_expectations(
             agentic_dir,
             workspace_root,
@@ -343,6 +384,19 @@ class FileSystemPublicAssetManager:
             _CLAUDE_DIRS,
             self._agents_md_source,
         ):
+            # FR3 boundary completion (W5, T-58-50): runtime_expectations yields the
+            # claude:<dir>/* projection expectations unconditionally. For a codex-only /
+            # pi-only profile those files are genuinely absent, so an unscoped loop emits
+            # `[missing] claude:*` (40 lines) and the doctor false-fails (CLI exit 1) — the
+            # exact boundary W3 flagged for W5. Scope the claude:* projection lines to
+            # `claude in profile`; the shared agents:skills/*, the AGENTS.md guardrail pairs,
+            # and the harness-independent chokepoint dadaia:scripts/* lines stay
+            # unconditional. A `.claude/` physically present outside the profile is still
+            # surfaced non-silently by the inline block's `[warn]` (A3), so scoping the
+            # projection lines here hides no real drift, and the all-four (absent-profile)
+            # path is unchanged (claude ∈ all-four ⇒ the loop runs fully → golden byte-lock).
+            if not claude_active and label.startswith("claude:"):
+                continue
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
@@ -350,53 +404,81 @@ class FileSystemPublicAssetManager:
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
-        reports.append(
-            self._compare_content(
-                _json_dump(_build_claude_settings(workspace_root)),
-                workspace_root / ".claude" / "settings.json",
-                "claude:settings.json",
-            )
-        )
-        reports.append(
-            self._compare_content(
-                _json_dump(_build_codex_hooks(workspace_root)),
-                workspace_root / ".codex" / "hooks.json",
-                "codex:hooks.json",
-            )
-        )
-        for name, content in _build_codex_hook_wrapper_contents().items():
+        # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
+        # resolution above is reused here (claude settings.json / codex hooks+config+rules /
+        # the .pi/ tree each gated on membership; a physically-present out-of-profile runtime
+        # emits the A3 `[warn]` line).
+
+        # Claude generated-config projection — scoped to `claude in profile`.
+        if "claude" in active:
             reports.append(
                 self._compare_content(
-                    content,
-                    workspace_root / ".dadaia" / "hooks" / name,
-                    f"dadaia:hooks/{name}",
+                    _json_dump(_build_claude_settings(workspace_root)),
+                    workspace_root / ".claude" / "settings.json",
+                    "claude:settings.json",
                 )
             )
-        reports.append(
-            self._compare_content(
-                _build_codex_config(agentic_dir),
-                workspace_root / ".codex" / "config.toml",
-                "codex:config.toml",
+        elif (workspace_root / ".claude").exists():
+            reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
+
+        # Codex generated-config projection — scoped to `codex in profile`.
+        if "codex" in active:
+            reports.append(
+                self._compare_content(
+                    _json_dump(_build_codex_hooks(workspace_root)),
+                    workspace_root / ".codex" / "hooks.json",
+                    "codex:hooks.json",
+                )
             )
-        )
-        reports.append(
-            self._compare_content(
-                _render_codex_command_policy_rules(),
-                workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules",
-                "codex:rules/dadaia-command-policy.rules",
+            for name, content in _build_codex_hook_wrapper_contents().items():
+                reports.append(
+                    self._compare_content(
+                        content,
+                        workspace_root / ".dadaia" / "hooks" / name,
+                        f"dadaia:hooks/{name}",
+                    )
+                )
+            reports.append(
+                self._compare_content(
+                    _build_codex_config(agentic_dir),
+                    workspace_root / ".codex" / "config.toml",
+                    "codex:config.toml",
+                )
             )
-        )
-        # PI (Layer-2 worker harness): verbatim source↔staging↔projected comparison.
+            reports.append(
+                self._compare_content(
+                    _render_codex_command_policy_rules(),
+                    workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules",
+                    "codex:rules/dadaia-command-policy.rules",
+                )
+            )
+        elif (workspace_root / ".codex").exists():
+            reports.append(_OUT_OF_PROFILE_WARN.format(harness="codex"))
+
+        # PI (Layer-2 worker harness) — scoped to `pi in profile`.
         pi_staged = agentic_dir / "pi"
         pi_projected = workspace_root / ".pi"
-        for staged in self._iter_files(pi_staged):
-            rel = staged.relative_to(pi_staged)
-            reports.append(self._compare(staged, pi_projected / rel, f"pi:{rel.as_posix()}"))
+        if "pi" in active:
+            for staged in self._iter_files(pi_staged):
+                rel = staged.relative_to(pi_staged)
+                reports.append(self._compare(staged, pi_projected / rel, f"pi:{rel.as_posix()}"))
+        elif pi_projected.exists():
+            reports.append(_OUT_OF_PROFILE_WARN.format(harness="pi"))
 
+        # Harness-independent checks stay unconditional (classify_workflows emits
+        # [reference-only] codex lines that are not blockers; the rule-corpus check
+        # early-returns on an absent .codex/agents; the skill/memory/privacy checks read the
+        # package public dir, not any runtime projection).
         reports.extend(classify_workflows(agentic_dir))
-        reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
+        # Codex-parity drift (D-CX-1..10) + trust-boundary info are codex-specific and MUST
+        # gate on `codex in profile` (Q1): check_codex_drift iterates the staged agents and
+        # emits `[missing] codex:agents/<name>.toml (D-CX-1)` ×12 for ANY codex-absent tree,
+        # which would make a claude-only/pi-only `public doctor` exit 1 (AC-5 unachievable).
+        if "codex" in active:
+            reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
         reports.extend(check_codex_rule_corpus_reachable(workspace_root))
-        reports.extend(codex_trust_boundary_info())
+        if "codex" in active:
+            reports.extend(codex_trust_boundary_info())
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(self._check_public_privacy())

@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.core import harness_registry
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root_for_init
 
 console = Console()
@@ -18,13 +19,26 @@ def init(
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
+    harness: str = typer.Option(
+        "all",
+        "--harness",
+        help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,pi.",
+    ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets into all runtimes (.claude/, .codex/, .pi/, .agents/)."""
+    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .claude/, .codex/, .pi/, .agents/)."""
+    # Parse --harness BEFORE any output so a bad value is a clean BadParameter
+    # (exit 2, message on stderr, empty stdout — no partial payload leaks).
+    try:
+        harnesses = harness_registry.parse_harness_set(harness)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--harness") from exc
+
     root = resolve_workspace_root_for_init(workspace, explicit=workspace is not None)
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
+    console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
 
     svc = container.build_workspace_service(root)
-    _, installed = svc.init(root, skip_assets=skip_assets)
+    _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
 
     console.print(f"[green]✓[/green] .dadaia/ bootstrapped at {root / '.dadaia'}")
 

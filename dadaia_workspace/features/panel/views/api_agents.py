@@ -57,6 +57,7 @@ import json
 import logging
 from collections.abc import Callable
 
+from dadaia_workspace.core.harness_registry import is_l1
 from dadaia_workspace.core.models.agent import AgentNotFoundError, InvalidAgentIdError
 from dadaia_workspace.core.models.telemetry import AgentSummary
 from dadaia_workspace.features.panel.service import PanelService
@@ -158,7 +159,7 @@ def render_api_agents_canonical(
         qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
         _runtime_vals = qs.get("runtime")
         runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
-        if runtime not in ("claude", "codex", "pi"):
+        if not is_l1(runtime):
             runtime = "claude"
 
         # Validate active_window_days range.

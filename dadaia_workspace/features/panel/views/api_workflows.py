@@ -19,6 +19,7 @@ import logging
 import re
 from collections.abc import Callable
 
+from dadaia_workspace.core.harness_registry import is_l1
 from dadaia_workspace.features.panel.service import PanelService
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ def render_api_workflows_list(
         qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
         _runtime_vals = qs.get("runtime")
         _runtime = (_runtime_vals[0].strip().lower() if _runtime_vals else "").strip()
-        if _runtime not in ("claude", "codex", "pi"):
+        if not is_l1(_runtime):
             _runtime = "claude"
 
         summaries = service.list_workflow_summaries()

@@ -19,13 +19,40 @@ _CONSUMER_VERSION = "0.0.0"
 _runner = CliRunner()
 
 
+def _register_context(workspace_root: Path, slug: str, state: str = "alive") -> None:
+    """Register a consumer repo in ``spec_contexts.json`` (v0.1.58 FR4 registry detection)."""
+    states_dir = workspace_root / ".dadaia" / "states"
+    states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    data = (
+        json.loads(registry.read_text(encoding="utf-8"))
+        if registry.exists()
+        else {"schema_version": "2", "contexts": []}
+    )
+    data["contexts"].append(
+        {
+            "name": slug,
+            "state": state,
+            "repo_slug": slug,
+            "repo_url": f"https://example.test/{slug}.git",
+            "created_at": "2026-07-04T00:00:00Z",
+            "alive_since": "2026-07-04T00:00:00Z" if state == "alive" else None,
+            "dead_since": None if state == "alive" else "2026-07-04T00:00:00Z",
+            "current_branch": "main",
+        }
+    )
+    registry.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def _add_marker_consumer(workspace_root: Path, slug: str) -> Path:
+    """Register a consumer repo under ``repos/`` via the registry (v0.1.58 FR4, Ruling G)."""
     consumer = workspace_root / "repos" / slug
     (consumer / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
     manifest = {"schema_version": "1", "package_version": _CONSUMER_VERSION}
     (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
         json.dumps(manifest), encoding="utf-8"
     )
+    _register_context(workspace_root, slug)
     return consumer
 
 
