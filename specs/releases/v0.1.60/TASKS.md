@@ -30,7 +30,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W1 — FR1/FR2 pack storage + `dadaia plugin` machinery (golden-first, ports-and-adapters)
 
-- [ ] T-60-10 Capture + commit **golden (a)** (pre-descriptor refactor-lock) BEFORE any descriptor/projection code.
+- [x] T-60-10 Capture + commit **golden (a)** (pre-descriptor refactor-lock) BEFORE any descriptor/projection code.
   Owner: software-engineer. Write set: NEW `tests/integration/test_plugin_install_goldens.py` + `_golden/`. <!-- AMEND:ARCH-4 --> <!-- AMEND:QA-2 --> <!-- AMEND:QA-8 -->
   Checklist:
   - Add the golden test (**`integration` layer** — real stage/install/doctor, QA-8b) running `public_assets.install()`
@@ -42,6 +42,14 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     refactor-lock (retired at ship). Commit BEFORE T-60-11's descriptors. (Golden (b) is captured in T-60-20.)
   - Evidence: golden (a) file + green test on the pre-descriptor tree; the normalization strategy stated in the test.
   - AC-13 ledger — NEW: the golden test + golden (a). No `specs/backlog/**`.
+  - **DONE-evidence:** NEW `tests/integration/test_plugin_install_goldens.py` (integration layer, `pytestmark = integration`)
+    + `tests/integration/_golden/plugin_install_targets_golden_a_v0160.json` + `plugin_doctor_report_golden_a_v0160.json`.
+    Green on the pre-descriptor tree: `pytest tests/integration/test_plugin_install_goldens.py -p no:cacheprovider` → 3 passed.
+    Normalization stated in the module docstring: v0.1.55 path/version + clock + the v0.1.58 three leak classes
+    (host-state cwd-walk `_norm_path_line`; directory-iteration order `_sort_line_lists`; OS-phrased exec-probe
+    `_canon_env_line`); env `git-dirty` dropped; `stage:plugins/*` descriptor-source lines excluded as golden (b)'s
+    territory (SPEC AC-5) so golden (a) is byte-stable across T-60-11's pack.json addition. Non-vacuous guard asserts
+    per-target install sets + the `[ok] stage:data/AGENTS.md` + `public-privacy` anchors. Commit `test(T-60-10): ...`.
 
 - [ ] T-60-11 Ports-and-adapters seam + `dadaia plugin` CLI. Owner: software-engineer. Write set: NEW
   `core/models/plugin_pack.py`, NEW `core/protocols/plugin_store.py`, NEW `infrastructure/json_plugin_store.py`, NEW
