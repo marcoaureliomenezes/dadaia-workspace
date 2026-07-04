@@ -1,0 +1,13 @@
+{
+  "release": "v0.1.56",
+  "consumed": [
+    {
+      "slug": "lifecycle-verb-governance-uniformity",
+      "shipped_anchors": [
+        "dadaia_workspace/features/lifecycle/pipeline.py#LifecyclePipeline",
+        "dadaia_workspace/core/models/lifecycle.py#TRANSITIONS"
+      ],
+      "note": "DELIVERED — v0.1.56. Both anchors survive (archival at CLOSURE, not SHIP). Intent 1 fully consumed by W1-W3: apply_entry_to_step extracted as the single FAKE-preserving per-step policy author, apply_resolved_policy maps it over the structural PolicyApplicableStep Protocol, all 7 existing verbs + the 3 newly wired verbs (audit/research/bug_report — WIRE ruling, not demote) resolve/apply/freeze a workflow policy snapshot onto the run-store record, raw id:effort path retired (--model = non-fatal stderr deprecation warning per binding ruling; hard removal returned to backlog as hard-remove-model-flag-across-run-verbs); run_implement_review_loop fixed (rejection digest injected into implement#N, both workers gated through evaluate_gate_with_result is_review=False evidence-only, verdict from structured_output drives the retry ledger) and given its first production caller (dadaia lifecycle implement-review). Intent 2 consumed by W4 under the REMOVE ruling: the three review->IMPLEMENTATION backtrack edges removed, frozenset-equality pins added, BLOCKED resume fan-out retained."
+    }
+  ]
+}

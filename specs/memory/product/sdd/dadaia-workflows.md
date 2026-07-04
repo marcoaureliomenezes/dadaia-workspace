@@ -2,25 +2,26 @@
 slug: dadaia-workflows
 title: dadaia-workflows
 category: product
-tldr: The 7 governed Layer-2 workflows; 4 operator-invocable verbs today (release define, backlog define, pipeline, close); every model step gets fragment + persona.
+tldr: The 7 governed Layer-2 workflows, all operator-invocable since v0.1.56 via ~12 CLI verbs; every model step gets fragment + persona.
 summary: >-
   The roster and invocability truth of the dadaia-workflows: 7 workflows defined in
   the governed catalog (release_definition, implementation, backlog_definition,
-  closure, audit, research, bug_report), of which 4 workflow verbs are
-  operator-invocable today — release define, backlog define, pipeline (with its
-  single-step verbs implement / review qa|security|code), and close.
-  audit/research/bug_report have real fragment+gate bodies but no CLI verb yet
-  (backlog lifecycle-verb-governance-uniformity). Every model-driven step prompt on
-  every verb carries its fragment AND its persona. Engine mechanics live in
-  lifecycle-foundation.
+  closure, audit, research, bug_report), now ALL operator-invocable (v0.1.56),
+  surfaced by these CLI verbs: release define, backlog define, pipeline, implement,
+  review qa|security|code, close, audit, research, bug_report, implement-review
+  (~12 verbs on 7 workflows — implement-review is a verb on the implementation
+  workflow, not a new workflow). audit/research/bug_report gained container builders
+  + CLI verbs, born resolver-governed on the shared policy seam (no second raw
+  id:effort path). Every model-driven step prompt on every verb carries its fragment
+  AND its persona. Engine mechanics live in lifecycle-foundation.
 tags:
 - sdd
 - workflows
 - lifecycle
 - layer-2
 token_estimate: 750
-last_updated: '2026-07-03'
-release_origin: v0.1.54
+last_updated: '2026-07-04'
+release_origin: v0.1.56
 ---
 
 ## Purpose
@@ -37,21 +38,27 @@ engine mechanics (pipeline, gates, run store, data plane) are [[lifecycle-founda
 `features/lifecycle/governed_catalog.py` — `governed_workflow_catalog()`; re-exported for
 presentation on the stable public path `features/workflows/dadaia_catalog.py`):
 
-| Workflow | Body | Availability | CLI verb today |
-|----------|------|--------------|----------------|
+| Workflow | Body | Availability | CLI verb |
+|----------|------|--------------|----------|
 | `release_definition` | `workflows/release_definition.py` | available | `dadaia lifecycle release define` |
 | `backlog_definition` | `workflows/backlog_definition.py` | available | `dadaia lifecycle backlog define` |
-| `implementation` | `pipeline.py` / `phase_workflow.py` | partial | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`) |
-| `closure` | step `close` + `closure_removal_gate` | partial | `dadaia lifecycle close` |
-| `audit` | `workflows/audit.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
-| `research` | `workflows/research.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
-| `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available in the catalog | **no verb** — pending |
+| `implementation` | `pipeline.py` / `phase_workflow.py` | available | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`, and the `implement-review` loop verb) |
+| `closure` | step `close` + `closure_removal_gate` | available | `dadaia lifecycle close` |
+| `audit` | `workflows/audit.py` (real, fragment+gate) | available | `dadaia lifecycle audit` |
+| `research` | `workflows/research.py` (real, fragment+gate) | available | `dadaia lifecycle research` |
+| `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available | `dadaia lifecycle bug_report` |
 
-**Honest invocability: 4 workflow verbs today** — `release define`,
-`backlog define`, `pipeline`, `close`. `audit`/`research`/`bug_report` are governed
-catalog entries with real bodies but **no CLI verb invokes them yet**
-(verb wiring + container builders is the `lifecycle-verb-governance-uniformity`
-backlog). Do not claim 7 invocable.
+**All 7 workflows are invocable (v0.1.56).** They are surfaced by these CLI verbs:
+`release define`, `backlog define`, `pipeline`, `implement`,
+`review qa|security|code`, `close`, `audit`, `research`, `bug_report`,
+`implement-review` — ~12 verbs on 7 workflows. Keep the two counts distinct: the
+**workflow** count is 7; the **verb** roster is larger because `implementation`
+carries several verbs. `implement-review` is a **verb on the `implementation`
+workflow** (the digest-injecting, runner-gated implement/review loop), **not** a new
+workflow. `audit`/`research`/`bug_report` gained container builders + CLI verbs in
+v0.1.56, each **born resolver-governed** on the shared policy seam (no second raw
+`<id>:<effort>` path). The governed catalog was already AVAILABLE for all 7; v0.1.56
+closed the invocability gap.
 
 ## Usage flow
 

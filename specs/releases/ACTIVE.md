@@ -1,18 +1,18 @@
 ---
-release: v0.1.56
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.56 — Lifecycle Verb Governance
+# Active release: none
 
-Sequence position: **R8 of the operator-approved 12-release plan**; final
-release of the operator's R6→R8 continuation mandate (2026-07-03). Settles
-the runtime/policy seam before prompt assembly is rebuilt (R9): the policy
-resolver on EVERY verb, the audit/research/bug_report invocability decision,
-the implement/review loop fixes (rejection digest, runner gate, CLI caller),
-and the TRANSITIONS-table reconciliation. Consumes
-`lifecycle-verb-governance-uniformity`. Open-bug debt at pick: none
-(ledger 0 open).
+No release is currently active. The operator's R6→R8 continuation mandate
+(2026-07-03) is **complete**: R6 **v0.1.54 — Import Boundaries** (merged
+`aeaa3c66`, PR #97), R7 **v0.1.55 — Architecture Decomposition** (merged
+`a1fc29f4`, PR #99), and R8 **v0.1.56 — Lifecycle Verb Governance** (merged
+`3a02f758`, PR #101) are all CLOSED and ARCHIVED under
+`specs/_archive/releases/`.
 
-Previous: **v0.1.55** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.55/`
-(merged `a1fc29f4`; closure `53a14e57`).
+Next in the operator-approved 12-release plan: R9 (prompt-assembly rebuild),
+pending operator dispatch. Open-bug ledger at mandate close: 1 LOW
+(`pipeline-accepted-true-on-illegal-transition`, synthetic-only reachability,
+registered at v0.1.56 closure).
