@@ -239,6 +239,45 @@ def important(
     raise typer.Exit(0)
 
 
+def _write_efficiency_audit_marker(workspace_root: Path, report: str, by: str) -> Path:
+    """Write ``.dadaia/states/last_efficiency_audit.json`` with the current RFC3339 stamp.
+
+    Schema ``{schema_version, last_efficiency_audit, by, report}`` — the marker the
+    ``DoctorService`` EFF-1 staleness check reads (v0.1.60 FR7). Producing a fresh marker is
+    the production clear path for the EFF-1 warning.
+    """
+    marker = workspace_root / ".dadaia" / "states" / "last_efficiency_audit.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "1",
+        "last_efficiency_audit": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "by": by,
+        "report": report,
+    }
+    marker.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
+    return marker
+
+
+@app.command(name="mark-efficiency-audit")
+def mark_efficiency_audit(
+    report: str = typer.Option(
+        ..., "--report", help="Workspace-relative path to the efficiency-audit report."
+    ),
+    by: str = typer.Option("", "--by", help="Agent that produced the report."),
+) -> None:
+    """Record that an efficiency audit was produced — clears the doctor EFF-1 staleness issue."""
+    try:
+        workspace_root = resolve_workspace_root()
+    except WorkspaceNotInitializedError:
+        err_console.print(
+            "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
+        )
+        raise typer.Exit(3) from None
+    marker = _write_efficiency_audit_marker(workspace_root, report, by)
+    console.print(f"Recorded efficiency-audit marker: {marker}")
+    raise typer.Exit(0)
+
+
 @app.command(name="status")
 def status(
     older_than: str = typer.Option("48h", "--older-than", help="TTL threshold, e.g. 48h or 2d."),

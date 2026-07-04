@@ -227,7 +227,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W4 — FR6/FR7 tier-taxonomy fix + efficiency-audit trigger (software-engineer)
 
-- [ ] T-60-40 Efficiency-audit EFF-1 `DoctorIssue` + `mark-efficiency-audit` writer + MANDATORY tier-taxonomy contract.
+- [x] T-60-40 Efficiency-audit EFF-1 `DoctorIssue` + `mark-efficiency-audit` writer + MANDATORY tier-taxonomy contract.
   Owner: software-engineer. Write set: `features/spec_context/doctor.py` (new EFF-1 `DoctorIssue` check) +
   `EFFICIENCY_AUDIT_STALE_DAYS = 30` constant; `cli/commands/reports.py` (NEW `mark-efficiency-audit` verb) + its
   marker-writer helper; NEW `tests/unit/.../test_efficiency_audit_trigger.py` + `tests/unit/cli/test_reports_mark_efficiency_audit.py`;
@@ -255,6 +255,36 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     runs `dadaia doctor` — **stays green because *absent* ⇒ no EFF-1** (the fresh-workspace `All invariants OK` path is
     unchanged); enumerate each and confirm.
   - AC-13 ledger — NEW: the EFF-1 check + writer verb + mandatory taxonomy contract + tests. No `specs/backlog/**`.
+  - **DONE-evidence:**
+    - **EFF-1 (FR7):** `features/spec_context/doctor.py` — NEW `EFFICIENCY_AUDIT_STALE_DAYS = 30` + `_EFFICIENCY_AUDIT_MARKER`
+      constants + `_check_efficiency_audit()` emitting `DoctorIssue(code="EFF-1", fixable=False, description=<age +
+      "run: dadaia reports mark-efficiency-audit --report <report-path>">)`, wired into `check()`. Reads
+      `.dadaia/states/last_efficiency_audit.json` (`{schema_version,last_efficiency_audit,by,report}`). **4-case matrix
+      (through `check()`):** absent ⇒ no issue; fresh/≤30d ⇒ no issue; stale/>30d ⇒ EFF-1; malformed (invalid JSON /
+      missing field / unparseable ts) ⇒ EFF-1 "malformed marker", never a crash. Bare `dadaia doctor` exit stays 0
+      (service never raises on issues; `[manual]` render for fixable=False).
+    - **Writer (FR7):** `cli/commands/reports.py` — NEW `dadaia reports mark-efficiency-audit --report <path> [--by <agent>]`
+      + `_write_efficiency_audit_marker` helper writing the marker with the current RFC3339 (`...Z`) timestamp — the
+      production EFF-1 clear path. Round-trip test proves writer↔reader agree (stale marker ⇒ EFF-1 → run writer ⇒ EFF-1
+      cleared).
+    - **MANDATORY tier-taxonomy contract (FR6, Ruling 17):** NEW `tests/contract/test_agent_tier_taxonomy.py` (yaml-parsed
+      frontmatter) — every non-plugin core agent (9 in `public/agents/` without `plugin: true`) carries a numeric `tier`
+      + registry-known `model == claude-opus-4-8` (registry tier `dispatch`); the 3 plugin bodies
+      (`public/plugins/*/agents/*.md`) carry `tier: 3` + `model: claude-sonnet-4-6` (registry tier `plugin`); roster
+      counts pinned (9 core, 3 plugin).
+    - **RED-first / AC-11(e) sabotage (capture → revert):** removing `issues.extend(self._check_efficiency_audit())` from
+      `check()` ⇒ `test_efficiency_audit_trigger.py::test_stale_marker_emits_eff1_through_check` AND
+      `test_reports_mark_efficiency_audit.py::test_writer_round_trip_clears_eff1` FAIL (`assert 0 == 1` — EFF-1 not
+      emitted). Reverted. (Pre-fix there was no `DoctorService` EFF-1 check — the sabotage is the RED-first proof.)
+    - **existing-test fate ledger (QA-3 — ENUMERATED, each verified green because *absent ⇒ no issue*):**
+      `tests/integration/test_cli_doctor.py` (workspace-doctor CLI — fresh ws asserts exit 0 / happy path, unchanged),
+      `tests/e2e/features/test_public_pipeline.py`, `tests/e2e/features/test_specs_upgrade_e2e.py`,
+      `tests/e2e/test_lifecycle_engine_smoke.py` (fresh-workspace `dadaia doctor` journeys — all green). 31/31 passed on
+      the enumerated set. No `specs/backlog/**` staged.
+    - Gates: `ruff format --check` + `ruff check --no-cache` + `mypy --strict` (312 files, 0 issues) + `lint-imports`
+      **8 kept / 0 broken** ignore-cap 26 UNCHANGED (EFF-1 lives in `features/spec_context` reading `.dadaia/states` via
+      the existing doctor file-IO patterns — no new edge, no core-IO ratchet trip) + **full unpiped `pytest` = 4657
+      passed, 17 skipped, 0 failed**. Goldens untouched this wave. Commit `feat(T-60-40): ...`.
 
 ## W4B — FR9 provenance-gated consumer-repo fan-out (HIGH bug fix; AMENDS v0.1.58 Ruling L)
 
