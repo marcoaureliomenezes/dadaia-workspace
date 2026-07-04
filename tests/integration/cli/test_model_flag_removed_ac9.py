@@ -16,12 +16,29 @@ surviving ``--model`` reference in production is ``infrastructure/pi_runtime.py`
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_BOX_CHARS = "│╭╮╰╯─"
+
+
+def _norm_stderr(output: str) -> str:
+    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
+
+    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
+    env-dependent width, splitting ``No such option: --model`` across borders;
+    locally (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace.
+    """
+    text = _ANSI_RE.sub("", output)
+    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
+    return re.sub(r"\s+", " ", text)
+
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it).
 _runner = CliRunner()
@@ -58,7 +75,7 @@ def test_model_flag_is_unknown_option_on_every_run_verb(subcmd: list[str]) -> No
         ["lifecycle", *subcmd, "--release-id", _RELEASE, "--model", "anything:high"],
     )
     assert result.exit_code == 2
-    assert "No such option: --model" in result.stderr
+    assert "No such option: --model" in _norm_stderr(result.stderr)
     # Q4: the UsageError is on stderr — stdout stays empty (no partial payload leaks).
     assert result.stdout == ""
 

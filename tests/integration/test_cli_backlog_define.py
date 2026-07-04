@@ -144,6 +144,6 @@ def test_model_flag_is_removed(workspace: Path) -> None:
         ],
     )
     assert result.exit_code == 2
-    assert "No such option: --model" in result.stderr
+    assert "No such option: --model" in _clean(result.stderr)
     # Q4: the UsageError is on stderr — the --json stdout stays empty.
     assert result.stdout == ""

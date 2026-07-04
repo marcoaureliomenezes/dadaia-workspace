@@ -18,6 +18,7 @@ The snapshot assertion channel is the persisted ``LifecycleRun.workflow_policy``
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -42,6 +43,22 @@ from dadaia_workspace.features.workflows.dadaia_catalog import (
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_BOX_CHARS = "│╭╮╰╯─"
+
+
+def _norm_stderr(output: str) -> str:
+    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
+
+    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
+    env-dependent width, splitting ``No such option: --model`` across borders;
+    locally (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace.
+    """
+    text = _ANSI_RE.sub("", output)
+    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
+    return re.sub(r"\s+", " ", text)
+
 
 _runner = CliRunner()
 _RELEASE = "v0.1.56"
@@ -188,7 +205,7 @@ def test_wire_verb_model_flag_is_removed(workspace: Path, verb: str) -> None:
         ],
     )
     assert result.exit_code == 2
-    assert "No such option: --model" in result.stderr
+    assert "No such option: --model" in _norm_stderr(result.stderr)
     # Q4: the UsageError is on stderr — stdout stays empty.
     assert result.stdout == ""
 
