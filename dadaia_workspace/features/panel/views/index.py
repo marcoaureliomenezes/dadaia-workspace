@@ -116,10 +116,10 @@ def render_index(
   <main class="main" role="main">
 
     <section id="section-servers" class="section" aria-label="Running development servers" role="tabpanel" tabindex="0" aria-labelledby="tab-servers">
-      <div class="section-header">
+      <header class="section-header">
         <h2>Servers</h2>
         <p>Dev servers running across active contexts. Auto-refreshes every 5 seconds.</p>
-      </div>
+      </header>
       <div class="refresh-notice">
         <span id="refresh-status" aria-hidden="true"></span>
         <span id="refresh-label">Last updated just now</span>
@@ -128,10 +128,10 @@ def render_index(
     </section>
 
     <section id="section-memories" class="section active" aria-label="Spec Context Project memories" role="tabpanel" tabindex="0" aria-labelledby="tab-memories">
-      <div class="section-header">
+      <header class="section-header">
         <h2>Projects</h2>
         <span class="projects-count-badge">{context_count} projects</span>
-      </div>
+      </header>
       <details class="section-desc">
         <summary>About this section</summary>
         <p>Active Spec Context Projects — architecture, tech-stack and product memories for each repo.</p>

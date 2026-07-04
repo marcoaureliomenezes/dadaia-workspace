@@ -14,6 +14,10 @@ PROJECTS_CSS: str = """
 /* ── Projects section header ──────────────────────────────────────────────── */
 
 .projects-count-badge {
+  /* margin-left:auto right-aligns the count in the FR4 single-row section header
+     (.section-header:has(.projects-count-badge) in structure.py). */
+  margin-left: auto;
+  flex-shrink: 0;
   background: var(--color-primary-bg);
   color: var(--color-accent-dark);
   border: 1px solid var(--color-accent);
@@ -42,18 +46,34 @@ PROJECTS_CSS: str = """
 }
 
 /* ── Context card — uniform treatment (no primary special casing) ──────────── */
+/* v0.1.59 / FR4 density pass: aligned to the one card-elevation language shared by
+   the Workflows + Academy cards — a calm resting shadow (--shadow-card-rest) that
+   lifts on hover (--shadow-card-hover + --lift-hover translate) with the softer
+   --radius-lg corner, so every card surface reads as one designed system. The
+   4px accent left-border + --space-md padding are preserved. Motion-guarded. */
 
 .context-card {
   background: var(--color-surface);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card-rest);
   padding: var(--space-md);
   border-left: 4px solid var(--color-accent);
-  transition: box-shadow var(--duration-fast) var(--easing-standard);
+  transition: box-shadow var(--duration-normal) var(--easing-standard),
+              transform var(--duration-normal) var(--easing-decelerate);
 }
 
 .context-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(var(--lift-hover));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-card {
+    transition: box-shadow var(--duration-normal) var(--easing-standard);
+  }
+  .context-card:hover {
+    transform: none;
+  }
 }
 
 /* ── Zone A — project name ─────────────────────────────────────────────────── */

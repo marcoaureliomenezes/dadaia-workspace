@@ -130,8 +130,43 @@ code {
   padding-bottom: var(--space-sm);
   border-bottom: 1px solid var(--color-border);
 }
-.section-header h2 { font-size: 1.15rem; color: var(--color-heading); }
-.section-header p { font-size: 0.88rem; color: var(--color-muted); margin-top: 0.25rem; }
+.section-header h2 {
+  font-size: 1.15rem;
+  color: var(--color-heading);
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.01em;
+}
+.section-header p {
+  font-size: var(--text-base);
+  color: var(--color-muted);
+  margin-top: var(--space-2xs);
+  line-height: var(--line-height-snug);
+}
+
+/* ── Title + trailing-meta header row (v0.1.59 / FR4) ────────────────────────
+   A section header that pairs its <h2> title with a single trailing meta pill
+   (the Projects tab's .projects-count-badge) lays out on ONE aligned row — title
+   left, count right — instead of the pre-pass block flow that dropped the count
+   badge onto a second line below the title. This is the same single-row pattern
+   the W3/FR3 pass gave the Sessions .runtime-switcher header, applied here for a
+   consistent header hierarchy across the six tabs. The badge is pushed to the
+   trailing edge (margin-left:auto, in projects.py); a long title ellipsises
+   before the badge shrinks. Token-anchored; no colour/type/radius literals.
+   Scoped via :has(.projects-count-badge) so the plain title/description headers
+   (Servers, Reports, Academy) keep their stacked title+description flow. */
+.section-header:has(.projects-count-badge) {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-md);
+  min-width: 0;
+}
+.section-header:has(.projects-count-badge) > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Single-line header/control row (v0.1.59 / FR3) ──────────────────────────
    A header that pairs a title with a trailing control (the Sessions tab's

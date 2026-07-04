@@ -257,7 +257,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W4 — FR4 layout / IA hierarchy + density
 
-- [ ] T-59-40 Restructure section/card grouping, alignment, density across the live tabs. Checklist:
+- [x] T-59-40 Restructure section/card grouping, alignment, density across the live tabs. Checklist:
   - **Layout/IA pass** — consistent `.section-header` hierarchy, card density/spacing rhythm, and visual
     grouping across Projects / Workflows / Sessions / Reports / Academy / Servers (SSR-HTML in `index.py` +
     section-scaffold views `sessions.py`/`academy.py`/`reports.py`/`workflows.py` + their CSS). SSR-HTML + CSS
@@ -274,6 +274,67 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
   - **AC-1/AC-2 replay.** AC-11 ledger — EDITED: `views/index.py` (layout/IA, sequential after W3), the section
     scaffold views (`views/sessions.py`/`views/academy.py`/`views/reports.py`/`views/workflows.py`) + their CSS;
     SURVIVE unchanged: `test_views_index.py` (markers preserved). No `specs/backlog/**` staged.
+  - **W4 EVIDENCE (T-59-40 DONE 2026-07-04, software-engineer).**
+    - **Layout/IA pass (SSR-HTML)** — every top-level section header standardized to a proper `<header
+      class="section-header">` landmark for a consistent structural hierarchy across the six tabs (Sessions was
+      already `<header>`; Servers + Projects in `views/index.py`, `views/academy.py`, `views/reports.py`,
+      `views/workflows.py` changed `<div class="section-header">` → `<header ...>`). CSP-clean (no `<script>`
+      touched); NO inline `style=` reintroduced (`grep -c 'style=' index.py sessions.py` → `0`/`0`). No
+      `render_api_*` edit. 6-tab nav UNCHANGED (Ruling A).
+    - **Marker strings PRESERVED (A4)** — `sessions-dashboard` / `reports-list` / `academy-content` untouched;
+      `<div>`→`<header>` only changes the container element, never a marker/selector. `test_views_index.py`
+      SURVIVES unchanged (`<h2>Projects</h2>`, `projects-count-badge`, `section-desc`, `About this section`,
+      `Active Spec Context Projects`, all card zones + 5 memory chips intact). **STOP-and-rescope (Q5): NONE** —
+      no asserted DOM-contract selector changed; the DOM-contract lock was NOT re-baselined.
+    - **Density/hierarchy pass (CSS)** — (1) `structure.py`: `.section-header h2`/`p` given tokenized rhythm
+      (`--line-height-tight`/`-snug`, `--text-base`, `--space-2xs`); NEW FR4 rule
+      `.section-header:has(.projects-count-badge)` lays the Projects title + count badge on ONE aligned row
+      (title left, count right) — the same single-row pattern W3 gave the Sessions `.runtime-switcher` header,
+      scoped so Servers/Reports/Academy keep their stacked title+description flow. (2) `projects.py`:
+      `.context-card` upgraded to the shared card-elevation language (`--shadow-card-rest` →
+      `--shadow-card-hover` + `--lift-hover`, softer `--radius-lg`), motion-guarded; `.projects-count-badge`
+      gets `margin-left:auto`+`flex-shrink:0` for the right-aligned header row (`border-left` + `--space-md`
+      padding preserved). (3) `academy.py` CSS: `.academy-card` aligned to the same rest→hover-lift elevation +
+      `--radius-lg`, motion-guarded. (4) `sessions.py` CSS: `.sessions-stat-card` given `--shadow-card-rest`
+      resting elevation (non-interactive → no hover lift). (5) `workflows.py` CSS: NEW `.section-meta` rule
+      (the workflows subsection description was emitted unstyled) → muted `--color-muted`/`--text-sm` treatment
+      consistent with a `.section-header <p>`. All token-anchored; no palette-hex change (Ruling E); no control
+      rule touched with an ad-hoc literal.
+    - **AC-5 replay + fate ledger (panel unit subset, 578 passed):** `test_index_dom_contract.py` GREEN (all 6
+      tabs/sections + `.nav-tab`/`.memory-chip`/`.context-card`/`.card-zone-*` + theme + runtime switchers
+      present — never re-baselined); `test_views_index.py` SURVIVES unchanged (markers + `projects-count-badge`
+      + `section-desc` + card contract preserved); `test_api_golden.py` + `api_golden_v0155.json` INVARIANT
+      byte-identical (`UPDATE_API_GOLDEN` never used); `test_security_headers.py` incl. the W1 CSP equality lock
+      GREEN (no inline-script edit; `_CSP_SCRIPT_HASH_1/2` unchanged); `test_control_tokens.py` GREEN (no control
+      rule literal); `test_palette.py` + `test_panel_css_contrast.py` GREEN (WCAG AA/AAA preserved — 0 palette-hex
+      change; brand-token fallbacks intact; new structure/workflows/sessions rules use no bare brand-var);
+      `test_theme_switcher.py`, `test_theme_palettes.py`, `test_runtime_switcher_pi.py`, `test_static.py`,
+      `test_views_static.py`, `test_svg_validity.py`, `test_projects_css_contract.py` all GREEN. AGENTS_CSS
+      importers untouched (W5 co-edits). No frozen-suite interaction.
+    - **Changed-surface e2e (16 passed, artifacts `.dadaia/tmp/software-engineer/20260704/pw-out|report`):**
+      `header-row-width.spec.ts` (6 — the W3 Sessions single-line row STILL green; my Projects header-row rule is
+      a separate `:has(.projects-count-badge)` rule and does not perturb the Sessions `:has(.runtime-switcher)`
+      rule) + `theme-switcher.spec.ts` (10 — incl. E2E-THM-09 axe-core zero critical/serious on all 3 themes).
+    - **AC-9 self-check (optional/preferred — DONE):** live registered panel (`dadaia server register --port
+      3742`); with FR4 the Projects `7 projects` badge sits inline-right on the title row
+      (`w4-projects-with-grouping.png`); sabotaging the FR4 rule
+      (`sed 's/:has(.projects-count-badge)/:has(.projects-count-badge-SABOTAGED)/'`) visibly regresses density —
+      the badge STACKS onto a second line below the title (`w4-projects-SABOTAGED-density-regressed.png`),
+      exactly the "stacked fragments / weak grouping" complaint — then reverted (grep `SABOTAGED` → 0). Panel
+      released. Screenshots + academy grouping under `.dadaia/tmp/software-engineer/20260704/`.
+    - **AC-11 ledger** — EDITED: `views/index.py` (Servers + Projects header → `<header>`), `views/academy.py`,
+      `views/reports.py`, `views/workflows.py` (top-level `.section-header` → `<header>`),
+      `views/assets/css/structure.py` (section-header rhythm + FR4 Projects header-row rule),
+      `views/assets/css/projects.py` (context-card elevation + count-badge alignment),
+      `views/assets/css/academy.py` (academy-card elevation), `views/assets/css/sessions.py` (stat-card resting
+      shadow), `views/assets/css/workflows.py` (`.section-meta` rule). NEEDED NO EDIT: `views/sessions.py`
+      (already `<header class="section-header">`; its runtime-switcher row is the W3 fix). SURVIVE unchanged:
+      `test_views_index.py`. No `specs/backlog/**` staged.
+    - **Gates:** `ruff format --check` clean (797 files) · `ruff check --no-cache` passed · `mypy --strict` 309
+      files clean · `lint-imports --no-cache` 8 kept/0 broken (ignore-cap UNCHANGED — no import edge) · full
+      unpiped `pytest -p no:cacheprovider` 4596 passed / 17 skipped (exit 0). `git status --short`: no
+      `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, repo-local `.dadaia/`, `playwright-report/`, or
+      `test-results/` (Q7); no `public/**` diff (AC-12: panel is package code — no re-projection needed).
 
 ## W5 — FR5 theme-switcher polish + FR6 two-category dead-CSS purge
 

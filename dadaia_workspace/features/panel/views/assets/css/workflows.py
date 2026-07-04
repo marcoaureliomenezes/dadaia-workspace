@@ -565,6 +565,19 @@ WORKFLOWS_CSS: str = """
   user-select: none;
 }
 
+/* ── Subsection meta description (v0.1.59 / FR4) ─────────────────────────────
+   The dadaia-workflows subsection header emits <p class="section-meta"> (the
+   "Every dadaia-workflow: purpose, step sequence …" line) which previously had no
+   rule and rendered as unstyled body text. Give it the same muted-description
+   treatment as a .section-header <p> so the workflows subsection reads with the
+   consistent title→description hierarchy of the other tabs. Token-anchored. */
+.section-meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-height-snug);
+}
+
 /* ── dadaia-workflow catalog cards (v0.1.45 / T-45-03) ───────────────── */
 /* Big, scannable, expandable diagram cards in a responsive grid. Each card is a
    native <details> disclosure: server-rendered, CSP-clean, no client script, not a

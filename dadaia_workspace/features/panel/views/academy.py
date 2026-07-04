@@ -47,10 +47,10 @@ def render_academy_section() -> str:
     return (
         '<section id="section-academy" class="section" aria-label="Academy modules"\n'
         '         role="tabpanel" tabindex="0" aria-labelledby="tab-academy">\n'
-        '  <div class="section-header">\n'
+        '  <header class="section-header">\n'
         "    <h2>Academy</h2>\n"
         "    <p>Course modules and learning resources for the workspace.</p>\n"
-        "  </div>\n"
+        "  </header>\n"
         '  <div id="academy-content">\n'
         '    <div class="empty-state">Loading academy modules...</div>\n'
         "  </div>\n"
