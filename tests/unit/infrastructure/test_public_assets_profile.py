@@ -41,6 +41,7 @@ from tests.unit.infrastructure.test_install_target_goldens import (
     _DOCTOR_GOLDEN,
     _is_env_doctor_line,
     _norm_path_line,
+    _sort_line_lists,
 )
 
 pytestmark = pytest.mark.unit
@@ -362,7 +363,8 @@ def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> No
     report = mgr.doctor(ws)
     normalized = [_norm_path_line(line, ws) for line in report if not _is_env_doctor_line(line)]
 
-    golden = json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8"))
+    golden = _sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))
+    normalized = _sort_line_lists(normalized)
     assert normalized == golden, (
         "absent-profile doctor diverged from the W1 all-four golden — FR3 broke back-compat."
     )

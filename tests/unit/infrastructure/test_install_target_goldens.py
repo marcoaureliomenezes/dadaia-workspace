@@ -243,13 +243,37 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _sort_line_lists(obj: object) -> object:
+    """Sort every list-of-strings in the captured object (platform-invariant law).
+
+    Directory-iteration order differs across OSes (Windows yielded
+    ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse),
+    and iteration order is not a product contract. The golden locks the exact
+    MULTISET of lines per key — order-insensitive, count-preserving.
+    """
+    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
+        return sorted(obj)
+    if isinstance(obj, dict):
+        return {k: _sort_line_lists(v) for k, v in obj.items()}
+    return obj
+
+
 def _assert_golden(path: Path, current_obj: object, what: str) -> None:
+    current_obj = _sort_line_lists(current_obj)
     current = json.dumps(current_obj, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     if os.environ.get("UPDATE_INSTALL_GOLDENS"):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(current, encoding="utf-8")
         pytest.skip(f"regenerated {what} golden (UPDATE_INSTALL_GOLDENS set)")
-    golden = path.read_text(encoding="utf-8")
+    golden = (
+        json.dumps(
+            _sort_line_lists(json.loads(path.read_text(encoding="utf-8"))),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     assert current == golden, (
         f"{what} diverged from the committed v0.1.58 W1 golden — the change altered "
         "observable behaviour. Fix the consumer, never the golden."
