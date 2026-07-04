@@ -106,7 +106,23 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W2 — FR2 wire audit / research / bug_report (born governed)
 
-- [ ] T-56-20 Make the three catalog-AVAILABLE workflows invocable, born on the W1 resolver seam.
+- [x] T-56-20 Make the three catalog-AVAILABLE workflows invocable, born on the W1 resolver seam.
+  **AC-7 evidence:** in `audit` CLI verb, set `build_audit_workflow(..., policy_snapshot=None)` ⇒
+  `test_lifecycle_fr2_wire_verbs.py::test_wire_verb_completes_and_persists_resolver_snapshot[audit]`
+  FAILED (`workflow_policy is None — verb is not resolver-governed`) → reverted.
+  **AC-8 ledger** — SURVIVING: the three workflow bodies (`AuditWorkflow`/`ResearchWorkflow`/
+  `BugReportWorkflow`) + the governed catalog (audit/research/bug_report already AVAILABLE);
+  NEW: the three-part FR1 seam on each body (`AuditStep`/`ResearchStep`/`BugReportStep`
+  `resolved_model`+`model_profile` fields → `_scope` → `PromptScope.resolved_model`; optional
+  `policy_snapshot` on each `__init__` frozen via `workflow_policy=` in `run()`) + three container
+  builders (`build_audit_workflow`/`build_research_workflow`/`build_bug_report_workflow`, the
+  bug_report one step-aware so ADDITIVE `bug_write` stays in-scope) + three `@app.command` verbs
+  (`audit`/`research`/`bug_report`) + `_emit_wire_result` + `_WireWorkflowResult` Protocol. NO
+  `pipeline.py` edit (structural `PolicyApplicableStep` decoupling). No `specs/backlog/**` staged.
+  **Adjudication:** bug_report driving fake is STEP-AWARE (specs/bugs ref for `bug_write`, handoff
+  ref elsewhere), not the uniform `.dadaia/handoff/` note in the checklist — a uniform handoff ref
+  out-of-scope-BLOCKs `bug_write` (empirically confirmed) since the frozen bug_write scope is
+  `specs/bugs/**`-only; step-aware is the only impl satisfying AC-3 COMPLETED + the frozen scope test.
   Checklist:
   - **Workflow-body seam edit (A1/R-4 — FR2 is NOT builder+verb only)**: `audit.py`, `research.py`,
     `bug_report.py` each get the **same three-part FR1 seam** W1 gave `ReleaseStep`/`ReleaseDefinitionWorkflow`:

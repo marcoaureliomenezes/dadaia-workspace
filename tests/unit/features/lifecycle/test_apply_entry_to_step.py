@@ -20,11 +20,14 @@ from dadaia_workspace.features.lifecycle.pipeline import (
     apply_entry_to_step,
     apply_resolved_policy,
 )
+from dadaia_workspace.features.lifecycle.workflows.audit import AuditStep
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     BacklogStep,
     BacklogStepKind,
 )
+from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportStep
 from dadaia_workspace.features.lifecycle.workflows.release_definition import ReleaseStep
+from dadaia_workspace.features.lifecycle.workflows.research import ResearchStep
 
 
 def _entry(step: str, harness: str, profile: str) -> WorkflowPolicyStepEntry:
@@ -124,6 +127,64 @@ def test_backlog_step_structurally_satisfies_and_preserves_fake() -> None:
     out = apply_resolved_policy((step,), snapshot)
 
     # FAKE preserved for the dry-run base; governed model still threaded.
+    assert out[0].runtime_kind is AgentRuntimeKind.FAKE
+    assert out[0].resolved_model is not None
+    assert out[0].resolved_model.harness == "codex"
+    assert out[0].model_profile == "codex-implementation-standard"
+
+
+@pytest.mark.parametrize(
+    ("step", "step_label"),
+    [
+        (
+            AuditStep(
+                label="audit_scope",
+                role="project-auditor",
+                fragment_id="audit.audit_scope",
+                runtime_kind=AgentRuntimeKind.FAKE,
+            ),
+            "audit_scope",
+        ),
+        (
+            ResearchStep(
+                label="research_scope",
+                role="product-engineer",
+                fragment_id="research.research_scope",
+                runtime_kind=AgentRuntimeKind.FAKE,
+            ),
+            "research_scope",
+        ),
+        (
+            BugReportStep(
+                label="bug_intake",
+                role="project-auditor",
+                fragment_id="bug_report.bug_intake",
+                runtime_kind=AgentRuntimeKind.FAKE,
+            ),
+            "bug_intake",
+        ),
+    ],
+    ids=["audit", "research", "bug_report"],
+)
+def test_wave_e_step_structurally_satisfies_policy_applicable_step(
+    step: AuditStep | ResearchStep | BugReportStep, step_label: str
+) -> None:
+    """W2/R-2 decoupling: adding the two model fields auto-satisfies the structural Protocol.
+
+    The SAME generic ``apply_resolved_policy`` governs ``AuditStep`` / ``ResearchStep`` /
+    ``BugReportStep`` with NO ``pipeline.py`` edit — the whole point of binding a structural
+    ``PolicyApplicableStep`` Protocol rather than an enumerated type-union.
+    """
+    snapshot = WorkflowPolicySnapshot(
+        workflow_id="wave-e",
+        policy_id="default",
+        resolved_at="2026-07-03T00:00:00Z",
+        steps=(_entry(step_label, "codex", "codex-implementation-standard"),),
+    )
+
+    out = apply_resolved_policy((step,), snapshot)
+
+    # FAKE preserved for the fake base; the governed model/profile is still threaded.
     assert out[0].runtime_kind is AgentRuntimeKind.FAKE
     assert out[0].resolved_model is not None
     assert out[0].resolved_model.harness == "codex"

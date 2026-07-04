@@ -6,12 +6,13 @@ import json
 from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import typer
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
+    BlockedState,
     GateEvidenceKind,
     LifecyclePhase,
 )
@@ -1150,6 +1151,261 @@ def close(
         json_output=json_output,
         post_step=_apply_closure_removal,
     )
+
+
+# -- FR2: wire audit / research / bug_report as invocable, resolver-governed verbs -------
+
+
+class _WireStepResult(Protocol):
+    """Structural read view of one Wave-E workflow step result (audit/research/bug_report)."""
+
+    @property
+    def label(self) -> str: ...
+    @property
+    def is_gate(self) -> bool: ...
+    @property
+    def fragment_id(self) -> str | None: ...
+    @property
+    def accepted(self) -> bool: ...
+    @property
+    def runtime_kind(self) -> AgentRuntimeKind | None: ...
+
+
+class _WireWorkflowResult(Protocol):
+    """Structural read view of a Wave-E workflow result, shared across the three FR2 verbs.
+
+    ``AuditResult`` / ``ResearchResult`` / ``BugReportResult`` satisfy this Protocol
+    field-for-field, so one emitter serves all three verbs without a per-type union.
+    """
+
+    @property
+    def run_id(self) -> str: ...
+    @property
+    def completed(self) -> bool: ...
+    @property
+    def final_phase(self) -> LifecyclePhase: ...
+    @property
+    def steps(self) -> tuple[_WireStepResult, ...]: ...
+    @property
+    def blocked(self) -> BlockedState | None: ...
+
+
+def _emit_wire_result(verb: str, result: _WireWorkflowResult, *, json_output: bool) -> None:
+    """Emit an FR2 wire-verb result (JSON or human) + set the exit code (BLOCKED on failure)."""
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "final_phase": result.final_phase.value,
+                "steps": [
+                    {
+                        "label": step.label,
+                        "is_gate": step.is_gate,
+                        "fragment_id": step.fragment_id,
+                        "accepted": step.accepted,
+                        "runtime": step.runtime_kind.value if step.runtime_kind else None,
+                    }
+                    for step in result.steps
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(f"{s.label}:{'ok' if s.accepted else 'BLOCKED'}" for s in result.steps)
+        typer.echo(f"{status} {verb} run={result.run_id} phase={result.final_phase.value} {trail}")
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+@app.command("audit")
+def audit(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("audit", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3); steps: audit_scope, drift_scan, triage. See 'lifecycle workflow profiles list'.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the audit workflow (scope→drift-scan→triage) as a fragment-driven sequence.
+
+    Born resolver-governed (v0.1.56 / FR2): the per-step model is resolved through the shared
+    ``WorkflowExecutionPolicyResolver`` and the frozen snapshot is recorded on the run before
+    step 1 (LAW 7). ``--harness fake`` walks the whole sequence; ``--step-model`` is
+    profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning.
+    """
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+    from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
+
+    # FR2: resolve the frozen snapshot through the shared resolver; seed each base step's
+    # runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let apply_resolved_policy
+    # — the sole runtime_kind author — preserve FAKE while recording the governed harness.
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="audit",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names={},
+    )
+    base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
+    sequence = apply_resolved_policy(base, snapshot)
+
+    workflow = container.build_audit_workflow(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        default_runtime_kind=default_kind,
+        policy_snapshot=snapshot,
+    )
+    result = workflow.run(run_id, sequence=sequence)
+    _emit_wire_result("audit", result, json_output=json_output)
+
+
+@app.command("research")
+def research(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("research", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3); steps: research_scope, investigate, synthesis. See 'lifecycle workflow "
+        "profiles list'.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the research workflow (scope→investigate→synthesis) as a fragment-driven sequence.
+
+    Born resolver-governed (v0.1.56 / FR2), mirroring ``audit``: the frozen snapshot is
+    recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); ``--model``
+    is a non-fatal deprecation warning.
+    """
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+    from dadaia_workspace.features.lifecycle.workflows.research import _SEQUENCE
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
+
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="research",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names={},
+    )
+    base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
+    sequence = apply_resolved_policy(base, snapshot)
+
+    workflow = container.build_research_workflow(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        default_runtime_kind=default_kind,
+        policy_snapshot=snapshot,
+    )
+    result = workflow.run(run_id, sequence=sequence)
+    _emit_wire_result("research", result, json_output=json_output)
+
+
+@app.command("bug_report")
+def bug_report(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("bug-report", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3); steps: bug_intake, dedupe, bug_write. See 'lifecycle workflow profiles list'.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the bug-report workflow (intake→dedupe→bug_write) as a fragment-driven sequence.
+
+    Born resolver-governed (v0.1.56 / FR2). The verb's real ``bug_write`` target is the
+    ADDITIVE ``specs/bugs/`` path class — it takes no MUTATING lease by construction. Under
+    ``--harness fake`` a step-aware driving fake keeps the ADDITIVE ``bug_write`` step in-scope
+    so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); ``--model`` is a
+    non-fatal deprecation warning.
+    """
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import _SEQUENCE
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
+
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="bug_report",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names={},
+    )
+    base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
+    sequence = apply_resolved_policy(base, snapshot)
+
+    workflow = container.build_bug_report_workflow(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        default_runtime_kind=default_kind,
+        policy_snapshot=snapshot,
+    )
+    result = workflow.run(run_id, sequence=sequence)
+    _emit_wire_result("bug_report", result, json_output=json_output)
 
 
 @app.command()
