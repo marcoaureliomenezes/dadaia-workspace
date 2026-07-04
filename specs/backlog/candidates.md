@@ -2,11 +2,14 @@
 
 Curated index of surviving backlog items. Rebuilt 2026-07-02 after the operator-ordered
 backlog sanitization + architectural deep review (post-v0.1.48); **pruned 2026-07-04** after
-R1–R10 (v0.1.49–v0.1.58) shipped. This index lists **only** surviving open candidates —
+R1–R11 (v0.1.49–v0.1.59) shipped. This index lists **only** surviving open candidates —
 consumed, superseded, and stale entries were removed per removal-on-release and the
 never-keep-the-past law. R10 (v0.1.58) consumed `harness-isolation-profiles` +
 `consumer-agents-md-fanout-redesign` (both anchors survive → archived at CLOSURE to
-`specs/_archive/v0.1.58/consumed-backlog/`) and returned four items (indexed below).
+`specs/_archive/v0.1.58/consumed-backlog/`) and returned four items (indexed below). R11
+(v0.1.59) consumed `panel-ux-overhaul` (anchor survives → archived at CLOSURE to
+`specs/_archive/v0.1.59/consumed-backlog/`) and returned one item
+(`response-guard-chip-presence-hardening`, indexed below).
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -37,7 +40,7 @@ grill on the picked set before SPEC.
 | R8 | **SHIPPED — v0.1.56** (merged `3a02f758`, PR #101, 2026-07-04) | `lifecycle-verb-governance-uniformity` (consumed; archived at CLOSURE — both anchors survive) | Resolver on EVERY run verb + audit/research/bug_report invocable + implement/review loop fixed (digest + runner gate + CLI caller) + TRANSITIONS reconciliation. Final release of the R6→R8 mandate. |
 | R9 | **SHIPPED — v0.1.57** (merged `8bab315a`, PR #104, 2026-07-04) | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup`; `hard-remove-model-flag-across-run-verbs` (all consumed; the two injection-canon anchors survive → archived at CLOSURE; the `--model` dead anchor archived at SHIP — BL-SCHEMA) | The dedup base created the ONE prompt-assembly seam; role→atom map + phase threading + coherence doctor landed there; `--model` hard-removed across the 12 run verbs; `TransitionDecision.advanced` fixed the illegal-transition bug. First release of the R9→R12 mandate. |
 | R10 | **SHIPPED — v0.1.58** (merged `b0bd8217`, PR #106, 2026-07-04) | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` (both consumed; both anchors survive → archived at CLOSURE) | `init --harness` profiles + typed `core/harness_registry.py` (4 L1 + 3 L2 sites, contract-locked to `harness_models.harnesses()`) + profile-aware install/doctor (absent ⇒ all-four) + consumer AGENTS.md fan-out redesign (spec_contexts.json detection, `[updated]` restore, doctor flagging). First projection/install release after the structural chain; the workflow-spawn auto-default deferred (FR6). |
-| R11 | Panel UX overhaul | `panel-ux-overhaul` | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). |
+| R11 | **SHIPPED — v0.1.59** (merged `e6634996`, PR #108, 2026-07-04) | `panel-ux-overhaul` (consumed; anchor survives → archived at CLOSURE) | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). Token-driven design system + uniformly styled controls + single-line header/control rows + `<header>` IA density + theme polish + two-category dead-CSS purge; behavior-locked golden-first (DOM-contract lock never re-baselined + api-golden zero-diff + CSP hashes frozen). Returned one QA LOW item. |
 | R12 | Capability tail | `plugin-packs-and-install-command`; `model-tier-efficiency-and-fast-tier-utilization` | Pure new capability, zero debt: packs + install command, then Layer-1 fast-tier assignments. |
 
 ---
@@ -56,11 +59,6 @@ surface. Override: bounded phase-aware L1 digests reopen FR4.
 ---
 
 ## MEDIUM
-
-### `panel-ux-overhaul` — Panel UX overhaul (FEAT-PANEL-UX-200)
-Visual-quality + layout overhaul (tokens design system, row wrapping, theme switcher,
-tab consolidation). Re-baselined 2026-07-02: Sessions surface carved out to
-`panel-sessions-cost-dashboard-only`.
 
 ### `workflow-spawn-entry-harness-autodefault` — Workflow-spawn entry-harness auto-default *(2026-07-04)*
 Returned at v0.1.58 closure (FR6 / Ruling F). Auto-default the Layer-2 worker harness from
@@ -86,6 +84,13 @@ Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trig
 ---
 
 ## LOW
+
+### `response-guard-chip-presence-hardening` — Response-guard e2e chip-presence assertion (QA) *(2026-07-04)*
+Returned at v0.1.59 closure (W5 AC-9(e) finding). `tests/e2e/panel/response-guard.spec.ts:76-77`
+null-guards a missing `.memory-chip` (`if (firstChip) {…}`) and degrades gracefully, so a dropped
+chip is caught only by the FR1 DOM-contract unit lock, not the browser tour. Assert chip presence
+(`expect(firstChip).not.toBeNull()`) as defence-in-depth behind the DOM contract. Anchored at
+`tests/e2e/panel/response-guard.spec.ts`.
 
 ### `fanout-repo-slug-containment` — Consumer fan-out repo-slug containment guard *(2026-07-04)*
 Returned at v0.1.58 closure (FR4 hardening, security). The redesigned fan-out writes the
