@@ -36,6 +36,25 @@ class TransitionDecision:
     reason: str
     missing_requirements: tuple[GateRequirement, ...] = field(default_factory=tuple)
 
+    @property
+    def advanced(self) -> bool:
+        """Whether the run actually ADVANCED to the next phase (v0.1.57 FR5 / A5).
+
+        The correct accept predicate is DUAL-signal — the transition was ``accepted`` AND
+        the run carries no ``blocked`` state — because ``accepted`` and
+        ``run.blocked is None`` each miss a distinct failure mode when read alone:
+
+        * an ILLEGAL transition returns ``accepted=False`` with the run *unchanged*
+          (``blocked is None``) — ``run.blocked is None`` alone reads ``True`` (the bug
+          ``pipeline-accepted-true-on-illegal-transition``);
+        * a legal transition INTO BLOCKED returns ``accepted=True`` with a ``blocked``
+          run — ``accepted`` alone reads ``True``.
+
+        Single-sourcing the predicate here makes it the state machine's own contract
+        rather than caller lore, protecting every caller of ``LifecycleAgentRunner.run``.
+        """
+        return self.accepted and self.run.blocked is None
+
 
 class LifecycleStateMachine:
     """Evaluate lifecycle transitions without filesystem, CLI, or LLM dependencies."""

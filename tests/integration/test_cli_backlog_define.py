@@ -122,13 +122,11 @@ def test_raw_step_model_rejected_d3(workspace: Path) -> None:
     assert "profile id" in _clean(result.output)
 
 
-def test_model_flag_is_nonfatal_deprecation_warning(workspace: Path) -> None:
-    """v0.1.56 FR1 ruling (rewritten from the inverted LAW-2 no-model rejection):
+def test_model_flag_is_removed(workspace: Path) -> None:
+    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
+    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
 
-    ``--model`` is a NON-FATAL deprecation warning — the verb emits a stderr line naming
-    ``--step-model`` and proceeds under the resolved policy (``--harness fake`` completes).
-    Click 8.3 keeps stderr separate from stdout by default, so ``result.stderr`` isolates the
-    warning while ``result.stdout`` stays parseable JSON (R-QA-1).
+    The profile-ids-only D-3 rejection stays covered by ``test_raw_step_model_rejected_d3``.
     """
     result = _runner.invoke(
         app,
@@ -145,9 +143,7 @@ def test_model_flag_is_nonfatal_deprecation_warning(workspace: Path) -> None:
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.stderr
-    assert "--model is deprecated" in result.stderr
-    assert "--step-model" in result.stderr
-    # R-QA-1: the warning stays OUT of stdout so the --json payload stays parseable.
-    payload = json.loads(result.stdout)
-    assert payload["completed"] is True
+    assert result.exit_code == 2
+    assert "No such option: --model" in result.stderr
+    # Q4: the UsageError is on stderr — the --json stdout stays empty.
+    assert result.stdout == ""

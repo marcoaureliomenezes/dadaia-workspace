@@ -345,11 +345,6 @@ def backlog_define(
     harness: str = typer.Option(
         "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
@@ -372,7 +367,8 @@ def backlog_define(
     ``(harness, model)``. The §4 Python steps (``subject_bind``, ``existing_backlog_review``,
     ``reconcile_decision``, ``backlog_review_gate``) dispose deterministically via the R1
     registry + classifier; a blocked gate stops the sequence. ``--harness fake`` walks the
-    whole sequence; ``claude`` is rejected (LAW 1); an invalid ``--model`` is rejected (LAW 2).
+    whole sequence; ``claude`` is rejected (LAW 1); the per-step model is profile-ids-only
+    via ``--step-model`` (D-3) — the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
     from dataclasses import replace as _replace
 
@@ -387,7 +383,6 @@ def backlog_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     # Per-step harness overrides, keyed by the §4 model-step labels.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -479,11 +474,6 @@ def release_define(
     harness: str = typer.Option(
         "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
@@ -515,7 +505,6 @@ def release_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     # Per-step harness overrides, keyed by the §6.1 step label.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -655,11 +644,6 @@ def implement(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -680,7 +664,6 @@ def implement(
         harness=harness,
         workflow_id="implementation",
         catalog_step_label="implement",
-        model=model,
         step_model=step_model,
         json_output=json_output,
     )
@@ -699,26 +682,6 @@ def _resolve_harness(harness: str) -> AgentRuntimeKind:
     except KeyError as exc:
         choices = ", ".join(sorted(_HARNESS_KINDS))
         raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
-
-
-def _warn_model_deprecated(model: str | None) -> None:
-    """Emit the non-fatal ``--model`` deprecation warning (v0.1.56 FR1 ruling).
-
-    ``--model`` (the raw ``<id>:<effort>`` discrete-model selection) is superseded by the
-    governed policy resolver. Rather than a silent no-op (a hidden side-effect anti-slop
-    defect) or a hard error (which would break every script/test still passing ``--model``
-    mid-mandate), the flag is accepted and the verb proceeds under the resolved policy after
-    emitting ONE stderr line naming the replacement. STDERR keeps a ``--json`` payload on
-    stdout parseable (R-QA-1). A CLOSURE backlog return tracks hard-removing ``--model``.
-    """
-    if model is None:
-        return
-    typer.echo(
-        "warning: --model is deprecated and ignored; the per-step model is now governed by "
-        "the policy resolver. Use --step-model <label>=<profile-id> instead "
-        "(run 'dadaia lifecycle workflow profiles list' for the valid profile ids).",
-        err=True,
-    )
 
 
 def _parse_step_harness_overrides(
@@ -880,7 +843,6 @@ def _run_phase_step(
     workflow_id: str,
     catalog_step_label: str,
     json_output: bool,
-    model: str | None = None,
     step_model: list[str] | None = None,
     post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
 ) -> None:
@@ -892,7 +854,7 @@ def _run_phase_step(
     snapshot through the shared resolver, selects its ``catalog_step_label`` entry, and calls
     :func:`apply_entry_to_step` ONCE (there is no step object to iterate) to author its local
     ``runtime_kind`` (FAKE preserved for a dry-run) + ``resolved_model``. ``--step-model`` is
-    profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning. The frozen
+    profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6). The frozen
     snapshot is passed to ``LifecyclePhaseWorkflow.run`` so the run records it (LAW 7). The
     worker must emit an APPROVED handoff with an artifact_ref to advance the phase.
     """
@@ -901,7 +863,6 @@ def _run_phase_step(
 
     workspace_root = resolve_workspace_root()
     kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
     snapshot = _resolve_workflow_snapshot(
         workspace_root,
         workflow_id=workflow_id,
@@ -988,11 +949,6 @@ def review_qa(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1013,7 +969,6 @@ def review_qa(
         harness=harness,
         workflow_id="implementation",
         catalog_step_label="review_qa",
-        model=model,
         step_model=step_model,
         json_output=json_output,
     )
@@ -1026,11 +981,6 @@ def review_security(
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
-    ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1052,7 +1002,6 @@ def review_security(
         harness=harness,
         workflow_id="implementation",
         catalog_step_label="review_security",
-        model=model,
         step_model=step_model,
         json_output=json_output,
     )
@@ -1065,11 +1014,6 @@ def review_code(
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
-    ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1091,7 +1035,6 @@ def review_code(
         harness=harness,
         workflow_id="implementation",
         catalog_step_label="review_code",
-        model=model,
         step_model=step_model,
         json_output=json_output,
     )
@@ -1104,11 +1047,6 @@ def close(
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
-    ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1154,7 +1092,6 @@ def close(
         harness=harness,
         workflow_id="closure",
         catalog_step_label="close",
-        model=model,
         step_model=step_model,
         json_output=json_output,
         post_step=_apply_closure_removal,
@@ -1240,11 +1177,6 @@ def audit(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1258,7 +1190,7 @@ def audit(
     Born resolver-governed (v0.1.56 / FR2): the per-step model is resolved through the shared
     ``WorkflowExecutionPolicyResolver`` and the frozen snapshot is recorded on the run before
     step 1 (LAW 7). ``--harness fake`` walks the whole sequence; ``--step-model`` is
-    profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning.
+    profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
     from dataclasses import replace as _replace
 
@@ -1268,7 +1200,6 @@ def audit(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     # FR2: resolve the frozen snapshot through the shared resolver; seed each base step's
     # runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let apply_resolved_policy
@@ -1303,11 +1234,6 @@ def research(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1320,8 +1246,8 @@ def research(
     """Run the research workflow (scope→investigate→synthesis) as a fragment-driven sequence.
 
     Born resolver-governed (v0.1.56 / FR2), mirroring ``audit``: the frozen snapshot is
-    recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); ``--model``
-    is a non-fatal deprecation warning.
+    recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); the legacy
+    ``--model`` flag was removed in v0.1.57 (FR6).
     """
     from dataclasses import replace as _replace
 
@@ -1331,7 +1257,6 @@ def research(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     snapshot = _resolve_workflow_snapshot(
         workspace_root,
@@ -1363,11 +1288,6 @@ def bug_report(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1381,8 +1301,8 @@ def bug_report(
     Born resolver-governed (v0.1.56 / FR2). The verb's real ``bug_write`` target is the
     ADDITIVE ``specs/bugs/`` path class — it takes no MUTATING lease by construction. Under
     ``--harness fake`` a step-aware driving fake keeps the ADDITIVE ``bug_write`` step in-scope
-    so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); ``--model`` is a
-    non-fatal deprecation warning.
+    so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); the legacy
+    ``--model`` flag was removed in v0.1.57 (FR6).
     """
     from dataclasses import replace as _replace
 
@@ -1392,7 +1312,6 @@ def bug_report(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     snapshot = _resolve_workflow_snapshot(
         workspace_root,
@@ -1527,11 +1446,6 @@ def implement_review(
     harness: str = typer.Option(
         "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
     ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
-    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1554,7 +1468,7 @@ def implement_review(
     EVIDENCE ONLY (non-SUCCEEDED / empty artifact_refs / out-of-scope ⇒ BLOCK), never on the
     review verdict. An APPROVED review COMPLETES the loop; exhausting ``--max-review-retries``
     REJECTED rounds BLOCKS it. ``--harness fake`` drives it deterministically; ``--step-model``
-    is profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning.
+    is profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
     from dadaia_workspace.features.lifecycle.pipeline import (
         PipelineStep,
@@ -1563,7 +1477,6 @@ def implement_review(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _warn_model_deprecated(model)
 
     # FR3: resolve the ``implementation`` snapshot through the shared resolver; seed each base
     # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let
@@ -1613,11 +1526,6 @@ def pipeline(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option("fake", "--harness", help="Default harness for all steps."),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="Default discrete Layer-2 model '<id>:<effort>' for the default harness (LAW 2).",
-    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
@@ -1660,10 +1568,6 @@ def pipeline(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    # Coherence (v0.1.56): the legacy discrete --model is superseded by profile-id
-    # --step-model (D-3); accept it with the same non-fatal deprecation warning as the
-    # other run verbs rather than a silent no-op.
-    _warn_model_deprecated(model)
 
     # Parse --step-harness into label→(kind, name). The kind drives the base ladder's
     # dry-run sentinel (fake vs real); the name is threaded into the governed resolver.

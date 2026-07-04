@@ -263,7 +263,10 @@ class LifecyclePipeline:
             )
             run = decision.run
             self._run_store.save(run)
-            accepted = run.blocked is None
+            # FR5 (A5): the accept signal is the state machine's dual-signal contract, NOT
+            # ``run.blocked is None`` — the latter read ``True`` on an illegal transition
+            # (run unchanged, no blocked state) and wrongly advanced the ladder.
+            accepted = decision.advanced
             results.append(
                 PipelineStepResult(
                     label=step.label,

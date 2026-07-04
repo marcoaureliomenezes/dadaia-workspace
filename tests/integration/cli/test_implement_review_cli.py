@@ -183,8 +183,9 @@ def test_implement_review_rejects_raw_step_model(workspace: Path) -> None:
     assert "profile id" in result.output
 
 
-def test_implement_review_model_flag_is_nonfatal_deprecation(workspace: Path) -> None:
-    """AC-2(iv) / R-QA-1 parity: ``--model`` warns on stderr; ``--json`` stdout stays parseable."""
+def test_implement_review_model_flag_is_removed(workspace: Path) -> None:
+    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
+    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4)."""
     result = _runner.invoke(
         app,
         [
@@ -199,7 +200,6 @@ def test_implement_review_model_flag_is_nonfatal_deprecation(workspace: Path) ->
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.output
-    assert "--model is deprecated" in result.stderr
-    assert "--step-model" in result.stderr
-    json.loads(result.stdout)
+    assert result.exit_code == 2
+    assert "No such option: --model" in result.stderr
+    assert result.stdout == ""

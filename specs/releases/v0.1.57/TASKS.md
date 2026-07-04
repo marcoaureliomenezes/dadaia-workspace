@@ -269,15 +269,49 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W5 — FR5 bug fix + FR6 `--model` removal
 
-- [ ] T-57-50 Fix the pipeline accepted computation (both seams) + hard-remove `--model`.
-  **AC-10(c-pipeline) evidence:** revert ONLY the `LifecyclePipeline.run` fix ⇒ AC-8 pipeline-seam test
-  FAILS → re-applied. **AC-10(c-twin) evidence:** revert ONLY the `LifecyclePhaseWorkflow.run` fix ⇒
-  AC-8 phase_workflow-seam test FAILS → re-applied (Q5 — each seam sabotaged independently).
-  **AC-10(d) evidence:** restore `_warn_model_deprecated` + the `--model` option ⇒ AC-9 "No such option"
-  test FAILS → reverted. **AC-12 ledger** — NEW: `TransitionDecision.advanced` property (A5); SURVIVING:
-  `LifecyclePipeline.run` + `LifecyclePhaseWorkflow.run` (both read `decision.advanced`); DEAD (removed):
-  `_warn_model_deprecated`, the 12 `--model` option decls, the 5 deprecation-warning tests
-  (inverted/deleted). No `specs/backlog/**` staged. Checklist:
+- [x] T-57-50 Fix the pipeline accepted computation (both seams) + hard-remove `--model`.
+  **Done (evidence):** NEW read-only `TransitionDecision.advanced` property (A5) in
+  `state_machine.py` (`self.accepted and self.run.blocked is None`). Both seams now read it:
+  `LifecyclePipeline.run` → `accepted = decision.advanced`; `LifecyclePhaseWorkflow.run` →
+  `accepted=decision.advanced` AND the stale "decision.accepted is True even for a legal
+  transition INTO BLOCKED…" comment replaced with a dual-signal `advanced` note that names the
+  ILLEGAL-transition case it missed. FR6: `_warn_model_deprecated` DELETED; the **exactly 12**
+  `--model` option decls removed across the 12 run verbs; `_run_phase_step`'s `model` param + its
+  5 `model=model` call-site passes removed; 6 stale docstrings de-slopped ("legacy `--model`
+  removed in v0.1.57 (FR6)"). NEW tests: `test_accepted_advanced_bugfix.py` (6 — AC-8 both seams
+  RED-first + 4 regression guards), `test_state_machine.py` +4 (`advanced` across all 4 decision
+  shapes), `test_model_flag_removed_ac9.py` (14 — 12-verb parametrized removal + `_warn_model_deprecated`
+  zero-ref grep + sole-surviving `pi_runtime.py` `--model` grep). INVERTED 5 deprecation cases (no
+  deletions — all had invertible assertions): `test_lifecycle_verb_governance.py::test_verb_model_flag_is_removed`
+  (×7 params), `test_lifecycle_fr2_wire_verbs.py::test_wire_verb_model_flag_is_removed` (×3),
+  `test_implement_review_cli.py::test_implement_review_model_flag_is_removed`,
+  `test_cli_backlog_define.py::test_model_flag_is_removed`,
+  `test_lifecycle_cli.py::test_lifecycle_implement_rejects_raw_step_model_and_unknown_model` (keeps its
+  (a) D-3 rejection, inverts (b)) — each asserts exit 2 + `"No such option: --model"` in `result.stderr`
+  + `result.stdout == ""`, NO `mix_stderr` kwarg; each file's profile-ids-only D-3 rejection kept.
+  **AC-8 RED shown:** pre-fix BOTH illegal-transition seam tests asserted `accepted=True`
+  (`QA_REVIEW→IMPLEMENTATION`, run unchanged, `blocked is None`). **AC-9 RED shown:** pre-removal all
+  12 verb cases + both greps failed (`--model` accepted → exit 3).
+  **Gates:** `ruff format --check` (783 files); `ruff check --no-cache` clean; `mypy --strict` (305
+  files) clean; `lint-imports --no-cache` **8 kept / 0 broken** (cap 26 UNCHANGED — `advanced` is a
+  property on an existing dataclass, no new edge); FULL unpiped `pytest -p no:cacheprovider`
+  **4490 passed / 17 skipped / 0 failed**.
+  **AC-10(c-pipeline) evidence:** `pytest tests/unit/features/lifecycle/test_accepted_advanced_bugfix.py`
+  with ONLY `LifecyclePipeline.run` reverted to `accepted = run.blocked is None` ⇒
+  `test_pipeline_illegal_transition_is_not_accepted` FAILS (`accepted=True`) while the phase_workflow-seam
+  test still PASSES (seams differentiate) → re-applied. **AC-10(c-twin) evidence:** with ONLY
+  `LifecyclePhaseWorkflow.run` reverted to `accepted=decision.run.blocked is None` ⇒
+  `test_phase_workflow_illegal_transition_is_not_accepted` FAILS while the pipeline-seam test PASSES (Q5 —
+  each seam sabotaged independently) → re-applied. **AC-10(d) evidence:** add one `--model` option decl to
+  the `audit` verb (snapshot-reversible) ⇒ `pytest tests/integration/cli/test_model_flag_removed_ac9.py`
+  FAILS on `test_model_flag_is_unknown_option_on_every_run_verb[audit]` + the sole-surviving grep (12
+  other verbs still pass) → reverted from snapshot (AC-9 green again, `"--model"` literal count = 0 in
+  lifecycle.py). **AC-12 ledger** — NEW: `TransitionDecision.advanced` property (A5) + its 3 new test
+  modules/cases; SURVIVING: `LifecyclePipeline.run` + `LifecyclePhaseWorkflow.run` (both read
+  `decision.advanced`); DEAD (removed): `_warn_model_deprecated`, the 12 `--model` option decls,
+  `_run_phase_step`'s `model` param + 5 passes; the 5 deprecation-warning cases INVERTED (0 deleted).
+  Sole-surviving `--model` production reference: `infrastructure/pi_runtime.py` (pi subprocess arg, OUT
+  of scope). No `specs/backlog/**` staged. Checklist:
   - **Single-source the predicate (A5)**: add a read-only `TransitionDecision.advanced` property
     (`self.accepted and self.run.blocked is None`) to `state_machine.py`.
   - **Bug fix (A5)**: `LifecyclePipeline.run` → `accepted = decision.advanced`;

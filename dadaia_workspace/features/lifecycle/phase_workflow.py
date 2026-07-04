@@ -161,11 +161,14 @@ class LifecyclePhaseWorkflow:
             ),
         )
         self._run_store.save(decision.run)
-        # `decision.accepted` is True even for a (legal) transition INTO BLOCKED;
-        # the gate's pass/fail signal is whether the run carries a blocked state.
+        # FR5 (A5): the accept signal is the state machine's DUAL-signal ``advanced``
+        # contract (``accepted and run.blocked is None``). The prior ``run.blocked is None``
+        # reasoning missed the ILLEGAL-transition case — an illegal transition returns the
+        # run unchanged (``blocked is None``) yet never advanced the phase, so the old
+        # single-signal predicate wrongly reported ``accepted=True``.
         return PhaseWorkflowResult(
             run_id=run_id,
-            accepted=decision.run.blocked is None,
+            accepted=decision.advanced,
             phase=decision.run.phase,
             runtime_kind=self._runtime.runtime_kind(),
             blocked=decision.run.blocked,

@@ -174,3 +174,63 @@ def test_resume_requires_matching_token() -> None:
     assert accepted.run.phase is LifecyclePhase.SECURITY_REVIEW
     assert accepted.run.status is LifecycleRunStatus.RUNNING
     assert accepted.run.blocked is None
+
+
+# --- v0.1.57 FR5 / A5 — TransitionDecision.advanced single-sources the accept predicate --
+
+
+def test_advanced_is_false_on_illegal_transition() -> None:
+    """AC-8 root: an illegal transition returns the run UNCHANGED (blocked is None) but
+    was NOT accepted — ``advanced`` is False while ``run.blocked is None`` alone is True."""
+    # QA_REVIEW -> IMPLEMENTATION is illegal post-v0.1.56 FR4.
+    decision = LifecycleStateMachine().transition(
+        _run(phase=LifecyclePhase.QA_REVIEW),
+        TransitionInput(target_phase=LifecyclePhase.IMPLEMENTATION),
+    )
+    assert decision.accepted is False
+    assert decision.run.blocked is None
+    assert decision.advanced is False
+
+
+def test_advanced_is_false_on_legal_block() -> None:
+    """A legal transition INTO BLOCKED is ``accepted=True`` but did not advance the phase."""
+    decision = LifecycleStateMachine().transition(
+        _run(phase=LifecyclePhase.QA_REVIEW),
+        TransitionInput(
+            target_phase=LifecyclePhase.BLOCKED,
+            blocked_state=BlockedState(reason="held", blocked_at_step="qa-review"),
+        ),
+    )
+    assert decision.accepted is True
+    assert decision.run.blocked is not None
+    assert decision.advanced is False
+
+
+def test_advanced_is_false_on_missing_requirement_block() -> None:
+    """A missing-evidence block is ``accepted=False`` with a blocked run — not advanced."""
+    requirement = GateRequirement(
+        evidence_kind=GateEvidenceKind.HANDOFF,
+        required_agent="qa-engineer",
+        required_verdict=GateVerdict.APPROVED,
+    )
+    decision = LifecycleStateMachine().transition(
+        _run(),
+        TransitionInput(
+            target_phase=LifecyclePhase.QA_REVIEW,
+            requirements=(requirement,),
+        ),
+    )
+    assert decision.accepted is False
+    assert decision.run.blocked is not None
+    assert decision.advanced is False
+
+
+def test_advanced_is_true_on_legal_success() -> None:
+    """A legal transition with no unmet requirement advances — ``advanced`` is True."""
+    decision = LifecycleStateMachine().transition(
+        _run(),
+        TransitionInput(target_phase=LifecyclePhase.QA_REVIEW, current_step="qa-review"),
+    )
+    assert decision.accepted is True
+    assert decision.run.blocked is None
+    assert decision.advanced is True

@@ -125,19 +125,19 @@ def test_lifecycle_implement_rejects_claude_harness_with_layer1_pointer(
     assert "pi or codex" in result.output
 
 
-def test_lifecycle_implement_rejects_raw_step_model_and_deprecates_model(
+def test_lifecycle_implement_rejects_raw_step_model_and_unknown_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """v0.1.56 FR1 (rewritten from the inverted LAW-2 raw-model rejection):
+    """v0.1.57 FR6 (the (b) clause inverted from the v0.1.56 non-fatal-deprecation case):
 
-    (a) ``--step-model implement=<id>:<effort>`` (a raw model string) is rejected as a D-3
-        profile-id violation; (b) ``--model`` is a NON-FATAL deprecation warning to stderr —
-        the verb proceeds under the resolved policy rather than hard-rejecting the flag.
+    (a) ``--step-model implement=<id>:<effort>`` (a raw model string) is STILL rejected as a
+        D-3 profile-id violation (KEPT); (b) ``--model`` is now an UNKNOWN option — exit 2 +
+        ``No such option: --model`` on stderr + empty stdout (Q4), not a deprecation warning.
     """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    # (a) raw --step-model is a D-3 rejection (profile ids only).
+    # (a) raw --step-model is a D-3 rejection (profile ids only) — UNCHANGED.
     raw = _runner.invoke(
         app,
         [
@@ -154,8 +154,7 @@ def test_lifecycle_implement_rejects_raw_step_model_and_deprecates_model(
     assert raw.exit_code != 0
     assert "profile id" in raw.output
 
-    # (b) --model emits the stderr deprecation warning and proceeds. Click 8.3 keeps stderr
-    # separate from stdout by default, so result.stderr isolates the warning.
+    # (b) --model is hard-removed — an unknown-option UsageError on stderr, exit 2, empty stdout.
     dep = _runner.invoke(
         app,
         [
@@ -169,8 +168,9 @@ def test_lifecycle_implement_rejects_raw_step_model_and_deprecates_model(
             "anything:high",
         ],
     )
-    assert "--model is deprecated" in dep.stderr
-    assert "--step-model" in dep.stderr
+    assert dep.exit_code == 2
+    assert "No such option: --model" in dep.stderr
+    assert dep.stdout == ""
 
 
 def test_lifecycle_implement_rejects_claude_step_harness_in_pipeline(

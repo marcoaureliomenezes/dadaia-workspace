@@ -167,8 +167,12 @@ def test_wire_verb_rejects_raw_step_model(workspace: Path, verb: str, step_label
 
 
 @pytest.mark.parametrize("verb", [row[1] for row in _WIRE_VERBS], ids=_IDS)
-def test_wire_verb_model_flag_is_nonfatal_deprecation(workspace: Path, verb: str) -> None:
-    """AC-2(iv) / R-QA-1: ``--model`` warns on stderr; the ``--json`` stdout stays parseable."""
+def test_wire_verb_model_flag_is_removed(workspace: Path, verb: str) -> None:
+    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
+    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
+
+    The D-3 profile-id rejection stays asserted by ``test_wire_verb_rejects_raw_step_model``.
+    """
     result = _runner.invoke(
         app,
         [
@@ -183,11 +187,10 @@ def test_wire_verb_model_flag_is_nonfatal_deprecation(workspace: Path, verb: str
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.output
-    assert "--model is deprecated" in result.stderr
-    assert "--step-model" in result.stderr
-    # The warning is NOT on stdout — the JSON payload parses cleanly.
-    json.loads(result.stdout)
+    assert result.exit_code == 2
+    assert "No such option: --model" in result.stderr
+    # Q4: the UsageError is on stderr — stdout stays empty.
+    assert result.stdout == ""
 
 
 def test_governed_catalog_reports_wired_workflows_available_and_invocable() -> None:
