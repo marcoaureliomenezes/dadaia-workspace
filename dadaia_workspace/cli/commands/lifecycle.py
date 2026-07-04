@@ -6,7 +6,7 @@ import json
 from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import typer
 
@@ -31,6 +31,14 @@ from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandStatus,
     LifecyclePreflightService,
 )
+
+if TYPE_CHECKING:
+    from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+    from dadaia_workspace.features.lifecycle.pipeline import (
+        ImplementReviewLoopResult,
+        LifecyclePipeline,
+        RuntimeFactory,
+    )
 
 # Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
 # deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
@@ -1406,6 +1414,197 @@ def bug_report(
     )
     result = workflow.run(run_id, sequence=sequence)
     _emit_wire_result("bug_report", result, json_output=json_output)
+
+
+# -- FR3: implement/review attempt loop as an invocable, resolver-governed verb ----------
+
+
+def _implement_review_runtime_factory(
+    workspace_root: Path,
+    *,
+    context: str,
+) -> RuntimeFactory:
+    """Per-step runtime factory for the implement/review loop verb (FR3).
+
+    ``FAKE`` resolves to a *driving* fake returning an APPROVED handoff with an in-scope
+    ``.dadaia/handoff/<ctx>/**`` artifact_ref, so ``--harness fake`` drives the loop to
+    COMPLETED deterministically (both workers pass the structural gate; the review's APPROVED
+    verdict completes the loop) — mirroring the audit/research driving fakes. Real harnesses
+    (pi/codex) resolve to their live adapters; the policy-resolved concrete model reaches each
+    adapter through ``request.resolved_model`` (threaded by ``apply_resolved_policy``).
+
+    Kept a module-level seam so a CLI test can inject a scripted-verdict fake (the all-REJECTED
+    → BLOCK path) without bypassing the real snapshot-freezing wiring in
+    :func:`_build_implement_review_pipeline`.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake implement/review worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/implement-review-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return container.build_agent_runtime(kind, cwd=workspace_root)
+
+    return factory
+
+
+def _build_implement_review_pipeline(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    snapshot: WorkflowPolicySnapshot,
+    max_review_retries: int,
+) -> LifecyclePipeline:
+    """Compose the loop pipeline with the wired ``handoff_resolver`` the loop requires (FR3).
+
+    The run store + workflow-step handoff resolver come from the container seams; the frozen
+    ``snapshot`` is passed as ``policy_snapshot`` so the run records it before step 1 (LAW 7).
+    The runtime factory is resolved through :func:`_implement_review_runtime_factory` (the
+    monkeypatch seam), so the snapshot-freezing path is exercised on both the APPROVED and the
+    all-REJECTED test drives.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
+
+    return LifecyclePipeline(
+        context=context,
+        release_id=release_id,
+        run_store=container.build_lifecycle_run_store(workspace_root),
+        runtime_factory=_implement_review_runtime_factory(workspace_root, context=context),
+        handoff_resolver=container.build_workflow_handoff_resolver(workspace_root),
+        policy_snapshot=snapshot,
+        max_review_retries=max_review_retries,
+    )
+
+
+def _emit_implement_review_result(result: ImplementReviewLoopResult, *, json_output: bool) -> None:
+    """Emit the loop result (JSON or human) + set the exit code (BLOCKED on failure)."""
+    status = (
+        LifecycleCommandStatus.OK.value
+        if result.completed
+        else LifecycleCommandStatus.BLOCKED.value
+    )
+    final_verdict = result.rounds[-1].review_verdict if result.rounds else None
+    if json_output:
+        _emit_json(
+            {
+                "status": status,
+                "run_id": result.run_id,
+                "completed": result.completed,
+                "attempts": result.attempts,
+                "final_verdict": final_verdict,
+                "rounds": [
+                    {"attempt": r.attempt, "review_verdict": r.review_verdict}
+                    for r in result.rounds
+                ],
+                "blocked": result.blocked.to_dict() if result.blocked else None,
+            }
+        )
+    else:
+        trail = " → ".join(f"#{r.attempt}:{r.review_verdict}" for r in result.rounds)
+        typer.echo(
+            f"{status} implement-review run={result.run_id} "
+            f"attempts={result.attempts} verdict={final_verdict} {trail}"
+        )
+    if not result.completed:
+        raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+@app.command("implement-review")
+def implement_review(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str = typer.Option(..., "--release-id", help="Release id."),
+    run_id: str = typer.Option("implement-review", "--run-id", help="Lifecycle run id."),
+    harness: str = typer.Option(
+        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'implement|review_qa=profile-id' (repeatable). Profile "
+        "ids ONLY (D-3); see 'lifecycle workflow profiles list'.",
+    ),
+    max_review_retries: int = typer.Option(
+        2,
+        "--max-review-retries",
+        help="Bounded retry count: after this many REJECTED rounds the loop BLOCKS.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Run the implement/review attempt loop (implement → review, bounded retry) on a harness.
+
+    Born resolver-governed (v0.1.56 / FR3): the per-step model is resolved through the shared
+    ``WorkflowExecutionPolicyResolver`` (the ``implementation`` workflow snapshot) and the
+    frozen snapshot is recorded on the run before step 1 (LAW 7). Each REJECTED review injects
+    a COMPACT rejection digest into the next implement prompt; every loop worker is gated on
+    EVIDENCE ONLY (non-SUCCEEDED / empty artifact_refs / out-of-scope ⇒ BLOCK), never on the
+    review verdict. An APPROVED review COMPLETES the loop; exhausting ``--max-review-retries``
+    REJECTED rounds BLOCKS it. ``--harness fake`` drives it deterministically; ``--step-model``
+    is profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning.
+    """
+    from dadaia_workspace.features.lifecycle.pipeline import (
+        PipelineStep,
+        apply_resolved_policy,
+    )
+
+    workspace_root = resolve_workspace_root()
+    default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
+
+    # FR3: resolve the ``implementation`` snapshot through the shared resolver; seed each base
+    # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let
+    # apply_resolved_policy — the sole runtime_kind author — preserve FAKE while recording the
+    # governed harness/model onto the implement + review steps.
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="implementation",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names={},
+    )
+    implement_step = PipelineStep(
+        label="implement",
+        role="software-engineer",
+        from_phase=LifecyclePhase.IMPLEMENTATION,
+        target_phase=LifecyclePhase.QA_REVIEW,
+        runtime_kind=default_kind,
+    )
+    review_step = PipelineStep(
+        label="review_qa",
+        role="qa-engineer",
+        from_phase=LifecyclePhase.QA_REVIEW,
+        target_phase=LifecyclePhase.SECURITY_REVIEW,
+        runtime_kind=default_kind,
+        is_review=True,
+    )
+    implement_step, review_step = apply_resolved_policy((implement_step, review_step), snapshot)
+
+    pipeline = _build_implement_review_pipeline(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        snapshot=snapshot,
+        max_review_retries=max_review_retries,
+    )
+    result = pipeline.run_implement_review_loop(
+        run_id, implement_step=implement_step, review_step=review_step
+    )
+    _emit_implement_review_result(result, json_output=json_output)
 
 
 @app.command()

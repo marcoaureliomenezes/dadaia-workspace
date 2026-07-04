@@ -12,7 +12,7 @@ and persists progress at every step (resumable).
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import Field, dataclass
+from dataclasses import Field, dataclass, replace
 from typing import Any, ClassVar, Protocol
 
 from dadaia_workspace.core.harness_models import (
@@ -296,7 +296,10 @@ class LifecyclePipeline:
         rounds: list[ImplementReviewRound] = []
         # attempt 0 is the first try; up to max_review_retries additional attempts follow.
         for attempt in range(self._max_review_retries + 1):
-            # implement#attempt — from attempt 1 it consumes the prior review rejection.
+            # implement#attempt — from attempt 1 it consumes the prior review rejection, whose
+            # COMPACT digest is injected into the implement prompt (FR3 — the l.309 drop is
+            # replaced). The digest reaches the built request the implement worker receives.
+            digest: str | None = None
             if attempt > 0:
                 resolved = resolver.resolve_required(
                     run, producer_step=review_step.label, attempt=attempt - 1
@@ -308,8 +311,15 @@ class LifecyclePipeline:
                     consumer_step=implement_step.label,
                     consumer_attempt=attempt,
                 )
-                _ = resolved  # digest would be injected into the implement prompt here.
-            impl_result = self._run_loop_worker(run, implement_step, attempt)
+                digest = WorkflowHandoffResolver.render_digest(resolved)
+            impl_result, impl_blocked = self._run_loop_worker(
+                run, implement_step, attempt, digest=digest
+            )
+            # Structural runner gate (evidence only, is_review=False): a non-SUCCEEDED /
+            # evidence-less / out-of-scope implement worker BLOCKS the loop — it is a broken
+            # worker, never a rejected review to retry.
+            if impl_blocked is not None:
+                return self._finalize_structural_block(run, impl_blocked, rounds, attempt)
             run, _ = resolver.produce(
                 run,
                 producer_step=implement_step.label,
@@ -319,7 +329,11 @@ class LifecyclePipeline:
                 declared_consumers=(review_step.label,),
             )
 
-            # review#attempt — consumes implement#attempt, produces its verdict.
+            # review#attempt — consumes implement#attempt, produces its verdict. The review
+            # worker is gated on EVIDENCE ONLY (is_review=False): a REJECTED verdict must NOT
+            # block the loop (is_review=True would block the first REJECTED and destroy the
+            # retry model — agent_runner l.196). The verdict is read from the returned result
+            # to drive the attempt ledger; only a STRUCTURAL failure blocks here.
             run = resolver.record_consumption(
                 run,
                 producer_step=implement_step.label,
@@ -327,7 +341,9 @@ class LifecyclePipeline:
                 consumer_step=review_step.label,
                 consumer_attempt=attempt,
             )
-            review_result = self._run_loop_worker(run, review_step, attempt)
+            review_result, review_blocked = self._run_loop_worker(run, review_step, attempt)
+            if review_blocked is not None:
+                return self._finalize_structural_block(run, review_blocked, rounds, attempt)
             verdict = review_result.structured_output.get("verdict")
             run, _ = resolver.produce(
                 run,
@@ -343,17 +359,14 @@ class LifecyclePipeline:
             )
             rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
             if verdict == "APPROVED":
-                from dataclasses import replace
-
                 run = replace(run, status=LifecycleRunStatus.COMPLETED)
                 self._run_store.save(run)
                 return ImplementReviewLoopResult(
                     run_id=run_id, completed=True, attempts=attempt + 1, rounds=tuple(rounds)
                 )
 
-        # Exhausted the retry budget — BLOCK for operator intervention.
-        from dataclasses import replace
-
+        # Exhausted the retry budget on well-formed REJECTED rounds — BLOCK for operator
+        # intervention. This is retry EXHAUSTION, distinct from a structural evidence block.
         blocked = BlockedState(
             reason=(
                 f"implement/review loop exceeded the bounded retry count "
@@ -374,24 +387,85 @@ class LifecyclePipeline:
             blocked=blocked,
         )
 
+    def _finalize_structural_block(
+        self,
+        run: LifecycleRun,
+        blocked: BlockedState,
+        rounds: list[ImplementReviewRound],
+        attempt: int,
+    ) -> ImplementReviewLoopResult:
+        """Persist a structural (evidence) BLOCK on either loop worker and return the result.
+
+        A structural block — non-SUCCEEDED, empty ``artifact_refs``, or out-of-scope paths
+        (the runner's evidence-only decision, ``is_review=False``) — stops the loop
+        immediately: a broken worker is not a rejected review to retry. ``attempts`` counts
+        the current 1-based attempt, since the block occurred during it.
+        """
+        run = replace(
+            run,
+            phase=LifecyclePhase.BLOCKED,
+            status=LifecycleRunStatus.BLOCKED,
+            blocked=blocked,
+        )
+        self._run_store.save(run)
+        return ImplementReviewLoopResult(
+            run_id=run.run_id,
+            completed=False,
+            attempts=attempt + 1,
+            rounds=tuple(rounds),
+            blocked=blocked,
+        )
+
     def _run_loop_worker(
-        self, run: LifecycleRun, step: PipelineStep, attempt: int
-    ) -> AgentRunResult:
-        """Run one implement/review worker for *attempt* and return its raw result."""
+        self,
+        run: LifecycleRun,
+        step: PipelineStep,
+        attempt: int,
+        *,
+        digest: str | None = None,
+    ) -> tuple[AgentRunResult, BlockedState | None]:
+        """Run one implement/review worker for *attempt* through the STRUCTURAL runner gate.
+
+        Both workers route through :meth:`LifecycleAgentRunner.evaluate_gate_with_result`
+        with ``is_review=False`` (gate WITHOUT a phase transition, as ``release_definition`` /
+        ``audit`` do) — the gate decides on EVIDENCE ONLY (non-SUCCEEDED / empty
+        ``artifact_refs`` / out-of-scope paths BLOCK), never on the review verdict. Gating the
+        review ``is_review=True`` would return a block on the first REJECTED verdict
+        (``agent_runner`` l.196) and destroy the retry-with-digest model; the caller reads the
+        APPROVED/REJECTED verdict from the returned result to drive the attempt ledger
+        instead. When *digest* is present (the ``implement#N``, N ≥ 1 case) it trails the scope
+        prompt so the built request the worker receives carries the ``review#N-1`` rejection.
+        """
         runtime = self._runtime_factory(step.runtime_kind)
         built = self._prompt_builder.build(
-            self._scope(step, f"{run.run_id}#a{attempt}"),
+            self._scope(step, f"{run.run_id}#a{attempt}", digest_suffix=digest),
             runtime=runtime.runtime_kind(),
             prefix=self._prefix,
         )
-        return runtime.run(built.request)
+        runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
+        return runner.evaluate_gate_with_result(
+            run,
+            AgentRunnerInput(
+                request=built.request,
+                target_phase=step.target_phase,
+                requirements=step.requirements,
+                current_step=step.label,
+                is_review=False,
+            ),
+        )
 
-    def _scope(self, step: PipelineStep, run_id: str) -> PromptScope:
+    def _scope(
+        self, step: PipelineStep, run_id: str, *, digest_suffix: str | None = None
+    ) -> PromptScope:
         prompt = (
             self._fragment_prompt(step)
             if step.fragment_id is not None
             else self._generic_prompt(step)
         )
+        if digest_suffix:
+            # The prior review rejection digest (FR3) trails the step prompt so it reaches the
+            # built request verbatim; the multi-step ``run`` path passes no digest (default).
+            prompt = f"{prompt}\n\n{digest_suffix}"
         return PromptScope(
             role=step.role,
             context=self._context,

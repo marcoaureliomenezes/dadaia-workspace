@@ -156,7 +156,30 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W3 — FR3 loop fixes + CLI caller
 
-- [ ] T-56-30 Fix `run_implement_review_loop` and give it a CLI caller. Checklist:
+- [x] T-56-30 Fix `run_implement_review_loop` and give it a CLI caller.
+  **AC-7 mutation-sanity evidence (both captured then reverted):** (b) revert the digest line
+  (`digest = WorkflowHandoffResolver.render_digest(resolved)` → `digest = None`) ⇒
+  `pytest tests/unit/features/lifecycle/test_implement_review_loop.py::test_implement_prompt_contains_prior_review_digest`
+  FAILED (`assert 'handoff qa#0' in impl1.prompt`) → re-applied. (c) revert the structural-gate
+  wiring (`_run_loop_worker` → `return runtime.run(built.request), None` instead of
+  `evaluate_gate_with_result(..., is_review=False)`) ⇒
+  `pytest …::test_loop_blocks_on_evidence_less_worker_via_structural_gate` FAILED (loop COMPLETED
+  on the ungated APPROVED verdict instead of blocking) → re-applied.
+  **4-test fate ledger (A4/R-1 — enumerated, not assumed):**
+  `test_implement_attempt_2_consumes_exact_qa_attempt_1` SURVIVES+EXTENDED (digest-in-`implement#2`
+  assert added; `_ScriptedReviewRuntime` records requests + its in-scope artifact_refs pass the
+  structural gate each REJECTED round WITHOUT blocking — `result.blocked is None`);
+  `test_loop_blocks_after_bounded_retries_exceeded` SURVIVES (confirmed retry-EXHAUSTION:
+  `"bounded retry" in reason` AND `"artifact evidence" not in reason`);
+  `test_loop_completes_on_first_approval` SURVIVES; `test_loop_requires_resolver` SURVIVES. Fakes
+  needing in-scope artifact_refs: `_EvidencelessRuntime` (EMPTY artifact_refs → AC-4(b) structural
+  BLOCK) and the CLI `_RejectingRuntime` (in-scope ref + REJECTED verdict → retry-exhaustion BLOCK).
+  **AC-8 ledger** — SURVIVING: `LifecyclePipeline` + `run_implement_review_loop` (`_run_loop_worker`
+  now returns `(result, blocked)` via the evidence-only runner gate; `_scope` gains a `digest_suffix`);
+  NEW: `_finalize_structural_block`, the `implement-review` CLI verb + `_implement_review_runtime_factory`
+  / `_build_implement_review_pipeline` / `_emit_implement_review_result`. Full suite 4404 passed /
+  17 skipped; ruff format+check clean, mypy --strict (302 files) clean, lint-imports 8 kept/0 broken.
+  No `specs/backlog/**` staged. Checklist:
   - **Digest injection** (`pipeline.py`): replace `_ = resolved` (l.309) — render
     `WorkflowHandoffResolver.render_digest(resolved)` and inject it into the `implement#N` (N ≥ 1)
     prompt. Thread a per-attempt digest suffix into `_run_loop_worker`'s scope/prompt build so the
