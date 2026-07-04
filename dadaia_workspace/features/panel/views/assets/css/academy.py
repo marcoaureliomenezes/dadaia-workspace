@@ -26,21 +26,36 @@ ACADEMY_CSS: str = """
 }
 
 /* ── Academy card ─────────────────────────────────────────────────── */
+/* v0.1.59 / FR4 density pass: aligned to the shared card-elevation language
+   (--shadow-card-rest → --shadow-card-hover + --lift-hover on the softer
+   --radius-lg corner) used by the Projects + Workflows cards, so all card
+   surfaces read as one designed system. Motion-guarded. */
 .academy-card {
   background: var(--color-surface, #ffffff);
   border: 1px solid var(--color-border-card, #dddddd);
   border-left: 4px solid var(--color-warning-bg, #ddd9ab);
-  border-radius: var(--radius-card, 6px);
+  border-radius: var(--radius-lg, 10px);
   padding: var(--space-md, 1rem);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm, 0.6rem);
-  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,.12));
-  transition: box-shadow var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  box-shadow: var(--shadow-card-rest, 0 1px 3px rgba(0,0,0,.06));
+  transition: box-shadow var(--duration-normal, 220ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1)),
+              transform var(--duration-normal, 220ms) var(--easing-decelerate, cubic-bezier(0,0,0.2,1));
 }
 
 .academy-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,.16);
+  box-shadow: var(--shadow-card-hover, 0 6px 20px rgba(0,0,0,.10));
+  transform: translateY(var(--lift-hover, -2px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .academy-card {
+    transition: box-shadow var(--duration-normal, 220ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  }
+  .academy-card:hover {
+    transform: none;
+  }
 }
 
 /* ── Card header ──────────────────────────────────────────────────── */
@@ -86,18 +101,20 @@ ACADEMY_CSS: str = """
   margin-top: auto;
   padding: 0.35em 0.9em;
   background: transparent;
-  border: 1px solid var(--color-accent, #9cddc8);
-  border-radius: var(--radius, 4px);
-  color: var(--color-accent-dark, #2d7d9a);
-  font-size: 0.82rem;
-  font-weight: 500;
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--control-radius);
+  color: var(--color-accent-dark);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  transition: background var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
 }
 
 .academy-card__cta:hover,
 .academy-card__cta:focus-visible {
-  background: var(--color-primary-bg, #f0fbf7);
+  background: var(--color-primary-bg);
+  border-color: var(--color-accent-dark);
 }
 
 /* ── Detail view ──────────────────────────────────────────────────── */
@@ -116,15 +133,16 @@ ACADEMY_CSS: str = """
   align-self: flex-start;
   background: transparent;
   border: none;
-  color: var(--color-accent-dark, #2d7d9a);
-  font-size: 0.85rem;
+  color: var(--color-accent-dark);
+  font-size: var(--text-base);
   cursor: pointer;
   padding: 0;
-  margin-bottom: var(--space-sm, 0.6rem);
+  margin-bottom: var(--space-sm);
 }
 
 .academy-back-btn:hover,
 .academy-back-btn:focus-visible {
+  color: var(--color-cost);
   text-decoration: underline;
 }
 

@@ -55,6 +55,22 @@ code {
 .topbar-wordmark span { color: var(--color-accent-dark); }
 .topbar-divider { width: 1px; height: 24px; background: var(--color-border); }
 .topbar-subtitle { color: var(--color-muted); font-size: 0.9rem; }
+
+/* ── Topbar right cluster + theme-switcher anchor (de-inlined v0.1.59 / FR3) ──
+   Replaces the former inline `style=` attributes on .topbar-right and
+   .theme-switcher in views/index.py (CSP-clean, token-anchored — no ad-hoc
+   literals). .topbar-right right-aligns the control cluster inside the flex
+   .topbar; .theme-switcher establishes the positioning context for the
+   absolutely-positioned #theme-menu popover. */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.theme-switcher {
+  position: relative;
+}
 /* ── Navigation tabs ─────────────────────────────── */
 .nav-tabs {
   background: var(--color-surface);
@@ -64,27 +80,39 @@ code {
   gap: 0;
 }
 
+/* ── Controls · one button language (v0.1.59 / FR2) ──────────────────────────
+   Nav tabs, the theme button, and the runtime switcher share the token-anchored
+   control vocabulary from tokens.py (--control-*, --focus-ring-*, --text-*,
+   --font-weight-*). No ad-hoc hex / px / rem-font-size / px-radius literals in
+   these rules — grep-enforced by test_control_tokens.py. Brand tokens that need a
+   defensive fallback (test_panel_css_contrast) use a nested var() fallback rather
+   than a hex, so the rule is both fallback-safe AND literal-free. */
 .nav-tab {
   display: inline-block;
-  padding: 0.75rem 1.1rem;
-  font-size: 0.92rem;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
   color: var(--color-muted);
-  border-bottom: 3px solid transparent;
+  border-bottom: var(--border-width-accent) solid transparent;
   cursor: pointer;
   background: none;
   border-top: none;
   border-left: none;
   border-right: none;
   font-family: inherit;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
   white-space: nowrap;
 }
 .nav-tab:hover { color: var(--color-text); }
-.nav-tab:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
+.nav-tab:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: -2px;
+}
 .nav-tab.active {
   color: var(--color-heading);
-  font-weight: 600;
-  border-bottom-color: var(--color-accent, #9cddc8);
+  font-weight: var(--font-weight-semibold);
+  border-bottom-color: var(--color-accent, var(--color-accent-dark));
 }
 
 /* ── Main content ───────────────────────────────── */
@@ -102,8 +130,67 @@ code {
   padding-bottom: var(--space-sm);
   border-bottom: 1px solid var(--color-border);
 }
-.section-header h2 { font-size: 1.15rem; color: var(--color-heading); }
-.section-header p { font-size: 0.88rem; color: var(--color-muted); margin-top: 0.25rem; }
+.section-header h2 {
+  font-size: 1.15rem;
+  color: var(--color-heading);
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.01em;
+}
+.section-header p {
+  font-size: var(--text-base);
+  color: var(--color-muted);
+  margin-top: var(--space-2xs);
+  line-height: var(--line-height-snug);
+}
+
+/* ── Title + trailing-meta header row (v0.1.59 / FR4) ────────────────────────
+   A section header that pairs its <h2> title with a single trailing meta pill
+   (the Projects tab's .projects-count-badge) lays out on ONE aligned row — title
+   left, count right — instead of the pre-pass block flow that dropped the count
+   badge onto a second line below the title. This is the same single-row pattern
+   the W3/FR3 pass gave the Sessions .runtime-switcher header, applied here for a
+   consistent header hierarchy across the six tabs. The badge is pushed to the
+   trailing edge (margin-left:auto, in projects.py); a long title ellipsises
+   before the badge shrinks. Token-anchored; no colour/type/radius literals.
+   Scoped via :has(.projects-count-badge) so the plain title/description headers
+   (Servers, Reports, Academy) keep their stacked title+description flow. */
+.section-header:has(.projects-count-badge) {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-md);
+  min-width: 0;
+}
+.section-header:has(.projects-count-badge) > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Single-line header/control row (v0.1.59 / FR3) ──────────────────────────
+   A header that pairs a title with a trailing control (the Sessions tab's
+   <h2> + .runtime-switcher) lays out on ONE line by default. Before this pass the
+   shared .section-header was display:block, so the switcher stacked onto a second
+   line at every width — the operator's "rows breaking onto two or more lines"
+   complaint. Scoped via :has(.runtime-switcher) so the plain title/description
+   headers (Servers, Projects) are left untouched. min-width:0 + ellipsis let a
+   long title shrink and truncate instead of forcing a wrap; the control never
+   shrinks (flex-shrink:0). Responsive at 1024px (the --main cap) and 1440px.
+   Token-anchored; no colour/type/radius literals. */
+.section-header:has(.runtime-switcher) {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-md);
+  min-width: 0;
+}
+.section-header:has(.runtime-switcher) > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Servers section ─────────────────────────────── */
 .refresh-notice {
@@ -186,13 +273,8 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 .empty-state code { display: inline-block; margin-top: var(--space-sm); font-size: 0.85em; }
 
 /* ── Memory cards grid ───────────────────────────── */
-.context-count {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  margin-bottom: var(--space-md);
-}
-.context-count strong { color: var(--color-text); }
-
+/* (.context-count purged v0.1.59 / FR6 Cat-A — the live projects count uses
+   .projects-count-badge, W4; grep-proven zero live refs in views/JS/tests.) */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -207,29 +289,16 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   transition: box-shadow 0.15s;
 }
 .context-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.context-card.primary {
-  border-left: 4px solid var(--color-primary-ring, #9cddc8);
-  background: var(--color-primary-bg, #f0fbf7);
-}
+/* (.context-card.primary purged v0.1.59 / FR6 Cat-A — index.py renders only
+   class="context-card" (index.py:226); the .primary modifier is never emitted.
+   .context-card + :hover STAY live.) */
 
-.card-header {
-  padding: var(--space-md) var(--space-md) var(--space-sm);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-}
+/* (.card-header + .card-primary-badge purged v0.1.59 / FR6 Cat-A — the OLD card
+   anatomy; grep-proven zero live refs (the only card-header token in served HTML is
+   the distinct .dadaia-wf-card-header in workflows.py; card-primary-badge appears only
+   in a test_views_index `not in` absence guard). .card-name STAYS live — asserted by
+   test_index_dom_contract + rendered by _render_context_card. */
 .card-name { font-size: 0.97rem; font-weight: 700; color: var(--color-heading); flex: 1; }
-.card-primary-badge {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: var(--color-accent, #9cddc8);
-  color: var(--color-heading);
-  padding: 0.2em 0.5em;
-  border-radius: 20px;
-}
 .card-meta {
   padding: 0 var(--space-md) var(--space-sm);
   font-size: 0.83rem;
@@ -239,23 +308,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   gap: var(--space-sm);
 }
 
-.card-links { border-top: 1px solid var(--color-border); }
-.memory-link {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem var(--space-md);
-  font-size: 0.87rem;
-  color: var(--color-accent-dark);
-  border-bottom: 1px solid var(--color-border);
-  gap: var(--space-sm);
-  transition: background 0.1s;
-}
-.memory-link:last-child { border-bottom: none; }
-.memory-link:hover, .memory-link:focus { background: var(--color-card-hover); text-decoration: none; }
-.memory-link:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
-.memory-link-icon { font-size: 0.9em; color: var(--color-muted); flex-shrink: 0; width: 1.2em; text-align: center; }
-.memory-link-label { flex: 1; }
-.memory-link-arrow { color: var(--color-border); font-size: 0.9em; flex-shrink: 0; }
+/* (.card-links + .memory-link* purged v0.1.59 / FR6 Cat-A — the OLD memory-link card
+   anatomy; grep-proven zero live refs in views/JS/tests. The live card memory pills use
+   .memory-chip (projects.py). The now-dangling .memory-link:focus-visible selector was
+   also dropped from the Warm-theme focus-visible override below. */
 
 /* ── panel-section base ──────────────────────────── */
 .panel-section { display: none; }
@@ -281,37 +337,39 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
    IDs and data-theme-value attributes are unchanged (e2e selectors preserved).
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* Button — compact icon-pill in topbar */
+/* Button — compact icon-pill in topbar (token-anchored, one button language) */
 .theme-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.22rem 0.55rem 0.22rem 0.45rem;
+  gap: var(--control-gap);
+  padding: var(--control-pad-y) var(--control-pad-x);
   background: transparent;
-  border: 1px solid var(--color-border, #dddddd);
-  border-radius: 20px;            /* pill shape — compact and tidy */
-  color: var(--color-muted, #666666);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);   /* pill shape — compact and tidy */
+  color: var(--color-muted);
   font-family: var(--font-stack);
-  font-size: 0.82rem;
-  font-weight: 500;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background 0.13s, border-color 0.13s, color 0.13s;
+  transition: background var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard);
   white-space: nowrap;
-  line-height: 1.3;
+  line-height: var(--line-height-snug);
 }
 .theme-btn:hover {
-  background: var(--color-primary-bg, #f0fbf7);
-  border-color: var(--color-accent, #9cddc8);
-  color: var(--color-text, #222222);
+  background: var(--color-primary-bg, var(--color-surface));
+  border-color: var(--color-accent, var(--color-accent-dark));
+  color: var(--color-text);
 }
 .theme-btn:active {
-  background: var(--color-accent, #9cddc8);
-  border-color: var(--color-accent, #9cddc8);
-  color: var(--color-heading, #111111);
+  background: var(--color-accent, var(--color-accent-dark));
+  border-color: var(--color-accent, var(--color-accent-dark));
+  color: var(--color-heading);
 }
 .theme-btn:focus-visible {
-  outline: 2px solid var(--color-accent-dark, #2d7d9a);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-accent-dark);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Half-circle icon (◑) + caret */
@@ -321,7 +379,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   color: var(--color-accent-dark, #2d7d9a);
 }
 .theme-btn-label {
-  font-size: 0.82rem;
+  font-size: var(--text-md);
   color: inherit;
 }
 .theme-btn-caret {
@@ -335,19 +393,25 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   transform: rotate(180deg);
 }
 
-/* Popover panel */
+/* Popover panel — token-anchored spacing / radius / elevation (v0.1.59 / FR5 polish).
+   The former ad-hoc literals (6px offset, 0.3rem padding, 1px border, --radius-card,
+   a hardcoded two-layer box-shadow) are replaced by the design tokens so the popover
+   shares the card-elevation language (softer --radius-lg + the lifted --shadow-card-hover
+   the W4 cards use). min-width stays a bare layout constraint (no width token exists).
+   The [role="menuitemradio"] rows are NOT in the test_control_tokens allowlist, so this
+   polish is free to tokenize them without perturbing the FR2 grep gate. */
 #theme-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-2xs));
   right: 0;
   z-index: 200;
   list-style: none;
   margin: 0;
-  padding: 0.3rem 0;
+  padding: var(--space-2xs) 0;
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #dddddd);
-  border-radius: var(--radius-card, 6px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.08);
+  border: var(--border-width) solid var(--color-border, #dddddd);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: var(--shadow-card-hover);
   min-width: 130px;
   animation: theme-popover-in var(--duration-fast, 120ms) var(--easing-decelerate, cubic-bezier(0,0,0.2,1));
 }
@@ -361,17 +425,17 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 /* The [hidden] attribute hides the menu; JS toggles it. */
 #theme-menu[hidden] { display: none; }
 
-/* Row: colour dot + label */
+/* Row: colour dot + label — tokenized spacing rhythm + comfortable click target */
 #theme-menu [role="menuitemradio"] {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.87rem;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-base);
   color: var(--color-text, #222222);
   cursor: pointer;
   user-select: none;
-  transition: background 0.1s;
+  transition: background var(--duration-fast) var(--easing-standard);
   border-radius: 0;
 }
 #theme-menu [role="menuitemradio"]:first-child { border-radius: var(--radius-card, 6px) var(--radius-card, 6px) 0 0; }
@@ -386,10 +450,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   border-radius: var(--radius, 4px);
 }
 
-/* Active row: subtle highlight */
+/* Active row: subtle highlight — tokenized weight, brand-bg fallback preserved */
 #theme-menu [role="menuitemradio"][aria-checked="true"] {
   background: var(--color-primary-bg, #f0fbf7);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-heading, #111111);
 }
 
@@ -426,6 +490,66 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   line-height: 1;
 }
 
+/* ── Runtime switcher — segmented control (PR5-D4; relocated from tokens.py in
+   v0.1.59 / FR2 so the component rules live in a served control-surface stylesheet,
+   not the token-definition file). The --color-runtime-* tokens and per-theme
+   [data-runtime] overrides remain defined in tokens.py. Token-anchored to the one
+   button language (--control-*, --focus-ring-*, --text-*) — no ad-hoc literals. */
+.runtime-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2xs);
+  /* De-inlined from views/sessions.py (v0.1.59 / FR3): the switcher is pushed to
+     the trailing edge of its flex .section-header and never shrinks, so the title
+     ellipsises before the control does. */
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.runtime-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--control-gap);
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-stack);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing-standard),
+              color var(--duration-fast) var(--easing-standard),
+              border-color var(--duration-fast) var(--easing-standard);
+  white-space: nowrap;
+}
+
+.runtime-btn[aria-checked="true"] {
+  background: var(--color-runtime-active);
+  color: var(--color-surface);
+  border-color: transparent;
+}
+
+.runtime-btn[aria-checked="false"]:hover {
+  background: var(--color-row-hover);
+  color: var(--color-text);
+}
+
+.runtime-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-runtime-active);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.runtime-btn-icon {
+  font-size: 0.75em;
+  line-height: 1;
+}
+
 /* ── Ops consolidated tab — stacked sub-sections ─────────────────────────────
    T-016-P09: Agents + Workflows merged into one "Ops" nav tab.
    Each sub-section is stacked vertically inside #section-ops with a labelled
@@ -459,30 +583,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   white-space: nowrap;
 }
 
-/* Compact agent cards inside ops — smaller min-width so more fit per row */
-.agents-grid--compact {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-@media (max-width: 767px) {
-  .agents-grid--compact {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Compact workflow cards inside ops — 3 columns at >=1024px */
-.workflows-grid--compact {
-  grid-template-columns: repeat(3, 1fr);
-}
-@media (max-width: 900px) {
-  .workflows-grid--compact {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 600px) {
-  .workflows-grid--compact {
-    grid-template-columns: 1fr;
-  }
-}
+/* (.agents-grid--compact + .workflows-grid--compact purged v0.1.59 / FR6 Cat-A —
+   the compact ops grids for the removed Agentic/Ops agents+workflows grids;
+   grep-proven zero live refs in views/JS/tests. The surviving .ops-subsection*
+   header rules above STAY live — rendered by workflows.py:202-204. */
 
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
@@ -493,7 +597,6 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
    ─────────────────────────────────────────────────────────────────────────── */
 html[data-theme="warm"] a:focus-visible,
 html[data-theme="warm"] .nav-tab:focus-visible,
-html[data-theme="warm"] .memory-link:focus-visible,
 html[data-theme="warm"] button:focus-visible,
 html[data-theme="warm"] [role="button"]:focus-visible,
 html[data-theme="warm"] [role="menuitem"]:focus-visible,

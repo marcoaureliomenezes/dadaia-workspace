@@ -226,7 +226,7 @@ def render_workflows_first_class_section() -> str:
     return (
         '<section id="section-workflows" class="section panel-section" role="tabpanel" '
         'tabindex="0" aria-labelledby="tab-workflows">\n'
-        '  <div class="section-header">\n'
+        '  <header class="section-header">\n'
         "    <h2>Workflows</h2>\n"
         "    <p>Every dadaia-workflow as a diagram card. Expand a card for the legible "
         "fluxogram and a formatted, per-step detail with an <strong>inline model "
@@ -239,7 +239,7 @@ def render_workflows_first_class_section() -> str:
         '      <div class="wfp-banner" id="wfp-banner" role="status" aria-live="polite" '
         "hidden></div>\n"
         "    </div>\n"
-        "  </div>\n"
+        "  </header>\n"
         f"  {render_dadaia_workflows_section()}\n"
         "</section>"
     )

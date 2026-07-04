@@ -153,16 +153,18 @@ REPORTS_CSS: str = """
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--color-delete-icon, #666666);
-  border-radius: var(--radius, 4px);
+  color: var(--color-delete-icon);
+  border-radius: var(--control-radius);
   flex-shrink: 0;
-  font-size: 1rem;
-  transition: color var(--duration-fast, 120ms) var(--easing-standard, cubic-bezier(0.4,0,0.2,1));
+  font-size: var(--text-xl);
+  transition: color var(--duration-fast) var(--easing-standard),
+              background var(--duration-fast) var(--easing-standard);
 }
 
 .reports-row__trash:hover,
 .reports-row__trash:focus-visible {
-  color: var(--color-delete-icon-hover, #c0392b);
+  color: var(--color-delete-icon-hover);
+  background: var(--color-row-hover);
 }
 
 /* ── Inline confirm strip ─────────────────────────────────────────── */
@@ -181,26 +183,31 @@ REPORTS_CSS: str = """
 .reports-confirm-delete {
   padding: 0.25em 0.75em;
   background: transparent;
-  border: 1px solid var(--color-delete-icon-hover, #c0392b);
-  color: var(--color-delete-icon-hover, #c0392b);
-  border-radius: var(--radius, 4px);
-  font-size: 0.8rem;
+  border: var(--border-width) solid var(--color-delete-icon-hover);
+  color: var(--color-delete-icon-hover);
+  border-radius: var(--control-radius);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .reports-confirm-delete:hover {
-  background: var(--color-delete-icon-hover, #c0392b);
-  color: #ffffff;
+  background: var(--color-delete-icon-hover);
+  color: var(--color-surface);
 }
 
 .reports-confirm-cancel {
   padding: 0.25em 0.75em;
   background: transparent;
-  border: 1px solid var(--color-border, #dddddd);
-  color: var(--color-text, #222222);
-  border-radius: var(--radius, 4px);
-  font-size: 0.8rem;
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--control-radius);
+  font-size: var(--text-sm);
   cursor: pointer;
+}
+
+.reports-confirm-cancel:hover {
+  background: var(--color-row-hover);
+  color: var(--color-heading);
 }
 
 /* ── Content frame ────────────────────────────────────────────────── */
@@ -217,16 +224,17 @@ REPORTS_CSS: str = """
 .reports-back-btn {
   background: transparent;
   border: none;
-  color: var(--color-accent-dark, #2d7d9a);
-  font-size: 0.85rem;
+  color: var(--color-accent-dark);
+  font-size: var(--text-base);
   cursor: pointer;
   padding: 0;
-  margin-bottom: var(--space-sm, 0.6rem);
+  margin-bottom: var(--space-sm);
   display: block;
 }
 
 .reports-back-btn:hover,
 .reports-back-btn:focus-visible {
+  color: var(--color-cost);
   text-decoration: underline;
 }
 """

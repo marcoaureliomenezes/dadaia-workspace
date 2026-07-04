@@ -50,10 +50,15 @@ SESSIONS_CSS: str = """
 @media (max-width: 640px) {
   .sessions-dashboard { grid-template-columns: repeat(2, 1fr); }
 }
+/* v0.1.59 / FR4 density pass: a calm resting shadow (--shadow-card-rest) gives the
+   Sessions dashboard cards the same quiet elevation as the other card surfaces, so
+   the panel reads as one designed system. These summary cards are non-interactive,
+   so they carry no hover lift. */
 .sessions-stat-card {
   background: var(--color-surface, #ffffff);
   border: 1px solid var(--color-border, #dddddd);
   border-radius: var(--radius-card, 6px);
+  box-shadow: var(--shadow-card-rest, 0 1px 3px rgba(0,0,0,.06));
   padding: 0.85rem 1rem;
   overflow: hidden;
 }

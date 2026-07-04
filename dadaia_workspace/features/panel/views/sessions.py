@@ -33,7 +33,7 @@ def render_sessions_section() -> str:
         'role="tabpanel" tabindex="0" aria-labelledby="tab-sessions">\n'
         '  <header class="section-header">\n'
         "    <h2>Sessions</h2>\n"
-        '    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime" style="margin-left:auto;">\n'
+        '    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime">\n'
         '      <button type="button" class="runtime-btn runtime-btn--claude" id="sessions-runtime-btn-claude"\n'
         '        role="radio" aria-checked="true" data-runtime-value="claude" aria-label="Claude runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9672;</span>\n'
