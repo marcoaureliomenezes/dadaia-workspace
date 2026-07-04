@@ -76,8 +76,20 @@ _TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2
 
 
 def _norm_path_line(line: str, ws: Path) -> str:
-    """Normalize a plain-text install/doctor line: strip the fixture root, canonicalize sep."""
+    """Normalize a plain-text install/doctor line: strip the fixture root, canonicalize sep.
+
+    The public-privacy ok-marker is HOST-dependent, not projection behaviour:
+    privacy_check resolves the operator denylist by walking up from cwd, so a
+    workspace with .dadaia/states/privacy_denylist.json emits the bare marker
+    while a fresh checkout (CI) emits the "(baseline structural scan, no
+    operator denylist)" variant. Normalize both to the bare marker — same
+    rationale as the git-dirty exclusion in _is_env_doctor_line.
+    """
     out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
+    out = out.replace(
+        "[ok] public-privacy (baseline structural scan, no operator denylist)",
+        "[ok] public-privacy",
+    )
     return out.replace("\\", "/")
 
 
