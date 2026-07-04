@@ -17,8 +17,8 @@ tags:
 - agents
 - backlog
 token_estimate: 4650
-last_updated: '2026-07-03'
-release_origin: v0.1.55
+last_updated: '2026-07-04'
+release_origin: v0.1.57
 ---
 
 ## Overview
@@ -45,7 +45,7 @@ A **Spec Context Project** is a canonical specs folder bound to one repository �
 - `chokepoints` — backends of the harness-independent git-hook gates (pre-commit lease gate; consumed via `dadaia ci`). Detail in [[sdd-gate-v3]].
 - `ci_preflight` — the pre-push hook's local CI preflight (ruff/mypy/pytest).
 - `export` / `import_` — workspace portability ([[workspace-portability]]).
-- `lifecycle` — the multi-harness procedural lifecycle engine: state machine, semantic gates, hygiene/anti-slop, prompt builder + fragments + personas, workflow bodies, run store, policy resolver, workflow-step handoff data plane. Detail in [[lifecycle-foundation]] and [[dadaia-workflows]].
+- `lifecycle` — the multi-harness procedural lifecycle engine: state machine, semantic gates, hygiene/anti-slop, prompt builder + fragments + personas, workflow bodies (a shared `workflows/_fragment_gate.py` `FragmentGateWorkflow` base + `_FragmentAssemblyMixin` behind the 4 handoff-ledger bodies, v0.1.57), the declarative `role_atoms.py` role→memory-atom map, the `fragment_coherence_doctor.py` (FRAG-COH-1..4), run store, policy resolver, workflow-step handoff data plane. Detail in [[lifecycle-foundation]] and [[dadaia-workflows]].
 - `migrate` — v1→v2 and tree-v2 migrations.
 - `panel` — local HTTP control surface ([[panel]]).
 - `public` — model resolution and asset-chain services ([[public-asset-distribution]]).
@@ -274,7 +274,7 @@ The backlog is kept as a deduplicated, conflict-free, non-stale SET, **mechanica
 
 ## Workflow control plane subsystem
 
-Layer-2 model AND harness governance: profile registry (built-ins + operator-local profiles) → validated overlay (`workflow_model_policy.json`, with per-context `extends`) → the single `WorkflowExecutionPolicyResolver` (precedence CLI > overlay > catalog; effective harness per step; `apply_resolved_policy` the sole author of `runtime_kind`) → per-run snapshot frozen before step 1 → panel routes + `WMP-*` doctor. CLI and panel consume the SAME resolver via the container. Full mechanics: [[lifecycle-foundation]]; operator surface: [[panel]].
+Layer-2 model AND harness governance: profile registry (built-ins + operator-local profiles) → validated overlay (`workflow_model_policy.json`, with per-context `extends`) → the single `WorkflowExecutionPolicyResolver` (precedence CLI > overlay > catalog; effective harness per step; `apply_entry_to_step` the sole per-step author of `runtime_kind`, mapped by `apply_resolved_policy` over the structural `PolicyApplicableStep`) → per-run snapshot frozen before step 1 → panel routes + `WMP-*` doctor. CLI and panel consume the SAME resolver via the container. Full mechanics: [[lifecycle-foundation]]; operator surface: [[panel]].
 
 ## Workflow-step handoff data plane
 

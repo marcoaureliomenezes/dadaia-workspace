@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 1940
-last_updated: '2026-07-03'
-release_origin: v0.1.55
+token_estimate: 2075
+last_updated: '2026-07-04'
+release_origin: v0.1.57
 ---
 
 ## Purpose
@@ -119,6 +119,19 @@ renders identically cross-platform until the golden is proven byte-stable on the
 jobs. Also freeze any clock the captured output depends on (v0.1.55 froze `date.today` +
 `datetime.now(tz=UTC)` to 2026-07-15 so the release-semver and hotfix-date-gated checks were
 deterministic).
+
+**CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
+Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:
+--model` usage error) MUST normalize the stream first: strip ANSI escapes and collapse box-drawing
+characters + whitespace to single spaces (the shared `_norm_stderr`-style helper), then run the
+substring check on the normalized text. The reason is that GitHub Actions enables Rich's ANSI + panel
+boxing at a different terminal width than the local run, so Click renders the usage error **inside a
+Rich-drawn box** with line-wrapping and box characters injected mid-string — a flat, width-dependent
+substring assert **passes locally and fails on CI**. This is the recurring v0.1.26 Typer/Rich
+box-wrap gotcha; it is now a **default practice for CLI stderr asserts from day one**, not a
+per-release rediscovery (the v0.1.57 W5 `--model`-removed tests passed locally twice before the first
+CI run went red). Also never pass a `mix_stderr` kwarg to `CliRunner` — it was removed in Click 8.2
+and `TypeError`s on the installed 8.4.1; the default `CliRunner()` already separates stderr.
 
 **Module-size anti-erosion ratchet (v0.1.55).** `tests/contract/test_module_size_ceiling.py`
 is a test-side ratchet that caps `features/specs/doctor*.py` at **700 lines** and

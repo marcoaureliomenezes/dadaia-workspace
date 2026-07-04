@@ -5,6 +5,22 @@
       "slug": "hard-remove-model-flag-across-run-verbs",
       "shipped_anchors": [],
       "note": "DELIVERED — v0.1.57 (archived at SHIP, dead-anchor BL-SCHEMA: the entry's sole anchor cli/commands/lifecycle.py#_warn_model_deprecated was DELETED by W5/T-57-50). --model hard-removed across all 12 run verbs; the 5 deprecation-warning tests inverted to stderr-pinned No-such-option assertions; sole surviving --model reference is the pi subprocess arg (test_pi_runtime.py / pi_runtime.py, out of scope). Deprecation-expiry law satisfied at N+1."
+    },
+    {
+      "slug": "context-injection-role-phase-canon",
+      "shipped_anchors": [
+        "dadaia_workspace/features/lifecycle/context_selector.py#ContextSelector",
+        "dadaia_workspace/features/lifecycle/fragments/loader.py#FragmentLoader",
+        "dadaia_workspace/hooks/ctx_inject.py#main"
+      ],
+      "note": "DELIVERED — v0.1.57 (archived at CLOSURE, all three anchors survive). Intent 1: declarative role->atom map (role_atoms.py) consumed at prompt assembly on all 3 production surfaces incl. build_lifecycle_pipeline/build_lifecycle_phase_workflow wiring; implementation.qa_review declares quality_assurance_atom; phase threaded into SpecContext fail-open. Intent 2: FRAG-COH-1..4 coherence doctor (surfaced via workflow doctor; extends, never re-implements persona_doctor); sel_constitution KEPT with the write_set_guidance indirection documented; per-input max_context_policy (input_policies frontmatter, fixture-exercised). Intent 3: Ruling A — L1 self-pull RATIFIED (operator-overridable), ctx_inject byte-identical + golden lock; mechanical L1 verifiability deferred as layer1-selfpull-handoff-audit-line."
+    },
+    {
+      "slug": "fragment-workflow-base-dedup",
+      "shipped_anchors": [
+        "dadaia_workspace/features/lifecycle/workflows/release_definition.py#ReleaseDefinitionWorkflow"
+      ],
+      "note": "DELIVERED — v0.1.57 (archived at CLOSURE, anchor survives as a thin subclass). FragmentGateWorkflow base + _FragmentAssemblyMixin extracted golden-first (behavior goldens committed pre-extraction, byte-identical replay); 4 handoff-ledger bodies thin, backlog_definition = mixin consumer (structural outlier, no handoff data plane); ~14 duplicated members single-sourced; module-global _SEQUENCE survives by name (run-scoped internally); grill-found latent gap converged RED-first (backlog _scope now forwards resolved_model)."
     }
   ]
 }
