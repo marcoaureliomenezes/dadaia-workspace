@@ -40,7 +40,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W1 — FR1 design-system foundation + DOM-contract lock (golden-first)
 
-- [ ] T-59-10 Capture the DOM-contract lock + confirm the api-golden zero-diff baseline BEFORE any restyle.
+- [x] T-59-10 Capture the DOM-contract lock + confirm the api-golden zero-diff baseline BEFORE any restyle.
   Checklist:
   - **NEW `tests/unit/features/panel/test_index_dom_contract.py`** — render the real index (`render_index` over
     fixed fakes) and assert the §3-FR1 selector contract: the 6 tab ids
@@ -91,6 +91,24 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
   - **AC-11 ledger** — NEW: `test_index_dom_contract.py`; EDITED: `tokens.py` (design-system rationalization,
     palette unchanged), `test_security_headers.py` (equality lock added). Gates: ruff + mypy --strict +
     lint-imports 8/0 (no import edge) + full unpiped `pytest -p no:cacheprovider`. No `specs/backlog/**` staged.
+  - **W1 EVIDENCE (T-59-10 DONE 2026-07-04, software-engineer).**
+    - **AC-9(a)** DOM-contract sabotage: `sed -i 's/data-theme-value="sage"/data-theme-value="SABOTAGED"/'
+      views/index.py` ⇒ `test_index_dom_contract.py::test_three_theme_values_present[sage]` FAILED
+      (`AssertionError: missing data-theme-value=sage`) ⇒ reverted (`git checkout`).
+    - **AC-9(b′)** edit-with-recompute sabotage: appended `void 0;` to the theme pre-paint script body in
+      `views/index.py` AND recomputed `_CSP_SCRIPT_HASH_1` in `handler.py`
+      (`'sha256-p92XWe7yPRUpQcNZtXGiFCrBKEC7zQLtDidh/RL8Jmo='`) ⇒
+      `test_security_headers.py::TestCspHashEqualityLock::test_csp_script_hashes_frozen_to_w1_baseline`
+      FAILED (constant off baseline) while `TestInlineScriptCspCoverage` PASSED (script+hash moved together —
+      the exact gap the equality lock closes) ⇒ reverted (`git checkout` both files).
+    - **Fate ledger verified:** `test_views_index.py` SURVIVES unchanged (new lock CONSOLIDATES it, A4);
+      `test_api_golden.py` + `api_golden_v0155.json` INVARIANT byte-identical (`UPDATE_API_GOLDEN` never used);
+      AGENTS_CSS importers untouched (6 refs intact — W5 co-edits). `test_panel_css_contrast.py` GREEN (WCAG
+      AA/AAA preserved: 0 palette-hex changes; tokens.py tail byte-identical; 14 additive token-named tokens).
+    - **Gates:** `ruff format --check` clean · `ruff check --no-cache` passed · `mypy --strict` 309 files clean ·
+      `lint-imports --no-cache` 8 kept/0 broken · full unpiped `pytest -p no:cacheprovider` 4593 passed / 17
+      skipped. `git status --short`: no `.pytest_cache/`, no repo-local `.dadaia/`, no `playwright-report/`,
+      no `test-results/` (Q7).
 
 ## W2 — FR2 controls / buttons restyle from tokens
 

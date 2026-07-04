@@ -138,6 +138,45 @@ class TestSecurityHeaders:
 
 
 # ---------------------------------------------------------------------------
+# CSP zero-touch equality lock (v0.1.59 W1 / T-59-10, AC-2 / Q4).
+#
+# ``TestInlineScriptCspCoverage`` (below) recomputes each inline-script hash and
+# asserts CSP covers it — but it PASSES when a script and its hash change TOGETHER
+# (edit-with-recompute). The v0.1.59 overhaul declares the two pre-paint inline
+# scripts a ZERO-TOUCH invariant (Ruling B): they must stay byte-identical and
+# ``_CSP_SCRIPT_HASH_1/2`` must NOT be recomputed. This equality lock freezes both
+# hashes to their hardcoded W1 baseline values, so an edit-WITH-recompute (which
+# changes the constant) is caught here even though coverage would still pass.
+# ---------------------------------------------------------------------------
+
+# Hardcoded W1 baseline values (handler.py:111,116 as of the v0.1.59 branch point).
+# Do NOT update these during v0.1.59 — a change here is a Ruling-B violation, not a fix.
+_W1_BASELINE_CSP_HASH_1 = "'sha256-GRTndW6m1zCm5uxB5kEDoOXw05c1c9MDdem3TFqSMfQ='"
+_W1_BASELINE_CSP_HASH_2 = "'sha256-rrb6m84iyHOhA+A1XebxK17XtUkbhWfR95KsYvJgmpA='"
+
+
+class TestCspHashEqualityLock:
+    """Freeze _CSP_SCRIPT_HASH_1/2 to their W1 baseline (catches edit-with-recompute)."""
+
+    def test_csp_script_hashes_frozen_to_w1_baseline(self) -> None:
+        from dadaia_workspace.features.panel.handler import (
+            _CSP_SCRIPT_HASH_1,
+            _CSP_SCRIPT_HASH_2,
+        )
+
+        assert _CSP_SCRIPT_HASH_1 == _W1_BASELINE_CSP_HASH_1, (
+            "_CSP_SCRIPT_HASH_1 moved off its W1 baseline — the theme pre-paint inline "
+            "script was edited and its hash recomputed. v0.1.59 Ruling B forbids this "
+            "(the two pre-paint scripts stay byte-identical). Revert the script edit."
+        )
+        assert _CSP_SCRIPT_HASH_2 == _W1_BASELINE_CSP_HASH_2, (
+            "_CSP_SCRIPT_HASH_2 moved off its W1 baseline — the runtime pre-paint inline "
+            "script was edited and its hash recomputed. v0.1.59 Ruling B forbids this "
+            "(the two pre-paint scripts stay byte-identical). Revert the script edit."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Falsifiable CSP coverage: every inline <script> on the served index page
 # must be covered by a sha256 hash in script-src (zero CSP-blocked scripts).
 # ---------------------------------------------------------------------------

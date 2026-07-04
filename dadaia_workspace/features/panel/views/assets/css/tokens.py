@@ -14,25 +14,47 @@ Brand hex values (immutable, per brand-identity-v1):
 """
 
 TOKENS_CSS: str = """
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — :root token contract (v0.1.59 design-system rationalization)
+
+   One coherent, grep-reviewable token vocabulary for the whole panel. Restyled
+   control rules (FR2) consume these `var(--…)` tokens — never ad-hoc hex / px /
+   rem-font-size / radius literals. The v0.1.59 pass CONSOLIDATED the previously
+   scattered scales (spacing + radius were each defined in two places) into single
+   ordered scales and ADDED the missing control vocabulary (font weights,
+   line-heights, focus-ring, control rhythm). It is additive/rationalizing only:
+   no brand hex changed, the 5-color brand palette + the 3 themes are preserved,
+   and WCAG AA/AAA contrast is untouched (palette hexes live in the theme blocks
+   below; this block defines structural + semantic tokens).
+   ═══════════════════════════════════════════════════════════════════════════ */
 :root {
+  /* ── Color · surfaces & text ──────────────────────────────────── */
   --color-bg:            #fafafa;
   --color-surface:       #ffffff;
   --color-text:          #222222;
   --color-heading:       #111111;
   --color-muted:         #666666;
+  --color-code-bg:       #f0f0f0;
+  --color-th-bg:         #eeeeee;
+
+  /* ── Color · borders ──────────────────────────────────────────── */
   --color-border:        #dddddd;
   --color-border-card:   #dddddd; /* card-specific border — decoupled from generic --color-border */
   --color-border-strong: #333333;
+
+  /* ── Color · brand palette (brand-identity-v1, 5-color canon; immutable) ──
+     These are the default (Mint) values; the 3 theme blocks below override them
+     per palette. Hex values are frozen — a change is a Ruling-E violation. */
   --color-accent:        #9cddc8; /* was #7ec8e3 — brand-identity-v1 */
   --color-accent-dark:   #2d7d9a;
-  --color-code-bg:       #f0f0f0;
-  --color-th-bg:         #eeeeee;
   --color-primary-ring:  #9cddc8; /* was #7ec8e3 — brand-identity-v1 */
   --color-primary-bg:    #f0fbf7; /* was #f0faff — brand-identity-v1 */
   --color-accent-secondary: #bfd8ad; /* brand-identity-v1 */
   --color-warning-bg:    #ddd9ab; /* brand-identity-v1 */
   --color-alert:         #f7af63; /* brand-identity-v1 */
   --color-cost:          #633d2e; /* brand-identity-v1 */
+
+  /* ── Color · semantic UI (status, hover, chips, badges) ───────── */
   --color-active-dot:    #3aaa6e;
   --color-stale-dot:     #cc7700;
   --color-row-hover:     #f5f5f5;
@@ -48,22 +70,13 @@ TOKENS_CSS: str = """
   --color-badge-active-bg: #d4f5e5; /* active status badge background — T-PUX-04 */
   --color-badge-active-text: #1f7a46; /* active status badge text (WCAG AA on badge-active-bg) — T-PUX-04 */
 
+  /* ── Typography · families ────────────────────────────────────── */
   --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono:  ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  --radius:      4px;
-  --radius-card: 6px;
-  --space-xs:    0.3rem;
-  --space-sm:    0.6rem;
-  --space-md:    1rem;
-  --space-lg:    1.5rem;
-  --space-xl:    2rem;
-  --topbar-h:    52px;
-  --nav-h:       48px;
-
-  /* ── Typography scale (v0.1.45 / T-45-07 — semantic, token-anchored) ──
-     Restyled control rules consume these instead of ad-hoc rem literals so
-     type sizing is consistent and reviewable by grep. */
+  /* ── Typography · type scale (v0.1.45 / T-45-07 — semantic, token-anchored) ──
+     Restyled control rules consume these instead of ad-hoc rem literals so type
+     sizing is consistent and reviewable by grep. Ordered smallest → largest. */
   --text-2xs:    0.68rem;
   --text-xs:     0.72rem;
   --text-sm:     0.78rem;
@@ -72,25 +85,40 @@ TOKENS_CSS: str = """
   --text-lg:     0.95rem;
   --text-xl:     1rem;
 
-  /* ── Border widths (semantic) ─────────────────────────────────── */
-  --border-width:        1px;
-  --border-width-accent: 3px;
+  /* ── Typography · weights (v0.1.59 — additive, replaces hardcoded 400/500/…) ── */
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
 
-  /* ── Responsive card-grid track floor (v0.1.45 / T-45-07) ──────── */
-  --grid-card-min-w:     340px;
+  /* ── Typography · line-heights (v0.1.59 — additive) ───────────── */
+  --line-height-tight:   1.2;
+  --line-height-snug:    1.35;
+  --line-height-base:    1.5;
 
-  /* ── Spacing ──────────────────────────────────────── */
+  /* ── Spacing · rhythm (single consolidated scale, 2xs → 3xl) ──── */
   --space-2xs:   0.25rem;
+  --space-xs:    0.3rem;
+  --space-sm:    0.6rem;
+  --space-md:    1rem;
+  --space-lg:    1.5rem;
+  --space-xl:    2rem;
   --space-3xl:   3rem;
 
-  /* ── Border-radius ────────────────────────────────── */
-  --radius-modal: 0.75rem;
-  --radius-pill:  9999px;
+  /* ── Radius · scale (single consolidated scale, sharp → pill) ─── */
+  --radius:      4px;
+  --radius-card: 6px;
   /* Modern card radius (v0.1.45 / T-45-08 restyle) — softer than --radius-card
      so big content cards read contemporary, not boxy. Token-anchored. */
   --radius-lg:    10px;
+  --radius-modal: 0.75rem;
+  --radius-pill:  9999px;
 
-  /* ── Shadows ──────────────────────────────────────── */
+  /* ── Borders · widths (semantic) ──────────────────────────────── */
+  --border-width:        1px;
+  --border-width-accent: 3px;
+
+  /* ── Elevation · shadows (rest → hover → modal) ───────────────── */
   --shadow-none:  none;
   --shadow-card:  0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
   --shadow-modal: 0 8px 32px rgba(0,0,0,.24), 0 2px 8px rgba(0,0,0,.12);
@@ -101,12 +129,18 @@ TOKENS_CSS: str = """
   /* Vertical translate applied on card hover (motion-guarded at call sites). */
   --lift-hover:   -2px;
 
-  /* ── Z-index ──────────────────────────────────────── */
-  --z-modal-overlay: 400;
-  --z-modal:         500;
-  --z-toast:         600;
+  /* ── Controls · focus + rhythm (v0.1.59 — additive control vocabulary) ──
+     A single control language for FR2's button/tab/switcher restyle, so the
+     restyled rules carry no ad-hoc px/rem literals. */
+  --focus-ring-width:  2px;
+  --focus-ring-offset: 2px;
+  --control-height:    2rem;
+  --control-pad-y:     0.4rem;
+  --control-pad-x:     0.75rem;
+  --control-gap:       0.4rem;
+  --control-radius:    6px;
 
-  /* ── Motion ───────────────────────────────────────── */
+  /* ── Motion · durations + easings ─────────────────────────────── */
   --duration-fast:       120ms;
   --duration-normal:     220ms;
   --duration-slow:       380ms;
@@ -114,7 +148,15 @@ TOKENS_CSS: str = """
   --easing-decelerate:   cubic-bezier(0, 0, 0.2, 1);
   --easing-accelerate:   cubic-bezier(0.4, 0, 1, 1);
 
-  /* ── Dimensions ───────────────────────────────────── */
+  /* ── Z-index · layers ─────────────────────────────────────────── */
+  --z-modal-overlay: 400;
+  --z-modal:         500;
+  --z-toast:         600;
+
+  /* ── Layout · dimensions ──────────────────────────────────────── */
+  --topbar-h:    52px;
+  --nav-h:       48px;
+  --grid-card-min-w:     340px; /* responsive card-grid track floor (v0.1.45 / T-45-07) */
   --modal-max-w:  720px;
   --modal-max-h:  80vh;
 }
