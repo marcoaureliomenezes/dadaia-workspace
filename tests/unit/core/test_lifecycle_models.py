@@ -5,6 +5,7 @@ import dataclasses
 import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
+    TRANSITIONS,
     AgentRunRequest,
     AgentRunResult,
     AgentRunStatus,
@@ -42,6 +43,31 @@ def test_blocked_phase_can_resume_to_any_lifecycle_phase_except_itself() -> None
             assert not is_legal_transition(LifecyclePhase.BLOCKED, phase)
         else:
             assert is_legal_transition(LifecyclePhase.BLOCKED, phase)
+
+
+def test_review_phases_cannot_backtrack_to_implementation() -> None:
+    # FR4 (v0.1.56): the three review->implementation backtrack edges are removed. The
+    # state table no longer permits a (non-blocked) review phase to return to
+    # IMPLEMENTATION; the retained operator-driven rework path is BLOCKED -> IMPLEMENTATION
+    # (covered by test_blocked_phase_can_resume_* above).
+    assert not is_legal_transition(LifecyclePhase.QA_REVIEW, LifecyclePhase.IMPLEMENTATION)
+    assert not is_legal_transition(LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.IMPLEMENTATION)
+    assert not is_legal_transition(LifecyclePhase.CODE_REVIEW, LifecyclePhase.IMPLEMENTATION)
+
+
+def test_transitions_table_pins_review_targets_by_frozenset_equality() -> None:
+    # AC-5 (v0.1.56): exact frozenset-equality pins (not spot-checks) so a future stray
+    # review->implementation edge fails the pin. Each review phase's only legal targets
+    # are the next forward phase and BLOCKED.
+    assert TRANSITIONS[LifecyclePhase.QA_REVIEW] == frozenset(
+        {LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}
+    )
+    assert TRANSITIONS[LifecyclePhase.SECURITY_REVIEW] == frozenset(
+        {LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}
+    )
+    assert TRANSITIONS[LifecyclePhase.CODE_REVIEW] == frozenset(
+        {LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}
+    )
 
 
 def test_lifecycle_run_round_trips_to_primitive_dict() -> None:

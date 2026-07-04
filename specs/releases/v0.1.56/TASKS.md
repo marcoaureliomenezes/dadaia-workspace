@@ -217,7 +217,36 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W4 — FR4 TRANSITIONS reconciliation
 
-- [ ] T-56-40 Remove the unused review→implementation backtrack edges. Checklist:
+- [x] T-56-40 Remove the unused review→implementation backtrack edges.
+  **AC-7 mutation-sanity (captured then reverted):** (d) re-add the `QA_REVIEW → IMPLEMENTATION`
+  edge to `TRANSITIONS` ⇒
+  `pytest tests/unit/core/test_lifecycle_models.py::test_transitions_table_pins_review_targets_by_frozenset_equality`
+  FAILED (`Extra items in the left set: IMPLEMENTATION`) AND
+  `::test_review_phases_cannot_backtrack_to_implementation` FAILED (`assert not True`) → reverted.
+  **AC-8 ledger** — SURVIVING: the `TRANSITIONS` symbol + `is_legal_transition` (contents edited,
+  symbols retained); DEAD (removed): the three review→IMPLEMENTATION edges
+  (`QA_REVIEW`/`SECURITY_REVIEW`/`CODE_REVIEW` → `IMPLEMENTATION`); NEW tests:
+  `test_review_phases_cannot_backtrack_to_implementation` +
+  `test_transitions_table_pins_review_targets_by_frozenset_equality`.
+  **A9 public-asset grep conclusion:** the only `public/` mentions of
+  `TRANSITIONS`/`is_legal_transition` — `public/skills/dadaia-task-manager/SKILL.md:42`
+  (`is_legal_transition, TransitionDecision`) and
+  `public/skills/project-orchestration/SKILL.md:108/110` (`TRANSITIONS made executable`;
+  `is_legal_transition, TransitionDecision`) — name the **symbol generically**, NOT the removed
+  edges ⇒ **NO `public/` edit**; CLOSURE `public doctor` zero-change pre-justified.
+  **Inverted-test adjudication (AC-8 sweep — tests/ + docstrings):** SPEC §9-B's "no positive test
+  asserts them" was imprecise — two synthetic-ladder INTEGRATION tests asserted the removed edges as
+  legal end-to-end (`tests/integration/cli/test_lifecycle_pipeline_full.py::test_pipeline_qa_review_backtracks_to_implementation_on_fake`
+  + `::test_pipeline_security_and_code_review_backtrack_to_implementation_on_fake`, both former
+  T-23-03). "No PRODUCTION consumer" still holds (ladder is forward-only; the loop never touches the
+  state machine), but these two invert. Rewritten →
+  `test_pipeline_qa_review_cannot_backtrack_to_implementation_on_fake` +
+  `test_pipeline_security_and_code_review_cannot_backtrack_to_implementation_on_fake`: each asserts
+  `not is_legal_transition(<review>, IMPLEMENTATION)` and that the pipeline run does NOT reach
+  IMPLEMENTATION (state machine rejects the illegal transition; run stays at its review phase);
+  module docstring's T-23-03 note updated. **Gates:** ruff format+check clean; mypy --strict 302
+  files clean; lint-imports 8 kept/0 broken; full unpiped pytest **4406 passed / 17 skipped**
+  (exit 0). No `specs/backlog/**` staged. Checklist:
   - **`core/models/lifecycle.py` `TRANSITIONS`**: remove `IMPLEMENTATION` from the `QA_REVIEW`,
     `SECURITY_REVIEW`, and `CODE_REVIEW` target sets. **Retain** every forward edge
     (IMPLEMENTATION→QA_REVIEW→SECURITY_REVIEW→CODE_REVIEW→CLOSURE), every `*→BLOCKED`, and the full
