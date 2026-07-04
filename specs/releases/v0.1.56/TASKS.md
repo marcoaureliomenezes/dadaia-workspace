@@ -11,7 +11,7 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W0 — definition
 
-- [ ] T-56-01 SPEC/PLAN/TASKS authored from the 2026-07-03 **verb-by-verb code read** (not a dossier
+- [x] T-56-01 SPEC/PLAN/TASKS authored from the 2026-07-03 **verb-by-verb code read** (not a dossier
   restatement): the verb→governance matrix derived by reading `cli/commands/lifecycle.py`,
   `pipeline.py`, `phase_workflow.py`, `release_definition.py`, `governed_catalog.py`, `agent_runner.py`,
   `state_machine.py`, `container.py` — confirmed ONLY `pipeline` is resolver-governed; `run_implement_review_loop`
