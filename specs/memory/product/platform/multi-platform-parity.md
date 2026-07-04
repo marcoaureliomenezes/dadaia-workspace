@@ -20,9 +20,9 @@ tags:
 - pi
 - parity
 - multi-platform
-token_estimate: 1600
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+token_estimate: 1625
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
 ## Purpose
@@ -31,7 +31,13 @@ Multi-platform parity means the same canonical public assets are projected to
 Claude Code, Codex, and PI without pretending the runtimes are identical. Each
 projection must be truthful about the runtime's native concepts, supported hooks,
 config loading, workflow support, and skill discovery. The Layer-1 entry-harness set is
-exactly `{claude, codex, pi}` (roster single-source: [[tech-stack]] §Agent runtimes).
+exactly `{claude, codex, pi}` (roster single-source: [[tech-stack]] §Agent runtimes). That
+roster is now **typed** in `core/harness_registry.py` — a pure `core` leaf owning
+`L1_ENTRY_HARNESSES`, `L2_WORKER_HARNESSES = {codex, pi}` (claude is never L2), capability
+predicates (`is_l1`/`is_l2`/`can_be_workflow_worker`), and the install-target vocabulary —
+consumed by the formerly-forked roster literals; the `tech-stack` §Agent runtimes prose stays
+the roster doc single source and `harness_registry.py` is its code embodiment (a contract
+test locks `L2_WORKER_HARNESSES` to `harness_models.harnesses()` so the two never diverge).
 
 ### Two-layer scope: projection-parity vs worker-runtime parity
 

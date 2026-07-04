@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T09:13:19Z",
+  "generated_at": "2026-07-04T14:30:43Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -92,7 +92,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, registry-based consumer AGENTS fan-out with doctor flagging, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -101,8 +101,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 875,
-      "depends_on": []
+      "token_estimate": 1010,
+      "depends_on": [
+        "workspace-init"
+      ]
     },
     {
       "rank": 6,
@@ -119,8 +121,9 @@
         "layer-1",
         "projection"
       ],
-      "token_estimate": 475,
+      "token_estimate": 500,
       "depends_on": [
+        "workspace-init",
         "tech-stack",
         "sdd-gate-v3",
         "public-asset-distribution",
@@ -143,8 +146,9 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 550,
+      "token_estimate": 575,
       "depends_on": [
+        "workspace-init",
         "tech-stack",
         "lifecycle-foundation",
         "sdd-gate-v3",
@@ -167,8 +171,9 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 500,
+      "token_estimate": 525,
       "depends_on": [
+        "workspace-init",
         "tech-stack",
         "lifecycle-foundation",
         "sdd-gate-v3",
@@ -358,7 +363,7 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1600,
+      "token_estimate": 1625,
       "depends_on": [
         "tech-stack",
         "architecture",
@@ -437,7 +442,7 @@
       "category": "product",
       "area": "platform",
       "tldr": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure.",
-      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a non-installed fallback.",
+      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and persists the selection to harness_profile.json (absent ⇒ all-four back-compat); PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a non-installed fallback.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -445,7 +450,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 850,
+      "token_estimate": 930,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3"

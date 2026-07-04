@@ -13,9 +13,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 500
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+token_estimate: 525
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
 ## Purpose
@@ -64,7 +64,9 @@ Scaffold projected by `dadaia public install --target pi`: `.pi/SYSTEM.md`,
 `.pi/settings.json`, `.pi/prompts/`, `.pi/extensions/dadaia-sdd-gate.ts`.
 Operator-local model profiles live in `.dadaia/states/workflow_model_profiles.local.json`
 (validated, never projected to `public/`). A PI-only workspace = `--target pi`
-(+ shared `--target agents`).
+(+ shared `--target agents`). This isolation is now **enforced mechanically at init** —
+`dadaia init --harness pi` scaffolds only the `.pi/` post-trust projection and persists
+the profile ([[workspace-init]]) — not merely documented.
 
 ## Dependencies
 

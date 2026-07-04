@@ -11,9 +11,9 @@ tags:
 - claude-code
 - layer-1
 - projection
-token_estimate: 475
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+token_estimate: 500
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
 ## Purpose
@@ -59,7 +59,10 @@ manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin 
 `.claude/skills/` (18), `.claude/rules/` (8), `.claude/workflows/` (2, reference),
 `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
-`--target agents` tree); no `.codex/` or `.pi/` is required.
+`--target agents` tree); no `.codex/` or `.pi/` is required. This isolation is now
+**enforced mechanically at init** — `dadaia init --harness claude` scaffolds only the
+claude surface and persists the profile, so `public install`/`doctor` stay claude-scoped
+([[workspace-init]]) — not merely documented.
 
 ## Dependencies
 

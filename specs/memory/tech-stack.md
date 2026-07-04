@@ -10,9 +10,9 @@ tags:
 - dependencies
 - toolchain
 - constraints
-token_estimate: 2325
-last_updated: '2026-07-03'
-release_origin: v0.1.53
+token_estimate: 2345
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
 ## Languages
@@ -40,7 +40,11 @@ git| 2.x| VCS; `git_subprocess.py` wraps commands
 ## Agent runtimes
 
 **This section is the ONLY source of the harness/runtime roster** (constitution §0,
-roster invariant; SPEC-DOC-037 prevents the constitution from enumerating it). The roster:
+roster invariant; SPEC-DOC-037 prevents the constitution from enumerating it). This section
+stays the roster *doc* single source; its typed *code* embodiment is
+`core/harness_registry.py` (v0.1.58 — `L1_ENTRY_HARNESSES`/`L2_WORKER_HARNESSES` + capability
+predicates + the install-target vocabulary), locked to `harness_models.harnesses()` by a
+contract test so the doc roster and the code registry never fork. The roster:
 
   * **Layer 1 — entry harnesses (what the operator launches in the terminal):** exactly **`{claude, codex, pi}`**.
   * **Layer 2 — workflow worker harnesses (selectable in `dadaia lifecycle`):** exactly **`{pi, codex}`** (+ **`fake`** test-only). `claude` is rejected as a workflow `--harness` — **Claude Code is Layer-1-only by law** (cost bound).

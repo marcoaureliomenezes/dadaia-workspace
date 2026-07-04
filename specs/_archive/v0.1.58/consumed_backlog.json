@@ -1,0 +1,20 @@
+{
+  "release": "v0.1.58",
+  "consumed": [
+    {
+      "slug": "harness-isolation-profiles",
+      "shipped_anchors": [
+        "dadaia_workspace/core/harness_registry.py#L1_ENTRY_HARNESSES",
+        "dadaia_workspace/features/workspace/service.py#WorkspaceService"
+      ],
+      "note": "DELIVERED — v0.1.58 (archived at CLOSURE, anchors survive). Typed core/harness_registry.py (L1/L2 rosters, predicates, parse_harness_set, install-target single source) centralizing 7 roster-literal sites (4 L1 + 3 bare _LAYER2_HARNESSES per Ruling K; the derived 4th site locked by an order-independent frozenset contract test, R1); init --harness <set> with the persisted .dadaia/states/harness_profile.json via ports-and-adapters (core model NO-IO + protocol port + infrastructure JSON adapter, A1 — zero new import edges); harness-aware scaffold with hook gating; profile-aware public install/doctor (codex-parity gated, out-of-profile-on-disk never silent, absent profile byte-identical to all-four per the pre-refactor golden); per-profile sandboxed E2E ×4. Ruling F (workflow-spawn entry-harness auto-default) deferred to the workflow-spawn-entry-harness-autodefault return."
+    },
+    {
+      "slug": "consumer-agents-md-fanout-redesign",
+      "shipped_anchors": [
+        "dadaia_workspace/infrastructure/workspace_guardrail.py#_consumer_repos_for_root"
+      ],
+      "note": "DELIVERED — v0.1.58 (archived at CLOSURE, anchor survives by name — Ruling G). _consumer_repos_for_root reimplemented on .dadaia/states/spec_contexts.json (alive OR dead on-disk context repos minus the self-repo, Rulings H/G); the dead in-repo .dadaia/agentic/ marker requirement dropped; consumer ROOT AGENTS.md ruled lib-owned (Ruling L) — divergent copies restored to canonical with the DISTINCT [updated] line, nested scoped AGENTS.md never touched; doctor emits [drift]/[missing]/[ok] per consumer, never [skip] (Ruling J); ship executed the Ruling M doctor-before-install reconcile on the live instance (12 targets / 6 repos surfaced pre-install, recorded, restored, confirming doctor green)."
+    }
+  ]
+}

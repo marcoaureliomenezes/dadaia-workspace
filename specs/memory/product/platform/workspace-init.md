@@ -4,7 +4,9 @@ title: workspace-init
 category: product
 tldr: entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure.
 summary: entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent
-  structure; PreToolUse registered as ONE Python command (python -m
+  structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and
+  persists the selection to harness_profile.json (absent ⇒ all-four back-compat);
+  PreToolUse registered as ONE Python command (python -m
   dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a
   non-installed fallback.
 tags:
@@ -12,12 +14,12 @@ tags:
 - init
 - setup
 - idempotent
-token_estimate: 850
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+token_estimate: 930
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
-CLI surface: `dadaia init [--workspace PATH] [--skip-assets]` · Closure: sdd-release-lifecycle-v1
+CLI surface: `dadaia init [--workspace PATH] [--skip-assets] [--harness <set>]` · Closure: sdd-release-lifecycle-v1
 
 ## Purpose
 
@@ -28,6 +30,10 @@ The governance hooks are the Python package `dadaia_workspace/hooks/` (8 modules
 `workspace/service.py` recognizes both the old path (`.sh`) and the new Python command to avoid double registration in migrated workspaces. The bash script `ctx-inject.sh` exists in `.dadaia/scripts/` as a legacy artifact, but is no longer the registered hook mechanism.
 
 It is the only feature that can run in a zero workspace — without it, no other feature has anywhere to write state.
+
+## Harness profiles
+
+`dadaia init --harness <set>` makes init **harness-selective**. The flag accepts a comma set of Layer-1 harnesses (`claude`, `codex`, `pi`) or `all`; **omitted ⇒ `all`** (back-compat with the historical install-everything behaviour). The set is parsed by `core/harness_registry.parse_harness_set` (an unknown name raises a Click `BadParameter`, exit 2). `WorkspaceService.init` then creates ONLY the chosen harnesses' scaffold — for `claude` the `.claude/` tree + the `settings.json` ctx-inject hook (`_configure_hook` runs only when `claude` is in the set); for `codex` the `.codex/` tree + the `.dadaia/hooks/codex-*` wrappers; for `pi` the `.pi/` projection — and installs only the profile's targets, never `target="all"` for a subset. The chosen set is persisted to `.dadaia/states/harness_profile.json` (`{"schema_version":"1","harnesses":[...]}`) via a **ports-and-adapters** seam: a pure `HarnessProfile` core model + `parse_harness_set` (no I/O in `core`), an `infrastructure/json_harness_profile_store.py` adapter mirroring `json_context_store.py`, and an inline init-time write in `features/workspace/service.py` (no new `features→infrastructure` edge). The write is idempotent — re-running `init` with the same set is a no-op (no second hook entry). The profile is the source of truth that makes `public install`-all and `public doctor` profile-aware (mechanics: [[public-asset-distribution]]); an absent profile file (a pre-v0.1.58 workspace) is treated as all-four. The git chokepoint scripts are harness-independent and follow the existing `{all, claude, codex}` install rule — the profile does not remove them.
 
 ## Usage flow
 
@@ -51,6 +57,7 @@ Makes the workspace reproducible from the first command — agents and the opera
 ## Runtime state touched
 
   * `.dadaia/states/spec_contexts.json` — contexts list (empty until first creation)
+  * `.dadaia/states/harness_profile.json` — the persisted `dadaia init --harness <set>` selection (`{"schema_version":"1","harnesses":[...]}`); absent ⇒ all-four; consumed by profile-aware `public install`/`doctor`
   * `.dadaia/academy/academy.json` — courses list (empty)
   * `.dadaia/src/repos.xlsx` — static catalog of known repos
   * `.dadaia/scripts/ctx-inject.sh` — legacy bash script (still present; no longer the registered hook)
