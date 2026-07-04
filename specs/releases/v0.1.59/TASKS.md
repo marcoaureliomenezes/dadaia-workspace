@@ -17,7 +17,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W0 — definition
 
-- [ ] T-59-01 SPEC/PLAN/TASKS authored from the 2026-07-04 **code read** (not a dossier restatement): a full
+- [x] T-59-01 SPEC/PLAN/TASKS authored from the 2026-07-04 **code read** (not a dossier restatement): a full
   token system already exists in `tokens.py`; the `api_golden_v0155.json` byte-invariant captures ONLY
   `render_api_*` JSON bodies (NOT index HTML/CSS) ⇒ a pure-frontend overhaul is zero-diff by construction; the
   CSP covers exactly two inline pre-paint scripts (`_CSP_SCRIPT_HASH_1/2`) guarded by
@@ -462,7 +462,21 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W6 — FR7 e2e extension + gates + ship
 
-- [-] T-59-60 Extend the Playwright suite, run full gates + self-hosting verify, then ship. Checklist:
+- [x] T-59-60 Extend the Playwright suite, run full gates + self-hosting verify, then ship. **Ship evidence
+  (2026-07-04, tree = 849aa30b):** unpiped full pytest **4596 passed / 17 skipped, exit 0**; ruff
+  format+check clean; mypy --strict clean (308 files); lint-imports **8 kept / 0 broken**, cap
+  unchanged; specs doctor exit 0; backlog doctor exit 0; `git diff -- dadaia_workspace/public/` EMPTY +
+  public doctor **[ok] public-privacy** exit 0; frozen no-steal suite zero-diff. **Full local
+  Playwright suite 53 passed / 1 env-skip** (13 spec files incl. axe ×3 themes, the W3 width spec ×6,
+  the NEW button smoke ×2). **Live panel registered on :3742** (running, HTTP 200) + **17 operator
+  screenshots** (3 themes full-page; restyled controls; theme popover; 3×2 width matrix all
+  single-row) at `.dadaia/tmp/software-engineer/20260704/w6-screenshots/`. **QA ship gate: APPROVE**
+  (invariants independently confirmed: api golden ZERO commits since definition; DOM contract
+  single-commit history, never re-baselined; CSP baselines == handler.py values; purge zero-grep
+  re-run; 12/12 ACs falsifiable; 2 LOW non-blocking: response-guard chip-presence hardening → closure
+  note; T-59-01 marker flipped with this commit) — handoff
+  `2026-07-04T180947Z-qa-engineer-v0159-ship-gate.handoff.json`. Ship steps (security push gate keyed
+  to pushed sha; push; CI watch incl. e2e-panel; PR; merge) executed after this flip. Checklist:
   - **Extend `tests/e2e/panel/` — button smoke ONLY (the FR3 width spec is authored in W3, Q2/Option A, NOT
     here).** Add a restyled-button smoke assertion (computed `border-radius`/padding non-default — the controls
     are styled, not browser-default). Artifacts via `PLAYWRIGHT_OUTPUT_DIR`/`PLAYWRIGHT_REPORT_DIR` →
