@@ -111,7 +111,7 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W2 — FR2 `init --harness` profiles + persisted profile + harness-aware scaffold
 
-- [ ] T-58-20 `dadaia init --harness <set>` + harness-aware `WorkspaceService.init` + persisted profile.
+- [x] T-58-20 `dadaia init --harness <set>` + harness-aware `WorkspaceService.init` + persisted profile.
   Checklist:
   - **(A1 — persistence seam, ports-and-adapters, layer-pinned; BLOCKING):**
     - **`core`**: NEW pure typed model `HarnessProfile` (`schema_version` + `harnesses` tuple) +
@@ -142,14 +142,35 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
   - **Layer-boundary check (A1)**: `lint-imports --no-cache` stays `8 kept / 0 broken`, ignore-cap 9
     UNCHANGED (no new `features → infra` edge; no `infra → features` edge) — asserted in W6 gates.
   - **AC-9(b) sabotage:** make `WorkspaceService.init` ignore the harness set (always all-four) ⇒ the AC-3
-    claude-only test FAILS → revert. Capture command + failing test on this line.
-  - **existing-test fate ledger (Q3):** SURVIVE/EXTEND — the existing `WorkspaceService.init` /
-    `tests/unit/features/workspace/test_service.py` tests (default `--harness` omitted must still yield
-    all-four; assert unchanged); any `init` E2E in the all-harness pipeline (unchanged default path).
-  - **AC-11 ledger** — NEW (A1): `core/models/harness_profile.py`, `core/protocols/harness_profile_store.py`,
-    `infrastructure/json_harness_profile_store.py`, `parse_harness_set` (in `harness_registry.py`) + FR2
-    tests; EDITED: `init.py` (`--harness`), `service.py` (harness-aware init + profile write via port + hook
-    gating). No `specs/backlog/**` staged.
+    claude-only test FAILS → revert. **DONE:** sabotage = `chosen = L1_ENTRY_HARNESSES` (ignore `harnesses`
+    param) in `WorkspaceService.init`; command
+    `pytest tests/unit/cli/test_init_harness.py::test_harness_claude_scaffolds_claude_only -p no:cacheprovider`
+    → **FAILED** at `assert not (tmp_path / ".codex").exists()` (`.codex/` created because init always
+    scaffolds all-four). Reverted to `chosen = tuple(harnesses) if harnesses is not None else
+    L1_ENTRY_HARNESSES`; re-run → 4 passed. **RED-first also captured:** the same suite run against the
+    pre-flag HEAD failed 3/4 (claude-only, codex,pi, bad-value: `No such option: --harness`); the omitted →
+    all-four back-compat test passed pre-change, confirming the "always all-four" baseline.
+  - **existing-test fate ledger (Q3):** SURVIVE/EXTEND — `tests/unit/test_workspace_service.py` (the canonical
+    `WorkspaceService.init` suite; there is no `tests/unit/features/workspace/test_service.py`) SURVIVES
+    **unchanged** (10 tests pass: default `--harness` omitted still yields all-four — `.claude`+`.codex`
+    created, ctx-inject hook configured; idempotent; state files); the all-harness `init` E2E in
+    `tests/e2e/features/test_public_pipeline.py` SURVIVES (unchanged default path) — full unpiped suite
+    **4539 passed / 17 skipped / 0 failed**. The v0.1.50 frozen no-steal lease/gate suite is **zero-diff**
+    (release never enters `spec_context`/lease/gate). NEW sibling coverage lives in NEW files (no frozen edit).
+  - **AC-11 ledger** — NEW: `core/models/harness_profile.py` (`HarnessProfile` pure model, NO I/O),
+    `core/protocols/harness_profile_store.py` (`HarnessProfileStore` port), `infrastructure/json_harness_profile_store.py`
+    (`JsonHarnessProfileStore` adapter, mirrors `json_context_store.py` read/write style; W3 read-side consumer),
+    `tests/unit/cli/test_init_harness.py` (AC-3), `tests/unit/features/workspace/test_service_harness_profile.py`
+    (AC-4), `tests/unit/infrastructure/test_json_harness_profile_store.py` (adapter round-trip). REUSED:
+    `parse_harness_set` (already in `core/harness_registry.py` from W1 — extended NOT). EDITED: `cli/commands/init.py`
+    (`--harness` default `all` → `parse_harness_set` → `typer.BadParameter`, parsed before any stdout),
+    `features/workspace/service.py` (harness-aware `init` + `_install_for_harnesses` per-target subset +
+    inline `_write_harness_profile` bootstrap + `.claude`/`.codex` dir + `_configure_hook` gating). SEAM:
+    write is INLINE (allowed `_init_json_file`-style; no new `features→infra` edge), adapter serves W3 read.
+    Gates: ruff format+check clean, `mypy --strict` clean (309 files), `lint-imports --no-cache` **8 kept / 0
+    broken**, ignore-cap **26 UNCHANGED** (`features-no-infrastructure` still 9). No `specs/backlog/**` staged.
+    Deviation: pi-only/agents-only fresh init installs no chokepoint scripts (existing rule: scripts install
+    for `{all,claude,codex}` targets — FR2 "follow the existing rule"); flagged for W3/W5 (not a W2 AC).
 
 ## W3 — FR3 profile-aware `public install`-all + `public doctor`
 
