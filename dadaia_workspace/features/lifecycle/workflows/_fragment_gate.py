@@ -76,6 +76,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     PromptScope,
     build_fragment_suffix,
 )
+from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
@@ -424,6 +425,16 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             self._fragment_bundle(step, fragment, shared),
             selected_context=selected,
             is_review=step.is_review,
+        )
+        # v0.1.57 FR2 (A1): append the step role's mapped memory atom(s) + record their refs.
+        # The single resolve-and-inject helper; specs_dir comes from the wired selector's spec
+        # context. Independent of the fragment's dynamic_inputs — role alone guarantees grounding.
+        run, suffix = inject_role_atoms(
+            run=run,
+            step_label=step.label,
+            role=step.role,
+            specs_dir=self._selector.spec_context.specs_dir,
+            prompt=suffix,
         )
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)

@@ -80,11 +80,19 @@ class MaxContextPolicy(StrEnum):
 
 @dataclass(frozen=True)
 class SpecContext:
-    """Locates the active context's specs tree, release dir, and handoff dir."""
+    """Locates the active context's specs tree, release dir, and handoff dir.
+
+    ``phase`` (v0.1.57 FR2) is the active ``ACTIVE.md`` lifecycle phase, resolved and threaded
+    by the container builders (the READ stays in the features/container layer — this core-facing
+    model stays IO-free). Additive-optional: ``None`` when there is no active release or the
+    ``ACTIVE.md`` is absent/malformed (fail-open). A selector or fragment may declare an optional
+    phase gate against it; no fragment declares one this release, so it is inert-until-declared.
+    """
 
     specs_dir: Path
     release_id: str
     handoff_dir: Path | None = None
+    phase: str | None = None
 
     @property
     def release_dir(self) -> Path:

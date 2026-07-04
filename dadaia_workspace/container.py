@@ -843,6 +843,33 @@ def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWork
     )
 
 
+def _context_specs_dir(workspace_root: Path, context: str) -> Path:
+    """Resolve a context's ``specs/`` tree (v0.1.57 FR2 / A1 — role→atom map wiring).
+
+    Mirrors :func:`build_release_definition_workflow`'s resolution: a consumer context resolves
+    to ``workspace_root/repos/<ctx>/specs``; the self-hosting library repo falls back to the
+    workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
+    """
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    return specs_dir
+
+
+def _active_phase(specs_dir: Path) -> str | None:
+    """Resolve the active ``ACTIVE.md`` lifecycle phase under *specs_dir* (v0.1.57 FR2).
+
+    Reads ``<specs_dir>/releases/ACTIVE.md`` via the shared ``read_active_md`` parser. An
+    absent or malformed ``ACTIVE.md`` (no ``release:``/``phase:`` line) degrades to ``None``
+    (fail-open) so a context with no active release never crashes workflow construction.
+    """
+    from dadaia_workspace.features.specs.doctor_common import read_active_md
+
+    _, _, phase, err = read_active_md(specs_dir / "releases" / "ACTIVE.md")
+    return phase if err is None else None
+
+
 def build_lifecycle_phase_workflow(
     workspace_root: Path,
     *,
@@ -858,11 +885,15 @@ def build_lifecycle_phase_workflow(
     threaded into the adapter when supplied. The caller passes a resolved
     ``policy_snapshot`` to ``LifecyclePhaseWorkflow.run`` (composed via
     :func:`build_workflow_policy_resolver`) — the workflow itself never parses policy JSON.
+    The ``specs_dir_resolver`` (v0.1.57 FR2 / A1) closes over ``workspace_root`` so the
+    role→atom map resolves the run's context (only known at ``run()`` from ``scope.context``)
+    to its ``specs/`` tree with a real path — the map is not inert in the real phase-verb path.
     """
     _guard_initialized(workspace_root)
     return LifecyclePhaseWorkflow(
         runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root, model=model),
         run_store=build_lifecycle_run_store(workspace_root),
+        specs_dir_resolver=lambda ctx: _context_specs_dir(workspace_root, ctx),
     )
 
 
@@ -899,6 +930,9 @@ def build_lifecycle_pipeline(
         ),
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
+        # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
+        specs_dir=_context_specs_dir(workspace_root, context),
     )
 
 
@@ -979,7 +1013,12 @@ def build_release_definition_workflow(
         specs_dir = workspace_root / "specs"
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=handoff_dir,
+            phase=_active_phase(specs_dir),
+        )
     )
     return ReleaseDefinitionWorkflow(
         context=context,
@@ -1073,7 +1112,12 @@ def build_backlog_definition_workflow(
     # ``backlog_index`` resolution and the ``subject_bind`` registry both bind cli subjects.
     cli_anchors = derive_cli_anchors()
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir),
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=handoff_dir,
+            phase=_active_phase(specs_dir),
+        ),
         cli_anchors=cli_anchors,
     )
     registry = build_registry(
@@ -1167,7 +1211,12 @@ def build_audit_workflow(
         specs_dir = workspace_root / "specs"
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=handoff_dir,
+            phase=_active_phase(specs_dir),
+        )
     )
     return AuditWorkflow(
         context=context,
@@ -1216,7 +1265,12 @@ def build_research_workflow(
         specs_dir = workspace_root / "specs"
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=handoff_dir,
+            phase=_active_phase(specs_dir),
+        )
     )
     return ResearchWorkflow(
         context=context,
@@ -1319,7 +1373,12 @@ def build_bug_report_workflow(
         specs_dir = workspace_root / "specs"
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
-        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=handoff_dir,
+            phase=_active_phase(specs_dir),
+        )
     )
     return BugReportWorkflow(
         context=context,

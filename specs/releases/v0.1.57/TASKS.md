@@ -104,8 +104,41 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W2 — FR2 role→atom map + phase threading + qa_review atom
 
-- [ ] T-57-20 Declarative role→atom map + phase into `SpecContext` + qa_review atom.
-  **AC-10(b) evidence:** drop the map injection for qa-engineer ⇒ AC-3 pipeline `review_qa` grounding
+- [x] T-57-20 Declarative role→atom map + phase into `SpecContext` + qa_review atom.
+  **Done (evidence):** NEW `features/lifecycle/role_atoms.py` (`ROLE_ATOM_MAP` + the ONE
+  `inject_role_atoms` resolve-and-inject helper) wired into all THREE FR2 surfaces via that single
+  helper (never copy-pasted): `FragmentGateWorkflow._run_model_step` (specs_dir =
+  `self._selector.spec_context.specs_dir`), `LifecyclePipeline` (new `specs_dir` `__init__` param;
+  `run()` injects before the worker call, refs preserved onto `decision.run`), `LifecyclePhaseWorkflow`
+  (new `specs_dir_resolver` `__init__` param; resolved at `run()` from `scope.context`). `SpecContext`
+  gains `phase: str | None`; the 5 container builders resolve it from `ACTIVE.md` via
+  `container._active_phase` (absent/malformed → `None`, fail-open). `implementation.qa_review` gains
+  `quality_assurance_atom` (lib-originated SOURCE edit; `public stage/install` deferred to SHIP wave).
+  NEW `tests/unit/features/lifecycle/test_role_atoms_injection.py` (28 tests): AC-3 base
+  (product-engineer→catalog.json, software-architect→architecture.md, qa-engineer→quality-assurance.md,
+  multi-role `plan_review` records BOTH), AC-3 pipeline `review_qa` grounding (+ RED-anchor: an un-wired
+  pipeline lacks the atom), AC-3 phase_workflow; **(A1) PRODUCTION-builder wiring** —
+  `build_lifecycle_pipeline(...)._specs_dir == <real specs dir>` and
+  `build_lifecycle_phase_workflow(...)._specs_dir_resolver(ctx) == <real specs dir>` (asserted on the
+  constructed objects, not fixtures); AC-4 phase threading (parametrized × 5 builders + fail-open when
+  ACTIVE.md absent); single-sourced-helper grep across the 3 surfaces.
+  **Gates:** ruff format --check clean; ruff check --no-cache clean; `mypy --strict` (304 files) clean;
+  `lint-imports --no-cache` **8 kept / 0 broken** (ignore-cap 26 UNCHANGED — `role_atoms` lives inside
+  `features/lifecycle`, imports only `core.models.lifecycle` + stdlib, no new edge); FULL unpiped pytest
+  **4443 passed / 17 skipped / 0 failed**.
+  **GOLDEN RE-BASELINE (Q2, expected + intentional):** re-baselined ONLY `gate_release_definition.json`
+  (product-engineer ×4 + software-architect + qa-engineer + multi-role `plan_review`),
+  `gate_research.json` (product-engineer ×2 + software-architect), `gate_bug_report.json`
+  (product-engineer `dedupe` + `bug_write`). NOT re-baselined: `gate_audit.json` (project-auditor —
+  unmapped), `gate_backlog_definition.json` (the backlog body is NOT one of the 3 FR2 surfaces — it
+  shares only the assembly mixin, not `_run_model_step`), `gate_pipeline.json` (the golden test wires no
+  `specs_dir` → map inert, mirroring the pre-wire pipeline). Diffs are role-atom banners + fixture atom
+  content only, platform-invariant (no host paths leaked).
+  **AC-10(b) evidence:** sabotage — drop `"qa-engineer"` from `ROLE_ATOM_MAP` ⇒
+  `pytest tests/unit/features/lifecycle/test_role_atoms_injection.py::test_ac3_pipeline_review_qa_grounding`
+  FAILS (`assert 'FIXTURE QA BODY.' in review_qa.prompt` — atom absent from the built prompt) → reverted
+  (map restored; grounding test green).
+  **AC-10(b) (checklist ref):** drop the map injection for qa-engineer ⇒ AC-3 pipeline `review_qa` grounding
   test FAILS → reverted. **AC-12 ledger** — NEW: `features/lifecycle/role_atoms.py` (map + single-sourced
   inject helper); SURVIVING/EDITED: `SpecContext` (gains `phase`), the 5 container builders (resolve
   ACTIVE.md phase), **`build_lifecycle_pipeline` + `build_lifecycle_phase_workflow` (wire the resolver,

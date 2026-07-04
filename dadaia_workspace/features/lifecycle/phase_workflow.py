@@ -11,7 +11,9 @@ the harness is selectable/mixable per step purely by which adapter is injected.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
@@ -32,6 +34,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
     PromptScope,
 )
+from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 
 #: The review phases (v0.1.31 / C1). A phase step targeting one of these is a REVIEW step,
@@ -78,11 +81,17 @@ class LifecyclePhaseWorkflow:
         run_store: LifecycleRunStore,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
+        specs_dir_resolver: Callable[[str], Path | None] | None = None,
     ) -> None:
         self._runtime = runtime
         self._run_store = run_store
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # Resolve a context name → its ``specs/`` tree (v0.1.57 FR2 / A1). Injected by
+        # ``build_lifecycle_phase_workflow`` (closing over ``workspace_root``) because the
+        # context is only known at ``run()`` time from ``scope.context``. When ``None`` (a
+        # fixture-constructed workflow) no role atom is injected.
+        self._specs_dir_resolver = specs_dir_resolver
 
     def run(
         self,
@@ -118,6 +127,23 @@ class LifecyclePhaseWorkflow:
             workflow_policy=policy_snapshot,
         )
         self._run_store.save(run)
+
+        # FR2 (A1): resolve specs_dir from the run's context, append the role's mapped atom(s)
+        # to the scope prompt, and record the atom refs on the run before the worker call —
+        # the state machine's ``replace``-based transition preserves them onto ``decision.run``.
+        specs_dir = (
+            self._specs_dir_resolver(scope.context)
+            if self._specs_dir_resolver is not None
+            else None
+        )
+        run, injected_prompt = inject_role_atoms(
+            run=run,
+            step_label=step,
+            role=scope.role,
+            specs_dir=specs_dir,
+            prompt=scope.prompt,
+        )
+        scope = replace(scope, prompt=injected_prompt)
 
         built = self._prompt_builder.build(scope, runtime=self._runtime.runtime_kind())
         runner = LifecycleAgentRunner(
