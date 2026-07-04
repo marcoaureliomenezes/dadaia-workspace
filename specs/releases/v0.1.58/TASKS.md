@@ -53,7 +53,7 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
   - **AC-11 ledger** — NEW: `test_install_target_goldens.py` + install/panel/**doctor** goldens. No
     `specs/backlog/**` staged.
 
-- [ ] T-58-11 Add `core/harness_registry.py` and consume it in the roster-encoding literals. Checklist:
+- [-] T-58-11 Add `core/harness_registry.py` and consume it in the roster-encoding literals. Checklist:
   - **NEW `dadaia_workspace/core/harness_registry.py`** — pure `core` leaf (stdlib only, no upward import):
     `L1_ENTRY_HARNESSES = ("claude","codex","pi")`, `L2_WORKER_HARNESSES = ("codex","pi")`, capability
     predicates (`is_l1`/`is_l2`/`can_be_workflow_worker`), `PROJECTION_TARGETS`/`INSTALL_TARGETS` (the
