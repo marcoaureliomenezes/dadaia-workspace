@@ -1840,15 +1840,25 @@ def workflow_profiles_list(
 def workflow_doctor(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the workflow-model-policy governance doctor (WMP-* invariants, AC-10).
+    """Run the lifecycle governance + fragment-coherence doctors (WMP-* + FRAG-COH-*).
 
-    Checks the governed catalog + built-in profile registry + persisted overlay for:
-    workflow/step id uniqueness, default-profile resolution + harness match, fragment +
-    output-schema resolution, overlay override validity, and any ``claude``/``opencode``
-    Layer-2 residue. An invalid overlay state file is reported as an actionable error and
-    never crashes. Exit 1 if any ERROR finding is present.
+    The WMP-* governance doctor checks the governed catalog + built-in profile registry +
+    persisted overlay for: workflow/step id uniqueness, default-profile resolution + harness
+    match, fragment + output-schema resolution, overlay override validity, and any
+    ``claude``/``opencode`` Layer-2 residue. The FRAG-COH-* coherence doctor (v0.1.57 FR3) adds
+    the fragment-file surface: fragment role→persona resolution (FRAG-COH-1), selector-wired
+    main-fragment ``dynamic_inputs`` registration (FRAG-COH-2), orphan/dangling fragments
+    (FRAG-COH-3), and role→atom-map coverage across the FR2 delivery surfaces (FRAG-COH-4). An
+    invalid overlay state file is reported as an actionable error and never crashes. Exit 1 if
+    any ERROR finding is present in either doctor.
     """
     from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
+        Severity as CoherenceSeverity,
+    )
+    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
+        run_fragment_coherence_doctor,
+    )
     from dadaia_workspace.features.lifecycle.policy_doctor import (
         Severity,
         run_policy_doctor,
@@ -1857,14 +1867,27 @@ def workflow_doctor(
     workspace_root = resolve_workspace_root()
     store = container.build_workflow_model_policy_store(workspace_root)
     findings = run_policy_doctor(store=store)
+    coherence = run_fragment_coherence_doctor()
     if json_output:
-        _emit_json({"findings": [f.to_dict() for f in findings]})
+        _emit_json(
+            {
+                "findings": [f.to_dict() for f in findings],
+                "coherence": [f.to_dict() for f in coherence.findings],
+            }
+        )
     else:
         if not findings:
             typer.echo("[ok] workflow-model-policy (no governance issues)")
         for finding in findings:
             typer.echo(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
-    if any(f.severity is Severity.ERROR for f in findings):
+        if coherence.ok and not coherence.findings:
+            typer.echo("[ok] fragment-coherence (no coherence issues)")
+        for coh in coherence.findings:
+            typer.echo(f"[{coh.severity.value}] {coh.code.value}: {coh.message}")
+    has_error = any(f.severity is Severity.ERROR for f in findings) or any(
+        c.severity is CoherenceSeverity.ERROR for c in coherence.findings
+    )
+    if has_error:
         raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
 
 

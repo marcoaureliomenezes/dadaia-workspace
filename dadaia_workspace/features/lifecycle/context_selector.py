@@ -260,10 +260,23 @@ class ContextSelector:
         policy: MaxContextPolicy | str,
         *,
         fragment_ids: tuple[str, ...] = (),
+        input_policies: dict[str, MaxContextPolicy | str] | None = None,
     ) -> SelectionAudit:
-        """Resolve an ordered set of inputs at one policy into an auditable batch."""
+        """Resolve an ordered set of inputs into an auditable batch (v0.1.57 FR3 per-input).
+
+        Each input resolves at *policy* — the fragment-global ``max_context_policy`` — unless
+        it is named in *input_policies*, whose per-name override wins for that input only
+        (``input_policies`` maps an input name → its own :class:`MaxContextPolicy`). An input
+        absent from the map falls back to *policy*. ``input_policies=None`` (the default) is
+        byte-identical to the pre-FR3 behaviour — every input resolves at the fragment-global
+        policy — so a fragment declaring no ``input_policies`` is unchanged.
+        """
         resolved = MaxContextPolicy.parse(policy) if isinstance(policy, str) else policy
-        results = tuple(self.select(name, resolved) for name in names)
+        overrides = {
+            name: (MaxContextPolicy.parse(value) if isinstance(value, str) else value)
+            for name, value in (input_policies or {}).items()
+        }
+        results = tuple(self.select(name, overrides.get(name, resolved)) for name in names)
         return SelectionAudit(step=step, results=results, fragment_ids=fragment_ids)
 
     # -- single API ------------------------------------------------------
@@ -393,6 +406,16 @@ class ContextSelector:
         return self._render(name, policy, (_FileRef(path=path, ref=self._specs_ref(path)),))
 
     def sel_constitution(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
+        # NOT DEAD (v0.1.57 FR3 / A4). ``sel_constitution`` has no *direct* fragment
+        # ``dynamic_inputs`` consumer, but is reached two ways at runtime, so it stays
+        # registered and must never be pruned as unused:
+        #   1. INDIRECT chain — ``write_set_guidance`` (declared by
+        #      ``release_definition.tasks_create``) → :meth:`sel_write_set_guidance` →
+        #      :meth:`sel_constitution`.
+        #   2. DIRECT static-input — ``spec_create`` declares ``specs/constitution.md`` in its
+        #      fragment ``static_inputs``, resolved via :meth:`resolve_static_input`.
+        # The FR3 decision KEEPS it registered + both paths canonical; no removal, no new
+        # consumer, and constitution is deliberately NOT added to the FR2 role→atom baseline.
         path = self._ctx.specs_dir / "constitution.md"
         if not path.is_file():
             return SelectionResult(name=name, policy=policy, content="", refs=())

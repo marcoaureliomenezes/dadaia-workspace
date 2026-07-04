@@ -173,13 +173,46 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W3 — FR3 coherence doctor + sel_constitution + per-input policy
 
-- [ ] T-57-30 Fragment/selector/role-map coherence doctor + `sel_constitution` decision + per-input
-  policy. **AC-10(e) evidence:** make the selector-wired **`release_definition.spec_create`** main
-  fragment declare an unregistered `dynamic_inputs` entry ⇒ **FRAG-COH-2** ERROR fires and `ok` flips
-  → reverted. **AC-12 ledger** — NEW: `features/lifecycle/fragment_coherence_doctor.py`; SURVIVING:
+- [x] T-57-30 Fragment/selector/role-map coherence doctor + `sel_constitution` decision + per-input
+  policy.
+  **Done (evidence):** NEW `features/lifecycle/fragment_coherence_doctor.py` with FRAG-COH-1..4
+  (stable ids + fixed severities, Q6/A3): FRAG-COH-1 (ERROR) fragment role→persona/shared/python;
+  FRAG-COH-2 (ERROR, SCOPED A2) selector-wired MAIN-fragment `dynamic_inputs` registered, WARN for
+  shared + selector-less (`implementation.*`) inputs; FRAG-COH-3 (WARN) orphan/dangling; FRAG-COH-4
+  (ERROR) role→atom-map coverage across the THREE FR2 surfaces (release_definition/audit/research/
+  bug_report base + pipeline), **backlog_definition EXCLUDED** (W2 boundary: mixin-only, no
+  `_run_model_step`) — grounded against a self-contained canonical-layout oracle so the check is a
+  pure CODE-coherence proof, ambient-tree-independent. `ok=` from ERROR findings only. `persona_doctor`
+  NOT re-implemented (delegated to via its own module, untouched). Surfaced on the lifecycle doctor
+  surface `dadaia lifecycle workflow doctor` (mirrors persona_doctor→run_policy_doctor), emitting
+  FRAG-COH-* alongside WMP-*; exit 1 on any ERROR in either. **DOCTOR GREEN ON CURRENT TREE (run for
+  real):** `ok=True`, 0 ERROR, 25 FRAG-COH-2 WARNs (the legitimately-inert shared/implementation
+  inputs). `sel_constitution` (A4): KEPT registered + comment documenting the `write_set_guidance` →
+  `sel_write_set_guidance` → `sel_constitution` indirection (declared by `tasks_create`) + the
+  `spec_create` static-input path; test asserts static constitution injection intact + indirection
+  resolves. Per-input policy: additive `input_policies` map key (`_frontmatter_doc._MAP_KEYS` +
+  `FragmentLoader._MAP_KEYS`; loader list-key validation untouched); `Fragment.input_policies` field;
+  `ContextSelector.select_all(..., input_policies=None)` per-name override, default = fragment-global —
+  byte-stable when absent (N2: exercised by a TEST-FIXTURE fragment only, no shipped fragment edited).
+  NEW tests `test_fragment_coherence_doctor.py` (12) + `test_input_policies.py` (6): AC-5 green +
+  RED-first (sabotaged loader copy fires FRAG-COH-2, output contains "FRAG-COH-2", persona_doctor
+  green) + FRAG-COH-1/3/4 bites + W2-boundary scope + sel_constitution A4; AC-6 mixed per-input
+  policies + byte-stable + loader parse/reject. **Gates:** ruff format --check clean; ruff check
+  --no-cache clean; `mypy --strict` 305 files clean; `lint-imports --no-cache` **8 kept / 0 broken**
+  (cap 26 UNCHANGED — the doctor lives in `features/lifecycle`, imports only lifecycle internals +
+  `core.models.lifecycle`, no new cross-feature edge); FULL unpiped pytest **4461 passed / 17 skipped
+  / 0 failed**. No golden re-baseline (goldens byte-identical — changes are additive, no assembly leak).
+  **AC-10(e) evidence:** command `.dadaia/.venv/bin/python -m pytest -p no:cacheprovider
+  tests/unit/features/lifecycle/test_fragment_coherence_doctor.py::test_ac5_doctor_green_on_current_tree`
+  — with the SHIPPED `release_definition/spec-create.md` `dynamic_inputs` gaining an unregistered
+  `ac10e_unregistered_selector`, the doctor reports **failing check id FRAG-COH-2** ERROR (`ok=False`)
+  and the green test FAILS → reverted via `git checkout` (green test passes again).
+  **AC-12 ledger** — NEW: `features/lifecycle/fragment_coherence_doctor.py`; SURVIVING:
   `persona_doctor` (untouched), `sel_constitution` (kept, indirection documented),
-  `ContextSelector.select_all` (per-name policy), `FragmentLoader`/`_frontmatter_doc` (`input_policies`
-  key), `Fragment` (gains field). No `specs/backlog/**` staged. Checklist:
+  `ContextSelector.select_all` (gains per-name `input_policies`), `FragmentLoader`/`_frontmatter_doc`
+  (`input_policies`/`_MAP_KEYS` key), `Fragment` (gains `input_policies` field); EDITED:
+  `cli/commands/lifecycle.py` (`workflow doctor` surfaces the coherence doctor). No `specs/backlog/**`
+  staged. Checklist:
   - **Coherence doctor** (`fragment_coherence_doctor.py`) — NEW checks with **stable IDs + fixed
     severity (Q6), label order aligned across FR3/AC-5/AC-10/T-57-30 (A3)**:
     - **FRAG-COH-1 (ERROR)** — fragment `role` resolves to a persona atom OR is `shared`/`python`.
