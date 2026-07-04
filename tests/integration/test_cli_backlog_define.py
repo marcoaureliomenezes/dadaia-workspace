@@ -98,7 +98,12 @@ def test_claude_harness_rejected_law1(workspace: Path) -> None:
     assert "Layer-2 workflow harness" in cleaned or "LAW 1" in cleaned
 
 
-def test_bad_model_rejected_law2(workspace: Path) -> None:
+def test_raw_step_model_rejected_d3(workspace: Path) -> None:
+    """v0.1.56 FR1 (rewritten from the inverted LAW-2 raw-model rejection):
+
+    a raw ``--step-model label=<id>:<effort>`` is rejected as a D-3 profile-id violation —
+    profile ids only, resolved through the shared resolver.
+    """
     result = _runner.invoke(
         app,
         [
@@ -108,15 +113,23 @@ def test_bad_model_rejected_law2(workspace: Path) -> None:
             "--release-id",
             "v0.1.26",
             "--harness",
-            "codex",
-            "--model",
-            "not-a-real-model:nonsense",
+            "fake",
+            "--step-model",
+            "intake_grill=gpt-5.5:high",
         ],
     )
     assert result.exit_code != 0
+    assert "profile id" in _clean(result.output)
 
 
-def test_fake_harness_takes_no_model_law2(workspace: Path) -> None:
+def test_model_flag_is_nonfatal_deprecation_warning(workspace: Path) -> None:
+    """v0.1.56 FR1 ruling (rewritten from the inverted LAW-2 no-model rejection):
+
+    ``--model`` is a NON-FATAL deprecation warning — the verb emits a stderr line naming
+    ``--step-model`` and proceeds under the resolved policy (``--harness fake`` completes).
+    Click 8.3 keeps stderr separate from stdout by default, so ``result.stderr`` isolates the
+    warning while ``result.stdout`` stays parseable JSON (R-QA-1).
+    """
     result = _runner.invoke(
         app,
         [
@@ -129,7 +142,12 @@ def test_fake_harness_takes_no_model_law2(workspace: Path) -> None:
             "fake",
             "--model",
             "anything:high",
+            "--json",
         ],
     )
-    assert result.exit_code != 0
-    assert "no --model" in _clean(result.output)
+    assert result.exit_code == 0, result.stderr
+    assert "--model is deprecated" in result.stderr
+    assert "--step-model" in result.stderr
+    # R-QA-1: the warning stays OUT of stdout so the --json payload stays parseable.
+    payload = json.loads(result.stdout)
+    assert payload["completed"] is True

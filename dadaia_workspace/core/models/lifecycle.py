@@ -69,15 +69,12 @@ TRANSITIONS: dict[LifecyclePhase, frozenset[LifecyclePhase]] = {
         {LifecyclePhase.IMPLEMENTATION, LifecyclePhase.BLOCKED}
     ),
     LifecyclePhase.IMPLEMENTATION: frozenset({LifecyclePhase.QA_REVIEW, LifecyclePhase.BLOCKED}),
-    LifecyclePhase.QA_REVIEW: frozenset(
-        {LifecyclePhase.IMPLEMENTATION, LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}
-    ),
-    LifecyclePhase.SECURITY_REVIEW: frozenset(
-        {LifecyclePhase.IMPLEMENTATION, LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}
-    ),
-    LifecyclePhase.CODE_REVIEW: frozenset(
-        {LifecyclePhase.IMPLEMENTATION, LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}
-    ),
+    # FR4 (v0.1.56): the review phases advance forward or block only. The three
+    # review->implementation backtrack edges were unused table entries (no production
+    # path took them); the operator-driven rework path is BLOCKED -> IMPLEMENTATION.
+    LifecyclePhase.QA_REVIEW: frozenset({LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}),
+    LifecyclePhase.SECURITY_REVIEW: frozenset({LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}),
+    LifecyclePhase.CODE_REVIEW: frozenset({LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}),
     LifecyclePhase.CLOSURE: frozenset({LifecyclePhase.BLOCKED}),
     LifecyclePhase.BLOCKED: frozenset(
         {

@@ -12,7 +12,8 @@ and persists progress at every step (resumable).
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import Field, dataclass, replace
+from typing import Any, ClassVar, Protocol
 
 from dadaia_workspace.core.harness_models import (
     CODEX_HARNESS,
@@ -32,6 +33,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
+    WorkflowPolicyStepEntry,
 )
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
@@ -294,7 +296,10 @@ class LifecyclePipeline:
         rounds: list[ImplementReviewRound] = []
         # attempt 0 is the first try; up to max_review_retries additional attempts follow.
         for attempt in range(self._max_review_retries + 1):
-            # implement#attempt — from attempt 1 it consumes the prior review rejection.
+            # implement#attempt — from attempt 1 it consumes the prior review rejection, whose
+            # COMPACT digest is injected into the implement prompt (FR3 — the l.309 drop is
+            # replaced). The digest reaches the built request the implement worker receives.
+            digest: str | None = None
             if attempt > 0:
                 resolved = resolver.resolve_required(
                     run, producer_step=review_step.label, attempt=attempt - 1
@@ -306,8 +311,15 @@ class LifecyclePipeline:
                     consumer_step=implement_step.label,
                     consumer_attempt=attempt,
                 )
-                _ = resolved  # digest would be injected into the implement prompt here.
-            impl_result = self._run_loop_worker(run, implement_step, attempt)
+                digest = WorkflowHandoffResolver.render_digest(resolved)
+            impl_result, impl_blocked = self._run_loop_worker(
+                run, implement_step, attempt, digest=digest
+            )
+            # Structural runner gate (evidence only, is_review=False): a non-SUCCEEDED /
+            # evidence-less / out-of-scope implement worker BLOCKS the loop — it is a broken
+            # worker, never a rejected review to retry.
+            if impl_blocked is not None:
+                return self._finalize_structural_block(run, impl_blocked, rounds, attempt)
             run, _ = resolver.produce(
                 run,
                 producer_step=implement_step.label,
@@ -317,7 +329,11 @@ class LifecyclePipeline:
                 declared_consumers=(review_step.label,),
             )
 
-            # review#attempt — consumes implement#attempt, produces its verdict.
+            # review#attempt — consumes implement#attempt, produces its verdict. The review
+            # worker is gated on EVIDENCE ONLY (is_review=False): a REJECTED verdict must NOT
+            # block the loop (is_review=True would block the first REJECTED and destroy the
+            # retry model — agent_runner l.196). The verdict is read from the returned result
+            # to drive the attempt ledger; only a STRUCTURAL failure blocks here.
             run = resolver.record_consumption(
                 run,
                 producer_step=implement_step.label,
@@ -325,7 +341,9 @@ class LifecyclePipeline:
                 consumer_step=review_step.label,
                 consumer_attempt=attempt,
             )
-            review_result = self._run_loop_worker(run, review_step, attempt)
+            review_result, review_blocked = self._run_loop_worker(run, review_step, attempt)
+            if review_blocked is not None:
+                return self._finalize_structural_block(run, review_blocked, rounds, attempt)
             verdict = review_result.structured_output.get("verdict")
             run, _ = resolver.produce(
                 run,
@@ -341,17 +359,14 @@ class LifecyclePipeline:
             )
             rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
             if verdict == "APPROVED":
-                from dataclasses import replace
-
                 run = replace(run, status=LifecycleRunStatus.COMPLETED)
                 self._run_store.save(run)
                 return ImplementReviewLoopResult(
                     run_id=run_id, completed=True, attempts=attempt + 1, rounds=tuple(rounds)
                 )
 
-        # Exhausted the retry budget — BLOCK for operator intervention.
-        from dataclasses import replace
-
+        # Exhausted the retry budget on well-formed REJECTED rounds — BLOCK for operator
+        # intervention. This is retry EXHAUSTION, distinct from a structural evidence block.
         blocked = BlockedState(
             reason=(
                 f"implement/review loop exceeded the bounded retry count "
@@ -372,24 +387,85 @@ class LifecyclePipeline:
             blocked=blocked,
         )
 
+    def _finalize_structural_block(
+        self,
+        run: LifecycleRun,
+        blocked: BlockedState,
+        rounds: list[ImplementReviewRound],
+        attempt: int,
+    ) -> ImplementReviewLoopResult:
+        """Persist a structural (evidence) BLOCK on either loop worker and return the result.
+
+        A structural block — non-SUCCEEDED, empty ``artifact_refs``, or out-of-scope paths
+        (the runner's evidence-only decision, ``is_review=False``) — stops the loop
+        immediately: a broken worker is not a rejected review to retry. ``attempts`` counts
+        the current 1-based attempt, since the block occurred during it.
+        """
+        run = replace(
+            run,
+            phase=LifecyclePhase.BLOCKED,
+            status=LifecycleRunStatus.BLOCKED,
+            blocked=blocked,
+        )
+        self._run_store.save(run)
+        return ImplementReviewLoopResult(
+            run_id=run.run_id,
+            completed=False,
+            attempts=attempt + 1,
+            rounds=tuple(rounds),
+            blocked=blocked,
+        )
+
     def _run_loop_worker(
-        self, run: LifecycleRun, step: PipelineStep, attempt: int
-    ) -> AgentRunResult:
-        """Run one implement/review worker for *attempt* and return its raw result."""
+        self,
+        run: LifecycleRun,
+        step: PipelineStep,
+        attempt: int,
+        *,
+        digest: str | None = None,
+    ) -> tuple[AgentRunResult, BlockedState | None]:
+        """Run one implement/review worker for *attempt* through the STRUCTURAL runner gate.
+
+        Both workers route through :meth:`LifecycleAgentRunner.evaluate_gate_with_result`
+        with ``is_review=False`` (gate WITHOUT a phase transition, as ``release_definition`` /
+        ``audit`` do) — the gate decides on EVIDENCE ONLY (non-SUCCEEDED / empty
+        ``artifact_refs`` / out-of-scope paths BLOCK), never on the review verdict. Gating the
+        review ``is_review=True`` would return a block on the first REJECTED verdict
+        (``agent_runner`` l.196) and destroy the retry-with-digest model; the caller reads the
+        APPROVED/REJECTED verdict from the returned result to drive the attempt ledger
+        instead. When *digest* is present (the ``implement#N``, N ≥ 1 case) it trails the scope
+        prompt so the built request the worker receives carries the ``review#N-1`` rejection.
+        """
         runtime = self._runtime_factory(step.runtime_kind)
         built = self._prompt_builder.build(
-            self._scope(step, f"{run.run_id}#a{attempt}"),
+            self._scope(step, f"{run.run_id}#a{attempt}", digest_suffix=digest),
             runtime=runtime.runtime_kind(),
             prefix=self._prefix,
         )
-        return runtime.run(built.request)
+        runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
+        return runner.evaluate_gate_with_result(
+            run,
+            AgentRunnerInput(
+                request=built.request,
+                target_phase=step.target_phase,
+                requirements=step.requirements,
+                current_step=step.label,
+                is_review=False,
+            ),
+        )
 
-    def _scope(self, step: PipelineStep, run_id: str) -> PromptScope:
+    def _scope(
+        self, step: PipelineStep, run_id: str, *, digest_suffix: str | None = None
+    ) -> PromptScope:
         prompt = (
             self._fragment_prompt(step)
             if step.fragment_id is not None
             else self._generic_prompt(step)
         )
+        if digest_suffix:
+            # The prior review rejection digest (FR3) trails the step prompt so it reaches the
+            # built request verbatim; the multi-step ``run`` path passes no digest (default).
+            prompt = f"{prompt}\n\n{digest_suffix}"
         return PromptScope(
             role=step.role,
             context=self._context,
@@ -594,54 +670,116 @@ _HARNESS_TO_KIND: dict[str, AgentRuntimeKind] = {
 }
 
 
-def apply_resolved_policy(
-    steps: tuple[PipelineStep, ...],
-    snapshot: WorkflowPolicySnapshot,
-) -> tuple[PipelineStep, ...]:
-    """Overlay a resolved policy snapshot onto pipeline steps — the single author of
-    ``runtime_kind`` (T-29-A-06 / D-2).
+class PolicyApplicableStep(Protocol):
+    """Structural contract a frozen step dataclass satisfies to receive a resolved policy.
 
-    Matches each step to its snapshot entry by label and threads the resolved concrete
-    model into the step's ``resolved_model`` (and ``model_profile`` for observability), then
-    sets ``runtime_kind`` from the snapshot's **resolved harness** so the adapter that runs
-    and the snapshot that is recorded always agree — there is no separate post-resolve
-    ``runtime_kind`` swap. A step with no matching snapshot entry is returned unchanged.
+    :func:`apply_resolved_policy` maps :func:`apply_entry_to_step` over any step exposing
+    these four attributes — the pipeline :class:`PipelineStep`, the ``ReleaseStep`` /
+    ``BacklogStep`` definition steps, and (W2) the Wave-E ``AuditStep`` / ``ResearchStep`` /
+    ``BugReportStep``. Binding a **structural** Protocol (not an enumerated type-union) is
+    what lets those frozen dataclasses receive the policy with no ``pipeline.py`` edit once
+    they gain the two model fields (R-2 decoupling).
 
-    **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
-    harness; when the caller built the step on :data:`AgentRuntimeKind.FAKE` (a dry-run or
-    a test against ``FakeAgentRuntime``), the step keeps ``FAKE`` while the governed model
-    is still threaded for auditability. Only a real (non-fake) base step adopts the
-    resolved harness's kind.
+    Read-only ``@property`` members keep the concrete non-optional ``runtime_kind`` on
+    :class:`PipelineStep` covariant with the ``| None`` declared here; the
+    ``__dataclass_fields__`` marker lets :func:`dataclasses.replace` accept a value typed as
+    the bound TypeVar under ``mypy --strict`` (a plain Protocol is not a dataclass).
+    """
+
+    __dataclass_fields__: ClassVar[dict[str, Field[Any]]]
+
+    @property
+    def label(self) -> str: ...
+    @property
+    def runtime_kind(self) -> AgentRuntimeKind | None: ...
+    @property
+    def resolved_model(self) -> ResolvedModelConfig | None: ...
+    @property
+    def model_profile(self) -> str | None: ...
+
+
+def apply_entry_to_step(
+    entry: WorkflowPolicyStepEntry,
+    *,
+    base_kind: AgentRuntimeKind | None,
+    preserve_fake: bool,
+) -> tuple[AgentRuntimeKind, ResolvedModelConfig]:
+    """Author one step's ``(runtime_kind, resolved_model)`` from its snapshot entry (R-2).
+
+    The single FAKE-preserving per-step author. It threads the snapshot entry's resolved
+    concrete model into a :class:`ResolvedModelConfig` and picks the runtime kind:
+
+    * when ``preserve_fake`` (the base step is the FAKE dry-run/test sentinel — i.e.
+      ``base_kind is FAKE``) the kind stays FAKE, so ``--harness fake`` drives the fake
+      adapter while the snapshot still records the governed harness for auditability;
+    * otherwise the kind is the snapshot's **resolved harness** mapped through
+      :data:`_HARNESS_TO_KIND` (``codex -> CODEX_EXEC``, ``pi -> PI_HEADLESS``).
+
+    Both the per-step mapper (:func:`apply_resolved_policy`) and the single-step CLI verb
+    (which has no step object to iterate) call this exactly once — it is the sole author of
+    every run-a-worker verb's ``runtime_kind``.
 
     Raises:
-        ValueError: if a snapshot entry names a harness with no known runtime kind (a
+        ValueError: if a non-fake entry names a harness with no known runtime kind (a
             corrupt/forbidden Layer-2 harness leaked past resolution).
+    """
+    resolved = ResolvedModelConfig(
+        profile_id=entry.model_profile,
+        harness=entry.harness,
+        model=entry.model,
+        reasoning=entry.reasoning,
+        source=entry.source,
+    )
+    if preserve_fake:
+        # preserve_fake ⟺ base_kind is the FAKE dry-run sentinel; keep it (never a
+        # governed harness). Defensive None fallback keeps the return non-optional.
+        return (base_kind if base_kind is not None else AgentRuntimeKind.FAKE), resolved
+    mapped = _HARNESS_TO_KIND.get(entry.harness)
+    if mapped is None:
+        raise ValueError(
+            f"step {entry.step!r}: resolved harness {entry.harness!r} has no "
+            f"runtime kind; Layer-2 workers are codex or pi only"
+        )
+    return mapped, resolved
+
+
+def apply_resolved_policy[StepT: PolicyApplicableStep](
+    steps: tuple[StepT, ...],
+    snapshot: WorkflowPolicySnapshot,
+) -> tuple[StepT, ...]:
+    """Map :func:`apply_entry_to_step` over every step that has a snapshot entry (D-2).
+
+    The single author of each step's ``runtime_kind``, now generic over the structural
+    :class:`PolicyApplicableStep` Protocol so the SAME applier governs the pipeline ladder,
+    the release-/backlog-definition sequences, and (W2) the Wave-E bodies. A step matched by
+    label adopts the snapshot's resolved concrete model into ``resolved_model`` (and
+    ``model_profile`` for observability) and its ``runtime_kind`` from the resolved harness
+    (FAKE preserved for a dry-run base). A step with no matching entry (e.g. a Python gate)
+    is returned unchanged.
+
+    **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
+    harness; a step built on :data:`AgentRuntimeKind.FAKE` keeps ``FAKE`` while the governed
+    model is still threaded for auditability. Seeding each base step's ``runtime_kind`` to
+    the run's default kind BEFORE calling this (mirroring the pipeline verb) is what keeps a
+    ``None``-kind definition step from mapping ``None -> codex/pi`` and driving a live
+    adapter on ``--harness fake`` (R-3).
+
+    Raises:
+        ValueError: if a snapshot entry names a harness with no known runtime kind.
     """
     from dataclasses import replace
 
-    out: list[PipelineStep] = []
+    out: list[StepT] = []
     for step in steps:
         entry = snapshot.step(step.label)
         if entry is None:
             out.append(step)
             continue
-        resolved = ResolvedModelConfig(
-            profile_id=entry.model_profile,
-            harness=entry.harness,
-            model=entry.model,
-            reasoning=entry.reasoning,
-            source=entry.source,
+        runtime_kind, resolved = apply_entry_to_step(
+            entry,
+            base_kind=step.runtime_kind,
+            preserve_fake=step.runtime_kind is AgentRuntimeKind.FAKE,
         )
-        if step.runtime_kind is AgentRuntimeKind.FAKE:
-            runtime_kind = AgentRuntimeKind.FAKE
-        else:
-            mapped = _HARNESS_TO_KIND.get(entry.harness)
-            if mapped is None:
-                raise ValueError(
-                    f"step {step.label!r}: resolved harness {entry.harness!r} has no "
-                    f"runtime kind; Layer-2 workers are codex or pi only"
-                )
-            runtime_kind = mapped
         out.append(
             replace(
                 step,
@@ -661,7 +799,9 @@ __all__ = [
     "PipelineResult",
     "PipelineStep",
     "PipelineStepResult",
+    "PolicyApplicableStep",
     "RuntimeFactory",
+    "apply_entry_to_step",
     "apply_resolved_policy",
     "implementation_ladder",
 ]

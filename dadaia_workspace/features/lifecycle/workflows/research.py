@@ -40,6 +40,10 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_execution import (
+    ResolvedModelConfig,
+    WorkflowPolicySnapshot,
+)
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -92,6 +96,12 @@ class ResearchStep:
     runtime_kind: AgentRuntimeKind | None = None
     produces: str | None = None
     consumes: tuple[str, ...] = ()
+    # Governance-resolved concrete model for this step (v0.1.56 / FR2). Threaded by
+    # ``apply_resolved_policy`` (structural ``PolicyApplicableStep`` Protocol — no pipeline.py
+    # edit) and forwarded to the request by ``_scope``. Additive-optional, mirroring
+    # ``ReleaseStep``.
+    resolved_model: ResolvedModelConfig | None = None
+    model_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +178,7 @@ class ResearchWorkflow:
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
+        policy_snapshot: WorkflowPolicySnapshot | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -180,6 +191,9 @@ class ResearchWorkflow:
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
         self._handoff_resolver = handoff_resolver
+        # The resolved governance snapshot (v0.1.56 / FR2), frozen onto the run BEFORE the
+        # first step (mirroring ``ReleaseDefinitionWorkflow``).
+        self._policy_snapshot = policy_snapshot
 
     # -- public entrypoint ----------------------------------------------
 
@@ -197,6 +211,7 @@ class ResearchWorkflow:
             status=LifecycleRunStatus.RUNNING,
             current_step=sequence[0].label,
             idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
         )
         self._run_store.save(run)
 
@@ -506,5 +521,7 @@ class ResearchWorkflow:
             prompt=suffix,
             allowed_paths=(f".dadaia/handoff/{self._context}/**",),
             required_evidence=(GateEvidenceKind.HANDOFF,),
+            model_profile=step.model_profile,
+            resolved_model=step.resolved_model,
             persona=resolve_persona_for_role(step.role),
         )

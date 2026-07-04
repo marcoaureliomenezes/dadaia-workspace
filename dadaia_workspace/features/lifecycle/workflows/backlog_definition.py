@@ -43,6 +43,10 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.core.models.workflow_execution import (
+    ResolvedModelConfig,
+    WorkflowPolicySnapshot,
+)
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.features.backlog.classifier import (
     BoundItem,
@@ -166,6 +170,11 @@ class BacklogStep:
     fragment_id: str | None = None
     shared_fragment_ids: tuple[str, ...] = ()
     runtime_kind: AgentRuntimeKind | None = None
+    # Governance-resolved concrete model for this step (v0.1.56 / FR1). ``apply_resolved_policy``
+    # threads the resolved snapshot model here; ``_scope`` forwards it to the request so the
+    # adapter runs the policy-selected model. Additive-optional, mirroring ``PipelineStep``.
+    resolved_model: ResolvedModelConfig | None = None
+    model_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -256,6 +265,7 @@ class BacklogDefinitionWorkflow:
         prefix: PromptPrefix | None = None,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
+        policy_snapshot: WorkflowPolicySnapshot | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -269,6 +279,10 @@ class BacklogDefinitionWorkflow:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # The resolved governance snapshot (v0.1.56 / FR1 / LAW 7), frozen onto the run BEFORE
+        # the first step (mirroring ``LifecyclePipeline`` / ``LifecyclePhaseWorkflow``). The
+        # replace-based run-record helpers preserve it across every Python-step transition.
+        self._policy_snapshot = policy_snapshot
 
     # -- public entrypoint ----------------------------------------------
 
@@ -292,6 +306,7 @@ class BacklogDefinitionWorkflow:
             status=LifecycleRunStatus.RUNNING,
             current_step=sequence[0].label,
             idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
         )
         self._run_store.save(run)
 
@@ -594,50 +609,40 @@ class BacklogDefinitionWorkflow:
 
     @staticmethod
     def _still_running(run: LifecycleRun, step_label: str) -> LifecycleRun:
-        return LifecycleRun(
-            run_id=run.run_id,
-            context=run.context,
-            release_id=run.release_id,
-            command=run.command,
+        # ``replace`` (not a manual reconstruction) preserves every additive-optional field —
+        # notably the ``workflow_policy`` snapshot (FR1) — across the Python-step transition.
+        from dataclasses import replace
+
+        return replace(
+            run,
             phase=run.phase,
             status=LifecycleRunStatus.RUNNING,
             current_step=step_label,
-            expected_artifacts=run.expected_artifacts,
-            idempotency_key=run.idempotency_key,
             blocked=None,
-            injected_context=run.injected_context,
         )
 
     @staticmethod
     def _with_block(run: LifecycleRun, step_label: str, blocked: BlockedState) -> LifecycleRun:
-        return LifecycleRun(
-            run_id=run.run_id,
-            context=run.context,
-            release_id=run.release_id,
-            command=run.command,
+        from dataclasses import replace
+
+        return replace(
+            run,
             phase=LifecyclePhase.BLOCKED,
             status=LifecycleRunStatus.BLOCKED,
             current_step=step_label,
-            expected_artifacts=run.expected_artifacts,
-            idempotency_key=run.idempotency_key,
             blocked=blocked,
-            injected_context=run.injected_context,
         )
 
     @staticmethod
     def _advance(run: LifecycleRun) -> LifecycleRun:
-        return LifecycleRun(
-            run_id=run.run_id,
-            context=run.context,
-            release_id=run.release_id,
-            command=run.command,
+        from dataclasses import replace
+
+        return replace(
+            run,
             phase=LifecyclePhase.RELEASE_DEFINITION,
             status=LifecycleRunStatus.COMPLETED,
             current_step=run.current_step,
-            expected_artifacts=run.expected_artifacts,
-            idempotency_key=run.idempotency_key,
             blocked=None,
-            injected_context=run.injected_context,
         )
 
     @staticmethod

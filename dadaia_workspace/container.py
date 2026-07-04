@@ -27,12 +27,15 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.lifecycle.workflow_handoffs import (
         WorkflowHandoffResolver,
     )
+    from dadaia_workspace.features.lifecycle.workflows.audit import AuditWorkflow
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportWorkflow
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
     )
+    from dadaia_workspace.features.lifecycle.workflows.research import ResearchWorkflow
     from dadaia_workspace.infrastructure.json_local_model_profile_store import (
         JsonLocalModelProfileStore,
     )
@@ -903,15 +906,17 @@ def _release_definition_runtime_factory(
     *,
     context: str,
     run_cwd: Path,
-    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the release-definition workflow.
 
-    Real harnesses (pi/codex/claude) resolve to their live adapters. ``FAKE`` resolves
-    to a *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref —
-    so ``--harness fake`` walks the whole §6.1 sequence deterministically (the DoD
-    requirement), exercising every fragment-assembled prompt and Python gate without a
-    live worker. The artifact_ref stays inside the step's allowed handoff path.
+    Real harnesses (pi/codex/claude) resolve to their live adapters — the policy-resolved
+    concrete model reaches each adapter through ``request.resolved_model`` (threaded from
+    the step's ``resolved_model`` by ``apply_resolved_policy``), not a construction-time
+    model. ``FAKE`` resolves to a *driving* fake that returns an APPROVED handoff with an
+    in-scope artifact_ref — so ``--harness fake`` walks the whole §6.1 sequence
+    deterministically (the DoD requirement), exercising every fragment-assembled prompt and
+    Python gate without a live worker. The artifact_ref stays inside the step's allowed
+    handoff path.
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -929,7 +934,7 @@ def _release_definition_runtime_factory(
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
             return FakeAgentRuntime(result=approving)
-        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+        return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
 
@@ -942,16 +947,20 @@ def build_release_definition_workflow(
     default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
-    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> "ReleaseDefinitionWorkflow":
     """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
 
     The workflow runs the §6.1 step sequence with fragment-assembled, scoped prompts and
     Python-owned gates (no generic ``"Run the step"`` suffix). The injected runtime
     factory resolves each step's ``AgentRuntimeKind`` to its adapter so harnesses can be
-    mixed per step; ``FAKE`` drives the sequence end-to-end. ``models`` maps a runtime
-    kind to its discrete Layer-2 model (LAW 2). The :class:`ContextSelector` resolves
-    each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    mixed per step; ``FAKE`` drives the sequence end-to-end. The :class:`ContextSelector`
+    resolves each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    ``policy_snapshot`` is the resolved governance snapshot (v0.1.56 / FR1, from
+    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
+    the first step (LAW 7). The per-step concrete model reaches the adapter through the
+    step's ``resolved_model`` (threaded by ``apply_resolved_policy``), so no model-by-kind
+    construction arg is needed.
     """
     from dadaia_workspace.features.lifecycle.context_selector import (
         ContextSelector,
@@ -963,7 +972,6 @@ def build_release_definition_workflow(
 
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
-    model_by_kind = models or {}
     context_name = resolve_bound_context_name(context) or context
     specs_dir = workspace_root / "repos" / context_name / "specs"
     if not specs_dir.is_dir():
@@ -977,12 +985,11 @@ def build_release_definition_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_release_definition_runtime_factory(
-            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
-        ),
+        runtime_factory=_release_definition_runtime_factory(context=context, run_cwd=run_cwd),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
     )
 
 
@@ -990,14 +997,15 @@ def _backlog_definition_runtime_factory(
     *,
     context: str,
     run_cwd: Path,
-    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the backlog-definition workflow.
 
-    Real harnesses (pi/codex) resolve to their live adapters; ``FAKE`` resolves to a
-    *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref, so
-    ``--harness fake`` walks the whole §4 sequence deterministically (mirrors the
-    release-definition fake factory).
+    Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
+    model reaches each adapter through ``request.resolved_model`` (threaded from the step's
+    ``resolved_model``), not a construction-time model; ``FAKE`` resolves to a *driving*
+    fake that returns an APPROVED handoff with an in-scope artifact_ref, so ``--harness
+    fake`` walks the whole §4 sequence deterministically (mirrors the release-definition
+    fake factory).
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -1015,7 +1023,7 @@ def _backlog_definition_runtime_factory(
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
             return FakeAgentRuntime(result=approving)
-        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+        return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
 
@@ -1028,7 +1036,7 @@ def build_backlog_definition_workflow(
     default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
-    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> "BacklogDefinitionWorkflow":
     """Compose the fragment-driven backlog-definition workflow (R2 / epic §4).
 
@@ -1036,8 +1044,10 @@ def build_backlog_definition_workflow(
     factory resolves each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the
     sequence end-to-end); the :class:`ContextSelector` resolves each fragment's dynamic
     inputs bounded by ``max_context_policy``; the R1 canonical-subject :class:`Registry`
-    backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
-    Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
+    backs the ``subject_bind`` Python step. ``policy_snapshot`` is the resolved governance
+    snapshot (v0.1.56 / FR1) frozen onto the run before the first step; the per-step model
+    reaches the adapter through the step's ``resolved_model``. All roots are derived from
+    ``workspace_root`` — never cwd.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.subject_registry import build_registry
@@ -1051,7 +1061,6 @@ def build_backlog_definition_workflow(
 
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
-    model_by_kind = models or {}
     context_name = resolve_bound_context_name(context) or context
     specs_dir = workspace_root / "repos" / context_name / "specs"
     source_root = workspace_root / "repos" / context_name
@@ -1078,13 +1087,249 @@ def build_backlog_definition_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_backlog_definition_runtime_factory(
-            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
-        ),
+        runtime_factory=_backlog_definition_runtime_factory(context=context, run_cwd=run_cwd),
         context_selector=selector,
         registry=registry,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
+    )
+
+
+def _handoff_driving_fake_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+    summary: str,
+    artifact_ref: str,
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build a per-step runtime factory whose FAKE returns one in-scope handoff APPROVED result.
+
+    Shared by the ``audit`` and ``research`` builders (v0.1.56 / FR2): every step of those
+    workflows scopes writes to ``.dadaia/handoff/<ctx>/**``, so a single APPROVED handoff ref
+    is in-scope for the whole sequence and ``--harness fake`` walks it end-to-end. Real
+    harnesses (pi/codex) resolve to their live adapters; the policy-resolved concrete model
+    reaches each adapter through ``request.resolved_model`` (threaded from the step's
+    ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary=summary,
+        artifact_refs=(artifact_ref,),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=approving)
+        return build_agent_runtime(kind, cwd=run_cwd)
+
+    return factory
+
+
+def build_audit_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
+) -> "AuditWorkflow":
+    """Compose the fragment-driven audit workflow (v0.1.56 / FR2), born resolver-governed.
+
+    Mirrors :func:`build_release_definition_workflow`: the injected runtime factory resolves
+    each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the whole
+    scope→drift-scan→triage sequence end-to-end with an in-scope handoff ref); the
+    :class:`ContextSelector` resolves each fragment's dynamic inputs, bounded by
+    ``max_context_policy``. ``policy_snapshot`` is the resolved governance snapshot frozen onto
+    the run before the first step (LAW 7); the per-step model reaches the adapter through the
+    step's ``resolved_model``.
+    """
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.audit import AuditWorkflow
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return AuditWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_handoff_driving_fake_factory(
+            context=context,
+            run_cwd=run_cwd,
+            summary="fake audit worker: APPROVED",
+            artifact_ref=f".dadaia/handoff/{context}/audit-step.handoff.json",
+        ),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+        policy_snapshot=policy_snapshot,
+    )
+
+
+def build_research_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
+) -> "ResearchWorkflow":
+    """Compose the fragment-driven research workflow (v0.1.56 / FR2), born resolver-governed.
+
+    Mirrors :func:`build_release_definition_workflow`: ``FAKE`` drives the
+    scope→investigate→synthesis sequence end-to-end with an in-scope handoff ref;
+    ``policy_snapshot`` is frozen onto the run before the first step.
+    """
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.research import ResearchWorkflow
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return ResearchWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_handoff_driving_fake_factory(
+            context=context,
+            run_cwd=run_cwd,
+            summary="fake research worker: APPROVED",
+            artifact_ref=f".dadaia/handoff/{context}/research-step.handoff.json",
+        ),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+        policy_snapshot=policy_snapshot,
+    )
+
+
+def _bug_report_runtime_factory(
+    *,
+    context: str,
+    run_cwd: Path,
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Build the per-step runtime factory for the bug-report workflow (v0.1.56 / FR2).
+
+    Unlike audit/research, the bug-report ``bug_write`` step scopes writes to the ADDITIVE
+    ``specs/bugs/`` channel ONLY (A29), while its other steps scope to ``.dadaia/handoff/``.
+    A single uniform handoff ref would out-of-scope-BLOCK at ``bug_write``; a uniform
+    ``specs/bugs/`` ref would out-of-scope-BLOCK at the handoff-only steps. So the driving
+    FAKE is **step-aware** (mirroring the ``_StepAwareFake`` in
+    ``tests/unit/features/lifecycle/test_bug_report_workflow.py``): it returns an in-scope
+    ``specs/bugs/`` ref for the ``bug_write`` step and an in-scope handoff ref for every other
+    step, so ``--harness fake`` walks the whole intake→dedupe→bug_write sequence to COMPLETED.
+    Real harnesses (pi/codex) resolve to their live adapters.
+    """
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import _BUG_WRITE_STEP
+
+    class _BugReportDrivingFake:
+        """A driving FAKE whose in-scope artifact ref depends on the current step (A29)."""
+
+        def __init__(self, kind: AgentRuntimeKind) -> None:
+            self._kind = kind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self._kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            if (request.task_id or "").endswith(f":{_BUG_WRITE_STEP}"):
+                ref = f"repos/{context}/specs/bugs/fake-bug-report-record.md"
+            else:
+                ref = f".dadaia/handoff/{context}/bug-report-step.handoff.json"
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake bug-report worker: APPROVED",
+                artifact_refs=(ref,),
+                structured_output={"verdict": "APPROVED"},
+            )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        if kind is AgentRuntimeKind.FAKE:
+            return _BugReportDrivingFake(kind)
+        return build_agent_runtime(kind, cwd=run_cwd)
+
+    return factory
+
+
+def build_bug_report_workflow(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
+    prefix: PromptPrefix | None = None,
+    cwd: Path | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
+) -> "BugReportWorkflow":
+    """Compose the fragment-driven bug-report workflow (v0.1.56 / FR2), born resolver-governed.
+
+    Mirrors :func:`build_release_definition_workflow`, except the driving FAKE is **step-aware**
+    (:func:`_bug_report_runtime_factory`) so the ADDITIVE ``bug_write`` step stays in-scope and
+    ``--harness fake`` reaches COMPLETED. ``policy_snapshot`` is frozen onto the run before the
+    first step; the per-step model reaches the adapter through the step's ``resolved_model``.
+    """
+    from dadaia_workspace.features.lifecycle.context_selector import (
+        ContextSelector,
+        SpecContext,
+    )
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportWorkflow
+
+    _guard_initialized(workspace_root)
+    run_cwd = cwd or workspace_root
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = workspace_root / "repos" / context_name / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = workspace_root / "specs"
+    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs_dir, release_id=release_id, handoff_dir=handoff_dir)
+    )
+    return BugReportWorkflow(
+        context=context,
+        release_id=release_id,
+        run_store=build_lifecycle_run_store(workspace_root),
+        runtime_factory=_bug_report_runtime_factory(context=context, run_cwd=run_cwd),
+        context_selector=selector,
+        default_runtime_kind=default_runtime_kind,
+        prefix=prefix,
+        policy_snapshot=policy_snapshot,
     )
 
 
