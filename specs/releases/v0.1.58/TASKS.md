@@ -267,7 +267,63 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W4 — FR4 consumer `AGENTS.md` fan-out redesign
 
-- [ ] T-58-40 Registry-based consumer detection + doctor flagging. Checklist:
+- [x] T-58-40 Registry-based consumer detection + doctor flagging. Checklist:
+  - **Evidence:** EDITED `dadaia_workspace/infrastructure/workspace_guardrail.py` — (1)
+    `_consumer_repos_for_root` KEPT BY NAME, reimplemented to read
+    `.dadaia/states/spec_contexts.json` (direct defensive JSON read, never raises) and derive
+    `repos/<repo_slug>/` for each context whose dir exists on disk (alive OR dead — Ruling H); the
+    in-repo `.dadaia/agentic/` marker requirement DROPPED; absent-repo contexts skipped silently (no
+    stderr); duplicate slugs collapsed; `_is_self_repo` skip RETAINED in the callers. (2)
+    `_install_guardrail_pair`/`_write_pair` refactored to a `_write_one(dst, expected_sha, write_fn,
+    is_consumer)` helper: fresh create → `[ok]`, identical → `[skip]` (or `[ok]` under force),
+    **divergent CONSUMER overwrite → DISTINCT `[updated] <path> (overwrote divergent workspace-law
+    copy)`** (Ruling L / A5); the workspace-root pair keeps `[ok]` overwrite semantics; nested subtree
+    AGENTS.md never touched (only repo root written). (3) `_doctor_guardrail_pair` iterates the same
+    registry-derived repos, emits `[drift]`/`[missing]`/`[ok]`, never `[skip]` for a real consumer
+    (Ruling J). NEW `tests/unit/infrastructure/test_consumer_fanout.py` (11 tests, all green).
+  - **RED-first captures (AC-6/AC-7, against unmodified `workspace_guardrail.py`):** the new suite ran
+    **10 failed / 1 passed** — `test_fan_out_fires_for_registry_listed_marker_less_consumer` FAILED
+    (`repos/demo/AGENTS.md` not written; stderr `[skip] .../repos/demo/AGENTS.md (no .dadaia/ marker)`
+    — old marker filter drops the marker-less registry repo); `test_doctor_flags_drift_for_stale_consumer`
+    FAILED (report list == `['[missing] root:AGENTS.md','[missing] root:CLAUDE.md']`, **NO
+    `repos/demo:AGENTS.md` line at all** — Q5-corrected anchor). The 1 pre-passing case
+    (`test_tri_copy_targets_not_written_by_fan_out`) is invariant in both states. Post-fix: 11/11 green.
+  - **AC-9 sabotages (captured → reverted):** (d) restored the in-repo `.dadaia/agentic/` marker
+    requirement in `_consumer_repos_for_root` (`candidate.is_dir() and (candidate/".dadaia"/"agentic").is_dir()`)
+    ⇒ `test_fan_out_fires_for_registry_listed_marker_less_consumer` FAILED at
+    `assert (repo/"AGENTS.md").exists()` (nothing written) ⇒ reverted → green. (e/Q5-corrected) SAME
+    restored-marker-filter sabotage ⇒ `test_doctor_flags_drift_for_stale_consumer` FAILED — report list
+    dropped to `['[missing] root:AGENTS.md','[missing] root:CLAUDE.md']`, the `[drift] repos/demo:AGENTS.md`
+    line disappeared ⇒ reverted → green.
+  - **Fate ledger (Q3 — INVERT, outcomes):** `tests/unit/features/public/test_workspace_guardrail_pair.py`
+    — Case 1 (`test_four_target_projection_write`) INVERTED to a registry-listed marker-less consumer
+    (kept 4×`[ok]` + byte-identical/hash-compare); Case 4 (`test_skip_self_slug_package_version_match`)
+    INVERTED (registry-listed self repo, RETAINED manifest-based self-skip, kept assertions); Case 6
+    (`test_doctor_four_line_output`) INVERTED (registry-listed, kept 4-label `[ok]`); Case 2
+    (`test_skip_no_dadaia_marker`) INVERTED → `test_unregistered_repo_not_written`; **Case 3
+    (`test_skip_no_agentic_marker`) DELETED** — the `.dadaia/` vs `.dadaia/agentic/` marker distinction it
+    exercised no longer exists; registry-based detection gives it no invertible assertion distinct from
+    the inverted Case 2. `tests/integration/test_public_doctor_parity.py::test_doctor_emits_four_labels_with_one_consumer`
+    INVERTED (via `_add_consumer` → registry registration, kept `[ok]`×4) +
+    `test_no_marker_consumer...`→`test_unregistered_consumer...` repointed. Grep-repointed EVERY
+    `_consumer_repos_for_root`/`.dadaia/agentic` consumer-marker usage: `test_public_assets.py` (helper
+    `_add_marker_consumer` now registers in the registry + keeps manifest for retained `_is_self_repo`;
+    `TestConsumerReposForRoot`/`TestInstanceConsumerRepos` skip-stderr assertions dropped, renamed to
+    `test_unregistered_on_disk_repo_not_detected`; `TestInstallConsumerReposGuardrailPair` divergent-overwrite
+    assertion repointed `[ok]`→`[updated]` per Ruling L); `test_public_install_e2e.py`,
+    `test_public_install_scope_flags.py` (contract), `test_install_scope_flags.py` (integration) helpers
+    all register in the registry.
+  - **Gates (all five, `.dadaia/.venv/bin`):** `ruff format --check` (795 files) clean; `ruff check
+    --no-cache` clean; `mypy --strict dadaia_workspace/` clean (309 files); `lint-imports --no-cache`
+    **8 kept / 0 broken** (ignore-cap UNCHANGED — the registry read is a direct defensive JSON read, no
+    new import edge); full **unpiped** `pytest -p no:cacheprovider` **4557 passed / 17 skipped / 0
+    failed** (exit 0). Frozen no-steal suite zero-diff. No `specs/backlog/**` staged; no `.dadaia/` inside
+    the repo tree.
+  - **Deviation:** `_consumer_repos_for_root` reads `spec_contexts.json` via a direct, defensive
+    `json.loads` (never-raises contract) rather than `JsonContextStore.list_all()` — the store raises
+    `SchemaVersionError` on v1/unknown registries and its `_load` carries a "not outside SpecContextService"
+    caveat, so a read-only best-effort detection path is more honest and keeps fan-out/doctor from
+    crashing on a malformed registry. Same schema (`repo_slug`), no new infra→infra dependency.
   - **Reimplement `_consumer_repos_for_root` (KEPT BY NAME, Ruling G)** (`workspace_guardrail.py`): read
     `.dadaia/states/spec_contexts.json`, derive `repos/<repo_slug>/` for each context whose dir exists on
     disk (alive OR dead, Ruling H); drop the in-repo `.dadaia/agentic/` marker requirement; skip absent

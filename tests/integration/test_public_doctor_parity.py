@@ -4,8 +4,8 @@ Verifies that ``_runtime_expectations`` emits the correct labels when
 ``data/AGENTS.md`` is the source:
   - ``root:AGENTS.md``
   - ``root:CLAUDE.md``
-  - ``repos/<slug>:AGENTS.md``   (per marker-bearing consumer)
-  - ``repos/<slug>:CLAUDE.md``   (per marker-bearing consumer)
+  - ``repos/<slug>:AGENTS.md``   (per registry-listed consumer, v0.1.58 FR4)
+  - ``repos/<slug>:CLAUDE.md``   (per registry-listed consumer, v0.1.58 FR4)
 
 Also verifies the ``FileSystemPublicAssetManager.doctor()`` output includes
 all four labels after a full stage + install cycle.
@@ -42,18 +42,49 @@ def _make_minimal_public(tmp_path: Path) -> Path:
     return public_dir
 
 
+def _register_context(workspace_root: Path, slug: str, state: str = "alive") -> None:
+    """Register a consumer repo in ``spec_contexts.json`` (v0.1.58 FR4 registry detection)."""
+    states_dir = workspace_root / ".dadaia" / "states"
+    states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    data = (
+        json.loads(registry.read_text(encoding="utf-8"))
+        if registry.exists()
+        else {"schema_version": "2", "contexts": []}
+    )
+    data["contexts"].append(
+        {
+            "name": slug,
+            "state": state,
+            "repo_slug": slug,
+            "repo_url": f"https://example.test/{slug}.git",
+            "created_at": "2026-07-04T00:00:00Z",
+            "alive_since": "2026-07-04T00:00:00Z" if state == "alive" else None,
+            "dead_since": None if state == "alive" else "2026-07-04T00:00:00Z",
+            "current_branch": "main",
+        }
+    )
+    registry.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def _add_consumer(
     workspace_root: Path,
     slug: str,
     package_version: str = _CONSUMER_VERSION,
 ) -> Path:
-    """Create a marker-bearing consumer repo under ``workspace_root/repos/``."""
+    """Register a marker-less consumer repo via the workspace registry (v0.1.58 FR4).
+
+    Detection is registry-based (Ruling G): the slug is registered in
+    ``spec_contexts.json`` and the repo dir is created marker-less. The manifest
+    is still written for the retained ``_is_self_repo`` self-skip check.
+    """
     consumer = workspace_root / "repos" / slug
     (consumer / ".dadaia" / "agentic").mkdir(parents=True)
     manifest = {"schema_version": "1", "package_version": package_version}
     (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
         json.dumps(manifest), encoding="utf-8"
     )
+    _register_context(workspace_root, slug)
     return consumer
 
 
@@ -99,7 +130,10 @@ def test_doctor_root_labels_present_without_consumers(tmp_path: Path) -> None:
 
 
 def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
-    """Exactly 4 parity labels are emitted when one marker-bearing consumer exists.
+    """Exactly 4 parity labels are emitted when one registry-listed consumer exists.
+
+    v0.1.58 FR4 INVERT: the consumer is detected via ``spec_contexts.json``
+    (registry-based), not the dead in-repo marker (Ruling G).
 
     Labels expected:
       - root:AGENTS.md
@@ -207,8 +241,10 @@ def test_runtime_expectations_yields_guardrail_labels(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_no_marker_consumer_does_not_appear_in_doctor_labels(tmp_path: Path) -> None:
-    """Consumer dirs without ``.dadaia/agentic/`` are absent from doctor labels."""
+def test_unregistered_consumer_does_not_appear_in_doctor_labels(tmp_path: Path) -> None:
+    """A repo NOT registered in ``spec_contexts.json`` is absent from doctor
+    labels — registry-based detection (v0.1.58 FR4, Ruling G).
+    """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(_SOURCE_CONTENT)
@@ -216,7 +252,7 @@ def test_no_marker_consumer_does_not_appear_in_doctor_labels(tmp_path: Path) -> 
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
-    # No-marker consumer: has no .dadaia/ at all.
+    # Unregistered consumer: on disk but not in the registry.
     no_marker = workspace_root / "repos" / "no-marker-repo"
     no_marker.mkdir(parents=True)
 

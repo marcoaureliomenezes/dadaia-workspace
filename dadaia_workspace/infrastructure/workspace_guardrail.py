@@ -13,6 +13,7 @@ import json
 import shutil
 import sys
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -28,26 +29,51 @@ _CLAUDE_MD_STUB = "@AGENTS.md\n"
 
 
 def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
-    """Return marker-bearing consumer repo directories under ``workspace_root/repos/``.
+    """Return consumer repo directories registered in ``spec_contexts.json``.
 
-    A directory qualifies when BOTH markers are present (R13):
-    - ``<repo>/.dadaia/`` directory
-    - ``<repo>/.dadaia/agentic/`` directory
+    Detection is registry-based (v0.1.58 FR4, Ruling G). Reads
+    ``<workspace_root>/.dadaia/states/spec_contexts.json`` (schema v2) and derives
+    ``<workspace_root>/repos/<repo_slug>/`` for every registered context whose
+    directory exists on disk — **alive OR dead** (Ruling H). The old in-repo
+    ``.dadaia/agentic/`` marker requirement is DROPPED: the repo-cleanliness law
+    forbids ``.dadaia/`` inside a repo working tree, so the marker made the
+    fan-out dead by construction (a compliant workspace never had it).
 
-    Non-qualifying directories emit a ``[skip]`` line to stderr.
+    Contexts listed in the registry but absent under ``repos/`` are skipped
+    silently (no error, no stderr line). Duplicate ``repo_slug`` values collapse
+    to a single path. The ``_is_self_repo`` skip (the dadaia-workspace source
+    tree) is applied by the callers, not here.
+
+    Never raises: a missing / unreadable / malformed / non-v2 registry yields an
+    empty list — the fan-out and doctor degrade to workspace-root-only, never
+    crash.
     """
-    repos_dir = workspace_root / "repos"
-    if not repos_dir.is_dir():
+    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
+    if not registry.is_file():
         return []
+    try:
+        data = json.loads(registry.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    contexts = data.get("contexts")
+    if not isinstance(contexts, list):
+        return []
+    repos_dir = workspace_root / "repos"
     result: list[Path] = []
-    for p in sorted(repos_dir.iterdir()):
-        if not p.is_dir():
+    seen: set[str] = set()
+    for ctx in contexts:
+        if not isinstance(ctx, dict):
             continue
-        if (p / ".dadaia").is_dir() and (p / ".dadaia" / "agentic").is_dir():
-            result.append(p)
-        else:
-            sys.stderr.write(f"[skip] {p / 'AGENTS.md'} (no .dadaia/ marker)\n")
-    return result
+        slug = ctx.get("repo_slug")
+        if not isinstance(slug, str) or not slug or slug in seen:
+            continue
+        seen.add(slug)
+        candidate = repos_dir / slug
+        if candidate.is_dir():
+            result.append(candidate)
+    return sorted(result)
 
 
 def _is_self_repo(consumer: Path) -> bool:
@@ -143,17 +169,27 @@ def _install_guardrail_pair(
     SHA-256 differs from the destination, even when ``force=False``.
 
     Self-skip (R14): consumer repos whose manifest ``package_version`` matches
-    the installed package version are skipped (they are the dadaia-workspace
-    source tree).
+    the installed package version (or whose ``pyproject.toml`` names
+    ``dadaia-workspace``) are skipped — they are the dadaia-workspace source tree.
 
-    Marker-less repos under ``repos/`` emit ``[skip]`` to stderr and are never
-    written.  The function never raises on missing/unexpected paths.
+    Consumer detection is registry-based (v0.1.58 FR4): the repos written are
+    those registered in ``spec_contexts.json`` whose dir exists on disk. A
+    context absent under ``repos/`` is skipped silently. The function never
+    raises on missing/unexpected paths.
+
+    Ruling L (A5): the consumer-repo ROOT ``AGENTS.md`` is lib-owned canonical.
+    A divergent (hand-edited) consumer copy is restored to canonical, and the
+    overwrite is reported with a DISTINCT ``[updated] <path> (overwrote divergent
+    workspace-law copy)`` line — never a silent ``[ok]``. The workspace-root pair
+    keeps its ``[ok]`` overwrite semantics. Nested subtree ``AGENTS.md`` files are
+    never touched (only the repo root is written).
 
     Args:
         source: Absolute path to ``data/AGENTS.md`` (the single source of truth).
         workspace_root: Workspace root directory.
-        force: When True, overwrite existing files; when False, skip if present.
-        installed: Optional list mutated with ``"[ok]   <path>"`` strings.
+        force: When True, overwrite existing files; when False, skip if identical.
+        installed: Optional list mutated with ``"[ok]   <path>"`` / ``"[skip] ..."``
+            / ``"[updated] ..."`` strings.
         targets: Which targets to write. Defaults to ``{"workspace", "repos"}``.
     """
     if installed is None:
@@ -164,36 +200,49 @@ def _install_guardrail_pair(
     src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
     stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
-    def _write_pair(target_dir: Path) -> None:
+    def _write_one(
+        dst: Path,
+        expected_sha: str,
+        write_fn: Callable[[], object],
+        is_consumer: bool,
+    ) -> None:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            if hashlib.sha256(dst.read_bytes()).hexdigest() == expected_sha:
+                # Already canonical: force rewrites (byte-identical) else no-op.
+                if force:
+                    write_fn()
+                    installed.append(f"[ok]   {dst}")
+                else:
+                    installed.append(f"[skip] {dst}")
+                return
+            # Existing file diverges from the canonical workspace-law copy.
+            write_fn()
+            if is_consumer:
+                # Ruling L (A5): restore a divergent consumer copy with a DISTINCT,
+                # visible line so the operator always sees a restoration happened.
+                installed.append(f"[updated] {dst} (overwrote divergent workspace-law copy)")
+            else:
+                installed.append(f"[ok]   {dst}")
+            return
+        write_fn()
+        installed.append(f"[ok]   {dst}")
+
+    def _write_pair(target_dir: Path, is_consumer: bool) -> None:
         # AGENTS.md — full canonical content copied from source.
         agents_dst = target_dir / "AGENTS.md"
-        agents_dst.parent.mkdir(parents=True, exist_ok=True)
-        if agents_dst.exists() and not force:
-            # Hash-compare: skip only when content is identical (T-PROP-01).
-            if hashlib.sha256(agents_dst.read_bytes()).hexdigest() == src_sha:
-                installed.append(f"[skip] {agents_dst}")
-            else:
-                shutil.copy2(source, agents_dst)
-                installed.append(f"[ok]   {agents_dst}")
-        else:
-            shutil.copy2(source, agents_dst)
-            installed.append(f"[ok]   {agents_dst}")
+        _write_one(agents_dst, src_sha, lambda: shutil.copy2(source, agents_dst), is_consumer)
         # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
         claude_dst = target_dir / "CLAUDE.md"
-        claude_dst.parent.mkdir(parents=True, exist_ok=True)
-        if claude_dst.exists() and not force:
-            # Hash-compare: skip only when stub content is identical (T-PROP-01).
-            if hashlib.sha256(claude_dst.read_bytes()).hexdigest() == stub_sha:
-                installed.append(f"[skip] {claude_dst}")
-            else:
-                _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-                installed.append(f"[ok]   {claude_dst}")
-        else:
-            _atomic_write_text(claude_dst, _CLAUDE_MD_STUB)
-            installed.append(f"[ok]   {claude_dst}")
+        _write_one(
+            claude_dst,
+            stub_sha,
+            lambda: _atomic_write_text(claude_dst, _CLAUDE_MD_STUB),
+            is_consumer,
+        )
 
     if "workspace" in targets:
-        _write_pair(workspace_root)
+        _write_pair(workspace_root, is_consumer=False)
 
     if "repos" in targets:
         for consumer in _consumer_repos_for_root(workspace_root):
@@ -203,7 +252,7 @@ def _install_guardrail_pair(
                     f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
                 )
                 continue
-            _write_pair(consumer)
+            _write_pair(consumer, is_consumer=True)
 
 
 # ---------------------------------------------------------------------------
@@ -235,9 +284,12 @@ def _doctor_guardrail_pair(
 ) -> list[str]:
     """Return doctor parity lines for the guardrail pair projection.
 
-    Emits 2 root lines + 2 lines per marker-bearing consumer (R13).
-    Each line is ``[ok] <label>`` or ``[drift] <label>`` or ``[missing] <label>``.
-    Lines are also written to stderr for CLI visibility.
+    Emits 2 root lines + 2 lines per registry-detected consumer repo (v0.1.58
+    FR4, Ruling J). Consumers are the same registry-derived on-disk repos as the
+    install fan-out (``_consumer_repos_for_root``); the self-repo is skipped.
+    Each consumer line is ``[ok]``/``[drift]``/``[missing]`` — **never**
+    ``[skip]`` for a real consumer repo. Lines are also written to stderr for CLI
+    visibility.
 
     Labels: ``root:AGENTS.md``, ``root:CLAUDE.md``,
     ``repos/<slug>:AGENTS.md``, ``repos/<slug>:CLAUDE.md``.

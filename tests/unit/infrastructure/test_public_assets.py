@@ -57,16 +57,54 @@ def _make_agent_md(
     return f"---\nname: {name}\nmodel: {model}\n{tools_block}---\n# Body of {name}\n"
 
 
+def _register_context(workspace_root: Path, slug: str, state: str = "alive") -> None:
+    """Register a consumer repo in ``spec_contexts.json`` (v0.1.58 FR4 registry detection).
+
+    Consumer detection moved off the in-repo ``.dadaia/agentic/`` marker onto the
+    workspace registry (Ruling G); this appends a schema-v2 context row so
+    ``_consumer_repos_for_root`` derives ``repos/<slug>/`` on disk.
+    """
+    states_dir = workspace_root / ".dadaia" / "states"
+    states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    data = (
+        json.loads(registry.read_text(encoding="utf-8"))
+        if registry.exists()
+        else {"schema_version": "2", "contexts": []}
+    )
+    data["contexts"].append(
+        {
+            "name": slug,
+            "state": state,
+            "repo_slug": slug,
+            "repo_url": f"https://example.test/{slug}.git",
+            "created_at": "2026-07-04T00:00:00Z",
+            "alive_since": "2026-07-04T00:00:00Z" if state == "alive" else None,
+            "dead_since": None if state == "alive" else "2026-07-04T00:00:00Z",
+            "current_branch": "main",
+        }
+    )
+    registry.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def _add_marker_consumer(
     workspace_root: Path, slug: str, pkg_version: str = _OTHER_VERSION
 ) -> Path:
-    """Create a marker-bearing consumer repo under workspace_root/repos/."""
+    """Register a consumer repo under workspace_root/repos/ (v0.1.58 FR4).
+
+    Detection is now registry-based (Ruling G): the slug is registered in
+    ``spec_contexts.json``. The ``.dadaia/agentic/manifest.json`` is still
+    written because ``_is_self_repo`` reads ``package_version`` from it for the
+    self-skip check (RETAINED, Ruling G) — it is NO LONGER what drives
+    detection.
+    """
     consumer = workspace_root / "repos" / slug
     (consumer / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
     manifest = {"schema_version": "1", "package_version": pkg_version}
     (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
         json.dumps(manifest), encoding="utf-8"
     )
+    _register_context(workspace_root, slug)
     return consumer
 
 
@@ -399,19 +437,20 @@ class TestConsumerReposForRoot:
         assert _consumer_repos_for_root(tmp_path) == []
 
     def test_qualifying_repo_returned(self, tmp_path: Path) -> None:
+        """A registry-registered on-disk repo is returned (v0.1.58 FR4)."""
         consumer = _add_marker_consumer(tmp_path, "my-repo")
         result = _consumer_repos_for_root(tmp_path)
         assert consumer in result
 
-    def test_non_qualifying_repo_skipped(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_unregistered_on_disk_repo_not_detected(self, tmp_path: Path) -> None:
+        """A bare on-disk repo NOT in the registry is invisible (registry-based
+        detection, v0.1.58 FR4). No stderr [skip] line is emitted for it — the
+        old marker-skip stderr behaviour is gone (Ruling G).
+        """
         bad_repo = tmp_path / "repos" / "no-markers"
         bad_repo.mkdir(parents=True)
         result = _consumer_repos_for_root(tmp_path)
         assert bad_repo not in result
-        captured = capsys.readouterr()
-        assert "[skip]" in captured.err
 
     def test_file_in_repos_dir_skipped(self, tmp_path: Path) -> None:
         repos_dir = tmp_path / "repos"
@@ -423,7 +462,9 @@ class TestConsumerReposForRoot:
     def test_partial_marker_dadaia_only_skipped(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Repo with .dadaia/ but not .dadaia/agentic/ should not qualify."""
+        """A repo with an in-repo .dadaia/ but not registered is NOT detected —
+        the in-repo marker no longer drives detection (v0.1.58 FR4, Ruling G).
+        """
         repo = tmp_path / "repos" / "partial"
         (repo / ".dadaia").mkdir(parents=True)
         result = _consumer_repos_for_root(tmp_path)
@@ -704,15 +745,25 @@ class TestInstallConsumerReposGuardrailPair:
         assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == content
         assert any("[skip]" in e for e in installed)
 
-    def test_force_false_overwrites_when_different(self, tmp_path: Path) -> None:
-        """force=False: differing content is updated (T-PROP-01 hash-compare)."""
+    def test_force_false_overwrites_divergent_consumer_with_updated_line(
+        self, tmp_path: Path
+    ) -> None:
+        """force=False: a divergent CONSUMER copy is restored to canonical and
+        reported with the DISTINCT [updated] line (Ruling L / A5), not a silent
+        [ok] (the workspace-root pair keeps [ok]; consumer roots are lib-owned).
+        """
         src = _make_source_file(tmp_path, "# NEW\n")
         consumer = _add_marker_consumer(tmp_path, "my-repo")
         (consumer / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
         installed: list[str] = []
         _install_consumer_repos_guardrail_pair(src, tmp_path, force=False, installed=installed)
         assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
-        assert any("[ok]" in e for e in installed)
+        assert any(
+            e.startswith("[updated]")
+            and "overwrote divergent workspace-law copy" in e
+            and str(consumer / "AGENTS.md") in e
+            for e in installed
+        ), f"divergent consumer overwrite must emit [updated]. installed: {installed}"
 
     def test_no_consumer_repos_no_write(self, tmp_path: Path) -> None:
         src = _make_source_file(tmp_path)
@@ -2020,16 +2071,15 @@ class TestInstanceConsumerRepos:
         manager = FileSystemPublicAssetManager()
         assert manager._consumer_repos(tmp_path) == []
 
-    def test_non_qualifying_repo_skipped(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_unregistered_on_disk_repo_not_detected(self, tmp_path: Path) -> None:
+        """A bare on-disk repo NOT in the registry is invisible to the instance
+        method too (registry-based detection, v0.1.58 FR4) — no stderr [skip].
+        """
         bad_repo = tmp_path / "repos" / "partial"
         bad_repo.mkdir(parents=True)
         manager = FileSystemPublicAssetManager()
         result = manager._consumer_repos(tmp_path)
         assert bad_repo not in result
-        captured = capsys.readouterr()
-        assert "[skip]" in captured.err
 
 
 class TestInstanceIsSelfRepo:
