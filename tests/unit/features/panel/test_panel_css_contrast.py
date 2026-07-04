@@ -14,13 +14,12 @@ from __future__ import annotations
 
 import re
 
-from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
-PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + AGENTS_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
 
 PALETTE: dict[str, str] = {
     "accent": "#9cddc8",

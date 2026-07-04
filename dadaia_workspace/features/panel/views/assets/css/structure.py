@@ -273,13 +273,8 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 .empty-state code { display: inline-block; margin-top: var(--space-sm); font-size: 0.85em; }
 
 /* ── Memory cards grid ───────────────────────────── */
-.context-count {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  margin-bottom: var(--space-md);
-}
-.context-count strong { color: var(--color-text); }
-
+/* (.context-count purged v0.1.59 / FR6 Cat-A — the live projects count uses
+   .projects-count-badge, W4; grep-proven zero live refs in views/JS/tests.) */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -294,29 +289,16 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   transition: box-shadow 0.15s;
 }
 .context-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.context-card.primary {
-  border-left: 4px solid var(--color-primary-ring, #9cddc8);
-  background: var(--color-primary-bg, #f0fbf7);
-}
+/* (.context-card.primary purged v0.1.59 / FR6 Cat-A — index.py renders only
+   class="context-card" (index.py:226); the .primary modifier is never emitted.
+   .context-card + :hover STAY live.) */
 
-.card-header {
-  padding: var(--space-md) var(--space-md) var(--space-sm);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-}
+/* (.card-header + .card-primary-badge purged v0.1.59 / FR6 Cat-A — the OLD card
+   anatomy; grep-proven zero live refs (the only card-header token in served HTML is
+   the distinct .dadaia-wf-card-header in workflows.py; card-primary-badge appears only
+   in a test_views_index `not in` absence guard). .card-name STAYS live — asserted by
+   test_index_dom_contract + rendered by _render_context_card. */
 .card-name { font-size: 0.97rem; font-weight: 700; color: var(--color-heading); flex: 1; }
-.card-primary-badge {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: var(--color-accent, #9cddc8);
-  color: var(--color-heading);
-  padding: 0.2em 0.5em;
-  border-radius: 20px;
-}
 .card-meta {
   padding: 0 var(--space-md) var(--space-sm);
   font-size: 0.83rem;
@@ -326,23 +308,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   gap: var(--space-sm);
 }
 
-.card-links { border-top: 1px solid var(--color-border); }
-.memory-link {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem var(--space-md);
-  font-size: 0.87rem;
-  color: var(--color-accent-dark);
-  border-bottom: 1px solid var(--color-border);
-  gap: var(--space-sm);
-  transition: background 0.1s;
-}
-.memory-link:last-child { border-bottom: none; }
-.memory-link:hover, .memory-link:focus { background: var(--color-card-hover); text-decoration: none; }
-.memory-link:focus-visible { outline: 2px solid var(--color-accent, #9cddc8); outline-offset: -2px; }
-.memory-link-icon { font-size: 0.9em; color: var(--color-muted); flex-shrink: 0; width: 1.2em; text-align: center; }
-.memory-link-label { flex: 1; }
-.memory-link-arrow { color: var(--color-border); font-size: 0.9em; flex-shrink: 0; }
+/* (.card-links + .memory-link* purged v0.1.59 / FR6 Cat-A — the OLD memory-link card
+   anatomy; grep-proven zero live refs in views/JS/tests. The live card memory pills use
+   .memory-chip (projects.py). The now-dangling .memory-link:focus-visible selector was
+   also dropped from the Warm-theme focus-visible override below. */
 
 /* ── panel-section base ──────────────────────────── */
 .panel-section { display: none; }
@@ -410,7 +379,7 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   color: var(--color-accent-dark, #2d7d9a);
 }
 .theme-btn-label {
-  font-size: 0.82rem;
+  font-size: var(--text-md);
   color: inherit;
 }
 .theme-btn-caret {
@@ -424,19 +393,25 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   transform: rotate(180deg);
 }
 
-/* Popover panel */
+/* Popover panel — token-anchored spacing / radius / elevation (v0.1.59 / FR5 polish).
+   The former ad-hoc literals (6px offset, 0.3rem padding, 1px border, --radius-card,
+   a hardcoded two-layer box-shadow) are replaced by the design tokens so the popover
+   shares the card-elevation language (softer --radius-lg + the lifted --shadow-card-hover
+   the W4 cards use). min-width stays a bare layout constraint (no width token exists).
+   The [role="menuitemradio"] rows are NOT in the test_control_tokens allowlist, so this
+   polish is free to tokenize them without perturbing the FR2 grep gate. */
 #theme-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-2xs));
   right: 0;
   z-index: 200;
   list-style: none;
   margin: 0;
-  padding: 0.3rem 0;
+  padding: var(--space-2xs) 0;
   background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #dddddd);
-  border-radius: var(--radius-card, 6px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.08);
+  border: var(--border-width) solid var(--color-border, #dddddd);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: var(--shadow-card-hover);
   min-width: 130px;
   animation: theme-popover-in var(--duration-fast, 120ms) var(--easing-decelerate, cubic-bezier(0,0,0.2,1));
 }
@@ -450,17 +425,17 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
 /* The [hidden] attribute hides the menu; JS toggles it. */
 #theme-menu[hidden] { display: none; }
 
-/* Row: colour dot + label */
+/* Row: colour dot + label — tokenized spacing rhythm + comfortable click target */
 #theme-menu [role="menuitemradio"] {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.87rem;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-base);
   color: var(--color-text, #222222);
   cursor: pointer;
   user-select: none;
-  transition: background 0.1s;
+  transition: background var(--duration-fast) var(--easing-standard);
   border-radius: 0;
 }
 #theme-menu [role="menuitemradio"]:first-child { border-radius: var(--radius-card, 6px) var(--radius-card, 6px) 0 0; }
@@ -475,10 +450,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   border-radius: var(--radius, 4px);
 }
 
-/* Active row: subtle highlight */
+/* Active row: subtle highlight — tokenized weight, brand-bg fallback preserved */
 #theme-menu [role="menuitemradio"][aria-checked="true"] {
   background: var(--color-primary-bg, #f0fbf7);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-heading, #111111);
 }
 
@@ -608,30 +583,10 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   white-space: nowrap;
 }
 
-/* Compact agent cards inside ops — smaller min-width so more fit per row */
-.agents-grid--compact {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-@media (max-width: 767px) {
-  .agents-grid--compact {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Compact workflow cards inside ops — 3 columns at >=1024px */
-.workflows-grid--compact {
-  grid-template-columns: repeat(3, 1fr);
-}
-@media (max-width: 900px) {
-  .workflows-grid--compact {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 600px) {
-  .workflows-grid--compact {
-    grid-template-columns: 1fr;
-  }
-}
+/* (.agents-grid--compact + .workflows-grid--compact purged v0.1.59 / FR6 Cat-A —
+   the compact ops grids for the removed Agentic/Ops agents+workflows grids;
+   grep-proven zero live refs in views/JS/tests. The surviving .ops-subsection*
+   header rules above STAY live — rendered by workflows.py:202-204. */
 
 /* ── Warm theme focus-visible override (E2E-THM-07) ─────────────────────────
    Amber alone fails the WCAG 3:1 UI-component contrast threshold on white.
@@ -642,7 +597,6 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
    ─────────────────────────────────────────────────────────────────────────── */
 html[data-theme="warm"] a:focus-visible,
 html[data-theme="warm"] .nav-tab:focus-visible,
-html[data-theme="warm"] .memory-link:focus-visible,
 html[data-theme="warm"] button:focus-visible,
 html[data-theme="warm"] [role="button"]:focus-visible,
 html[data-theme="warm"] [role="menuitem"]:focus-visible,

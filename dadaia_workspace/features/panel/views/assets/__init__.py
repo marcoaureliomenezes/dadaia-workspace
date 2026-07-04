@@ -5,7 +5,6 @@ module so specialists can write into separate files in parallel without merge co
 (PLAN §4 ownership map). (The legacy ``_assets.py`` re-export shim was removed in v0.1.53.)
 """
 
-from dadaia_workspace.features.panel.views.assets.css.agents import AGENTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
@@ -13,6 +12,5 @@ from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS
 __all__ = [
     "TOKENS_CSS",
     "STRUCTURE_CSS",
-    "AGENTS_CSS",
     "WORKFLOWS_CSS",
 ]

@@ -338,7 +338,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W5 — FR5 theme-switcher polish + FR6 two-category dead-CSS purge
 
-- [ ] T-59-50 Theme-switcher polish + two-category dead-CSS purge (Cat-A rules + Cat-B AGENTS_CSS refactor).
+- [x] T-59-50 Theme-switcher polish + two-category dead-CSS purge (Cat-A rules + Cat-B AGENTS_CSS refactor).
   Checklist:
   - **FR5 polish** — refine the `.theme-btn` + `#theme-menu` popover from tokens (spacing, radius, elevation,
     active-row treatment). **Preserve every `theme-switcher.spec.ts` contract:** `#theme-btn`
@@ -378,6 +378,87 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
     (AGENTS_CSS concat dropped — the prior false SURVIVE-unchanged claim for `test_panel_css_contrast.py` is
     REMOVED; WCAG/token behavior preserved because AGENTS_CSS carries no served rule the WCAG assertions depend
     on). No `specs/backlog/**` staged.
+
+  - **W5 EVIDENCE (T-59-50 DONE 2026-07-04, software-engineer).**
+    - **FR5 theme-switcher polish (CSS, `structure.py`)** — `.theme-btn` + `#theme-menu` popover refined
+      from tokens: `#theme-menu` panel now `border: var(--border-width)`, `border-radius: var(--radius-lg,10px)`
+      (softer, matches the W4 card language), `box-shadow: var(--shadow-card-hover)` (the lifted card elevation,
+      replacing a hardcoded two-layer shadow), `padding: var(--space-2xs) 0`, `top: calc(100% + var(--space-2xs))`;
+      rows tokenized (`gap: var(--space-sm)`, `padding: var(--space-sm) var(--space-md)`, `font-size: var(--text-base)`,
+      `transition: … var(--duration-fast) var(--easing-standard)`); active-row `font-weight: var(--font-weight-semibold)`
+      (brand `--color-primary-bg` fallback PRESERVED); `.theme-btn-label` `font-size: var(--text-md)`. The four
+      grep-gated `.theme-btn`/`:hover`/`:active`/`:focus-visible` rules stayed literal-free (test_control_tokens
+      GREEN). **Every `theme-switcher.spec.ts` contract preserved** — `#theme-btn` (aria-haspopup=menu, in
+      `.topbar`), `#theme-menu` (role=menu, `[hidden]`), 3 `[role="menuitemradio"]` Mint/Sage/Warm +
+      `[data-theme-value]` + `.theme-swatch-dot`, localStorage, `data-theme`, Escape-close+focus, warm
+      `--color-accent-dark` focus-ring. Two inline pre-paint scripts BYTE-IDENTICAL (no `index.py`/`handler.py`
+      edit; `_CSP_SCRIPT_HASH_1/2` unchanged → AC-2 equality lock GREEN).
+    - **AC-6 — `theme-switcher.spec.ts` GREEN locally: 12 passed** (E2E-THM-01..10 + response-guard's 2), incl.
+      **E2E-THM-09 axe-core zero critical/serious on all 3 themes**. Harness: venv-python panel on :4994,
+      artifacts → `.dadaia/tmp/software-engineer/20260704/pw-report`. (WebServer `BrokenPipeError` in logs = benign
+      telemetry-teardown client-disconnect noise, not a test failure; e2e exit 0.)
+    - **AC-7 Category-A — file-enumerated REMOVE / KEEP ledger (grep: served HTML = all `views/*.py` render
+      output; JS = `views/assets/js/*.js` incl. template strings; `tests/`).** All edits in
+      `views/assets/css/structure.py#STRUCTURE_CSS` (string BODY only; symbol survives, no import breaks):
+
+      | Candidate selector | Fate | Grep evidence |
+      |---|---|---|
+      | `.context-count` (+ `strong`) | **REMOVED** | zero refs views/JS/tests; live projects count is `.projects-count-badge` (W4) |
+      | `.context-card.primary` | **REMOVED** | `index.py:226` renders only `class="context-card"`; the `.primary` modifier is never emitted (`.context-card` + `:hover` KEPT live) |
+      | `.card-header` | **REMOVED** | zero exact bare `card-header`; only served token is the DISTINCT `.dadaia-wf-card-header` (workflows.py:177), a different class |
+      | `.card-primary-badge` | **REMOVED** | zero HTML/JS; sole `tests/` ref is a `not in` ABSENCE guard (`test_views_index.py:354`) that PROVES the class is dead in markup — stays green |
+      | `.card-links` | **REMOVED** | zero refs views/JS/tests |
+      | `.memory-link*` (`.memory-link`, `:last-child`, `:hover,:focus`, `:focus-visible`, `-icon`, `-label`, `-arrow`) | **REMOVED** | zero refs views/JS/tests; live memory pills are `.memory-chip` (projects.py). The now-dangling `.memory-link:focus-visible` selector also dropped from the Warm-theme focus-visible override compound |
+      | `.agents-grid--compact` (+ `@media`) | **REMOVED** | zero refs views/JS/tests (removed Agentic/Ops agents grid) |
+      | `.workflows-grid--compact` (+ 2×`@media`) | **REMOVED** | zero refs views/JS/tests (verified vs `workflows.py` first — the live workflows catalog is `.dadaia-wf-catalog`/`.dadaia-wf-card`, not this) |
+      | `.ops-subsection` / `.ops-subsection-header` / `.ops-subsection-title` | **KEPT (live)** | **LIVE — `workflows.py:202-204` renders `class="ops-subsection"`, `ops-subsection-header`, `<h3 class="ops-subsection-title">`.** Not ambiguous — a confirmed live reference. `.ops-subsection{min-width:0}` overflow-safety rule also KEPT |
+
+      Out-of-scope note: `.card-meta` (exact) is not a served class (`index.py` uses `.card-meta-row`) but is NOT
+      an enumerated candidate → left untouched (no scope creep).
+    - **AC-7 Category-B — AGENTS_CSS coordinated refactor (PM Binding Ruling 1).** DELETED
+      `dadaia_workspace/features/panel/views/assets/css/agents.py`; co-edited its 3 live importers in the SAME
+      wave: `views/assets/__init__.py` (dropped `from ...css.agents import AGENTS_CSS` + the `"AGENTS_CSS"`
+      `__all__` entry); `tests/unit/features/panel/test_palette.py` (dropped import + `+ AGENTS_CSS` from the
+      `PANEL_CSS` concat); `tests/unit/features/panel/test_panel_css_contrast.py` (same). **Gate PASS:**
+      `grep -rn AGENTS_CSS dadaia_workspace/ tests/` → **ZERO** after co-edits. Confirmed AGENTS_CSS/`agents.css`
+      never served (absent from `static._ASSETS` + not linked by `index.py`). WCAG/token behavior preserved —
+      `test_panel_css_contrast.py` GREEN (AGENTS_CSS carried no served rule the WCAG assertions depend on).
+    - **AC-9(e) sabotage (delete a KEPT-as-live selector ⇒ guardrail FAILS ⇒ revert).** Renamed the live
+      `.memory-chip` (`index.py:234-238`) → `.memory-chip-SABOTAGED`:
+      `pytest test_index_dom_contract.py::test_memory_chip_present_with_populated_context` **FAILED**
+      (`AssertionError: .memory-chip absent`, exit 1) → `git checkout` reverted (0 SABOTAGED refs). Evidence:
+      `.dadaia/tmp/software-engineer/20260704/ac9e-sabotage-domcontract-fail.txt`. **Finding:** the response-guard
+      e2e does NOT catch this (it null-guards `if (firstChip)` at `response-guard.spec.ts:77` and degrades
+      gracefully — 2 passed even sabotaged), which is exactly why the FR1 DOM-contract lock is the primary
+      dropped-live-selector guardrail (the task's explicit "or the DOM contract" path).
+    - **AC-9(f) sabotage (delete `agents.py` WITHOUT co-edits ⇒ ImportError at collection ⇒ revert).** With the
+      2 test files restored to their AGENTS_CSS-importing state and `agents.py` removed,
+      `pytest test_palette.py test_panel_css_contrast.py --collect-only` **FAILED at collection** on both
+      (`ModuleNotFoundError: No module named '…css.agents'`, "2 errors during collection", exit 2) → restored +
+      re-applied the coordinated co-edits. Evidence:
+      `.dadaia/tmp/software-engineer/20260704/ac9f-sabotage-importerror.txt`.
+    - **AC-1/AC-2 replay + panel unit fate ledger (578 panel unit passed):** `test_api_golden.py` +
+      `api_golden_v0155.json` INVARIANT byte-identical (`UPDATE_API_GOLDEN` never used — no `render_api_*` edit);
+      `test_index_dom_contract.py` GREEN + NEVER re-baselined (no asserted selector changed — the purge only
+      removed non-asserted dead rules; STOP-and-rescope: NONE); `test_security_headers.py` incl. the W1 CSP
+      equality lock GREEN (`_CSP_SCRIPT_HASH_1/2` unchanged); `test_control_tokens.py` GREEN (`.theme-btn` still
+      literal-free); `test_palette.py` + `test_panel_css_contrast.py` GREEN after the AGENTS_CSS drop (WCAG AA/AAA
+      preserved); `test_theme_switcher.py`, `test_theme_palettes.py`, `test_views_index.py`,
+      `test_runtime_switcher_pi.py`, `test_static.py`, `test_views_static.py`, `test_svg_validity.py`,
+      `test_projects_css_contract.py` GREEN. No frozen-suite interaction.
+    - **AC-11 ledger — DELETED:** `dadaia_workspace/features/panel/views/assets/css/agents.py`. **EDITED:**
+      `dadaia_workspace/features/panel/views/assets/css/structure.py` (FR5 popover polish + 8 Cat-A selector
+      groups purged + Warm-override `.memory-link` selector dropped), `views/assets/__init__.py` (AGENTS_CSS
+      import + `__all__` dropped), `tests/unit/features/panel/test_palette.py` (AGENTS_CSS import + concat
+      dropped), `tests/unit/features/panel/test_panel_css_contrast.py` (AGENTS_CSS import + concat dropped — the
+      prior false SURVIVE-unchanged claim is REMOVED; WCAG behavior preserved). **KEPT live:** `.ops-subsection*`
+      (workflows.py). No `specs/backlog/**` staged. AC-12: no `public/**` diff — panel is package code, no
+      re-projection needed.
+    - **Gates:** `ruff format --check` clean (796 files) · `ruff check --no-cache` all passed · `mypy --strict`
+      308 files clean · `lint-imports --no-cache` **8 kept / 0 broken** (ignore-cap UNCHANGED — the AGENTS_CSS
+      refactor removed an import, added none) · full unpiped `pytest -p no:cacheprovider` **4596 passed / 17
+      skipped** (exit 0). `git status --short`: no `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, repo-local
+      `.dadaia/`, `playwright-report/`, or `test-results/`; no `public/**` diff.
 
 ## W6 — FR7 e2e extension + gates + ship
 
