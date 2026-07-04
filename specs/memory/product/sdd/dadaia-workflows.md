@@ -19,9 +19,9 @@ tags:
 - workflows
 - lifecycle
 - layer-2
-token_estimate: 750
+token_estimate: 760
 last_updated: '2026-07-04'
-release_origin: v0.1.56
+release_origin: v0.1.57
 ---
 
 ## Purpose
@@ -63,7 +63,9 @@ closed the invocability gap.
 ## Usage flow
 
 1. An entry harness (or the operator) invokes a verb:
-   `dadaia lifecycle <verb> --release-id <id> --harness {pi|codex|fake} [--model …]`.
+   `dadaia lifecycle <verb> --release-id <id> --harness {pi|codex|fake} [--step-model <step>=<profile-id>]`
+   (the legacy `--model <id>:<effort>` flag was hard-removed in v0.1.57 —
+   `--step-model <profile-id>` is the sole model-selection surface).
 2. The policy resolver freezes the per-step `(harness, profile, model)` snapshot before
    step 1 ([[lifecycle-foundation]] — control plane).
 3. For each model-driven step, the prompt is assembled as **persona (role directive) +

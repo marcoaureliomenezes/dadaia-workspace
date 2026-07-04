@@ -13,10 +13,14 @@ summary: >-
   runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2
   workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness;
   the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness
-  model catalog selected on the CLI (--model/--step-model). The verbs are
+  model catalog selected on the CLI (--step-model, profile-ids-only). The verbs are
   dadaia-workflows — Python bodies that import prompt fragments, select dynamic
   context, call workers, and advance Python-validated gates (workflow roster and
-  invocability: the dadaia-workflows atom). Single-step verbs run
+  invocability: the dadaia-workflows atom). The 4 handoff-ledger bodies share ONE
+  FragmentGateWorkflow base + assembly mixin; a declarative role→memory-atom map
+  grounds each step's role at assembly, the active ACTIVE.md phase threads into
+  SpecContext, and a fragment_coherence_doctor (FRAG-COH-1..4) guards
+  fragment/selector/role-map coherence. Single-step verbs run
   `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the
   IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude
   SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match`
@@ -26,7 +30,7 @@ summary: >-
   overlay with per-context `extends` inheritance (missing != invalid), one shared
   WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI
   default > overlay step > overlay default_harness > catalog default;
-  apply_resolved_policy as the single runtime_kind author), a per-run policy snapshot
+  apply_entry_to_step as the single per-step runtime_kind author), a per-run policy snapshot
   frozen before step 1, and WMP-* governance doctor checks. Workflow steps
   communicate over a run-scoped producer→consumer handoff ledger
   (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads +
@@ -38,12 +42,12 @@ tags:
 - multi-harness
 - hygiene
 - gates
-token_estimate: 5225
+token_estimate: 5650
 last_updated: '2026-07-04'
-release_origin: v0.1.56
+release_origin: v0.1.57
 ---
 
-CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. `--model <id>:<effort>` is accepted on every run verb but **non-fatal-deprecated** (v0.1.56): the verb emits a one-line stderr warning naming `--step-model <profile-id>` + `workflow profiles list`, then proceeds under the resolved policy (a closure backlog return tracks hard-removing the flag once callers migrate).
+CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. **`--step-model <profile-id>` is the sole model-selection surface: the legacy `--model <id>:<effort>` flag and its `_warn_model_deprecated` seam were hard-removed from all 12 run verbs in v0.1.57 (deprecation-expiry — `--model` is now an unknown option, `No such option: --model`, exit 2). The pi/codex subprocess `--model <id>` arg (`pi_runtime.py`) is a different, unchanged flag.**
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
@@ -92,12 +96,18 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
   attempt ledger). Every forward edge, every `*→BLOCKED` edge, and the full
   `BLOCKED → {BACKLOG_DEFINITION, RELEASE_DEFINITION, IMPLEMENTATION, QA_REVIEW, SECURITY_REVIEW,
   CODE_REVIEW, CLOSURE}` resume fan-out (the operator-driven rework path, `BLOCKED → IMPLEMENTATION`)
-  are **retained**, so the table implies no unused path.
+  are **retained**, so the table implies no unused path. **v0.1.57 added the read-only
+  `TransitionDecision.advanced` property (`self.accepted and self.run.blocked is None`)** so the
+  correct dual-signal accept predicate is the state machine's own contract, not caller lore. Both
+  `LifecyclePipeline.run` and `LifecyclePhaseWorkflow.run` now compute `accepted = decision.advanced`
+  (was `run.blocked is None`), fixing the reachable bug where an illegal transition
+  (`decision.accepted=False`, run unchanged) was marked accepted while the phase never advanced (the
+  v0.1.56 FR4 edge removal made a review-phase step targeting IMPLEMENTATION an illegal transition).
 - `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds.
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
 - `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
 - `core/harness_models.py` is the discrete per-harness model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. The per-harness options are enumerated once in [[tech-stack]] §Agent runtimes. Both catalogs are allowlist-validated (a Layer-2 id must be in the union of registry codex ids + `LAYER2_EXTRA_MODEL_IDS`, the curated Layer-2-native set); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
-- `features/lifecycle/fragments/loader.py` loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`). `features/lifecycle/workflows/` carries the executable dadaia-workflow bodies — the workflow roster and operator invocability are owned by [[dadaia-workflows]]. Every workflow body is fully fragment-driven: each step's prompt is `role + fragment bundle + selected context + output schema + discrete (harness, model)`; Python owns step order and blocks on missing/rejected handoffs; steps communicate via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
+- `features/lifecycle/fragments/loader.py` loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`, plus the additive-optional `input_policies` per-input policy map added in v0.1.57; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`); `select_all` accepts a per-name `input_policies` override map (v0.1.57), falling back to the fragment-global `max_context_policy` for unlisted inputs (byte-stable when absent). `features/lifecycle/workflows/` carries the executable dadaia-workflow bodies — the 4 handoff-ledger bodies (`release_definition`, `audit`, `research`, `bug_report`) are thin subclasses of the shared `FragmentGateWorkflow` base and `backlog_definition` mixes in `_FragmentAssemblyMixin` (v0.1.57 — see "Prompt-assembly canon" below); the workflow roster and operator invocability are owned by [[dadaia-workflows]]. Every workflow body is fully fragment-driven: each step's prompt is `role + fragment bundle + selected context + role-mapped memory atom + output schema + discrete (harness, model)`; Python owns step order and blocks on missing/rejected handoffs; steps communicate via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
 - `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected. v0.1.24 adds a fragment-suffix path: a workflow step's prompt is assembled from a fragment bundle (not the generic "Run the step" suffix). **Prompt observability (v0.1.24):** each lifecycle run record persists, per step, the fragment ids, dynamic context refs, `prefix_hash`, the discrete model, the runtime kind, the output schema, and the gate result — surfaced in a panel/report view; whole-memory injection is never the default (context selection is scoped).
 - `features/lifecycle/hygiene.py` owns the canonical `SlopPolicy`: reports TTL 48h, handoffs TTL 24h, tmp TTL 24h, safe-zone cleanup, protected residuals, unknown `.dadaia/` top-level detection, malformed/orphan handoffs, and elapsed scan metrics.
 - `features/lifecycle/antislop/slop_scan.py` is the directory-aware slop metric: a directory tree counts as ONE entry with recursive size (closing the directory-blind gap where multi-GB caches/venvs hid from the file-only metric); the canonical manifest derives from `hooks/root_whitelist._WHITELIST`, never hand-copied. Surfaced via `dadaia lifecycle slop`.
@@ -323,6 +333,81 @@ review worker is deliberately **not** verdict-gated, since `is_review=True` retu
 first REJECTED verdict and would kill the retry-with-digest model on round 0. The loop gained its
 **first production caller**, `dadaia lifecycle implement-review` (born resolver-governed). See
 [[architecture]] §"Workflow-step handoff data plane".
+
+## Prompt-assembly canon (v0.1.57)
+
+Layer-2 prompt assembly is ONE canonical seam, and role grounding is a guarantee rather than
+per-fragment luck. Before v0.1.57 five near-identical workflow bodies each carried their own copy of
+the assembly machinery, so a role-grounding fix had to land five times.
+
+- **`features/lifecycle/workflows/_fragment_gate.py` — the shared base + mixin.**
+  `FragmentGateWorkflow[StepT: FragmentGateStep, ResultT]` (PEP-695) carries the members every
+  handoff-ledger body used to duplicate (`_run_model_step`, `_resolve_upstream`, `_produce_payload`,
+  `_graph_completeness_block`, `_prefix_with_static_inputs`, `_collect_static_inputs`,
+  `_fragment_bundle`, `_select_context`, `_render_selection`, `_scope`, the terminal gate, `run`). It
+  parameterizes the legitimate divergence axes via overridable hooks: the Step/Result dataclass types
+  (generic), the class-bound `_SEQUENCE`, `run()`'s command string + initial phase + terminal gate +
+  result factory, the terminal gate's phase behaviour (`release_definition` transitions →
+  IMPLEMENTATION; `audit`/`research`/`bug_report` COMPLETE with no transition), and `_scope`
+  (`bug_report` overrides it for the ADDITIVE `bug_write` special-case). Each body's empty-sequence
+  `ValueError` message is derived from the class command string, so each keeps its exact text. An
+  internal `_StepOutcome` carrier threads each step's (request, result, payload) tuple through the
+  **run-scoped sequence** — `_produce_payload`/`_graph_completeness_block` iterate the sequence passed
+  to `run()`, never a module-global `_SEQUENCE` (that single-seam defect is exactly what the dedup
+  removes; the module-global `_SEQUENCE` survives by name per body as `run()`'s default arg). The 4
+  handoff-ledger bodies are thin subclasses; `_FragmentAssemblyMixin` (the six assembly helpers) is
+  shared by the base **and** `BacklogDefinitionWorkflow` — which keeps its kind-based dispatch and
+  Python-disposing steps and does **not** join the full base (Ruling C: two control-flow shapes must
+  not be coupled). The mixin `_scope` threads `model_profile`/`resolved_model`, converging the latent
+  `backlog_definition` bug where the resolved model was dropped. The `LifecyclePipeline` retains its
+  own near-identical assembly helpers this release (different control-flow shape — out of the FR1
+  base scope).
+- **`features/lifecycle/role_atoms.py` — the declarative role→memory-atom map.** `ROLE_ATOM_MAP`:
+  `software-architect → specs/memory/architecture.md`, `qa-engineer →
+  specs/memory/quality-assurance.md`, `product-engineer → specs/memory/product/catalog.json`. ONE
+  single-sourced `inject_role_atoms` helper (resolve `step.role` → read the atom file → append a
+  labelled context block → record the ref in `InjectedContext.refs`) is consumed by all THREE assembly
+  surfaces, never copy-pasted: the `FragmentGateWorkflow` base (specs_dir via
+  `self._selector.spec_context.specs_dir`), `LifecyclePipeline` (a `specs_dir` injected into
+  `__init__`, built in `build_lifecycle_pipeline` from `workspace_root + context`), and
+  `LifecyclePhaseWorkflow` (a `workspace_root`/resolver injected into `__init__`, resolved at `run()`
+  from `scope.context`). The map resolves from `step.role` **independent of** the fragment's
+  `dynamic_inputs` — a multi-role step (comma-split) resolves each named role's atom; an unmapped role
+  injects nothing. The production builders wire the resolver (asserted, not only fixtures), so the map
+  is not inert in the real pipeline path — this delivers `quality_assurance_atom` to
+  `implementation.qa_review` regardless of the fragment declaration and the pipeline's missing
+  selector.
+- **Phase threading into `SpecContext`.** `SpecContext` carries an additive-optional `phase: str |
+  None`; the 5 container builders (`build_release_definition_workflow`,
+  `build_backlog_definition_workflow`, `build_audit_workflow`, `build_research_workflow`,
+  `build_bug_report_workflow`) resolve the active phase from `ACTIVE.md` and thread it in;
+  absent/malformed `ACTIVE.md` degrades to `phase=None` (**fail-open**). The gate mechanism a selector
+  or fragment could declare is additive-optional and inert unless a fragment declares one — no
+  fragment declares a phase gate this release.
+- **`features/lifecycle/fragment_coherence_doctor.py` — the coherence surface (NEW checks only).** It
+  extends, does not re-implement, `persona_doctor` (which already covers bound step-role persona
+  resolution). Four checks, each with a stable id + fixed severity: **FRAG-COH-1 (ERROR)** every
+  fragment `role` resolves to a persona atom OR is `shared`/`python`; **FRAG-COH-2 (ERROR, scoped)** a
+  `dynamic_inputs` entry resolves to a registered `ContextSelector` selector — ERROR only for the MAIN
+  fragment of a selector-wired workflow step, WARN/skip for shared-fragment and selector-less
+  (`implementation.*`) inputs; **FRAG-COH-3 (WARN)** orphan fragment / dangling shared id;
+  **FRAG-COH-4 (ERROR)** role→atom-map coverage — each model-driven step's role-mapped atom appears in
+  its injected refs, grounded against a **self-contained canonical-layout oracle** (ambient-tree
+  independent), with `backlog_definition` EXCLUDED (mixin-only, no `_run_model_step`). `ok=` is
+  computed from ERROR checks only; WARNs never fail the doctor. Surfaced on `dadaia lifecycle workflow
+  doctor` alongside the `WMP-*` checks (green on the current tree: `ok=True`, 0 ERROR, 25
+  FRAG-COH-2 WARNs for the legitimately-inert shared/implementation inputs). `sel_constitution` is
+  KEPT registered (not dead): it is reached at runtime via `write_set_guidance`
+  (`release_definition.tasks_create`) → `sel_write_set_guidance` → `sel_constitution`, and directly as
+  `spec_create`'s `static_input` — the recorded decision notes this indirection so the selector is
+  never mistaken for dead.
+- **(N4) Layer grounding honesty.** **Layer-2** role grounding is now **mechanically recorded and
+  checked** — the role→atom map records each resolved atom in `InjectedContext.refs`, and FRAG-COH-4
+  asserts the role-mapped atom appears there. **Layer-1** memory grounding
+  (constitution/architecture/quality-assurance) remains **self-pull DISCIPLINE and is NOT mechanically
+  verified** — Ruling A ratified self-pull and kept `ctx_inject.py` byte-identical; the deferred
+  mechanical proof (a handoff audit line proving the L1 self-pull atoms were read) is filed as
+  `layer1-selfpull-handoff-audit-line`.
 
 ## Gating note (review-only typed gate + coherent worker-output contract)
 

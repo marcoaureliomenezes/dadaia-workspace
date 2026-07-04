@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T03:23:44Z",
+  "generated_at": "2026-07-04T09:13:19Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -487,7 +487,7 @@
         "lifecycle",
         "layer-2"
       ],
-      "token_estimate": 750,
+      "token_estimate": 760,
       "depends_on": [
         "lifecycle-foundation",
         "agent-orchestration",
@@ -503,7 +503,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--model/--step-model). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_resolved_policy as the single runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--step-model, profile-ids-only). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). The 4 handoff-ledger bodies share ONE FragmentGateWorkflow base + assembly mixin; a declarative role→memory-atom map grounds each step's role at assembly, the active ACTIVE.md phase threads into SpecContext, and a fragment_coherence_doctor (FRAG-COH-1..4) guards fragment/selector/role-map coherence. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_entry_to_step as the single per-step runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",
@@ -512,7 +512,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 5225,
+      "token_estimate": 5650,
       "depends_on": [
         "architecture",
         "tech-stack",

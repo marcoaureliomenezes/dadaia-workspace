@@ -34,7 +34,7 @@ grill on the picked set before SPEC.
 | R6 | **SHIPPED — v0.1.54** (merged `aeaa3c66`, PR #97, 2026-07-03) | `import-boundary-enforcement`; `features-import-infrastructure-direct-debt`; `pid-probe-seam-consolidation` (all consumed; archived at ship — dead-anchor BL-SCHEMA) | Contracts green + CI-wired + `workflows ↔ lifecycle` cycle broken; silent erosion stops here so all later structure lands under enforcement. |
 | R7 | **SHIPPED — v0.1.55** (merged `a1fc29f4`, PR #99, 2026-07-03) | `architecture-uml-decomposition` + bugs `bugs-append-ignores-persisted-bind`, `backlog-new-stub-readme-lag-intents-schema` (all consumed/resolved; archived at SHIP — dead-anchor BL-SCHEMA) | SpecsDoctor/api.py splits + reports_* merge landed under the now-enforced contracts; shipped the committed UML assets + the two open-bug fixes. |
 | R8 | **SHIPPED — v0.1.56** (merged `3a02f758`, PR #101, 2026-07-04) | `lifecycle-verb-governance-uniformity` (consumed; archived at CLOSURE — both anchors survive) | Resolver on EVERY run verb + audit/research/bug_report invocable + implement/review loop fixed (digest + runner gate + CLI caller) + TRANSITIONS reconciliation. Final release of the R6→R8 mandate. |
-| R9 | Injection canon | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup` | The dedup base creates the ONE prompt-assembly seam; the role→atom map + phase threading are implemented at that seam in the same release — five bodies touched once, not twice. |
+| R9 | **SHIPPED — v0.1.57** (merged `8bab315a`, PR #104, 2026-07-04) | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup`; `hard-remove-model-flag-across-run-verbs` (all consumed; the two injection-canon anchors survive → archived at CLOSURE; the `--model` dead anchor archived at SHIP — BL-SCHEMA) | The dedup base created the ONE prompt-assembly seam; role→atom map + phase threading + coherence doctor landed there; `--model` hard-removed across the 12 run verbs; `TransitionDecision.advanced` fixed the illegal-transition bug. First release of the R9→R12 mandate. |
 | R10 | Harness & projection distribution | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` | `init --harness` profiles + typed harness registry + consumer AGENTS.md fan-out redesign — the projection/install machinery, matured after the structural chain. |
 | R11 | Panel UX overhaul | `panel-ux-overhaul` | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). |
 | R12 | Capability tail | `plugin-packs-and-install-command`; `model-tier-efficiency-and-fast-tier-utilization` | Pure new capability, zero debt: packs + install command, then Layer-1 fast-tier assignments. |
@@ -43,11 +43,14 @@ grill on the picked set before SPEC.
 
 ## HIGH
 
-### `context-injection-role-phase-canon` — Context-injection role/phase canon *(2026-07-02)*
-Role→memory-atom default map (architect→architecture.md, qa→quality-assurance.md; fix
-`implementation.qa_review` missing `quality_assurance_atom`); phase threading into
-Layer-2 context selection; fragment/persona coherence doctor; Layer-1 self-pull vs
-injected-digest decision (grill mandatory).
+### `layer1-selfpull-handoff-audit-line` — Layer-1 self-pull handoff audit line *(2026-07-04)*
+Returned at v0.1.57 closure (FR4 Ruling A). R9 ratified Layer-1 **self-pull** for
+constitution/architecture/quality-assurance (`ctx_inject.py` byte-identical) and made
+**Layer-2** grounding mechanically checkable (role→atom map refs + `FRAG-COH-4`). This
+entry tracks the deferred **Layer-1** verifiability: a handoff-v1.1 schema audit line
+(+ validator) proving the self-pull atoms were actually read, turning the L1 discipline
+into a checkable contract. Anchored at `hooks/ctx_inject.py#main` + the handoff schema
+surface. Override: bounded phase-aware L1 digests reopen FR4.
 
 ---
 
@@ -62,10 +65,6 @@ tab consolidation). Re-baselined 2026-07-02: Sessions surface carved out to
 Detect Spec Context repos via spec_contexts.json; public doctor flags stale consumer
 copies instead of skipping.
 
-### `fragment-workflow-base-dedup` — Fragment workflow base dedup
-Extract the shared FragmentGateWorkflow base from the 5 near-verbatim workflow bodies
-(~1,500 duplicated lines) so prompt assembly has ONE seam.
-
 ### `harness-isolation-profiles` — Harness isolation profiles + harness registry
 `dadaia init --harness <set>` single-harness scaffolding; central harness-identity
 registry with Layer-1/Layer-2 capability typing replacing 61+ scattered string
@@ -77,10 +76,4 @@ Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule
 
 ### `model-tier-efficiency-and-fast-tier-utilization` — Layer-1 model-tier efficiency (P2)
 Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trigger.
-
-### `hard-remove-model-flag-across-run-verbs` — Hard-remove `--model` across run verbs *(2026-07-04)*
-Follow-through on the v0.1.56 `--model` non-fatal deprecation ruling: once callers
-migrate to `--step-model <profile-id>`, delete the `--model` flag and the
-`_warn_model_deprecated` seam across all `dadaia lifecycle` run verbs (no-legacy-code
-path). Returned at v0.1.56 closure.
 
