@@ -32,7 +32,14 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W1 — FR1 typed core harness registry (golden-first)
 
-- [ ] T-58-10 Capture + commit the behaviour goldens BEFORE any refactor. Checklist:
+- [x] T-58-10 Capture + commit the behaviour goldens BEFORE any refactor. Checklist:
+  - **Evidence:** `tests/unit/infrastructure/test_install_target_goldens.py` (4 tests, all green) +
+    3 committed goldens under `tests/unit/infrastructure/_golden/`: `install_target_resolution_v0158.json`
+    (5 targets: all=135/agents=42/claude=67/codex=70/pi=26 normalized `installed` lines),
+    `panel_runtime_validation_v0158.json` (api_workflows + api_agents × claude/codex/pi/bogus — api_agents
+    DISCRIMINATES: claude→[software-engineer], codex→[qa-engineer], pi→[security-reviewer], bogus→claude),
+    `doctor_all_four_v0158.json` (219 report lines on a fully-installed all-four no-profile tree, git-dirty
+    env-lines dropped, all paths `<WS>`-normalized). Captured on the pre-registry tree — the AC-1 behaviour lock.
   - Add `tests/unit/infrastructure/test_install_target_goldens.py` running `public_assets.install()` under a
     `FileSystemPublicAssetManager` + `tmp_path` for each `--target` in `{all, agents, claude, codex, pi}`;
     capture the produced `installed` list. Capture the panel runtime-validation accept/reject outputs
