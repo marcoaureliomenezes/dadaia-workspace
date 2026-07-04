@@ -174,7 +174,59 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W3 — FR3 profile-aware `public install`-all + `public doctor`
 
-- [ ] T-58-30 Profile-aware install-all + profile-scoped doctor. Checklist:
+- [x] T-58-30 Profile-aware install-all + profile-scoped doctor. Checklist:
+  - **Evidence:** EDITED `dadaia_workspace/infrastructure/public_assets.py` — (1) `install()`
+    reads `.dadaia/states/harness_profile.json` via the same-layer `JsonHarnessProfileStore`
+    adapter (new `_profile_harnesses` helper): `target=="all"` installs `("agents", *profile)`
+    when a profile exists, all-four when absent (back-compat), explicit `--target X` overrides;
+    (2) `doctor()` scopes the inline `_compare` block — claude `settings.json` gated on
+    `claude in profile`; codex hooks.json/wrappers/config.toml/rules gated on `codex`; the
+    `.pi/` tree gated on `pi`; **(Q1)** `check_codex_drift` (D-CX-1..10) + `codex_trust_boundary_info`
+    gated on `codex in profile`; **(A3)** `_OUT_OF_PROFILE_WARN` emitted for a runtime dir that
+    physically exists outside the profile (never silent). Kept unconditional: `classify_workflows`,
+    `check_codex_rule_corpus_reachable`, `check_agent_skill_refs`, `check_memory_phase_single_source`,
+    the runtime_expectations agents/claude/scripts loop, `_check_public_privacy`, git-dirty.
+    NEW `tests/unit/infrastructure/test_public_assets_profile.py` (8 tests, all green).
+  - **AC-5 RED-first (captured against unmodified public_assets.py):** the new suite ran 5
+    failed / 3 passed — `test_claude_only_profile_install_all_writes_only_claude` FAILED at
+    `assert not (ws/".codex").exists()` (install-all ignored the profile → all-four written);
+    `test_claude_only_profile_doctor_is_green` FAILED with the D-CX-1 ×12 `[missing]
+    codex:agents/<name>.toml (D-CX-1)` lines + `[missing] pi:*` + `[drift] codex:hooks.json`;
+    the CLI-exit-0 test FAILED (exit 1); the stale-`.codex` A3 test FAILED (no out-of-profile
+    line). The absent-profile byte-equality + explicit-override invariants PASSED pre-fix.
+    Post-fix: 8/8 green.
+  - **(Q2/A4) byte-equality:** `test_absent_profile_doctor_byte_equals_all_four_golden` asserts
+    the absent-profile doctor == `tests/unit/infrastructure/_golden/doctor_all_four_v0158.json`
+    using the W1 golden normalizer (`_norm_path_line` + git-dirty exclusion, imported from
+    `test_install_target_goldens`) — PASS. The W1 `test_install_target_goldens.py` doctor golden
+    also replays byte-identical (201 fate-ledger tests green).
+  - **AC-9 sabotages (captured → reverted):** (c) `active = set(L1_ENTRY_HARNESSES)` (ignore
+    profile) ⇒ `test_claude_only_profile_doctor_is_green` FAILED on the D-CX-1 assertion ⇒
+    reverted → 1 passed. (c′) `check_codex_drift` unconditional (inline block still scoped) ⇒
+    same green test FAILED with the D-CX-1 ×12 lines ⇒ reverted → 1 passed. (c″) drop the codex
+    `_OUT_OF_PROFILE_WARN` branch (zero lines for on-disk out-of-profile) ⇒
+    `test_stale_out_of_profile_codex_on_disk_is_not_silent` FAILED (report ended at
+    `[ok] public-privacy`, no out-of-profile line) ⇒ reverted → 1 passed.
+  - **Fate ledger (SURVIVE byte-identical on the absent-profile path):**
+    `tests/integration/test_public_doctor_parity.py`,
+    `tests/unit/features/public_assets/test_doctor_projected_drift.py`,
+    `tests/unit/infrastructure/test_public_assets.py` doctor cases (`TestDoctorMethod`/
+    `TestDoctorGitDirtyCheck`/`TestDoctorFindingPersistence`),
+    `tests/unit/infrastructure/test_install_target_goldens.py` (incl. the doctor golden) — all
+    SURVIVE (201 passed together, no regeneration). Q2 golden proves the absent-profile lock.
+  - **Gates:** ruff format --check (794 files) clean; ruff check --no-cache clean; mypy --strict
+    clean (309 files); lint-imports --no-cache **8 kept / 0 broken** (ignore-cap unchanged — the
+    W2 `json_harness_profile_store` adapter is consumed same-layer by `public_assets`, no new
+    features→infra / infra→features edge); full unpiped pytest **4547 passed / 17 skipped / 0
+    failed**. NO `specs/backlog/**` staged.
+  - **Boundary flagged for W5 (not silently gated):** the `runtime_expectations` claude/pi
+    projection loop (claude rules/skills/agents/workflows + scripts) stays UNCONDITIONAL per the
+    T-58-30 scope (only the inline `_compare` block is scoped). For a **claude-only** tree this is
+    fine (claude installed → `[ok]`; W3 tests are claude-only). A **codex-only / pi-only** doctor
+    would still emit `[missing] claude:*` from that loop, so W5 (T-58-50) codex-only/pi-only green
+    will additionally need that loop scoped — flagged as a boundary rather than expanding W3 scope.
+    (The W2 pi-only-scripts boundary does NOT bite W3: profile-aware install-all keeps `target=="all"`
+    so scripts install for the claude profile.)
   - **Install-all reads the profile** (`public_assets.install`, via the W2 `json_harness_profile_store`
     adapter): install the profile set when `.dadaia/states/harness_profile.json` exists; absent ⇒ all-four
     (back-compat); explicit `--target claude|codex|pi|agents` overrides regardless of profile.
