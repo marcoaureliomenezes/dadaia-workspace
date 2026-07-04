@@ -12,9 +12,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 550
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+token_estimate: 575
+last_updated: '2026-07-04'
+release_origin: v0.1.58
 ---
 
 ## Purpose
@@ -67,7 +67,10 @@ pair; doctor lint D-CX-4 blocks Anthropic tier names (Opus/Sonnet/Haiku) and Cla
 model/path/tool-name leaks in Codex-projected artifacts), `.codex/rules/`
 (Starlark command policy), `.codex/skills/` (context adapters), `.codex/workflows/`
 (reference-only). Wrappers in `.dadaia/hooks/codex-*`. A Codex-only workspace =
-`--target codex` (+ shared `--target agents`).
+`--target codex` (+ shared `--target agents`). This isolation is now **enforced
+mechanically at init** — `dadaia init --harness codex` scaffolds only the `.codex/`
+surface + the `.dadaia/hooks/codex-*` wrappers and persists the profile
+([[workspace-init]]) — not merely documented.
 
 ## Dependencies
 

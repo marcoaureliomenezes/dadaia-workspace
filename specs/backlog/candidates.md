@@ -1,11 +1,12 @@
 # Backlog candidates
 
 Curated index of surviving backlog items. Rebuilt 2026-07-02 after the operator-ordered
-backlog sanitization + architectural deep review (post-v0.1.48); **pruned 2026-07-03** after
-R1–R5 (v0.1.49–v0.1.53) shipped and R6 (v0.1.54 "Import Boundaries") entered definition. This
-index lists **only** surviving open candidates — consumed, superseded, and stale entries were
-removed per removal-on-release and the never-keep-the-past law. The three R6 source entries
-archived at R6 SHIP (2026-07-03) to `specs/_archive/v0.1.54/consumed-backlog/`.
+backlog sanitization + architectural deep review (post-v0.1.48); **pruned 2026-07-04** after
+R1–R10 (v0.1.49–v0.1.58) shipped. This index lists **only** surviving open candidates —
+consumed, superseded, and stale entries were removed per removal-on-release and the
+never-keep-the-past law. R10 (v0.1.58) consumed `harness-isolation-profiles` +
+`consumer-agents-md-fanout-redesign` (both anchors survive → archived at CLOSURE to
+`specs/_archive/v0.1.58/consumed-backlog/`) and returned four items (indexed below).
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -35,7 +36,7 @@ grill on the picked set before SPEC.
 | R7 | **SHIPPED — v0.1.55** (merged `a1fc29f4`, PR #99, 2026-07-03) | `architecture-uml-decomposition` + bugs `bugs-append-ignores-persisted-bind`, `backlog-new-stub-readme-lag-intents-schema` (all consumed/resolved; archived at SHIP — dead-anchor BL-SCHEMA) | SpecsDoctor/api.py splits + reports_* merge landed under the now-enforced contracts; shipped the committed UML assets + the two open-bug fixes. |
 | R8 | **SHIPPED — v0.1.56** (merged `3a02f758`, PR #101, 2026-07-04) | `lifecycle-verb-governance-uniformity` (consumed; archived at CLOSURE — both anchors survive) | Resolver on EVERY run verb + audit/research/bug_report invocable + implement/review loop fixed (digest + runner gate + CLI caller) + TRANSITIONS reconciliation. Final release of the R6→R8 mandate. |
 | R9 | **SHIPPED — v0.1.57** (merged `8bab315a`, PR #104, 2026-07-04) | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup`; `hard-remove-model-flag-across-run-verbs` (all consumed; the two injection-canon anchors survive → archived at CLOSURE; the `--model` dead anchor archived at SHIP — BL-SCHEMA) | The dedup base created the ONE prompt-assembly seam; role→atom map + phase threading + coherence doctor landed there; `--model` hard-removed across the 12 run verbs; `TransitionDecision.advanced` fixed the illegal-transition bug. First release of the R9→R12 mandate. |
-| R10 | Harness & projection distribution | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` | `init --harness` profiles + typed harness registry + consumer AGENTS.md fan-out redesign — the projection/install machinery, matured after the structural chain. |
+| R10 | **SHIPPED — v0.1.58** (merged `b0bd8217`, PR #106, 2026-07-04) | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` (both consumed; both anchors survive → archived at CLOSURE) | `init --harness` profiles + typed `core/harness_registry.py` (4 L1 + 3 L2 sites, contract-locked to `harness_models.harnesses()`) + profile-aware install/doctor (absent ⇒ all-four) + consumer AGENTS.md fan-out redesign (spec_contexts.json detection, `[updated]` restore, doctor flagging). First projection/install release after the structural chain; the workflow-spawn auto-default deferred (FR6). |
 | R11 | Panel UX overhaul | `panel-ux-overhaul` | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). |
 | R12 | Capability tail | `plugin-packs-and-install-command`; `model-tier-efficiency-and-fast-tier-utilization` | Pure new capability, zero debt: packs + install command, then Layer-1 fast-tier assignments. |
 
@@ -61,14 +62,19 @@ Visual-quality + layout overhaul (tokens design system, row wrapping, theme swit
 tab consolidation). Re-baselined 2026-07-02: Sessions surface carved out to
 `panel-sessions-cost-dashboard-only`.
 
-### `consumer-agents-md-fanout-redesign` — Consumer-repo AGENTS.md fan-out redesign
-Detect Spec Context repos via spec_contexts.json; public doctor flags stale consumer
-copies instead of skipping.
+### `workflow-spawn-entry-harness-autodefault` — Workflow-spawn entry-harness auto-default *(2026-07-04)*
+Returned at v0.1.58 closure (FR6 / Ruling F). Auto-default the Layer-2 worker harness from
+the entry harness (enter codex ⇒ `--harness codex`, enter pi ⇒ `--harness pi`; explicit flag
+wins). Deferred because PI has no session env var (`core/session_env.py` carries only
+`CLAUDE_CODE_SESSION_ID` + `CODEX_SESSION_ID`) and claude is L1-only. Override: codex-only
+best-effort default now.
 
-### `harness-isolation-profiles` — Harness isolation profiles + harness registry
-`dadaia init --harness <set>` single-harness scaffolding; central harness-identity
-registry with Layer-1/Layer-2 capability typing replacing 61+ scattered string
-literals (extended 2026-07-02).
+### `golden-platform-normalization-layer` — Consolidated golden platform-normalization layer *(2026-07-04)*
+Returned at v0.1.58 closure (three-round CI saga). Consolidate the per-test golden-normalization
+helpers into ONE shared platform-invariance layer (host-state canonicalization + sorted-multiset
+report-list locks + OS-phrase canonicalization) so a byte-golden is cross-platform-stable by
+construction. Anchored at the v0.1.58 golden helpers in `test_install_target_goldens.py` + the
+v0.1.55 golden-authoring law.
 
 ### `plugin-packs-and-install-command` — Plugin packs + `dadaia plugin install`
 Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule.
@@ -76,4 +82,21 @@ Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule
 
 ### `model-tier-efficiency-and-fast-tier-utilization` — Layer-1 model-tier efficiency (P2)
 Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trigger.
+
+---
+
+## LOW
+
+### `fanout-repo-slug-containment` — Consumer fan-out repo-slug containment guard *(2026-07-04)*
+Returned at v0.1.58 closure (FR4 hardening, security). The redesigned fan-out writes the
+workspace-law pair to `repos/<repo_slug>/` derived from `spec_contexts.json`; assert each
+resolved dir is `is_relative_to(repos/)` or reject a multi-component / traversal slug. Anchored
+at `workspace_guardrail.py#_install_guardrail_pair`. Override: `REJECTED — trusted-input` if
+`spec_contexts.json` is deemed fully first-party.
+
+### `selfrepo-agents-md-doubled-header` — Self-repo AGENTS.md doubled header (doc-pass) *(2026-07-04)*
+Returned at v0.1.58 closure (doc-pass). `repos/dadaia-workspace/AGENTS.md` carries a doubled
+workspace-law header (v0.1.47 hand-sync artifact); the retained `_is_self_repo` fan-out skip
+means it is never auto-rewritten, so it needs a sanctioned hand-sync to collapse to one header.
+Anchored at `workspace_guardrail.py#_is_self_repo` + the self-repo AGENTS.md.
 

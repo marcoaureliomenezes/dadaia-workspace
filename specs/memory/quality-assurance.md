@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 2075
+token_estimate: 2210
 last_updated: '2026-07-04'
-release_origin: v0.1.57
+release_origin: v0.1.58
 ---
 
 ## Purpose
@@ -119,6 +119,30 @@ renders identically cross-platform until the golden is proven byte-stable on the
 jobs. Also freeze any clock the captured output depends on (v0.1.55 froze `date.today` +
 `datetime.now(tz=UTC)` to 2026-07-15 so the release-semver and hotfix-date-gated checks were
 deterministic).
+
+**Golden-authoring law extension (v0.1.58) — three environmental-leak classes beyond path
+rendering.** The v0.1.55 law covers platform-variant PATH rendering; v0.1.58's three-round CI saga
+proved a byte-golden can leak host/OS state through THREE further channels, each of which turned CI red
+one round at a time on the `-cross` matrix and each fixed **test-only**
+(fix-the-consumer-never-the-golden) with the behaviour invariant preserved:
+
+1. **Host-state reads resolved from cwd.** A captured output that includes a check which walks UP from
+   cwd for host state (e.g. the `_check_public_privacy` denylist walk) will differ between the local
+   capture tree and the CI runner tree. **Canonicalize the host-state-dependent line** at capture — do
+   not let an ambient-tree read enter a byte-golden.
+2. **Directory-iteration order.** A report list built by iterating a directory (e.g. the `.pi/`
+   projection lines) has a stable MULTISET but a platform-variant SEQUENCE — Windows enumerates a
+   directory in a different order than Linux. **Lock the report list with a sorted-multiset**, never a
+   byte-sequence compare, when order is not itself the behaviour under test.
+3. **OS-phrased error/probe text.** Any captured line embedding an OS's process-spawn / exec-probe
+   phrasing (e.g. a wrapper that renders `exited 127` on POSIX vs `[WinError 193]` on Windows) carries
+   an OS-specific string. **Canonicalize the OS-phrased text to a stable token**, invariant preserved.
+
+The meta-lesson: three per-round patches to the SAME golden-capture harness is the signal to build ONE
+consolidated platform-invariance layer at capture (host-state canonicalization + sorted-multiset locks
++ OS-phrase canonicalization) rather than re-discovering each leak class one CI round at a time —
+tracked by the backlog return `golden-platform-normalization-layer`. Assume nothing renders identically
+cross-platform until the golden is proven byte-stable on the `-cross` jobs.
 
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:
