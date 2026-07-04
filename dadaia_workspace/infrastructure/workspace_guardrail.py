@@ -27,6 +27,34 @@ from dadaia_workspace.infrastructure.public_assets_common import (
 # to load AGENTS.md (see code.claude.com/docs/en/memory#agentsmd). One line is sufficient.
 _CLAUDE_MD_STUB = "@AGENTS.md\n"
 
+# FR9 (v0.1.60) — provenance discriminator for the consumer-repo AGENTS.md fan-out.
+# A consumer root AGENTS.md that BEGINS WITH this exact banner block is a provable
+# ``dadaia public install`` projection (lib-owned, overwritable); anything else is
+# hand-authored / repo-owned and MUST NEVER be clobbered (the HIGH bug
+# public-install-clobbers-consumer-repo-agents-md). This is a FIXED LITERAL — never a
+# runtime read of ``public/data`` — asserted byte-equal to the actual
+# ``public/data/AGENTS.md`` banner by the contract test
+# ``test_agents_banner_constant_matches_public_data`` (Ruling 15 / ADR-9). Only
+# ``public install`` emits this banner, so its presence is deterministic provenance.
+_CANONICAL_AGENTS_BANNER = (
+    "> **AI agent rules.** This file is generated from\n"
+    "> `dadaia_workspace/public/data/AGENTS.md` by `dadaia public install`.\n"
+    "> Do not put project-specific instructions here. Put them in a scoped\n"
+    "> `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.\n"
+)
+
+
+def _carries_canonical_banner(dst: Path) -> bool:
+    """True when *dst* begins with the generated provenance banner (a lib-owned copy).
+
+    The byte-exact full-banner-block match minimizes accidental collision (ADR-9 residual
+    risk). An unreadable / non-UTF-8 file is treated as foreign (never overwrite).
+    """
+    try:
+        return dst.read_text(encoding="utf-8").startswith(_CANONICAL_AGENTS_BANNER)
+    except (OSError, UnicodeDecodeError):
+        return False
+
 
 def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
     """Return consumer repo directories registered in ``spec_contexts.json``.
@@ -228,12 +256,66 @@ def _install_guardrail_pair(
         write_fn()
         installed.append(f"[ok]   {dst}")
 
+    def _write_consumer_agents(dst: Path) -> bool:
+        """FR9 provenance-gated consumer AGENTS.md write. Returns True iff the sibling
+        CLAUDE.md should be written (created / restored), False when the AGENTS.md is
+        foreign (hand-authored) and left untouched.
+        """
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            # Case 3 (absent): create — an empty slot has nothing to clobber.
+            shutil.copy2(source, dst)
+            installed.append(f"[ok]   {dst}")
+            return True
+        if hashlib.sha256(dst.read_bytes()).hexdigest() == src_sha:
+            if force:
+                shutil.copy2(source, dst)
+                installed.append(f"[ok]   {dst}")
+            else:
+                installed.append(f"[skip] {dst}")
+            return True
+        if _carries_canonical_banner(dst):
+            # Case 1 (banner match): stale canonical projection → restore + DISTINCT line.
+            shutil.copy2(source, dst)
+            installed.append(f"[updated] {dst} (overwrote divergent workspace-law copy)")
+            return True
+        # Case 2 (no banner): FOREIGN / repo-owned → NEVER overwrite (the bug fix).
+        installed.append(f"[foreign] {dst} — left untouched")
+        return False
+
+    def _write_consumer_claude(dst: Path, sibling_written: bool) -> None:
+        """FR9: the CLAUDE.md bridge follows its sibling's fate.
+
+        Written ONLY when the sibling AGENTS.md was created/restored; when AGENTS.md is
+        foreign, no CLAUDE.md is dropped (the orphan-drop the bug flags). A foreign
+        (non-stub) existing CLAUDE.md is always left untouched.
+        """
+        if sibling_written:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if not dst.exists():
+                _atomic_write_text(dst, _CLAUDE_MD_STUB)
+                installed.append(f"[ok]   {dst}")
+            elif dst.read_text(encoding="utf-8") == _CLAUDE_MD_STUB:
+                if force:
+                    _atomic_write_text(dst, _CLAUDE_MD_STUB)
+                    installed.append(f"[ok]   {dst}")
+                else:
+                    installed.append(f"[skip] {dst}")
+            else:
+                installed.append(f"[foreign] {dst} — left untouched")
+        elif dst.exists() and dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+            installed.append(f"[foreign] {dst} — left untouched")
+
     def _write_pair(target_dir: Path, is_consumer: bool) -> None:
-        # AGENTS.md — full canonical content copied from source.
         agents_dst = target_dir / "AGENTS.md"
-        _write_one(agents_dst, src_sha, lambda: shutil.copy2(source, agents_dst), is_consumer)
-        # CLAUDE.md — 1-line stub only (T-41: delegates to AGENTS.md).
         claude_dst = target_dir / "CLAUDE.md"
+        if is_consumer:
+            # FR9: provenance-gated — never clobber a hand-authored consumer AGENTS.md.
+            sibling_written = _write_consumer_agents(agents_dst)
+            _write_consumer_claude(claude_dst, sibling_written)
+            return
+        # Workspace root: lib-owned canonical (unchanged Ruling-L overwrite semantics).
+        _write_one(agents_dst, src_sha, lambda: shutil.copy2(source, agents_dst), is_consumer)
         _write_one(
             claude_dst,
             stub_sha,
@@ -317,6 +399,24 @@ def _doctor_guardrail_pair(
         sys.stderr.write(line + "\n")
         return line
 
+    def _check_consumer_agents(dst: Path, label: str) -> str:
+        """FR9 provenance-aware consumer AGENTS.md doctor line.
+
+        A hand-authored (no-banner) consumer AGENTS.md is ``[foreign]`` — repo-owned, not a
+        drift — so ``public doctor`` does not perpetually flag it. A banner-bearing
+        (lib-owned) copy keeps ``[ok]``/``[drift]`` vs the source; absent is ``[missing]``.
+        """
+        if not dst.exists():
+            line = f"[missing] {label}"
+        elif not _carries_canonical_banner(dst):
+            line = f"[foreign] {label}"
+        elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
+            line = f"[drift] {label}"
+        else:
+            line = f"[ok] {label}"
+        sys.stderr.write(line + "\n")
+        return line
+
     lines: list[str] = []
     lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
     lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
@@ -325,7 +425,18 @@ def _doctor_guardrail_pair(
         if _is_self_repo(consumer):
             continue
         slug = consumer.name
-        lines.append(_check(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md"))
-        lines.append(_check_stub(consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md"))
+        agents_line = _check_consumer_agents(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md")
+        lines.append(agents_line)
+        claude_label = f"repos/{slug}:CLAUDE.md"
+        if agents_line.startswith("[foreign]"):
+            # Ruling 16 (CRITICAL): the PAIR is provenance-aware — a foreign AGENTS.md's
+            # paired CLAUDE.md is ALSO [foreign], whether the CLAUDE.md is absent OR a
+            # foreign non-stub — never [missing]/[drift], so `public doctor` EXITS 0 for a
+            # hand-authored consumer repo (public.py:161-172 exits 1 on [missing]/[drift]).
+            line = f"[foreign] {claude_label}"
+            sys.stderr.write(line + "\n")
+            lines.append(line)
+        else:
+            lines.append(_check_stub(consumer / "CLAUDE.md", claude_label))
 
     return lines

@@ -135,11 +135,10 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     v0.1.58 FR4 INVERT: the consumer is detected via ``spec_contexts.json``
     (registry-based), not the dead in-repo marker (Ruling G).
 
-    Labels expected:
-      - root:AGENTS.md
-      - root:CLAUDE.md
-      - repos/<slug>:AGENTS.md
-      - repos/<slug>:CLAUDE.md
+    v0.1.60 FR9 amendment: ``_SOURCE_CONTENT`` is BANNERLESS, so the consumer pair
+    classifies ``[foreign]`` (doctor-``[ok]``-parity flip) — including the PAIRED
+    ``repos/<slug>:CLAUDE.md`` line (Ruling 16) — while the lib-owned root pair keeps
+    ``[ok]``. All 4 labels are still present.
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -154,7 +153,7 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
     lines = _doctor_guardrail_pair(source, workspace_root)
-    labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
+    status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
 
     expected = {
         "root:AGENTS.md",
@@ -162,11 +161,16 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
         f"repos/{slug}:AGENTS.md",
         f"repos/{slug}:CLAUDE.md",
     }
-    assert labels == expected, f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {labels}"
-    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
-    assert all(ln.startswith("[ok]") for ln in lines), (
-        f"All labels should be [ok] after install. Lines: {lines}"
+    assert set(status) == expected, (
+        f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {set(status)}"
     )
+    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
+    # Root pair (lib-owned) [ok]; consumer pair (bannerless source) [foreign] — INCLUDING the
+    # paired CLAUDE.md line, so `public doctor` exits 0 for a hand-authored consumer repo.
+    assert status["root:AGENTS.md"] == "[ok]", lines
+    assert status["root:CLAUDE.md"] == "[ok]", lines
+    assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines
+    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines
 
 
 # ---------------------------------------------------------------------------

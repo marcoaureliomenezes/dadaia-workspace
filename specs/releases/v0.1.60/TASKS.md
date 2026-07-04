@@ -288,7 +288,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W4B — FR9 provenance-gated consumer-repo fan-out (HIGH bug fix; AMENDS v0.1.58 Ruling L)
 
-- [ ] T-60-45 Banner-constant discriminator + PAIRED provenance-aware doctor on the consumer `AGENTS.md` fan-out.
+- [x] T-60-45 Banner-constant discriminator + PAIRED provenance-aware doctor on the consumer `AGENTS.md` fan-out.
   Owner: software-engineer. Write set: `infrastructure/workspace_guardrail.py` (`_CANONICAL_AGENTS_BANNER` constant +
   `_install_guardrail_pair._write_one` + `_doctor_guardrail_pair` PAIRED), NEW
   `tests/unit/infrastructure/test_consumer_fanout_provenance.py`, NEW contract
@@ -340,6 +340,44 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
   - **AC-13 ledger** — EDITED: `_write_one` (banner-constant gate), `_doctor_guardrail_pair` (PAIRED `[foreign]`); NEW:
     `_CANONICAL_AGENTS_BANNER` constant, `test_consumer_fanout_provenance.py`, banner contract test; ADJUDICATED: the
     full flip set across the 4 v0.1.58 pin files (enumerated cases). No `specs/backlog/**`.
+  - **DONE-evidence:**
+    - **Fix (FR9):** `infrastructure/workspace_guardrail.py` — NEW `_CANONICAL_AGENTS_BANNER` module constant (fixed
+      literal = the `public/data/AGENTS.md` banner block) + `_carries_canonical_banner()`; `_install_guardrail_pair` gains
+      `_write_consumer_agents` (three-way: absent→create+`[ok]`; banner-match→restore+`[updated]`; no-banner→`[foreign]
+      — left untouched`) + `_write_consumer_claude` (sibling-follows-fate: written only when AGENTS created/restored; a
+      foreign non-stub CLAUDE.md is `[foreign]` untouched; AGENTS foreign ⇒ no CLAUDE.md drop). `_doctor_guardrail_pair`
+      gains `_check_consumer_agents` (absent→`[missing]`; no-banner→`[foreign]`; banner→`[ok]`/`[drift]`) + PAIRED
+      CLAUDE.md `[foreign]` when AGENTS.md is `[foreign]` (Ruling 16 → `public doctor` exits 0). Self-repo skip + root
+      (lib-owned) semantics unchanged. Constant re-exported via `public_assets`.
+    - **RED capture (bug reproducing, via `git stash` of the fix):** a registered consumer with a hand-authored
+      (no-banner) `AGENTS.md` → pre-fix `public install` → `survived byte-identical: False`, `CLAUDE.md dropped: True`,
+      install line `[updated] .../repos/game/AGENTS.md (overwrote divergent workspace-law copy)`, doctor
+      `['[ok] repos/game:AGENTS.md', '[ok] repos/game:CLAUDE.md']` (masking the clobber). Post-fix (GREEN): survived
+      `True`, no CLAUDE.md, `[foreign] ... — left untouched`, doctor `['[foreign] repos/game:AGENTS.md', '[foreign]
+      repos/game:CLAUDE.md']`.
+    - **NEW tests:** `tests/unit/infrastructure/test_consumer_fanout_provenance.py` (8 — three-way install + CLAUDE
+      pairing + AC-14 registered-fixture paired-`[foreign]` + `public doctor` exit-0 proxy + drift/ok);
+      `tests/contract/test_agents_banner_constant_matches_public_data.py` (2 — byte-equality of the constant vs the
+      shipped banner block).
+    - **AC-11(g) sabotage (capture → revert):** `_carries_canonical_banner` → `return True` (drop the discriminator) ⇒
+      `test_hand_authored_consumer_agents_survives_untouched` AND `test_doctor_pair_foreign_for_hand_authored_repo_exits_zero`
+      FAIL against the REGISTERED fixture (foreign file clobbered). Reverted.
+    - **FULL FLIP-SET adjudication (per-case, deliberate Ruling-L amendment — recorded, never silent):**
+
+      | file | case | flip | how |
+      |---|---|---|---|
+      | `test_consumer_fanout.py` | `test_doctor_reports_ok_for_fresh_consumer`→`..._foreign_for_fresh_bannerless_consumer` | `[ok]`→`[foreign]` | bannerless source; assert `[foreign]` |
+      | `test_consumer_fanout.py` | `test_doctor_flags_drift_for_stale_consumer`→`..._flags_foreign_for_bannerless_consumer` | `[drift]`→`[foreign]` | bannerless stale; assert `[foreign]` |
+      | `test_consumer_fanout.py` | `test_divergent_consumer_root_restored_with_updated_line` | keep `[updated]` | re-fixture consumer content WITH `_CANONICAL_AGENTS_BANNER` |
+      | `test_workspace_guardrail_pair.py` | Case 6 `test_doctor_four_line_output` | `[ok]`→`[foreign]` (parity flip) | root `[ok]` + consumer pair `[foreign]` (QA-1 misattribution corrected) |
+      | `test_public_assets.py::TestInstallConsumerReposGuardrailPair` | `test_force_false_overwrites_divergent_consumer_with_updated_line` (@L748) | keep `[updated]` | re-fixture source+stale-consumer WITH the banner |
+      | `test_public_doctor_parity.py` | `test_doctor_emits_four_labels_with_one_consumer` | `[ok]`→`[foreign]` + PAIRED CLAUDE.md `[foreign]` | bannerless source; assert root `[ok]` + consumer pair `[foreign]` |
+
+    - **Frozen v0.1.50 no-steal suite:** zero-diff confirmed (`git diff` on `test_lock_steal.py` + `test_lease*.py` = 0
+      lines). **Goldens:** unchanged this wave (the fan-out targets CONSUMER repos, not self-repo staging).
+    - Gates: `ruff format --check` + `ruff check --no-cache` + `mypy --strict` (312 files, 0 issues) + `lint-imports`
+      **8 kept / 0 broken** (guardrail edit is same-layer infra) + **full unpiped `pytest` = 4667 passed, 17 skipped, 0
+      failed**. Commit `fix(T-60-45): ...` (bug id `public-install-clobbers-consumer-repo-agents-md` in the body).
 
 ## W5 — per-pack sandboxed E2E (qa-engineer)
 

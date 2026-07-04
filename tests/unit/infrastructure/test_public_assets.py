@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
+    _CANONICAL_AGENTS_BANNER,
     _CLAUDE_MD_STUB,
     FileSystemPublicAssetManager,
     _atomic_write_text,
@@ -748,16 +749,24 @@ class TestInstallConsumerReposGuardrailPair:
     def test_force_false_overwrites_divergent_consumer_with_updated_line(
         self, tmp_path: Path
     ) -> None:
-        """force=False: a divergent CONSUMER copy is restored to canonical and
-        reported with the DISTINCT [updated] line (Ruling L / A5), not a silent
-        [ok] (the workspace-root pair keeps [ok]; consumer roots are lib-owned).
+        """force=False: a divergent but BANNER-BEARING (lib-owned) CONSUMER copy is restored
+        to canonical and reported with the DISTINCT [updated] line (Ruling L / A5), not a
+        silent [ok].
+
+        v0.1.60 FR9 amendment: the [updated] restore path is now gated on the provenance
+        banner — re-fixtured WITH ``_CANONICAL_AGENTS_BANNER`` in both source and the stale
+        consumer copy to keep the [updated] classification (a bannerless divergent copy is now
+        [foreign], left untouched — see ``test_consumer_fanout_provenance.py``).
         """
-        src = _make_source_file(tmp_path, "# NEW\n")
+        new_body = _CANONICAL_AGENTS_BANNER + "\n# NEW\n"
+        src = _make_source_file(tmp_path, new_body)
         consumer = _add_marker_consumer(tmp_path, "my-repo")
-        (consumer / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
+        (consumer / "AGENTS.md").write_text(
+            _CANONICAL_AGENTS_BANNER + "\n# OLD\n", encoding="utf-8"
+        )
         installed: list[str] = []
         _install_consumer_repos_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
+        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == new_body
         assert any(
             e.startswith("[updated]")
             and "overwrote divergent workspace-law copy" in e

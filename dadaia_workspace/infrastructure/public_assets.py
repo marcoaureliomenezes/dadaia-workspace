@@ -98,7 +98,9 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  #
 )
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
+    _CANONICAL_AGENTS_BANNER,
     _CLAUDE_MD_STUB,
+    _carries_canonical_banner,
     _consumer_repos_for_root,
     _doctor_guardrail_pair,
     _install_consumer_repos_guardrail_pair,
