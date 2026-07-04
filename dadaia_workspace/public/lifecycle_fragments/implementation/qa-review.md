@@ -4,7 +4,7 @@ role: qa-engineer
 workflow: implementation
 step: qa_review
 static_inputs: []
-dynamic_inputs: [spec_criteria, plan_test_strategy, change_diff, test_evidence]
+dynamic_inputs: [spec_criteria, plan_test_strategy, change_diff, test_evidence, quality_assurance_atom]
 output_schema: qa-review-verdict-v1
 max_context_policy: exact-files-only
 ---

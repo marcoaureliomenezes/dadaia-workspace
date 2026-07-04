@@ -17,6 +17,7 @@ The assertion channel is the persisted ``LifecycleRun.workflow_policy`` via
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,22 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_BOX_CHARS = "│╭╮╰╯─"
+
+
+def _norm_stderr(output: str) -> str:
+    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
+
+    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
+    env-dependent width, splitting ``No such option: --model`` across borders;
+    locally (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace.
+    """
+    text = _ANSI_RE.sub("", output)
+    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
+    return re.sub(r"\s+", " ", text)
+
 
 _runner = CliRunner()
 _RELEASE = "v0.1.56"
@@ -179,11 +196,14 @@ def test_verb_rejects_raw_step_model(
 
 
 @pytest.mark.parametrize("subcmd", [row[1] for row in _VERBS], ids=_IDS)
-def test_verb_model_flag_is_nonfatal_deprecation(workspace: Path, subcmd: list[str]) -> None:
-    """AC-2(iv) / R-QA-1: ``--model`` warns on stderr; the ``--json`` stdout stays parseable.
+def test_verb_model_flag_is_removed(workspace: Path, subcmd: list[str]) -> None:
+    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
+    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
 
-    Click 8.3 keeps stderr separate from stdout by default (the removed ``mix_stderr=False``),
-    so ``result.stderr`` isolates the warning and ``result.stdout`` stays clean JSON.
+    ``--step-model <profile-id>`` (D-3) is the sole model-selection surface; the profile-id
+    resolution + raw-rejection are covered by ``test_verb_persists_resolver_derived_snapshot``
+    and ``test_verb_rejects_raw_step_model``. ``CliRunner`` takes NO ``mix_stderr`` kwarg
+    (removed in Click 8.2; the installed 8.4.1 ``TypeError``s on it).
     """
     result = _runner.invoke(
         app,
@@ -199,10 +219,10 @@ def test_verb_model_flag_is_nonfatal_deprecation(workspace: Path, subcmd: list[s
             "--json",
         ],
     )
-    assert "--model is deprecated" in result.stderr
-    assert "--step-model" in result.stderr
-    # The warning is NOT on stdout — the JSON payload parses cleanly.
-    json.loads(result.stdout)
+    assert result.exit_code == 2
+    assert "No such option: --model" in _norm_stderr(result.stderr)
+    # Q4: the UsageError is on stderr — stdout stays empty (no partial JSON leaks).
+    assert result.stdout == ""
 
 
 def test_release_define_threads_resolved_model_into_request(

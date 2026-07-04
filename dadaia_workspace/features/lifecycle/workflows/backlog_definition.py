@@ -1,13 +1,16 @@
 """Backlog-definition workflow body — the epic §4 sequence on fragments + Python gates (R2).
 
-Mirrors :mod:`release_definition` field-for-field: a ``_SEQUENCE`` of frozen step
-dataclasses + a workflow class whose ``run()`` folds each model fragment's ``static_inputs``
-into a cacheable :class:`PromptPrefix`, selects dynamic context per fragment, builds the
-suffix via :func:`build_fragment_suffix`, runs the worker on the injected
-:class:`RuntimeFactory`, reads the Python-owned typed gate, and advances only on success.
+Shares the pure fragment-assembly helpers with the four handoff-ledger bodies via
+:class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate._FragmentAssemblyMixin`
+(v0.1.57 FR1) — the ``run()`` folds each model fragment's ``static_inputs`` into a cacheable
+:class:`PromptPrefix`, selects dynamic context per fragment, builds the suffix via
+:func:`build_fragment_suffix`, runs the worker on the injected :class:`RuntimeFactory`, reads
+the Python-owned typed gate, and advances only on success.
 
-What is different from release-definition is the **Python-disposing** steps that this
-workflow owns directly — the linchpin of the epic. Python decides these gates with the R1
+What is different from the handoff-ledger bodies is the **Python-disposing** steps this
+workflow owns directly (the linchpin of the epic) — so it is a *structural outlier* that mixes
+in only the assembly helpers rather than joining the full ``FragmentGateWorkflow`` base
+(Ruling C: it has no handoff-ledger data plane). Python decides these gates with the R1
 machinery, never on model say-so:
 
 * **1b ``subject_bind``** — binds every proposed subject through the R1 canonical-subject
@@ -22,9 +25,9 @@ machinery, never on model say-so:
   of the backlog; blocks on any ``DUPLICATE``/``DIVERGENT_CONFLICT`` in the result.
 
 The model steps (1 ``intake_grill``, 4 ``conflict_resolution_grill`` when it runs, 5
-``backlog_author``) run a worker through the injected runtime and read the same typed gate
-as release-definition. A blocked step stops the sequence with a ``BlockedState``; the terminal
-success advances the run to RELEASE_DEFINITION (the next lifecycle phase).
+``backlog_author``) run a worker through the injected runtime and read the same typed gate as
+the handoff-ledger bodies. A blocked step stops the sequence with a ``BlockedState``; the
+terminal success advances the run to RELEASE_DEFINITION (the next lifecycle phase).
 """
 
 from __future__ import annotations
@@ -37,7 +40,6 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
-    GateEvidenceKind,
     GateVerdict,
     LifecyclePhase,
     LifecycleRun,
@@ -63,23 +65,16 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     record_injected_context,
     record_prompt_composition,
 )
-from dadaia_workspace.features.lifecycle.context_selector import (
-    ContextSelector,
-    MaxContextPolicy,
-    SelectionAudit,
-    StaticInput,
-)
+from dadaia_workspace.features.lifecycle.context_selector import ContextSelector
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
-from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
 from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
-    FragmentBundle,
     LifecyclePromptBuilder,
     PromptPrefix,
-    PromptScope,
     build_fragment_suffix,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflows._fragment_gate import _FragmentAssemblyMixin
 
 __all__ = [
     "AuthoredItem",
@@ -171,8 +166,9 @@ class BacklogStep:
     shared_fragment_ids: tuple[str, ...] = ()
     runtime_kind: AgentRuntimeKind | None = None
     # Governance-resolved concrete model for this step (v0.1.56 / FR1). ``apply_resolved_policy``
-    # threads the resolved snapshot model here; ``_scope`` forwards it to the request so the
-    # adapter runs the policy-selected model. Additive-optional, mirroring ``PipelineStep``.
+    # threads the resolved snapshot model here; the shared mixin ``_scope`` forwards it to the
+    # request so the adapter runs the policy-selected model. Additive-optional, mirroring
+    # ``PipelineStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
 
@@ -247,8 +243,15 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
 )
 
 
-class BacklogDefinitionWorkflow:
-    """Run the epic §4 backlog-definition sequence with fragment prompts + Python gates."""
+class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
+    """Run the epic §4 backlog-definition sequence with fragment prompts + Python gates.
+
+    Mixes in :class:`_FragmentAssemblyMixin` for the pure fragment-assembly helpers (v0.1.57
+    FR1) and keeps its own kind-based dispatch + Python-disposing steps. The converged mixin
+    ``_scope`` now threads ``model_profile`` / ``resolved_model`` — before FR1 this body's
+    ``_scope`` dropped both although ``BacklogStep`` carries them (grill Problem #8), so its
+    worker ran on the wrong model.
+    """
 
     def __init__(
         self,
@@ -410,9 +413,9 @@ class BacklogDefinitionWorkflow:
         * else, the default offline/``FAKE`` path keeps :func:`no_downgrade` — no model call,
           a shared-anchor differing-change pair stays ``DIVERGENT_CONFLICT`` (existing
           behavior, existing tests unchanged);
-        * else (a real model runtime is wired AND the step names ``conflict_scan``), return
-          the model-backed consult. ``classify`` calls it ONLY on the differing-change branch,
-          so the worker is consulted on exactly the shared-anchor differing-change pairs.
+        * else (a real model runtime is wired AND the step names ``conflict_scan``), return the
+          model-backed consult. ``classify`` calls it ONLY on the differing-change branch, so
+          the worker is consulted on exactly the shared-anchor differing-change pairs.
         """
         if self._downgrade is not no_downgrade:
             return self._downgrade
@@ -424,10 +427,10 @@ class BacklogDefinitionWorkflow:
         """Return a model-backed ``downgrade`` callable that consults ``conflict_scan``.
 
         The returned callable runs the worker on the ``conflict_scan`` fragment for the one
-        differing shared anchor and maps **only** a parsed ``OVERLAP``/``SUPERSEDES`` verdict
-        to a :class:`Verdict`; anything else or unparseable -> ``None`` (the WS-3 wrapper).
-        Combined with the classifier clamp (T-43-6b) this is defence-in-depth: the consult can
-        narrow a conflict's name but can never upgrade an ``UNRELATED`` or mask a conflict.
+        differing shared anchor and maps **only** a parsed ``OVERLAP``/``SUPERSEDES`` verdict to
+        a :class:`Verdict`; anything else or unparseable -> ``None`` (the WS-3 wrapper). Combined
+        with the classifier clamp (T-43-6b) this is defence-in-depth: the consult can narrow a
+        conflict's name but can never upgrade an ``UNRELATED`` or mask a conflict.
         """
         assert step.fragment_id is not None
         fragment = self._loader.load_fragment(step.fragment_id)
@@ -542,7 +545,7 @@ class BacklogDefinitionWorkflow:
             return self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
         return self._still_running(run, step.label), self._ok_sr(step)
 
-    # -- model step (mirrors release_definition) ------------------------
+    # -- model step (mirrors the handoff-ledger bodies) -----------------
 
     def _run_model_step(
         self, run: LifecycleRun, step: BacklogStep
@@ -652,76 +655,3 @@ class BacklogDefinitionWorkflow:
     @staticmethod
     def _blocked_sr(step: BacklogStep, blocked: BlockedState) -> BacklogStepResult:
         return BacklogStepResult(label=step.label, accepted=False, kind=step.kind, blocked=blocked)
-
-    # -- static-input injection (folded into the cacheable prefix) ------
-
-    def _prefix_with_static_inputs(self, sequence: tuple[BacklogStep, ...]) -> PromptPrefix | None:
-        resolved = self._collect_static_inputs(sequence)
-        present = [item for item in resolved if item.present]
-        if not present:
-            return self._prefix
-        sections: dict[str, str] = {}
-        if self._prefix is not None and self._prefix.text:
-            sections["release-context"] = self._prefix.text
-        for item in present:
-            sections[f"static-input:{item.ref}"] = item.content
-        return PromptPrefix.from_sections(sections)
-
-    def _collect_static_inputs(self, sequence: tuple[BacklogStep, ...]) -> tuple[StaticInput, ...]:
-        seen: set[str] = set()
-        out: list[StaticInput] = []
-        for step in sequence:
-            if step.fragment_id is None:
-                continue
-            fragment = self._loader.load_fragment(step.fragment_id)
-            for declared in fragment.static_inputs:
-                ref = declared.strip().lstrip("/")
-                if ref in seen:
-                    continue
-                seen.add(ref)
-                out.append(self._selector.resolve_static_input(declared))
-        return tuple(out)
-
-    # -- assembly helpers -----------------------------------------------
-
-    def _fragment_bundle(
-        self, step: BacklogStep, fragment: Fragment, shared: tuple[Fragment, ...]
-    ) -> FragmentBundle:
-        return FragmentBundle(
-            fragment_id=fragment.id,
-            role=step.role,
-            body=fragment.body,
-            output_schema=fragment.output_schema,
-            shared_bodies=tuple(frag.body for frag in shared),
-            shared_ids=tuple(frag.id for frag in shared),
-        )
-
-    def _select_context(self, step: BacklogStep, fragment: Fragment) -> SelectionAudit:
-        policy = MaxContextPolicy.parse(fragment.max_context_policy)
-        return self._selector.select_all(
-            step.label,
-            fragment.dynamic_inputs,
-            policy,
-            fragment_ids=(fragment.id, *step.shared_fragment_ids),
-        )
-
-    @staticmethod
-    def _render_selection(audit: SelectionAudit) -> str:
-        blocks = [
-            f"### {result.name}\n{result.content}".rstrip()
-            for result in audit.results
-            if result.content.strip()
-        ]
-        return "\n\n".join(blocks)
-
-    def _scope(self, step: BacklogStep, run_id: str, suffix: str) -> PromptScope:
-        return PromptScope(
-            role=step.role,
-            context=self._context,
-            release_id=self._release_id,
-            task_id=f"{run_id}:{step.label}",
-            prompt=suffix,
-            allowed_paths=(f".dadaia/handoff/{self._context}/**",),
-            required_evidence=(GateEvidenceKind.HANDOFF,),
-            persona=resolve_persona_for_role(step.role),
-        )

@@ -24,7 +24,7 @@ fragments and are skipped by discovery and validation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import DadaiaError
@@ -89,10 +89,20 @@ _STR_KEYS = frozenset({"id", "role", "workflow", "step", "output_schema", "max_c
 #: Keys whose value must be a ``list`` of ``str``.
 _LIST_KEYS = frozenset({"static_inputs", "dynamic_inputs"})
 
+#: Optional keys whose value, when present, must map ``str`` → ``str`` (v0.1.57 FR3). Kept
+#: separate from ``_LIST_KEYS`` so the required list-key validation is untouched.
+_MAP_KEYS = frozenset({"input_policies"})
+
 
 @dataclass(frozen=True)
 class Fragment:
-    """A loaded, validated lifecycle fragment."""
+    """A loaded, validated lifecycle fragment.
+
+    ``input_policies`` (v0.1.57 FR3) is an additive-optional per-input ``max_context_policy``
+    override map (input name → policy) that :meth:`ContextSelector.select_all` consumes for
+    per-name resolution; absent in every shipped fragment (default ``{}``), so a fragment that
+    declares none is byte-identical to the pre-FR3 behaviour.
+    """
 
     id: str
     role: str
@@ -104,6 +114,7 @@ class Fragment:
     max_context_policy: str
     body: str
     path: Path
+    input_policies: dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +141,7 @@ class FragmentLoader(FrontmatterDocLoader):
     _REQUIRED_KEYS = _REQUIRED_KEYS
     _STR_KEYS = _STR_KEYS
     _LIST_KEYS = _LIST_KEYS
+    _MAP_KEYS = _MAP_KEYS
 
     def __init__(self, root: Path | None = None) -> None:
         self._root = root if root is not None else _default_root()
@@ -191,11 +203,15 @@ class FragmentLoader(FrontmatterDocLoader):
         meta, body = self._split_frontmatter(text, path)
         self._validate_metadata(meta, path)
         self._lint_body(body, path)
-        # _validate_metadata has proven the list keys are list[str].
+        # _validate_metadata has proven the list keys are list[str] and any map key is
+        # dict[str, str].
         static_inputs = meta["static_inputs"]
         dynamic_inputs = meta["dynamic_inputs"]
         assert isinstance(static_inputs, list)
         assert isinstance(dynamic_inputs, list)
+        raw_policies = meta.get("input_policies", {})
+        assert isinstance(raw_policies, dict)
+        input_policies = {str(name): str(policy) for name, policy in raw_policies.items()}
         return Fragment(
             id=str(meta["id"]),
             role=str(meta["role"]),
@@ -207,6 +223,7 @@ class FragmentLoader(FrontmatterDocLoader):
             max_context_policy=str(meta["max_context_policy"]),
             body=body,
             path=path,
+            input_policies=input_policies,
         )
 
 

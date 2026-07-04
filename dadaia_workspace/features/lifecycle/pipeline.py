@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import Field, dataclass, replace
+from pathlib import Path
 from typing import Any, ClassVar, Protocol
 
 from dadaia_workspace.core.harness_models import (
@@ -62,6 +63,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     PromptScope,
     build_fragment_suffix,
 )
+from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
 
@@ -159,6 +161,7 @@ class LifecyclePipeline:
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         handoff_resolver: WorkflowHandoffResolver | None = None,
         max_review_retries: int = 2,
+        specs_dir: Path | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -193,6 +196,31 @@ class LifecyclePipeline:
         # role with no persona atom resolve to ``None`` (no persona block).
         self._persona_loader = persona_loader or PersonaLoader()
         self._context_selector = context_selector
+        # The active context's ``specs/`` tree (v0.1.57 FR2 / A1). Wired by
+        # ``build_lifecycle_pipeline`` from ``workspace_root + context`` so the declarative
+        # role→atom map resolves atoms via a light direct read — independent of the (absent)
+        # context selector, whose ``implementation.*`` fragment inputs are unregistered. When
+        # ``None`` (a fixture-constructed pipeline) no role atom is injected: the map is inert
+        # only when the surface is deliberately un-wired, never in the real pipeline path.
+        self._specs_dir = specs_dir
+
+    def _inject_role_atoms(
+        self, run: LifecycleRun, step: PipelineStep, scope: PromptScope
+    ) -> tuple[LifecycleRun, PromptScope]:
+        """Append the step role's mapped memory atom(s) to *scope*'s prompt + record their refs.
+
+        Delegates to the single :func:`inject_role_atoms` helper (never a copy of the map/read
+        logic). Returns the (possibly unchanged) run + a scope whose prompt carries the atom
+        block(s); a fixture pipeline with no ``specs_dir`` is byte-identical (no injection).
+        """
+        run, prompt = inject_role_atoms(
+            run=run,
+            step_label=step.label,
+            role=step.role,
+            specs_dir=self._specs_dir,
+            prompt=scope.prompt,
+        )
+        return run, replace(scope, prompt=prompt)
 
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
         if not steps:
@@ -213,8 +241,12 @@ class LifecyclePipeline:
         results: list[PipelineStepResult] = []
         for step in steps:
             runtime = self._runtime_factory(step.runtime_kind)
+            # FR2 (A1): resolve the step role's mapped atom(s), append them to the prompt, and
+            # record the atom refs on the run BEFORE the worker call — the state machine's
+            # ``replace``-based transition preserves ``injected_context`` onto ``decision.run``.
+            run, scope = self._inject_role_atoms(run, step, self._scope(step, run_id))
             built = self._prompt_builder.build(
-                self._scope(step, run_id),
+                scope,
                 runtime=runtime.runtime_kind(),
                 prefix=self._prefix,
             )
@@ -231,7 +263,10 @@ class LifecyclePipeline:
             )
             run = decision.run
             self._run_store.save(run)
-            accepted = run.blocked is None
+            # FR5 (A5): the accept signal is the state machine's dual-signal contract, NOT
+            # ``run.blocked is None`` — the latter read ``True`` on an illegal transition
+            # (run unchanged, no blocked state) and wrongly advanced the ladder.
+            accepted = decision.advanced
             results.append(
                 PipelineStepResult(
                     label=step.label,

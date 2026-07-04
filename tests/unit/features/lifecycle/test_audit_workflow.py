@@ -133,12 +133,13 @@ def test_audit_disposition_gate_blocks_on_incomplete_handoff_graph(tmp_path: Pat
         current_step="triage",
         blocked=None,
     )
-    block = wf._graph_completeness_block(run, gate_step)
+    # v0.1.57 FR1: the base iterates the RUN-SCOPED sequence (threaded), never a module-global.
+    block = wf._graph_completeness_block(run, gate_step, _SEQUENCE)
     assert block is not None
     assert "graph incomplete" in block.reason
     # And with no resolver wired, the gate degrades to a no-op (no ledger to check).
     wf_no_resolver = _workflow(tmp_path, None)
-    assert wf_no_resolver._graph_completeness_block(run, gate_step) is None
+    assert wf_no_resolver._graph_completeness_block(run, gate_step, _SEQUENCE) is None
 
 
 def test_audit_body_records_injected_fragments_and_context(tmp_path: Path) -> None:

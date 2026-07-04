@@ -73,6 +73,9 @@ class FrontmatterDocLoader:
     * ``_REQUIRED_KEYS`` — the required frontmatter keys, in declaration order.
     * ``_STR_KEYS`` — keys whose value must be a non-empty ``str``.
     * ``_LIST_KEYS`` — keys whose value must be a ``list`` of ``str``.
+    * ``_MAP_KEYS`` — **optional** keys whose value, when present, must be a ``dict`` mapping
+      ``str`` → ``str`` (additive-optional; absence is never an error). Kept distinct from
+      ``_LIST_KEYS`` so the required list-key validation is untouched (v0.1.57 FR3).
 
     The base provides ``_split_frontmatter``, ``_validate_metadata``, and
     ``_lint_body``; concrete loaders compose them in their own ``_load_path``.
@@ -84,6 +87,7 @@ class FrontmatterDocLoader:
     _REQUIRED_KEYS: tuple[str, ...] = ()
     _STR_KEYS: frozenset[str] = frozenset()
     _LIST_KEYS: frozenset[str] = frozenset()
+    _MAP_KEYS: frozenset[str] = frozenset()
 
     # -- frontmatter split ----------------------------------------------------
 
@@ -143,6 +147,20 @@ class FrontmatterDocLoader:
                     raise self._ERROR(
                         f"{path}: {self._NOUN} metadata key '{key}' must contain only strings, "
                         f"found {type(item).__name__}"
+                    )
+        for key in self._MAP_KEYS:
+            if key not in meta:
+                continue  # optional — absence is never an error
+            value = meta[key]
+            if not isinstance(value, dict):
+                raise self._ERROR(
+                    f"{path}: {self._NOUN} metadata key '{key}' must be a mapping, "
+                    f"got {type(value).__name__}"
+                )
+            for map_key, map_value in value.items():
+                if not isinstance(map_key, str) or not isinstance(map_value, str):
+                    raise self._ERROR(
+                        f"{path}: {self._NOUN} metadata key '{key}' must map strings to strings"
                     )
 
     # -- harness-universal token lint -----------------------------------------
