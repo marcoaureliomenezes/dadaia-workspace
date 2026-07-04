@@ -242,7 +242,7 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W4 — FR4 Layer-1 ruling (ratify self-pull; verifiable)
 
-- [ ] T-57-40 Ratify self-pull; lock ctx_inject byte-identical; verifiability via Layer-2 refs.
+- [x] T-57-40 Ratify self-pull; lock ctx_inject byte-identical; verifiability via Layer-2 refs.
   **AC-12 ledger** — SURVIVING: `hooks/ctx_inject.py` (byte-identical, no code change); NEW/updated:
   a byte-identical `_build_memory` golden/assert. No `specs/backlog/**` staged. Checklist:
   - **Ratify**: no `ctx_inject.py` code change (constitution/architecture/QA stay self-pull-only at L1).
@@ -255,6 +255,17 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
   - **Tests — AC-7** ctx_inject bootstrap byte-identical; existing `test_ctx_inject.py` /
     `test_ctx_inject_digest.py` green. **(Q5) AC-10(f) evidence:** append any atom to `_build_memory`'s
     L1 bootstrap ⇒ AC-7 byte-identical assert FAILS → reverted. AC-12 ledger. NO `specs/backlog`.
+  - **DONE evidence.** NEW: `tests/unit/hooks/test_ctx_inject_bootstrap_lock.py` (5 tests; AC-7
+    byte-identical golden on `_build_memory` + no-host-path + forbidden-atom-exclusion + digest-field
+    + no-memory-dir). **Ratify verified:** `git diff main..HEAD -- dadaia_workspace/hooks/ctx_inject.py`
+    is EMPTY — zero code change to the hook. **AC-10(f) evidence** (Q5): appended
+    `architecture.md` to `_build_memory`'s L1 bootstrap ⇒
+    `pytest tests/unit/hooks/test_ctx_inject_bootstrap_lock.py::test_build_memory_bootstrap_is_byte_identical_golden`
+    FAILED (byte-identical assert) ⇒ `git checkout dadaia_workspace/hooks/ctx_inject.py` (zero diff
+    re-verified). **AC-12 ledger** — SURVIVING: `hooks/ctx_inject.py` (byte-identical, zero code change,
+    `git diff main..HEAD` empty); NEW: the lock test module. Gates green: `ruff format --check`,
+    `ruff check --no-cache`, `mypy --strict dadaia_workspace/` (305 files), `lint-imports --no-cache`
+    (8 kept / 0 broken), full unpiped `pytest -p no:cacheprovider` (4466 passed, 17 skipped).
 
 ## W5 — FR5 bug fix + FR6 `--model` removal
 
