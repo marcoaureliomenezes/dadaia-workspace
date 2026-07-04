@@ -28,7 +28,10 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W1 — FR1 `FragmentGateWorkflow` base + assembly mixin (golden-first)
 
-- [ ] T-57-10 Capture + commit the behaviour goldens BEFORE any extraction.
+- [x] T-57-10 Capture + commit the behaviour goldens BEFORE any extraction.
+  **Done (evidence):** `tests/unit/features/lifecycle/test_fragment_gate_goldens.py` (7 passed) + 6 committed
+  goldens `_golden/gate_{release_definition,audit,research,bug_report,backlog_definition,pipeline}.json`;
+  Q1 model fields excluded (0 `model_profile`/`resolved_model` keys), no abs paths leaked, deterministic.
   **AC-12 ledger** — NEW: `tests/unit/features/lifecycle/test_fragment_gate_goldens.py` + goldens under
   `tests/unit/features/lifecycle/_golden/`. No `specs/backlog/**` staged. Checklist:
   - Run `release_definition`, `audit`, `research`, `bug_report`, `backlog_definition`, and the
