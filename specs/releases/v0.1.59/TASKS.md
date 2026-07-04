@@ -462,7 +462,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W6 — FR7 e2e extension + gates + ship
 
-- [ ] T-59-60 Extend the Playwright suite, run full gates + self-hosting verify, then ship. Checklist:
+- [-] T-59-60 Extend the Playwright suite, run full gates + self-hosting verify, then ship. Checklist:
   - **Extend `tests/e2e/panel/` — button smoke ONLY (the FR3 width spec is authored in W3, Q2/Option A, NOT
     here).** Add a restyled-button smoke assertion (computed `border-radius`/padding non-default — the controls
     are styled, not browser-default). Artifacts via `PLAYWRIGHT_OUTPUT_DIR`/`PLAYWRIGHT_REPORT_DIR` →
@@ -493,6 +493,50 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
     (incl. the `e2e-panel` job); PR; merge. No dead anchor this release → **no SHIP-time backlog archival** (the
     surviving anchor is archived at CLOSURE). Verify no W1–W5 commit staged `specs/backlog`. *(PE runs no shell —
     surfaces the npm/Playwright + `server register` + git commands to PM/operator or requests devops-engineer.)*
+
+  - **W6 ENGINEERING EVIDENCE (T-59-60 engineering sub-items DONE 2026-07-04, software-engineer — marker stays
+    `[-]`; the ship ladder QA/security-gate → push → PR → merge completes it).**
+    - **FR7 button smoke (NEW `tests/e2e/panel/button-smoke.spec.ts`, 2 tests, GREEN).** Reads the computed
+      `border-radius`/padding of the three restyled control families and asserts token-driven values a
+      browser-default `<button>` (padTop≈1px, padLeft≈6px, radius 0px) does NOT carry: (1) `.nav-tab`/`.theme-btn`/
+      `.runtime-btn` padTop>4 AND padLeft>8 (shipped: nav-tab 9.6/16, theme+runtime 6.4/12); (2) `.theme-btn`
+      radius>4 (var(--radius-pill)=9999px pill) + `.runtime-btn` radius>4 (var(--control-radius)=6px). Small +
+      honest; artifacts via `PLAYWRIGHT_OUTPUT_DIR`/`PLAYWRIGHT_REPORT_DIR` → `.dadaia/tmp/software-engineer/20260704/pw-w6/`.
+    - **AC-9 mutation-sanity (button smoke sabotage → FAIL → revert):** edited `.theme-btn` in `structure.py`
+      (`padding: 0; border-radius: 0;`) ⇒ BOTH button-smoke tests FAILED (`.theme-btn :: padTop=0 padLeft=0
+      radius=0` — "control is unstyled" / "pill styling missing") ⇒ reverted `git checkout -- structure.py`
+      (grep SABOTAGE → 0; `border-radius: var(--radius-pill)` restored at line 348). No production file left changed.
+    - **AC-8 full local GH-only Playwright panel suite — 53 passed / 1 skipped (54 total, 13 spec files, 58.1s).**
+      Harness: venv-python panel on :4993 via `PANEL_WEB_SERVER_COMMAND`. Green specs: `response-guard`
+      (E2E-GUARD-01/02 — no 4xx/5xx + no console error on the 6-tab tour + memory chip), `theme-switcher`
+      (E2E-THM-01..10 incl. **E2E-THM-09 axe-core zero critical/serious on all 3 themes**), `tab-navigation`
+      (E2E-TAB-01..06), `workflows-tab` + `workflow-policy-editor` + `workflow-policy-harness-toggle`,
+      `sessions-dashboard` (E2E-SES-DASH-01..04), `servers-tab`, `spec-context-tab`/`-operation-journey`,
+      `api-contracts`, the W3 **`header-row-width`** width spec (6 combos), and the NEW **`button-smoke`** (2). The
+      1 skip = the LAN non-loopback IPv4 check (`test_panel.py:345`, no non-loopback addr). The WebServer
+      `BrokenPipeError` in logs = benign telemetry-teardown client-disconnect noise, e2e exit 0.
+    - **AC-10 full local gates:** `ruff format --check` clean (796 files) · `ruff check --no-cache` all passed ·
+      `mypy --strict dadaia_workspace/` 308 files clean · `lint-imports --no-cache` **8 kept / 0 broken** (ignore-cap
+      UNCHANGED — no import edge added) · full **unpiped** `pytest -p no:cacheprovider` **4596 passed / 17 skipped**
+      (exit 0, 447.69s). `dadaia specs doctor` **exit 0** (0 errors, 11 WARN — all pre-existing SPEC-DOC-031
+      backlog slug-mention false-positives, ADR-6 class, not this release). `dadaia backlog doctor` **clean** (exit 0).
+    - **AC-12 self-hosting reconcile:** `git diff -- dadaia_workspace/public/` **EMPTY** (panel is package code, not
+      a projected asset — no re-projection needed) · `dadaia public doctor` **exit 0** with **`[ok] public-privacy`**.
+      **Frozen v0.1.50 no-steal suite zero-diff:** `git diff --name-only main..HEAD -- tests/` matching
+      `lease|gate_policy|spec_context` (excl. `release`) → **none**. **(Q7) repo hygiene:** `git status --short` =
+      only `M specs/releases/v0.1.59/TASKS.md` + `?? tests/e2e/panel/button-smoke.spec.ts`; the `.ruff_cache/` +
+      `.mypy_cache/` gate-run residue (gitignored) removed; no `.pytest_cache/`, no repo-local `.dadaia/`, no
+      `playwright-report/`, no `test-results/`.
+    - **Live-panel + screenshots (ADR-H / server-registration law):** live `dadaia panel --port 3742` (venv dadaia)
+      registered via `dadaia server register --port 3742 --project dadaia-workspace --pid <pid>` — **LEFT RUNNING +
+      REGISTERED** (● running) for PR sign-off (end-of-work dev-server law). **17 operator screenshots** →
+      `.dadaia/tmp/software-engineer/20260704/w6-screenshots/`: all 3 themes full-page (`01-panel-{mint,sage,warm}-1440`);
+      restyled controls (`02-controls-topbar-*`, `03-controls-navtabs-*`, `04-controls-theme-popover-mint`,
+      `06-controls-runtime-switcher-warm`); the Sessions header/control row `05-sessions-row-{theme}-{1024,1440}`
+      across 3 themes × {1024px,1440px} — **all measured single-row=true** (rsTop 127.2 < h2Bottom 159.6, header
+      h 53.4 — no wrap at either width, matching the W3 width-spec invariant).
+    - **AC-11 ledger** — NEW: `tests/e2e/panel/button-smoke.spec.ts`. No production source edited (the `structure.py`
+      sabotage was reverted). No `specs/backlog/**` staged. Verified: no W1–W6 commit staged `specs/backlog`.
 
 ## W7 — closure (CLOSURE phase)
 
