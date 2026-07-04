@@ -79,8 +79,8 @@ def render_index(
     <div class="topbar-wordmark">dadaia<span>&#183;</span>workspace</div>
     <div class="topbar-divider" aria-hidden="true"></div>
     <div class="topbar-subtitle">panel</div>
-    <div class="topbar-right" style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
-    <div class="theme-switcher" style="position:relative;">
+    <div class="topbar-right">
+    <div class="theme-switcher">
       <button id="theme-btn" type="button" class="theme-btn"
         aria-haspopup="menu" aria-expanded="false"
         aria-label="Switch colour theme" aria-controls="theme-menu">

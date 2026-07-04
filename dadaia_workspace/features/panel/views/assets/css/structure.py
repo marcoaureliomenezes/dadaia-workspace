@@ -55,6 +55,22 @@ code {
 .topbar-wordmark span { color: var(--color-accent-dark); }
 .topbar-divider { width: 1px; height: 24px; background: var(--color-border); }
 .topbar-subtitle { color: var(--color-muted); font-size: 0.9rem; }
+
+/* ── Topbar right cluster + theme-switcher anchor (de-inlined v0.1.59 / FR3) ──
+   Replaces the former inline `style=` attributes on .topbar-right and
+   .theme-switcher in views/index.py (CSP-clean, token-anchored — no ad-hoc
+   literals). .topbar-right right-aligns the control cluster inside the flex
+   .topbar; .theme-switcher establishes the positioning context for the
+   absolutely-positioned #theme-menu popover. */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.theme-switcher {
+  position: relative;
+}
 /* ── Navigation tabs ─────────────────────────────── */
 .nav-tabs {
   background: var(--color-surface);
@@ -116,6 +132,30 @@ code {
 }
 .section-header h2 { font-size: 1.15rem; color: var(--color-heading); }
 .section-header p { font-size: 0.88rem; color: var(--color-muted); margin-top: 0.25rem; }
+
+/* ── Single-line header/control row (v0.1.59 / FR3) ──────────────────────────
+   A header that pairs a title with a trailing control (the Sessions tab's
+   <h2> + .runtime-switcher) lays out on ONE line by default. Before this pass the
+   shared .section-header was display:block, so the switcher stacked onto a second
+   line at every width — the operator's "rows breaking onto two or more lines"
+   complaint. Scoped via :has(.runtime-switcher) so the plain title/description
+   headers (Servers, Projects) are left untouched. min-width:0 + ellipsis let a
+   long title shrink and truncate instead of forcing a wrap; the control never
+   shrinks (flex-shrink:0). Responsive at 1024px (the --main cap) and 1440px.
+   Token-anchored; no colour/type/radius literals. */
+.section-header:has(.runtime-switcher) {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-md);
+  min-width: 0;
+}
+.section-header:has(.runtime-switcher) > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Servers section ─────────────────────────────── */
 .refresh-notice {
@@ -453,6 +493,11 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--space-2xs);
+  /* De-inlined from views/sessions.py (v0.1.59 / FR3): the switcher is pushed to
+     the trailing edge of its flex .section-header and never shrinks, so the title
+     ellipsises before the control does. */
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .runtime-btn {

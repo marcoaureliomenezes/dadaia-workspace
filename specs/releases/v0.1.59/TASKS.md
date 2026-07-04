@@ -178,7 +178,7 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
 
 ## W3 — FR3 single-line header / control-row layout (width e2e authored HERE — Q2/Option A)
 
-- [ ] T-59-30 De-inline THREE inline styles + responsive single-line row + RED-first width e2e. Checklist:
+- [x] T-59-30 De-inline THREE inline styles + responsive single-line row + RED-first width e2e. Checklist:
   - **De-inline THREE inline styles (A5)** — move all three into token-anchored CSS classes: (1)
     `views/index.py:82` topbar-right `style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;"`; (2)
     `views/index.py:83` `.theme-switcher style="position:relative;"`; (3) `views/sessions.py:36`
@@ -201,6 +201,59 @@ inline-script edit (Ruling B), no new dependency (Ruling D).
   - **AC-1/AC-2 replay.** AC-11 ledger — EDITED: `views/sessions.py`, `views/index.py` (de-inline 3 styles),
     `views/assets/css/structure.py` / `views/assets/css/sessions.py` (single-line rule); NEW:
     `tests/e2e/panel/<width>.spec.ts`. No `specs/backlog/**` staged.
+  - **W3 EVIDENCE (T-59-30 DONE 2026-07-04, software-engineer).**
+    - **De-inline (A5)** — all THREE inline `style=` attributes removed and replaced by token-anchored CSS
+      classes: (1) `views/index.py:82` `.topbar-right` `margin-left:auto;display:flex;align-items:center;gap:0.5rem;`
+      → `.topbar-right` rule in `structure.py` (`gap: var(--space-sm)`); (2) `views/index.py:83` `.theme-switcher`
+      `position:relative;` → `.theme-switcher` rule in `structure.py`; (3) `views/sessions.py:36`
+      `.runtime-switcher` `margin-left:auto;` → folded into the existing `.runtime-switcher` component rule in
+      `structure.py` (`margin-left: auto; flex-shrink: 0;`). The `.runtime-switcher`/`.theme-switcher`/
+      `[data-runtime-value]`/`[data-theme-value]` DOM-contract selectors are all preserved (Q5) — only `style=`
+      attrs removed, no class renamed. CSP-clean (no `<script>` touched; `_CSP_SCRIPT_HASH_1/2` unchanged).
+    - **Responsive single-line CSS** — new `structure.py` rule `.section-header:has(.runtime-switcher){display:flex;
+      align-items:center;flex-wrap:nowrap;gap:var(--space-md);min-width:0}` + `> h2{min-width:0;overflow:hidden;
+      text-overflow:ellipsis;white-space:nowrap}`. Scoped via `:has()` so the plain title/description headers
+      (Servers, Projects) are untouched — this is the surgical W3 fix, not the W4 layout/IA pass. Token-anchored;
+      no colour/type/radius literals.
+    - **Grep-proof (A5):** `grep -n 'style=' views/index.py views/sessions.py` → ZERO (exit 1, no matches);
+      `grep -c` → `index.py:0`, `sessions.py:0`. Recorded.
+    - **AC-4 width e2e — RED-FIRST, empirically pinned.** NEW spec `tests/e2e/panel/header-row-width.spec.ts`
+      measures the Sessions `#section-sessions .section-header` control row on all 3 themes × {1024px, 1440px}
+      (6 combos), asserting the `.runtime-switcher` shares the `<h2>` band (`rsBox.y < h2Bottom`) AND the header is
+      a single row (`headerBox.height < max(h2,rs)+24`). **PINNED WRAP WIDTH:** the pre-fix wrap is STRUCTURAL, not
+      width-responsive — the pre-fix `.section-header` is `display:block`, so the switcher stacks below the title at
+      EVERY width; RED captured at BOTH 1024px and 1440px (all 6 combos). **RED capture (pre-fix tree, before CSS
+      landed):** all 6 FAILED — e.g. `theme=warm @1024px :: h2 y=127.2 h=28.5 bottom=155.7; runtime-switcher
+      y=155.7 h=42.8; header h=81.9` → `expect(155.7).toBeLessThan(155.7)` FAILS (switcher top == heading bottom =
+      stacked). **GREEN post-fix:** all 6 passed (6.6s). Artifacts under
+      `.dadaia/tmp/software-engineer/20260704/pw-{red,green}-*`.
+    - **AC-9(d) sabotage — RUNNABLE IN W3 (proven):** `sed -i 's/\.section-header:has(\.runtime-switcher) {/
+      .section-header:has(.runtime-switcher-SABOTAGED) {/'` (neutralize the `:has()` single-line rule ⇒ restore the
+      pre-fix wrapping arrangement) ⇒ `header-row-width.spec.ts` FAILED all 6 (`runtime-switcher WRAPS below the
+      heading … h2 bottom=155.7; runtime-switcher y=155.7; header h=81.9`) ⇒ reverted via inverse `sed`
+      (`grep SABOTAGED` → reverted-clean; `.section-header:has(.runtime-switcher)` rule restored at line 146/153).
+    - **AC-1/AC-2 replay + fate ledger (panel unit subset, 180 passed):** `test_api_golden.py` +
+      `api_golden_v0155.json` INVARIANT byte-identical (no `render_api_*` edit); `test_index_dom_contract.py`
+      never re-baselined (theme/runtime switcher selectors preserved — only `style=` attrs dropped);
+      `test_security_headers.py` incl. the W1 CSP equality lock GREEN (no inline-script edit; `_CSP_SCRIPT_HASH_1/2`
+      unchanged); `test_views_index.py` SURVIVES (markers + selectors preserved); `test_control_tokens.py`,
+      `test_palette.py`, `test_panel_css_contrast.py`, `test_theme_switcher.py`, `test_theme_palettes.py`,
+      `test_runtime_switcher_pi.py`, `test_static.py`, `test_views_static.py`, `test_svg_validity.py` all GREEN.
+      **Changed-surface e2e (28 passed):** `header-row-width.spec.ts` (6) + `theme-switcher.spec.ts` (10) +
+      `sessions-dashboard.spec.ts` + `response-guard.spec.ts` + `tab-navigation.spec.ts` — all SURVIVE, selectors
+      preserved. AGENTS_CSS importers untouched (W5 co-edits). No frozen-suite interaction.
+    - **AC-11 ledger** — EDITED: `views/index.py` (de-inline `.topbar-right` + `.theme-switcher` `style=`),
+      `views/sessions.py` (de-inline `.runtime-switcher` `style=`), `views/assets/css/structure.py`
+      (`.topbar-right`/`.theme-switcher` rules + `.section-header:has(.runtime-switcher)` single-line rule +
+      `margin-left:auto`/`flex-shrink:0` on `.runtime-switcher`). `views/assets/css/sessions.py` NEEDED NO EDIT
+      (the single-line rule is structural → `structure.py`). NEW: `tests/e2e/panel/header-row-width.spec.ts`.
+      No `specs/backlog/**` staged.
+    - **Gates:** `ruff format --check` clean (797 files) · `ruff check --no-cache` passed · `mypy --strict` 309
+      files clean · `lint-imports --no-cache` 8 kept/0 broken (ignore-cap UNCHANGED — no import edge) · full unpiped
+      `pytest -p no:cacheprovider` 4596 passed / 17 skipped (exit 0). `git status --short`: no `.pytest_cache/`,
+      `.mypy_cache/`, `.ruff_cache/`, repo-local `.dadaia/`, `playwright-report/`, or `test-results/` (Q7 — the
+      `.mypy_cache/`/`.ruff_cache/` materialized by the gate runs were gitignored + removed); no `public/**` diff
+      (AC-12: panel is package code — no re-projection needed).
 
 ## W4 — FR4 layout / IA hierarchy + density
 
