@@ -37,6 +37,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.models.harness_profile import HarnessProfile
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 pytestmark = pytest.mark.integration
@@ -156,3 +159,140 @@ def test_golden_b_includes_descriptor_stage_lines(tmp_path: Path) -> None:
     doctor = _capture_doctor(tmp_path)
     assert any(ln == "[ok] stage:plugins/frontend-design/pack.json" for ln in doctor), doctor
     assert any(ln == "[ok] stage:plugins/devops/pack.json" for ln in doctor), doctor
+
+
+# ---------------------------------------------------------------------------
+# Projection behaviour (AC-3/AC-4/AC-15) — a synthetic pack BODY seeded into the
+# staged tree. The real W3 pack bodies do not exist yet; the projection MECHANISM
+# is exercised with a controlled fixture (standard integration testing).
+# ---------------------------------------------------------------------------
+
+_PACK = "frontend-design"
+_AGENT = "frontend-engineer"
+_PACK_BODY = """---
+name: frontend-engineer
+description: Frontend engineer plugin agent (synthetic W2 fixture).
+tier: 3
+model: claude-sonnet-4-6
+tools: [Read, Write]
+---
+
+# Frontend Engineer (plugin pack body)
+
+Real browser HTML/CSS/TS/React implementation body — NOT the core stub.
+"""
+
+
+def _staged_workspace_with_pack_body(
+    tmp_path: Path,
+    harnesses: tuple[str, ...] | None = None,
+) -> tuple[Path, FileSystemPublicAssetManager]:
+    """Build a workspace whose staged ``frontend-design`` pack carries a real agent body.
+
+    Optionally writes a harness profile (e.g. claude-only) BEFORE the core install so the
+    projection is profile-scoped. Stages + core-installs (projects the stub), then seeds the
+    pack agent body into the staged tree (simulating the W3 content).
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    if harnesses is not None:
+        states = ws / ".dadaia" / "states"
+        states.mkdir(parents=True)
+        JsonHarnessProfileStore().write(states, HarnessProfile.of(harnesses))
+    mgr = FileSystemPublicAssetManager()
+    mgr.install(ws, target="all")
+    pack_agent = ws / ".dadaia" / "agentic" / "plugins" / _PACK / "agents" / f"{_AGENT}.md"
+    pack_agent.parent.mkdir(parents=True, exist_ok=True)
+    pack_agent.write_text(_PACK_BODY, encoding="utf-8")
+    return ws, mgr
+
+
+def _claude_agent(ws: Path) -> Path:
+    return ws / ".claude" / "agents" / f"{_AGENT}.md"
+
+
+def test_plugin_install_projects_real_body_over_stub(tmp_path: Path) -> None:
+    """AC-3: install_plugin overwrites the core stub with the pack body + records the ledger.
+
+    RED-first: pre-projection-code there was no projection at all (the W1 `_project_pack`
+    seam was a no-op), so `.claude/agents/frontend-engineer.md` stayed the stub.
+    """
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
+    # Pre-install: the projected claude agent is the core stub.
+    assert "[PLUGIN REQUIRED]" in _claude_agent(ws).read_text(encoding="utf-8")
+
+    mgr.install_plugin(ws, _PACK)
+
+    projected = _claude_agent(ws).read_text(encoding="utf-8")
+    assert projected == _PACK_BODY
+    assert "[PLUGIN REQUIRED]" not in projected
+    # Ledger records the pack (not per-harness).
+    ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
+    assert ledger is not None and ledger.plugins == (_PACK,)
+    # Codex toml is the pack render on the sonnet/plugin tier (gpt-5.3-codex), not opus.
+    codex_toml = (ws / ".codex" / "agents" / f"{_AGENT}.toml").read_text(encoding="utf-8")
+    assert 'model = "gpt-5.3-codex"' in codex_toml
+    assert "gpt-5.5" not in codex_toml
+
+
+def test_plugin_install_is_idempotent(tmp_path: Path) -> None:
+    """AC-3: a re-install is a no-op — every projected file is a hash-compare [skip]."""
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
+    mgr.install_plugin(ws, _PACK)
+    lines = mgr.install_plugin(ws, _PACK)
+    assert all(not ln.startswith("[ok]   ") for ln in lines), lines
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+
+
+def test_core_install_keeps_pack_body_precedence(tmp_path: Path) -> None:
+    """AC-4: a following core `install(target=all)` keeps the pack body, not the stub.
+
+    RED-first: pre-precedence-code, a core install re-ran the stub projection over the pack
+    body (the clobber the ledger-read now prevents).
+    """
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
+    mgr.install_plugin(ws, _PACK)
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+
+    mgr.install(ws, target="all", force=True)
+
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+
+
+def test_claude_only_profile_projects_no_codex_orphan(tmp_path: Path) -> None:
+    """AC-15: in a claude-only profile, install_plugin projects only the claude agent."""
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path, harnesses=("claude",))
+    mgr.install_plugin(ws, _PACK)
+
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+    # No .codex/ orphan — the claude-only profile never projects a codex agent.
+    assert not (ws / ".codex" / "agents" / f"{_AGENT}.toml").exists()
+    # The ledger records the pack, not a per-harness selection.
+    ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
+    assert ledger is not None and ledger.plugins == (_PACK,)
+
+
+def test_doctor_reports_installed_pack_ok(tmp_path: Path) -> None:
+    """AC-5: doctor reports [ok] for the projected pack file (and no false drift on the stub)."""
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
+    mgr.install_plugin(ws, _PACK)
+    report = mgr.doctor(ws)
+    assert f"[ok] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
+    # The core loop no longer emits a stub-vs-projection line for the overridden agent.
+    assert f"[drift] claude:agents/{_AGENT}.md" not in report
+
+
+def test_doctor_non_silent_on_stale_pack_file(tmp_path: Path) -> None:
+    """AC-5 + AC-11(c): a stale/absent installed-pack file is never silent."""
+    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
+    mgr.install_plugin(ws, _PACK)
+
+    # Tamper: drift.
+    _claude_agent(ws).write_text("# tampered\n", encoding="utf-8")
+    report = mgr.doctor(ws)
+    assert f"[drift] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
+
+    # Remove: missing.
+    _claude_agent(ws).unlink()
+    report = mgr.doctor(ws)
+    assert f"[missing] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report

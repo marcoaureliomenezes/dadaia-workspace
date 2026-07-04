@@ -24,6 +24,7 @@ from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins, PluginPack
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 app = typer.Typer(help="Install and inspect distributed plugin packs.")
 console = Console()
@@ -81,16 +82,13 @@ def _read_ledger(states_dir: Path) -> InstalledPlugins:
 
 
 def _project_pack(workspace_root: Path, pack: PluginPack, force: bool) -> list[str]:
-    """Project a pack's agents/skills/rules into the runtime projections.
+    """Record the ledger and project a pack's agents/skills/rules into the projections.
 
-    **W1 SEAM (no-op).** In v0.1.60 W1 the ``dadaia plugin`` machinery only validates a pack
-    and records the ledger; the actual profile-scoped projection + stub replacement +
-    projection precedence lands in **W2 (T-60-20)**, wired through
-    ``infrastructure/public_assets.py``. This function is the single, greppable call site W2
-    fleshes out — it deliberately returns no projected lines today so the W1 CLI stays
-    unit-cheap and byte-neutral (golden (a) is unaffected).
+    Delegates to ``FileSystemPublicAssetManager.install_plugin`` (W2, T-60-20): it records
+    the pack in ``installed_plugins.json`` (idempotent) and projects it profile-scoped, with
+    the pack body overwriting the core stub (stub replacement + projection precedence).
     """
-    return []
+    return FileSystemPublicAssetManager().install_plugin(workspace_root, pack.name, force=force)
 
 
 # ---------------------------------------------------------------------------
@@ -123,10 +121,9 @@ def install(
     workspace_root = states_dir.parent.parent
     resolved = available[pack]
 
-    ledger = _read_ledger(states_dir)
-    already_installed = pack in ledger.plugins
-    JsonPluginStore().write(states_dir, ledger.with_added(pack))
+    already_installed = pack in _read_ledger(states_dir).plugins
 
+    # Records the ledger (idempotent) + projects the pack profile-scoped.
     _project_pack(workspace_root, resolved, force)
 
     if already_installed:
@@ -155,13 +152,11 @@ def list_packs() -> None:
 
 @app.command()
 def doctor() -> None:
-    """Report the descriptor status of each installed plugin pack.
-
-    W1 surfaces whether each installed pack still resolves to a packaged descriptor; the
-    per-projected-file drift/missing reporting lands in W2 (T-60-20).
-    """
+    """Report the descriptor + per-projected-file status of each installed plugin pack."""
+    states_dir = _states_dir()
+    workspace_root = states_dir.parent.parent
     available = _available_packs()
-    installed = _read_ledger(_states_dir()).plugins
+    installed = _read_ledger(states_dir).plugins
 
     if not installed:
         console.print("[not-applicable] no plugin packs installed", markup=False)
@@ -176,3 +171,7 @@ def doctor() -> None:
                 style="yellow",
                 markup=False,
             )
+
+    for line in FileSystemPublicAssetManager().doctor_plugins(workspace_root):
+        style = "green" if line.startswith("[ok]") else "yellow"
+        console.print(line, style=style, markup=False)

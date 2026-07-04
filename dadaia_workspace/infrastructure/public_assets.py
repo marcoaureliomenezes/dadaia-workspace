@@ -13,6 +13,7 @@ from typing import Literal
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -46,6 +47,7 @@ from dadaia_workspace.infrastructure.install_helpers import (
     write_generated,
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 
 # Several names below are imported purely for re-export, so tests and other
 # consumers can keep importing them from public_assets after the T-017-11 split.
@@ -84,6 +86,7 @@ from dadaia_workspace.infrastructure.runtime_config import (
 from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
     _parse_agent_frontmatter,
     _parse_write_allowlist,
@@ -93,6 +96,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  #
     _render_codex_agent_toml,
     _render_codex_command_policy_rules,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import map_model
 from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
     _CLAUDE_MD_STUB,
     _consumer_repos_for_root,
@@ -214,6 +218,181 @@ class FileSystemPublicAssetManager:
         states_dir = workspace_root / ".dadaia" / "states"
         profile = JsonHarnessProfileStore().read(states_dir)
         return set(profile.harnesses) if profile is not None else None
+
+    # ------------------------------------------------------------------
+    # Plugin packs (v0.1.60 FR3) — projection, precedence, doctor
+    # ------------------------------------------------------------------
+
+    def _installed_plugins(self, workspace_root: Path) -> tuple[str, ...]:
+        """Return the installed plugin-pack names from the ledger (empty when absent).
+
+        An absent ``installed_plugins.json`` ⇒ no packs installed. This is the single
+        precedence source read by ``install`` (core projection precedence) and ``doctor``;
+        when it is empty EVERY plugin code path is a strict no-op, so the zero-plugin
+        install/doctor surface is byte-identical to golden (b).
+        """
+        states_dir = workspace_root / ".dadaia" / "states"
+        ledger = JsonPluginStore().read(states_dir)
+        return ledger.plugins if ledger is not None else ()
+
+    def _plugin_agent_stems(self, agentic_dir: Path, packs: tuple[str, ...]) -> set[str]:
+        """Return the agent-file stems owned by the installed packs (from the staged tree)."""
+        stems: set[str] = set()
+        for pack in packs:
+            for md in (agentic_dir / "plugins" / pack / "agents").glob("*.md"):
+                stems.add(md.stem)
+        return stems
+
+    def _render_codex_pack_agent(
+        self, md_path: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Render a pack agent's ``.codex/agents/<name>.toml`` from its body.
+
+        Mirrors ``install_codex_agents`` for a single pack agent md: parse frontmatter,
+        strip it, transform Claude-isms out of the body/description, map the Claude model to
+        its Codex id (``claude-sonnet-4-6`` → ``gpt-5.3-codex``), and render the TOML.
+        """
+        text = md_path.read_text(encoding="utf-8")
+        fm = _parse_agent_frontmatter(text)
+        if not fm:
+            return
+        agent_name = str(fm.get("name", "")) or md_path.stem
+        if text.startswith("---\n"):
+            end_idx = text.find("\n---\n", 4)
+            body = text[end_idx + 5 :] if end_idx != -1 else text
+        else:
+            body = text
+        body = transform_for_codex(body, agent_name)
+        claude_model = str(fm.get("model", "claude-sonnet-4-6"))
+        description = fm.get("description")
+        codex_description = (
+            transform_for_codex(str(description), agent_name) if description else None
+        )
+        toml_content = _render_codex_agent_toml(
+            agent_name,
+            map_model(claude_model),
+            body,
+            description=codex_description,
+            claude_model=claude_model,
+        )
+        write_generated(
+            workspace_root / ".codex" / "agents" / f"{agent_name}.toml",
+            toml_content,
+            force,
+            installed,
+        )
+
+    def _project_installed_plugins(
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        active: set[str],
+        force: bool,
+        installed: list[str],
+    ) -> None:
+        """Project every installed pack's agents/skills/rules over the core projections.
+
+        Profile-scoped (Ruling 13): a pack agent lands in a runtime ONLY when that harness is
+        in *active*, so a claude-only workspace never gets a ``.codex/`` orphan (AC-15). The
+        pack agent body OVERWRITES the projected core stub (ADR-4 stub replacement); because
+        this runs AFTER the core projection loop it is the projection-precedence step
+        (AC-4 clobber-safety). A no-op when no pack is installed (byte-lock golden (b)).
+        """
+        packs = self._installed_plugins(workspace_root)
+        if not packs:
+            return
+        for pack in packs:
+            pack_dir = agentic_dir / "plugins" / pack
+            if not pack_dir.is_dir():
+                continue
+            for md in sorted((pack_dir / "agents").glob("*.md")):
+                if "claude" in active:
+                    copy_file(md, workspace_root / ".claude" / "agents" / md.name, force, installed)
+                if "codex" in active:
+                    self._render_codex_pack_agent(md, workspace_root, force, installed)
+            for skill in sorted(self._iter_files(pack_dir / "skills")):
+                if skill.name == ".gitkeep":
+                    continue
+                rel = skill.relative_to(pack_dir / "skills")
+                copy_file(skill, workspace_root / ".agents" / "skills" / rel, force, installed)
+            if "claude" in active:
+                for rule in sorted(self._iter_files(pack_dir / "rules")):
+                    if rule.name == ".gitkeep":
+                        continue
+                    rel = rule.relative_to(pack_dir / "rules")
+                    copy_file(rule, workspace_root / ".claude" / "rules" / rel, force, installed)
+
+    def install_plugin(
+        self, workspace_root: Path, pack_name: str, force: bool = False
+    ) -> list[str]:
+        """Enable a plugin pack: record the ledger and project it (profile-scoped).
+
+        Records *pack_name* in ``installed_plugins.json`` via the ``JsonPluginStore`` adapter
+        (idempotent — a re-install adds nothing) and projects the installed packs from the
+        already-staged ``.dadaia/agentic/plugins/`` tree into the profile-scoped runtime
+        projections. Re-install is a no-op (hash-compare ``[skip]`` on every file). Staging is
+        the caller's responsibility (``dadaia init`` / ``public install`` always stage first);
+        when a pack has not been staged, the ledger is still recorded and projection is a
+        no-op for that pack.
+        """
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        installed: list[str] = []
+        states_dir = workspace_root / ".dadaia" / "states"
+        store = JsonPluginStore()
+        ledger = store.read(states_dir) or InstalledPlugins.empty()
+        store.write(states_dir, ledger.with_added(pack_name))
+        profile = self._profile_harnesses(workspace_root)
+        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
+        self._project_installed_plugins(agentic_dir, workspace_root, active, force, installed)
+        return installed
+
+    def _doctor_installed_plugins(
+        self, agentic_dir: Path, workspace_root: Path, active: set[str]
+    ) -> list[str]:
+        """Report ``[ok]``/``[drift]``/``[missing]`` per installed-pack projected file.
+
+        A stale or out-of-manifest installed-pack file is never silent (AC-5). A no-op when
+        no pack is installed, so the zero-plugin doctor surface stays byte-identical to
+        golden (b).
+        """
+        packs = self._installed_plugins(workspace_root)
+        out: list[str] = []
+        for pack in packs:
+            pack_dir = agentic_dir / "plugins" / pack
+            for md in sorted((pack_dir / "agents").glob("*.md")):
+                name = md.stem
+                if "claude" in active:
+                    dst = workspace_root / ".claude" / "agents" / f"{name}.md"
+                    out.append(self._compare(md, dst, f"plugin:{pack}:claude/agents/{name}.md"))
+                if "codex" in active:
+                    toml = workspace_root / ".codex" / "agents" / f"{name}.toml"
+                    label = f"plugin:{pack}:codex/agents/{name}.toml"
+                    out.append(f"[ok] {label}" if toml.exists() else f"[missing] {label}")
+            for skill in sorted(self._iter_files(pack_dir / "skills")):
+                if skill.name == ".gitkeep":
+                    continue
+                rel = skill.relative_to(pack_dir / "skills")
+                dst = workspace_root / ".agents" / "skills" / rel
+                out.append(
+                    self._compare(skill, dst, f"plugin:{pack}:agents/skills/{rel.as_posix()}")
+                )
+            if "claude" in active:
+                for rule in sorted(self._iter_files(pack_dir / "rules")):
+                    if rule.name == ".gitkeep":
+                        continue
+                    rel = rule.relative_to(pack_dir / "rules")
+                    dst = workspace_root / ".claude" / "rules" / rel
+                    out.append(
+                        self._compare(rule, dst, f"plugin:{pack}:claude/rules/{rel.as_posix()}")
+                    )
+        return out
+
+    def doctor_plugins(self, workspace_root: Path) -> list[str]:
+        """Public wrapper: per-installed-pack projected-file doctor lines (profile-scoped)."""
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        profile = self._profile_harnesses(workspace_root)
+        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
+        return self._doctor_installed_plugins(agentic_dir, workspace_root, active)
 
     # ------------------------------------------------------------------
     # Public API
@@ -340,6 +519,15 @@ class FileSystemPublicAssetManager:
         if target in {"all", "claude", "codex"}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
 
+        # Projection precedence (FR3, AC-4): after the core projection, overlay any installed
+        # pack's real body over its stub — scoped to the harnesses actually being projected —
+        # so a routine `public install` never silently reverts an installed pack agent to its
+        # stub. A no-op when no pack is installed (byte-lock golden (b)).
+        active_harnesses = {item for item in targets if item in L1_ENTRY_HARNESSES}
+        self._project_installed_plugins(
+            agentic_dir, workspace_root, active_harnesses, force, installed
+        )
+
         return installed
 
     def doctor(self, workspace_root: Path) -> list[str]:
@@ -377,6 +565,13 @@ class FileSystemPublicAssetManager:
         active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
         claude_active = "claude" in active
 
+        # Plugin precedence (FR3): an installed pack's claude agent projection is the PACK
+        # body, so its `claude:agents/<name>.md` line is reported by the plugin block below
+        # (compared vs the pack body) — skipping it in the core loop avoids a false [drift]
+        # against the stub. Empty when no pack is installed ⇒ zero skips (byte-lock golden b).
+        installed_packs = self._installed_plugins(workspace_root)
+        plugin_agent_stems = self._plugin_agent_stems(agentic_dir, installed_packs)
+
         for expected_src, dst, label, transform in runtime_expectations(
             agentic_dir,
             workspace_root,
@@ -397,12 +592,24 @@ class FileSystemPublicAssetManager:
             # path is unchanged (claude ∈ all-four ⇒ the loop runs fully → golden byte-lock).
             if not claude_active and label.startswith("claude:"):
                 continue
+            if (
+                plugin_agent_stems
+                and label.startswith("claude:agents/")
+                and label.endswith(".md")
+                and label[len("claude:agents/") : -len(".md")] in plugin_agent_stems
+            ):
+                continue
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
             else:
                 reports.append(self._compare(expected_src, dst, label))
+
+        # Installed-pack projected-file doctoring (FR3, AC-5): a stale/out-of-manifest
+        # installed-pack file is never silent. Empty when no pack is installed ⇒ zero lines
+        # (byte-lock golden b).
+        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active))
 
         # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
         # resolution above is reused here (claude settings.json / codex hooks+config+rules /

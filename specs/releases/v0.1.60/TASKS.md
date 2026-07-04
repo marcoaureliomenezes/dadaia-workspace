@@ -120,7 +120,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W2 — FR3 pack projection + ledger + manifest + precedence
 
-- [ ] T-60-20 Golden (b) + pack projection + profile-scope + stub replacement + precedence + doctor. Owner:
+- [x] T-60-20 Golden (b) + pack projection + profile-scope + stub replacement + precedence + doctor. Owner:
   software-engineer. Write set: `infrastructure/public_assets.py` (+ `public_assets_common.py` only if a plugin route
   constant is needed), NEW `tests/integration/test_plugin_projection.py` (real install → integration layer, QA-8b) +
   golden (b). Checklist:
@@ -155,6 +155,44 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     `tests/integration/test_public_doctor_parity.py`.
   - AC-13 ledger — EDITED: `public_assets.install`/`doctor` (plugin projection + precedence + doctor). No
     `specs/backlog/**`.
+  - **DONE-evidence:**
+    - **Golden (b)** captured FIRST (descriptors present, zero plugin, BEFORE projection code) into NEW
+      `tests/integration/test_plugin_projection.py` + `tests/integration/_golden/plugin_{install_targets,doctor_report}_golden_b_v0160.json`
+      (INCLUDES the 8 `stage:plugins/*` lines — golden (b)'s baseline, unlike plugin-blind golden (a)); committed
+      `test(T-60-20): ...` (SHA `fbc261bd`) BEFORE any projection code. After the projection code the zero-plugin path
+      is byte-identical to golden (b) (AC-5 green): `_project_installed_plugins`/`_doctor_installed_plugins` are strict
+      no-ops when `installed_plugins.json` is absent.
+    - **Projection (FR3):** `install_plugin` on `FileSystemPublicAssetManager` records the ledger (idempotent) + projects
+      the pack's agents/skills/rules from staged `.dadaia/agentic/plugins/<pack>/` (profile-scoped via `_profile_harnesses`;
+      pack agent body overwrites the `.claude/agents/<name>.md` stub + renders `.codex/agents/<name>.toml` from the pack
+      model). CLI `_project_pack` seam (flagged in W1) now delegates to `install_plugin`; ledger write moved into it
+      (single owner). `plugin doctor` reports per-pack-file status via new public `doctor_plugins`.
+    - **Precedence (AC-4):** core `install()` calls `_project_installed_plugins(active_harnesses)` after the core loop —
+      a later `public install --target all` keeps the pack body. **Doctor precedence:** the core `claude:agents/<name>.md`
+      line is skipped for installed-plugin agents (reported vs the pack body by the `plugin:<pack>:...` block, no false
+      drift). Codex doctor is presence/quality-based (dcx1/4/5) so the pack-rendered toml needs no special-casing.
+    - **Tests (integration, synthetic pack body seeded into the staged tree — real W3 bodies land later):** AC-3 real-body
+      install + idempotent + codex `gpt-5.3-codex` render; AC-4 clobber-safety (core install keeps pack body); AC-5 doctor
+      `[ok] plugin:...` + no false `[drift] claude:agents/...` + non-silent stale ([drift]/[missing]); AC-15 claude-only
+      profile → NO `.codex/` orphan + ledger records the pack (not per-harness). Full suite **4633 passed, 17 skipped, 0
+      failed**.
+    - **AC-11 sabotages (capture → revert):**
+      - **(a)** `install_plugin` skips `_project_installed_plugins` ⇒ `test_plugin_install_projects_real_body_over_stub`
+        FAILS (stub not replaced). Reverted.
+      - **(b)** core `install()` drops the precedence `_project_installed_plugins` call ⇒
+        `test_core_install_keeps_pack_body_precedence` FAILS (stub clobbers pack body). Reverted.
+      - **(c)** `_doctor_installed_plugins` forces `packs = ()` ⇒ `test_doctor_non_silent_on_stale_pack_file` FAILS
+        (`[drift] plugin:...` absent). Reverted.
+    - **existing-test fate ledger (file-enumerated — SURVIVE byte-identical on the no-plugin path, proven by golden (a) +
+      golden (b) + the amended v0.1.58 goldens all green untouched this wave):**
+      `tests/unit/infrastructure/test_public_assets.py` (doctor/install cases — unchanged, green),
+      `tests/integration/test_public_doctor_parity.py` (guardrail-pair doctor cases — unchanged, green),
+      `tests/unit/infrastructure/test_install_target_goldens.py` + `test_public_assets_profile.py` (the W1-amended
+      goldens — unchanged, green). No `specs/backlog/**` staged.
+    - Gates: `ruff format --check` + `ruff check --no-cache` (I001 import-order auto-fixed) + `mypy --strict` (312 files,
+      0 issues) + `lint-imports` **8 kept / 0 broken** ignore-cap 26 UNCHANGED (the projection edit is same-layer inside
+      `infrastructure/public_assets.py`; the CLI→`FileSystemPublicAssetManager` edge is cli→infra, ungoverned). Commit
+      `feat(T-60-20): ...`.
 
 ## W3 — FR4/FR5 minimal-viable pack content + plugin-scope rewrite + plugin tier (ai-engineer)
 
