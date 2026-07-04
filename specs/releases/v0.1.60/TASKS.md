@@ -1,0 +1,298 @@
+# TASKS — v0.1.60 — Capability Tail (plugin packs + Layer-1 model-tier efficiency)
+
+**Status:** Aprovado
+
+Markers: `[ ]` open · `[-]` in progress · `[x]` done. Shared file `public_assets.py` is touched only in W2 (after the
+W1 adapter lands) — sequential, one owner, no parallel `[-]`. Every implementation-wave task: **NO `specs/backlog/**`
+paths staged** (dead/surviving anchors dispositioned at CLOSURE — T-60-70). Every move/repoint grep **includes `tests/`
+AND non-import textual references** (docstrings/comments). AC-11 mutation-sanity: each new test is sabotaged → shown to
+FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-first) — the machinery FR3–FR8 build on.
+
+## W0 — definition
+
+- [x] T-60-01 SPEC/PLAN/TASKS authored from the 2026-07-04 **code read** (not a dossier restatement): `_COPY_DIRS`
+  already stages `"plugins"` but the route is dead-on-arrival (no projection/ledger); the registry `Tier` already has
+  `fast`+`plugin` (only unassigned); the "mechanical sub-task classes" are deterministic CLI (no model) and Layer-1 has
+  no sub-task tiering (only whole-persona `model:`); the efficiency-audit rubric exists but has no recurring trigger/
+  marker; `tier: 1/2/3` frontmatter vs registry `Tier` is a divergent-naming inconsistency; constitution §14 already
+  forward-compatible. Mandatory release-definition grill on the picked set (report emitted). **DEFINITION-phase memory
+  correction:** `architecture.md` L63 kanban "remain served" corrected as a dated v0.1.52 drift-fix (no catalog regen —
+  `core` atom). **ADRs recorded (§9, operator unavailable — overridable):** ADR-1 in-package storage; ADR-2 install/
+  list/doctor + ledger, no uninstall; ADR-3 install-gated plugin-scope; ADR-4 stub-overwrite + projection precedence;
+  ADR-5 machinery + minimal-viable content; ADR-6 defer fast/haiku persona downgrade; ADR-7 deterministic
+  efficiency-audit marker; ADR-8 plugin agents on the `plugin`/sonnet tier; ADR-9 banner-match discriminator (FR9).
+  **Dual DEFINITION review REJECT (2026-07-04) folded** with greppable `<!-- AMEND:ARCH-n -->` / `<!-- AMEND:QA-n -->`
+  markers + PM binding Rulings 10-17 (SPEC §0.1): 10 EFF-1 `DoctorIssue` (not `[warn]`); 11 cadence 30d + writer
+  `dadaia reports mark-efficiency-audit`; 12 FR4 ceiling (2 named skills: `browser-frontend-implementation`,
+  `github-actions-cicd`); 13 profile×pack scope; 14 two goldens + three-leak norm; 15 banner module constant + contract
+  test; 16 PAIRED CLAUDE.md doctor line (CRITICAL); 17 mandatory tier contract + plugin `tier: 3` + `tier-taxonomy-rename`
+  return. `Aprovado` after dual **re-verify**; definition commit. Owner: product-engineer (orchestrated).
+
+## W1 — FR1/FR2 pack storage + `dadaia plugin` machinery (golden-first, ports-and-adapters)
+
+- [ ] T-60-10 Capture + commit **golden (a)** (pre-descriptor refactor-lock) BEFORE any descriptor/projection code.
+  Owner: software-engineer. Write set: NEW `tests/integration/test_plugin_install_goldens.py` + `_golden/`. <!-- AMEND:ARCH-4 --> <!-- AMEND:QA-2 --> <!-- AMEND:QA-8 -->
+  Checklist:
+  - Add the golden test (**`integration` layer** — real stage/install/doctor, QA-8b) running `public_assets.install()`
+    (all targets) + `public_assets.doctor()`'s full report list on the **current pre-descriptor** tree under
+    `FileSystemPublicAssetManager` + `tmp_path`. **Normalize from day one (Ruling 14 / QA-2):** v0.1.55 path/version +
+    clock-freeze PLUS the v0.1.58 three leak classes the doctor surface carries — (1) host-state cwd-walk
+    (`_check_public_privacy` denylist) → host-state canonicalization; (2) directory-iteration order (`.pi/` lines) →
+    sorted-multiset lock; (3) OS-phrased exec-probe text → OS-phrase canonicalization. Golden (a) is the transient
+    refactor-lock (retired at ship). Commit BEFORE T-60-11's descriptors. (Golden (b) is captured in T-60-20.)
+  - Evidence: golden (a) file + green test on the pre-descriptor tree; the normalization strategy stated in the test.
+  - AC-13 ledger — NEW: the golden test + golden (a). No `specs/backlog/**`.
+
+- [ ] T-60-11 Ports-and-adapters seam + `dadaia plugin` CLI. Owner: software-engineer. Write set: NEW
+  `core/models/plugin_pack.py`, NEW `core/protocols/plugin_store.py`, NEW `infrastructure/json_plugin_store.py`, NEW
+  `cli/commands/plugin.py`, `cli/main.py` (register), NEW `public/plugins/{frontend-design,devops}/pack.json` (+ empty
+  agents/skills/rules dirs), NEW `tests/unit/core/test_plugin_pack.py`, `tests/unit/infrastructure/test_json_plugin_store.py`,
+  `tests/unit/cli/test_plugin_cli.py`. Checklist:
+  - **Seam (A, blocking):** `PluginPack` pure `core` model (NO I/O; mirrors `HarnessProfile`); `PluginStore` port;
+    `JsonPluginStore` adapter (mirrors `json_harness_profile_store.py`) reading/writing
+    `.dadaia/states/installed_plugins.json`. **Forbid** any new `features→infra` / `infra→features` edge.
+  - **CLI:** `dadaia plugin install <pack>` / `list` / `doctor`; bad pack → Click `BadParameter` (`exit_code == 2`,
+    empty stdout, no `mix_stderr` kwarg). <!-- AMEND:QA-7 --> The `result.stderr` substring check normalizes via the
+    shared `_norm_stderr`-style helper (ANSI-strip + box-drawing collapse) BEFORE the `"bogus"/"plugin"` assert
+    (v0.1.57 QA-atom law). Register in `cli/main.py`.
+  - **Pack descriptors:** `pack.json` for `frontend-design` (agents `frontend-engineer`+`design-specialist`) and
+    `devops` (agent `devops-engineer`) — content bodies land in W3.
+  - Tests — AC-2 seam (import-linter clean, ignore-cap UNCHANGED); AC-3 CLI surface + `_norm_stderr` bad-value stderr
+    (RED-first: pre-fix there is no `plugin` command); adapter round-trip.
+  - **W1 mutation-sanity NOW (QA-6 — born falsifiable, NOT deferred):** <!-- AMEND:QA-6 --> AC-11(0a) make `install`
+    accept any pack (skip validation) ⇒ the AC-3 bad-value `exit_code == 2` test FAILS → revert; AC-11(0b) drop a
+    ledger field in `JsonPluginStore` ⇒ the adapter round-trip test FAILS → revert. Capture each command + failing test
+    on this line. (Projection sabotages a/b/c remain in W2.)
+  - **existing-test fate ledger (file-enumerated):** NEW files only; `cli/main.py` gains one `add_typer` (SURVIVE:
+    the main-CLI smoke test). Gates: ruff, mypy --strict, lint-imports 8/0 (ignore-cap unchanged), unpiped pytest green.
+  - AC-13 ledger — NEW: the seam + CLI + descriptors + tests. No `specs/backlog/**`.
+
+## W2 — FR3 pack projection + ledger + manifest + precedence
+
+- [ ] T-60-20 Golden (b) + pack projection + profile-scope + stub replacement + precedence + doctor. Owner:
+  software-engineer. Write set: `infrastructure/public_assets.py` (+ `public_assets_common.py` only if a plugin route
+  constant is needed), NEW `tests/integration/test_plugin_projection.py` (real install → integration layer, QA-8b) +
+  golden (b). Checklist:
+  - **Golden (b) capture (Ruling 14 / ARCH-4):** <!-- AMEND:ARCH-4 --> with the W1 descriptors present but BEFORE any
+    projection code, capture the durable **"descriptors-present, zero-plugin-installed"** golden (b) (same three-leak
+    normalization as golden (a)). The added `stage:plugins/...` descriptor-source parity lines are captured INTO golden
+    (b) — not a violation.
+  - **`dadaia plugin install`** projects the pack's agents/skills/rules from `.dadaia/agentic/plugins/<pack>/` into the
+    runtime projections, hash-compare; records `installed_plugins.json` via the W1 adapter; idempotent (re-install = no-op).
+  - **Profile-scoped projection (Ruling 13 / ARCH-3, blocking):** <!-- AMEND:ARCH-3 --> projection, precedence AND
+    plugin doctor scope to the harness profile via the same `_profile_harnesses` seam already in `public_assets`
+    (absent profile ⇒ all targets, v0.1.58 back-compat) — a claude-only workspace projects only the `.claude/` agent,
+    NEVER a `.codex/` orphan; a later out-of-profile pack asset on disk surfaces via the v0.1.58 A3 never-silent law.
+    `installed_plugins.json` records the pack (not per-harness).
+  - **Stub replacement (ADR-4):** the pack agent body overwrites the projected core stub
+    (`.claude/agents/<name>.md`, `.codex/agents/<name>.toml`).
+  - **Projection precedence (blocking):** core `public_assets.install` reads `installed_plugins.json` and projects the
+    **pack body** (not the stub) for installed plugins, within the profile scope.
+  - **Manifest tracking** of pack-projected files; **doctor** reports `[ok]`/`[drift]`/`[missing]` per pack file; a
+    stale installed-pack file is never silent.
+  - Tests — **AC-3** real-body install (`.claude/agents/frontend-engineer.md` contains the pack body, not
+    `[PLUGIN REQUIRED]`) + idempotent (RED-first: no `plugin` command / stub only pre-fix); **AC-4** clobber-safety —
+    a following core `public install --target all` keeps the pack body (RED-first: pre-fix core install re-writes the
+    stub); **AC-5** doctor **byte-equality vs golden (b)** (runtime-projection + install-set lines) + non-silent stale
+    installed-pack file; **AC-15 profile×pack** — `plugin install frontend-design` in a claude-only-profile workspace
+    projects NO `.codex/` orphan; precedence honors the scope.
+  - **AC-11 sabotages (capture → revert):** (a) `plugin install` skips projection ⇒ AC-3 real-body test FAILS; (b) core
+    install ignores `installed_plugins.json` ⇒ AC-4 clobber-safety test FAILS (stub re-written); (c) doctor emits zero
+    lines for a stale installed-pack file ⇒ AC-5 non-silent test FAILS. Capture each command + failing test.
+  - **existing-test fate ledger (file-enumerated):** SURVIVE byte-identical on the no-plugin path (proven by the
+    T-60-10 golden) — `tests/unit/infrastructure/test_public_assets.py` doctor/install cases,
+    `tests/integration/test_public_doctor_parity.py`.
+  - AC-13 ledger — EDITED: `public_assets.install`/`doctor` (plugin projection + precedence + doctor). No
+    `specs/backlog/**`.
+
+## W3 — FR4/FR5 minimal-viable pack content + plugin-scope rewrite + plugin tier (ai-engineer)
+
+- [ ] T-60-30 Enumerated pack content (3 agent bodies + ONE skill/pack) + plugin-scope rewrite + plugin tier. Owner:
+  ai-engineer. Write set: NEW `public/plugins/frontend-design/agents/{frontend-engineer,design-specialist}.md` + NEW
+  `public/plugins/frontend-design/skills/browser-frontend-implementation/SKILL.md`; NEW
+  `public/plugins/devops/agents/devops-engineer.md` + NEW `public/plugins/devops/skills/github-actions-cicd/SKILL.md`;
+  `public/rules/plugin-scope.md` (rewrite); NEW `tests/unit/infrastructure/test_plugin_content.py`. Checklist:
+  - **3 real agent bodies** with full frontmatter (`name`/`description`/**`tier: 3`** (leaf-worker band, Ruling 17)/
+    **`model: claude-sonnet-4-6`**/tools) + real SDD-role body (frontend: browser HTML/CSS/JS/TS/React; design: UX/UI +
+    visual review; devops: CI/CD + GitHub Actions + gitflow + deploy).
+  - **Enumerated skills — EXACTLY ONE per pack, ZERO new rules (Ruling 12 / ARCH-5):** <!-- AMEND:ARCH-5 -->
+    `frontend-design` → skill `browser-frontend-implementation`; `devops` → skill `github-actions-cicd`. Reference (do
+    NOT duplicate) the existing codex `frontend-ctx`/`design-ctx` adapters. Everything beyond the two named skills →
+    `plugin-pack-content-libraries` backlog return.
+  - **Rewrite `public/rules/plugin-scope.md`** + the `[PLUGIN REQUIRED]` response to install-gated wording (drop "no
+    install command exists"/"not yet distributed"; name `dadaia plugin install`); record the retired `panel-ux-overhaul`
+    deviation class (doc note).
+  - Tests — **AC-6** each pack agent generic + **Codex `model`-field tiered (ARCH-2):** <!-- AMEND:ARCH-2 --> the
+    installed agent's `.codex/agents/<name>.toml` renders `model = "gpt-5.3-codex"` (sonnet/plugin), NOT `gpt-5.5`
+    (opus) — the `model_reasoning_effort` is `medium` for plugin AND opus AND fallback and is NOT the discriminator —
+    plus the Claude frontmatter `model: claude-sonnet-4-6`; `[ok] public-privacy`; exactly the two named skills present;
+    ctx adapters reused not duplicated. **AC-7** install-gated grep (RED-first: pre-fix the rule says "no install
+    command exists") — retired wording gone from the projected `.claude/rules/plugin-scope.md`.
+  - **AC-11 sabotages (capture → revert):** (d) leave the retired wording in `plugin-scope.md` ⇒ AC-7 grep test FAILS;
+    **(f)** give a plugin agent `model: claude-opus-4-8` ⇒ AC-6 **Codex `model`-field** test FAILS (`.codex/...toml`
+    renders `gpt-5.5`). Capture each.
+  - **existing-test fate ledger (file-enumerated):** the `plugin-scope` rule is a lib-originated asset — a grep test
+    over the projected rule INVERTS from "asserts stub language" to "asserts install-gated language". `check_agent_skill_refs`
+    (public_assets doctor) SURVIVES — pack skill refs must resolve.
+  - AC-13 ledger — NEW: 3 agent bodies + minimal skills/rules; EDITED: `plugin-scope.md`. No `specs/backlog/**`.
+
+## W4 — FR6/FR7 tier-taxonomy fix + efficiency-audit trigger (software-engineer)
+
+- [ ] T-60-40 Efficiency-audit EFF-1 `DoctorIssue` + `mark-efficiency-audit` writer + MANDATORY tier-taxonomy contract.
+  Owner: software-engineer. Write set: `features/spec_context/doctor.py` (new EFF-1 `DoctorIssue` check) +
+  `EFFICIENCY_AUDIT_STALE_DAYS = 30` constant; `cli/commands/reports.py` (NEW `mark-efficiency-audit` verb) + its
+  marker-writer helper; NEW `tests/unit/.../test_efficiency_audit_trigger.py` + `tests/unit/cli/test_reports_mark_efficiency_audit.py`;
+  **MANDATORY** `tests/contract/test_agent_tier_taxonomy.py`. Checklist:
+  - **EFF-1 `DoctorIssue`, NOT a `[warn]` token (Rulings 10/11 / ARCH-6/7 / QA-3):** <!-- AMEND:ARCH-6 --> <!-- AMEND:ARCH-7 --> <!-- AMEND:QA-3 -->
+    add a `DoctorService` check emitting `DoctorIssue(code="EFF-1", fixable=False, description=<staleness age + "run:
+    dadaia reports mark-efficiency-audit ...">)` reading `.dadaia/states/last_efficiency_audit.json` (schema
+    `{schema_version,last_efficiency_audit,by,report}`) vs `EFFICIENCY_AUDIT_STALE_DAYS = 30`. **4-case matrix:**
+    *absent* ⇒ **no issue** (preserves the fresh-workspace `All invariants OK` happy path); *fresh* (≤30d) ⇒ no issue;
+    *stale* (>30d) ⇒ EFF-1; *malformed* (invalid JSON / missing `last_efficiency_audit`) ⇒ EFF-1 "malformed marker",
+    **never a crash**. The bare `dadaia doctor` exit stays 0 (already never exits non-zero on issues).
+  - **Writer verb (Ruling 11):** add `dadaia reports mark-efficiency-audit --report <workspace-relative-path>
+    [--by <agent>]` (one verb under the existing `reports` group) writing the marker with the current RFC3339 timestamp
+    — the production EFF-1 clear path (fresh marker ⇒ no EFF-1).
+  - **MANDATORY tier-taxonomy contract (Ruling 17 / ARCH-9 / QA-8a):** <!-- AMEND:ARCH-9 --> <!-- AMEND:QA-8 -->
+    NON-OPTIONAL `tests/contract/test_agent_tier_taxonomy.py` asserts every non-plugin core agent carries a numeric
+    `tier` + a registry-known `model`, the 9 core keep `dispatch` (opus), the 3 plugin agents carry `tier: 3` +
+    `model: claude-sonnet-4-6`.
+  - Tests — **AC-8** EFF-1 4-case matrix (absent/fresh/stale/malformed — RED-first: no `DoctorService` EFF-1 check
+    pre-fix) + writer round-trip; **AC-9** MANDATORY taxonomy contract.
+  - **AC-11 sabotage (capture → revert):** (e) make the `DoctorService` skip the EFF-1 check ⇒ AC-8 stale-marker test
+    FAILS. Capture.
+  - **existing-test fate ledger (QA-3 — ENUMERATE, do not assert "unchanged"):** <!-- AMEND:QA-3 --> the workspace-doctor
+    suite exposed to a default marker state — `tests/integration/test_cli_doctor.py` + every fresh-workspace e2e that
+    runs `dadaia doctor` — **stays green because *absent* ⇒ no EFF-1** (the fresh-workspace `All invariants OK` path is
+    unchanged); enumerate each and confirm.
+  - AC-13 ledger — NEW: the EFF-1 check + writer verb + mandatory taxonomy contract + tests. No `specs/backlog/**`.
+
+## W4B — FR9 provenance-gated consumer-repo fan-out (HIGH bug fix; AMENDS v0.1.58 Ruling L)
+
+- [ ] T-60-45 Banner-constant discriminator + PAIRED provenance-aware doctor on the consumer `AGENTS.md` fan-out.
+  Owner: software-engineer. Write set: `infrastructure/workspace_guardrail.py` (`_CANONICAL_AGENTS_BANNER` constant +
+  `_install_guardrail_pair._write_one` + `_doctor_guardrail_pair` PAIRED), NEW
+  `tests/unit/infrastructure/test_consumer_fanout_provenance.py`, NEW contract
+  `tests/contract/test_agents_banner_constant_matches_public_data.py`, ADJUDICATED (QA-gate, full flip set):
+  `tests/unit/infrastructure/test_consumer_fanout.py` + `tests/unit/features/public/test_workspace_guardrail_pair.py`
+  + `tests/unit/infrastructure/test_public_assets.py` + `tests/integration/test_public_doctor_parity.py`. Resolves bug
+  `public-install-clobbers-consumer-repo-agents-md`. Checklist:
+  - **Banner = MODULE CONSTANT + contract test (Ruling 15 / QA-1):** <!-- AMEND:QA-1 --> add
+    `_CANONICAL_AGENTS_BANNER` (fixed literal = the `public/data/AGENTS.md` banner block) + the contract test
+    `test_agents_banner_constant_matches_public_data` asserting BYTE-equality with the actual `public/data/AGENTS.md`
+    banner (drift on either side fails; **NO runtime read of `public/data`**). In `_write_one`, gate the divergent
+    overwrite on a match against the constant: **banner-match** → restore + `[updated] <path> (overwrote divergent
+    workspace-law copy)`; **no banner** → `[foreign] <path> — left untouched` (never overwrite); **absent** → create +
+    `[ok]`.
+  - **CLAUDE.md bridge follows its sibling** — written only when the sibling `AGENTS.md` is created/restored; when
+    `AGENTS.md` is `[foreign]`, NO `CLAUDE.md` is dropped. A foreign (non-stub) existing `CLAUDE.md` → `[foreign]`,
+    untouched.
+  - **Doctor provenance-aware ON THE PAIR (Ruling 16 / ARCH-1 — CRITICAL):** <!-- AMEND:ARCH-1 --> `_doctor_guardrail_pair`
+    makes BOTH lines provenance-aware — when the consumer `AGENTS.md` is `[foreign]` (no banner), the paired `CLAUDE.md`
+    line is **also `[foreign]`** whether the CLAUDE.md is absent OR a foreign non-stub — never `[missing]`/`[drift]`, so
+    `public doctor` (exits 1 on any `[missing]`/`[drift]`, `public.py:161-172`) **EXITS 0** for a hand-authored repo. A
+    banner-bearing (canonical) copy keeps `[ok]`/`[drift]`/`[missing]` on both lines. Self-repo skip retained.
+  - Tests — **AC-14 (RED-first, REGISTERED fixture — QA-4):** <!-- AMEND:QA-4 --> the fixture consumer repo is
+    **registered** in `spec_contexts.json` (schema-v2, via `_register_context`/`_write_registry`) so the fan-out reaches
+    it; a hand-authored (no-banner) `AGENTS.md` survives `install` byte-identical, **BOTH** paired doctor lines
+    (`repos/<slug>:AGENTS.md` + `:CLAUDE.md`) report `[foreign]` (no `[missing]`), and `dadaia public doctor` **EXITS
+    0**; a stale-canonical (banner-bearing) copy → `[updated]`; absent → `[ok]`. RED-first: pre-fix the registered
+    hand-authored file is overwritten + `[updated]` (the bug). Plus the banner **contract test**.
+  - **AC-11(g) sabotage (capture → revert):** drop the banner discriminator (overwrite any divergent consumer
+    `AGENTS.md`) ⇒ the AC-14 hand-authored-survives test FAILS against the **registered** fixture (foreign file
+    clobbered). Capture the command + failing test.
+  - **v0.1.58 test-pin adjudication — FULL FLIP SET (Ruling 15 / QA-1; QA-gate, do NOT silently rewrite):**
+    <!-- AMEND:QA-1 --> under the module-constant banner, every consumer copy from a **synthetic bannerless source**
+    reclassifies `[foreign]`. Enumerate per file the concrete affected cases (not one per file) — re-fixture the source
+    to EMBED `_CANONICAL_AGENTS_BANNER` to keep a canonical classification — each adjudicated INVARIANT-or-amended with
+    rationale:
+    - `test_consumer_fanout.py`: `test_doctor_reports_ok_for_fresh_consumer` (`[ok]`→`[foreign]`),
+      `test_doctor_flags_drift_for_stale_consumer` (`[drift]`→`[foreign]`),
+      `test_divergent_consumer_root_restored_with_updated_line` (bannerless divergent → `[foreign]`; re-fixture WITH the
+      banner to keep `[updated]`).
+    - `test_workspace_guardrail_pair.py`: **Case 6 `test_doctor_four_line_output`** — a doctor-`[ok]`-parity flip
+      (`[ok]`→`[foreign]`), NOT an `[updated]`-on-divergent case (QA-1 misattribution correction).
+    - `test_public_assets.py::TestInstallConsumerReposGuardrailPair::test_force_false_overwrites_divergent_consumer_with_updated_line`
+      (@ L748) — the REAL `[updated]`-on-divergent INSTALL pin; re-fixture the source WITH the banner to keep `[updated]`.
+    - `test_public_doctor_parity.py` (consumer fan-out `[ok]`/`[drift]` cases → `[foreign]` unless bannered; ALSO add
+      the PAIRED CLAUDE.md `[foreign]` assertion).
+    A byte diff on a Ruling-L pin is a deliberate amendment, recorded, never a silent regen. Frozen v0.1.50 no-steal
+    suite untouched — confirm zero-diff.
+  - **AC-13 ledger** — EDITED: `_write_one` (banner-constant gate), `_doctor_guardrail_pair` (PAIRED `[foreign]`); NEW:
+    `_CANONICAL_AGENTS_BANNER` constant, `test_consumer_fanout_provenance.py`, banner contract test; ADJUDICATED: the
+    full flip set across the 4 v0.1.58 pin files (enumerated cases). No `specs/backlog/**`.
+
+## W5 — per-pack sandboxed E2E (qa-engineer)
+
+- [ ] T-60-50 Per-pack E2E. Owner: qa-engineer. Write set: NEW `tests/e2e/features/test_plugin_pipeline.py` (or a
+  sibling of `test_public_pipeline.py` reusing its helpers). Checklist:
+  - Scaffold a workspace in-process via `CliRunner.invoke`; assert: (a) fresh no-plugin → the 3 agents are stubs +
+    descriptors-present-zero-plugin doctor green + golden (b) byte-lock; (b) `plugin install frontend-design` → both
+    agents real + `installed_plugins.json` correct + doctor green; (c) `plugin install devops` → `devops-engineer`
+    real; (d) a following core `public install --target all` keeps the pack bodies (AC-4); **(e/FR9, QA-4)** a
+    **registered** (in `spec_contexts.json` via `_register_context`/`_write_registry`) consumer repo with a
+    hand-authored root `AGENTS.md` survives `public install --target all` byte-identical (**BOTH** paired doctor lines
+    `[foreign]`) and a real `dadaia public doctor` run **EXITS 0** while a stale-canonical fixture gets `[updated]`;
+    **(f/QA-5)** double `plugin install frontend-design` no-ops (`installed_plugins.json` unchanged — ledger
+    idempotency); **(g/QA-5)** `installed_plugins.json` coexists with `harness_profile.json`/overlay state without
+    interference (profile×pack). `tmp_path` isolation + `-p no:cacheprovider`; <!-- AMEND:QA-4 --> <!-- AMEND:QA-5 -->
+    **wall-time ≤ ~10s** (v0.1.58 ~6s precedent — a concrete bound, not "stated budget").
+  - Tests — **AC-10** (a)-(g) scenarios.
+  - **AC-11 discriminating sabotage (capture → revert):** with the T-60-20(b) precedence sabotage active, the E2E
+    scenario (d) FAILS (pack body reverts to stub); with the T-60-45 banner discriminator dropped, scenario (e) FAILS
+    (registered hand-authored `AGENTS.md` clobbered). Capture the command + failing E2E.
+  - AC-13 ledger — NEW/EXTENDED: the per-pack E2E. No `specs/backlog/**`.
+
+## W6 — gates + ship
+
+- [ ] T-60-60 Full local gates (AC-12) + self-hosting reconcile, then ship. Owner: software-engineer (gates) +
+  qa-engineer (ship-gate) + security-reviewer (push-gate). Write set: none (`specs/**` untouched). Checklist:
+  - **Unpiped** `pytest` (real exit) — full suite green; `ruff format --check`; `ruff check --no-cache`;
+    `mypy --strict dadaia_workspace`.
+  - `lint-imports --no-cache` → **`8 kept, 0 broken`**; ignore-cap UNCHANGED — the new `core/models/plugin_pack.py` +
+    `core/protocols/plugin_store.py` are `core` leaves, and the `JsonPluginStore` adapter is consumed same-layer by
+    `public_assets` (no new `features→infra` / `infra→features` edge); if any new edge is unavoidable, STOP and
+    document (would fail AC-12).
+  - `dadaia specs doctor` exit 0; `dadaia backlog doctor` exit 0.
+  - **Self-hosting reconcile:** run in order — `dadaia public stage` → `dadaia public doctor` (surfaces any consumer
+    write targets + confirms the pack staging) → `dadaia public install --target all` → confirming `dadaia public
+    doctor` (`[ok] public-privacy`, exit 0). Confirm the v0.1.50 frozen no-steal suite is **zero-diff**. **FR9
+    reconcile (bug fix on the live instance):** the pre-install `public doctor` must surface
+    `[foreign] repos/<slug>:AGENTS.md` for any of the ~6 on-disk consumer repos carrying a hand-authored (no-banner)
+    root `AGENTS.md`; the install leaves those byte-identical (NO `[updated]`, NO CLAUDE.md drop) — PM records the
+    `[foreign]`/`[updated]`/`[ok]` split in the ship evidence and proves no hand-authored consumer `AGENTS.md` was
+    clobbered (the v0.1.58 ship had fanned `[updated]` to 6 repos). *(PE surfaces these + the git commands to
+    PM/operator or requests devops-engineer; PE runs no shell.)*
+  - Confirm the **no-plugin byte-lock** holds on the live instance (a `public install`/`doctor` with no plugin installed
+    is byte-identical to the T-60-10 golden).
+  - QA ship-gate APPROVE; security push-gate keyed to the pushed sha; push; **watch CI until every job green**; PR;
+    merge. No dead anchor this release → **no SHIP-time backlog archival** (both anchors survive → CLOSURE). Verify no
+    W1–W5 commit staged `specs/backlog`.
+
+## W7 — closure (CLOSURE phase)
+
+- [ ] T-60-70 CLOSURE.md + memory truth + disposition + archive. Owner: product-engineer. Write set:
+  `specs/releases/v0.1.60/CLOSURE.md`, `specs/memory/**`, `specs/_archive/v0.1.60/consumed-backlog/`, `ACTIVE.md`.
+  Checklist:
+  - Set `ACTIVE.md` phase = `CLOSURE`. Write `CLOSURE.md` (Summary, Tasks completed w/ SHAs, Validations triples,
+    Drifts, Memory updates, Dispositions, Backlog returns, Archive decision).
+  - **MEMORY (§SPEC 8):** `public-asset-distribution.md` → plugin staging/projection/ledger/doctor (primary);
+    `agent-orchestration.md` → plugin agents carry behavior + plugin tier + two tier axes; assess a NEW
+    `plugin-packs.md` atom vs fold; `tech-stack.md` → two tier axes + efficiency marker cadence; `architecture.md` →
+    module map (`cli/commands/plugin.py`, `core/models/plugin_pack.py`, `core/protocols/plugin_store.py`,
+    `infrastructure/json_plugin_store.py`, `public/plugins/`, precedence, efficiency check); `quality-assurance.md` →
+    assess absent-pack golden + plugin-install E2E note. Regen `catalog.json` + `index.md` ONLY if
+    `tldr`/`summary`/`area` change — **keep the regenerated `tldr` within the established length cap** so the catalog
+    regen + `dadaia specs doctor` at W7 stays clean. `release_origin` → v0.1.60 on each edited atom.
+  - **Backlog returns:** file `plugin-pack-content-libraries` (full skill corpora), `plugin-uninstall`,
+    `fast-tier-persona-validation`, **`tier-taxonomy-rename`** (Ruling 17 — the eventual `tier:` → `dispatch_band:`
+    frontmatter rename) (route through PM curation). Record in the CLOSURE `## Backlog returns`.
+  - **Dispositions:** archive `plugin-packs-and-install-command` + `model-tier-efficiency-and-fast-tier-utilization` →
+    `specs/_archive/v0.1.60/consumed-backlog/` + `consumed_backlog.json`; terminal status `DELIVERED — v0.1.60` (both
+    anchors survive → CLOSURE archival). **Bug terminal event:** append `dadaia bugs append --bug-id
+    public-install-clobbers-consumer-repo-agents-md --event resolved --release v0.1.60` (never dropped — solved by FR9;
+    the `resolved` event is appended NOW at closure, not at definition). Record all in the CLOSURE `## Dispositions`
+    table (bug row: `resolved` / evidence = the FR9 commit SHA + AC-14 test).
+  - `dadaia specs doctor` clean; request `git mv specs/releases/v0.1.60 → specs/_archive/releases/`
+    (devops/operator); set `ACTIVE.md` → `release: none` (final release of the R9→R12 mandate); mark candidates R12 row
+    **SHIPPED — v0.1.60**.
