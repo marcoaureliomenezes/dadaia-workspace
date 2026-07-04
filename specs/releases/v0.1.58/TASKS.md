@@ -449,7 +449,25 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W6 — gates + ship
 
-- [ ] T-58-60 Full local gates (AC-10) + self-hosting reconcile (AC-12), then ship. Checklist:
+- [x] T-58-60 Full local gates (AC-10) + self-hosting reconcile (AC-12), then ship. **Gate evidence
+  (2026-07-04, tree = 6e16a98b):** unpiped full pytest **4566 passed / 17 skipped, exit 0**; ruff
+  format --check clean (795 files); ruff check --no-cache clean; mypy --strict clean (309 files);
+  lint-imports --no-cache **8 kept / 0 broken** + ignore-cap 4/4 UNCHANGED (A1 held: no new
+  features→infra / infra→features edge); `dadaia specs doctor` exit 0; `dadaia backlog doctor` exit 0;
+  frozen v0.1.50 no-steal suite **zero-diff**; no `public/**` asset content changed; no
+  `specs/backlog/**` staged (both anchors survive → CLOSURE archival). **AC-12 reconcile (Ruling M,
+  doctor-before-install, executed + recorded):** stage exit 0 → pre-install doctor surfaced the FULL
+  consumer write set — 6 consumer repos (bothub-provisioner, burrinhos-barbe, dadaia-bots,
+  dd-chain-capture, dd-chain-explorer, tauan-games), each `[drift]` AGENTS.md + `[missing]` CLAUDE.md,
+  12 targets total, self-repo absent — PM reviewed: all lib-owned root law files, no nested/operator
+  files → install restored each divergent root with the DISTINCT `[updated]` line + created the
+  CLAUDE.md bridges, self-repo `[skip]` (self-projection) → confirming doctor exit 0, **0
+  drift/missing, [ok] public-privacy**. Every consumer overwrite appeared in the pre-install surface —
+  no silent clobber. **QA ship gate: APPROVE, zero blockers** (AC-1..8 traced + spot-run green;
+  golden-first verified by commit order; 9/9 AC-9 evidences specific; slop check clean; AC-12 claims
+  verified against the tree) — handoff `2026-07-04T124902Z-qa-engineer-v0158-ship-gate.handoff.json`.
+  Ship steps (security push gate keyed to pushed sha; push; CI watch; PR; merge) executed after this
+  flip. Checklist:
   - **Unpiped** `pytest` (real exit) — full suite green; `ruff format --check`; `ruff check --no-cache`;
     `mypy --strict dadaia_workspace`.
   - `lint-imports --no-cache` → **`8 kept, 0 broken`**; ignore-cap UNCHANGED — `core/harness_registry.py` is
