@@ -268,7 +268,18 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W5 — gates + ship
 
-- [ ] T-56-50 Full local gates (AC-6) then ship. Checklist:
+- [x] T-56-50 Full local gates (AC-6) then ship. **Gate evidence (2026-07-04, tree = 4e6ed9cd):**
+  unpiped full pytest **4406 passed / 17 skipped, exit 0** (722s); `ruff format --check` clean (772
+  files); `ruff check --no-cache` clean; `mypy --strict` clean (302 files); `lint-imports --no-cache`
+  **8 kept / 0 broken**; ignore-cap contract test 4/4 (total == 26, families 9/4/13 UNCHANGED);
+  `dadaia specs doctor` exit 0; `dadaia backlog doctor` exit 0; `dadaia public doctor` exit 0 with
+  `[ok] public-privacy` (zero `public/` change, per the W4 A9 pre-justification). Frozen v0.1.50
+  no-steal suite **zero-diff** (the two "release"-substring grep hits are `model_by_kind` factory-arg
+  repoints, not lease/gate files). **No `specs/backlog/**` staged on the branch** (archival deferred
+  to CLOSURE — both anchors survive). **QA ship gate: APPROVE, zero blockers** (5/5 AC coverage
+  re-verified in a fresh 77-test targeted run; all three wave adjudications ruled sound; no slop) —
+  handoff `2026-07-04T024052Z-qa-engineer-v0156-ship-gate.handoff.json`. Ship steps (security
+  push-gate keyed to pushed sha; push; CI watch; PR; merge) executed after this flip. Checklist:
   - **Unpiped** `pytest` (real exit) — full suite green.
   - `ruff format --check`; `ruff check --no-cache`; `mypy --strict dadaia_workspace`.
   - `lint-imports --no-cache` → **`8 kept, 0 broken`**; the ignore-cap test → total `== 26` +
