@@ -343,7 +343,19 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W6 — gates + ship
 
-- [-] T-57-60 Full local gates (AC-11) + public re-projection, then ship. Checklist:
+- [x] T-57-60 Full local gates (AC-11) + public re-projection, then ship. **Gate evidence (2026-07-04,
+  tree = cc4f4f63):** unpiped full pytest **4490 passed / 17 skipped, exit 0**; ruff format --check
+  clean (783 files); ruff check --no-cache clean; mypy --strict clean (305 files); lint-imports
+  --no-cache **8 kept / 0 broken** + ignore-cap 4/4 UNCHANGED; `dadaia specs doctor` exit 0;
+  `dadaia backlog doctor` clean after the dead-anchor SHIP archival (BL-SCHEMA fired on the deleted
+  `_warn_model_deprecated` anchor exactly as planned → `hard-remove-model-flag-across-run-verbs`
+  archived to `specs/_archive/v0.1.57/` w/ ledger, cc4f4f63); `dadaia public stage && install
+  --target all && public doctor` exit 0 **[ok] public-privacy** (sole public edit:
+  implementation/qa-review.md); frozen v0.1.50 no-steal suite **zero-diff**; ctx_inject.py
+  **byte-identical to main**. **QA ship gate: APPROVE** (AC-1..AC-9 each mapped to named passing
+  tests, 92 spot-run green; golden-first verified by commit order; all 7 AC-10 evidences specific;
+  slop check clean) — handoff `2026-07-04T082055Z-qa-engineer-v0157-ship-gate.handoff.json`. Ship
+  steps (security push gate keyed to pushed sha; push; CI watch; PR; merge) executed after this flip. Checklist:
   - **Unpiped** `pytest` (real exit) — full suite green; `ruff format --check`; `ruff check --no-cache`;
     `mypy --strict dadaia_workspace`.
   - `lint-imports --no-cache` → **`8 kept, 0 broken`**; ignore-cap contract UNCHANGED (the new
