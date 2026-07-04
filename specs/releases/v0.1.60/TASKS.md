@@ -381,7 +381,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W5 — per-pack sandboxed E2E (qa-engineer)
 
-- [ ] T-60-50 Per-pack E2E. Owner: qa-engineer. Write set: NEW `tests/e2e/features/test_plugin_pipeline.py` (or a
+- [x] T-60-50 Per-pack E2E. Owner: qa-engineer. Write set: NEW `tests/e2e/features/test_plugin_pipeline.py` (or a
   sibling of `test_public_pipeline.py` reusing its helpers). Checklist:
   - Scaffold a workspace in-process via `CliRunner.invoke`; assert: (a) fresh no-plugin → the 3 agents are stubs +
     descriptors-present-zero-plugin doctor green + golden (b) byte-lock; (b) `plugin install frontend-design` → both
@@ -399,6 +399,49 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     scenario (d) FAILS (pack body reverts to stub); with the T-60-45 banner discriminator dropped, scenario (e) FAILS
     (registered hand-authored `AGENTS.md` clobbered). Capture the command + failing E2E.
   - AC-13 ledger — NEW/EXTENDED: the per-pack E2E. No `specs/backlog/**`.
+  - **DONE-evidence:**
+    - NEW `tests/e2e/features/test_plugin_pipeline.py` — real-CLI in-process E2E (`CliRunner` + `tmp_path`, mirroring
+      `test_public_pipeline.py`); **6 tests → 5 passed + 1 xfailed**, module wall-time **~7.7s** (call-time 6.1s;
+      transient 10.x readings were post-suite machine load) — inside the ~10s bound. `-p no:cacheprovider`, venv faked
+      by the conftest autouse fixture. Scenario evidence (real `dadaia` verbs):
+      - **(a)** fresh `dadaia init --harness all` → all 3 plugin agents are `plugin: true` stubs (no pack-body heading);
+        empty ledger; **golden (b) doctor byte-lock** reused from `tests/integration/_golden/plugin_doctor_report_golden_b_v0160.json`
+        (same three-leak normalization) + zero `[missing]`/`[drift]` blockers (green). `test_a_fresh_no_plugin_stubs_doctor_green_and_golden_b_bytelock` PASS.
+      - **(b)+(c)+(d)** merged install-chain `test_bcd_install_chain_and_core_reinstall_precedence` PASS: `plugin install
+        frontend-design` → `frontend-engineer`+`design-specialist` real bodies (`# … [plugin]`), codex tomls render
+        `gpt-5.3-codex` (plugin tier, not `gpt-5.5`), `installed_plugins.json` = `{"schema_version":"1","plugins":["frontend-design"]}`,
+        `dadaia public doctor` exit 0; then `plugin install devops` → `devops-engineer` real, ledger accumulates; then core
+        `dadaia public install --target all` keeps ALL 3 pack bodies (AC-4 precedence).
+      - **(e/FR9, QA-4)** split: `test_e_install_registered_hand_authored_consumer_survives_byte_identical` PASS — a
+        REGISTERED (schema-v2 `spec_contexts.json`) consumer `repos/game` with a hand-authored root `AGENTS.md` survives
+        `public install --target all` byte-identical (`[foreign] … — left untouched`, no `CLAUDE.md` orphan); a
+        stale-canonical `repos/stale` is restored + `[updated]`. The DOCTOR half
+        `test_e_public_doctor_exits_zero_for_hand_authored_consumer` is **`xfail(strict=True)`** against **OPEN HIGH bug
+        `public-doctor-flags-hand-authored-consumer-agents-md`**: the real `dadaia public doctor` emits
+        `[drift] repos/game:AGENTS.md` + `[missing] repos/game:CLAUDE.md` and EXITS **1** (not the Ruling-16 `[foreign]`
+        pair + exit 0) because FR9's `_doctor_guardrail_pair` is imported but **never called by `manager.doctor()`**
+        (consumer doctor lines still come from `runtime_expectations`). Strict xfail = regression lock: it XPASSES → suite
+        red the moment software-engineer wires the provenance gate into the doctor fan-out; the marker must then be removed.
+      - **(f/QA-5)** `test_f_double_install_frontend_design_ledger_idempotent` PASS — a second `plugin install
+        frontend-design` reports "already installed" and leaves `installed_plugins.json` byte-unchanged.
+      - **(g/QA-5)** `test_g_installed_plugins_coexists_with_harness_profile_state` PASS — `init --harness claude` +
+        `plugin install frontend-design`: `harness_profile.json` byte-unchanged (`["claude"]`), ledger records the pack,
+        claude body real, NO `.codex/` orphan (profile-scoped).
+    - **AC-11 discriminating sabotages (capture → revert, both reverted CLEAN):**
+      - **(d) precedence** — in `public_assets.install()` replaced the trailing
+        `self._project_installed_plugins(agentic_dir, workspace_root, active_harnesses, force, installed)` with a no-op ⇒
+        `test_bcd_install_chain_and_core_reinstall_precedence` FAILS: `AssertionError: frontend-engineer is still a stub
+        after install`. Reverted.
+      - **(e) banner** — in `workspace_guardrail._carries_canonical_banner` replaced the banner `startswith` check with
+        `return True` ⇒ `test_e_install_registered_hand_authored_consumer_survives_byte_identical` FAILS:
+        `AssertionError: hand-authored AGENTS.md clobbered`. Reverted.
+    - **Bug filed (mandatory):** `specs/bugs/20260704T23Z-00.jsonl` — `public-doctor-flags-hand-authored-consumer-agents-md`
+      (HIGH). Surfaced to project-manager (REQUEST_CHANGES on FR9's doctor wiring) for software-engineer remediation.
+    - Gates: `ruff format --check` + `ruff check --no-cache` (dadaia_workspace/ + tests/, 812 files) + `mypy --strict
+      dadaia_workspace` (312 files, 0 issues) + `mypy --strict` on the new test file (0 issues) + `lint-imports` **8 kept /
+      0 broken** (E2E-only, no import edges) + **full unpiped `pytest` = 4674 passed, 17 skipped, 1 xfailed, 0 failed**.
+      Goldens untouched (integration `_golden/` byte-identical). Caches removed; `git status` clean (test + this marker +
+      the bug jsonl). Commit `test(T-60-50): ...`.
 
 ## W6 — gates + ship
 
