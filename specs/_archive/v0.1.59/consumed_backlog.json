@@ -1,0 +1,13 @@
+{
+  "release": "v0.1.59",
+  "consumed": [
+    {
+      "slug": "panel-ux-overhaul",
+      "shipped_anchors": [
+        "dadaia_workspace/features/panel/views/index.py#render_index",
+        "dadaia_workspace/features/panel/views/assets/css/tokens.py#TOKENS_CSS"
+      ],
+      "note": "DELIVERED — v0.1.59 (archived at CLOSURE, both anchors survive). Token-driven design system: TOKENS_CSS rationalized with 14 additive semantic tokens (--font-weight-*, --line-height-*, --focus-ring-*, --control-*) mapped onto the frozen 5-color brand palette (Ruling E — palette untouched); one uniform control language grep-gated by the test_control_tokens.py allowlist + reject regexes (no raw hex / px font-size / px border-radius outside tokens); the wrapping shared header/control rows fixed STRUCTURALLY (display:block on .section-header:has(.runtime-switcher) — genuinely RED at every width, not a squeeze fix) and locked by header-row-width.spec.ts (3 themes x 1024/1440px); layout/IA pass with <header class=\"section-header\"> landmarks on academy/reports/workflows and theme-popover polish; zero inline style= on index/sessions; two-category dead-CSS purge (-905 lines) incl. the coordinated Category-B deletion of views/assets/css/agents.py#AGENTS_CSS with its 3 live importers co-edited and a zero-grep gate (PM Ruling 1 — it was NOT an orphan); CSP pre-paint scripts byte-frozen by the hash-equality lock; DOM presence-invariant contract test on populated fixtures (never re-baselined); local Playwright 53 pass / 1 skip incl. axe x3 themes. Ship PR #108, squash e6634996."
+    }
+  ]
+}

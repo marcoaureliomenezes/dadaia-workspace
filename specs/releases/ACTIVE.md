@@ -1,15 +1,14 @@
 ---
-release: v0.1.59
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.59 — Panel UX Overhaul
+# Active release: none
 
-Sequence position: **R11 of the operator-approved 12-release plan**; third
-release of the operator's R9→R12 continuation mandate (2026-07-04). Visual
-redesign on the stabilized post-v0.1.52 panel, under the recorded
-`plugin-scope` deviation (operator 2026-07-02). Consumes `panel-ux-overhaul`.
-Open-bug debt at pick: none (ledger 0).
+No release is active. v0.1.59 (R11 — Panel UX Overhaul) is CLOSED and ARCHIVED
+at `specs/_archive/releases/v0.1.59/` (merged `e6634996`, PR #108).
 
-Previous: **v0.1.58** — CLOSED and ARCHIVED at `specs/_archive/releases/v0.1.58/`
-(merged `b0bd8217`; closure `63023ba2`).
+Next in the operator mandate: **R12 (v0.1.60) Capability tail** — consumes
+`plugin-packs-and-install-command` +
+`model-tier-efficiency-and-fast-tier-utilization`; final release of the
+R9→R12 continuation mandate (2026-07-04).

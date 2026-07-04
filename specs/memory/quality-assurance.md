@@ -16,7 +16,7 @@ tags:
   - test-architecture
 token_estimate: 2210
 last_updated: '2026-07-04'
-release_origin: v0.1.58
+release_origin: v0.1.59
 ---
 
 ## Purpose
@@ -143,6 +143,26 @@ consolidated platform-invariance layer at capture (host-state canonicalization +
 + OS-phrase canonicalization) rather than re-discovering each leak class one CI round at a time —
 tracked by the backlog return `golden-platform-normalization-layer`. Assume nothing renders identically
 cross-platform until the golden is proven byte-stable on the `-cross` jobs.
+
+**Intentional-restyle lock pattern (v0.1.59) — presence-invariant + zero-touch equality lock.** When a
+release **deliberately restyles a rendered surface** (a UX/visual overhaul where the markup/CSS
+changes on purpose), a byte-golden of the rendered output is the WRONG lock — every wave would force a
+regeneration, and a lock you regenerate every wave locks nothing. Use two complementary locks instead.
+(1) **Presence-invariant contract test, never re-baselined.** Render the real surface over **populated**
+fixtures (fakes that actually exercise the data-dependent selectors — an empty fake silently drops the
+assertions it never renders) and assert the **presence** of the e2e selector contract (ids, classes,
+ARIA hooks). This survives an intentional restyle because it asserts *structure exists*, not *bytes
+match*; declare it a never-re-baselined invariant so any asserted-selector change is a STOP-and-rescope,
+not a silent regen. (2) **Zero-touch equality lock for constants that must NOT move.** Freeze anything
+the restyle must not perturb (e.g. the CSP inline-script sha256 hashes) to a hardcoded baseline value.
+This is strictly stronger than a coverage-style check: a `len==N`-inline-scripts + recompute-and-cover
+test **passes** when a script body and its hash change *together* (edit-with-recompute), whereas the
+equality lock catches exactly that — the constant moved off baseline. Pair the two with the
+golden-first discipline: capture both locks BEFORE the first restyle so a dropped selector or a moved
+constant fails loudly in unit CI (the GH-only browser e2e is a backstop, not the primary guard).
+v0.1.59's panel overhaul proved the split — the presence-invariant `test_index_dom_contract.py` caught a
+dropped `.memory-chip` that the browser response-guard e2e null-guarded past, and the equality lock
+caught an edit-with-recompute that `TestInlineScriptCspCoverage` passed.
 
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:
