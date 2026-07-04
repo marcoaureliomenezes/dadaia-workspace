@@ -31,9 +31,20 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W1 — FR1 policy resolver on every run-a-worker verb
 
-- [ ] T-56-10 Route all **7 verbs** — `release define`, `backlog define`, `implement`, `review qa`,
+- [x] T-56-10 Route all **7 verbs** — `release define`, `backlog define`, `implement`, `review qa`,
   `review security`, `review code`, `close` — through the shared resolver; retire the raw
-  `<id>:<effort>` path. Checklist:
+  `<id>:<effort>` path. **AC-7 evidence:** (a) `policy_snapshot=None` in `release_define` ⇒
+  `test_lifecycle_verb_governance.py::test_verb_persists_resolver_derived_snapshot[release-define]`
+  FAILED (`workflow_policy is None`) → reverted; (e) disable the D-3 raw-string guard in
+  `_parse_step_profile_overrides` ⇒ `::test_verb_rejects_raw_step_model[release-define,backlog-define]`
+  FAILED → reverted. **AC-8 ledger** — SURVIVING (all gain governance): `release_define`,
+  `backlog_define`, `implement`, `review_qa/security/code`, `close`, `pipeline`,
+  `apply_resolved_policy` (now generic over the structural `PolicyApplicableStep` Protocol);
+  NEW: `apply_entry_to_step`, `PolicyApplicableStep`, `_warn_model_deprecated`,
+  `_resolve_workflow_snapshot`, `_parse_step_harness_overrides`, `ReleaseStep`/`BacklogStep`
+  `resolved_model`+`model_profile` fields + `policy_snapshot` on both workflow `__init__`s;
+  DEAD (removed): `_resolve_model`, `_HARNESS_CATALOG_KEY`, the CLI raw `<id>:<effort>` path,
+  the builders' `models`-by-kind arg. No `specs/backlog/**` staged. Checklist:
   - **Extract `apply_entry_to_step(entry, *, base_kind, preserve_fake) -> (AgentRuntimeKind,
     ResolvedModelConfig)`** (`pipeline.py`, R-2): the single FAKE-preserving per-step author
     (`codex→CODEX_EXEC`, `pi→PI_HEADLESS`; returns FAKE when `preserve_fake`). `apply_resolved_policy(steps,

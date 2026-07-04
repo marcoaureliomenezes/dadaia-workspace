@@ -78,7 +78,6 @@ def _install_fake_factory(monkeypatch: pytest.MonkeyPatch) -> None:
         *,
         context: str,  # noqa: ARG001
         run_cwd: Path,  # noqa: ARG001
-        model_by_kind: dict[AgentRuntimeKind, object],  # noqa: ARG001
     ) -> object:
         def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
             return _KindReportingFake(kind, approving)

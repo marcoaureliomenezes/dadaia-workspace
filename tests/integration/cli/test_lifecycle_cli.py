@@ -125,14 +125,20 @@ def test_lifecycle_implement_rejects_claude_harness_with_layer1_pointer(
     assert "pi or codex" in result.output
 
 
-def test_lifecycle_implement_rejects_invalid_model_with_valid_set(
+def test_lifecycle_implement_rejects_raw_step_model_and_deprecates_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """LAW 2: an invalid ``(harness, model)`` pair lists the harness's valid options."""
+    """v0.1.56 FR1 (rewritten from the inverted LAW-2 raw-model rejection):
+
+    (a) ``--step-model implement=<id>:<effort>`` (a raw model string) is rejected as a D-3
+        profile-id violation; (b) ``--model`` is a NON-FATAL deprecation warning to stderr —
+        the verb proceeds under the resolved policy rather than hard-rejecting the flag.
+    """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(
+    # (a) raw --step-model is a D-3 rejection (profile ids only).
+    raw = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -141,14 +147,30 @@ def test_lifecycle_implement_rejects_invalid_model_with_valid_set(
             "v0.1.24",
             "--harness",
             "codex",
-            "--model",
-            "gpt-9.9:high",
+            "--step-model",
+            "implement=gpt-5.5:high",
         ],
     )
+    assert raw.exit_code != 0
+    assert "profile id" in raw.output
 
-    assert result.exit_code != 0
-    assert "gpt-5.5:high" in result.output
-    assert "gpt-5.5:medium" in result.output
+    # (b) --model emits the stderr deprecation warning and proceeds. Click 8.3 keeps stderr
+    # separate from stdout by default, so result.stderr isolates the warning.
+    dep = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "implement",
+            "--release-id",
+            "v0.1.24",
+            "--harness",
+            "fake",
+            "--model",
+            "anything:high",
+        ],
+    )
+    assert "--model is deprecated" in dep.stderr
+    assert "--step-model" in dep.stderr
 
 
 def test_lifecycle_implement_rejects_claude_step_harness_in_pipeline(

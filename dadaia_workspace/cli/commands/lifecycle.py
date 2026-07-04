@@ -10,19 +10,12 @@ from typing import Any
 
 import typer
 
-from dadaia_workspace.core.harness_models import (
-    CODEX_HARNESS,
-    PI_HARNESS,
-    HarnessModelOption,
-)
-from dadaia_workspace.core.harness_models import (
-    validate as validate_harness_model,
-)
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     GateEvidenceKind,
     LifecyclePhase,
 )
+from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
@@ -47,13 +40,6 @@ _HARNESS_KINDS = {
     "fake": AgentRuntimeKind.FAKE,
     "codex": AgentRuntimeKind.CODEX_EXEC,
     "pi": AgentRuntimeKind.PI_HEADLESS,
-}
-
-# Harness names → the CLI ``--harness`` value that selects a discrete model catalog
-# (LAW 2). ``fake`` carries no model. Used to map a chosen harness to its catalog key.
-_HARNESS_CATALOG_KEY = {
-    "codex": CODEX_HARNESS,
-    "pi": PI_HARNESS,
 }
 
 # Harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer. Claude is a
@@ -353,7 +339,7 @@ def backlog_define(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
     ),
     step_harness: list[str] | None = typer.Option(
         None,
@@ -364,8 +350,9 @@ def backlog_define(
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
-        help="Per-step model override 'step=model' (repeatable); model is "
-        "'<id>:<effort>' valid for that step's harness (LAW 2).",
+        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
+        "profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -382,6 +369,7 @@ def backlog_define(
 
     from dadaia_workspace import container
     from dadaia_workspace.features.backlog.classifier import BoundItem
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         _SEQUENCE,
         AuthoredItem,
@@ -390,49 +378,37 @@ def backlog_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
 
     # Per-step harness overrides, keyed by the §4 model-step labels.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
-    overrides: dict[str, AgentRuntimeKind] = {}
-    harness_by_label: dict[str, str] = {}
-    for item in step_harness or []:
-        label, sep, kind_str = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
-        clean_label = label.strip()
-        if clean_label not in valid_labels:
-            raise typer.BadParameter(
-                f"unknown backlog-definition step {clean_label!r}; "
-                f"valid steps: {', '.join(sorted(valid_labels))}"
-            )
-        overrides[clean_label] = _resolve_harness(kind_str.strip())
-        harness_by_label[clean_label] = kind_str.strip()
+    step_harness_kinds, step_harness_names = _parse_step_harness_overrides(
+        step_harness, valid_labels=valid_labels, verb="backlog-definition"
+    )
 
-    # LAW 2 — resolve the discrete model per runtime kind.
-    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
-    default_model = _resolve_model(harness, model)
-    if default_model is not None:
-        models[default_kind] = default_model
-    for item in step_model or []:
-        label, sep, model_str = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
-        clean_label = label.strip()
-        step_harness_name = harness_by_label.get(clean_label, harness)
-        resolved = _resolve_model(step_harness_name, model_str.strip())
-        if resolved is not None:
-            models[_resolve_harness(step_harness_name)] = resolved
+    # FR1: resolve the frozen policy snapshot through the shared resolver; seed each base
+    # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3) so apply_resolved_policy
+    # — the sole runtime_kind author — preserves FAKE while recording the governed harness.
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="backlog_definition",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names=step_harness_names,
+    )
+    base = tuple(
+        _replace(step, runtime_kind=step_harness_kinds.get(step.label, default_kind))
+        for step in _SEQUENCE
+    )
+    sequence = apply_resolved_policy(base, snapshot)
 
     workflow = container.build_backlog_definition_workflow(
         workspace_root,
         context=context,
         release_id=release_id,
         default_runtime_kind=default_kind,
-        models=models,
-    )
-    sequence = tuple(
-        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
-        for step in _SEQUENCE
+        policy_snapshot=snapshot,
     )
     # The CLI verb walks the §4 sequence on the chosen harness; absent a structured demand
     # source it threads an empty demand (no proposed intents, an empty authored result) so
@@ -497,7 +473,7 @@ def release_define(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Default discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
     ),
     step_harness: list[str] | None = typer.Option(
         None,
@@ -508,8 +484,9 @@ def release_define(
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
-        help="Per-step model override 'step=model' (repeatable); model is "
-        "'<id>:<effort>' valid for that step's harness (LAW 2).",
+        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
+        "profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -521,57 +498,45 @@ def release_define(
     missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
     advances the release to IMPLEMENTATION only when every gate passed.
     """
+    from dataclasses import replace as _replace
+
     from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
     from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    _warn_model_deprecated(model)
 
     # Per-step harness overrides, keyed by the §6.1 step label.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
-    overrides: dict[str, AgentRuntimeKind] = {}
-    harness_by_label: dict[str, str] = {}
-    for item in step_harness or []:
-        label, sep, kind_str = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
-        clean_label = label.strip()
-        if clean_label not in valid_labels:
-            raise typer.BadParameter(
-                f"unknown release-definition step {clean_label!r}; "
-                f"valid steps: {', '.join(sorted(valid_labels))}"
-            )
-        overrides[clean_label] = _resolve_harness(kind_str.strip())
-        harness_by_label[clean_label] = kind_str.strip()
+    step_harness_kinds, step_harness_names = _parse_step_harness_overrides(
+        step_harness, valid_labels=valid_labels, verb="release-definition"
+    )
 
-    # LAW 2 — resolve the discrete model per runtime kind. The default --model applies to
-    # the default harness; --step-model overrides per label (keyed onto its step's kind).
-    models: dict[AgentRuntimeKind, HarnessModelOption] = {}
-    default_model = _resolve_model(harness, model)
-    if default_model is not None:
-        models[default_kind] = default_model
-    for item in step_model or []:
-        label, sep, model_str = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--step-model expects 'step=model', got {item!r}")
-        clean_label = label.strip()
-        step_harness_name = harness_by_label.get(clean_label, harness)
-        resolved = _resolve_model(step_harness_name, model_str.strip())
-        if resolved is not None:
-            models[_resolve_harness(step_harness_name)] = resolved
+    # FR1: resolve the frozen policy snapshot through the shared resolver; seed each base
+    # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3) so apply_resolved_policy
+    # — the sole runtime_kind author — preserves FAKE while recording the governed harness.
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id="release_definition",
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names=step_harness_names,
+    )
+    base = tuple(
+        _replace(step, runtime_kind=step_harness_kinds.get(step.label, default_kind))
+        for step in _SEQUENCE
+    )
+    sequence = apply_resolved_policy(base, snapshot)
 
     workflow = container.build_release_definition_workflow(
         workspace_root,
         context=context,
         release_id=release_id,
         default_runtime_kind=default_kind,
-        models=models,
-    )
-    from dataclasses import replace as _replace
-
-    sequence = tuple(
-        _replace(step, runtime_kind=overrides.get(step.label, step.runtime_kind))
-        for step in _SEQUENCE
+        policy_snapshot=snapshot,
     )
     result = workflow.run(run_id, sequence)
 
@@ -684,7 +649,13 @@ def implement(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'implement=profile-id' (repeatable). Profile ids "
+        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -698,7 +669,10 @@ def implement(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        workflow_id="implementation",
+        catalog_step_label="implement",
         model=model,
+        step_model=step_model,
         json_output=json_output,
     )
 
@@ -718,23 +692,100 @@ def _resolve_harness(harness: str) -> AgentRuntimeKind:
         raise typer.BadParameter(f"unknown harness '{harness}'; choose one of: {choices}") from exc
 
 
-def _resolve_model(harness: str, model: str | None) -> HarnessModelOption | None:
-    """Validate a ``(harness, model)`` selection against the discrete catalog (LAW 2).
+def _warn_model_deprecated(model: str | None) -> None:
+    """Emit the non-fatal ``--model`` deprecation warning (v0.1.56 FR1 ruling).
 
-    Returns ``None`` when no model is requested (adapter keeps its default), or when the
-    harness has no catalog (``fake``). An invalid pair raises a ``BadParameter`` whose
-    message lists the harness's valid options.
+    ``--model`` (the raw ``<id>:<effort>`` discrete-model selection) is superseded by the
+    governed policy resolver. Rather than a silent no-op (a hidden side-effect anti-slop
+    defect) or a hard error (which would break every script/test still passing ``--model``
+    mid-mandate), the flag is accepted and the verb proceeds under the resolved policy after
+    emitting ONE stderr line naming the replacement. STDERR keeps a ``--json`` payload on
+    stdout parseable (R-QA-1). A CLOSURE backlog return tracks hard-removing ``--model``.
     """
     if model is None:
-        return None
-    key = _HARNESS_CATALOG_KEY.get(harness.lower())
-    if key is None:
-        raise typer.BadParameter(
-            f"harness '{harness}' takes no --model; only pi and codex select a discrete model"
-        )
+        return
+    typer.echo(
+        "warning: --model is deprecated and ignored; the per-step model is now governed by "
+        "the policy resolver. Use --step-model <label>=<profile-id> instead "
+        "(run 'dadaia lifecycle workflow profiles list' for the valid profile ids).",
+        err=True,
+    )
+
+
+def _parse_step_harness_overrides(
+    step_harness: list[str] | None,
+    *,
+    valid_labels: set[str],
+    verb: str,
+) -> tuple[dict[str, AgentRuntimeKind], dict[str, str]]:
+    """Parse ``--step-harness 'label=harness'`` items into ``(kinds, names)`` maps.
+
+    ``kinds`` drives the base-sequence seeding (fake-vs-real sentinel); ``names`` is threaded
+    into the governed resolver as per-step harness overrides. An unknown step label or a
+    malformed item is a clean ``BadParameter``.
+    """
+    kinds: dict[str, AgentRuntimeKind] = {}
+    names: dict[str, str] = {}
+    for item in step_harness or []:
+        label, sep, kind_str = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--step-harness expects 'step=harness', got {item!r}")
+        clean_label = label.strip()
+        if clean_label not in valid_labels:
+            raise typer.BadParameter(
+                f"unknown {verb} step {clean_label!r}; "
+                f"valid steps: {', '.join(sorted(valid_labels))}"
+            )
+        clean_name = kind_str.strip().lower()
+        kinds[clean_label] = _resolve_harness(clean_name)
+        names[clean_label] = clean_name
+    return kinds, names
+
+
+def _resolve_workflow_snapshot(
+    workspace_root: Path,
+    *,
+    workflow_id: str,
+    context: str,
+    harness: str,
+    step_model: list[str] | None,
+    step_harness_names: dict[str, str],
+) -> WorkflowPolicySnapshot:
+    """Resolve a workflow's frozen policy snapshot through the shared resolver (FR1).
+
+    ``--step-model`` is profile-ids-only (D-3, raw ``<id>:<effort>`` rejected via
+    :func:`_parse_step_profile_overrides`). ``fake`` is the dry-run sentinel — never threaded
+    into ``resolve`` as a governed harness (the base sequence seeded on FAKE is preserved by
+    ``apply_resolved_policy``). This is the one seam every run-a-worker verb resolves through.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        PolicyResolutionError,
+        StepHarnessOverride,
+        StepOverride,
+    )
+
+    cli_overrides = _parse_step_profile_overrides(step_model)
+    typed_overrides: tuple[StepOverride, ...] = tuple(
+        ov for ov in cli_overrides if isinstance(ov, StepOverride)
+    )
+    default_harness_name = harness.lower()
+    resolve_default_harness = None if default_harness_name == "fake" else default_harness_name
+    typed_step_harness: tuple[StepHarnessOverride, ...] = tuple(
+        StepHarnessOverride(step=label, harness=name)
+        for label, name in step_harness_names.items()
+        if name != "fake"
+    )
+    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
     try:
-        return validate_harness_model(key, model)
-    except ValueError as exc:
+        return resolver.resolve(
+            workflow_id,
+            context="default",
+            cli_overrides=typed_overrides,
+            default_harness=resolve_default_harness,
+            step_harness_overrides=typed_step_harness,
+        )
+    except PolicyResolutionError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
 
@@ -817,26 +868,50 @@ def _run_phase_step(
     release_id: str,
     run_id: str,
     harness: str,
+    workflow_id: str,
+    catalog_step_label: str,
     json_output: bool,
     model: str | None = None,
+    step_model: list[str] | None = None,
     post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
 ) -> None:
     """Run one bounded lifecycle step through the engine on a selectable harness.
 
-    Shared by every single-step lifecycle verb (backlog/release define, implement,
-    review qa|security|code, close). The harness is chosen per invocation (LAW 1:
-    pi/codex/fake only — ``claude`` is rejected); ``--model`` selects the discrete
-    Layer-2 model (LAW 2). The worker must emit an APPROVED handoff with an
-    artifact_ref to advance the phase.
+    Shared by every single-step lifecycle verb (implement, review qa|security|code, close).
+    The harness is chosen per invocation (LAW 1: pi/codex/fake only — ``claude`` is
+    rejected). FR1: the step's model is governed — the verb resolves the ``workflow_id``
+    snapshot through the shared resolver, selects its ``catalog_step_label`` entry, and calls
+    :func:`apply_entry_to_step` ONCE (there is no step object to iterate) to author its local
+    ``runtime_kind`` (FAKE preserved for a dry-run) + ``resolved_model``. ``--step-model`` is
+    profile-ids-only (D-3); ``--model`` is a non-fatal deprecation warning. The frozen
+    snapshot is passed to ``LifecyclePhaseWorkflow.run`` so the run records it (LAW 7). The
+    worker must emit an APPROVED handoff with an artifact_ref to advance the phase.
     """
     from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.pipeline import apply_entry_to_step
 
     workspace_root = resolve_workspace_root()
     kind = _resolve_harness(harness)
-    resolved_model = _resolve_model(harness, model)
-    workflow = container.build_lifecycle_phase_workflow(
-        workspace_root, runtime_kind=kind, model=resolved_model
+    _warn_model_deprecated(model)
+    snapshot = _resolve_workflow_snapshot(
+        workspace_root,
+        workflow_id=workflow_id,
+        context=context,
+        harness=harness,
+        step_model=step_model,
+        step_harness_names={},
     )
+    entry = snapshot.step(catalog_step_label)
+    if entry is None:
+        raise typer.BadParameter(
+            f"workflow {workflow_id!r} has no governed step {catalog_step_label!r}"
+        )
+    # apply_entry_to_step is the SOLE runtime_kind author (no step object here): FAKE is
+    # preserved for a fake run while the snapshot still records the governed harness/model.
+    local_kind, resolved_model = apply_entry_to_step(
+        entry, base_kind=kind, preserve_fake=(harness.lower() == "fake")
+    )
+    workflow = container.build_lifecycle_phase_workflow(workspace_root, runtime_kind=local_kind)
     scope = PromptScope(
         role=role,
         context=context,
@@ -845,6 +920,8 @@ def _run_phase_step(
         prompt=_phase_step_prompt(label, release_id, context, target_phase),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
+        model_profile=entry.model_profile,
+        resolved_model=resolved_model,
         persona=resolve_persona_for_role(role),
     )
     result = workflow.run(
@@ -853,6 +930,7 @@ def _run_phase_step(
         from_phase=from_phase,
         target_phase=target_phase,
         scope=scope,
+        policy_snapshot=snapshot,
     )
     status = (
         LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
@@ -904,7 +982,13 @@ def review_qa(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'review_qa=profile-id' (repeatable). Profile ids "
+        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -918,7 +1002,10 @@ def review_qa(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        workflow_id="implementation",
+        catalog_step_label="review_qa",
         model=model,
+        step_model=step_model,
         json_output=json_output,
     )
 
@@ -934,7 +1021,13 @@ def review_security(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'review_security=profile-id' (repeatable). Profile "
+        "ids ONLY (D-3); see 'lifecycle workflow profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -948,7 +1041,10 @@ def review_security(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        workflow_id="implementation",
+        catalog_step_label="review_security",
         model=model,
+        step_model=step_model,
         json_output=json_output,
     )
 
@@ -964,7 +1060,13 @@ def review_code(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'review_code=profile-id' (repeatable). Profile ids "
+        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -978,7 +1080,10 @@ def review_code(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        workflow_id="implementation",
+        catalog_step_label="review_code",
         model=model,
+        step_model=step_model,
         json_output=json_output,
     )
 
@@ -994,7 +1099,13 @@ def close(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Discrete Layer-2 model '<id>:<effort>' (pi/codex only; LAW 2).",
+        help="[deprecated] superseded by governed --step-model <profile-id> (v0.1.56).",
+    ),
+    step_model: list[str] | None = typer.Option(
+        None,
+        "--step-model",
+        help="Per-step model override 'close=profile-id' (repeatable). Profile ids ONLY "
+        "(D-3); see 'lifecycle workflow profiles list'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -1032,7 +1143,10 @@ def close(
         release_id=release_id,
         run_id=run_id,
         harness=harness,
+        workflow_id="closure",
+        catalog_step_label="close",
         model=model,
+        step_model=step_model,
         json_output=json_output,
         post_step=_apply_closure_removal,
     )
@@ -1091,7 +1205,10 @@ def pipeline(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _ = model  # legacy discrete --model is superseded by profile-id --step-model (D-3).
+    # Coherence (v0.1.56): the legacy discrete --model is superseded by profile-id
+    # --step-model (D-3); accept it with the same non-fatal deprecation warning as the
+    # other run verbs rather than a silent no-op.
+    _warn_model_deprecated(model)
 
     # Parse --step-harness into label→(kind, name). The kind drives the base ladder's
     # dry-run sentinel (fake vs real); the name is threaded into the governed resolver.

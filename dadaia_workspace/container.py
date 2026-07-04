@@ -903,15 +903,17 @@ def _release_definition_runtime_factory(
     *,
     context: str,
     run_cwd: Path,
-    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the release-definition workflow.
 
-    Real harnesses (pi/codex/claude) resolve to their live adapters. ``FAKE`` resolves
-    to a *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref —
-    so ``--harness fake`` walks the whole §6.1 sequence deterministically (the DoD
-    requirement), exercising every fragment-assembled prompt and Python gate without a
-    live worker. The artifact_ref stays inside the step's allowed handoff path.
+    Real harnesses (pi/codex/claude) resolve to their live adapters — the policy-resolved
+    concrete model reaches each adapter through ``request.resolved_model`` (threaded from
+    the step's ``resolved_model`` by ``apply_resolved_policy``), not a construction-time
+    model. ``FAKE`` resolves to a *driving* fake that returns an APPROVED handoff with an
+    in-scope artifact_ref — so ``--harness fake`` walks the whole §6.1 sequence
+    deterministically (the DoD requirement), exercising every fragment-assembled prompt and
+    Python gate without a live worker. The artifact_ref stays inside the step's allowed
+    handoff path.
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -929,7 +931,7 @@ def _release_definition_runtime_factory(
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
             return FakeAgentRuntime(result=approving)
-        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+        return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
 
@@ -942,16 +944,20 @@ def build_release_definition_workflow(
     default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
-    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> "ReleaseDefinitionWorkflow":
     """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
 
     The workflow runs the §6.1 step sequence with fragment-assembled, scoped prompts and
     Python-owned gates (no generic ``"Run the step"`` suffix). The injected runtime
     factory resolves each step's ``AgentRuntimeKind`` to its adapter so harnesses can be
-    mixed per step; ``FAKE`` drives the sequence end-to-end. ``models`` maps a runtime
-    kind to its discrete Layer-2 model (LAW 2). The :class:`ContextSelector` resolves
-    each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    mixed per step; ``FAKE`` drives the sequence end-to-end. The :class:`ContextSelector`
+    resolves each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
+    ``policy_snapshot`` is the resolved governance snapshot (v0.1.56 / FR1, from
+    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
+    the first step (LAW 7). The per-step concrete model reaches the adapter through the
+    step's ``resolved_model`` (threaded by ``apply_resolved_policy``), so no model-by-kind
+    construction arg is needed.
     """
     from dadaia_workspace.features.lifecycle.context_selector import (
         ContextSelector,
@@ -963,7 +969,6 @@ def build_release_definition_workflow(
 
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
-    model_by_kind = models or {}
     context_name = resolve_bound_context_name(context) or context
     specs_dir = workspace_root / "repos" / context_name / "specs"
     if not specs_dir.is_dir():
@@ -977,12 +982,11 @@ def build_release_definition_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_release_definition_runtime_factory(
-            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
-        ),
+        runtime_factory=_release_definition_runtime_factory(context=context, run_cwd=run_cwd),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
     )
 
 
@@ -990,14 +994,15 @@ def _backlog_definition_runtime_factory(
     *,
     context: str,
     run_cwd: Path,
-    model_by_kind: dict[AgentRuntimeKind, HarnessModelOption],
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the backlog-definition workflow.
 
-    Real harnesses (pi/codex) resolve to their live adapters; ``FAKE`` resolves to a
-    *driving* fake that returns an APPROVED handoff with an in-scope artifact_ref, so
-    ``--harness fake`` walks the whole §4 sequence deterministically (mirrors the
-    release-definition fake factory).
+    Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
+    model reaches each adapter through ``request.resolved_model`` (threaded from the step's
+    ``resolved_model``), not a construction-time model; ``FAKE`` resolves to a *driving*
+    fake that returns an APPROVED handoff with an in-scope artifact_ref, so ``--harness
+    fake`` walks the whole §4 sequence deterministically (mirrors the release-definition
+    fake factory).
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -1015,7 +1020,7 @@ def _backlog_definition_runtime_factory(
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
             return FakeAgentRuntime(result=approving)
-        return build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))
+        return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
 
@@ -1028,7 +1033,7 @@ def build_backlog_definition_workflow(
     default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
     prefix: PromptPrefix | None = None,
     cwd: Path | None = None,
-    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
+    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
 ) -> "BacklogDefinitionWorkflow":
     """Compose the fragment-driven backlog-definition workflow (R2 / epic §4).
 
@@ -1036,8 +1041,10 @@ def build_backlog_definition_workflow(
     factory resolves each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the
     sequence end-to-end); the :class:`ContextSelector` resolves each fragment's dynamic
     inputs bounded by ``max_context_policy``; the R1 canonical-subject :class:`Registry`
-    backs the ``subject_bind`` Python step. ``models`` maps a runtime kind to its discrete
-    Layer-2 model (LAW 2). All roots are derived from ``workspace_root`` — never cwd.
+    backs the ``subject_bind`` Python step. ``policy_snapshot`` is the resolved governance
+    snapshot (v0.1.56 / FR1) frozen onto the run before the first step; the per-step model
+    reaches the adapter through the step's ``resolved_model``. All roots are derived from
+    ``workspace_root`` — never cwd.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.subject_registry import build_registry
@@ -1051,7 +1058,6 @@ def build_backlog_definition_workflow(
 
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
-    model_by_kind = models or {}
     context_name = resolve_bound_context_name(context) or context
     specs_dir = workspace_root / "repos" / context_name / "specs"
     source_root = workspace_root / "repos" / context_name
@@ -1078,13 +1084,12 @@ def build_backlog_definition_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_backlog_definition_runtime_factory(
-            context=context, run_cwd=run_cwd, model_by_kind=model_by_kind
-        ),
+        runtime_factory=_backlog_definition_runtime_factory(context=context, run_cwd=run_cwd),
         context_selector=selector,
         registry=registry,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
+        policy_snapshot=policy_snapshot,
     )
 
 

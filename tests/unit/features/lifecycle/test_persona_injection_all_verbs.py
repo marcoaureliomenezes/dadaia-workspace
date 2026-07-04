@@ -219,6 +219,10 @@ def test_cli_run_phase_step_injects_persona(
     """The CLI single-step path (close/qa/security/code/implement/define) injects persona."""
     from dadaia_workspace import container
     from dadaia_workspace.cli.commands import lifecycle as lifecycle_cli
+    from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
+    from dadaia_workspace.features.lifecycle.policy_resolver import (
+        WorkflowExecutionPolicyResolver,
+    )
 
     recording = _RecordingRuntime()
 
@@ -227,6 +231,13 @@ def test_cli_run_phase_step_injects_persona(
 
     monkeypatch.setattr(lifecycle_cli, "resolve_workspace_root", lambda: tmp_path)
     monkeypatch.setattr(container, "build_lifecycle_phase_workflow", _fake_phase_workflow)
+    # v0.1.56 FR1: the CLI phase path resolves a governed snapshot first; back it with the
+    # code-only governed catalog so no initialized workspace is needed for this unit test.
+    monkeypatch.setattr(
+        container,
+        "build_workflow_policy_resolver",
+        lambda *a, **k: WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog()),
+    )
 
     # The FAKE worker emits no artifact_refs → the create-step gate blocks → typer.Exit.
     with pytest.raises(typer.Exit):
@@ -239,6 +250,8 @@ def test_cli_run_phase_step_injects_persona(
             release_id=_RELEASE,
             run_id="close-run",
             harness="fake",
+            workflow_id="closure",
+            catalog_step_label="close",
             json_output=True,
         )
 

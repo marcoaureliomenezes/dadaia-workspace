@@ -12,7 +12,8 @@ and persists progress at every step (resumable).
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import Field, dataclass
+from typing import Any, ClassVar, Protocol
 
 from dadaia_workspace.core.harness_models import (
     CODEX_HARNESS,
@@ -32,6 +33,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
+    WorkflowPolicyStepEntry,
 )
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
@@ -594,54 +596,116 @@ _HARNESS_TO_KIND: dict[str, AgentRuntimeKind] = {
 }
 
 
-def apply_resolved_policy(
-    steps: tuple[PipelineStep, ...],
-    snapshot: WorkflowPolicySnapshot,
-) -> tuple[PipelineStep, ...]:
-    """Overlay a resolved policy snapshot onto pipeline steps — the single author of
-    ``runtime_kind`` (T-29-A-06 / D-2).
+class PolicyApplicableStep(Protocol):
+    """Structural contract a frozen step dataclass satisfies to receive a resolved policy.
 
-    Matches each step to its snapshot entry by label and threads the resolved concrete
-    model into the step's ``resolved_model`` (and ``model_profile`` for observability), then
-    sets ``runtime_kind`` from the snapshot's **resolved harness** so the adapter that runs
-    and the snapshot that is recorded always agree — there is no separate post-resolve
-    ``runtime_kind`` swap. A step with no matching snapshot entry is returned unchanged.
+    :func:`apply_resolved_policy` maps :func:`apply_entry_to_step` over any step exposing
+    these four attributes — the pipeline :class:`PipelineStep`, the ``ReleaseStep`` /
+    ``BacklogStep`` definition steps, and (W2) the Wave-E ``AuditStep`` / ``ResearchStep`` /
+    ``BugReportStep``. Binding a **structural** Protocol (not an enumerated type-union) is
+    what lets those frozen dataclasses receive the policy with no ``pipeline.py`` edit once
+    they gain the two model fields (R-2 decoupling).
 
-    **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
-    harness; when the caller built the step on :data:`AgentRuntimeKind.FAKE` (a dry-run or
-    a test against ``FakeAgentRuntime``), the step keeps ``FAKE`` while the governed model
-    is still threaded for auditability. Only a real (non-fake) base step adopts the
-    resolved harness's kind.
+    Read-only ``@property`` members keep the concrete non-optional ``runtime_kind`` on
+    :class:`PipelineStep` covariant with the ``| None`` declared here; the
+    ``__dataclass_fields__`` marker lets :func:`dataclasses.replace` accept a value typed as
+    the bound TypeVar under ``mypy --strict`` (a plain Protocol is not a dataclass).
+    """
+
+    __dataclass_fields__: ClassVar[dict[str, Field[Any]]]
+
+    @property
+    def label(self) -> str: ...
+    @property
+    def runtime_kind(self) -> AgentRuntimeKind | None: ...
+    @property
+    def resolved_model(self) -> ResolvedModelConfig | None: ...
+    @property
+    def model_profile(self) -> str | None: ...
+
+
+def apply_entry_to_step(
+    entry: WorkflowPolicyStepEntry,
+    *,
+    base_kind: AgentRuntimeKind | None,
+    preserve_fake: bool,
+) -> tuple[AgentRuntimeKind, ResolvedModelConfig]:
+    """Author one step's ``(runtime_kind, resolved_model)`` from its snapshot entry (R-2).
+
+    The single FAKE-preserving per-step author. It threads the snapshot entry's resolved
+    concrete model into a :class:`ResolvedModelConfig` and picks the runtime kind:
+
+    * when ``preserve_fake`` (the base step is the FAKE dry-run/test sentinel — i.e.
+      ``base_kind is FAKE``) the kind stays FAKE, so ``--harness fake`` drives the fake
+      adapter while the snapshot still records the governed harness for auditability;
+    * otherwise the kind is the snapshot's **resolved harness** mapped through
+      :data:`_HARNESS_TO_KIND` (``codex -> CODEX_EXEC``, ``pi -> PI_HEADLESS``).
+
+    Both the per-step mapper (:func:`apply_resolved_policy`) and the single-step CLI verb
+    (which has no step object to iterate) call this exactly once — it is the sole author of
+    every run-a-worker verb's ``runtime_kind``.
 
     Raises:
-        ValueError: if a snapshot entry names a harness with no known runtime kind (a
+        ValueError: if a non-fake entry names a harness with no known runtime kind (a
             corrupt/forbidden Layer-2 harness leaked past resolution).
+    """
+    resolved = ResolvedModelConfig(
+        profile_id=entry.model_profile,
+        harness=entry.harness,
+        model=entry.model,
+        reasoning=entry.reasoning,
+        source=entry.source,
+    )
+    if preserve_fake:
+        # preserve_fake ⟺ base_kind is the FAKE dry-run sentinel; keep it (never a
+        # governed harness). Defensive None fallback keeps the return non-optional.
+        return (base_kind if base_kind is not None else AgentRuntimeKind.FAKE), resolved
+    mapped = _HARNESS_TO_KIND.get(entry.harness)
+    if mapped is None:
+        raise ValueError(
+            f"step {entry.step!r}: resolved harness {entry.harness!r} has no "
+            f"runtime kind; Layer-2 workers are codex or pi only"
+        )
+    return mapped, resolved
+
+
+def apply_resolved_policy[StepT: PolicyApplicableStep](
+    steps: tuple[StepT, ...],
+    snapshot: WorkflowPolicySnapshot,
+) -> tuple[StepT, ...]:
+    """Map :func:`apply_entry_to_step` over every step that has a snapshot entry (D-2).
+
+    The single author of each step's ``runtime_kind``, now generic over the structural
+    :class:`PolicyApplicableStep` Protocol so the SAME applier governs the pipeline ladder,
+    the release-/backlog-definition sequences, and (W2) the Wave-E bodies. A step matched by
+    label adopts the snapshot's resolved concrete model into ``resolved_model`` (and
+    ``model_profile`` for observability) and its ``runtime_kind`` from the resolved harness
+    (FAKE preserved for a dry-run base). A step with no matching entry (e.g. a Python gate)
+    is returned unchanged.
+
+    **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
+    harness; a step built on :data:`AgentRuntimeKind.FAKE` keeps ``FAKE`` while the governed
+    model is still threaded for auditability. Seeding each base step's ``runtime_kind`` to
+    the run's default kind BEFORE calling this (mirroring the pipeline verb) is what keeps a
+    ``None``-kind definition step from mapping ``None -> codex/pi`` and driving a live
+    adapter on ``--harness fake`` (R-3).
+
+    Raises:
+        ValueError: if a snapshot entry names a harness with no known runtime kind.
     """
     from dataclasses import replace
 
-    out: list[PipelineStep] = []
+    out: list[StepT] = []
     for step in steps:
         entry = snapshot.step(step.label)
         if entry is None:
             out.append(step)
             continue
-        resolved = ResolvedModelConfig(
-            profile_id=entry.model_profile,
-            harness=entry.harness,
-            model=entry.model,
-            reasoning=entry.reasoning,
-            source=entry.source,
+        runtime_kind, resolved = apply_entry_to_step(
+            entry,
+            base_kind=step.runtime_kind,
+            preserve_fake=step.runtime_kind is AgentRuntimeKind.FAKE,
         )
-        if step.runtime_kind is AgentRuntimeKind.FAKE:
-            runtime_kind = AgentRuntimeKind.FAKE
-        else:
-            mapped = _HARNESS_TO_KIND.get(entry.harness)
-            if mapped is None:
-                raise ValueError(
-                    f"step {step.label!r}: resolved harness {entry.harness!r} has no "
-                    f"runtime kind; Layer-2 workers are codex or pi only"
-                )
-            runtime_kind = mapped
         out.append(
             replace(
                 step,
@@ -661,7 +725,9 @@ __all__ = [
     "PipelineResult",
     "PipelineStep",
     "PipelineStepResult",
+    "PolicyApplicableStep",
     "RuntimeFactory",
+    "apply_entry_to_step",
     "apply_resolved_policy",
     "implementation_ladder",
 ]

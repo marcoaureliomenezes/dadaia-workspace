@@ -123,7 +123,6 @@ def _install_fake_factory(
         *,
         context: str,  # noqa: ARG001
         run_cwd: Path,  # noqa: ARG001
-        model_by_kind: dict[AgentRuntimeKind, object],  # noqa: ARG001
     ) -> object:
         def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
             if reject_kind is not None and kind is reject_kind:
