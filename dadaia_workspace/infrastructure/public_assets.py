@@ -366,6 +366,17 @@ class FileSystemPublicAssetManager:
             except (json.JSONDecodeError, OSError):
                 reports.append("[drift] stage:agents.index.json (invalid JSON)")
 
+        # Resolve the profile-scoped active harness set FIRST — it scopes BOTH the
+        # runtime_expectations projection loop below (its claude:* projection lines) AND the
+        # inline generated-config block further down. Absent profile ⇒ all-four (back-compat,
+        # byte-identical to the W1 all-four doctor golden). An out-of-profile runtime whose
+        # directory physically EXISTS on disk is never silent (A3): a `[warn]` line from the
+        # inline block replaces the scoped drift block so a stale/hand-installed runtime
+        # cannot read green-with-zero-lines.
+        profile_harnesses = self._profile_harnesses(workspace_root)
+        active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
+        claude_active = "claude" in active
+
         for expected_src, dst, label, transform in runtime_expectations(
             agentic_dir,
             workspace_root,
@@ -373,6 +384,19 @@ class FileSystemPublicAssetManager:
             _CLAUDE_DIRS,
             self._agents_md_source,
         ):
+            # FR3 boundary completion (W5, T-58-50): runtime_expectations yields the
+            # claude:<dir>/* projection expectations unconditionally. For a codex-only /
+            # pi-only profile those files are genuinely absent, so an unscoped loop emits
+            # `[missing] claude:*` (40 lines) and the doctor false-fails (CLI exit 1) — the
+            # exact boundary W3 flagged for W5. Scope the claude:* projection lines to
+            # `claude in profile`; the shared agents:skills/*, the AGENTS.md guardrail pairs,
+            # and the harness-independent chokepoint dadaia:scripts/* lines stay
+            # unconditional. A `.claude/` physically present outside the profile is still
+            # surfaced non-silently by the inline block's `[warn]` (A3), so scoping the
+            # projection lines here hides no real drift, and the all-four (absent-profile)
+            # path is unchanged (claude ∈ all-four ⇒ the loop runs fully → golden byte-lock).
+            if not claude_active and label.startswith("claude:"):
+                continue
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
@@ -380,14 +404,10 @@ class FileSystemPublicAssetManager:
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
-        # Profile-scoped inline projection block (FR3). The persisted harness profile scopes
-        # which runtimes' generated-config expectations the doctor checks; an absent profile
-        # ⇒ all-four (back-compat, byte-identical to the W1 all-four doctor golden). An
-        # out-of-profile runtime whose directory physically EXISTS on disk is never silent
-        # (A3): a `[warn]` line replaces the scoped drift block so a stale/hand-installed
-        # runtime cannot read green-with-zero-lines.
-        profile_harnesses = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
+        # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
+        # resolution above is reused here (claude settings.json / codex hooks+config+rules /
+        # the .pi/ tree each gated on membership; a physically-present out-of-profile runtime
+        # emits the A3 `[warn]` line).
 
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:

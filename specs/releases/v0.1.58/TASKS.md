@@ -367,7 +367,60 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
 
 ## W5 — FR5 per-profile sandboxed E2E
 
-- [ ] T-58-50 Per-profile E2E extending `test_public_pipeline.py`. Checklist:
+- [x] T-58-50 Per-profile E2E extending `test_public_pipeline.py`. Checklist:
+  - **Evidence:** EXTENDED `tests/e2e/features/test_public_pipeline.py` — new `TestPerProfileInit`
+    class with 4 E2Es (`test_claude_only_profile`, `test_codex_only_profile`, `test_pi_only_profile`,
+    `test_default_no_flag_scaffolds_all_four`). Scaffold is **in-process (Q4)** via
+    `CliRunner.invoke(cli_app, ["init","--harness",X,"--workspace",ws])` (NOT a subprocess); the
+    root conftest `_no_real_venv_in_tests` autouse fakes `ensure_workspace_venv` so real-CLI init
+    builds no venv. Module-scoped shared fixture `_staged_pi_files` stages ONCE and supplies the
+    reused `.pi/` expectation baseline (each init re-stages internally, 0.12s — measured, negligible).
+    Each E2E asserts the EXACT structure (chosen-harness dirs present / un-chosen absent + ctx-inject
+    hook / codex wrappers / `.pi/` file-set match) + persisted `harness_profile.json` == the requested
+    set + a profile-scoped **green** `public doctor` on BOTH Q7 surfaces (report-list blocker-free via
+    `mgr.doctor(ws)` AND real `dadaia public doctor` CLI **exit 0** via `monkeypatch.chdir(ws)`).
+    **Batch wall-time:** the 4-profile matrix = **~6.0s test-exec (~7.9s incl. interpreter startup)** —
+    well under the ~30s budget; `tmp_path` isolation (no `.dadaia/` inside any repo), `-p no:cacheprovider`.
+  - **Boundary completion 1 (in-spirit FR3 "doctor scopes runtime expectations", W3-flagged → W5):**
+    EDITED `dadaia_workspace/infrastructure/public_assets.py#doctor()` — the `runtime_expectations`
+    projection loop (`_CLAUDE_DIRS` → `claude:<dir>/*`) stayed UNCONDITIONAL after W3 (only the inline
+    `_compare` block was scoped). Now the `profile_harnesses`/`active` resolution is hoisted ABOVE the
+    loop and a one-line guard `if not claude_active and label.startswith("claude:"): continue` scopes
+    the `claude:*` projection lines to `claude in profile`. The shared `agents:skills/*`, the AGENTS.md
+    guardrail pairs, and the harness-independent `dadaia:scripts/*` lines stay unconditional; A3 is
+    unaffected (a physically-present out-of-profile `.claude/` still emits the inline `[warn]`).
+    **RED-first capture:** neutralising the guard (`if False and …`) made the 4 new profile-doctor
+    unit tests FAIL — codex-only & pi-only each emit **×40 `[missing] claude:rules|skills|commands|
+    agents|workflows/*`** lines and `dadaia public doctor` exits 1; restoring the guard → GREEN.
+    **Byte-lock preserved:** claude ∈ all-four ⇒ the loop runs fully on the absent-profile path;
+    `test_absent_profile_doctor_byte_equals_all_four_golden` + the W1 doctor golden replay byte-identical.
+    NEW unit tests in `tests/unit/infrastructure/test_public_assets_profile.py`:
+    `test_codex_only_profile_doctor_is_green`, `test_codex_only_cli_doctor_exits_zero`,
+    `test_pi_only_profile_doctor_is_green`, `test_pi_only_cli_doctor_exits_zero`,
+    `test_codex_only_out_of_profile_claude_on_disk_is_not_silent` (A3 symmetry).
+  - **Boundary 2 (W2 scripts — NOT scoped, per FR3):** a pi-only per-target subset init installs no
+    chokepoint scripts (existing rule installs them only for `{all,claude,codex}` targets). FR3 keeps the
+    scripts doctor check **UNCONDITIONAL** (chokepoints are harness-independent), so scoping them would
+    contradict FR3 — instead the pi-only E2E (and unit fixture) **scaffold the scripts** via the real
+    production `_install_scripts` (exactly what `dadaia public install` runs). Recorded boundary; no
+    production install-path change.
+  - **(Q6) AC-9(f) sabotage (captured → reverted):** applied the AC-9(b) init sabotage
+    (`chosen = L1_ENTRY_HARNESSES` in `WorkspaceService.init` → always all-four); command
+    `pytest tests/e2e/features/test_public_pipeline.py::TestPerProfileInit::test_claude_only_profile`
+    ⇒ **FAILED** at `assert not (ws/".codex").exists()` ("codex must NOT be scaffolded for a claude
+    profile") — the discriminating "NO `.codex/`, NO `.pi/`" anchor. Reverted → 4/4 green.
+  - **AC-11 ledger — file-enumerated fates:** NEW/EXTENDED —
+    `tests/e2e/features/test_public_pipeline.py` (+4 E2Es; `TestPerProfileInit` + `_run_init`/
+    `_persisted_profile`/`_assert_profile_doctor_green`/`_staged_pi_files` helpers; imports `cli.main.app`,
+    `CliRunner`, `pytest`); `tests/unit/infrastructure/test_public_assets_profile.py` (+5 tests; `_install_codex_only_tree`/
+    `_install_pi_only_tree`/`_scaffold_chokepoint_scripts`/`_mentions_claude` helpers). EDITED (boundary-1
+    completion) — `dadaia_workspace/infrastructure/public_assets.py#doctor()` (hoisted `active`, one-line
+    `claude:*` scope). SURVIVE untouched — `runtime_expectations`/`_runtime_expectations` signatures (their
+    consumers `test_public_assets.py`, `test_doctor_projected_drift.py`, `test_public_doctor_parity.py`
+    unchanged); the W1 install/doctor goldens replay byte-identical. **Gates:** ruff format --check clean
+    (795 files); ruff check --no-cache clean; mypy --strict clean (309 files); lint-imports --no-cache
+    **8 kept / 0 broken** (ignore-cap unchanged — the doctor edit adds no import edge); full unpiped pytest
+    **4566 passed / 17 skipped / 0 failed** (exit 0). No `specs/backlog/**` staged.
   - Extend `tests/e2e/features/test_public_pipeline.py` (or a sibling module reusing its helpers +
     `FileSystemPublicAssetManager`) with **claude-only / codex-only / pi-only / all** E2Es. **(Q4 — pinned
     mechanism)** scaffold **in-process** via `CliRunner.invoke(app, ["init","--harness",X,"--workspace",tmp])`

@@ -84,8 +84,59 @@ def _install_claude_only_tree(ws: Path) -> FileSystemPublicAssetManager:
     return mgr
 
 
+def _scaffold_chokepoint_scripts(mgr: FileSystemPublicAssetManager, ws: Path) -> None:
+    """Install the harness-independent git chokepoint scripts into ``.dadaia/scripts``.
+
+    W2 boundary (recorded): a pi-only / agents-only per-target subset install does NOT
+    install the chokepoint scripts — the existing install rule projects them only for the
+    ``{all, claude, codex}`` targets (FR2 "follow the existing rule"). FR3 keeps the scripts
+    doctor check UNCONDITIONAL (the chokepoints are harness-independent), so a pi-only tree
+    must have them present to read green. This mirrors what ``install(target="all")`` (the
+    real ``dadaia public install`` path) does via ``_install_scripts`` — used here so the
+    pi-only doctor-green assertion isolates the CLAUDE-loop scoping fix, not the scripts gap.
+    """
+    agentic_dir = ws / ".dadaia" / "agentic"
+    mgr._install_scripts(agentic_dir, ws, False, [])
+
+
+def _install_codex_only_tree(ws: Path) -> FileSystemPublicAssetManager:
+    """Build a genuinely codex-only projection tree (isolates the doctor claude-loop fix).
+
+    Explicit ``agents`` + ``codex`` target installs give the shared ``.agents/skills`` root,
+    the ``.codex/`` projection, and the git chokepoint scripts (codex install triggers them)
+    — but NO ``.claude/`` and NO ``.pi/``. The profile is then written so ``doctor`` scopes to
+    ``codex``. RED/GREEN is attributable purely to the W5 claude-loop scoping (not install).
+    """
+    mgr = FileSystemPublicAssetManager()
+    mgr.install(ws, target="agents")
+    mgr.install(ws, target="codex")
+    _write_profile(ws, ("codex",))
+    return mgr
+
+
+def _install_pi_only_tree(ws: Path) -> FileSystemPublicAssetManager:
+    """Build a genuinely pi-only projection tree (isolates the doctor claude-loop fix).
+
+    Explicit ``agents`` + ``pi`` target installs give the shared ``.agents/skills`` root and
+    the ``.pi/`` post-trust projection — but NO ``.claude/`` and NO ``.codex/``. The pi target
+    does NOT install the chokepoint scripts (W2 boundary), so they are scaffolded explicitly
+    (they are harness-independent and FR3 keeps their doctor check unconditional). The profile
+    is written so ``doctor`` scopes to ``pi``.
+    """
+    mgr = FileSystemPublicAssetManager()
+    mgr.install(ws, target="agents")
+    mgr.install(ws, target="pi")
+    _scaffold_chokepoint_scripts(mgr, ws)
+    _write_profile(ws, ("pi",))
+    return mgr
+
+
 def _mentions_codex_or_pi(line: str) -> bool:
     return "codex" in line or "pi:" in line or ".codex" in line or "/.pi" in line
+
+
+def _mentions_claude(line: str) -> bool:
+    return line.startswith("claude:") or "claude:" in line or "/.claude" in line
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +229,118 @@ def test_claude_only_cli_doctor_exits_zero(tmp_path: Path, monkeypatch: pytest.M
     result = CliRunner().invoke(public_app, ["doctor"])
 
     assert result.exit_code == 0, result.output
+
+
+# ---------------------------------------------------------------------------
+# W5 boundary completion (in-spirit FR3 "doctor scopes runtime expectations") —
+# the runtime_expectations claude:* projection loop is scoped by `claude in profile`
+# so a codex-only / pi-only doctor is green (no [missing] claude:* false-fail).
+#
+# W3 scoped only the inline _compare block + the codex-parity gate; the
+# runtime_expectations claude/pi projection loop stayed UNCONDITIONAL (W3 handoff +
+# T-58-30 ledger flagged this as a W5 boundary). Pre-fix, a codex-only / pi-only doctor
+# emits 40 `[missing] claude:rules|skills|commands|agents|workflows/*` lines and the CLI
+# exits 1 — AC-8's per-profile green doctor is UNACHIEVABLE. The one-line scope in
+# doctor() (`if not claude_active and label.startswith("claude:"): continue`) completes it.
+# ---------------------------------------------------------------------------
+
+
+def test_codex_only_profile_doctor_is_green(tmp_path: Path) -> None:
+    """W5/AC-8 (report list): a codex-only doctor emits no [missing] claude:* + is blocker-free.
+
+    RED-first: pre-fix (unscoped runtime_expectations claude loop), a codex-only tree reports
+    the ×40 `[missing] claude:rules|skills|commands|agents|workflows/*` lines — the assertions
+    below FAIL and ``dadaia public doctor`` exits 1.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_codex_only_tree(ws)
+
+    reports = mgr.doctor(ws)
+
+    # The W5 boundary: no [missing] claude:* projection line for an out-of-profile claude.
+    assert not any(r.startswith("[missing]") and _mentions_claude(r) for r in reports), (
+        "profile-scoped doctor must not emit [missing] claude:* for a codex-only profile"
+    )
+    # Q7 (report list): blocker-free for a clean codex-only tree.
+    blockers = [r for r in reports if r.startswith(_BLOCKER_PREFIXES)]
+    assert blockers == [], f"codex-only doctor must be blocker-free, got: {blockers}"
+    # The codex projection itself is still verified (it is in-profile).
+    assert any(r == "[ok] codex:hooks.json" for r in reports)
+    # classify_workflows still emits its harness-independent [ok] claude:workflows/* lines
+    # (non-blockers) — scoping must not have removed those.
+    assert any(r.startswith("[ok] claude:workflows/") for r in reports)
+
+
+def test_codex_only_cli_doctor_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """W5/AC-8 (CLI surface): ``dadaia public doctor`` exits 0 for a codex-only workspace."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _install_codex_only_tree(ws)
+    _seed_spec_contexts(ws)
+    monkeypatch.chdir(ws)
+
+    result = CliRunner().invoke(public_app, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+
+
+def test_pi_only_profile_doctor_is_green(tmp_path: Path) -> None:
+    """W5/AC-8 (report list): a pi-only doctor emits no [missing] claude:*/codex:* + is blocker-free.
+
+    RED-first: pre-fix, a pi-only tree reports the ×40 `[missing] claude:*` lines (the
+    unscoped runtime_expectations loop) — the claude assertion below FAILS and the CLI exits 1.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_pi_only_tree(ws)
+
+    reports = mgr.doctor(ws)
+
+    assert not any(r.startswith("[missing]") and _mentions_claude(r) for r in reports), (
+        "profile-scoped doctor must not emit [missing] claude:* for a pi-only profile"
+    )
+    assert not any(r.startswith(_BLOCKER_PREFIXES) and _mentions_codex_or_pi(r) for r in reports), (
+        "no codex blocker for a pi-only profile (and pi is checked, not missing)"
+    )
+    blockers = [r for r in reports if r.startswith(_BLOCKER_PREFIXES)]
+    assert blockers == [], f"pi-only doctor must be blocker-free, got: {blockers}"
+    # The pi projection itself is still verified (it is in-profile).
+    assert any(r.startswith("[ok] pi:") for r in reports)
+
+
+def test_pi_only_cli_doctor_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """W5/AC-8 (CLI surface): ``dadaia public doctor`` exits 0 for a pi-only workspace."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _install_pi_only_tree(ws)
+    _seed_spec_contexts(ws)
+    monkeypatch.chdir(ws)
+
+    result = CliRunner().invoke(public_app, ["doctor"])
+
+    assert result.exit_code == 0, result.output
+
+
+def test_codex_only_out_of_profile_claude_on_disk_is_not_silent(tmp_path: Path) -> None:
+    """A3 symmetry: a codex-only profile + a stale ``.claude/`` on disk stays non-silent.
+
+    Scoping the runtime_expectations claude:* loop must NOT re-open the A3 hole: a physically
+    present out-of-profile ``.claude/`` is still surfaced by the inline block's ``[warn]``,
+    never green-with-zero-lines.
+    """
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_codex_only_tree(ws)
+    claude_dir = ws / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    (claude_dir / "settings.json").write_text('{"stale": true}\n', encoding="utf-8")
+
+    reports = mgr.doctor(ws)
+
+    assert any("claude" in r and "out-of-profile" in r for r in reports), (
+        "an out-of-profile claude runtime present on disk must produce a non-silent line"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,15 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+# NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it) —
+# QA-atom law (v0.1.57). stdout/stderr are read as separate channels.
+_runner = CliRunner()
 
 # ---------------------------------------------------------------------------
 # Canonical expectations — update when agents/skills are added or removed
@@ -502,3 +510,191 @@ class TestWorkflows:
         _manager().stage(workspace)
         # Re-staging idempotently must keep working.
         _manager().stage(workspace)
+
+
+# ---------------------------------------------------------------------------
+# TestPerProfileInit — FR5 / AC-8: per-profile sandboxed E2E scaffolded via the REAL
+# `dadaia init --harness <set>` CLI (in-process CliRunner, Q4 — NOT a subprocess), each
+# asserting the EXACT default structure + the persisted profile + a profile-scoped GREEN
+# `public doctor` (Q7: no [missing]/[drift]/[fail] for out-of-profile harnesses AND CLI
+# exit 0). Extends this pipeline module (reuses FileSystemPublicAssetManager + helpers);
+# does NOT duplicate the all-harness pipeline tests above.
+#
+# `WorkspaceService.init` builds a real venv via `ensure_workspace_venv`, but the root
+# conftest `_no_real_venv_in_tests` autouse fixture fakes it to a bare mkdir — so these
+# real-CLI inits create no venv and exhaust no disk. tmp_path isolates every workspace
+# from the repo (no `.dadaia/` inside any repo); the suite runs `-p no:cacheprovider`.
+# ---------------------------------------------------------------------------
+
+_DOCTOR_BLOCKER_PREFIXES = ("[missing]", "[drift]", "[fail]")
+
+
+def _run_init(workspace: Path, harness: str | None) -> object:
+    """Scaffold *workspace* via the real `dadaia init` CLI (in-process, Q4).
+
+    ``harness=None`` omits ``--harness`` entirely (default = all-four back-compat path).
+    """
+    args = ["init", "--workspace", str(workspace)]
+    if harness is not None:
+        args += ["--harness", harness]
+    return _runner.invoke(cli_app, args)
+
+
+def _persisted_profile(workspace: Path) -> list[str]:
+    data = json.loads(
+        (workspace / ".dadaia" / "states" / "harness_profile.json").read_text(encoding="utf-8")
+    )
+    return data["harnesses"]
+
+
+def _ctx_inject_registered(claude_dir: Path) -> bool:
+    settings = json.loads((claude_dir / "settings.json").read_text(encoding="utf-8"))
+    commands = [
+        h["command"]
+        for entry in settings.get("hooks", {}).get("UserPromptSubmit", [])
+        for h in entry.get("hooks", [])
+    ]
+    return any("dadaia_workspace.hooks.ctx_inject" in c for c in commands)
+
+
+def _doctor_blockers(report: list[str]) -> list[str]:
+    return [line for line in report if line.startswith(_DOCTOR_BLOCKER_PREFIXES)]
+
+
+def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Assert the profile-scoped `public doctor` is GREEN on both Q7 surfaces.
+
+    * report-list surface — ``FileSystemPublicAssetManager.doctor`` returns no
+      ``[missing]``/``[drift]``/``[fail]`` line (this subsumes Q7's "no blocker for the
+      out-of-profile harnesses" clause and is stronger — a clean profile tree is fully
+      blocker-free);
+    * CLI surface — ``dadaia public doctor`` exits 0 (the mechanical Q7 second clause).
+    """
+    report = _manager().doctor(workspace)
+    blockers = _doctor_blockers(report)
+    assert blockers == [], "profile doctor must be blocker-free, got:\n" + "\n".join(blockers)
+
+    monkeypatch.chdir(workspace)
+    result = _runner.invoke(cli_app, ["public", "doctor"])
+    assert result.exit_code == 0, result.output
+
+
+@pytest.fixture(scope="module")
+def _staged_pi_files() -> set[str]:
+    """FR5/Q4 shared fixture — stage the asset set ONCE and derive the canonical `.pi/`
+    projection file set, reused across the profile E2Es (avoids an explicit per-profile
+    stage). Each profile's `init --harness X` re-stages internally (0.12s — negligible);
+    this fixture is the single reused expectation baseline for the pi projection.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="dadaia-staged-template-") as tmp:
+        ws = Path(tmp) / "ws"
+        _manager().stage(ws)
+        pi_base = ws / ".dadaia" / "agentic" / "pi"
+        return {p.relative_to(pi_base).as_posix() for p in pi_base.rglob("*") if p.is_file()}
+
+
+class TestPerProfileInit:
+    def test_claude_only_profile(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    ) -> None:
+        """AC-8 claude-only: `.claude/` (agents/skills/rules) + ctx-inject hook; NO .codex/ NO .pi/."""
+        ws = tmp_path / "claude_only"
+        monkeypatch.chdir(tmp_path)
+        result = _run_init(ws, "claude")
+        assert result.exit_code == 0, result.output
+
+        # EXACT structure — claude present with the agents/skills/rules projection subdirs.
+        for sub in ("agents", "skills", "rules"):
+            assert (ws / ".claude" / sub).is_dir(), f".claude/{sub}/ missing for a claude profile"
+        assert _ctx_inject_registered(ws / ".claude"), (
+            "ctx-inject hook not registered in settings.json"
+        )
+        # AC-9(f) discriminating anchor: the two un-chosen harnesses get NO projection dir.
+        assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a claude profile"
+        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a claude profile"
+
+        assert _persisted_profile(ws) == ["claude"]
+        _assert_profile_doctor_green(ws, monkeypatch)
+
+    def test_codex_only_profile(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    ) -> None:
+        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/ NO .pi/."""
+        ws = tmp_path / "codex_only"
+        monkeypatch.chdir(tmp_path)
+        result = _run_init(ws, "codex")
+        assert result.exit_code == 0, result.output
+
+        # EXACT structure — codex config surface + the codex hook wrappers.
+        assert (ws / ".codex" / "agents").is_dir(), ".codex/agents/ missing for a codex profile"
+        assert (ws / ".codex" / "hooks.json").exists(), ".codex/hooks.json missing"
+        assert (ws / ".codex" / "config.toml").exists(), ".codex/config.toml missing"
+        assert (ws / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
+        codex_wrappers = sorted((ws / ".dadaia" / "hooks").glob("codex-*"))
+        assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
+        # un-chosen harnesses get no projection.
+        assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a codex profile"
+        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a codex profile"
+
+        assert _persisted_profile(ws) == ["codex"]
+        # Green requires the W5 boundary completion (runtime_expectations claude:* loop scoped);
+        # without it a codex-only doctor emits ×40 [missing] claude:* lines and exits 1.
+        _assert_profile_doctor_green(ws, monkeypatch)
+
+    def test_pi_only_profile(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    ) -> None:
+        """AC-8 pi-only: `.pi/` post-trust projection; NO .claude/ NO .codex/."""
+        ws = tmp_path / "pi_only"
+        monkeypatch.chdir(tmp_path)
+        result = _run_init(ws, "pi")
+        assert result.exit_code == 0, result.output
+
+        # EXACT structure — the `.pi/` projection matches the staged pi file set (shared fixture).
+        assert (ws / ".pi").is_dir(), ".pi/ missing for a pi profile"
+        projected_pi = {
+            p.relative_to(ws / ".pi").as_posix() for p in (ws / ".pi").rglob("*") if p.is_file()
+        }
+        assert projected_pi == _staged_pi_files, (
+            f".pi/ projection mismatch.\n  Missing: {sorted(_staged_pi_files - projected_pi)}\n"
+            f"  Extra:   {sorted(projected_pi - _staged_pi_files)}"
+        )
+        # un-chosen harnesses get no projection.
+        assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a pi profile"
+        assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a pi profile"
+
+        assert _persisted_profile(ws) == ["pi"]
+
+        # W2 boundary (recorded): a pi-only per-target subset init does NOT install the
+        # git chokepoint scripts — the existing install rule projects them only for the
+        # {all, claude, codex} targets (FR2 "follow the existing rule"). FR3 keeps the
+        # scripts doctor check UNCONDITIONAL (the chokepoints are harness-independent), so
+        # a pi-only tree must have them present to read green. Scaffold them via the real
+        # production installer (`_install_scripts`, exactly what `dadaia public install`
+        # runs) — this is the "scaffold scripts in the fixture" resolution the SPEC's FR3
+        # scripts-are-harness-independent text mandates (scoping them would contradict FR3).
+        mgr = _manager()
+        mgr._install_scripts(ws / ".dadaia" / "agentic", ws, False, [])
+
+        _assert_profile_doctor_green(ws, monkeypatch)
+
+    def test_default_no_flag_scaffolds_all_four(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    ) -> None:
+        """AC-8 all-harness: default (no `--harness`) is still all-four; green doctor (back-compat)."""
+        ws = tmp_path / "all_default"
+        monkeypatch.chdir(tmp_path)
+        result = _run_init(ws, None)  # omit --harness entirely → default all-four
+        assert result.exit_code == 0, result.output
+
+        assert (ws / ".claude" / "agents").is_dir()
+        assert (ws / ".codex").is_dir()
+        assert (ws / ".pi").is_dir()
+        assert _ctx_inject_registered(ws / ".claude")
+        # The all-four install path also lays the chokepoint scripts (target=="all").
+        assert (ws / ".dadaia" / "scripts").is_dir()
+
+        assert _persisted_profile(ws) == ["claude", "codex", "pi"]
+        _assert_profile_doctor_green(ws, monkeypatch)
