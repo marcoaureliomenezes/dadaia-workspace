@@ -1,0 +1,10 @@
+{
+  "release": "v0.1.57",
+  "consumed": [
+    {
+      "slug": "hard-remove-model-flag-across-run-verbs",
+      "shipped_anchors": [],
+      "note": "DELIVERED — v0.1.57 (archived at SHIP, dead-anchor BL-SCHEMA: the entry's sole anchor cli/commands/lifecycle.py#_warn_model_deprecated was DELETED by W5/T-57-50). --model hard-removed across all 12 run verbs; the 5 deprecation-warning tests inverted to stderr-pinned No-such-option assertions; sole surviving --model reference is the pi subprocess arg (test_pi_runtime.py / pi_runtime.py, out of scope). Deprecation-expiry law satisfied at N+1."
+    }
+  ]
+}

@@ -343,7 +343,7 @@ mutation-sanity: each new test is sabotaged → shown to FAIL → reverted, capt
 
 ## W6 — gates + ship
 
-- [ ] T-57-60 Full local gates (AC-11) + public re-projection, then ship. Checklist:
+- [-] T-57-60 Full local gates (AC-11) + public re-projection, then ship. Checklist:
   - **Unpiped** `pytest` (real exit) — full suite green; `ruff format --check`; `ruff check --no-cache`;
     `mypy --strict dadaia_workspace`.
   - `lint-imports --no-cache` → **`8 kept, 0 broken`**; ignore-cap contract UNCHANGED (the new
