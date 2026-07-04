@@ -39,11 +39,11 @@ tags:
 - hygiene
 - gates
 token_estimate: 5225
-last_updated: '2026-07-03'
-release_origin: v0.1.54
+last_updated: '2026-07-04'
+release_origin: v0.1.56
 ---
 
-CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--show-policy`/`--json`.
+CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. `--model <id>:<effort>` is accepted on every run verb but **non-fatal-deprecated** (v0.1.56): the verb emits a one-line stderr warning naming `--step-model <profile-id>` + `workflow profiles list`, then proceeds under the resolved policy (a closure backlog return tracks hard-removing the flag once callers migrate).
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads
@@ -84,7 +84,15 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 - `core/models/lifecycle.py` and `core/models/hygiene.py` define pure run, gate, blocked-state, agent-request, and hygiene models. `AgentRuntimeKind` has four members (roster single source: [[tech-stack]] §Agent runtimes).
 - `core/scope_match.py` is the shared, pure path classifier used by BOTH the runner's Ring-2 out-of-scope detection and the Claude adapter's Ring-1 write-permission decider — one classifier, two boundaries.
 - `core/protocols/agent_runtime.py` and `core/protocols/runtime_files.py` define the runtime and artifact ports.
-- `features/lifecycle/state_machine.py` owns legal, illegal, blocked, and resume transitions.
+- `features/lifecycle/state_machine.py` owns legal, illegal, blocked, and resume transitions
+  over the `core/models/lifecycle.py#TRANSITIONS` table. **v0.1.56 removed the three unused
+  direct `QA_REVIEW`/`SECURITY_REVIEW`/`CODE_REVIEW` → `IMPLEMENTATION` backtrack edges** — no
+  production path used them (the phase ladder advances forward only, and
+  `run_implement_review_loop` never touches the state machine, driving its rework as a bounded
+  attempt ledger). Every forward edge, every `*→BLOCKED` edge, and the full
+  `BLOCKED → {BACKLOG_DEFINITION, RELEASE_DEFINITION, IMPLEMENTATION, QA_REVIEW, SECURITY_REVIEW,
+  CODE_REVIEW, CLOSURE}` resume fan-out (the operator-driven rework path, `BLOCKED → IMPLEMENTATION`)
+  are **retained**, so the table implies no unused path.
 - `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds.
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
 - `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
@@ -158,11 +166,19 @@ CLI and the panel (see [[panel]] for the panel control plane).
   `LifecycleRun.workflow_policy: WorkflowPolicySnapshot | None` (additive optional; old v1
   records load to `None` — the run-store schema literal is deliberately unchanged for
   back-compat read).
-- **Resolve-once-before-step-1 (LAW 7).** The pipeline/phase workflow resolve the policy and
-  freeze the snapshot onto `LifecycleRun.workflow_policy` **before** the first worker call;
-  the snapshot is preserved across transitions via `dataclasses.replace`. An overlay mutated
-  after a run starts does not change the in-flight run; the panel reads the persisted
-  snapshot for run history (current policy only governs future runs).
+- **Resolve-once-before-step-1 (LAW 7) — on EVERY run-a-worker verb (v0.1.56).** Every run
+  verb — `release define`, `backlog define`, `implement`, `review qa|security|code`, `close`,
+  `pipeline`, and the v0.1.56 `audit`/`research`/`bug_report`/`implement-review` — resolves its
+  policy through the one shared `WorkflowExecutionPolicyResolver`, applies it, and freezes the
+  resolved `WorkflowPolicySnapshot` onto `LifecycleRun.workflow_policy` **before** the first
+  worker call (the multi-step workflow bodies and the single-step CLI `_run_phase_step` alike);
+  the snapshot is preserved across transitions via `dataclasses.replace` and persisted on the
+  run-store record (`JsonLifecycleRunStore` `to_dict`/`from_dict` — the universal assertion
+  channel). **Before v0.1.56 only `pipeline` was resolver-governed;** every other verb ran a
+  legacy raw `<id>:<effort>` second path and authored `runtime_kind` itself — that second path
+  is **retired** (`--step-model` is profile-ids-only on every verb). An overlay mutated after a
+  run starts does not change the in-flight run; the panel reads the persisted snapshot for run
+  history (current policy only governs future runs).
 - **Adapters consume the resolved model (AC-12).** `CodexExecAdapter` prefers
   `request.resolved_model` in `_model_and_effort` and passes `-m <id> -c
   model_reasoning_effort=<effort>`; `PiHeadlessAdapter._command()` adds `--model <id>` from
@@ -214,14 +230,25 @@ the panel toggle — and the executed adapter and the recorded snapshot always a
   default profile for the step's purpose (producing step → standard profile, review/gate step
   → deep/reasoning profile). The per-harness default profiles live on the catalog DTO; the
   resolver reads the effective harness's entry instead of only `default_profile`.
-- **Single source of truth for `runtime_kind` (D-2).** `pipeline.apply_resolved_policy` is
-  the **sole** author of each `PipelineStep.runtime_kind`, derived from the snapshot entry's
-  resolved harness (codex → `CODEX_EXEC`, pi → `PI_HEADLESS`; an unmappable harness raises).
-  The CLI's separate post-resolve `runtime_kind` swap was removed, so the executed adapter
-  and the persisted snapshot provably agree — fixing the v0.1.28
-  codex-recorded-while-pi-ran divergence. **FAKE is preserved:** a step built on
-  `AgentRuntimeKind.FAKE` keeps FAKE (so `--harness fake` dry-runs still drive the fake
-  adapter) while the snapshot records the governed harness.
+- **Single source of truth for `runtime_kind` (D-2; generalized to every step shape in
+  v0.1.56).** `apply_entry_to_step(entry, *, base_kind, preserve_fake) → (AgentRuntimeKind,
+  ResolvedModelConfig)` is the **single FAKE-preserving per-step author** of `runtime_kind`,
+  derived from the snapshot entry's resolved harness (codex → `CODEX_EXEC`, pi → `PI_HEADLESS`;
+  an unmappable harness raises). `pipeline.apply_resolved_policy` **maps** it over a
+  **structural** Protocol `PolicyApplicableStep` (`label`/`runtime_kind`/`resolved_model`/
+  `model_profile`) satisfied **structurally** by `PipelineStep`, `ReleaseStep`, `BacklogStep`,
+  `AuditStep`, `ResearchStep`, and `BugReportStep` — no enumerated type-union, so a new step
+  shape auto-satisfies the applier just by carrying the two fields (this is why W2's audit/
+  research/bug_report wiring needed no `pipeline.py` edit). Multi-step verbs map
+  `apply_resolved_policy` over their `_SEQUENCE`; a single-step verb (which has **no** step
+  object) calls `apply_entry_to_step` **once** on its selected snapshot entry and applies the
+  result to its local kind + `scope.resolved_model`. Each verb **seeds each base step
+  `runtime_kind = default_kind` before applying** and passes `preserve_fake=(default_harness is
+  None)`, so the CLI's separate post-resolve `runtime_kind` swap is gone and the executed adapter
+  and the persisted snapshot provably agree — fixing the v0.1.28 codex-recorded-while-pi-ran
+  divergence. **FAKE is preserved:** a step seeded on `AgentRuntimeKind.FAKE` keeps FAKE (so
+  `--harness fake` dry-runs still drive the fake adapter) while the snapshot records the governed
+  harness.
 - **Overlay carries harness (D-3).** The overlay schema + store carry an optional per-step
   `harnesses` map and a per-workflow `default_harness` (Layer-2 enum `codex|pi`, store +
   schema widened in lockstep, `additionalProperties:false` kept). Accessors `step_harness`
@@ -284,7 +311,18 @@ orphan/malformed/stale/undeclared/unconsumed-required payloads; the panel expose
 ledger via a minimal API. `release_definition.py` declares per-`ReleaseStep`
 `produces`/`consumes` edges with a terminal graph-completeness gate, and the
 implementation/review loop tracks attempts (bounded retry default 2 → BLOCK) so `implement#2`
-consumes the `qa#1` rejection. See [[architecture]] §"Workflow-step handoff data plane".
+consumes the `qa#1` rejection. **`run_implement_review_loop` (fixed + made reachable in v0.1.56):**
+it now **renders the resolved `review#N-1` rejection digest** (`WorkflowHandoffResolver.render_digest`)
+**into the `implement#N` prompt** — the prior `_ = resolved` drop is gone — and routes **both** loop
+workers through `LifecycleAgentRunner.evaluate_gate_with_result(..., is_review=False)`, an
+**evidence-only structural gate** (non-SUCCEEDED / empty `artifact_refs` / out-of-scope paths BLOCK
+the loop; `_run_loop_worker` no longer calls `runtime.run` directly). The APPROVED/REJECTED verdict
+is read from `worker_result.structured_output` to drive the attempt ledger (APPROVED → COMPLETED; a
+structurally-valid REJECTED → the next digest-injected attempt; retry exhaustion → BLOCK) — the
+review worker is deliberately **not** verdict-gated, since `is_review=True` returns a block on the
+first REJECTED verdict and would kill the retry-with-digest model on round 0. The loop gained its
+**first production caller**, `dadaia lifecycle implement-review` (born resolver-governed). See
+[[architecture]] §"Workflow-step handoff data plane".
 
 ## Gating note (review-only typed gate + coherent worker-output contract)
 

@@ -33,7 +33,7 @@ grill on the picked set before SPEC.
 | R5 | **SHIPPED — v0.1.53** (merged `d3f46360`, PR #95, 2026-07-03) | `legacy-surface-retirement`; `hygiene-and-dead-code-cleanup`; `centralize-release-semver-canon`; `telemetry-tier2-chmod-unguarded-on-windows` (all consumed; archived at ship — dead-anchor BL-SCHEMA) | Delete before refactoring: shrinks the surface R6–R9 must restructure and the import contracts must cover. |
 | R6 | **SHIPPED — v0.1.54** (merged `aeaa3c66`, PR #97, 2026-07-03) | `import-boundary-enforcement`; `features-import-infrastructure-direct-debt`; `pid-probe-seam-consolidation` (all consumed; archived at ship — dead-anchor BL-SCHEMA) | Contracts green + CI-wired + `workflows ↔ lifecycle` cycle broken; silent erosion stops here so all later structure lands under enforcement. |
 | R7 | **SHIPPED — v0.1.55** (merged `a1fc29f4`, PR #99, 2026-07-03) | `architecture-uml-decomposition` + bugs `bugs-append-ignores-persisted-bind`, `backlog-new-stub-readme-lag-intents-schema` (all consumed/resolved; archived at SHIP — dead-anchor BL-SCHEMA) | SpecsDoctor/api.py splits + reports_* merge landed under the now-enforced contracts; shipped the committed UML assets + the two open-bug fixes. |
-| R8 | Lifecycle verb governance | `lifecycle-verb-governance-uniformity` | Settles the runtime/policy seam (resolver on EVERY verb, loop through the runner gate, TRANSITIONS reconciliation) before prompt assembly is rebuilt. |
+| R8 | **SHIPPED — v0.1.56** (merged `3a02f758`, PR #101, 2026-07-04) | `lifecycle-verb-governance-uniformity` (consumed; archived at CLOSURE — both anchors survive) | Resolver on EVERY run verb + audit/research/bug_report invocable + implement/review loop fixed (digest + runner gate + CLI caller) + TRANSITIONS reconciliation. Final release of the R6→R8 mandate. |
 | R9 | Injection canon | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup` | The dedup base creates the ONE prompt-assembly seam; the role→atom map + phase threading are implemented at that seam in the same release — five bodies touched once, not twice. |
 | R10 | Harness & projection distribution | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` | `init --harness` profiles + typed harness registry + consumer AGENTS.md fan-out redesign — the projection/install machinery, matured after the structural chain. |
 | R11 | Panel UX overhaul | `panel-ux-overhaul` | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). |
@@ -42,11 +42,6 @@ grill on the picked set before SPEC.
 ---
 
 ## HIGH
-
-### `lifecycle-verb-governance-uniformity` — Lifecycle verb governance uniformity
-Policy resolver on EVERY verb; audit/research/bug_report invocability decision;
-implement/review loop fixes (rejection digest, runner gate, CLI caller); TRANSITIONS
-table reconciliation (absorbed the retired `review-rejection-rework-path` idea).
 
 ### `context-injection-role-phase-canon` — Context-injection role/phase canon *(2026-07-02)*
 Role→memory-atom default map (architect→architecture.md, qa→quality-assurance.md; fix
@@ -82,4 +77,10 @@ Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule
 
 ### `model-tier-efficiency-and-fast-tier-utilization` — Layer-1 model-tier efficiency (P2)
 Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trigger.
+
+### `hard-remove-model-flag-across-run-verbs` — Hard-remove `--model` across run verbs *(2026-07-04)*
+Follow-through on the v0.1.56 `--model` non-fatal deprecation ruling: once callers
+migrate to `--step-model <profile-id>`, delete the `--model` flag and the
+`_warn_model_deprecated` seam across all `dadaia lifecycle` run verbs (no-legacy-code
+path). Returned at v0.1.56 closure.
 
