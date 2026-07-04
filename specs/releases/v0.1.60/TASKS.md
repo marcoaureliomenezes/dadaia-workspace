@@ -196,7 +196,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W3 — FR4/FR5 minimal-viable pack content + plugin-scope rewrite + plugin tier (ai-engineer)
 
-- [ ] T-60-30 Enumerated pack content (3 agent bodies + ONE skill/pack) + plugin-scope rewrite + plugin tier. Owner:
+- [-] T-60-30 Enumerated pack content (3 agent bodies + ONE skill/pack) + plugin-scope rewrite + plugin tier. Owner:
   ai-engineer. Write set: NEW `public/plugins/frontend-design/agents/{frontend-engineer,design-specialist}.md` + NEW
   `public/plugins/frontend-design/skills/browser-frontend-implementation/SKILL.md`; NEW
   `public/plugins/devops/agents/devops-engineer.md` + NEW `public/plugins/devops/skills/github-actions-cicd/SKILL.md`;
