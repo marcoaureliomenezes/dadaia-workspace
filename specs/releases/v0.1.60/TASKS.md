@@ -51,7 +51,7 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     territory (SPEC AC-5) so golden (a) is byte-stable across T-60-11's pack.json addition. Non-vacuous guard asserts
     per-target install sets + the `[ok] stage:data/AGENTS.md` + `public-privacy` anchors. Commit `test(T-60-10): ...`.
 
-- [ ] T-60-11 Ports-and-adapters seam + `dadaia plugin` CLI. Owner: software-engineer. Write set: NEW
+- [x] T-60-11 Ports-and-adapters seam + `dadaia plugin` CLI. Owner: software-engineer. Write set: NEW
   `core/models/plugin_pack.py`, NEW `core/protocols/plugin_store.py`, NEW `infrastructure/json_plugin_store.py`, NEW
   `cli/commands/plugin.py`, `cli/main.py` (register), NEW `public/plugins/{frontend-design,devops}/pack.json` (+ empty
   agents/skills/rules dirs), NEW `tests/unit/core/test_plugin_pack.py`, `tests/unit/infrastructure/test_json_plugin_store.py`,
@@ -73,7 +73,50 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     on this line. (Projection sabotages a/b/c remain in W2.)
   - **existing-test fate ledger (file-enumerated):** NEW files only; `cli/main.py` gains one `add_typer` (SURVIVE:
     the main-CLI smoke test). Gates: ruff, mypy --strict, lint-imports 8/0 (ignore-cap unchanged), unpiped pytest green.
+    **AMENDED — the pre-descriptor v0.1.58 full-staging byte-goldens (PM ruling on the T-60-11 STOP; the definition
+    under-enumerated this exposure):** adding `public/plugins/**/pack.json` + empty-dir `.gitkeep`s is FR1's real,
+    deliberate staging-inventory surface change, so the three full-inventory goldens are re-captured to the
+    descriptors-present truth via each test's OWN `UPDATE_INSTALL_GOLDENS` mechanism — a deliberate recorded amendment,
+    never a silent regen; **plugin-blind filtering REJECTED** (would hide future plugin-staging drift — golden (a) is the
+    deliberately core-scoped lock, golden (b) in W2 locks the full new baseline; three locks, three distinct roles):
+    - `tests/unit/infrastructure/test_install_target_goldens.py::test_install_target_resolution_is_byte_identical`
+      (`install_target_resolution_v0158.json`) — diff = **+5× `[stage] <WS>/.dadaia/agentic/plugins`** (one per staging
+      install target), ZERO other delta, ZERO removals.
+    - `tests/unit/infrastructure/test_install_target_goldens.py::test_doctor_all_four_report_is_byte_identical`
+      (`doctor_all_four_v0158.json`) — diff = **+8× `[ok] stage:plugins/{frontend-design,devops}/{pack.json,agents/.gitkeep,skills/.gitkeep,rules/.gitkeep}`**,
+      ZERO other delta, ZERO removals.
+    - `tests/unit/infrastructure/test_public_assets_profile.py::test_absent_profile_doctor_byte_equals_all_four_golden`
+      — reuses `_DOCTOR_GOLDEN`; re-greens transitively with the doctor-golden amendment (no own fixture).
+      Rigorous multiset (Counter) diff proved the delta is EXACTLY the added `stage:plugins/*` lines and nothing else;
+      the `panel_runtime_validation_v0158.json` golden is untouched.
   - AC-13 ledger — NEW: the seam + CLI + descriptors + tests. No `specs/backlog/**`.
+  - **DONE-evidence:**
+    - Seam (AC-2): NEW `core/models/plugin_pack.py` (`PluginPack` + `InstalledPlugins`, pure, NO I/O, `from_dict`
+      parse/validate), NEW `core/protocols/plugin_store.py` (`PluginStore` port), NEW `infrastructure/json_plugin_store.py`
+      (`JsonPluginStore`, ledger `.dadaia/states/installed_plugins.json` = `{"schema_version":"1","plugins":[...]}`).
+      `lint-imports --no-cache` = **8 kept / 0 broken**, ignore-cap 26 UNCHANGED (no new features→infra/infra→features edge).
+    - CLI (AC-3): NEW `cli/commands/plugin.py` (`install <pack>`/`list`/`doctor`) registered in `cli/main.py` (one
+      `add_typer`). Projection is a documented W1 no-op seam `_project_pack` (W2/T-60-20 fills it via `public_assets.py`).
+      **RED-first:** pre-change `CliRunner.invoke(app, ["plugin","list"])` → exit 2, empty stdout, stderr
+      `No such command 'plugin'.` (Rich-boxed → confirms `_norm_stderr` need). Post-change: `install bogus` → exit 2 +
+      `_norm_stderr(stderr)` contains `"bogus"`+`"plugin"` + empty stdout; `install frontend-design` records
+      `{"schema_version":"1","plugins":["frontend-design"]}`; re-install idempotent; `list`/`doctor` green.
+    - Descriptors (FR1): NEW `public/plugins/frontend-design/pack.json` (agents frontend-engineer+design-specialist)
+      + `public/plugins/devops/pack.json` (agent devops-engineer) + empty agents/skills/rules dirs via `.gitkeep`.
+    - **W1 mutation-sanity (AC-11, born falsifiable):**
+      - **(0a)** sabotage: in `cli/commands/plugin.py` `install`, replace the `if pack not in available: raise
+        BadParameter` with `if pack not in available: available = {**available, pack: PluginPack.of(pack, agents=("x",))}`
+        (accept any pack) ⇒ `tests/unit/cli/test_plugin_cli.py::test_plugin_install_bad_value_is_bad_parameter` FAILS
+        (`assert 0 == 2`). Reverted.
+      - **(0b)** sabotage: in `infrastructure/json_plugin_store.py` `_to_dict`, drop the `"plugins"` field ⇒
+        `tests/unit/infrastructure/test_json_plugin_store.py::test_write_then_read_round_trips` FAILS
+        (`plugins: () != ('frontend-design','devops')`). Reverted.
+    - **golden (a)** stays green after descriptors (its `stage:plugins/*` filter holds); the three v0.1.58 full-inventory
+      goldens were AMENDED per PM ruling (diff = +5 `[stage] .../plugins` install + +8 `[ok] stage:plugins/*` doctor,
+      ZERO other delta / ZERO removals; see the fate-ledger enumeration above).
+    - Gates: `ruff format --check` (8 files) + `ruff check --no-cache` (pass) + `mypy --strict dadaia_workspace`
+      (312 files, 0 issues) + `lint-imports` (8/0) + **full unpiped `pytest` = 4624 passed, 17 skipped, 0 failed**.
+      Commit `feat(T-60-11): ...`.
 
 ## W2 — FR3 pack projection + ledger + manifest + precedence
 
