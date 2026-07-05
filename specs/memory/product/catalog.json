@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T14:30:43Z",
+  "generated_at": "2026-07-05T01:15:34Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -49,7 +49,7 @@
       "category": "product",
       "area": "agents",
       "tldr": "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas.",
-      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, and the Layer-2 persona surface.",
+      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3 plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs, the two independent tier axes (numeric dispatch band vs registry model-cost Tier), and the Layer-2 persona surface.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -59,6 +59,8 @@
       ],
       "token_estimate": 1700,
       "depends_on": [
+        "plugin-packs",
+        "tech-stack",
         "architecture",
         "dadaia-workflows",
         "harness-codex",
@@ -87,12 +89,35 @@
     },
     {
       "rank": 5,
+      "slug": "plugin-packs",
+      "title": "plugin-packs",
+      "category": "product",
+      "area": "distribution",
+      "tldr": "in-package plugin packs enabled per workspace via `dadaia plugin install`; the 3 stub agents carry real behavior on the plugin/sonnet tier once installed.",
+      "summary": "The plugin-distribution capability — in-package packs under public/plugins/ (frontend-design + devops), the `dadaia plugin install/list/doctor` CLI on a ports-and-adapters seam (PluginPack/InstalledPlugins core model + PluginStore port + JsonPluginStore adapter), a per-workspace installed_plugins.json ledger, profile-scoped projection that overwrites the projected core stub with the pack's real agent body, core-install precedence so a later public install never reverts an installed pack, plugin doctor per-file status, and the three plugin agents (frontend-engineer, design-specialist, devops-engineer) carrying real behavior on the registry plugin/sonnet tier once their pack is installed. Additive-only (no uninstall this release).",
+      "path": "specs/memory/product/distribution/plugin-packs.md",
+      "tags": [
+        "plugins",
+        "distribution",
+        "install",
+        "agents"
+      ],
+      "token_estimate": 900,
+      "depends_on": [
+        "public-asset-distribution",
+        "agent-orchestration",
+        "tech-stack",
+        "workspace-init"
+      ]
+    },
+    {
+      "rank": 6,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, registry-based consumer AGENTS fan-out with doctor flagging, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]), scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -103,11 +128,12 @@
       ],
       "token_estimate": 1010,
       "depends_on": [
-        "workspace-init"
+        "workspace-init",
+        "plugin-packs"
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -131,7 +157,7 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
@@ -156,7 +182,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-pi",
       "title": "Harness — PI (pi-coding-agent)",
       "category": "product",
@@ -182,7 +208,7 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -202,7 +228,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -232,7 +258,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -272,7 +298,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -295,7 +321,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -320,7 +346,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -348,7 +374,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -373,7 +399,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -393,7 +419,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -414,7 +440,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -436,7 +462,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -457,7 +483,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -478,7 +504,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "dadaia-workflows",
       "title": "dadaia-workflows",
       "category": "product",
@@ -502,7 +528,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "lifecycle-foundation",
       "title": "lifecycle-foundation",
       "category": "product",
@@ -526,7 +552,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -553,7 +579,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -576,7 +602,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",

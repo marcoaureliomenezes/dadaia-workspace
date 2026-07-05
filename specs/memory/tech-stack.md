@@ -12,7 +12,7 @@ tags:
 - constraints
 token_estimate: 2345
 last_updated: '2026-07-04'
-release_origin: v0.1.58
+release_origin: v0.1.60
 ---
 
 ## Languages
@@ -59,13 +59,34 @@ Per harness (per-runtime truth in `specs/memory/product/harness/` — [[harness-
 
 
 
-## Model assignments (9 core agents + 3 plugin stubs)
+## Model assignments (9 core agents + 3 plugin agents)
 
-**Single tier in practice:** the **9 core agents** run on `claude-opus-4-8` — there
-is no tier-split in production (verifiable: all 9 frontmatter `model:` values resolve
-to `claude-opus-4-8`). Per-dispatch override via `DADAIA_MODEL_OVERRIDE` when the
-dispatcher's policy justifies it. Optional packs may define their own agents and
-models outside the public default.
+**Two independent "tier" axes (do not conflate).** A frontmatter carries a numeric
+`tier: 1/2/3` (a Layer-1 **dispatch band**: 1 dispatchers, 2 curator, 3 leaf workers) AND a
+`model:` that resolves to a registry **`Tier`** (`deep`/`dispatch`/`fast`/`plugin`, the
+**model-cost class**). These are unrelated concepts sharing the word "tier"; the mandatory
+`tests/contract/test_agent_tier_taxonomy.py` machine-enforces both (every non-plugin core agent
+carries a numeric `tier` + a registry-known `model`). The eventual source rename
+(`tier:` → `dispatch_band:`) is the `tier-taxonomy-rename` backlog return.
+
+**Core: single model-cost tier in practice:** the **9 core agents** run on `claude-opus-4-8`
+(registry `Tier` = `dispatch`) — no model-cost split in production. Per-dispatch override via
+`DADAIA_MODEL_OVERRIDE` when the dispatcher's policy justifies it.
+
+**Plugin agents: off-opus by design (v0.1.60).** When a pack installs ([[plugin-packs]]), the 3
+plugin agents carry `model: claude-sonnet-4-6` (registry `Tier` = `plugin`; Codex renders
+`gpt-5.3-codex`, NOT the opus `gpt-5.5`) — the demonstrable non-opus Layer-1 assignment. The
+`fast`/haiku tier remains unassigned by any agent (the reasoning-persona downgrade is deferred
+to the `fast-tier-persona-validation` backlog return; deep/`claude-fable-5` stays region-locked
+and unused).
+
+**Efficiency-audit staleness trigger (v0.1.60).** A `dadaia doctor` `DoctorIssue(code="EFF-1")`
+fires when `.dadaia/states/last_efficiency_audit.json`
+(`{schema_version,last_efficiency_audit,by,report}`) is older than the named constant
+`EFFICIENCY_AUDIT_STALE_DAYS = 30` (or malformed); absent ⇒ no issue (fresh-workspace happy
+path preserved). The marker is written — and the issue cleared — by
+`dadaia reports mark-efficiency-audit --report <path> [--by <agent>]`; the bare `dadaia doctor`
+exit stays 0.
 
 **Single source:** `dadaia_workspace/core/model_registry.py` is the only source of
 model ids/pricing/tier (`ModelEntry{claude_id, codex_id, pricing dated
@@ -91,9 +112,9 @@ software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE)
 qa-engineer| `claude-opus-4-8`| Review → commit gate leaf
 security-reviewer| `claude-opus-4-8`| Review → push gate leaf
 code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
-frontend-engineer (plugin)| — (no `model:` frontmatter)| Plugin stub (frontend-design pack); no behavior and no model assignment until the pack ships
-design-specialist (plugin)| — (no `model:` frontmatter)| Plugin stub (frontend-design pack); no behavior and no model assignment until the pack ships
-devops-engineer (plugin)| — (no `model:` frontmatter)| Plugin stub (devops pack); no behavior and no model assignment until the pack ships
+frontend-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install frontend-design`
+design-specialist (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until the pack installs
+devops-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (devops pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install devops`
 
 ## Plugin inventory
 

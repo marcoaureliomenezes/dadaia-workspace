@@ -16,7 +16,7 @@ tags:
   - test-architecture
 token_estimate: 2210
 last_updated: '2026-07-04'
-release_origin: v0.1.59
+release_origin: v0.1.60
 ---
 
 ## Purpose
@@ -163,6 +163,25 @@ constant fails loudly in unit CI (the GH-only browser e2e is a backstop, not the
 v0.1.59's panel overhaul proved the split — the presence-invariant `test_index_dom_contract.py` caught a
 dropped `.memory-chip` that the browser response-guard e2e null-guarded past, and the equality lock
 caught an edit-with-recompute that `TestInlineScriptCspCoverage` passed.
+
+**Executed-path law (v0.1.60) — a unit test that calls a helper directly proves nothing about
+the wired path.** v0.1.60's FR9 fix added the correct consumer-`AGENTS.md` provenance logic to
+`_doctor_guardrail_pair`, and a unit test that **called that helper directly** went green — but
+the real `dadaia public doctor` (`manager.doctor()`) never called it: it still doctored
+consumers through the untouched `runtime_expectations` path and emitted `[drift]`/`[missing]` →
+exit 1, the exact bug the fix was meant to end. The green unit test was **false confidence**: it
+proved the helper was correct, not that the helper was *reached*. Two durable rules: (1) **for a
+wiring-sensitive fix (a behavior that depends on which call site runs), the acceptance test must
+exercise the real executed path** — the CLI/`manager` entry point at the integration/e2e
+boundary, not the helper in isolation; a helper-direct unit test is at best a *secondary* lens.
+(2) **`xfail(strict=True)` is a regression lock, not a TODO.** The W5 E2E marked the
+still-broken real-doctor path `xfail(strict=True)` against the OPEN bug; strict-xfail turns the
+suite **red the moment the behavior is fixed** (an unexpected XPASS), forcing the marker's
+removal in the same commit that lands the fix — so a fix can never silently ship while a stale
+"known-broken" marker hides it. The corollary anti-slop rule: **collapse duplicate classifiers
+into ONE authority that the real entry point calls** (v0.1.60 extracted the consumer
+classification into a single `_doctor_consumer_pair_lines` that `manager.doctor()` and
+`_doctor_guardrail_pair` both delegate to — no parallel legacy path to drift dead).
 
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:

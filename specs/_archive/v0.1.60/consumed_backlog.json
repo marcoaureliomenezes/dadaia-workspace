@@ -1,0 +1,20 @@
+{
+  "release": "v0.1.60",
+  "consumed": [
+    {
+      "slug": "plugin-packs-and-install-command",
+      "shipped_anchors": [
+        "dadaia_workspace/core/models/plugin_pack.py#PluginPack",
+        "dadaia_workspace/cli/commands/plugin.py#install"
+      ],
+      "note": "DELIVERED — v0.1.60 (archived at CLOSURE, anchors survive). Real `dadaia plugin install/list/doctor` CLI via ports-and-adapters (PluginPack core model NO-IO + PluginStore port + JsonPluginStore adapter -> .dadaia/states/installed_plugins.json, mirroring the v0.1.58 harness-profile seam — lint-imports 8/0 and cap-26 unchanged); in-package pack storage public/plugins/{frontend-design,devops}/ (ADR-1, no network); profile-scoped projection + stub-replacement + core-install precedence + per-pack-file doctor with the absent-pack surface byte-locked by golden (b); minimal-viable content under the Ruling 12 hard ceiling (3 real agent bodies tier:3/claude-sonnet-4-6 — codex renders gpt-5.3-codex — + exactly one skill per pack: browser-frontend-implementation, github-actions-cicd + zero new rules); plugin-scope rule AND stub bodies rewritten install-gated (the v0.1.59 panel-ux plugin-scope deviation class retired going forward). No uninstall this release (ADR-2 -> plugin-uninstall return); full corpora -> plugin-pack-content-libraries return. Ship PR #110, squash 4ccc6a21."
+    },
+    {
+      "slug": "model-tier-efficiency-and-fast-tier-utilization",
+      "shipped_anchors": [
+        "dadaia_workspace/core/model_registry.py#Tier"
+      ],
+      "note": "DELIVERED — v0.1.60 (archived at CLOSURE, anchor survives). Grill found the headline premise partly a Layer-1 category error: the named mechanical sub-task classes are deterministic CLI calls with no model tier, and Layer-1 has only whole-persona model assignment. Shipped: the demonstrable off-uniform-opus assignment via the previously-unused `plugin` registry tier (3 plugin agents on claude-sonnet-4-6, ADR-8) with the MANDATORY tier-taxonomy contract test (9 core = opus/dispatch, 3 plugin = sonnet/tier-3, Ruling 17); the recurring efficiency-audit trigger as DoctorIssue EFF-1 on a >30d-stale .dadaia/states/last_efficiency_audit.json (absent => no issue; malformed => EFF-1 never a crash; exit unchanged, Rulings 10/11) with the deterministic clear path `dadaia reports mark-efficiency-audit`. The fast/haiku reasoning-persona downgrade DEFERRED by ADR-6 (no live operator to validate equal-quality) -> fast-tier-persona-validation return; the tier:-frontmatter rename -> tier-taxonomy-rename return. Ship PR #110, squash 4ccc6a21."
+    }
+  ]
+}
