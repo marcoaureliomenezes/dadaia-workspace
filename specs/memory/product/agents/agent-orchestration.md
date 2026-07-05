@@ -6,7 +6,9 @@ tldr: "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent 
 summary: Defines the public default 9-core agent topology with coordinator+sub-agent
   architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch),
   per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD
-  step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, and
+  step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3
+  plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs,
+  the two independent tier axes (numeric dispatch band vs registry model-cost Tier), and
   the Layer-2 persona surface.
 tags:
 - orchestration
@@ -14,8 +16,8 @@ tags:
 - workflows
 - dispatch
 token_estimate: 1700
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-04'
+release_origin: v0.1.60
 ---
 
 ## Purpose
@@ -77,7 +79,27 @@ workers.
 - `software-architect` — architectural review; feeds findings into phases 4/5 (ADDITIVE).
 
 **Plugins (not in core roster):** `frontend-engineer`, `design-specialist` (plugin
-`frontend-design`); `devops-engineer` (plugin `devops`).
+`frontend-design`); `devops-engineer` (plugin `devops`). They ship as behavior-less stubs and
+carry real behavior **once their pack is installed** for the workspace via `dadaia plugin
+install <pack>` ([[plugin-packs]]): the pack overwrites the stub with a real agent body on the
+registry `plugin`/sonnet tier (`model: claude-sonnet-4-6`, numeric `tier: 3`). Until installed
+in a given workspace, plugin-domain work routes to the operator.
+
+### Two independent "tier" axes (do not conflate)
+
+An agent frontmatter carries **two** unrelated `tier`-named concepts:
+
+- **Numeric `tier: 1/2/3` (Layer-1 dispatch band)** — a coordination/priority band (1 =
+  dispatchers, 2 = curator, 3 = leaf workers; the 3 plugin agents are `tier: 3`).
+- **Registry `Tier` (model-cost class)** — the `deep`/`dispatch`/`fast`/`plugin` literal in
+  `core/model_registry.py`, resolved from the frontmatter `model:` (the 9 core resolve to
+  `dispatch`/opus; the 3 plugin agents to `plugin`/sonnet). See [[tech-stack]] "Model
+  assignments".
+
+The mandatory contract test `tests/contract/test_agent_tier_taxonomy.py` machine-enforces both
+axes (every non-plugin core agent carries a numeric `tier` + a registry-known `model`; the 3
+plugin agents carry `tier: 3` + `model: claude-sonnet-4-6`); the eventual source-level rename
+(`tier:` → `dispatch_band:`) is tracked as the `tier-taxonomy-rename` backlog return.
 
 ### Dispatcher purity (constitution §9)
 

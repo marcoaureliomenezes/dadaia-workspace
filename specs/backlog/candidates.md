@@ -9,7 +9,13 @@ never-keep-the-past law. R10 (v0.1.58) consumed `harness-isolation-profiles` +
 `specs/_archive/v0.1.58/consumed-backlog/`) and returned four items (indexed below). R11
 (v0.1.59) consumed `panel-ux-overhaul` (anchor survives → archived at CLOSURE to
 `specs/_archive/v0.1.59/consumed-backlog/`) and returned one item
-(`response-guard-chip-presence-hardening`, indexed below).
+(`response-guard-chip-presence-hardening`, indexed below). **R12 (v0.1.60) consumed
+`plugin-packs-and-install-command` + `model-tier-efficiency-and-fast-tier-utilization`**
+(both anchors survive → archived at CLOSURE to `specs/_archive/v0.1.60/consumed-backlog/`;
+both removed from this index per removal-on-release), resolved the two reopened HIGH
+consumer-fan-out data-loss bugs, and returned four items (indexed below). **With R12 the
+R1–R12 operator-approved plan is COMPLETE; the `plugin-scope` deviation class is retired
+(plugin capability is now installable via `dadaia plugin install`).**
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -41,7 +47,7 @@ grill on the picked set before SPEC.
 | R9 | **SHIPPED — v0.1.57** (merged `8bab315a`, PR #104, 2026-07-04) | `context-injection-role-phase-canon`; `fragment-workflow-base-dedup`; `hard-remove-model-flag-across-run-verbs` (all consumed; the two injection-canon anchors survive → archived at CLOSURE; the `--model` dead anchor archived at SHIP — BL-SCHEMA) | The dedup base created the ONE prompt-assembly seam; role→atom map + phase threading + coherence doctor landed there; `--model` hard-removed across the 12 run verbs; `TransitionDecision.advanced` fixed the illegal-transition bug. First release of the R9→R12 mandate. |
 | R10 | **SHIPPED — v0.1.58** (merged `b0bd8217`, PR #106, 2026-07-04) | `harness-isolation-profiles`; `consumer-agents-md-fanout-redesign` (both consumed; both anchors survive → archived at CLOSURE) | `init --harness` profiles + typed `core/harness_registry.py` (4 L1 + 3 L2 sites, contract-locked to `harness_models.harnesses()`) + profile-aware install/doctor (absent ⇒ all-four) + consumer AGENTS.md fan-out redesign (spec_contexts.json detection, `[updated]` restore, doctor flagging). First projection/install release after the structural chain; the workflow-spawn auto-default deferred (FR6). |
 | R11 | **SHIPPED — v0.1.59** (merged `e6634996`, PR #108, 2026-07-04) | `panel-ux-overhaul` (consumed; anchor survives → archived at CLOSURE) | Visual redesign on the stabilized post-R4 panel, under the recorded `plugin-scope` deviation (operator 2026-07-02). Token-driven design system + uniformly styled controls + single-line header/control rows + `<header>` IA density + theme polish + two-category dead-CSS purge; behavior-locked golden-first (DOM-contract lock never re-baselined + api-golden zero-diff + CSP hashes frozen). Returned one QA LOW item. |
-| R12 | Capability tail | `plugin-packs-and-install-command`; `model-tier-efficiency-and-fast-tier-utilization` | Pure new capability, zero debt: packs + install command, then Layer-1 fast-tier assignments. |
+| R12 | **SHIPPED — v0.1.60** (merged `4ccc6a21`, PR #110, 2026-07-04) | `plugin-packs-and-install-command`; `model-tier-efficiency-and-fast-tier-utilization` (both consumed; both anchors survive → archived at CLOSURE) + reopened HIGH bugs `public-install-clobbers-consumer-repo-agents-md` + `public-doctor-flags-hand-authored-consumer-agents-md` (both resolved by FR9) | Pure new capability: `dadaia plugin install/list/doctor` + in-package packs so the 3 stub agents carry behavior on the plugin/sonnet tier; mandatory tier-taxonomy contract + EFF-1 efficiency trigger; FR9 provenance-gated consumer fan-out (bug fix, amends v0.1.58 Ruling L). Returned four items (indexed below). **Final release of the R9→R12 mandate — the R1–R12 plan is COMPLETE.** |
 
 ---
 
@@ -74,16 +80,36 @@ report-list locks + OS-phrase canonicalization) so a byte-golden is cross-platfo
 construction. Anchored at the v0.1.58 golden helpers in `test_install_target_goldens.py` + the
 v0.1.55 golden-authoring law.
 
-### `plugin-packs-and-install-command` — Plugin packs + `dadaia plugin install`
-Distribute frontend-design + devops packs; referenced by the `plugin-scope` rule.
-(File recreated 2026-07-02 — the entry existed only as an index line.)
+### `plugin-pack-content-libraries` — Full plugin pack skill corpora *(2026-07-04)*
+Returned at v0.1.60 closure (Ruling ADR-5 / 12 ceiling). v0.1.60 shipped machinery + ONE
+minimal skill per pack (`browser-frontend-implementation`, `github-actions-cicd`); grow each
+pack's skill set to a complete reviewable library (ai-engineer, public-privacy law). Anchored
+at `core/models/plugin_pack.py#PluginPack`.
 
-### `model-tier-efficiency-and-fast-tier-utilization` — Layer-1 model-tier efficiency (P2)
-Fast-tier assignments for mechanical sub-tasks + recurring efficiency-audit trigger.
+### `plugin-uninstall` — `dadaia plugin uninstall` (inverse of install) *(2026-07-04)*
+Returned at v0.1.60 closure (Ruling ADR-2 — additive-only install this release). Drop a pack
+from `installed_plugins.json` + restore the projected core stub over the pack agent body
+(profile-scoped, idempotent, doctor-clean). Anchored at
+`infrastructure/public_assets.py#install_plugin`.
+
+### `fast-tier-persona-validation` — Fast-tier persona validation (P2) *(2026-07-04)*
+Returned at v0.1.60 closure (Ruling ADR-6). v0.1.60 shipped the off-opus assignment via the 3
+plugin agents on the `plugin`/sonnet tier but deferred moving a reasoning-heavy core persona to
+the unused `fast`/haiku tier (deep/`claude-fable-5` region-locked; no live operator to validate
+equal quality). Assign one mechanical Layer-1 lane to the `fast` tier + operator-live
+equal-quality validation. Anchored at `core/model_registry.py#Tier`.
 
 ---
 
 ## LOW
+
+### `tier-taxonomy-rename` — Rename frontmatter `tier:` → `dispatch_band:` *(2026-07-04)*
+Returned at v0.1.60 closure (Ruling 17). Agent frontmatter carries two unrelated `tier`-named
+concepts (numeric dispatch band vs registry model-cost `Tier`); v0.1.60 FR6 documented +
+machine-guarded them (`test_agent_tier_taxonomy.py`) but did not rename. Rename `tier:` →
+`dispatch_band:` across all agent bodies + the parsers/renderers that read it + the contract
+test. Anchored at
+`tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_opus_dispatch_model`.
 
 ### `response-guard-chip-presence-hardening` — Response-guard e2e chip-presence assertion (QA) *(2026-07-04)*
 Returned at v0.1.59 closure (W5 AC-9(e) finding). `tests/e2e/panel/response-guard.spec.ts:76-77`
