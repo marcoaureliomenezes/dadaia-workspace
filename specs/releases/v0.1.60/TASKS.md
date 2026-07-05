@@ -224,6 +224,18 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     over the projected rule INVERTS from "asserts stub language" to "asserts install-gated language". `check_agent_skill_refs`
     (public_assets doctor) SURVIVES — pack skill refs must resolve.
   - AC-13 ledger — NEW: 3 agent bodies + minimal skills/rules; EDITED: `plugin-scope.md`. No `specs/backlog/**`.
+  - **W5 follow-up (PM-ruled evidence append, FR5-adjacent — commit `feat(T-60-30): install-gated wording in plugin
+    stub bodies (W5 follow-up)`):** the W5 E2E surfaced that the 3 STUB agent bodies
+    (`public/agents/{frontend-engineer,design-specialist,devops-engineer}.md`) still claimed "plugin pack is not yet
+    distributed (no install command exists)" — factually wrong once v0.1.60 ships (W3 rewrote only the plugin-scope
+    RULE). Fixed the 3 stub `[PLUGIN REQUIRED]` bodies to the same install-gated wording (`dadaia plugin install <pack>`,
+    ships in v0.1.60). Discriminators preserved for E2E scenario (a): `plugin: true` frontmatter kept, `[PLUGIN REQUIRED]`
+    marker kept (`test_plugin_projection.py:222` asserts it in the pre-install stub), NO pack-body H1 heading added
+    (`_PACK_BODY_HEADING`/`_is_plugin_stub` still discriminate). Grep guard: 0 "not yet distributed"/"no install command
+    exists" hits under `public/` source + projected `.claude/agents/` + `.claude/rules/`. Propagated (stage/install/doctor
+    exit 0, `[ok] public-privacy`). Goldens did NOT move (`[ok] stage:*`/`[ok] claude:*` line format is hash-verified but
+    content-invariant; `git diff _golden/` empty). Gates: ruff format/check clean, full unpiped pytest 4674 passed / 17
+    skipped.
 
 ## W4 — FR6/FR7 tier-taxonomy fix + efficiency-audit trigger (software-engineer)
 
