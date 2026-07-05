@@ -241,6 +241,50 @@ def test_runtime_expectations_yields_guardrail_labels(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# FR9 wiring — the REAL manager.doctor() consumer fan-out is provenance-aware
+# (bug public-doctor-flags-hand-authored-consumer-agents-md; Ruling 16). PRIMARY proof that
+# the gate is on the executed `dadaia public doctor` path (not the dead `_doctor_guardrail_pair`).
+# ---------------------------------------------------------------------------
+
+
+def test_manager_doctor_foreign_pair_for_hand_authored_consumer(tmp_path: Path) -> None:
+    """The REAL ``manager.doctor()`` emits ``[foreign]`` on BOTH paired consumer lines for a
+    hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]`` — so
+    ``public doctor`` does not perpetually flag a repo-owned file.
+
+    RED-first (pre-fix): the consumer lines came from ``runtime_expectations`` (a raw
+    sha-compare + stub-check), so ``manager.doctor()`` emitted ``[drift] repos/game:AGENTS.md``
+    + ``[missing] repos/game:CLAUDE.md`` and ``public doctor`` EXITED 1.
+    """
+    public_dir = _make_minimal_public(tmp_path)
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+
+    slug = "game"
+    consumer = _add_consumer(workspace_root, slug)
+    hand_authored = "# My Game Repo\n\nHand-authored, repo-owned rules. NOT lib-originated.\n"
+    (consumer / "AGENTS.md").write_text(hand_authored, encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+    manager.stage(workspace_root)
+    manager.install(workspace_root, target="all", force=True)
+
+    # INSTALL side: the hand-authored file survives byte-identical, no CLAUDE.md orphan.
+    assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
+    assert not (consumer / "CLAUDE.md").exists()
+
+    # DOCTOR side via the REAL manager.doctor(): the consumer pair is [foreign] (Ruling 16).
+    lines = manager.doctor(workspace_root)
+    assert "[foreign] repos/game:AGENTS.md" in lines, lines
+    assert "[foreign] repos/game:CLAUDE.md" in lines, lines
+    consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]
+    assert consumer_lines and all(ln.startswith("[foreign]") for ln in consumer_lines), (
+        f"the consumer pair must be [foreign] only — no legacy [drift]/[missing].\n  {consumer_lines}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 5 — consumer repos without marker are skipped silently
 # ---------------------------------------------------------------------------
 

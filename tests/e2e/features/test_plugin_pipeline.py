@@ -310,16 +310,14 @@ def test_bcd_install_chain_and_core_reinstall_precedence(
 
 
 # ---------------------------------------------------------------------------
-# (e/FR9, QA-4) registered hand-authored consumer — split into the INSTALL half
-# (provenance gate, green, the banner-drop sabotage target) and the DOCTOR half
-# (Ruling 16). The doctor half is xfail(strict) against the OPEN HIGH bug
-# `public-doctor-flags-hand-authored-consumer-agents-md`: the FR9 provenance-aware
-# `_doctor_guardrail_pair` (T-60-45) was never wired into the real `manager.doctor()`
-# path — the consumer lines still come from `runtime_expectations`, so `dadaia public
-# doctor` emits `[drift]`/`[missing]` and EXITS 1 for a hand-authored consumer. The
-# strict xfail is the regression lock: the instant software-engineer wires the fix,
-# this XPASSES → the suite goes red → this xfail marker must be removed. This is a
-# filed, tracked known-failure, NOT a slope test.
+# (e/FR9, QA-4) registered hand-authored consumer — the INSTALL half (provenance gate, the
+# banner-drop sabotage target) and the DOCTOR half (Ruling 16). The doctor half was xfail
+# against the HIGH bug `public-doctor-flags-hand-authored-consumer-agents-md` (the FR9
+# provenance gate was wired only into the unreferenced `_doctor_guardrail_pair`, never into the
+# real `manager.doctor()` consumer fan-out). The T-60-45 fix round routed the consumer
+# `repos/<slug>:` lines through the single `_doctor_consumer_pair_lines` authority that
+# `manager.doctor()` now calls (removed from `runtime_expectations`), so this test PASSES and
+# the xfail marker was removed.
 # ---------------------------------------------------------------------------
 
 
@@ -360,16 +358,6 @@ def test_e_install_registered_hand_authored_consumer_survives_byte_identical(
     assert "[updated]" in squashed and "repos/stale/AGENTS.md" in squashed, result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "OPEN HIGH bug public-doctor-flags-hand-authored-consumer-agents-md: the FR9 "
-        "provenance-aware _doctor_guardrail_pair is never called by manager.doctor(); the "
-        "real `dadaia public doctor` emits [drift]/[missing] and EXITS 1 for a hand-authored "
-        "consumer instead of the [foreign] pair + exit 0 (Ruling 16). Remove this marker when "
-        "software-engineer wires the provenance gate into the doctor consumer fan-out."
-    ),
-)
 def test_e_public_doctor_exits_zero_for_hand_authored_consumer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

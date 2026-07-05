@@ -102,6 +102,7 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
     _CLAUDE_MD_STUB,
     _carries_canonical_banner,
     _consumer_repos_for_root,
+    _doctor_consumer_pair_lines,
     _doctor_guardrail_pair,
     _install_consumer_repos_guardrail_pair,
     _install_guardrail_pair,
@@ -607,6 +608,17 @@ class FileSystemPublicAssetManager:
                 reports.append(f"[unsupported] {label}")
             else:
                 reports.append(self._compare(expected_src, dst, label))
+
+        # Consumer-repo guardrail pair (FR9, bug public-doctor-flags-hand-authored-consumer-
+        # agents-md): the `repos/<slug>:AGENTS.md`/`:CLAUDE.md` lines flow through the SINGLE
+        # provenance-aware authority — a hand-authored (no-banner) consumer reads [foreign] on
+        # BOTH paired lines (never [drift]/[missing]), so `public doctor` exits 0 (Ruling 16).
+        # `runtime_expectations` no longer emits these lines (no parallel legacy path).
+        consumer_source = self._agents_md_source(agentic_dir)
+        if consumer_source is not None:
+            reports.extend(
+                _doctor_consumer_pair_lines(consumer_source, workspace_root, emit_stderr=False)
+            )
 
         # Installed-pack projected-file doctoring (FR3, AC-5): a stale/out-of-manifest
         # installed-pack file is never silent. Empty when no pack is installed ⇒ zero lines

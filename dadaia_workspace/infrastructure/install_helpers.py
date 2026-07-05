@@ -24,10 +24,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_write_allowlist,
     _render_codex_agent_toml,
 )
-from dadaia_workspace.infrastructure.workspace_guardrail import (
-    _consumer_repos_for_root,
-    _is_self_repo,
-)
 
 # ---------------------------------------------------------------------------
 # Stage helpers (moved from FileSystemPublicAssetManager internal methods)
@@ -258,12 +254,12 @@ def runtime_expectations(
     if agents_md is not None:
         yield (agents_md, workspace_root / "AGENTS.md", "root:AGENTS.md", False)
         yield (None, workspace_root / "CLAUDE.md", "root:CLAUDE.md", True)
-        for consumer in _consumer_repos_for_root(workspace_root):
-            if _is_self_repo(consumer):
-                continue
-            slug = consumer.name
-            yield (agents_md, consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md", False)
-            yield (None, consumer / "CLAUDE.md", f"repos/{slug}:CLAUDE.md", True)
+        # v0.1.60 FR9 (bug public-doctor-flags-hand-authored-consumer-agents-md): the
+        # consumer-repo guardrail pairs are NO LONGER doctored here. They flow through the
+        # single provenance-aware authority `_doctor_consumer_pair_lines`, invoked directly by
+        # `manager.doctor()`, so a hand-authored (no-banner) consumer AGENTS.md reads [foreign]
+        # (never [drift]/[missing]) and `public doctor` exits 0 (Ruling 16). Keeping a parallel
+        # sha-compare here would re-open the clobber-adjacent perpetual-drift regression.
 
     reports_agents_md = agentic_dir / "data" / "reports-AGENTS.md"
     if reports_agents_md.exists():

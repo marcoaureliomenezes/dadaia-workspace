@@ -360,17 +360,77 @@ _install_consumer_repos_guardrail_pair = functools.partial(
 """Write the guardrail pair to consumer repos only (scope="repos-only")."""
 
 
+def _doctor_consumer_pair_lines(
+    source: Path,
+    workspace_root: Path,
+    *,
+    emit_stderr: bool = True,
+) -> list[str]:
+    """The SINGLE authority for provenance-aware CONSUMER guardrail-pair doctor lines (FR9).
+
+    This is the one classification used by BOTH ``manager.doctor()`` (the real
+    ``dadaia public doctor`` consumer fan-out — the ``repos/<slug>:`` lines are no longer
+    emitted by ``runtime_expectations``) AND :func:`_doctor_guardrail_pair`. There is no
+    parallel legacy consumer-doctor path.
+
+    Per registry-detected consumer repo (self-repo skipped):
+      * **AGENTS.md** — absent → ``[missing]``; no canonical banner → ``[foreign]`` (repo-owned,
+        NOT a drift); banner-bearing → ``[ok]``/``[drift]`` vs *source*.
+      * **CLAUDE.md** — paired (Ruling 16, CRITICAL): when the AGENTS.md line is ``[foreign]``
+        the CLAUDE.md line is ALSO ``[foreign]`` (whether absent OR a foreign non-stub) — never
+        ``[missing]``/``[drift]`` — so ``public doctor`` (exits 1 on any ``[missing]``/``[drift]``,
+        ``public.py:161-172``) EXITS 0 for a hand-authored consumer repo. Otherwise the stub
+        check applies (``[ok]``/``[drift]``/``[missing]``).
+
+    Never ``[skip]`` for a real consumer repo.
+    """
+    source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    def _emit(line: str) -> str:
+        if emit_stderr:
+            sys.stderr.write(line + "\n")
+        return line
+
+    lines: list[str] = []
+    for consumer in _consumer_repos_for_root(workspace_root):
+        if _is_self_repo(consumer):
+            continue
+        slug = consumer.name
+        agents_dst = consumer / "AGENTS.md"
+        a_label = f"repos/{slug}:AGENTS.md"
+        if not agents_dst.exists():
+            agents_line = f"[missing] {a_label}"
+        elif not _carries_canonical_banner(agents_dst):
+            agents_line = f"[foreign] {a_label}"
+        elif hashlib.sha256(agents_dst.read_bytes()).hexdigest() != source_sha:
+            agents_line = f"[drift] {a_label}"
+        else:
+            agents_line = f"[ok] {a_label}"
+        lines.append(_emit(agents_line))
+
+        claude_dst = consumer / "CLAUDE.md"
+        c_label = f"repos/{slug}:CLAUDE.md"
+        if agents_line.startswith("[foreign]"):
+            claude_line = f"[foreign] {c_label}"
+        elif not claude_dst.exists():
+            claude_line = f"[missing] {c_label}"
+        elif claude_dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+            claude_line = f"[drift] {c_label}"
+        else:
+            claude_line = f"[ok] {c_label}"
+        lines.append(_emit(claude_line))
+    return lines
+
+
 def _doctor_guardrail_pair(
     source: Path,
     workspace_root: Path,
 ) -> list[str]:
     """Return doctor parity lines for the guardrail pair projection.
 
-    Emits 2 root lines + 2 lines per registry-detected consumer repo (v0.1.58
-    FR4, Ruling J). Consumers are the same registry-derived on-disk repos as the
-    install fan-out (``_consumer_repos_for_root``); the self-repo is skipped.
-    Each consumer line is ``[ok]``/``[drift]``/``[missing]`` — **never**
-    ``[skip]`` for a real consumer repo. Lines are also written to stderr for CLI
+    Emits 2 root lines + the provenance-aware consumer pair lines from the single authority
+    :func:`_doctor_consumer_pair_lines` (so this helper and ``manager.doctor()`` classify
+    consumers identically — no dead parallel path). Lines are also written to stderr for CLI
     visibility.
 
     Labels: ``root:AGENTS.md``, ``root:CLAUDE.md``,
@@ -399,44 +459,8 @@ def _doctor_guardrail_pair(
         sys.stderr.write(line + "\n")
         return line
 
-    def _check_consumer_agents(dst: Path, label: str) -> str:
-        """FR9 provenance-aware consumer AGENTS.md doctor line.
-
-        A hand-authored (no-banner) consumer AGENTS.md is ``[foreign]`` — repo-owned, not a
-        drift — so ``public doctor`` does not perpetually flag it. A banner-bearing
-        (lib-owned) copy keeps ``[ok]``/``[drift]`` vs the source; absent is ``[missing]``.
-        """
-        if not dst.exists():
-            line = f"[missing] {label}"
-        elif not _carries_canonical_banner(dst):
-            line = f"[foreign] {label}"
-        elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
-            line = f"[drift] {label}"
-        else:
-            line = f"[ok] {label}"
-        sys.stderr.write(line + "\n")
-        return line
-
     lines: list[str] = []
     lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
     lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
-
-    for consumer in _consumer_repos_for_root(workspace_root):
-        if _is_self_repo(consumer):
-            continue
-        slug = consumer.name
-        agents_line = _check_consumer_agents(consumer / "AGENTS.md", f"repos/{slug}:AGENTS.md")
-        lines.append(agents_line)
-        claude_label = f"repos/{slug}:CLAUDE.md"
-        if agents_line.startswith("[foreign]"):
-            # Ruling 16 (CRITICAL): the PAIR is provenance-aware — a foreign AGENTS.md's
-            # paired CLAUDE.md is ALSO [foreign], whether the CLAUDE.md is absent OR a
-            # foreign non-stub — never [missing]/[drift], so `public doctor` EXITS 0 for a
-            # hand-authored consumer repo (public.py:161-172 exits 1 on [missing]/[drift]).
-            line = f"[foreign] {claude_label}"
-            sys.stderr.write(line + "\n")
-            lines.append(line)
-        else:
-            lines.append(_check_stub(consumer / "CLAUDE.md", claude_label))
-
+    lines.extend(_doctor_consumer_pair_lines(source, workspace_root, emit_stderr=True))
     return lines

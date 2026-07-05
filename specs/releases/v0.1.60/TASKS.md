@@ -378,6 +378,31 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
     - Gates: `ruff format --check` + `ruff check --no-cache` + `mypy --strict` (312 files, 0 issues) + `lint-imports`
       **8 kept / 0 broken** (guardrail edit is same-layer infra) + **full unpiped `pytest` = 4667 passed, 17 skipped, 0
       failed**. Commit `fix(T-60-45): ...` (bug id `public-install-clobbers-consumer-repo-agents-md` in the body).
+  - **FIX ROUND (QA REQUEST_CHANGES — HIGH bug `public-doctor-flags-hand-authored-consumer-agents-md`, found by the W5
+    E2E `b9c588b4`):** the FR9 `_doctor_guardrail_pair`/`_check_consumer_agents` provenance logic was DEAD for the real
+    `dadaia public doctor` — `manager.doctor()` doctored consumers via the untouched `runtime_expectations` path, emitting
+    `[drift] repos/<slug>:AGENTS.md` + `[missing] repos/<slug>:CLAUDE.md` → EXIT 1 (Ruling 16 violation); the unit test
+    passed by calling the dead helper directly (false confidence).
+    - **Root-cause wiring:** extracted the consumer classification into a SINGLE authority
+      `_doctor_consumer_pair_lines` (`workspace_guardrail.py`); `manager.doctor()` (`public_assets.py`) now calls it after
+      the runtime loop; `runtime_expectations` (`install_helpers.py`) NO LONGER yields the `repos/<slug>:` pairs (unused
+      `_consumer_repos_for_root`/`_is_self_repo` imports removed). `_doctor_guardrail_pair` also delegates to it — ONE
+      classification path for consumers, no parallel legacy path.
+    - **PRIMARY end-to-end proof:** NEW `test_public_doctor_parity.py::test_manager_doctor_foreign_pair_for_hand_authored_consumer`
+      exercises the REAL `manager.doctor()` (stage+install+doctor) → `[foreign]` pair, no `[drift]`/`[missing]` on
+      `repos/game`. **E2E xfail LIFTED:** `test_plugin_pipeline.py::test_e_public_doctor_exits_zero_for_hand_authored_consumer`
+      now PASSES (real `dadaia public doctor` exit 0). The direct-helper provenance test is retained as a SECONDARY lens
+      (now hits the shared authority, not dead code).
+    - **fate ledger (fix round):** `test_public_assets.py::TestRuntimeExpectations::test_yields_consumer_repo_pair`
+      INVERTED → `test_no_longer_yields_consumer_repo_pair` (runtime_expectations no longer yields consumer pairs — the
+      deliberate authority move; root pair still yielded). The W4B flip-set doctor tests
+      (`test_consumer_fanout.py`, `test_workspace_guardrail_pair.py` Case 6, `test_public_doctor_parity.py`
+      four-labels) call `_doctor_guardrail_pair` which now delegates to the shared authority → valid (secondary lenses),
+      re-verified green.
+    - Frozen v0.1.50 no-steal suite zero-diff; goldens unchanged (consumer lines are workspace-level, not self-repo
+      staging); `mypy --strict` 0 issues; `lint-imports` 8/0; **full unpiped `pytest` = 4674 passed, 17 skipped, 0
+      failed, 0 xfailed**. Fix commit `fix(T-60-45): wire provenance gate into the real doctor consumer fan-out` (new
+      bug id in the body). Both bugs' terminal `resolved` events appended at CLOSURE (T-60-70).
 
 ## W5 — per-pack sandboxed E2E (qa-engineer)
 

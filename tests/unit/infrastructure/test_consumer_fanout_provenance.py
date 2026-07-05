@@ -168,7 +168,16 @@ def test_foreign_claude_md_left_untouched_when_agents_foreign(tmp_path: Path) ->
 
 
 def test_doctor_pair_foreign_for_hand_authored_repo_exits_zero(tmp_path: Path) -> None:
-    """AC-14: hand-authored consumer → BOTH paired lines [foreign], no [missing]/[drift]."""
+    """AC-14 (SECONDARY direct-helper lens): hand-authored consumer → BOTH paired lines
+    [foreign], no [missing]/[drift].
+
+    ``_doctor_guardrail_pair`` now delegates the consumer classification to the SINGLE
+    authority ``_doctor_consumer_pair_lines`` that the REAL ``manager.doctor()`` also calls —
+    so this is no longer a dead-code lens. The PRIMARY end-to-end proof that the gate is on the
+    executed ``dadaia public doctor`` path lives in
+    ``tests/integration/test_public_doctor_parity.py::test_manager_doctor_foreign_pair_for_hand_authored_consumer``
+    and the ``tests/e2e/features/test_plugin_pipeline.py`` scenario (e)-doctor.
+    """
     src = _source(tmp_path)
     repo = _consumer(tmp_path)
     (repo / "AGENTS.md").write_text(_HAND_AUTHORED, encoding="utf-8")
