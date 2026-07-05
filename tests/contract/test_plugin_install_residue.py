@@ -1,23 +1,22 @@
-"""Plugin-install residue contract (FR-W4-01 / AC-W4-01, release v0.1.11).
+"""Plugin-install command contract — INVERTED at v0.1.60 (T-60-30).
 
-ADR-4 resolved bug ``plugin-install-command-missing`` by honest-relabel, not by
-inventing a ``dadaia plugin`` command: no plugin pack assets exist anywhere under
-``dadaia_workspace/``, so an install command would have nothing to install. The
-``plugin-scope`` rule and the three plugin agent stubs (``frontend-engineer``,
-``design-specialist``, ``devops-engineer``) must therefore never instruct anyone to run
-``dadaia plugin install`` — the wording routes plugin-domain work to the operator and
-points at the backlog entry ``plugin-packs-and-install-command`` (the real feature,
-registered at CLOSURE).
+**History.** At v0.1.11, ADR-4 resolved bug ``plugin-install-command-missing`` by an
+*honest relabel*: no plugin pack assets existed under ``dadaia_workspace/``, so there was
+nothing to install, and this contract pinned **zero** ``plugin install`` references in the
+public asset tree (the wording routed plugin-domain work to the operator).
 
-This contract pins the relabel permanently: zero ``plugin install`` references under
-the canonical asset tree ``dadaia_workspace/public/``. The grep is scoped to public
-assets only — CHANGELOG, ``specs/``, bug files, and test files may discuss the retired
-wording freely.
+**Inversion (v0.1.60, FR2/FR5 — fate-ledger INVERTS).** v0.1.60 ships the real
+``dadaia plugin install <pack>`` command plus the in-package ``frontend-design`` / ``devops``
+packs, consuming the backlog entry ``plugin-packs-and-install-command``. The ADR-4 premise is
+therefore reversed: the command **exists**, and the ``plugin-scope`` rule is rewritten to be
+install-gated (FR5). This contract inverts to pin the new law — the canonical ``plugin-scope``
+rule **names** ``dadaia plugin install`` and the retired ``not yet distributed`` /
+``no install command exists`` wording is **gone** — so the honest-relabel wording can never
+silently creep back now that packs are installable.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -26,33 +25,30 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
+_PLUGIN_SCOPE = _PUBLIC_ROOT / "rules" / "plugin-scope.md"
 
-# Any "plugin install" phrasing is residue: the command does not exist (ADR-4).
-_RESIDUE = re.compile(r"plugin\s+install", re.IGNORECASE)
+# The install-gated command the rewritten rule must name (v0.1.60 FR2/FR5).
+_INSTALL_COMMAND = "dadaia plugin install"
 
-# Text-bearing public asset types worth scanning (skip binaries like .png/.xlsx).
-_TEXT_SUFFIXES = {".md", ".json", ".sh", ".ts", ".js", ".py", ".toml", ".yml", ".yaml", ".txt"}
-
-
-def _public_text_assets() -> list[Path]:
-    return [
-        p
-        for p in sorted(_PUBLIC_ROOT.rglob("*"))
-        if p.is_file() and p.suffix in _TEXT_SUFFIXES and "__pycache__" not in p.parts
-    ]
+# The relabel wording retired by v0.1.60 — must be absent from the canonical rule.
+_RETIRED_WORDING = ("not yet distributed", "no install command exists")
 
 
-def test_no_plugin_install_references_under_public() -> None:
-    """Zero `plugin install` references in canonical public assets (AC-W4-01)."""
-    assert _PUBLIC_ROOT.is_dir(), f"public asset tree missing: {_PUBLIC_ROOT}"
-    offenders: list[str] = []
-    for asset in _public_text_assets():
-        rel = asset.relative_to(_REPO_ROOT).as_posix()
-        for lineno, line in enumerate(asset.read_text(encoding="utf-8").splitlines(), 1):
-            if _RESIDUE.search(line):
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
+def test_plugin_scope_names_install_command() -> None:
+    """The canonical ``plugin-scope`` rule names ``dadaia plugin install`` (v0.1.60 FR5)."""
+    assert _PLUGIN_SCOPE.is_file(), f"plugin-scope rule missing: {_PLUGIN_SCOPE}"
+    text = _PLUGIN_SCOPE.read_text(encoding="utf-8")
+    assert _INSTALL_COMMAND in text, (
+        "the plugin-scope rule must name the install command "
+        f"'{_INSTALL_COMMAND}' now that packs are installable (v0.1.60 FR2/FR5)"
+    )
+
+
+def test_plugin_scope_dropped_retired_relabel_wording() -> None:
+    """The retired ADR-4 honest-relabel wording is gone from the canonical rule (v0.1.60)."""
+    text = _PLUGIN_SCOPE.read_text(encoding="utf-8").lower()
+    offenders = [phrase for phrase in _RETIRED_WORDING if phrase in text]
     assert not offenders, (
-        "`plugin install` references the nonexistent command (ADR-4 honest-relabel; "
-        "route to the operator + backlog `plugin-packs-and-install-command`):\n"
-        + "\n".join(offenders)
+        "plugin-scope still carries the retired 'not yet distributed'/'no install command "
+        f"exists' wording superseded by v0.1.60: {offenders}"
     )

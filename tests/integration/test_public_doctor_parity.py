@@ -135,11 +135,10 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     v0.1.58 FR4 INVERT: the consumer is detected via ``spec_contexts.json``
     (registry-based), not the dead in-repo marker (Ruling G).
 
-    Labels expected:
-      - root:AGENTS.md
-      - root:CLAUDE.md
-      - repos/<slug>:AGENTS.md
-      - repos/<slug>:CLAUDE.md
+    v0.1.60 FR9 amendment: ``_SOURCE_CONTENT`` is BANNERLESS, so the consumer pair
+    classifies ``[foreign]`` (doctor-``[ok]``-parity flip) — including the PAIRED
+    ``repos/<slug>:CLAUDE.md`` line (Ruling 16) — while the lib-owned root pair keeps
+    ``[ok]``. All 4 labels are still present.
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -154,7 +153,7 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
 
     lines = _doctor_guardrail_pair(source, workspace_root)
-    labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
+    status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
 
     expected = {
         "root:AGENTS.md",
@@ -162,11 +161,16 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
         f"repos/{slug}:AGENTS.md",
         f"repos/{slug}:CLAUDE.md",
     }
-    assert labels == expected, f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {labels}"
-    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
-    assert all(ln.startswith("[ok]") for ln in lines), (
-        f"All labels should be [ok] after install. Lines: {lines}"
+    assert set(status) == expected, (
+        f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {set(status)}"
     )
+    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
+    # Root pair (lib-owned) [ok]; consumer pair (bannerless source) [foreign] — INCLUDING the
+    # paired CLAUDE.md line, so `public doctor` exits 0 for a hand-authored consumer repo.
+    assert status["root:AGENTS.md"] == "[ok]", lines
+    assert status["root:CLAUDE.md"] == "[ok]", lines
+    assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines
+    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +237,50 @@ def test_runtime_expectations_yields_guardrail_labels(tmp_path: Path) -> None:
     )
     assert any("root:CLAUDE.md" in ln for ln in label_set), (
         f"Expected 'root:CLAUDE.md' in doctor output.\n  Lines: {sorted(label_set)}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# FR9 wiring — the REAL manager.doctor() consumer fan-out is provenance-aware
+# (bug public-doctor-flags-hand-authored-consumer-agents-md; Ruling 16). PRIMARY proof that
+# the gate is on the executed `dadaia public doctor` path (not the dead `_doctor_guardrail_pair`).
+# ---------------------------------------------------------------------------
+
+
+def test_manager_doctor_foreign_pair_for_hand_authored_consumer(tmp_path: Path) -> None:
+    """The REAL ``manager.doctor()`` emits ``[foreign]`` on BOTH paired consumer lines for a
+    hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]`` — so
+    ``public doctor`` does not perpetually flag a repo-owned file.
+
+    RED-first (pre-fix): the consumer lines came from ``runtime_expectations`` (a raw
+    sha-compare + stub-check), so ``manager.doctor()`` emitted ``[drift] repos/game:AGENTS.md``
+    + ``[missing] repos/game:CLAUDE.md`` and ``public doctor`` EXITED 1.
+    """
+    public_dir = _make_minimal_public(tmp_path)
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+
+    slug = "game"
+    consumer = _add_consumer(workspace_root, slug)
+    hand_authored = "# My Game Repo\n\nHand-authored, repo-owned rules. NOT lib-originated.\n"
+    (consumer / "AGENTS.md").write_text(hand_authored, encoding="utf-8")
+
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+    manager.stage(workspace_root)
+    manager.install(workspace_root, target="all", force=True)
+
+    # INSTALL side: the hand-authored file survives byte-identical, no CLAUDE.md orphan.
+    assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
+    assert not (consumer / "CLAUDE.md").exists()
+
+    # DOCTOR side via the REAL manager.doctor(): the consumer pair is [foreign] (Ruling 16).
+    lines = manager.doctor(workspace_root)
+    assert "[foreign] repos/game:AGENTS.md" in lines, lines
+    assert "[foreign] repos/game:CLAUDE.md" in lines, lines
+    consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]
+    assert consumer_lines and all(ln.startswith("[foreign]") for ln in consumer_lines), (
+        f"the consumer pair must be [foreign] only — no legacy [drift]/[missing].\n  {consumer_lines}"
     )
 
 

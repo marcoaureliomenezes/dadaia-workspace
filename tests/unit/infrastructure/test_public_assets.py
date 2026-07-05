@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
+    _CANONICAL_AGENTS_BANNER,
     _CLAUDE_MD_STUB,
     FileSystemPublicAssetManager,
     _atomic_write_text,
@@ -748,16 +749,24 @@ class TestInstallConsumerReposGuardrailPair:
     def test_force_false_overwrites_divergent_consumer_with_updated_line(
         self, tmp_path: Path
     ) -> None:
-        """force=False: a divergent CONSUMER copy is restored to canonical and
-        reported with the DISTINCT [updated] line (Ruling L / A5), not a silent
-        [ok] (the workspace-root pair keeps [ok]; consumer roots are lib-owned).
+        """force=False: a divergent but BANNER-BEARING (lib-owned) CONSUMER copy is restored
+        to canonical and reported with the DISTINCT [updated] line (Ruling L / A5), not a
+        silent [ok].
+
+        v0.1.60 FR9 amendment: the [updated] restore path is now gated on the provenance
+        banner — re-fixtured WITH ``_CANONICAL_AGENTS_BANNER`` in both source and the stale
+        consumer copy to keep the [updated] classification (a bannerless divergent copy is now
+        [foreign], left untouched — see ``test_consumer_fanout_provenance.py``).
         """
-        src = _make_source_file(tmp_path, "# NEW\n")
+        new_body = _CANONICAL_AGENTS_BANNER + "\n# NEW\n"
+        src = _make_source_file(tmp_path, new_body)
         consumer = _add_marker_consumer(tmp_path, "my-repo")
-        (consumer / "AGENTS.md").write_text("# OLD\n", encoding="utf-8")
+        (consumer / "AGENTS.md").write_text(
+            _CANONICAL_AGENTS_BANNER + "\n# OLD\n", encoding="utf-8"
+        )
         installed: list[str] = []
         _install_consumer_repos_guardrail_pair(src, tmp_path, force=False, installed=installed)
-        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == "# NEW\n"
+        assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == new_body
         assert any(
             e.startswith("[updated]")
             and "overwrote divergent workspace-law copy" in e
@@ -1236,7 +1245,15 @@ class TestRuntimeExpectations:
         assert src is None  # sentinel
         assert transform is True  # stub mode
 
-    def test_yields_consumer_repo_pair(self, tmp_path: Path) -> None:
+    def test_no_longer_yields_consumer_repo_pair(self, tmp_path: Path) -> None:
+        """v0.1.60 FR9 amendment (bug public-doctor-flags-hand-authored-consumer-agents-md):
+        ``runtime_expectations`` NO LONGER yields the consumer ``repos/<slug>:`` pairs — those
+        flow through the single provenance-aware authority ``_doctor_consumer_pair_lines``
+        (called by ``manager.doctor()``), so a hand-authored consumer reads ``[foreign]`` not a
+        raw ``[drift]``/``[missing]``. Keeping a parallel yield here would re-introduce the
+        legacy sha-compare path. The provenance-aware wiring is proven by
+        ``test_public_doctor_parity.py::test_manager_doctor_foreign_pair_for_hand_authored_consumer``.
+        """
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
         data_dir = agentic_dir / "data"
         data_dir.mkdir()
@@ -1245,8 +1262,9 @@ class TestRuntimeExpectations:
         manager = self._make_manager()
         items = list(manager._runtime_expectations(agentic_dir, workspace_root))
         labels = [t[2] for t in items]
-        assert "repos/my-repo:AGENTS.md" in labels
-        assert "repos/my-repo:CLAUDE.md" in labels
+        assert not any(label.startswith("repos/my-repo:") for label in labels), labels
+        # The root pair is still yielded by runtime_expectations.
+        assert "root:AGENTS.md" in labels
 
     def test_codex_rules_not_sourced_from_markdown_protocols(self, tmp_path: Path) -> None:
         agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)

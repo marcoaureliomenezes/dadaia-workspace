@@ -1,0 +1,11 @@
+{
+  "schema_version": "1",
+  "name": "devops",
+  "agents": [
+    "devops-engineer"
+  ],
+  "skills": [
+    "github-actions-cicd"
+  ],
+  "rules": []
+}

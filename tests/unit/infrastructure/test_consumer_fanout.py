@@ -26,11 +26,18 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import (
+    _CANONICAL_AGENTS_BANNER,
     _CLAUDE_MD_STUB,
     _doctor_guardrail_pair,
     _install_workspace_guardrail_pair,
 )
 
+# This suite's source is a SYNTHETIC BANNERLESS ``AGENTS.md``. Under the v0.1.60 FR9
+# module-constant banner discriminator, a consumer copy projected from a bannerless source
+# carries NO provenance banner and therefore classifies ``[foreign]`` (repo-owned) — a
+# DELIBERATE Ruling-L amendment, recorded here, never a silent regen. Cases that must keep a
+# lib-owned classification ([updated]) re-fixture the consumer content to EMBED
+# ``_CANONICAL_AGENTS_BANNER``.
 _SOURCE_CONTENT = b"# AGENTS\n\nWorkspace-law guardrail content for fan-out tests.\n"
 
 
@@ -186,14 +193,21 @@ def test_tri_copy_targets_not_written_by_fan_out(tmp_path: Path) -> None:
 
 
 def test_divergent_consumer_root_restored_with_updated_line(tmp_path: Path) -> None:
-    """A hand-edited (divergent) consumer root ``AGENTS.md`` is restored to
-    canonical AND ``_write_pair`` emits the DISTINCT ``[updated]`` line
-    (separate from the ``[ok]`` fresh-create line) — never a silent ``[ok]``.
+    """A divergent but BANNER-BEARING (lib-owned) consumer root ``AGENTS.md`` is restored to
+    canonical AND ``_write_pair`` emits the DISTINCT ``[updated]`` line — never a silent
+    ``[ok]``.
+
+    v0.1.60 FR9 amendment: only a *provable canonical projection* (carries
+    ``_CANONICAL_AGENTS_BANNER``) is lib-owned and eligible for restore; the divergent copy is
+    re-fixtured WITH the banner to keep the ``[updated]`` classification (a bannerless
+    divergent copy is now ``[foreign]`` — see the provenance suite).
     """
     source = _make_source(tmp_path)
     _write_registry(tmp_path, [("demo", "alive")])
     repo = _make_repo(tmp_path, "demo")
-    (repo / "AGENTS.md").write_bytes(b"# HAND-EDITED divergent copy\n")
+    (repo / "AGENTS.md").write_bytes(
+        _CANONICAL_AGENTS_BANNER.encode() + b"\n# HAND-EDITED divergent (but lib-owned) copy\n"
+    )
 
     installed: list[str] = []
     _install_workspace_guardrail_pair(source, tmp_path, force=False, installed=installed)
@@ -242,22 +256,25 @@ def test_nested_subtree_agents_md_left_untouched(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_flags_drift_for_stale_consumer(tmp_path: Path) -> None:
-    """A stale ``repos/demo/AGENTS.md`` yields ``[drift] repos/demo:AGENTS.md``
-    in the returned doctor report list. RED-first: pre-fix the report list had
-    NO ``repos/demo:AGENTS.md`` line at all (marker-less repo dropped at
-    ``_consumer_repos_for_root``; its ``[skip]`` went to stderr only).
+def test_doctor_flags_foreign_for_bannerless_consumer(tmp_path: Path) -> None:
+    """A bannerless (hand-authored / stale-bannerless) ``repos/demo/AGENTS.md`` yields
+    ``[foreign] repos/demo:AGENTS.md`` — never ``[skip]``.
+
+    v0.1.60 FR9 amendment ([drift]→[foreign]): under the module-constant banner, a consumer
+    AGENTS.md that does NOT carry ``_CANONICAL_AGENTS_BANNER`` is repo-owned, not a drift — so
+    ``public doctor`` does not perpetually flag it. (A banner-bearing stale copy is still
+    ``[drift]`` — see ``test_consumer_fanout_provenance.py``.)
     """
     source = _make_source(tmp_path)
     _write_registry(tmp_path, [("demo", "alive")])
     repo = _make_repo(tmp_path, "demo")
-    (repo / "AGENTS.md").write_bytes(b"# STALE consumer copy\n")
+    (repo / "AGENTS.md").write_bytes(b"# STALE bannerless consumer copy\n")
     (repo / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
 
     lines = _doctor_guardrail_pair(source, tmp_path)
 
-    assert "[drift] repos/demo:AGENTS.md" in lines, (
-        f"stale consumer AGENTS.md must be flagged [drift] in the report list.\n  lines: {lines}"
+    assert "[foreign] repos/demo:AGENTS.md" in lines, (
+        f"bannerless consumer AGENTS.md must be flagged [foreign] in the report list.\n  lines: {lines}"
     )
     assert not any(ln.startswith("[skip]") for ln in lines), (
         "the doctor report list must never contain a [skip] line for a real consumer repo."
@@ -277,8 +294,15 @@ def test_doctor_flags_missing_consumer(tmp_path: Path) -> None:
     )
 
 
-def test_doctor_reports_ok_for_fresh_consumer(tmp_path: Path) -> None:
-    """After a fresh install the consumer copy reads ``[ok] repos/demo:AGENTS.md``."""
+def test_doctor_reports_foreign_for_fresh_bannerless_consumer(tmp_path: Path) -> None:
+    """After a fresh install of a BANNERLESS source the consumer copy reads
+    ``[foreign] repos/demo:AGENTS.md``.
+
+    v0.1.60 FR9 amendment ([ok]→[foreign]): the synthetic source carries no banner, so the
+    projected consumer copy is not a provable lib-owned projection — it classifies
+    ``[foreign]``. In production the shipped ``data/AGENTS.md`` DOES carry the banner, so a
+    real fresh consumer reads ``[ok]`` (covered by ``test_consumer_fanout_provenance.py``).
+    """
     source = _make_source(tmp_path)
     _write_registry(tmp_path, [("demo", "alive")])
     _make_repo(tmp_path, "demo")
@@ -289,7 +313,9 @@ def test_doctor_reports_ok_for_fresh_consumer(tmp_path: Path) -> None:
     labels = _labels(lines)
     assert "repos/demo:AGENTS.md" in labels
     assert "repos/demo:CLAUDE.md" in labels
-    assert "[ok] repos/demo:AGENTS.md" in lines, f"fresh consumer must read [ok].\n  lines: {lines}"
+    assert "[foreign] repos/demo:AGENTS.md" in lines, (
+        f"a bannerless fresh consumer copy must read [foreign].\n  lines: {lines}"
+    )
 
 
 def test_doctor_never_skips_a_registered_consumer(tmp_path: Path) -> None:

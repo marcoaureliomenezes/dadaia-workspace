@@ -307,13 +307,11 @@ def test_doctor_four_line_output(tmp_path: Path) -> None:
       - `_doctor_guardrail_pair` is called against the same workspace.
 
     Then:
-      - The returned list contains exactly 4 lines.
-      - The 4 labels are exactly:
-          `root:AGENTS.md`
-          `root:CLAUDE.md`
-          `repos/<slug>:AGENTS.md`
-          `repos/<slug>:CLAUDE.md`
-      - All 4 lines report `[ok]` (files are byte-identical to source).
+      - The returned list contains exactly 4 lines with the 4 labels
+        (`root:AGENTS.md`, `root:CLAUDE.md`, `repos/<slug>:AGENTS.md`, `repos/<slug>:CLAUDE.md`).
+      - v0.1.60 FR9 amendment (doctor-`[ok]`-parity flip, NOT an `[updated]`-on-divergent case
+        — QA-1 misattribution correction): the source here is BANNERLESS, so the consumer pair
+        classifies `[foreign]` (repo-owned) while the lib-owned root pair keeps `[ok]`.
     """
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -338,17 +336,19 @@ def test_doctor_four_line_output(tmp_path: Path) -> None:
         f"repos/{slug}:AGENTS.md",
         f"repos/{slug}:CLAUDE.md",
     }
-    actual_labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
+    status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
 
-    assert actual_labels == expected_labels, (
-        f"Doctor labels mismatch.\n  Expected: {expected_labels}\n  Got: {actual_labels}"
+    assert set(status) == expected_labels, (
+        f"Doctor labels mismatch.\n  Expected: {expected_labels}\n  Got: {set(status)}"
     )
     assert len(lines) == 4, (
         f"Expected exactly 4 parity lines, found {len(lines)}.\n  Lines: {lines}"
     )
-    assert all(ln.startswith("[ok]") for ln in lines), (
-        f"All parity lines should be [ok] after install.\n  Lines: {lines}"
-    )
+    # Root pair (lib-owned) is [ok]; the consumer pair (bannerless source) is [foreign].
+    assert status["root:AGENTS.md"] == "[ok]", lines
+    assert status["root:CLAUDE.md"] == "[ok]", lines
+    assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines
+    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines
 
 
 # ---------------------------------------------------------------------------

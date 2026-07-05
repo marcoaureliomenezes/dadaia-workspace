@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "name": "frontend-design",
+  "agents": [
+    "frontend-engineer",
+    "design-specialist"
+  ],
+  "skills": [
+    "browser-frontend-implementation"
+  ],
+  "rules": []
+}

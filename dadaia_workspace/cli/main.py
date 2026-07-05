@@ -16,6 +16,7 @@ from dadaia_workspace.cli.commands import (
     migrate,
     orchestrate,
     panel,
+    plugin,
     public,
     reports,
     repos,
@@ -57,6 +58,7 @@ app.add_typer(public.app, name="public")
 app.add_typer(doctor.app, name="doctor")
 app.add_typer(academy.app, name="academy")
 app.add_typer(orchestrate.app, name="orchestrate")
+app.add_typer(plugin.app, name="plugin")
 app.add_typer(reports.app, name="reports")
 app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")

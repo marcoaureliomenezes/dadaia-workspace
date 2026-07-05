@@ -6,7 +6,7 @@ import os
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
@@ -36,6 +36,18 @@ _PRODUCTION_WRITE_EVENTS: frozenset[str] = frozenset(
         "WRITE",
     }
 )
+
+# ---------------------------------------------------------------------------
+# EFF-1 — recurring efficiency-audit staleness marker (v0.1.60 FR7)
+# ---------------------------------------------------------------------------
+
+#: Days after which the recorded efficiency audit is considered stale (EFF-1 fires).
+EFFICIENCY_AUDIT_STALE_DAYS = 30
+
+#: The marker file the ``dadaia reports mark-efficiency-audit`` writer produces and this
+#: check reads. Kept in sync with ``cli/commands/reports.py`` by the writer→doctor
+#: round-trip test (``AC-8``); a divergence there would break the production clear path.
+_EFFICIENCY_AUDIT_MARKER = "last_efficiency_audit.json"
 
 # ---------------------------------------------------------------------------
 # ROOT-* invariant constants
@@ -465,6 +477,62 @@ class DoctorService:
             ]
         return []
 
+    def _check_efficiency_audit(self) -> list[DoctorIssue]:
+        """EFF-1 (FR7) — flag a stale or malformed efficiency-audit marker.
+
+        Reads ``.dadaia/states/last_efficiency_audit.json`` (schema
+        ``{schema_version, last_efficiency_audit, by, report}``) and emits a
+        ``DoctorIssue(code="EFF-1", fixable=False, ...)`` — NOT a ``[warn]`` token, and the
+        bare ``dadaia doctor`` exit stays 0 (the service never raises on issues). 4-case
+        matrix: *absent* ⇒ no issue (fresh-workspace happy path unchanged); *fresh* (≤
+        :data:`EFFICIENCY_AUDIT_STALE_DAYS`) ⇒ no issue; *stale* (> threshold) ⇒ EFF-1;
+        *malformed* (invalid JSON / missing ``last_efficiency_audit`` / unparseable
+        timestamp) ⇒ EFF-1 "malformed marker" — **never a crash**.
+        """
+        clear = "run: dadaia reports mark-efficiency-audit --report <report-path>"
+        marker = self._workspace_root / ".dadaia" / "states" / _EFFICIENCY_AUDIT_MARKER
+        if not marker.exists():
+            return []
+
+        def _malformed(reason: str) -> list[DoctorIssue]:
+            return [
+                DoctorIssue(
+                    code="EFF-1",
+                    description=f"efficiency-audit marker is malformed ({reason}) — {clear}",
+                    fixable=False,
+                )
+            ]
+
+        try:
+            data = json.loads(marker.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return _malformed("invalid JSON")
+        if not isinstance(data, dict):
+            return _malformed("not a JSON object")
+        raw = data.get("last_efficiency_audit")
+        if not isinstance(raw, str) or not raw.strip():
+            return _malformed("missing 'last_efficiency_audit'")
+        try:
+            recorded = datetime.fromisoformat(raw)
+        except ValueError:
+            return _malformed("unparseable 'last_efficiency_audit' timestamp")
+        if recorded.tzinfo is None:
+            recorded = recorded.replace(tzinfo=UTC)
+
+        age = datetime.now(tz=UTC) - recorded
+        if age <= timedelta(days=EFFICIENCY_AUDIT_STALE_DAYS):
+            return []
+        return [
+            DoctorIssue(
+                code="EFF-1",
+                description=(
+                    f"efficiency audit is {age.days} day(s) old "
+                    f"(threshold {EFFICIENCY_AUDIT_STALE_DAYS}d) — {clear}"
+                ),
+                fixable=False,
+            )
+        ]
+
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
         contexts = self._store.list_all()
@@ -586,6 +654,9 @@ class DoctorService:
 
         # ---- Venv health (FR-W3-02, T-014-13) ----
         issues.extend(self._check_venv_health())
+
+        # ---- Efficiency-audit staleness (EFF-1, v0.1.60 FR7) ----
+        issues.extend(self._check_efficiency_audit())
 
         return issues
 
