@@ -482,8 +482,23 @@ FAIL → reverted, captured on the task line. **FR1/FR2 land FIRST** (golden-fir
 
 ## W6 — gates + ship
 
-- [ ] T-60-60 Full local gates (AC-12) + self-hosting reconcile, then ship. Owner: software-engineer (gates) +
-  qa-engineer (ship-gate) + security-reviewer (push-gate). Write set: none (`specs/**` untouched). Checklist:
+- [x] T-60-60 Full local gates (AC-12) + self-hosting reconcile, then ship. Owner: software-engineer (gates) +
+  qa-engineer (ship-gate) + security-reviewer (push-gate). Write set: none (`specs/**` untouched). **DONE evidence
+  (2026-07-05):** gates — ruff format --check 0 / ruff check --no-cache 0 / mypy --strict 312 files 0 issues /
+  lint-imports 8 kept 0 broken / full unpiped pytest 4674 passed 17 skipped 0 failed 0 xfailed exit 0 (one transient
+  failure was the import-linter cache-hygiene contract catching the orchestrator's own non-`--no-cache` run — cache
+  removed, test green: the contract working, not a bug); specs doctor exit 0 (0 errors) + backlog doctor clean exit 0.
+  **Self-hosting reconcile (FR9 on the live instance):** the bug's damage was found LIVE on all 6 consumer repos
+  (working-tree AGENTS.md clobbered + untracked CLAUDE.md bridge stubs — inflicted by the v0.1.58 reconcile and
+  re-inflicted by the W3 propagation running pre-fix code); remediated by `git checkout -- AGENTS.md` ×6 + removal of
+  the 6 untracked `@AGENTS.md` bridge stubs (tracked/operator files untouched); post-restore doctor exit 0 with
+  **[foreign] ×12** (6 repos × AGENTS.md+CLAUDE.md); `public install --target all` left ALL hand-authored copies
+  byte-identical (**0 [updated] / 12 [foreign] / self-repo [skip]** — vs the v0.1.58 ship that fanned [updated] to 6);
+  confirming doctor exit 0 + [ok] public-privacy; consumer trees verified 0 AGENTS/CLAUDE deltas. No-plugin byte-lock
+  held in-suite (golden (a)+(b) green). **QA ship gate: APPROVED** (handoff
+  2026-07-05T003903Z-qa-engineer-v0160-ship-gate.handoff.json, validated — E2E 6/6 no-xfail, structural single
+  authority verified, AC-1..15 all live, frozen no-steal suite zero-diff vs merge-base 96440487). No W1–W5 commit
+  staged specs/backlog (verified). Security push-gate keyed to the pushed sha + CI watch recorded on the PR. Checklist:
   - **Unpiped** `pytest` (real exit) — full suite green; `ruff format --check`; `ruff check --no-cache`;
     `mypy --strict dadaia_workspace`.
   - `lint-imports --no-cache` → **`8 kept, 0 broken`**; ignore-cap UNCHANGED — the new `core/models/plugin_pack.py` +
