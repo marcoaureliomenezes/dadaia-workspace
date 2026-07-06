@@ -7,15 +7,19 @@ The word "tier" names two distinct axes and this contract machine-enforces the s
   * the registry ``Tier`` (``deep``/``dispatch``/``fast``/``plugin``) = the model-cost class
     resolved from the frontmatter ``model:`` via ``core/model_registry``.
 
-Assertions (AC-9):
+Assertions (AC-9, amended by the 2026-07-06 operator retier):
   * every NON-plugin core agent (``public/agents/*.md`` without ``plugin: true``) carries a
-    numeric ``tier`` AND a registry-known ``model`` — the 9 core keep ``claude-opus-4-8``
-    (registry tier ``dispatch``);
+    numeric ``tier`` AND a registry-known ``model``. The core roster is split by operator
+    decision (2026-07-06): FIVE agents run ``claude-fable-5`` (registry tier ``deep``) with a
+    pinned per-agent Claude ``effort`` — product-engineer/high, project-auditor/high,
+    ai-engineer/medium, software-engineer/low, qa-engineer/low — and the remaining FOUR
+    (project-manager, software-architect, security-reviewer, code-reviewer) keep
+    ``claude-opus-4-8`` (registry tier ``dispatch``) with no ``effort`` override;
   * the 3 plugin agents (the real bodies at ``public/plugins/*/agents/*.md``) carry
     ``tier: 3`` + ``model: claude-sonnet-4-6`` (registry tier ``plugin``).
 
-This is NON-OPTIONAL: it must fail loudly if a core agent loses its tier/model, if a plugin
-agent is put back on opus, or if the roster count drifts. The eventual source-level
+This is NON-OPTIONAL: it must fail loudly if a core agent's model/effort drifts from the
+pinned map, or if the roster count drifts. The eventual source-level
 ``tier:`` → ``dispatch_band:`` rename is tracked as backlog return ``tier-taxonomy-rename``.
 """
 
@@ -71,20 +75,56 @@ def test_plugin_bodies_are_exactly_three() -> None:
     }, [p.name for p in bodies]
 
 
-def test_core_agents_carry_numeric_tier_and_opus_dispatch_model() -> None:
+#: The operator-pinned Claude-axis assignment (2026-07-06): agent -> (model, effort).
+#: ``effort`` is the per-agent Claude Code frontmatter override; ``None`` = no override
+#: (the agent inherits the session effort).
+_CORE_MODEL_EFFORT: dict[str, tuple[str, str | None]] = {
+    "product-engineer": ("claude-fable-5", "high"),
+    "project-auditor": ("claude-fable-5", "high"),
+    "ai-engineer": ("claude-fable-5", "medium"),
+    "software-engineer": ("claude-fable-5", "low"),
+    "qa-engineer": ("claude-fable-5", "low"),
+    "project-manager": ("claude-opus-4-8", None),
+    "software-architect": ("claude-opus-4-8", None),
+    "security-reviewer": ("claude-opus-4-8", None),
+    "code-reviewer": ("claude-opus-4-8", None),
+}
+
+#: The registry tier each pinned model must resolve to.
+_MODEL_TIER: dict[str, str] = {
+    "claude-fable-5": "deep",
+    "claude-opus-4-8": "dispatch",
+}
+
+
+def test_core_agents_carry_numeric_tier_and_pinned_model_effort() -> None:
     registry = registry_by_claude_id()
+    seen: set[str] = set()
     for md in _core_agents():
         fm = _frontmatter(md)
         tier = fm.get("tier")
         assert isinstance(tier, int) and not isinstance(tier, bool), (
             f"{md.name}: 'tier' must be a numeric band, got {tier!r}"
         )
+        assert md.stem in _CORE_MODEL_EFFORT, f"{md.name}: not in the pinned roster map"
+        expected_model, expected_effort = _CORE_MODEL_EFFORT[md.stem]
         model = fm.get("model")
         assert model in registry, f"{md.name}: model {model!r} is not registry-known"
-        assert model == "claude-opus-4-8", f"{md.name}: core agent must keep opus, got {model!r}"
-        assert registry[str(model)].tier == "dispatch", (
-            f"{md.name}: {model!r} must resolve to the 'dispatch' registry tier"
+        assert model == expected_model, (
+            f"{md.name}: pinned model is {expected_model!r}, got {model!r}"
         )
+        assert registry[str(model)].tier == _MODEL_TIER[expected_model], (
+            f"{md.name}: {model!r} must resolve to the {_MODEL_TIER[expected_model]!r} "
+            "registry tier"
+        )
+        effort = fm.get("effort")
+        assert effort == expected_effort, (
+            f"{md.name}: pinned effort is {expected_effort!r}, got {effort!r}"
+        )
+        seen.add(md.stem)
+    assert seen == set(_CORE_MODEL_EFFORT), (
+        f"roster/map mismatch: missing {set(_CORE_MODEL_EFFORT) - seen}"
+    )
 
 
 def test_plugin_agents_carry_tier3_sonnet_plugin_model() -> None:
