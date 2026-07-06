@@ -109,7 +109,7 @@ concepts (numeric dispatch band vs registry model-cost `Tier`); v0.1.60 FR6 docu
 machine-guarded them (`test_agent_tier_taxonomy.py`) but did not rename. Rename `tier:` →
 `dispatch_band:` across all agent bodies + the parsers/renderers that read it + the contract
 test. Anchored at
-`tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_opus_dispatch_model`.
+`tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_pinned_model_effort`.
 
 ### `response-guard-chip-presence-hardening` — Response-guard e2e chip-presence assertion (QA) *(2026-07-04)*
 Returned at v0.1.59 closure (W5 AC-9(e) finding). `tests/e2e/panel/response-guard.spec.ts:76-77`
