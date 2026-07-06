@@ -2,7 +2,8 @@
 name: project-auditor
 description: Tier-1 peer coordinator / drift anchor. Audits spec/memory vs code, finds dead/stale code, dispatches evidence agents (code-reviewer/security-reviewer/software-architect/qa-engineer/ai-engineer). Emits scorecard. NEVER fixes drift.
 tier: 1
-model: claude-opus-4-8
+model: claude-fable-5
+effort: high
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"
 gate_role: "none (peer coordinator / drift anchor)"
