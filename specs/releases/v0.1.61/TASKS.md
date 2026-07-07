@@ -202,7 +202,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W5 — workspace hygiene + gates + ship
 
-- [ ] T-61-60 FR7 + AC-10 full gates + ship. Owner: software-engineer (gates) + qa-engineer (ship-gate) +
+- [-] T-61-60 FR7 + AC-10 full gates + ship. Owner: software-engineer (gates) + qa-engineer (ship-gate) +
   security-reviewer (push-gate) + operator/PM (shell hygiene). Write set: none in `specs/**`. Checklist:
   - FR7 (operator/PM shell): `dadaia doctor --fix` (clears `.mypy_cache/` + the stale `tauan-games` lease —
     verify, both may be transient-cleared already); surface `bug-space-war` for operator triage (record decision
@@ -219,6 +219,22 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
   - *(PE runs no shell — every command above is surfaced to PM/operator; devops-domain routing per plugin-scope
     noted: devops pack not installed in this workspace ⇒ software-engineer owns the YAML under the recorded
     audit-routing exception, or the operator installs the pack first.)*
+  - **FR7 evidence (2026-07-07, PM shell):** `dadaia doctor --fix` → ROOT-2 deleted `.mypy_cache`; stale
+    `tauan-games.lock.json` lease GC'd (specs doctor: zero SPEC-DOC-029). `bug-space-war` root entry: operator
+    unavailable at ship ⇒ **explicitly deferred to operator triage** (§6 row 15 residual — operator-created
+    root entry, human-judgment call: `root_exceptions.txt` or relocate). D-2: stale `dist/` (mtime 2026-06-07)
+    deleted; dir absent. G-23: `v0.1.41` residue (untracked-only: GRILL.md gitignored, OQ-DECISIONS.md untracked)
+    relocated via `mv` (git mv impossible on untracked sources) to `specs/_archive/wip-abandoned/v0.1.41/` +
+    README breadcrumb; OQ-DECISIONS.md + README now tracked (Bash-side write — `_archive` FROZEN applies to file
+    tools; operator/PM chokepoint path per TASKS).
+  - **AC-10 evidence (2026-07-07):** unpiped pytest exit 0 — **4684 passed, 17 skipped, 0 warnings** ·
+    ruff format --check exit 0 · ruff check --no-cache exit 0 · mypy --strict exit 0 (312 files) ·
+    lint-imports --no-cache **9 kept / 0 broken** · specs doctor exit 0 (LINT-1/TREE-5/029 all clear) ·
+    backlog doctor clean exit 0 · self-hosting reconcile stage→doctor→install --target all→doctor all exit 0
+    with `[ok] public-privacy` · frozen v0.1.50 no-steal suite **zero-diff** vs main · goldens **zero
+    re-baseline** vs main. `release.yml` e2e-panel leg: no version bump this release ⇒ GHA evidence plan =
+    the leg runs on the next version-bump push; `ci.yml`'s e2e-panel leg is the in-release GHA proof (watched
+    at this push).
 
 ## W6 — closure (CLOSURE phase)
 
