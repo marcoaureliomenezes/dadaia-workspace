@@ -62,7 +62,15 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # T-010-33's reverse-direction `forbidden` contracts (core-no-upper-layers,
 # infrastructure-no-upper-layers) add ZERO ignore edges — they freeze layers verified
 # clean — so they do not move this number.
-_RECORDED_IGNORE_EDGE_CAP = 26
+#
+# W3 NOTE (v0.1.61 FR5, T-61-30, ADR-4 / audit A-2): the new `cli-no-infrastructure`
+# forbidden contract caps the cli -> infrastructure edge class (11 sites at audit time,
+# growing silently — v0.1.60 added 2 unnoticed). The post-W2 edge set (plugin.py's
+# public-asset-manager wiring edge remains; the FR4/W2-removed edge is gone) was
+# re-enumerated by grep at implementation time = 10 module-pair edges. None is
+# composition-root wiring (container.py's monopoly); all are accepted, capped, ratcheted
+# debt. Cap raised 26 -> 36 (+10) in the same commit as the setup.cfg contract.
+_RECORDED_IGNORE_EDGE_CAP = 36
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
@@ -70,6 +78,7 @@ _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 9,
     "features-no-subprocess": 4,
     "features-no-cross-feature": 13,
+    "cli-no-infrastructure": 10,
 }
 
 
@@ -152,23 +161,29 @@ def test_ignore_edge_count_matches_recorded_per_family_breakdown() -> None:
 
 
 def test_every_ignored_edge_is_a_features_layering_exception() -> None:
-    """Every ignored edge must be a ``features ->`` edge (the only sanctioned exceptions).
+    """Every ignored edge must originate in its family's sanctioned source layer.
 
-    The layering law's sanctioned exceptions all originate in ``features`` — two kinds now:
+    The layering law's sanctioned exceptions come in three kinds now:
     (1) ``features -> infrastructure`` reach while container DI is incomplete
-    (``features-no-infrastructure`` / ``features-no-subprocess``), and (2) v0.1.54 FR3:
-    ``features -> features`` cross-feature composition debt (``features-no-cross-feature``) —
-    a feature reaching a sibling feature instead of composing via the container. Both kinds
-    keep a ``dadaia_workspace.features`` **source**, so this assertion still holds across all
-    three contract families. An ignored edge that does NOT start at ``dadaia_workspace.features``
-    would be a new, unrelated suppression smuggled into the list — fail loudly so it cannot
-    hide among the documented feature-layering debt.
+    (``features-no-infrastructure`` / ``features-no-subprocess``), (2) v0.1.54 FR3:
+    ``features -> features`` cross-feature composition debt (``features-no-cross-feature``),
+    and (3) v0.1.61 FR5 (ADR-4): ``cli -> infrastructure`` capped debt
+    (``cli-no-infrastructure``) — the CLI reaching adapters instead of composing via the
+    container. The first two keep a ``dadaia_workspace.features`` **source**; the cli family
+    keeps a ``dadaia_workspace.cli`` source. An ignored edge whose source does not match its
+    family's sanctioned layer would be a new, unrelated suppression smuggled into the list —
+    fail loudly so it cannot hide among the documented layering debt.
     """
+    _SANCTIONED_SOURCE_BY_FAMILY = {
+        "cli-no-infrastructure": "dadaia_workspace.cli",
+    }
     offenders: list[str] = []
     for section, section_edges in _ignore_edges_by_contract().items():
+        family = section.split(":")[-1]
+        sanctioned = _SANCTIONED_SOURCE_BY_FAMILY.get(family, "dadaia_workspace.features")
         for edge in section_edges:
             source = edge.split("->", 1)[0].strip()
-            if not source.startswith("dadaia_workspace.features"):
+            if not source.startswith(sanctioned):
                 offenders.append(f"[{section}] {edge}")
     assert not offenders, (
         "ignored import edges that are not features-layering exceptions:\n" + "\n".join(offenders)

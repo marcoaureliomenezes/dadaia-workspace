@@ -100,7 +100,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W3 — cli-no-infrastructure contract (A-2)
 
-- [ ] T-61-30 FR5 — capped import-linter contract + bidirectional cap pin. Owner: software-engineer
+- [x] T-61-30 FR5 — capped import-linter contract + bidirectional cap pin. Owner: software-engineer
   (software-architect countersign at review — ADR-4). Write set: `setup.cfg`,
   `tests/contract/test_import_linter_ignore_cap.py`. Checklist:
   - **Re-enumerate the post-W2 edge set by grep** (expect ≤ 10 sites; SPEC read fact 3 is definition-time truth,
@@ -115,6 +115,22 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
   - Fate ledger: `test_import_linter_ignore_cap.py` AMENDED deliberately (recorded); all sibling contracts
     SURVIVE (8 existing contracts untouched).
   - Gates: full gate set green. Commit `feat(T-61-30): cap the cli→infrastructure edge class (A-2)`.
+  - **Evidence (2026-07-07, implementer):** post-W2 grep re-enumeration = **10 sites / 10 module pairs**
+    (lock.py:13, plugin.py:29, bugs.py:26, main.py:37, specs.py:21+25, ci.py:113, public.py:47,
+    context.py:39, lifecycle.py:1361 — plugin.py:26 gone per FR4/W2). Contract added with
+    `allow_indirect_imports = True` (direct edges only — transitive cli→container→infra chains are the
+    LEGAL composition-root direction; without it the contract flagged 24 indirect chains through
+    `container`/features). `lint-imports --no-cache` = **9 kept / 0 broken** (exit 0). Cap raised
+    26→36 (total) + new per-family pin `cli-no-infrastructure: 10`; source-layer assertion amended to a
+    per-family sanctioned-source map (cli family sources `dadaia_workspace.cli`). **AC-9(b) RED probe:**
+    temp `from dadaia_workspace.infrastructure import subprocess_runner` in `cli/commands/doctor.py` ⇒
+    `Contracts: 8 kept, 1 broken` (cli-no-infrastructure BROKEN); reverted ⇒ 9/0 clean. **AC-9(b′):**
+    cap 36→35 ⇒ `test_recorded_cap_is_not_stale_above_reality` + cap-growth test FAIL
+    (`_RECORDED_IGNORE_EDGE_CAP=35 but setup.cfg has 36`); reverted ⇒ 4 passed. Fate ledger:
+    `test_import_linter_ignore_cap.py` AMENDED deliberately; all 8 sibling contracts SURVIVE untouched.
+    Gates: ruff format --check 0 (813 files); ruff check --no-cache 0; mypy --strict "no issues in 312
+    source files"; lint-imports --no-cache 9/0; full unpiped pytest exit 0 — 4678 passed, 17 skipped,
+    1 pre-existing warning (T-1, owned by FR6).
 
 ## W4 — hygiene batch (parallel-safe: disjoint write sets)
 
