@@ -128,3 +128,53 @@ def test_plugin_doctor_reports_installed_pack(tmp_path: Path, monkeypatch) -> No
     after = _runner.invoke(app, ["plugin", "doctor"])
     assert after.exit_code == 0, after.output
     assert "[ok] plugin:frontend-design (descriptor present)" in after.stdout
+
+
+# ---------------------------------------------------------------------------
+# v0.1.63 FR1 — `dadaia plugin uninstall` (AC-1). RED-first: pre-fix the verb
+# does not exist (`No such command 'uninstall'`, exit 2).
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_uninstall_unknown_pack_is_bad_parameter(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """``plugin uninstall bogus`` → exit 2, stderr names the pack, empty stdout (AC-1).
+
+    Descriptor validation precedes workspace resolution (mirrors install). AC-8(d)
+    sabotage target: accepting an unknown pack makes this FAIL.
+    """
+    monkeypatch.chdir(_workspace(tmp_path))
+    result = _runner.invoke(app, ["plugin", "uninstall", "bogus"])
+    assert result.exit_code == 2
+    norm = _norm_stderr(result.stderr)
+    assert "bogus" in norm, norm
+    assert result.stdout == ""
+
+
+def test_plugin_uninstall_known_not_installed_is_exit_zero_no_change(  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A known-but-not-installed pack is an idempotent no-op — exit 0, `no change` (ADR-U2)."""
+    monkeypatch.chdir(_workspace(tmp_path))
+    _runner.invoke(app, ["plugin", "install", "frontend-design"])
+    ledger_path = tmp_path / ".dadaia" / "states" / "installed_plugins.json"
+    before = ledger_path.read_bytes()
+
+    result = _runner.invoke(app, ["plugin", "uninstall", "devops"])
+    assert result.exit_code == 0, result.output
+    assert "no change" in result.stdout
+    assert ledger_path.read_bytes() == before, "not-installed uninstall mutated the ledger"
+
+
+def test_plugin_uninstall_drops_ledger_and_prints_restored_agents(  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Success drops the pack from the ledger and prints the restored agents (AC-1)."""
+    monkeypatch.chdir(_workspace(tmp_path))
+    _runner.invoke(app, ["plugin", "install", "frontend-design"])
+    assert _ledger(tmp_path)["plugins"] == ["frontend-design"]
+
+    result = _runner.invoke(app, ["plugin", "uninstall", "frontend-design"])
+    assert result.exit_code == 0, result.output
+    assert "frontend-engineer" in result.stdout
+    assert "design-specialist" in result.stdout
+    assert _ledger(tmp_path) == {"schema_version": "1", "plugins": []}

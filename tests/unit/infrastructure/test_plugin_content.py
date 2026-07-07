@@ -35,12 +35,25 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _PLUGINS = _PUBLIC / "plugins"
 
-# The exact enumerated pack surface (Ruling 12 hard ceiling).
-_PACK_SKILL = {
-    "frontend-design": "browser-frontend-implementation",
-    "devops": "github-actions-cicd",
+# The exact enumerated pack surface — per-pack skill ROSTERS (hard ceiling).
+# v0.1.60 Ruling 12 shipped exactly one skill per pack; v0.1.63 ADR-C1 amends the
+# ceiling as a deliberate recorded amendment (SPEC v0.1.63 FR4/FR5, AC-6):
+# frontend-design grows to 4 (T-63-20); devops grows to 4 (T-63-30).
+_PACK_SKILLS: dict[str, list[str]] = {
+    "frontend-design": [
+        "browser-frontend-implementation",
+        "design-system-authoring",
+        "frontend-component-architecture",
+        "visual-review-protocol",
+    ],
+    "devops": [
+        "github-actions-cicd",
+        "gitflow-release-engineering",
+        "container-build-and-deploy",
+        "cicd-security-hardening",
+    ],
 }
-_EXPECTED_SKILLS = set(_PACK_SKILL.values())
+_EXPECTED_SKILLS = {skill for roster in _PACK_SKILLS.values() for skill in roster}
 
 # Claude → Codex model mapping under test (registry single source of truth).
 _PLUGIN_CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -82,7 +95,7 @@ def _has_tools_list(text: str) -> bool:
 
 
 def _pack_names() -> list[str]:
-    return sorted(_PACK_SKILL)
+    return sorted(_PACK_SKILLS)
 
 
 def _pack_agents(pack: str) -> list[str]:
@@ -129,29 +142,71 @@ def test_every_pack_agent_carries_required_frontmatter() -> None:
 
 
 @pytest.mark.unit
-def test_exactly_the_two_named_skills_ship_per_pack() -> None:
-    """AC-6 (Ruling 12 ceiling): exactly {browser-frontend-implementation, github-actions-cicd}."""
-    skill_dirs = {p.parent.name for p in _PLUGINS.glob("*/skills/*/SKILL.md")}
-    assert skill_dirs == _EXPECTED_SKILLS, (
-        f"pack skill set drifted from the Ruling 12 ceiling: {sorted(skill_dirs)}"
-    )
-    # Each pack ships exactly its one named skill (and its dir name matches pack.json).
-    for pack, skill in _PACK_SKILL.items():
-        declared = json.loads((_PLUGINS / pack / "pack.json").read_text(encoding="utf-8"))["skills"]
-        assert declared == [skill], f"{pack}/pack.json skills {declared} != [{skill!r}]"
-        assert (_PLUGINS / pack / "skills" / skill / "SKILL.md").is_file()
+def test_all_pack_agent_skill_refs_resolve_full_sweep() -> None:
+    """T-63-40 full-sweep contract (FR6/AC-6): every pack-agent ``skills:`` ref for BOTH
+    shipped packs resolves via the plugin-aware ``check_agent_skill_refs`` sweep — proving
+    the W2/W3 wiring doctor-side. Zero plugin-agent ``[drift]`` lines on the real tree."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+
+    plugin_drift = [
+        r for r in check_agent_skill_refs(_PUBLIC) if r.startswith("[drift] plugin-agent:")
+    ]
+    assert plugin_drift == [], plugin_drift
+    # The sweep actually covered both packs (agents exist where we claim they resolve).
+    for pack in _PACK_SKILLS:
+        assert list((_PLUGINS / pack / "agents").glob("*.md")), f"{pack}: no pack agents swept"
 
 
 @pytest.mark.unit
-def test_pack_skills_reference_ctx_adapters_without_duplicating_them() -> None:
-    """AC-6: the frontend skill REFERENCES frontend-ctx/design-ctx, never inline-copies them."""
-    skill = _PLUGINS / "frontend-design" / "skills" / "browser-frontend-implementation" / "SKILL.md"
+def test_exactly_the_two_named_skills_ship_per_pack() -> None:
+    """AC-6 (ADR-C1 ceiling): roster map == pack.json skills[] == on-disk skill dirs."""
+    skill_dirs = {p.parent.name for p in _PLUGINS.glob("*/skills/*/SKILL.md")}
+    assert skill_dirs == _EXPECTED_SKILLS, (
+        f"pack skill set drifted from the ADR-C1 ceiling: {sorted(skill_dirs)}"
+    )
+    # Each pack ships exactly its enumerated roster (pack.json == roster == disk).
+    for pack, roster in _PACK_SKILLS.items():
+        declared = json.loads((_PLUGINS / pack / "pack.json").read_text(encoding="utf-8"))["skills"]
+        assert declared == roster, f"{pack}/pack.json skills {declared} != roster {roster}"
+        on_disk = sorted(p.parent.name for p in (_PLUGINS / pack / "skills").glob("*/SKILL.md"))
+        assert on_disk == sorted(roster), f"{pack} on-disk skill dirs {on_disk} != roster"
+        for skill in roster:
+            assert (_PLUGINS / pack / "skills" / skill / "SKILL.md").is_file()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "skill_dir",
+    ["browser-frontend-implementation", "visual-review-protocol"],
+)
+def test_pack_skills_reference_ctx_adapters_without_duplicating_them(skill_dir: str) -> None:
+    """AC-6: ctx-referencing skills name frontend-ctx/design-ctx, never inline-copy them."""
+    skill = _PLUGINS / "frontend-design" / "skills" / skill_dir / "SKILL.md"
     text = skill.read_text(encoding="utf-8")
     # Referenced by name.
     assert "frontend-ctx" in text and "design-ctx" in text, "adapters not referenced by name"
     # NOT duplicated: the adapters' distinctive emit-block markers must be absent.
     assert "=== frontend-ctx: Session Context ===" not in text, "frontend-ctx body inlined"
     assert "=== design-ctx: Session Context ===" not in text, "design-ctx body inlined"
+
+
+@pytest.mark.unit
+def test_every_pack_skill_no_ctx_emit_block_and_frontmatter_law() -> None:
+    """AC-6 (generalized): every pack skill — name == dir slug, description present,
+    and no skill inlines a ctx adapter's distinctive emit-block marker."""
+    for pack, roster in _PACK_SKILLS.items():
+        for skill in roster:
+            path = _PLUGINS / pack / "skills" / skill / "SKILL.md"
+            text = path.read_text(encoding="utf-8")
+            fm = _frontmatter_scalars(text)
+            assert fm.get("name") == skill, (
+                f"{pack}/{skill}: frontmatter name {fm.get('name')!r} != dir slug"
+            )
+            assert "description" in fm, f"{pack}/{skill}: frontmatter carries no description"
+            assert "=== frontend-ctx: Session Context ===" not in text, (
+                f"{path}: emit block inlined"
+            )
+            assert "=== design-ctx: Session Context ===" not in text, f"{path}: emit block inlined"
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,8 @@ tools:
   - Grep
 skills:
   - browser-frontend-implementation
+  - design-system-authoring
+  - visual-review-protocol
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator

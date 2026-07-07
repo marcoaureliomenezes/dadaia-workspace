@@ -252,19 +252,18 @@ class FileSystemPublicAssetManager:
                 stems.add(md.stem)
         return stems
 
-    def _render_codex_pack_agent(
-        self, md_path: Path, workspace_root: Path, force: bool, installed: list[str]
-    ) -> None:
-        """Render a pack agent's ``.codex/agents/<name>.toml`` from its body.
+    def _codex_toml_from_md(self, md_path: Path) -> tuple[str, str] | None:
+        """Render an agent md into its ``(agent_name, .codex toml content)`` pair.
 
-        Mirrors ``install_codex_agents`` for a single pack agent md: parse frontmatter,
-        strip it, transform Claude-isms out of the body/description, map the Claude model to
-        its Codex id (``claude-sonnet-4-6`` → ``gpt-5.3-codex``), and render the TOML.
+        Mirrors ``install_codex_agents`` for a single agent md: parse frontmatter, strip it,
+        transform Claude-isms out of the body/description, map the Claude model to its Codex
+        id (``claude-sonnet-4-6`` → ``gpt-5.3-codex``), and render the TOML. Shared by the
+        pack-body projection (install) and the core-stub restoration (uninstall, v0.1.63 FR2).
         """
         text = md_path.read_text(encoding="utf-8")
         fm = _parse_agent_frontmatter(text)
         if not fm:
-            return
+            return None
         agent_name = str(fm.get("name", "")) or md_path.stem
         if text.startswith("---\n"):
             end_idx = text.find("\n---\n", 4)
@@ -284,6 +283,16 @@ class FileSystemPublicAssetManager:
             description=codex_description,
             claude_model=claude_model,
         )
+        return agent_name, toml_content
+
+    def _render_codex_pack_agent(
+        self, md_path: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Render a pack agent's ``.codex/agents/<name>.toml`` from its body."""
+        rendered = self._codex_toml_from_md(md_path)
+        if rendered is None:
+            return
+        agent_name, toml_content = rendered
         write_generated(
             workspace_root / ".codex" / "agents" / f"{agent_name}.toml",
             toml_content,
@@ -354,6 +363,99 @@ class FileSystemPublicAssetManager:
         active = set(L1_ENTRY_HARNESSES) if profile is None else profile
         self._project_installed_plugins(agentic_dir, workspace_root, active, force, installed)
         return installed
+
+    @staticmethod
+    def _prune_empty_dirs(start: Path, stop: Path) -> None:
+        """Remove now-empty directories from *start* up to (exclusive) *stop*."""
+        current = start
+        while current != stop and current.is_dir() and not any(current.iterdir()):
+            current.rmdir()
+            current = current.parent
+
+    def uninstall_plugin(self, workspace_root: Path, pack_name: str) -> list[str]:
+        """Disable a plugin pack — the exact inverse of :meth:`install_plugin` (v0.1.63 FR2).
+
+        Enumerates the staged pack tree (``.dadaia/agentic/plugins/<pack>/``) as the removal
+        set, profile-scoped exactly like install (ADR-U3): each pack agent's projection is
+        re-projected back to the CORE STUB (claude md copy + codex stub toml render); each
+        pack-only skill/rule projection is deleted (with now-empty dirs pruned). A drifted
+        (hand-edited) projected pack file is restored/removed anyway — the runtime projection
+        surface is lib-owned — but never silently: a ``[drift-restored]``/``[drift-removed]``
+        line is emitted per file (ADR-U1). An unstaged pack degrades to a ledger-only removal
+        with a non-silent line. Ordering is FILES FIRST, LEDGER LAST (ADR-U4): an interrupted
+        uninstall leaves the ledger entry present so ``plugin doctor`` still surfaces the
+        pack's file state. Idempotent end-to-end.
+        """
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        states_dir = workspace_root / ".dadaia" / "states"
+        pack_dir = agentic_dir / "plugins" / pack_name
+        out: list[str] = []
+        profile = self._profile_harnesses(workspace_root)
+        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
+
+        if not pack_dir.is_dir():
+            out.append(f"[skip] pack '{pack_name}' is not staged — ledger-only removal")
+        else:
+            # Pack agents: restore the core stub over the pack body (profile-scoped).
+            for md in sorted((pack_dir / "agents").glob("*.md")):
+                stub_src = agentic_dir / "agents" / md.name
+                if "claude" in active:
+                    dst = workspace_root / ".claude" / "agents" / md.name
+                    if (
+                        dst.exists()
+                        and dst.read_bytes() != md.read_bytes()
+                        and (not stub_src.exists() or dst.read_bytes() != stub_src.read_bytes())
+                    ):
+                        out.append(f"[drift-restored] {dst}")
+                    if stub_src.exists():
+                        copy_file(stub_src, dst, False, out)
+                if "codex" in active:
+                    dst = workspace_root / ".codex" / "agents" / f"{md.stem}.toml"
+                    stub_render = self._codex_toml_from_md(stub_src) if stub_src.exists() else None
+                    pack_render = self._codex_toml_from_md(md)
+                    if dst.exists():
+                        current = dst.read_text(encoding="utf-8")
+                        if (pack_render is None or current != pack_render[1]) and (
+                            stub_render is None or current != stub_render[1]
+                        ):
+                            out.append(f"[drift-restored] {dst}")
+                    if stub_render is not None:
+                        write_generated(dst, stub_render[1], False, out)
+            # Pack-only skill projections: delete (+ prune now-empty dirs).
+            skills_root = workspace_root / ".agents" / "skills"
+            for skill in sorted(self._iter_files(pack_dir / "skills")):
+                if skill.name == ".gitkeep":
+                    continue
+                rel = skill.relative_to(pack_dir / "skills")
+                dst = skills_root / rel
+                if dst.exists():
+                    if dst.read_bytes() != skill.read_bytes():
+                        out.append(f"[drift-removed] {dst}")
+                    dst.unlink()
+                    out.append(f"[rm]   {dst}")
+                    self._prune_empty_dirs(dst.parent, skills_root)
+            # Pack-only rule projections (claude-scoped, mirroring install).
+            if "claude" in active:
+                rules_root = workspace_root / ".claude" / "rules"
+                for rule in sorted(self._iter_files(pack_dir / "rules")):
+                    if rule.name == ".gitkeep":
+                        continue
+                    rel = rule.relative_to(pack_dir / "rules")
+                    dst = rules_root / rel
+                    if dst.exists():
+                        if dst.read_bytes() != rule.read_bytes():
+                            out.append(f"[drift-removed] {dst}")
+                        dst.unlink()
+                        out.append(f"[rm]   {dst}")
+                        self._prune_empty_dirs(dst.parent, rules_root)
+
+        # LEDGER LAST (ADR-U4): dropped only after every file operation completed.
+        store = self._plugin_store
+        ledger = store.read(states_dir) or InstalledPlugins.empty()
+        if pack_name in ledger.plugins:
+            store.write(states_dir, ledger.with_removed(pack_name))
+            out.append(f"[ledger] removed '{pack_name}' from installed_plugins.json")
+        return out
 
     def _doctor_installed_plugins(
         self, agentic_dir: Path, workspace_root: Path, active: set[str]
