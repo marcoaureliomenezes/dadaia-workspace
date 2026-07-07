@@ -34,7 +34,10 @@ summary: >-
   frozen before step 1, and WMP-* governance doctor checks. Workflow steps
   communicate over a run-scoped producer→consumer handoff ledger
   (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads +
-  resolver + retention + attempt loop + handoffs doctor). Anti-slop
+  resolver + retention + attempt loop + handoffs doctor). Layer-2 emitters produce
+  handoff-v1.2 with self_pull.refs from InjectedContext refs (role-map fallback →
+  honest v1.1 on zero refs); the role→atom map data lives in core/role_atom_map.py
+  (same-object re-export via role_atoms.py). Anti-slop
   self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.
 tags:
 - sdd
@@ -42,9 +45,9 @@ tags:
 - multi-harness
 - hygiene
 - gates
-token_estimate: 7120
+token_estimate: 7260
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.62
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. **`--step-model <profile-id>` is the sole model-selection surface: the legacy `--model <id>:<effort>` flag and its `_warn_model_deprecated` seam were hard-removed from all 12 run verbs in v0.1.57 (deprecation-expiry — `--model` is now an unknown option, `No such option: --model`, exit 2). The pi/codex subprocess `--model <id>` arg (`pi_runtime.py`) is a different, unchanged flag.**
@@ -103,7 +106,7 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
   (was `run.blocked is None`), fixing the reachable bug where an illegal transition
   (`decision.accepted=False`, run unchanged) was marked accepted while the phase never advanced (the
   v0.1.56 FR4 edge removal made a review-phase step targeting IMPLEMENTATION an illegal transition).
-- `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds.
+- `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds. Its `schema_version` accept-set is `{handoff-v1, handoff-v1.1, handoff-v1.2}` (mirrored by `infrastructure/runtime_files.py`).
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
 - `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
 - `core/harness_models.py` is the discrete per-harness model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. The per-harness options are enumerated once in [[tech-stack]] §Agent runtimes. Both catalogs are allowlist-validated (a Layer-2 id must be in the union of registry codex ids + `LAYER2_EXTRA_MODEL_IDS`, the curated Layer-2-native set); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
@@ -113,6 +116,17 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
 - `features/lifecycle/antislop/slop_scan.py` is the directory-aware slop metric: a directory tree counts as ONE entry with recursive size (closing the directory-blind gap where multi-GB caches/venvs hid from the file-only metric); the canonical manifest derives from `hooks/root_whitelist._WHITELIST`, never hand-copied. Surfaced via `dadaia lifecycle slop`.
 - `features/lifecycle/antislop/retention.py` (`RetentionSweep.sweep`) is the deleter: dry-run by default, deletes only with `apply=True`; reclaims past-TTL non-canonical swept-zone entries; has a HARD liveness gate (never reclaims a live run's tmp); refuses canonical/outside-`.dadaia`/symlink-escape paths (resolve + relative_to, TOCTOU re-confine). Surfaced via `dadaia lifecycle clean [--apply]`.
 - `features/lifecycle/report_workflow.py` writes human report HTML, matching handoff JSON, baseline/final hygiene snapshots, and optional explicit cleanup.
+- **Layer-2 handoff emission is v1.2 with the `self_pull` proof line.** The two code
+  emitters (`features/lifecycle/service.py` — via `resolve_emitted_handoff_version`,
+  consumed by `blocked_push_preflight` — and `LifecycleReportWorkflow.run`) emit
+  `schema_version: "handoff-v1.2"` with `self_pull.refs` populated from the run's
+  recorded `InjectedContext` refs (deduplicated, `specs/`-prefixed as recorded — the
+  existing mechanical data, never a second bookkeeping path). Zero recorded refs →
+  fallback to the step's role-mapped atom refs (existing-atom-only, via the core map) →
+  when even that is empty, the **honest v1.1 emission** (legacy token, no fabricated
+  proof) — the only sanctioned v1.1 emission. The emitted document passes `gates.py`,
+  `runtime_files.py`, and `dadaia reports validate` round-trip ([[agent-comms]] owns the
+  contract).
 - `features/lifecycle/run_store.py` and `infrastructure/json_lifecycle_run_store.py` persist lifecycle run records under canonical workspace state/run zones and reject repo-tree stores.
 
 ## Harness runtime boundary
@@ -306,8 +320,8 @@ the panel `_semantic_check` mirrors the doctor's explicit 3-map union
 
 Workflow steps now communicate over a **run-scoped producer→consumer ledger** instead of
 stale prose / "latest handoff by agent filename" directory scans — a separate layer **beside**
-the generic `handoff-v1.1` contract (which stays reserved for durable external evidence in
-`.dadaia/handoff/`). Control plane: `LifecycleRun.workflow_steps`
+the generic handoff-v1 family contract (current token `handoff-v1.2` — [[agent-comms]]; it stays
+reserved for durable external evidence in `.dadaia/handoff/`). Control plane: `LifecycleRun.workflow_steps`
 (`core/models/workflow_handoff.py` — additive backward-compatible field; old records load).
 Data plane: immutable step payloads under
 `.dadaia/runs/lifecycle/<run_id>/steps/*.step-payload.json`, validated against
@@ -364,7 +378,12 @@ the assembly machinery, so a role-grounding fix had to land five times.
   base scope).
 - **`features/lifecycle/role_atoms.py` — the declarative role→memory-atom map.** `ROLE_ATOM_MAP`:
   `software-architect → specs/memory/architecture.md`, `qa-engineer →
-  specs/memory/quality-assurance.md`, `product-engineer → specs/memory/product/catalog.json`. ONE
+  specs/memory/quality-assurance.md`, `product-engineer → specs/memory/product/catalog.json`. The
+  map **data** lives in `core/role_atom_map.py` (a pure, stdlib-only `core` leaf);
+  `role_atoms.py` imports and re-exports it under the same name — the **same object**
+  (identity-asserted) — so the three Layer-2 assembly surfaces keep their import path while
+  `features/reports` consumes the map from `core` for the v1.2 coverage check with no
+  cross-feature edge. ONE
   single-sourced `inject_role_atoms` helper (resolve `step.role` → read the atom file → append a
   labelled context block → record the ref in `InjectedContext.refs`) is consumed by all THREE assembly
   surfaces, never copy-pasted: the `FragmentGateWorkflow` base (specs_dir via
@@ -401,13 +420,16 @@ the assembly machinery, so a role-grounding fix had to land five times.
   (`release_definition.tasks_create`) → `sel_write_set_guidance` → `sel_constitution`, and directly as
   `spec_create`'s `static_input` — the recorded decision notes this indirection so the selector is
   never mistaken for dead.
-- **(N4) Layer grounding honesty.** **Layer-2** role grounding is now **mechanically recorded and
-  checked** — the role→atom map records each resolved atom in `InjectedContext.refs`, and FRAG-COH-4
-  asserts the role-mapped atom appears there. **Layer-1** memory grounding
-  (constitution/architecture/quality-assurance) remains **self-pull DISCIPLINE and is NOT mechanically
-  verified** — Ruling A ratified self-pull and kept `ctx_inject.py` byte-identical; the deferred
-  mechanical proof (a handoff audit line proving the L1 self-pull atoms were read) is filed as
-  `layer1-selfpull-handoff-audit-line`.
+- **(N4) Layer grounding honesty.** Both layers now carry a mechanical proof. **Layer-2** role
+  grounding is mechanically recorded and checked — the role→atom map records each resolved atom in
+  `InjectedContext.refs`, and FRAG-COH-4 asserts the role-mapped atom appears there. **Layer-1**
+  self-pull carries its mirror: the **handoff-v1.2 `self_pull.refs` audit line** ([[agent-comms]]),
+  version-conditionally required by `dadaia reports validate` (existence + role-map coverage
+  checks). Ruling A stands — `ctx_inject.py` stays byte-identical (bounded tech-stack + lean catalog
+  digest is the only Layer-1 injection); the deep atoms still reach agents via step0 self-pull, and
+  the handoff now proves which atoms a session actually read. The proof is self-reported where not
+  mechanically checkable (the same honesty boundary FRAG-COH-4 accepts at Layer-2); a per-atom
+  read-proof hash is deliberately out of scope.
 
 ## Gating note (review-only typed gate + coherent worker-output contract)
 

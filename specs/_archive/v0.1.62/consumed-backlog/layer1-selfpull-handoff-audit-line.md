@@ -1,6 +1,7 @@
 ---
 name: layer1-selfpull-handoff-audit-line
-status: candidate
+status: delivered
+delivered_in: v0.1.62
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.57 closure backlog return (FR4 Ruling A — Layer-1 injection ratified self-pull; the mechanical verifiability was deferred)

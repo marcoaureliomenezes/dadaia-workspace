@@ -1,0 +1,26 @@
+{
+  "release": "v0.1.62",
+  "consumed": [
+    {
+      "slug": "layer1-selfpull-handoff-audit-line",
+      "shipped_anchors": [
+        "dadaia_workspace/hooks/ctx_inject.py#main"
+      ],
+      "note": "DELIVERED \u2014 v0.1.62 (archived at CLOSURE, anchor survives BYTE-IDENTICAL \u2014 the release verifies self-pull, it never reopened Ruling A). handoff-v1.2 schema bump ($id/title/enum; optional self_pull {refs, minItems 1, no-traversal pattern} on whitelisted stdlib-validator keywords only); version-conditional service-layer check in ReportsValidationService (v1.2 => self_pull required + ref existence repos/<context>/<ref> -> <workspace>/<ref> fail-soft + role-map coverage via NEW core/role_atom_map.py, same-object re-export through role_atoms.py); _detect_sidecar_version fix resolving the picked HIGH bug reports-sidecar-version-detection-misroutes-future-tokens; both L2 emitters v1.2 from InjectedContext refs (role-map fallback -> honest v1.1 on zero refs \u2014 the only sanctioned v1.1 emission); accept-sets widened {v1, v1.1, v1.2}; 16-surface instruction adoption pinned by tests/contract/test_handoff_instruction_adoption.py (16/16); AC-1 corpus lock proves the transition posture golden-first. Live proof at ship: the security push-gate handoff was a real v1.2 with self_pull.refs and the QA reviewer's first draft was REJECTED by the new coverage check. Ship PR #118, squash 352969da."
+    },
+    {
+      "slug": "fanout-repo-slug-containment",
+      "shipped_anchors": [
+        "dadaia_workspace/infrastructure/workspace_guardrail.py#_install_guardrail_pair"
+      ],
+      "note": "DELIVERED \u2014 v0.1.62 (archived at CLOSURE, anchor survives hardened). The 'REJECTED \u2014 trusted-input' override was DECLINED (ADR-9; PM retier LOW->MEDIUM on two independent security reviews + the 2026-07-06 pass). Lexical slug validation at derivation (_consumer_repos_for_root: single relative non-dot component; rejects /, \\, ., .., absolute incl. Windows drive/UNC via PurePosixPath AND PureWindowsPath parts; non-silent [reject] stderr line; fail-open; protects install AND doctor) + write-time containment assert in _install_guardrail_pair + FR6 symlink write-through refusal (dst.is_symlink() incl. dangling => never written, [foreign] ... (symlink); doctor symlink-aware, exit 0; symlinked consumer DIRs stay legitimate \u2014 the CI ln -sfn pattern pinned green by AC-8(d)). RED-first: pre-fix '../evil' received the pair OUTSIDE repos/ and copy2 wrote through the link. v0.1.60 provenance suites byte-identical (204 passed). Ship PR #118, squash 352969da."
+    },
+    {
+      "slug": "response-guard-chip-presence-hardening",
+      "shipped_anchors": [
+        "tests/unit/features/panel/test_index_dom_contract.py#test_memory_chip_present_with_populated_context"
+      ],
+      "note": "DELIVERED \u2014 v0.1.62 (archived at CLOSURE, anchor survives byte-identical \u2014 the primary DOM-contract lock). Both response-guard.spec.ts null-guards replaced with required presence (waitForSelector('.memory-chip', {timeout: 8000}) -> click -> settle); graceful-empty branch REMOVED (ADR-8 \u2014 the CI fixture deterministically seeds >=1 context + memory atoms and fast-fails otherwise). AC-9 sabotage replay: chip renamed => unit lock FAILED AND e2e 2 failed (pre-fix e2e passed '2 passed'); reverted => 578 unit + 2 e2e green. Defence-in-depth behind the never-re-baselined unit lock, codified as the required-presence e2e law in quality-assurance.md. Ship PR #118, squash 352969da."
+    }
+  ]
+}

@@ -20,6 +20,13 @@ R1–R12 operator-approved plan is COMPLETE; the `plugin-scope` deviation class 
 `selfrepo-agents-md-doubled-header`** (`status: delivered`, removed from this index per
 removal-on-release; archived at closure) and returned two items
 (`platform-seam-todo-retirement` + `specs-doctor-partial-archive-invariant`, indexed below).
+**v0.1.62 (injection contract & fan-out containment, merged `352969da`, PR #118,
+2026-07-07) consumed `layer1-selfpull-handoff-audit-line` +
+`fanout-repo-slug-containment` + `response-guard-chip-presence-hardening`** (all three
+`status: delivered`, removed from this index per removal-on-release; all anchors survive
+→ archived at CLOSURE to `specs/_archive/v0.1.62/consumed-backlog/`) and also resolved
+the picked HIGH bug `reports-sidecar-version-detection-misroutes-future-tokens`; it
+returned **no** items.
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -57,14 +64,7 @@ grill on the picked set before SPEC.
 
 ## HIGH
 
-### `layer1-selfpull-handoff-audit-line` — Layer-1 self-pull handoff audit line *(2026-07-04)*
-Returned at v0.1.57 closure (FR4 Ruling A). R9 ratified Layer-1 **self-pull** for
-constitution/architecture/quality-assurance (`ctx_inject.py` byte-identical) and made
-**Layer-2** grounding mechanically checkable (role→atom map refs + `FRAG-COH-4`). This
-entry tracks the deferred **Layer-1** verifiability: a handoff-v1.1 schema audit line
-(+ validator) proving the self-pull atoms were actually read, turning the L1 discipline
-into a checkable contract. Anchored at `hooks/ctx_inject.py#main` + the handoff schema
-surface. Override: bounded phase-aware L1 digests reopen FR4.
+*(none open — `layer1-selfpull-handoff-audit-line` was consumed by v0.1.62.)*
 
 ---
 
@@ -114,20 +114,6 @@ machine-guarded them (`test_agent_tier_taxonomy.py`) but did not rename. Rename 
 `dispatch_band:` across all agent bodies + the parsers/renderers that read it + the contract
 test. Anchored at
 `tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_pinned_model_effort`.
-
-### `response-guard-chip-presence-hardening` — Response-guard e2e chip-presence assertion (QA) *(2026-07-04)*
-Returned at v0.1.59 closure (W5 AC-9(e) finding). `tests/e2e/panel/response-guard.spec.ts:76-77`
-null-guards a missing `.memory-chip` (`if (firstChip) {…}`) and degrades gracefully, so a dropped
-chip is caught only by the FR1 DOM-contract unit lock, not the browser tour. Assert chip presence
-(`expect(firstChip).not.toBeNull()`) as defence-in-depth behind the DOM contract. Anchored at
-`tests/e2e/panel/response-guard.spec.ts`.
-
-### `fanout-repo-slug-containment` — Consumer fan-out repo-slug containment guard *(2026-07-04)*
-Returned at v0.1.58 closure (FR4 hardening, security). The redesigned fan-out writes the
-workspace-law pair to `repos/<repo_slug>/` derived from `spec_contexts.json`; assert each
-resolved dir is `is_relative_to(repos/)` or reject a multi-component / traversal slug. Anchored
-at `workspace_guardrail.py#_install_guardrail_pair`. Override: `REJECTED — trusted-input` if
-`spec_contexts.json` is deemed fully first-party.
 
 ### `platform-seam-todo-retirement` — Retire the aged `PLATFORM.has_fcntl` TODOs *(2026-07-07)*
 Returned at v0.1.61 closure (audit A-3 deferral). Replace the in-body `sys.platform` checks in
