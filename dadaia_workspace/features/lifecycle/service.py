@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 
 from dadaia_workspace.core.models.hygiene import HygieneCounters
 from dadaia_workspace.core.models.lifecycle import (
@@ -15,10 +17,46 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort, RuntimeFileRef
 from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
+from dadaia_workspace.features.lifecycle.role_atoms import ROLE_ATOM_MAP
 from dadaia_workspace.features.lifecycle.run_store import (
     LifecycleRunStore,
     LifecycleRunStoreError,
 )
+
+
+def resolve_emitted_handoff_version(
+    *,
+    agent: str,
+    injected_refs: Sequence[str] = (),
+    specs_dir: Path | None = None,
+) -> tuple[str, dict[str, list[str]] | None]:
+    """Resolve the emitted handoff ``schema_version`` + ``self_pull`` block (FR3/ADR-5).
+
+    Precedence:
+
+    1. The run's recorded ``InjectedContext`` refs (deduplicated, order preserved) —
+       the mechanical grounding data, never a second bookkeeping path (ADR-5).
+    2. Role→atom map fallback: the emitting *agent*'s mapped atom(s), included only
+       when the atom file actually exists under *specs_dir* (mechanical honesty —
+       never claim an atom that is not on disk).
+    3. Honest ``handoff-v1.1`` with no ``self_pull`` — the ONLY sanctioned v1.1
+       emission; a v1.2 document with empty or fabricated refs is never produced.
+    """
+    refs: list[str] = []
+    for ref in injected_refs:
+        cleaned = ref.strip()
+        if cleaned and cleaned not in refs:
+            refs.append(cleaned)
+    if not refs and specs_dir is not None:
+        for role in (part.strip() for part in agent.split(",")):
+            relpath = ROLE_ATOM_MAP.get(role)
+            if relpath is not None and (specs_dir / relpath).is_file():
+                mapped_ref = f"specs/{relpath}"
+                if mapped_ref not in refs:
+                    refs.append(mapped_ref)
+    if refs:
+        return "handoff-v1.2", {"refs": refs}
+    return "handoff-v1.1", None
 
 
 @dataclass(frozen=True)
@@ -191,8 +229,20 @@ class LifecyclePreflightService:
         commit_sha: str,
         runtime_files: RuntimeFilePort,
         run_id: str,
+        injected_refs: Sequence[str] = (),
+        specs_dir: Path | None = None,
     ) -> BlockedPushResult:
-        """Return and emit the resumable blocked state for no-approval push."""
+        """Return and emit the resumable blocked state for no-approval push.
+
+        Emits ``handoff-v1.2`` with ``self_pull.refs`` from the run's recorded
+        ``InjectedContext`` refs (dedup); zero refs fall back to the role→atom map,
+        then to an honest ``handoff-v1.1`` (FR3/ADR-5).
+        """
+        schema_version, self_pull = resolve_emitted_handoff_version(
+            agent="lifecycle",
+            injected_refs=injected_refs,
+            specs_dir=specs_dir,
+        )
         blocked = BlockedState(
             reason="push requires security-reviewer approval",
             blocked_at_step="push",
@@ -209,37 +259,40 @@ class LifecyclePreflightService:
             message=blocked.reason,
             blocked=blocked,
         )
+        payload: dict[str, object] = {
+            "schema_version": schema_version,
+            "agent": "lifecycle",
+            "context": context,
+            "release_id": release_id,
+            "produced_at": datetime.now(UTC)
+            .isoformat(timespec="seconds")
+            .replace(
+                "+00:00",
+                "Z",
+            ),
+            "artifact": {"type": "other"},
+            "scope": "blocked-push",
+            "metrics": {
+                "commit_sha": commit_sha,
+                "blocked_at_step": blocked.blocked_at_step,
+                "operator_command": blocked.operator_command or "",
+                "resume_token": blocked.resume_token or "",
+            },
+            "findings": [
+                {
+                    "severity": "HIGH",
+                    "message": blocked.reason,
+                    "detail_md": "Push is blocked until security-reviewer handoff approval.",
+                    "fix_recommendation": blocked.operator_command or "git push",
+                }
+            ],
+        }
+        if self_pull is not None:
+            payload["self_pull"] = self_pull
         handoff = runtime_files.write_handoff(
             context=context,
             filename=f"{run_id}-blocked-push.handoff.json",
-            payload={
-                "schema_version": "handoff-v1.1",
-                "agent": "lifecycle",
-                "context": context,
-                "release_id": release_id,
-                "produced_at": datetime.now(UTC)
-                .isoformat(timespec="seconds")
-                .replace(
-                    "+00:00",
-                    "Z",
-                ),
-                "artifact": {"type": "other"},
-                "scope": "blocked-push",
-                "metrics": {
-                    "commit_sha": commit_sha,
-                    "blocked_at_step": blocked.blocked_at_step,
-                    "operator_command": blocked.operator_command or "",
-                    "resume_token": blocked.resume_token or "",
-                },
-                "findings": [
-                    {
-                        "severity": "HIGH",
-                        "message": blocked.reason,
-                        "detail_md": "Push is blocked until security-reviewer handoff approval.",
-                        "fix_recommendation": blocked.operator_command or "git push",
-                    }
-                ],
-            },
+            payload=payload,
         )
         return BlockedPushResult(command=command, handoff=handoff)
 

@@ -103,7 +103,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W2 — FR3 accept-sets + Layer-2 emitter bump (sequential after W1)
 
-- [ ] T-62-20 Accept-set widening + emitter bump + tree-wide token sweep. Owner: software-engineer. Preconditions:
+- [x] T-62-20 Accept-set widening + emitter bump + tree-wide token sweep. Owner: software-engineer. Preconditions:
   T-62-11 done. Write set: `features/lifecycle/gates.py`, `infrastructure/runtime_files.py`,
   `features/lifecycle/service.py`, `features/lifecycle/report_workflow.py`, `features/panel/reports_doctor.py`
   (grep fate), their unit tests. Checklist:
@@ -115,6 +115,28 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Tests: AC-5 round-trip (emit → gates → runtime_files → `reports validate` exit 0; zero-refs fallback = v1.1).
   - Fate ledger: gates/runtime_files tests pinning the old set amended-with-rationale; frozen v0.1.50 suite
     zero-diff. Done: gates green.
+  - **Evidence (T-62-20 done):** accept-sets widened to `{v1, v1.1, v1.2}` in `gates.py#_schema_version` +
+    `runtime_files.py#_validate_handoff_payload`; new `service.py#resolve_emitted_handoff_version` (InjectedContext
+    refs dedup → role-map fallback, existing-atom-only → honest v1.1) consumed by `blocked_push_preflight` and
+    `LifecycleReportWorkflow.run`. RED captured: ImportError on `resolve_emitted_handoff_version` +
+    emitter test failing pre-fix. Mutation-sanity: dropping the `payload["self_pull"]` population ⇒
+    `test_ac5_blocked_push_v12_roundtrip` (KeyError) + emitter unit test FAILED ⇒ reverted.
+    Tests: `tests/unit/features/lifecycle/test_handoff_v12_emission.py` (10),
+    `tests/integration/test_handoff_v12_roundtrip.py` (AC-5 round-trip ×3 incl. `reports validate --strict` exit 0
+    and zero-refs honest v1.1).
+  - **Sweep fate ledger (`rg 'handoff-v1'`, `dadaia_workspace/`):** `gates.py:195` + `runtime_files.py:210`
+    UPDATED (widened); `service.py` + `report_workflow.py` UPDATED (dynamic version + self_pull);
+    `cli/commands/reports.py:81/91` SURVIVES (W1 already v1.2-aware); `container.py:477/486` SURVIVES (schema
+    filename, unversioned); `core/models/handoff.py` SURVIVES (schema filename refs); `core/role_atom_map.py:9` +
+    `features/reports/validation.py` SURVIVES (W1 v1.2 validator, correct); `features/panel/reports_doctor.py:80`
+    SURVIVES (docstring about v1.1 artifact optionality — no behavioral token pin; grep fate only);
+    `features/lifecycle/workflow_handoffs.py` + `pipeline.py` + `workflows/{audit,research,bug_report,
+    release_definition}.py` OUT (step-payload `*-handoff-v1` family, `workflow-step-payload-v1.schema.json` —
+    different family, explicitly out of scope); `public/**` hits (schema, lint-memory-atoms.py, fragments)
+    DEFERRED to T-62-30 (W3, ai-engineer surface). No gates/runtime_files test pinned the OLD accept-set
+    (nothing rejected v1.2 pre-change) — no amendments needed; frozen v0.1.50 no-steal suite zero-diff
+    (untouched, full suite 4717 passed / 17 skipped, exit 0). Gates: ruff format --check 0; ruff check
+    --no-cache 0; mypy --strict dadaia_workspace/ 0 (313 files); lint-imports 9 kept / 0 broken.
 
 ## W3 — FR4 instruction adoption (ai-engineer, `public/**`, sequential after W2)
 

@@ -192,7 +192,8 @@ class HandoffGateValidator:
 
     def _schema_version(self, handoff: dict[str, object], reasons: list[str]) -> None:
         value = handoff.get("schema_version")
-        if value not in {"handoff-v1", "handoff-v1.1"}:
+        # FR3 (v0.1.62): accept-set widened to include handoff-v1.2 (self_pull line).
+        if value not in {"handoff-v1", "handoff-v1.1", "handoff-v1.2"}:
             reasons.append("malformed schema_version")
 
     def _metrics(

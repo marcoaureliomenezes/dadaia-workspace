@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from dadaia_workspace.features.lifecycle.hygiene import (
     HygieneCleanupResult,
     LifecycleHygieneService,
 )
+from dadaia_workspace.features.lifecycle.service import resolve_emitted_handoff_version
 from dadaia_workspace.features.reports.validation import (
     ReportsValidationService,
     ValidationResult,
@@ -57,8 +59,15 @@ class LifecycleReportWorkflow:
         release_id: str,
         run_id: str,
         apply_cleanup: bool = False,
+        injected_refs: Sequence[str] = (),
+        specs_dir: Path | None = None,
     ) -> LifecycleReportWorkflowResult:
         produced_at = self._timestamp()
+        schema_version, self_pull = resolve_emitted_handoff_version(
+            agent="lifecycle",
+            injected_refs=injected_refs,
+            specs_dir=specs_dir,
+        )
         filename_slug = self._safe_filename_slug(run_id)
         baseline = self._write_snapshot(
             label="baseline",
@@ -73,23 +82,26 @@ class LifecycleReportWorkflow:
             filename=f"{filename_slug}.html",
             html=self._render_report(context=context, release_id=release_id, run_id=run_id),
         )
+        payload: dict[str, object] = {
+            "schema_version": schema_version,
+            "agent": "lifecycle",
+            "context": context,
+            "release_id": release_id,
+            "produced_at": produced_at,
+            "artifact": {
+                "type": "report",
+                "path": report.path,
+                "content_hash": report.content_hash,
+            },
+            "scope": "lifecycle-report",
+            "metrics": {"cleanup_apply": str(apply_cleanup).lower()},
+        }
+        if self_pull is not None:
+            payload["self_pull"] = self_pull
         handoff = self._runtime_files.write_handoff(
             context=context,
             filename=f"{filename_slug}.handoff.json",
-            payload={
-                "schema_version": "handoff-v1.1",
-                "agent": "lifecycle",
-                "context": context,
-                "release_id": release_id,
-                "produced_at": produced_at,
-                "artifact": {
-                    "type": "report",
-                    "path": report.path,
-                    "content_hash": report.content_hash,
-                },
-                "scope": "lifecycle-report",
-                "metrics": {"cleanup_apply": str(apply_cleanup).lower()},
-            },
+            payload=payload,
         )
         validation = self._validation.validate_file(self._workspace_root / handoff.path)
         cleanup = self._hygiene.cleanup(dry_run=not apply_cleanup)

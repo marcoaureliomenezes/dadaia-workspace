@@ -207,7 +207,8 @@ class FilesystemRuntimeFileAdapter:
         missing = sorted(key for key in required if key not in payload)
         if missing:
             raise RuntimeFilePathError(f"handoff payload missing required fields: {missing}")
-        if payload["schema_version"] not in {"handoff-v1", "handoff-v1.1"}:
+        # FR3 (v0.1.62): accept-set widened to include handoff-v1.2 (self_pull line).
+        if payload["schema_version"] not in {"handoff-v1", "handoff-v1.1", "handoff-v1.2"}:
             raise RuntimeFilePathError("handoff payload has unsupported schema_version")
         if payload["context"] != context:
             raise RuntimeFilePathError("handoff payload context must match target context")
