@@ -94,3 +94,28 @@ def test_with_added_is_idempotent_no_duplicate() -> None:
     again = ledger.with_added("frontend-design")
     assert again is ledger
     assert again.plugins == ("frontend-design",)
+
+
+def test_with_removed_drops_the_named_pack() -> None:
+    """v0.1.63 FR2: ``with_removed`` is the pure inverse of ``with_added``."""
+    ledger = InstalledPlugins.of(("frontend-design", "devops"))
+    assert ledger.with_removed("frontend-design").plugins == ("devops",)
+    assert ledger.with_removed("devops").plugins == ("frontend-design",)
+
+
+def test_with_removed_is_idempotent_absent_name_returns_self() -> None:
+    """Removing an absent name is a no-op returning ``self`` (mirrors ``with_added``)."""
+    ledger = InstalledPlugins.of(("frontend-design",))
+    again = ledger.with_removed("devops")
+    assert again is ledger
+    assert InstalledPlugins.empty().with_removed("anything") is InstalledPlugins.empty() or (
+        InstalledPlugins.empty().with_removed("anything").plugins == ()
+    )
+
+
+def test_with_removed_preserves_order_and_schema_version() -> None:
+    """Removal keeps the remaining insertion order and the ledger schema version."""
+    ledger = InstalledPlugins(schema_version="1", plugins=("a", "b", "c"))
+    removed = ledger.with_removed("b")
+    assert removed.plugins == ("a", "c")
+    assert removed.schema_version == "1"

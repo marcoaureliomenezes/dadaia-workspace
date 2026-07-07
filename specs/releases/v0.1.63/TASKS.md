@@ -25,7 +25,21 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W1 — FR1/FR2/FR3 uninstall machinery
 
-- [-] T-63-10 `with_removed` + `uninstall_plugin` + CLI `uninstall`. Owner: software-engineer. Write set:
+- [x] T-63-10 `with_removed` + `uninstall_plugin` + CLI `uninstall`. Owner: software-engineer. **DONE
+  2026-07-07.** Base state (Ruling 63-A: branch already based on v0.1.61+62 — container
+  `build_plugin_store` store-construction pattern adopted): lint-imports **9 kept / 0 broken**, ignore-cap
+  arrows **36**; branch-point `pytest --collect-only -q` = **4772** (QAX-4 pin; post-task 4785 = 4772 + 13 new
+  tests, 4768 passed + 17 skipped, exit 0). RED captured: 13 failures pre-fix (`with_removed` absent,
+  `No such command 'uninstall'`, no `uninstall_plugin`). AC-2 equivalence test measured **3.16s**
+  (`@pytest.mark.slow`, ≤ ~15s bracket); golden (b) fixture read-only, byte-untouched, its own test green.
+  AC-8 sabotage captures (each → 1 failed → reverted → green): (a) ledger-drop skip ⇒ AC-2 ledger assert
+  FAILED; (b) skill-deletion skip ⇒ AC-2 zero-pack-files FAILED; (c) stub-restore skip ⇒ AC-2 stub-body
+  FAILED; (d) unknown-pack accepted ⇒ AC-1 exit-2 test FAILED. Fate ledger:
+  `test_plugin_pack.py`/`test_plugin_cli.py` EXTENDED (existing cases byte-identical);
+  `test_plugin_install_residue.py` ASSESSED — SURVIVES untouched (it pins plugin-scope rule wording only,
+  no no-removal claim); `test_json_plugin_store.py`, `test_plugin_projection.py`, both goldens SURVIVE
+  untouched. Gates: ruff format --check 0, ruff check --no-cache 0, mypy --strict 0,
+  lint-imports --no-cache 9 kept/0 broken (== base), full unpiped pytest exit 0.
   `core/models/plugin_pack.py`, `infrastructure/public_assets.py` (plugin block), `cli/commands/plugin.py`,
   `tests/unit/core/test_plugin_pack.py`, `tests/unit/cli/test_plugin_cli.py`, NEW
   `tests/integration/test_plugin_uninstall.py`. Preconditions: SPEC/PLAN/TASKS `Aprovado`; **v0.1.61 landed

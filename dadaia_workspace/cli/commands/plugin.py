@@ -140,6 +140,44 @@ def install(
         console.print(f"[green]✓[/green] Plugin pack '{pack}' installed (agents: {agents}).")
 
 
+@app.command()
+def uninstall(
+    pack: str = typer.Argument(..., help="Plugin pack to uninstall (e.g. frontend-design)."),
+) -> None:
+    """Disable a distributed plugin pack in this workspace (v0.1.63 FR1).
+
+    Validates *pack* against the in-package descriptors BEFORE workspace resolution
+    (unknown pack ⇒ ``BadParameter``, exit 2, message on stderr, empty stdout — mirrors
+    ``install``). A known-but-not-installed pack is an idempotent no-op (exit 0,
+    ``no change`` — ADR-U2). On success delegates to
+    ``FileSystemPublicAssetManager.uninstall_plugin`` (files first, ledger last) and prints
+    the restored agents plus any never-silent drift/skip lines.
+    """
+    available = _available_packs()
+    if pack not in available:
+        names = ", ".join(sorted(available)) or "(none)"
+        raise typer.BadParameter(
+            f"unknown plugin pack '{pack}'. Available packs: {names}",
+            param_hint="PACK",
+        )
+
+    states_dir = _states_dir()
+    workspace_root = states_dir.parent.parent
+
+    if pack not in _read_ledger(states_dir).plugins:
+        console.print(f"[dim]Plugin pack '{pack}' is not installed — no change.[/dim]")
+        return
+
+    manager = FileSystemPublicAssetManager(plugin_store=container.build_plugin_store())
+    lines = manager.uninstall_plugin(workspace_root, pack)
+    for line in lines:
+        if line.startswith(("[drift-restored]", "[drift-removed]", "[skip] pack")):
+            console.print(line, style="yellow", markup=False)
+
+    agents = ", ".join(available[pack].agents)
+    console.print(f"[green]✓[/green] Plugin pack '{pack}' uninstalled (restored agents: {agents}).")
+
+
 @app.command(name="list")
 def list_packs() -> None:
     """List available in-package plugin packs and which are installed in this workspace."""

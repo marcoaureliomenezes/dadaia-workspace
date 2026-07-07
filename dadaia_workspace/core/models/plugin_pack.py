@@ -127,3 +127,16 @@ class InstalledPlugins:
         if name in self.plugins:
             return self
         return InstalledPlugins(schema_version=self.schema_version, plugins=(*self.plugins, name))
+
+    def with_removed(self, name: str) -> InstalledPlugins:
+        """Return a ledger with *name* disabled — the pure inverse of :meth:`with_added`.
+
+        Idempotent: removing an absent name returns ``self`` (v0.1.63 FR2). Remaining
+        entries keep their insertion order and the schema version is preserved.
+        """
+        if name not in self.plugins:
+            return self
+        return InstalledPlugins(
+            schema_version=self.schema_version,
+            plugins=tuple(entry for entry in self.plugins if entry != name),
+        )
