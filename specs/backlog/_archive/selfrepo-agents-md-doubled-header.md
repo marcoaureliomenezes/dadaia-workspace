@@ -1,6 +1,7 @@
 ---
 name: selfrepo-agents-md-doubled-header
-status: candidate
+status: delivered
+delivered_in: v0.1.61
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.58 closure backlog return (doc-pass — pre-existing v0.1.47 hand-sync artifact)
