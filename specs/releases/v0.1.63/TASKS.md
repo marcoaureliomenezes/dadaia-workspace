@@ -180,13 +180,19 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W5 — ship
 
-- [ ] T-63-50 Ship gates + live-instance propagation. Owner: software-engineer (devops-engineer if pack
+- [-] T-63-50 Ship gates + live-instance propagation. Owner: software-engineer (devops-engineer if pack
   installed; else PM surfaces commands). Preconditions: T-63-10..40 `[x]`. Checklist: AC-9 full gates (ruff
   format/check, mypy --strict, unpiped pytest, lint-imports kept/ignore-cap == base counts, specs doctor exit 0,
   backlog doctor exit 0); `dadaia public stage` → `public doctor` → `public install --target all` → confirming
   `public doctor` (`[ok] public-privacy`, exit 0); frozen no-steal suite zero-diff; qa-engineer alpha review;
   security-reviewer APPROVE handoff per push cycle (`metrics.commit_sha`). Done-evidence: command outputs +
   SHAs recorded for CLOSURE Validations.
+  - **AC-9 evidence (2026-07-07, PM shell):** unpiped pytest exit 0 — **4778 passed, 17 skipped** · ruff
+    format --check 0 · ruff check --no-cache 0 · mypy --strict 0 · lint-imports --no-cache **9 kept / 0
+    broken** (== base pins) · specs doctor exit 0 · backlog doctor clean · frozen v0.1.50 suite zero-diff vs
+    main · live-instance propagation `stage → doctor → install --target all → doctor` all exit 0 with
+    `[ok] public-privacy` (both packs' new skills staged to the instance). Task SHAs: W1 `a23a63d1` +
+    `65419397`, W2 `22e88227`, W3 `30561711`, W4 `c273b33f`.
 
 ## CLOSURE
 
