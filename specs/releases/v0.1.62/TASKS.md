@@ -249,7 +249,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W5 — gates + ship
 
-- [ ] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
+- [-] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
   security-reviewer for the push verdict). Preconditions: T-62-11/20/30/40/50 all `[x]`. Checklist:
   - AC-11: `ruff format --check`; `ruff check --no-cache`; `mypy --strict`; full **unpiped** `pytest`;
     `lint-imports --no-cache` (**8 kept / 0 broken**, ignore-cap UNCHANGED); `dadaia specs doctor` exit 0;
@@ -259,6 +259,11 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - QA ship-gate review; security push-gate handoff with `metrics.commit_sha` == pushed sha; push; **watch CI until
     every job green** (incl. e2e-panel with the FR7 assertion); PR; merge — sequenced with the sibling releases
     through PM. *(PE runs no shell — commands surfaced to PM/operator or devops-engineer.)*
+  - **AC-11 evidence (2026-07-07, PM shell):** unpiped pytest exit 0 — **4755 passed, 17 skipped** · ruff
+    format --check 0 · ruff check --no-cache 0 · mypy --strict 0 · lint-imports --no-cache **9 kept / 0
+    broken** (rebase note: v0.1.61 added the 9th contract; the SPEC's "8 kept" is pre-rebase text) · specs
+    doctor exit 0 · backlog doctor clean · frozen v0.1.50 suite zero-diff vs main · self-hosting reconcile
+    stage→install --target all→doctor exit 0 with `[ok] public-privacy` (W3 surfaces projected).
 
 ## W6 — closure (CLOSURE phase)
 
