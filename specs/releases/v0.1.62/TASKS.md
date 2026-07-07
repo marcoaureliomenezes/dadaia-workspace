@@ -194,7 +194,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W4 — FR5/FR6 fan-out containment + symlink refusal (∥ W5a permitted — disjoint write sets)
 
-- [ ] T-62-40 Slug containment + symlink write-through refusal. Owner: software-engineer. Preconditions: none on
+- [x] T-62-40 Slug containment + symlink write-through refusal. Owner: software-engineer. Preconditions: none on
   W1-W3 files (disjoint); may start after T-62-01. Write set: `infrastructure/workspace_guardrail.py`, NEW
   `tests/unit/infrastructure/test_consumer_fanout_containment.py`. Checklist:
   - `_consumer_repos_for_root`: lexical slug validation (single relative non-dot component; reject `/`, `\\`,
@@ -216,6 +216,15 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
     `tests/unit/infrastructure/test_public_assets.py` (consumer classes),
     `tests/unit/features/public/test_workspace_guardrail_pair.py`,
     `tests/integration/test_public_doctor_parity.py` — enumerate + confirm green. Done: gates green.
+  - **Evidence (2026-07-07):** RED capture #1 (AC-7): pre-fix, `"../evil"` landed `AGENTS.md` at `ws/evil/AGENTS.md`
+    OUTSIDE `repos/` (`test_traversal_slug_writes_nothing_outside_repos` FAILED `assert not exists()`). RED capture
+    #2 (AC-8(a)): pre-fix, `shutil.copy2` wrote THROUGH the link — banner-bearing out-of-repo target sha changed
+    `7d5eba05… → 5a67bc07…` (`test_symlinked_banner_bearing_target_survives` FAILED). Sabotage AC-10(e) (slug reject
+    dropped): 10 FAILED incl. `test_hostile_slug_rejected_at_derivation[../evil|a/b|..|\\\\host\\share]` — reverted.
+    Sabotage AC-10(f) (`is_symlink()` dropped): 3 FAILED (`symlinked_agents_target`, `banner_bearing`, `dangling`) —
+    reverted. Fate ledger: the 4 enumerated suites 204 passed, `git diff` empty (byte-identical). Gates:
+    `ruff format --check` 0, `ruff check --no-cache` 0, `mypy --strict dadaia_workspace` 0 (313 files),
+    `lint-imports` 9 kept / 0 broken, full unpiped pytest exit 0 — 4755 passed, 17 skipped. New suite: 19 passed.
 
 ## W5a — FR7 response-guard chip assertion (∥ W4 permitted — disjoint write set)
 
