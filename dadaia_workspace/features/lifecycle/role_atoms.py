@@ -28,16 +28,13 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import InjectedContext, LifecycleRun
 
-#: The declarative role → memory-atom map (FR2). Each value is the atom's path relative to the
-#: active context's ``specs_dir``. Injection is INDEPENDENT of a fragment's ``dynamic_inputs``:
-#: the step's ``role`` alone selects the atom(s), so grounding is guaranteed by the map, not by
-#: per-fragment declaration luck (the frontmatter-inert defect this release removes). A role not
-#: listed here (e.g. ``python``, ``security-reviewer``, ``project-auditor``) injects nothing.
-ROLE_ATOM_MAP: dict[str, str] = {
-    "software-architect": "memory/architecture.md",
-    "qa-engineer": "memory/quality-assurance.md",
-    "product-engineer": "memory/product/catalog.json",
-}
+#: The declarative role → memory-atom map (FR2). Relocated to ``core/role_atom_map.py``
+#: in v0.1.62 (ADR-4) so ``features/reports`` can consume the DATA without a cross-feature
+#: edge; re-exported here under the same name so the three Layer-2 assembly surfaces and
+#: existing tests keep importing from ``role_atoms``. Semantics unchanged: each value is
+#: the atom's path relative to the active context's ``specs_dir``; the step's ``role``
+#: alone selects the atom(s); an unlisted role injects nothing.
+from dadaia_workspace.core.role_atom_map import ROLE_ATOM_MAP
 
 
 def _atom_ref(relpath: str) -> str:

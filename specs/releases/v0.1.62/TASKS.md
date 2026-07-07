@@ -50,7 +50,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
     `pytest --collect-only -q` = 4701 tests collected** (at HEAD 52606197, pre-corpus-file; re-validate at
     closure).
 
-- [-] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
+- [x] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
   Preconditions: T-62-10 committed. Write set: `public/schemas/handoff-v1.schema.json`,
   `features/reports/validation.py`, `cli/commands/reports.py`, NEW `core/role_atom_map.py`,
   `features/lifecycle/role_atoms.py` (re-export ONLY), `tests/unit/features/reports/test_handoff_v12_validation.py`.
@@ -73,6 +73,33 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Fate ledger (file-enumerated): existing reports/CLI/stdlib-validator tests SURVIVE (v1.1 accepted); any test
     pinning unknown-token rejection amended-with-rationale; `lint-imports` 8/0, ignore-cap UNCHANGED. Done: gates
     green (ruff, mypy --strict, unpiped pytest).
+  - **Evidence (2026-07-07):** AC-2 staged RED: stage-1 (pre-FR1) v1.2−self_pull failed ONLY on enum
+    (`'handoff-v1.2' is not one of ['handoff-v1', 'handoff-v1.1']`); stage-2 (post-FR1, pre-FR2) same doc passed
+    schema-blind (`validator errors == []`); post-FR2 the `self_pull`-pathed conditional fires.
+    `test_schema_version_matrix` = ONE named parametrized 4-case test (v1 ✓ / v1.1 ✓ / v1.2+self_pull ✓ /
+    v1.2−self_pull ✗). AC-3(a) indexed `self_pull.refs[1] ref does not exist` + repos/<context> resolution +
+    fail-soft (root None) tests; AC-3(b) qa-engineer coverage miss fails / software-engineer unmapped passes;
+    AC-3(c) `..`/absolute refs rejected by the schema pattern (`self_pull.refs[0]` pattern error). AC-4 RED
+    (bug repro VERBATIM, pre-fix): `dadaia reports validate <v1.2 sidecar>` → exit 1,
+    `ERROR: Missing required field 'findings[]'. This sidecar appears to be v1.0 and is incompatible with
+    v1.1.`; post-fix same sidecar (no findings[]) exits 0, `1 valid`. `StdlibHandoffValidator` constructs
+    UNCHANGED against the v1.2 schema (whitelisted keywords only). Map relocation grep: consumers
+    (`fragment_coherence_doctor`, `role_atoms` helpers, `test_role_atoms_injection`,
+    `test_fragment_coherence_doctor`) all still import via `role_atoms`; re-export is the SAME object
+    (identity-asserted test). **Mutation-sanity AC-10:** (a) drop conditional ⇒
+    `test_schema_version_matrix[v1.2-without-self_pull-fails]` FAILED; (b) `if False` existence ⇒
+    `test_v12_nonexistent_ref_fails_with_indexed_evidence` FAILED; (c) `mapped = None` coverage ⇒
+    `test_v12_mapped_agent_missing_its_atom_fails_coverage` FAILED; (d) detection reverted to v1.1-only ⇒
+    `test_v12_sidecar_never_routes_to_v10_compat_cli` FAILED (exit 1, findings[] compat error) — all four
+    surgically reverted, file back to 20 passed. **Fate ledger:** NO existing test pinned unknown-token
+    rejection (grep `_detect_sidecar_version|findings\[\]` in tests/ = zero hits) — nothing amended;
+    reports/CLI/stdlib-validator suites SURVIVE green in the full run; AC-1 corpus lock still green
+    post-bump (transition proven). **Rebase note (Ruling 62-A):** the "8 kept" figure in this task text
+    predates v0.1.61's merge, which landed a 9th contract (`cli must not import infrastructure`) — actual
+    gate result **9 kept / 0 broken**, ignore-cap UNCHANGED (`core/role_atom_map.py` is a stdlib-only core
+    leaf; `features→core` edges legal). Gates: `ruff format --check` 0 (816 formatted); `ruff check
+    --no-cache` 0; `mypy --strict dadaia_workspace/` 0 (313 files, CI-canonical scope); full unpiped
+    `pytest` exit 0 — **4704 passed, 17 skipped** (4701 branch-point + 20 new = 4721 collected).
 
 ## W2 — FR3 accept-sets + Layer-2 emitter bump (sequential after W1)
 

@@ -78,10 +78,19 @@ def _candidate_payload(candidate: CleanupCandidate) -> dict[str, object]:
 
 
 def _detect_sidecar_version(doc: dict[str, object]) -> str:
-    """Return '1.1' if doc declares handoff-v1.1, else '1.0'."""
+    """Return '1.1' (modern) for handoff-v1.1/handoff-v1.2 sidecars, else '1.0'.
+
+    v0.1.62 FR2 fix for bug ``reports-sidecar-version-detection-misroutes-future-tokens``
+    (HIGH): ``handoff-v1.2`` is modern and must NEVER fall through to ``_check_v10_compat``
+    — pre-fix any token other than the exact v1.1 string routed to the v1.0 compat check,
+    which hard-errors on a missing ``findings[]``. Modern sidecars take the full schema +
+    service validation path instead.
+    """
     schema_version = doc.get("schema_version", "")
-    schema_id = doc.get("$id", "")
-    if schema_version == "handoff-v1.1" or "v1.1" in str(schema_id):
+    schema_id = str(doc.get("$id", ""))
+    if schema_version in ("handoff-v1.1", "handoff-v1.2"):
+        return "1.1"
+    if "v1.1" in schema_id or "v1.2" in schema_id:
         return "1.1"
     return "1.0"
 
