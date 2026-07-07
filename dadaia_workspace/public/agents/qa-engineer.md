@@ -367,7 +367,7 @@ Before writing any E2E test or acceptance criteria, confirm the task's release s
 
 ---
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1). Invoke the `dadaia-handoff-emitter` skill once per report.
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read). Invoke the `dadaia-handoff-emitter` skill once per report.
 
 ---
 ## Approval contract

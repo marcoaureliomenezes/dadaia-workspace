@@ -33,6 +33,11 @@ dadaia reports validate <handoff-json-path>
 
 ## Write Rules
 
+- Emit `schema_version: "handoff-v1.2"` and record in `self_pull.refs` the memory
+  atoms this session actually self-pulled/read (step-0 atoms plus any deep atom read
+  during the task), as `specs/`-prefixed context-relative paths. Never list an atom
+  that was not read (with zero atoms read, the emitter skill's honest legacy fallback
+  applies — see `dadaia-handoff-emitter`).
 - Keep the file concise: status, findings, decisions, and next action only.
 - Use stable workspace-relative paths.
 - Include only information needed by the next agent.

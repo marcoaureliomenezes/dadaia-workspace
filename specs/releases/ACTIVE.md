@@ -1,6 +1,6 @@
 ---
 release: v0.1.62
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.62 — Injection Contract & Fan-out Containment

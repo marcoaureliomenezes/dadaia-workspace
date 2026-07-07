@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.exceptions import HandoffValidationError
 from dadaia_workspace.core.protocols.handoff_validator import ValidatorPort
+from dadaia_workspace.core.role_atom_map import ROLE_ATOM_MAP
 
 if TYPE_CHECKING:
     pass
@@ -95,6 +96,8 @@ class ReportsValidationService:
             return ValidationResult(path=path, valid=False, errors=(malformed_error,))
 
         errors = list(self._validator.validate(doc))
+        if not errors:
+            errors.extend(self._check_self_pull(doc))
         hash_status = None
         if not errors and self._artifact_path(doc):
             hash_status = self.check_hash(path)
@@ -164,6 +167,88 @@ class ReportsValidationService:
 
         actual_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
         return "match" if actual_hash == expected_hash else "mismatch"
+
+    def _check_self_pull(self, doc: dict[str, object]) -> list[HandoffValidationError]:
+        """Version-conditional ``self_pull`` checks for ``handoff-v1.2`` documents (FR2).
+
+        The stdlib validator cannot express "required only when schema_version ==
+        handoff-v1.2" (no ``if``/``then`` — ADR-2), so the conditional lives here,
+        evaluated only after a clean schema pass. ``handoff-v1``/``handoff-v1.1``
+        documents are exempt (transition posture — the on-disk corpus keeps validating).
+
+        Checks, in order:
+
+        1. **Presence** — a v1.2 doc without a ``self_pull.refs`` non-empty array fails
+           with a ``self_pull``-pathed error (shape errors are already the schema's job).
+        2. **Existence** — each ref must resolve to an existing file, trying
+           ``<workspace>/repos/<context>/<ref>`` then ``<workspace>/<ref>`` (self-hosting
+           root), both guarded by ``_within_workspace``. Fail-soft: when
+           ``_workspace_root`` is ``None`` (non-canonical handoff root) the existence
+           check degrades to shape-only, mirroring the artifact-path posture.
+        3. **Role-map coverage** — when the emitting ``agent`` has a role→atom mapping
+           (``core.role_atom_map.ROLE_ATOM_MAP``), the mapped atom's ``specs/``-prefixed
+           ref must appear in ``refs``. Unmapped agents carry no coverage requirement.
+        """
+        if doc.get("schema_version") != "handoff-v1.2":
+            return []
+        errors: list[HandoffValidationError] = []
+        self_pull = doc.get("self_pull")
+        refs: list[str] = []
+        if isinstance(self_pull, dict):
+            refs_obj = self_pull.get("refs")
+            if isinstance(refs_obj, list):
+                refs = [ref for ref in refs_obj if isinstance(ref, str)]
+        if not refs:
+            errors.append(
+                HandoffValidationError(
+                    "self_pull",
+                    "handoff-v1.2 requires self_pull with a non-empty refs array "
+                    "(the Layer-1 self-pull audit line)",
+                )
+            )
+            return errors
+
+        # Existence (fail-soft when the workspace root cannot be inferred).
+        if self._workspace_root is not None:
+            context = doc.get("context")
+            for idx, ref in enumerate(refs):
+                if not self._self_pull_ref_exists(ref, context):
+                    errors.append(
+                        HandoffValidationError(
+                            f"self_pull.refs[{idx}]",
+                            f"ref does not exist: {ref!r} (checked repos/<context>/<ref> "
+                            "and <workspace>/<ref>)",
+                        )
+                    )
+
+        # Role-map coverage (pure data — applies regardless of workspace root).
+        agent = doc.get("agent")
+        if isinstance(agent, str):
+            mapped = ROLE_ATOM_MAP.get(agent)
+            if mapped is not None:
+                expected_ref = f"specs/{mapped}"
+                if expected_ref not in refs:
+                    errors.append(
+                        HandoffValidationError(
+                            "self_pull.refs",
+                            f"agent {agent!r} is role-mapped to {expected_ref!r} "
+                            "but self_pull.refs does not list it",
+                        )
+                    )
+        return errors
+
+    def _self_pull_ref_exists(self, ref: str, context: object) -> bool:
+        """Resolve a ``self_pull`` ref inside the workspace boundary — existing file or not."""
+        assert self._workspace_root is not None
+        candidates: list[Path] = []
+        if isinstance(context, str) and context:
+            candidates.append(self._workspace_root / "repos" / context / ref)
+        candidates.append(self._workspace_root / ref)
+        for candidate in candidates:
+            resolved = self._within_workspace(candidate)
+            if resolved is not None and resolved.is_file():
+                return True
+        return False
 
     def _resolve_artifact_path(self, handoff_path: Path, artifact_ref: str) -> Path | None:
         """Resolve ``artifact_ref`` to an in-workspace path, or ``None`` if it escapes.

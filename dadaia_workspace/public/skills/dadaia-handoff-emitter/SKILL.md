@@ -79,13 +79,19 @@ All field semantics match the schema at `.dadaia/agentic/schemas/handoff-v1.sche
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema_version` | string (literal) | Always `"handoff-v1.1"` |
+| `schema_version` | string (literal) | Always `"handoff-v1.2"` (see the version note below for the only sanctioned fallback) |
+| `self_pull` | object | `{"refs": [...]}` — the memory atoms this session **actually self-pulled/read** (step-0 atoms + any deep atom read during the task), as `specs/`-prefixed context-relative paths (e.g. `"specs/memory/architecture.md"`). Never list an atom you did not read. Required for `"handoff-v1.2"`. |
 | `agent` | string | The `name` from your own frontmatter (e.g. `"software-engineer"`) |
 | `context` | string | Active Spec Context Project name (e.g. `"dadaia-workspace"`) |
 | `produced_at` | string (ISO 8601) | UTC timestamp of emission, e.g. `"2026-06-10T12:00:00Z"` |
 | `scope` | string | Scope descriptor (e.g. task id, file path, module, component) |
 | `metrics` | object | Key quantitative metrics (e.g. `{"files_changed": 3, "lines_added": 42}`) |
 | `artifact.type` | string | One of `"report"`, `"spec"`, `"plan"`, `"tasks"`, `"closure"`, `"memory"`, `"other"` |
+
+**Version note (transition posture).** New handoffs are `"handoff-v1.2"` and MUST carry
+`self_pull.refs`. If the session genuinely read **zero** memory atoms, emit
+`"schema_version": "handoff-v1.1"` with no `self_pull` — the honest legacy fallback —
+rather than fabricating refs. Historical v1/v1.1 documents on disk stay valid forever.
 
 #### Optional fields (include when applicable)
 
@@ -104,7 +110,13 @@ All field semantics match the schema at `.dadaia/agentic/schemas/handoff-v1.sche
 
 ```json
 {
-  "schema_version": "handoff-v1.1",
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/architecture.md"
+    ]
+  },
   "agent": "software-engineer",
   "context": "dadaia-workspace",
   "produced_at": "2026-06-10T12:00:00Z",
@@ -124,7 +136,13 @@ All field semantics match the schema at `.dadaia/agentic/schemas/handoff-v1.sche
 
 ```json
 {
-  "schema_version": "handoff-v1.1",
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/quality-assurance.md"
+    ]
+  },
   "agent": "qa-engineer",
   "context": "dadaia-workspace",
   "produced_at": "2026-06-10T12:00:00Z",

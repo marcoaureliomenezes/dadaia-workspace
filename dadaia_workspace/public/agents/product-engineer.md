@@ -518,7 +518,7 @@ Browser frontend -> frontend-engineer [plugin]. CI YAML -> devops-engineer [plug
 Após finalizar qualquer report HTML em `.dadaia/reports/`, invocar a skill `dadaia-handoff-emitter`
 para emitir o handoff JSON em `.dadaia/handoff/<context>/`.
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1).
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## dadaia CLI reference

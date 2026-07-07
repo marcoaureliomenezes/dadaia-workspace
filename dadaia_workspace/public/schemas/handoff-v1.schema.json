@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "handoff-v1.1",
-  "title": "Handoff Document v1.1",
+  "$id": "handoff-v1.2",
+  "title": "Handoff Document v1.2",
   "description": "Structured handoff emitted by an agent at the end of any task (handoff-first; an HTML report artifact is optional). Validates the handoff contract between pipeline stages.",
   "type": "object",
   "required": ["schema_version", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
@@ -9,8 +9,26 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "enum": ["handoff-v1", "handoff-v1.1"],
-      "description": "Schema version identifier. Use 'handoff-v1.1' for new handoffs."
+      "enum": ["handoff-v1", "handoff-v1.1", "handoff-v1.2"],
+      "description": "Schema version identifier. Use 'handoff-v1.2' for new handoffs. Historical v1/v1.1 documents stay valid (transition posture)."
+    },
+    "self_pull": {
+      "type": "object",
+      "required": ["refs"],
+      "additionalProperties": false,
+      "description": "Layer-1 self-pull audit line (v1.2). Records the memory atoms the emitting session actually read, in InjectedContext ref style (context-relative, specs/-prefixed). Optional at schema level; REQUIRED for schema_version handoff-v1.2 by the service-layer conditional (the stdlib validator has no if/then).",
+      "properties": {
+        "refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9_./-]+$",
+            "description": "Context-relative, specs/-prefixed atom ref (e.g. specs/memory/architecture.md). No absolute paths, no .. traversal."
+          },
+          "description": "Non-empty list of self-pulled atom refs. Never list an atom that was not read."
+        }
+      }
     },
     "agent": {
       "type": "string",

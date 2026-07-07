@@ -33,15 +33,24 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W1 — FR1/FR2 schema bump + validator (golden-first → RED-first)
 
-- [ ] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
+- [x] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
   `tests/unit/features/reports/test_handoff_v12_validation.py` (corpus-lock section only). Checklist:
   - Collect every in-tree v1/v1.1 handoff fixture + transcribe the emitter-skill v1.1 example as a fixture; assert
     each passes `ReportsValidationService.validate_file` (hash checks stubbed/absent-path variants as today).
   - **First implementation wave (QAX-4):** pin the branch-point `pytest --collect-only -q` count in this task's
     fate ledger (re-validated at closure). <!-- AMEND:QAX-4 -->
   - Commit BEFORE any schema/service edit. Precondition for T-62-11. Done: green on the pre-bump tree.
+  - **Evidence (2026-07-07):** corpus = 5 fixtures (tree carries NO committed `*.handoff.json` — corpus is the
+    fixture docs embedded in tests + the emitter skill): `v1-minimal-report` (test_cli_reports.py),
+    `v1-no-artifact-path` (test_reports_validation_service.py), `v1.1-contract-full`
+    (test_handoff_schema_contract.py), `v1.1-skill-handoff-only` + `v1.1-skill-with-report` (SKILL.md examples
+    transcribed; report-mode hash recomputed against a materialized artifact — literal skill hash is
+    illustrative). Real `StdlibHandoffValidator` + real public schema; 6 tests (5 parametrized + validate_all
+    sweep) GREEN on the pre-bump tree (`6 passed`). **QAX-4 branch-point collect count pin:
+    `pytest --collect-only -q` = 4701 tests collected** (at HEAD 52606197, pre-corpus-file; re-validate at
+    closure).
 
-- [ ] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
+- [x] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
   Preconditions: T-62-10 committed. Write set: `public/schemas/handoff-v1.schema.json`,
   `features/reports/validation.py`, `cli/commands/reports.py`, NEW `core/role_atom_map.py`,
   `features/lifecycle/role_atoms.py` (re-export ONLY), `tests/unit/features/reports/test_handoff_v12_validation.py`.
@@ -64,10 +73,37 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Fate ledger (file-enumerated): existing reports/CLI/stdlib-validator tests SURVIVE (v1.1 accepted); any test
     pinning unknown-token rejection amended-with-rationale; `lint-imports` 8/0, ignore-cap UNCHANGED. Done: gates
     green (ruff, mypy --strict, unpiped pytest).
+  - **Evidence (2026-07-07):** AC-2 staged RED: stage-1 (pre-FR1) v1.2−self_pull failed ONLY on enum
+    (`'handoff-v1.2' is not one of ['handoff-v1', 'handoff-v1.1']`); stage-2 (post-FR1, pre-FR2) same doc passed
+    schema-blind (`validator errors == []`); post-FR2 the `self_pull`-pathed conditional fires.
+    `test_schema_version_matrix` = ONE named parametrized 4-case test (v1 ✓ / v1.1 ✓ / v1.2+self_pull ✓ /
+    v1.2−self_pull ✗). AC-3(a) indexed `self_pull.refs[1] ref does not exist` + repos/<context> resolution +
+    fail-soft (root None) tests; AC-3(b) qa-engineer coverage miss fails / software-engineer unmapped passes;
+    AC-3(c) `..`/absolute refs rejected by the schema pattern (`self_pull.refs[0]` pattern error). AC-4 RED
+    (bug repro VERBATIM, pre-fix): `dadaia reports validate <v1.2 sidecar>` → exit 1,
+    `ERROR: Missing required field 'findings[]'. This sidecar appears to be v1.0 and is incompatible with
+    v1.1.`; post-fix same sidecar (no findings[]) exits 0, `1 valid`. `StdlibHandoffValidator` constructs
+    UNCHANGED against the v1.2 schema (whitelisted keywords only). Map relocation grep: consumers
+    (`fragment_coherence_doctor`, `role_atoms` helpers, `test_role_atoms_injection`,
+    `test_fragment_coherence_doctor`) all still import via `role_atoms`; re-export is the SAME object
+    (identity-asserted test). **Mutation-sanity AC-10:** (a) drop conditional ⇒
+    `test_schema_version_matrix[v1.2-without-self_pull-fails]` FAILED; (b) `if False` existence ⇒
+    `test_v12_nonexistent_ref_fails_with_indexed_evidence` FAILED; (c) `mapped = None` coverage ⇒
+    `test_v12_mapped_agent_missing_its_atom_fails_coverage` FAILED; (d) detection reverted to v1.1-only ⇒
+    `test_v12_sidecar_never_routes_to_v10_compat_cli` FAILED (exit 1, findings[] compat error) — all four
+    surgically reverted, file back to 20 passed. **Fate ledger:** NO existing test pinned unknown-token
+    rejection (grep `_detect_sidecar_version|findings\[\]` in tests/ = zero hits) — nothing amended;
+    reports/CLI/stdlib-validator suites SURVIVE green in the full run; AC-1 corpus lock still green
+    post-bump (transition proven). **Rebase note (Ruling 62-A):** the "8 kept" figure in this task text
+    predates v0.1.61's merge, which landed a 9th contract (`cli must not import infrastructure`) — actual
+    gate result **9 kept / 0 broken**, ignore-cap UNCHANGED (`core/role_atom_map.py` is a stdlib-only core
+    leaf; `features→core` edges legal). Gates: `ruff format --check` 0 (816 formatted); `ruff check
+    --no-cache` 0; `mypy --strict dadaia_workspace/` 0 (313 files, CI-canonical scope); full unpiped
+    `pytest` exit 0 — **4704 passed, 17 skipped** (4701 branch-point + 20 new = 4721 collected).
 
 ## W2 — FR3 accept-sets + Layer-2 emitter bump (sequential after W1)
 
-- [ ] T-62-20 Accept-set widening + emitter bump + tree-wide token sweep. Owner: software-engineer. Preconditions:
+- [x] T-62-20 Accept-set widening + emitter bump + tree-wide token sweep. Owner: software-engineer. Preconditions:
   T-62-11 done. Write set: `features/lifecycle/gates.py`, `infrastructure/runtime_files.py`,
   `features/lifecycle/service.py`, `features/lifecycle/report_workflow.py`, `features/panel/reports_doctor.py`
   (grep fate), their unit tests. Checklist:
@@ -79,10 +115,32 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Tests: AC-5 round-trip (emit → gates → runtime_files → `reports validate` exit 0; zero-refs fallback = v1.1).
   - Fate ledger: gates/runtime_files tests pinning the old set amended-with-rationale; frozen v0.1.50 suite
     zero-diff. Done: gates green.
+  - **Evidence (T-62-20 done):** accept-sets widened to `{v1, v1.1, v1.2}` in `gates.py#_schema_version` +
+    `runtime_files.py#_validate_handoff_payload`; new `service.py#resolve_emitted_handoff_version` (InjectedContext
+    refs dedup → role-map fallback, existing-atom-only → honest v1.1) consumed by `blocked_push_preflight` and
+    `LifecycleReportWorkflow.run`. RED captured: ImportError on `resolve_emitted_handoff_version` +
+    emitter test failing pre-fix. Mutation-sanity: dropping the `payload["self_pull"]` population ⇒
+    `test_ac5_blocked_push_v12_roundtrip` (KeyError) + emitter unit test FAILED ⇒ reverted.
+    Tests: `tests/unit/features/lifecycle/test_handoff_v12_emission.py` (10),
+    `tests/integration/test_handoff_v12_roundtrip.py` (AC-5 round-trip ×3 incl. `reports validate --strict` exit 0
+    and zero-refs honest v1.1).
+  - **Sweep fate ledger (`rg 'handoff-v1'`, `dadaia_workspace/`):** `gates.py:195` + `runtime_files.py:210`
+    UPDATED (widened); `service.py` + `report_workflow.py` UPDATED (dynamic version + self_pull);
+    `cli/commands/reports.py:81/91` SURVIVES (W1 already v1.2-aware); `container.py:477/486` SURVIVES (schema
+    filename, unversioned); `core/models/handoff.py` SURVIVES (schema filename refs); `core/role_atom_map.py:9` +
+    `features/reports/validation.py` SURVIVES (W1 v1.2 validator, correct); `features/panel/reports_doctor.py:80`
+    SURVIVES (docstring about v1.1 artifact optionality — no behavioral token pin; grep fate only);
+    `features/lifecycle/workflow_handoffs.py` + `pipeline.py` + `workflows/{audit,research,bug_report,
+    release_definition}.py` OUT (step-payload `*-handoff-v1` family, `workflow-step-payload-v1.schema.json` —
+    different family, explicitly out of scope); `public/**` hits (schema, lint-memory-atoms.py, fragments)
+    DEFERRED to T-62-30 (W3, ai-engineer surface). No gates/runtime_files test pinned the OLD accept-set
+    (nothing rejected v1.2 pre-change) — no amendments needed; frozen v0.1.50 no-steal suite zero-diff
+    (untouched, full suite 4717 passed / 17 skipped, exit 0). Gates: ruff format --check 0; ruff check
+    --no-cache 0; mypy --strict dadaia_workspace/ 0 (313 files); lint-imports 9 kept / 0 broken.
 
 ## W3 — FR4 instruction adoption (ai-engineer, `public/**`, sequential after W2)
 
-- [ ] T-62-30 All-agent emission-instruction adoption. Owner: ai-engineer. Preconditions: T-62-20 done. Write set:
+- [x] T-62-30 All-agent emission-instruction adoption. Owner: ai-engineer. Preconditions: T-62-20 done. Write set:
   `public/agents/*.md` (9 core), `public/plugins/{frontend-design,devops}/agents/*.md` (3),
   `public/skills/dadaia-handoff-emitter/SKILL.md`, `public/data/handoff-AGENTS.md`,
   `public/lifecycle_fragments/shared/output-handoff.md`, affected prompt goldens. Checklist:
@@ -98,10 +156,45 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Prompt goldens embedding `output-handoff.md`: re-baseline as deliberate recorded amendments (diff = exactly the
     fragment edit); FRAG-COH doctor green before/after.
   - Public-privacy law holds (generic content only). Done: AC-6 both halves asserted; gates green.
+  - **Evidence (done):** 16 surfaces adopted — 12 agent bodies (9 core + 3 plugin: one-line §4 blockquote →
+    `schema handoff-v1.2, with self_pull.refs = the memory atoms this session actually self-pulled/read —
+    specs/-prefixed, context-relative; never list an atom you did not read`), emitter skill (required-fields table
+    gains `self_pull` row; `schema_version` literal → `"handoff-v1.2"`; BOTH examples gain `self_pull.refs` +
+    v1.2 token; version note carries the honest zero-refs v1.1 fallback — the ONLY sanctioned v1.1 emission),
+    `handoff-AGENTS.md` (new leading Write Rule), `output-handoff.md` (new "Self-pull proof (handoff-v1.2)" body
+    section; frontmatter + canonical fragment pins untouched — no `schema_version`/`output_schema` in body).
+  - **AC-6 negative-grep fate ledger (8 survivors, all back-compat/non-instructional):**
+    (1) `skills/dadaia-handoff-emitter/SKILL.md:93` — the honest zero-refs fallback explanation itself (the
+    sanctioned transition-posture mention); (2) `schemas/handoff-v1.schema.json:12` — the version enum
+    (historical v1/v1.1 stay valid forever); (3) `schemas/workflow-step-payload-v1.schema.json:5` — descriptive
+    note that the generic v1.1 schema is never mutated (different payload family, out of scope per W2 ledger);
+    (4) `scripts/lint-memory-atoms.py:110` — allowlisted legitimate memory-atom section-heading literal
+    ("Schema handoff-v1.1"), not an emission instruction (atom heading rename is PE/CLOSURE scope);
+    (5-8) `lifecycle_fragments/shared/{output-handoff,write-scope,memory-selection,anti-slop}.md:8`
+    `output_schema: handoff-v1.1` frontmatter — the fragment's own descriptive domain id (`FragmentSpec.n`
+    metadata), NOT an emit instruction; pinned "distinct concept, stays UNCHANGED" by
+    `test_output_handoff_fragment_canonical.py`; changing it is an L2 metadata/code change outside FR4's
+    instruction surface. No surviving "emit v1.1" instruction anywhere in `public/`.
+  - **AC-6 positive:** NEW `tests/contract/test_handoff_instruction_adoption.py` — file-enumerated 16-surface
+    roster (14 files + the skill's 2 JSON examples as 2 surfaces) + 3 roster-completeness asserts (core-agents
+    set-equality vs the 3 plugin stubs, plugin-agents set-equality, exactly-2-examples ⇒ 16): 19/19 passed.
+  - **Mutation-sanity (captured → reverted):** stripped `self_pull` from `agents/code-reviewer.md` ⇒
+    `test_surface_carries_v12_and_self_pull_instruction[agents/code-reviewer.md]` FAILED naming the surface
+    (1 failed, 18 passed); reverted, 19/19 + fragment-canonical 5/5 green.
+  - **Golden re-baseline (deliberate recorded amendment):** 6 gate goldens re-baselined via
+    `UPDATE_FRAGMENT_GOLDEN=1` — 19 embedded prompts across gate_{audit×2,backlog_definition×1,bug_report×2,
+    pipeline×4,release_definition×8,research×2}.json; machine-verified diff = EXACTLY the 10-line
+    "Self-pull proof (handoff-v1.2)" fragment insertion before `## Rules`, nothing else
+    (VERDICT: EXACT-INSERTION-ONLY). FRAG-COH doctor (`dadaia lifecycle workflow doctor`) exit 0
+    before AND after (pre-existing FRAG-COH-2 body-only warnings unchanged, 0 errors).
+  - **Gates:** ruff format --check 0; ruff check --no-cache 0; mypy --strict 0 (314 files incl. the new
+    contract test); lint-imports 9 kept / 0 broken; full pytest 4736 passed / 17 skipped, exit 0.
+    Public-privacy grep over the diff clean (generic content only). `public stage/install` deferred to W5
+    (T-62-60) per plan.
 
 ## W4 — FR5/FR6 fan-out containment + symlink refusal (∥ W5a permitted — disjoint write sets)
 
-- [ ] T-62-40 Slug containment + symlink write-through refusal. Owner: software-engineer. Preconditions: none on
+- [x] T-62-40 Slug containment + symlink write-through refusal. Owner: software-engineer. Preconditions: none on
   W1-W3 files (disjoint); may start after T-62-01. Write set: `infrastructure/workspace_guardrail.py`, NEW
   `tests/unit/infrastructure/test_consumer_fanout_containment.py`. Checklist:
   - `_consumer_repos_for_root`: lexical slug validation (single relative non-dot component; reject `/`, `\\`,
@@ -123,21 +216,40 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
     `tests/unit/infrastructure/test_public_assets.py` (consumer classes),
     `tests/unit/features/public/test_workspace_guardrail_pair.py`,
     `tests/integration/test_public_doctor_parity.py` — enumerate + confirm green. Done: gates green.
+  - **Evidence (2026-07-07):** RED capture #1 (AC-7): pre-fix, `"../evil"` landed `AGENTS.md` at `ws/evil/AGENTS.md`
+    OUTSIDE `repos/` (`test_traversal_slug_writes_nothing_outside_repos` FAILED `assert not exists()`). RED capture
+    #2 (AC-8(a)): pre-fix, `shutil.copy2` wrote THROUGH the link — banner-bearing out-of-repo target sha changed
+    `7d5eba05… → 5a67bc07…` (`test_symlinked_banner_bearing_target_survives` FAILED). Sabotage AC-10(e) (slug reject
+    dropped): 10 FAILED incl. `test_hostile_slug_rejected_at_derivation[../evil|a/b|..|\\\\host\\share]` — reverted.
+    Sabotage AC-10(f) (`is_symlink()` dropped): 3 FAILED (`symlinked_agents_target`, `banner_bearing`, `dangling`) —
+    reverted. Fate ledger: the 4 enumerated suites 204 passed, `git diff` empty (byte-identical). Gates:
+    `ruff format --check` 0, `ruff check --no-cache` 0, `mypy --strict dadaia_workspace` 0 (313 files),
+    `lint-imports` 9 kept / 0 broken, full unpiped pytest exit 0 — 4755 passed, 17 skipped. New suite: 19 passed.
 
 ## W5a — FR7 response-guard chip assertion (∥ W4 permitted — disjoint write set)
 
-- [ ] T-62-50 Require the memory chip in both e2e guards. Owner: qa-engineer. Write set:
+- [x] T-62-50 Require the memory chip in both e2e guards. Owner: qa-engineer. Write set:
   `tests/e2e/panel/response-guard.spec.ts` ONLY. Checklist:
   - Replace BOTH null-guards (L76-83, L128-131): `await page.waitForSelector('.memory-chip', { timeout: 8000 })` →
-    click → settle; delete the `if (firstChip)` branches; update the module docblock (chip REQUIRED).
+    click → settle; delete the `if (firstChip)` branches; update the module docblock (chip REQUIRED). **DONE** —
+    both guards now `waitForSelector('.memory-chip', { timeout: 8000 })` → `click('.memory-chip')` → networkidle
+    settle; both `if (firstChip)` branches deleted; docblock states the chip is REQUIRED (FR7/ADR-8, defence-in-depth
+    behind the DOM-contract unit lock). Local playwright run (self-started panel fixture, port 5163): `2 passed (9.8s)`.
   - **AC-9 sabotage replay:** rename `.memory-chip` in `features/panel/views/index.py` (v0.1.59 AC-9(e)) ⇒ unit DOM
     lock FAILS AND the local playwright run now FAILS (pre-fix: "2 passed") ⇒ revert ⇒ both green. Captured here.
+    **CAPTURED** — sabotage `class="memory-chip"` → `class="memory-chip-SABOTAGED"` (5 chip anchors, index.py:234-238):
+    (a) unit lock `test_memory_chip_present_with_populated_context` FAILED — `AssertionError: .memory-chip absent`
+    (1 failed / 25 passed); (b) local playwright `2 failed` — BOTH guards timed out at
+    `waitForSelector('.memory-chip', { timeout: 8000 })` (spec.ts:84 / :136), where the pre-fix null-guard yielded
+    "2 passed". Reverted via `git checkout -- index.py`: unit panel suite 578 passed, e2e `2 passed (8.0s)`.
   - Fate ledger: `test_index_dom_contract.py` byte-identical (primary lock SURVIVES); other panel specs untouched.
-  Done: local e2e green; GH e2e-panel job re-proves at W5 push.
+    **VERIFIED** — `git status` post-work shows only `response-guard.spec.ts` + this TASKS.md modified;
+    `tests/unit/features/panel/` 578 passed post-revert; no TS lint configured for `tests/e2e/` (none to run).
+  Done: local e2e green (`2 passed`); GH e2e-panel job re-proves at W5 push.
 
 ## W5 — gates + ship
 
-- [ ] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
+- [-] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
   security-reviewer for the push verdict). Preconditions: T-62-11/20/30/40/50 all `[x]`. Checklist:
   - AC-11: `ruff format --check`; `ruff check --no-cache`; `mypy --strict`; full **unpiped** `pytest`;
     `lint-imports --no-cache` (**8 kept / 0 broken**, ignore-cap UNCHANGED); `dadaia specs doctor` exit 0;
@@ -147,6 +259,11 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - QA ship-gate review; security push-gate handoff with `metrics.commit_sha` == pushed sha; push; **watch CI until
     every job green** (incl. e2e-panel with the FR7 assertion); PR; merge — sequenced with the sibling releases
     through PM. *(PE runs no shell — commands surfaced to PM/operator or devops-engineer.)*
+  - **AC-11 evidence (2026-07-07, PM shell):** unpiped pytest exit 0 — **4755 passed, 17 skipped** · ruff
+    format --check 0 · ruff check --no-cache 0 · mypy --strict 0 · lint-imports --no-cache **9 kept / 0
+    broken** (rebase note: v0.1.61 added the 9th contract; the SPEC's "8 kept" is pre-rebase text) · specs
+    doctor exit 0 · backlog doctor clean · frozen v0.1.50 suite zero-diff vs main · self-hosting reconcile
+    stage→install --target all→doctor exit 0 with `[ok] public-privacy` (W3 surfaces projected).
 
 ## W6 — closure (CLOSURE phase)
 

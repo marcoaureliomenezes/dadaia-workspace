@@ -14,7 +14,7 @@ import shutil
 import sys
 import tomllib
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
 from dadaia_workspace.infrastructure.public_assets_common import (
@@ -54,6 +54,32 @@ def _carries_canonical_banner(dst: Path) -> bool:
         return dst.read_text(encoding="utf-8").startswith(_CANONICAL_AGENTS_BANNER)
     except (OSError, UnicodeDecodeError):
         return False
+
+
+def _slug_is_safe(slug: str) -> bool:
+    """FR5 (v0.1.62, ADR-6) — lexical validation of a registry ``repo_slug``.
+
+    A safe slug is a SINGLE, RELATIVE, NON-DOT path component. Rejected forms:
+    separators (``/`` or ``\\``), ``.`` / ``..``, absolute paths including
+    Windows drive (``C:...``) and UNC (``\\\\host\\...``) forms. Both
+    :class:`PurePosixPath` and :class:`PureWindowsPath` semantics are checked so
+    the validation is platform-independent (a Windows-hostile slug is rejected
+    on POSIX too, and vice versa). Purely lexical — never touches the filesystem.
+    """
+    if not slug or slug in {".", ".."}:
+        return False
+    if "/" in slug or "\\" in slug:
+        return False
+    if Path(slug).is_absolute() or PureWindowsPath(slug).is_absolute():
+        return False
+    if len(PurePosixPath(slug).parts) != 1 or len(PureWindowsPath(slug).parts) != 1:
+        return False
+    return not PureWindowsPath(slug).drive
+
+
+def _reject_slug(slug: str) -> None:
+    """FR5 non-silent rejection (A3 never-silent law): one stderr line, then skip."""
+    sys.stderr.write(f"[reject] repo_slug '{slug}' (unsafe path component) — skipped\n")
 
 
 def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
@@ -98,6 +124,11 @@ def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
         if not isinstance(slug, str) or not slug or slug in seen:
             continue
         seen.add(slug)
+        if not _slug_is_safe(slug):
+            # FR5: lexical containment — a hostile slug never reaches the join.
+            # Non-silent (distinct from the silent skip of absent dirs); fail-open.
+            _reject_slug(slug)
+            continue
         candidate = repos_dir / slug
         if candidate.is_dir():
             result.append(candidate)
@@ -262,6 +293,11 @@ def _install_guardrail_pair(
         foreign (hand-authored) and left untouched.
         """
         dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.is_symlink():
+            # FR6 (ADR-7): NEVER write through a destination-file symlink — checked
+            # BEFORE exists() so a DANGLING link is refused too (never "absent → create").
+            installed.append(f"[foreign] {dst} — left untouched (symlink)")
+            return False
         if not dst.exists():
             # Case 3 (absent): create — an empty slot has nothing to clobber.
             shutil.copy2(source, dst)
@@ -290,6 +326,10 @@ def _install_guardrail_pair(
         foreign, no CLAUDE.md is dropped (the orphan-drop the bug flags). A foreign
         (non-stub) existing CLAUDE.md is always left untouched.
         """
+        if dst.is_symlink():
+            # FR6 (ADR-7): a symlinked CLAUDE.md (incl. dangling) is never written through.
+            installed.append(f"[foreign] {dst} — left untouched (symlink)")
+            return
         if sibling_written:
             dst.parent.mkdir(parents=True, exist_ok=True)
             if not dst.exists():
@@ -327,7 +367,14 @@ def _install_guardrail_pair(
         _write_pair(workspace_root, is_consumer=False)
 
     if "repos" in targets:
+        repos_dir = workspace_root / "repos"
         for consumer in _consumer_repos_for_root(workspace_root):
+            if consumer.parent != repos_dir:
+                # FR5 (ADR-6) belt-and-braces: write-time containment assert — the
+                # lexical join must stay directly inside repos/. Skip, never write,
+                # never raise (trivially true post-validation).
+                _reject_slug(consumer.name)
+                continue
             if _is_self_repo(consumer):
                 v = _package_version()
                 sys.stderr.write(
@@ -398,7 +445,12 @@ def _doctor_consumer_pair_lines(
         slug = consumer.name
         agents_dst = consumer / "AGENTS.md"
         a_label = f"repos/{slug}:AGENTS.md"
-        if not agents_dst.exists():
+        if agents_dst.is_symlink():
+            # FR6: symlink-aware doctor — a symlinked pair FILE is [foreign] (never
+            # [ok]/[drift]/[missing]) so doctor exits 0 and never prescribes an
+            # install that would be refused. Symlinked consumer DIRS remain legit.
+            agents_line = f"[foreign] {a_label}"
+        elif not agents_dst.exists():
             agents_line = f"[missing] {a_label}"
         elif not _carries_canonical_banner(agents_dst):
             agents_line = f"[foreign] {a_label}"
@@ -410,7 +462,7 @@ def _doctor_consumer_pair_lines(
 
         claude_dst = consumer / "CLAUDE.md"
         c_label = f"repos/{slug}:CLAUDE.md"
-        if agents_line.startswith("[foreign]"):
+        if agents_line.startswith("[foreign]") or claude_dst.is_symlink():
             claude_line = f"[foreign] {c_label}"
         elif not claude_dst.exists():
             claude_line = f"[missing] {c_label}"

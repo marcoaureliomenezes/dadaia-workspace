@@ -42,6 +42,16 @@ Review and gate steps additionally carry:
 When the step produced a written artifact (SPEC, PLAN, report) the result names its
 path and a content hash so the gate can confirm the file exists and matches.
 
+## Self-pull proof (handoff-v1.2)
+
+The workflow persists your step's result as a `handoff-v1.2` document whose
+`self_pull.refs` records the memory atoms actually self-pulled/read during the step,
+in `specs/`-prefixed context-relative form (e.g. `specs/memory/architecture.md`).
+When you read memory atoms beyond the injected context, include a `self_pull` object
+with those `refs` in your result. Never list an atom that was not read — with zero
+atoms read the emitter falls back to the honest legacy version token rather than
+fabricating proof.
+
 ## Rules
 
 - The verdict is a judgment from evidence, never a courtesy. If acceptance is not
