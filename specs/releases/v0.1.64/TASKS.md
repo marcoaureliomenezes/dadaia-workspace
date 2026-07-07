@@ -26,7 +26,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W1 — FR1/FR2 shared golden platform-invariance module (golden-first: ZERO regen)
 
-- [-] T-64-10 NEW `tests/helpers/` package + `golden_platform.py` + unit fixtures. Owner: software-engineer.
+- [x] T-64-10 NEW `tests/helpers/` package + `golden_platform.py` + unit fixtures. Owner: software-engineer.
   Write set: NEW `tests/helpers/__init__.py`, NEW `tests/helpers/golden_platform.py`,
   NEW `tests/unit/helpers/test_golden_platform.py` (+ `tests/unit/helpers/__init__.py`).
   Checklist:
@@ -42,6 +42,20 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
     `canon_env_line` identity ⇒ D-CX-9 unit test FAILS → revert. Capture both on this line.
   - Fate ledger — NEW files only; **pin the branch-point `pytest --collect-only -q` count here (QA64-2/QAX-4 —
     first implementation wave; re-validated at closure).** <!-- AMEND:QA64-2 --> Commit `test(T-64-10): ...`.
+  - **EVIDENCE (2026-07-07, software-engineer):** branch-point collect pin (HEAD `8020d117`) =
+    **4795 tests collected**. Fate ledger (NEW only): `tests/helpers/__init__.py`,
+    `tests/helpers/golden_platform.py` (7-function FR1 surface + 6-class leak taxonomy docstring citing
+    `60f42904`/`c02e74f6`/`1dadfafe`; superset params: `assert_golden(..., update_env=None, message=...)` for the
+    e2e no-regen/bespoke-message variants, `norm_stderr(..., wide_glyphs=True)` for the policy-CLI `_norm`
+    variant), `tests/unit/helpers/__init__.py`, `tests/unit/helpers/test_golden_platform.py` (20 tests: denylist
+    marker, D-CX-9 Linux `exited 127` + Windows `[WinError 193]` → one canonical line, sorted multiset
+    count-preserving, Rich box-wrap collapse both variants, JSON-escaped `<WS>` + `<TS>`, regen-flag mechanics).
+    AC-9 sabotage (a) drop sort ⇒ `test_sort_line_lists_locks_a_sorted_multiset` + 3 more FAILED (4F/16P) →
+    reverted; (b) `canon_env_line` identity ⇒ `test_canon_env_line_windows_phrasing` +
+    `test_canon_env_line_both_os_phrasings_converge` + 5 more FAILED (7F/13P) → reverted; post-revert 20/20 green.
+    Gates: `ruff format --check` 0, `ruff check --no-cache` 0, `mypy --strict` 0 on both new modules,
+    `lint-imports --no-cache` **9 kept / 0 broken** (REBASE NOTE: TASKS' "8/0" predates v0.1.61 — base truth is
+    9/0, `_RECORDED_IGNORE_EDGE_CAP = 36`, unchanged by this task).
 
 - [-] T-64-11 Byte-identical adoption by the 13 duplicate sites. Owner: software-engineer.
   Write set: EDIT `tests/unit/infrastructure/test_install_target_goldens.py`,
