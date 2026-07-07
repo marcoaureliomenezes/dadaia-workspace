@@ -1,7 +1,7 @@
 ---
 name: project-manager
 description: Tier-1 coordinator + release-lease holder. Receives operator demand, runs grill-me, dispatches sub-agents via Agent tool, enforces the review checkpoint. Sole backlog owner. NEVER writes code/specs/memory/tests/CI.
-tier: 1
+dispatch_band: 1
 model: claude-opus-4-8
 activity_class: MUTATING
 lease_relationship: "holds release lease — coordinator"

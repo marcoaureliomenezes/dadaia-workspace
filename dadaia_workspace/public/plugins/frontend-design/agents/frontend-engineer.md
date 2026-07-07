@@ -1,7 +1,7 @@
 ---
 name: frontend-engineer
 description: Browser frontend implementer (HTML/CSS/JS/TS/React and other component frameworks). Implements the design-specialist's visual direction into real browser source. PM sub-agent. Runs on the plugin (sonnet) tier. No production backend code, no specs, no AI-entity surface, no CI YAML, no E2E ownership.
-tier: 3
+dispatch_band: 3
 model: claude-sonnet-4-6
 activity_class: MUTATING
 lease_relationship: "PM sub-agent — no independent acquire"

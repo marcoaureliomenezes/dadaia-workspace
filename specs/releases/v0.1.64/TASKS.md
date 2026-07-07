@@ -165,7 +165,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W3 — FR5 `tier:` → `dispatch_band:` rename (strictly AFTER W1)
 
-- [ ] T-64-30 Rename the frontmatter key in the 12 agent bodies. Owner: ai-engineer.
+- [x] T-64-30 Rename the frontmatter key in the 12 agent bodies. Owner: ai-engineer.
   Write set: EDIT `dadaia_workspace/public/agents/{project-manager,product-engineer,project-auditor,ai-engineer,
   software-engineer,qa-engineer,software-architect,security-reviewer,code-reviewer}.md`,
   `dadaia_workspace/public/plugins/frontend-design/agents/{frontend-engineer,design-specialist}.md`,
@@ -176,6 +176,16 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   grep AND verify v0.1.62's AC-6 adoption grep (handoff-v1.2/self_pull instruction present in all 12 bodies)
   stays satisfied.** <!-- AMEND:ARCHX-1 --> Done: `grep -rn "^tier:"` over both agent dirs = zero (AC-6 half)
   + the v0.1.62 AC-6 re-verification recorded. Fate ledger — 12 EDITs enumerated. Commit `feat(T-64-30): ...`.
+  - Evidence (2026-07-07): 12 EDITs (fate ledger, `dispatch_band:` values unchanged) — project-manager 1,
+    project-auditor 1, product-engineer 2, ai-engineer 3, software-engineer 3, qa-engineer 3,
+    software-architect 3, security-reviewer 3, code-reviewer 3, frontend-engineer 3, design-specialist 3,
+    devops-engineer 3. The 3 `plugin: true` stubs under `public/agents/` verified tier-less (untouched).
+    `grep -rn "^tier:"` over both agent dirs = ZERO; `grep -rn "^dispatch_band:"` = exactly 12. Ruling 64-A
+    re-verifications: (a) v61 AC-1 — `git diff -U0` shows ONLY the tier→dispatch_band line per file; all
+    `model:`/`effort:` values untouched (opus×4, fable-5×5 w/ effort high/high/medium/low/low, sonnet×3);
+    (b) v62 AC-6 — `handoff-v1.2` grep 12/12 AND `self_pull` grep 12/12 post-rename. RED-first window
+    recorded for T-64-31: `tests/contract/test_agent_tier_taxonomy.py` = 2 failed / 2 passed (contract
+    still reads `tier`; core + plugin band asserts get None) — expected RED, fix owned by T-64-31.
 
 - [ ] T-64-31 Parser/model/renderer/tests rename (tolerate-then-strip) + deliberate golden regens. Owner:
   software-engineer. Write set: EDIT `dadaia_workspace/features/agents/reader.py`,

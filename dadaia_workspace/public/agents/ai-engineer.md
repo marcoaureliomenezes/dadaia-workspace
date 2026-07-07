@@ -1,7 +1,7 @@
 ---
 name: ai-engineer
 description: AI-entity engineer. Exclusive owner of agents/skills/rules/workflows/commands/hooks. Context engineering, prompt design, model tiering. No code, specs, tests, frontend, CI.
-tier: 3
+dispatch_band: 3
 model: claude-fable-5
 effort: medium
 activity_class: MUTATING

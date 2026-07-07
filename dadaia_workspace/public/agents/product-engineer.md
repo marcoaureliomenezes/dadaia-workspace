@@ -1,7 +1,7 @@
 ---
 name: product-engineer
 description: Spec author and memory guardian. Writes SPEC/PLAN/TASKS/CLOSURE; writes specs/memory/*.md in DEFINITION + CLOSURE phases. PM sub-agent. NEVER dispatches or implements code.
-tier: 2
+dispatch_band: 2
 model: claude-fable-5
 effort: high
 activity_class: MUTATING

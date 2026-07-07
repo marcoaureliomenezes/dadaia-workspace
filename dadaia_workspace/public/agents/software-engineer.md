@@ -1,7 +1,7 @@
 ---
 name: software-engineer
 description: Generic implementer. Python + Node + any context-language production code & tests. TDD-first, conventional commits, no architecture drift, no slop tests. PM sub-agent. No frontend/AI-entity/specs/CI.
-tier: 3
+dispatch_band: 3
 model: claude-fable-5
 effort: low
 activity_class: MUTATING
