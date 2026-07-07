@@ -12,11 +12,11 @@ tags:
 - import
 - backup
 token_estimate: 400
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
-CLI surface: `dadaia export [--output DIR] [--include-reports] [--exclude-mnt]` and `dadaia import <archive> [--workspace DEST] [--skip-activate]` · Closure: sdd-release-lifecycle-v1
+CLI surface: `dadaia export [--output DIR] [--include-reports] [--exclude-mnt] [--list]` and `dadaia import <archive> [--workspace DEST] [--skip-mnt] [--skip-activate] [--dry-run]` · Closure: sdd-release-lifecycle-v1
 
 ## Purpose
 

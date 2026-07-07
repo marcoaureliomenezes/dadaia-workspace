@@ -1,0 +1,9 @@
+# Workspace heading allowlist (lint-memory-atoms.py — merged as a union with the
+# curated groups; one exact heading per line; `#` comments ignored).
+# MEMORY-class file: edited by product-engineer in DEFINITION/CLOSURE phase only.
+# Entries below allowlist legitimate, stable current-canon headings flagged by
+# LINT-1 at the 2026-07-06 audit (dispositioned v0.1.61).
+Model assignments (9 core agents + 3 plugin agents)
+Harness profiles
+Prompt-assembly canon (v0.1.57)
+Public surface counts (v0.2.1)

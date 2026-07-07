@@ -10,6 +10,7 @@ if TYPE_CHECKING:
         WorkflowModelPolicyOverlay,
         WorkflowPolicySnapshot,
     )
+    from dadaia_workspace.core.protocols.plugin_store import PluginStore
     from dadaia_workspace.core.protocols.workflow_model_policy_store import (
         WorkflowModelPolicyStorePort,
     )
@@ -781,6 +782,20 @@ def build_local_model_profile_store(
 
     _guard_initialized(workspace_root)
     return JsonLocalModelProfileStore(workspace_root)
+
+
+def build_plugin_store() -> "PluginStore":
+    """Compose the installed-plugins ledger store (T-61-20 / FR4 — A-1 wired).
+
+    Returns the store typed as the :class:`PluginStore` port: consumers (the ``dadaia
+    plugin`` CLI and ``infrastructure/public_assets``) depend on the Protocol in ``core``,
+    never on the ``JsonPluginStore`` adapter directly. The store is path-parametric —
+    ``read``/``write`` take the target ``states_dir`` per call — so composition needs no
+    workspace root.
+    """
+    from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
+
+    return JsonPluginStore()
 
 
 def load_operator_model_profiles(workspace_root: Path) -> None:

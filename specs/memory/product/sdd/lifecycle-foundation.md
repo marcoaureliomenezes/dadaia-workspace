@@ -42,9 +42,9 @@ tags:
 - multi-harness
 - hygiene
 - gates
-token_estimate: 5650
-last_updated: '2026-07-04'
-release_origin: v0.1.57
+token_estimate: 7120
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. **`--step-model <profile-id>` is the sole model-selection surface: the legacy `--model <id>:<effort>` flag and its `_warn_model_deprecated` seam were hard-removed from all 12 run verbs in v0.1.57 (deprecation-expiry — `--model` is now an unknown option, `No such option: --model`, exit 2). The pi/codex subprocess `--model <id>` arg (`pi_runtime.py`) is a different, unchanged flag.**
@@ -434,8 +434,9 @@ review steps self-verdict (APPROVED/REJECTED + evidence); create steps emit an a
 `artifact_refs` and are NOT told to self-verdict — and is reconciled across **all three** prompt
 surfaces: `build_fragment_suffix` (an `is_review`-aware keyword-only, no-default parameter so a
 forgotten flag is a call error, threaded at all six suffix call sites),
-`pipeline._generic_prompt`, and the CLI's `_run_phase_step` (all routed through one shared
-`is_review_phase` helper so a future surface inherits the correct branch). The single
+`pipeline._generic_prompt` (which branches directly on the step's `is_review` field),
+and the CLI's `_run_phase_step` (which routes through the shared
+`phase_workflow.is_review_phase` helper). The single
 `shared.output_handoff` fragment documents the canonical field `schema`.
 
 Result extraction is **single-sourced** in `headless_adapter_base` (`SubprocessAdapterMixin`):

@@ -2,13 +2,15 @@
 
 The Layer-1 entry surface for the in-package plugin packs (``frontend-design``, ``devops``).
 ``install`` validates a pack against the packaged descriptors, records it in the
-``.dadaia/states/installed_plugins.json`` ledger via the ``JsonPluginStore`` adapter, and
+``.dadaia/states/installed_plugins.json`` ledger via the ``PluginStore`` port, and
 calls the :func:`_project_pack` seam. In **W1** projection is a documented no-op — the real
 profile-scoped projection + precedence lands in W2 (T-60-20, ``infrastructure/public_assets.py``).
 
 Ports-and-adapters (v0.1.58 precedent): the pure ``PluginPack``/``InstalledPlugins`` core
 models + the ``PluginStore`` port + the ``JsonPluginStore`` JSON adapter keep all I/O out of
-``core``. This CLI is the only place the packaged descriptors are read from disk.
+``core``. This CLI consumes the store via ``container.build_plugin_store()`` (the composition
+root — T-61-20 / FR4) and never constructs the adapter directly. This CLI is the only place
+the packaged descriptors are read from disk.
 """
 
 from __future__ import annotations
@@ -20,10 +22,10 @@ import typer
 from rich.console import Console
 
 import dadaia_workspace
+from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins, PluginPack
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 app = typer.Typer(help="Install and inspect distributed plugin packs.")
@@ -77,8 +79,11 @@ def _states_dir() -> Path:
 
 
 def _read_ledger(states_dir: Path) -> InstalledPlugins:
-    """Read the installed-plugins ledger, defaulting to the empty ledger when absent."""
-    return JsonPluginStore().read(states_dir) or InstalledPlugins.empty()
+    """Read the installed-plugins ledger, defaulting to the empty ledger when absent.
+
+    Consumes the ``PluginStore`` port via the composition root (T-61-20 / FR4).
+    """
+    return container.build_plugin_store().read(states_dir) or InstalledPlugins.empty()
 
 
 def _project_pack(workspace_root: Path, pack: PluginPack, force: bool) -> list[str]:
@@ -86,9 +91,11 @@ def _project_pack(workspace_root: Path, pack: PluginPack, force: bool) -> list[s
 
     Delegates to ``FileSystemPublicAssetManager.install_plugin`` (W2, T-60-20): it records
     the pack in ``installed_plugins.json`` (idempotent) and projects it profile-scoped, with
-    the pack body overwriting the core stub (stub replacement + projection precedence).
+    the pack body overwriting the core stub (stub replacement + projection precedence). The
+    manager's ledger store is injected via ``container.build_plugin_store()`` (T-61-20 / FR4).
     """
-    return FileSystemPublicAssetManager().install_plugin(workspace_root, pack.name, force=force)
+    manager = FileSystemPublicAssetManager(plugin_store=container.build_plugin_store())
+    return manager.install_plugin(workspace_root, pack.name, force=force)
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +179,7 @@ def doctor() -> None:
                 markup=False,
             )
 
-    for line in FileSystemPublicAssetManager().doctor_plugins(workspace_root):
+    manager = FileSystemPublicAssetManager(plugin_store=container.build_plugin_store())
+    for line in manager.doctor_plugins(workspace_root):
         style = "green" if line.startswith("[ok]") else "yellow"
         console.print(line, style=style, markup=False)

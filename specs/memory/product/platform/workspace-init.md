@@ -7,16 +7,16 @@ summary: entry point; creates .dadaia/, .venv, Python governance hooks and an id
   structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and
   persists the selection to harness_profile.json (absent ⇒ all-four back-compat);
   PreToolUse registered as ONE Python command (python -m
-  dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a
-  non-installed fallback.
+  dadaia_workspace.hooks.pre_gate), not bash; no legacy ctx-inject.sh is shipped
+  or installed.
 tags:
 - workspace
 - init
 - setup
 - idempotent
 token_estimate: 930
-last_updated: '2026-07-04'
-release_origin: v0.1.58
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 CLI surface: `dadaia init [--workspace PATH] [--skip-assets] [--harness <set>]` · Closure: sdd-release-lifecycle-v1
@@ -27,7 +27,7 @@ The product's entry point. Bootstraps a new workspace by creating the idempotent
 
 The governance hooks are the Python package `dadaia_workspace/hooks/` (8 modules: `__init__`, `_common`, `pre_gate`, `sdd_gate`, `root_whitelist`, `venv_guard`, `ctx_inject`, `sdd_post_gate`), working on Windows, macOS and Linux without Git Bash or WSL. Per-runtime registration via `infrastructure/runtime_config.py`: on Claude, `python -m dadaia_workspace.hooks.<name>` commands; on Codex, executable wrappers at `.dadaia/hooks/codex-*` referenced in `.codex/hooks.json` — wrapper and matcher registration mechanics are owned by [[public-asset-distribution]]. The PreToolUse is ONE single command (`pre_gate`: root-whitelist → venv-guard → SDD gate, first-block-wins). The git chokepoints (pre-commit lease gate + pre-push CI/security gate) are installed separately by `dadaia ci install-hook`.
 
-`workspace/service.py` recognizes both the old path (`.sh`) and the new Python command to avoid double registration in migrated workspaces. The bash script `ctx-inject.sh` exists in `.dadaia/scripts/` as a legacy artifact, but is no longer the registered hook mechanism.
+`workspace/service.py` recognizes both the old `.sh` registration form and the new Python command purely to avoid double registration in migrated workspaces — no `ctx-inject.sh` script is shipped or installed by init (the only shell assets in the product are the two git chokepoint scripts).
 
 It is the only feature that can run in a zero workspace — without it, no other feature has anywhere to write state.
 
@@ -60,7 +60,6 @@ Makes the workspace reproducible from the first command — agents and the opera
   * `.dadaia/states/harness_profile.json` — the persisted `dadaia init --harness <set>` selection (`{"schema_version":"1","harnesses":[...]}`); absent ⇒ all-four; consumed by profile-aware `public install`/`doctor`
   * `.dadaia/academy/academy.json` — courses list (empty)
   * `.dadaia/src/repos.xlsx` — static catalog of known repos
-  * `.dadaia/scripts/ctx-inject.sh` — legacy bash script (still present; no longer the registered hook)
   * `.venv/` — Python virtualenv (executor path resolved by `PLATFORM.venv_scripts_dir`/`PLATFORM.venv_exe_suffix`)
   * `.claude/settings.json` — hook entries registered with Python commands (`ctx_inject`, single `pre_gate`, `sdd_post_gate`); per-runtime matchers: [[sdd-gate-v3]] enforcement matrix
   * `.codex/hooks.json` — same entries in Codex format via the `.dadaia/hooks/codex-*` wrappers (wrapper/matcher mechanics: [[public-asset-distribution]])

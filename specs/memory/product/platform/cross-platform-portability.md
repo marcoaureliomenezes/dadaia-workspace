@@ -20,8 +20,8 @@ tags:
 - hooks
 - security
 token_estimate: 1750
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -81,7 +81,7 @@ The `PLATFORM` singleton is accessed via `from dadaia_workspace.core.platform im
 ## Resilience contract — 3 tiers
 
 **TIER 1 — FAIL LOUD (security controls; silent no-op forbidden):**
-- `WindowsFilePermissionSetter.restrict_to_owner()` — applies the ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` BEFORE creating the protected file. `icacls` with `shell=False`. Username via `getpass.getuser()`. Failure → `PlatformSecurityError` (never warn-and-continue). (The original consumer — the panel auth token — was removed with the panel's no-auth model; the `panel.token` residue in telemetry is tracked in the `hygiene-and-dead-code-cleanup` backlog.)
+- `WindowsFilePermissionSetter.restrict_to_owner()` — applies the ACL via `icacls <parent_dir> /inheritance:r /grant:r "<user>:(OI)(CI)F"` BEFORE creating the protected file. `icacls` with `shell=False`. Username via `getpass.getuser()`. Failure → `PlatformSecurityError` (never warn-and-continue). (The original consumer — the panel auth token — was removed with the panel's no-auth model; no `panel.token` residue remains in `features/telemetry/` — that tracked cleanup completed.)
 - `WindowsFileLock.acquire()` — uses `msvcrt.locking` (stdlib). If `msvcrt` is absent → `PlatformCapabilityError`. Silent no-op is forbidden (it creates false confidence of serialization).
 
 **TIER 2 — DEGRADE WITH INFO LOG (non-security features):**
@@ -89,7 +89,7 @@ The `PLATFORM` singleton is accessed via `from dadaia_workspace.core.platform im
 - `signal.SIGTERM` on Windows → registers SIGINT only + INFO log.
 - `WindowsTelemetryRefreshLock` → always-acquire no-op + INFO log. Safe because SQLite WAL mode provides its own write serialization. If WAL is ever disabled, this adapter must be revisited.
 - `WindowsFilePermissionSetter` on telemetry/lease dirs → Tier 2 (INFO log + continue).
-- `os.chmod(db_path, 0o600)` in `features/telemetry/service.py` (1 site) — no `PLATFORM.has_posix_chmod` guard; silent no-op on Windows. Tier-2 acceptable (the telemetry DB is not a security credential). Guard is a low-priority follow-up.
+- `os.chmod(db_path, 0o600)` in `features/telemetry/service.py` — hardened: permission restriction runs through the injected `FilePermissionSetter` with a `PLATFORM.has_posix_chmod`-guarded direct-chmod fallback (the direct call fires only where POSIX chmod takes effect; Tier-2 INFO posture on Windows). The follow-up guard landed.
 - `script.chmod(0o755)` in `infrastructure/public_assets.py` (1 site) — executability bit; no guard; silent no-op on Windows. Tier-2 acceptable. Guard is a low-priority follow-up.
 
 **TIER 3 — UNSUPPORTED PLATFORM at construction.** Where no degradation exists, `PlatformCapabilityError` / `PlatformSecurityError` is raised in `container.py` at service construction, not at call time.
@@ -117,9 +117,9 @@ The `PLATFORM` singleton is accessed via `from dadaia_workspace.core.platform im
 PreToolUse wiring: the harness registers **a single** entrypoint, the MERGED `pre_gate`
 (`python -m dadaia_workspace.hooks.pre_gate`), which runs the stages root-whitelist →
 venv-guard → SDD gate in sequence, first-block-wins. `sdd_gate.py` and `root_whitelist.py`
-remain POLICY modules exposing `evaluate_payload()`, consumed by `pre_gate`
-(the legacy standalone `main()`s still exist; removal tracked in the
-`hygiene-and-dead-code-cleanup` backlog). `ctx_inject` and `sdd_post_gate` have their own entrypoints
+are import-only POLICY modules exposing `evaluate_payload()`, consumed by `pre_gate` —
+their legacy standalone `main()`s were removed; `pre_gate` is the sole PreToolUse
+entrypoint. `ctx_inject` and `sdd_post_gate` have their own entrypoints
 (`if __name__ == '__main__': sys.exit(main())`).
 
 Parity invariants (parity contract with the previous bash hooks):
@@ -152,8 +152,10 @@ now required checks in branch-protection (6 contexts added via API).
 The PyPI classifier was widened from `POSIX :: Linux` to
 `POSIX :: Linux + MacOS + Microsoft :: Windows` (no longer the provisional "OS Independent").
 
-**Jobs with 3-OS coverage (Linux/macOS/Windows):** `importability-smoke`, `unit-fast`,
-`contract-coverage` — all hard-gated. Any failure on Windows or macOS blocks the merge.
+**Cross-OS jobs (hard-gated):** `importability-smoke` (Windows/macOS matrix: import +
+`dadaia --help`) plus the dedicated cross legs `unit-fast-cross` and
+`contract-coverage-cross` (the Windows/macOS matrix of the Linux `unit-fast` /
+`contract-coverage` jobs). Any failure on Windows or macOS blocks the merge.
 
 **Linux-only by design (never add Win/macOS):** `integration`, `e2e-python`, `e2e-panel`.
 They depend on `/proc` and `ss` — documented in the `scan.py` docstring.
@@ -162,8 +164,9 @@ They depend on `/proc` and `ss` — documented in the `scan.py` docstring.
 
 - `dadaia_workspace/core/platform.py` — `PLATFORM` singleton instantiated at module load
 - `dadaia_workspace/hooks/` — Python package; executed as a subprocess by the harness
-- `.dadaia/scripts/*.sh` — legacy bash scripts; still present but no longer the registered hooks
-  (except `pre-push-ci-gate.sh`, which remains active)
+- `.dadaia/scripts/` — the only shell assets shipped are the two git chokepoints
+  (`pre-commit-lease-gate.sh`, `pre-push-ci-gate.sh`, installed by `dadaia ci
+  install-hook`); no legacy governance `.sh` hooks are shipped or installed
 - `.claude/settings.json` + `.codex/hooks.json` — hook entries with the Python command
 
 ## Dependencies

@@ -13,9 +13,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 525
-last_updated: '2026-07-04'
-release_origin: v0.1.58
+token_estimate: 575
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -38,9 +38,12 @@ unless the operator overrides to `codex`.
    deliberate privilege grant, lib-originated and manifest-tracked, never hand-edited.
 3. As a Layer-2 worker: the engine invokes `pi --mode json --model <id>` with the
    fragment+persona step prompt; auth comes from `~/.pi/agent/auth.json` under the
-   operator's **Codex subscription** (provider openai-codex) — NOT an Anthropic key.
-   Result extraction is the shared strict-schema-first path (tolerates bare unfenced
-   JSON).
+   operator's **Codex subscription** (provider openai-codex) — PI itself requires no
+   Anthropic key. Qualification: the PI worker env allowlist **deliberately passes
+   `ANTHROPIC_API_KEY` through when present** (`infrastructure/pi_runtime.py`, via the
+   shared `headless_adapter_base` env filter) so provider-flexible setups work; it is
+   pass-through, not a requirement. Result extraction is the shared
+   strict-schema-first path (tolerates bare unfenced JSON).
 4. Telemetry: `features/telemetry/reader/pi.py` ingests session METADATA only from
    `~/.pi/agent/sessions/` (invariant T1 — no message bodies; cost unknown ⇒ never
    fabricated).

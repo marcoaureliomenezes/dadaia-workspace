@@ -14,6 +14,7 @@ from typing import Literal
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
+from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -120,8 +121,13 @@ _OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift 
 
 
 class FileSystemPublicAssetManager:
-    def __init__(self) -> None:
+    def __init__(self, plugin_store: PluginStore = JsonPluginStore()) -> None:
+        # Injectable installed-plugins ledger seam (T-61-20 / FR4). The same-layer
+        # ``JsonPluginStore()`` default is legal (infrastructure consuming
+        # infrastructure); the composition root (``container.build_plugin_store``)
+        # injects the port for CLI consumers.
         self._public_dir = Path(__file__).parent.parent / "public"
+        self._plugin_store = plugin_store
 
     # ------------------------------------------------------------------
     # Thin delegators (T-017-11) — preserve the historical method surface
@@ -235,7 +241,7 @@ class FileSystemPublicAssetManager:
         install/doctor surface is byte-identical to golden (b).
         """
         states_dir = workspace_root / ".dadaia" / "states"
-        ledger = JsonPluginStore().read(states_dir)
+        ledger = self._plugin_store.read(states_dir)
         return ledger.plugins if ledger is not None else ()
 
     def _plugin_agent_stems(self, agentic_dir: Path, packs: tuple[str, ...]) -> set[str]:
@@ -330,8 +336,8 @@ class FileSystemPublicAssetManager:
     ) -> list[str]:
         """Enable a plugin pack: record the ledger and project it (profile-scoped).
 
-        Records *pack_name* in ``installed_plugins.json`` via the ``JsonPluginStore`` adapter
-        (idempotent — a re-install adds nothing) and projects the installed packs from the
+        Records *pack_name* in ``installed_plugins.json`` via the injected ``PluginStore``
+        port (idempotent — a re-install adds nothing) and projects the installed packs from the
         already-staged ``.dadaia/agentic/plugins/`` tree into the profile-scoped runtime
         projections. Re-install is a no-op (hash-compare ``[skip]`` on every file). Staging is
         the caller's responsibility (``dadaia init`` / ``public install`` always stage first);
@@ -341,7 +347,7 @@ class FileSystemPublicAssetManager:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         installed: list[str] = []
         states_dir = workspace_root / ".dadaia" / "states"
-        store = JsonPluginStore()
+        store = self._plugin_store
         ledger = store.read(states_dir) or InstalledPlugins.empty()
         store.write(states_dir, ledger.with_added(pack_name))
         profile = self._profile_harnesses(workspace_root)

@@ -74,7 +74,6 @@ def _valid_frontmatter(
         "tldr": "A short description under 160 characters.",
         "summary": "One to two sentence summary.",
         "tags": ["test", "unit"],
-        "agent_tier": "self-pull",
         # token_estimate=0 skips drift warning (actual == 0 guard in lint_atom)
         "token_estimate": 0,
         "last_updated": "2026-06-01",
@@ -124,6 +123,25 @@ def _load_schema_real() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Schema contract pin: agent_tier dropped (v0.1.61 D-1; deprecated v0.1.53)
+# ---------------------------------------------------------------------------
+
+
+def test_agent_tier_property_absent_from_schema() -> None:
+    """The expired ``agent_tier`` property must stay out of the schema.
+
+    Deprecated in v0.1.53 (zero runtime consumers) and dropped in v0.1.61
+    (D-1; zero carriers among all memory atoms). With
+    ``additionalProperties: false`` its absence means any atom carrying
+    ``agent_tier`` is a hard validation error — this pin prevents silent
+    re-introduction.
+    """
+    schema = _load_schema_real()
+    assert "agent_tier" not in schema["properties"]
+    assert "agent_tier" not in schema.get("required", [])
+
+
+# ---------------------------------------------------------------------------
 # Test: valid atom passes
 # ---------------------------------------------------------------------------
 
@@ -164,7 +182,6 @@ def test_missing_required_field_errors(tmp_path: Path) -> None:
         "tldr: Short description.\n"
         "summary: Two sentence summary.\n"
         "tags:\n  - foo\n"
-        "agent_tier: self-pull\n"
         "token_estimate: 50\n"
         "last_updated: '2026-06-01'\n"
         "release_origin: memory-markdown-source-v1\n"

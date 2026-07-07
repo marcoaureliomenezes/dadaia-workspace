@@ -25,11 +25,11 @@ tags:
 - enforcement
 - chokepoints
 token_estimate: 3425
-last_updated: '2026-07-03'
-release_origin: v0.1.53
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
-Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, single entrypoint) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + advisory reconciler) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (installed via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). The `sdd_gate` and `root_whitelist` modules are thin policy modules consumed by `pre_gate` (`evaluate_payload()`); their legacy `main()`s are kept for one release.
+Assets: `python -m dadaia_workspace.hooks.pre_gate` (PreToolUse, single entrypoint) · `python -m dadaia_workspace.hooks.sdd_post_gate` (PostToolUse, heartbeat + advisory reconciler) · `python -m dadaia_workspace.hooks.ctx_inject` · git hooks `pre-commit-lease-gate.sh` + `pre-push-ci-gate.sh` (installed via `dadaia ci install-hook`; backends `dadaia ci pre-commit-check` / `dadaia ci push-gate-check`). The `sdd_gate` and `root_whitelist` modules are import-only thin policy modules consumed by `pre_gate` (`evaluate_payload()`); their legacy standalone `main()`s were removed — `pre_gate` is the sole PreToolUse entrypoint.
 
 ## Purpose
 
@@ -148,7 +148,7 @@ the exit code; no payload, paths, or session ids).
 
 For lease-taking MUTATING writes, the gate calls `lease.acquire(ctx, session_id,
 release, mode, pid_probe)` (in-process; the `OsProcessProbe` pid-probe is injected by
-the hook — `features/lease.py` never imports the adapter). Acquire uses an O_EXCL
+the hook — `features/spec_context/lease.py` never imports the adapter). Acquire uses an O_EXCL
 sentinel file (the only path — no read-then-write TOCTOU); `renew_heartbeat` runs
 inside the same CAS. The record carries `pid` — that of the **long-lived harness
 process**, resolved by `sdd_gate._resolve_holder_pid` (`harness_pid`/`parent_pid`/
