@@ -26,7 +26,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W1 — FR1/FR2 shared golden platform-invariance module (golden-first: ZERO regen)
 
-- [ ] T-64-10 NEW `tests/helpers/` package + `golden_platform.py` + unit fixtures. Owner: software-engineer.
+- [-] T-64-10 NEW `tests/helpers/` package + `golden_platform.py` + unit fixtures. Owner: software-engineer.
   Write set: NEW `tests/helpers/__init__.py`, NEW `tests/helpers/golden_platform.py`,
   NEW `tests/unit/helpers/test_golden_platform.py` (+ `tests/unit/helpers/__init__.py`).
   Checklist:
@@ -43,7 +43,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   - Fate ledger — NEW files only; **pin the branch-point `pytest --collect-only -q` count here (QA64-2/QAX-4 —
     first implementation wave; re-validated at closure).** <!-- AMEND:QA64-2 --> Commit `test(T-64-10): ...`.
 
-- [ ] T-64-11 Byte-identical adoption by the 13 duplicate sites. Owner: software-engineer.
+- [-] T-64-11 Byte-identical adoption by the 13 duplicate sites. Owner: software-engineer.
   Write set: EDIT `tests/unit/infrastructure/test_install_target_goldens.py`,
   `tests/unit/infrastructure/test_public_assets_profile.py`, `tests/integration/test_plugin_install_goldens.py`,
   `tests/integration/test_plugin_projection.py`, `tests/e2e/features/test_plugin_pipeline.py`,
