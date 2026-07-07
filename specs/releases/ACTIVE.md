@@ -1,6 +1,6 @@
 ---
 release: v0.1.61
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.61 — Audit Remediation & Memory Truth
