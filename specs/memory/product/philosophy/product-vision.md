@@ -17,8 +17,8 @@ tags:
   - lifecycle
   - anti-slop
 token_estimate: 1700
-last_updated: '2026-07-03'
-release_origin: v0.1.54
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -107,9 +107,10 @@ Constitution §8 is the normative contract; this is a summary only.
 Nine core agents cover the full lifecycle. Each is a generic AI implementation specialized
 only in its dadaia-workspace SDD role — no project-domain knowledge in public defaults.
 Three plugin agents (frontend-engineer, design-specialist, devops-engineer) ship as
-behavior-less stubs until their plugin packs are distributed (no install command exists
-yet — backlog `plugin-packs-and-install-command`). Constitution §14 is the normative
-roster; this is a summary only.
+behavior-less stubs; their packs (`frontend-design`, `devops`) are distributed in-package
+and enabled per workspace with `dadaia plugin install <pack>` (v0.1.60 — [[plugin-packs]]).
+Until a pack installs in a given workspace, plugin-domain work routes to the operator.
+Constitution §14 is the normative roster; this is a summary only.
 
 ### Two-layer agentic model (summary)
 
@@ -168,14 +169,17 @@ overwritten; the §13 vision/users/capabilities/limits content lives HERE).
 
 ## Known limits
 
-- Only 4 workflow verbs are operator-invocable today; `audit`/`research`/
-  `bug_report` have real bodies with no verb ([[dadaia-workflows]]).
 - Deterministic enforcement covers file-write tools + git chokepoints; arbitrary
   Bash writes between chokepoints are discipline + the advisory reconciler
   ([[sdd-gate-v3]]).
 - The panel is a loopback-only dev tool with no authentication; never expose it
   beyond the machine ([[panel]]).
-- Plugin packs (frontend-design, devops) are not yet distributed.
+- Plugin packs are a per-workspace opt-in: a pack's agents stay behavior-less
+  stubs until the operator runs `dadaia plugin install <pack>`, and no uninstall
+  verb exists yet ([[plugin-packs]]).
+- All 7 dadaia-workflows are operator-invocable (~12 CLI verbs since v0.1.56), but
+  `implementation` and `closure` remain availability `partial` — only some of their
+  steps are fragment-driven ([[dadaia-workflows]]).
 
 ## Runtime state touched
 

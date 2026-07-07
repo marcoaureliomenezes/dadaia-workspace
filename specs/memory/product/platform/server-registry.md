@@ -13,11 +13,11 @@ tags:
 - ports
 - ttl
 token_estimate: 750
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
-CLI surface: `dadaia server {list,register,unregister,clean,scan}` · Closure: v0.1.1 (hotfix)
+CLI surface: `dadaia server {list,next,register,release,show,clean,scan}` · Closure: v0.1.1 (hotfix)
 
 ## Purpose
 

@@ -19,8 +19,8 @@ tags:
 - validation
 - sdd
 token_estimate: 2320
-last_updated: '2026-07-03'
-release_origin: v0.1.55
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closure: v0.2.1
@@ -29,7 +29,7 @@ CLI surface: `dadaia specs doctor [--specs-dir PATH] [--json] [--fix]` · Closur
 
 Validates structural invariants of the `specs/` directory under the SDD release-lifecycle model. Check groups:
 
-  * **Structural SPEC-DOC** (live non-sequential IDs: 001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016): presence of `constitution.md`, memory `.md` with a folder catalog in `product/`, well-formed `ACTIVE.md`, canonical statuses, PLAN ≤ 300 lines, CLOSURE with evidence triples, **008** — memory atomicity: forbidden changelog/history `##` headings in the `.md` body (check #8 greps the body; ERROR), backlog schema (check 012 embeds rules **022** — the format of `## Hotfixes pendentes` bullets — and **023** — hotfix bullet stale > 72h; 022/023 are never emitted as their own codes), **SPEC-DOC-002L** (stray `.html` under `specs/memory/` must be deleted), and **D-OC-1** (bidirectional orchestration registry consistency). Ids 010/011 are retired no-op stubs (HTML-era image-link/mermaid checks); 013/014/015/025 do not exist (retired/absorbed).
+  * **Structural SPEC-DOC** (live non-sequential IDs: 001, 002, 002L, 003, 004, 005, 006, 007, 008, 009, 012, 016): presence of `constitution.md`, memory `.md` with a folder catalog in `product/`, well-formed `ACTIVE.md`, canonical statuses, PLAN ≤ 300 lines, CLOSURE with evidence triples, **008** — memory atomicity: forbidden changelog/history `##` headings in the `.md` body (check #8 greps the body; ERROR), backlog schema (check 012 embeds rules **022** — the format of `## Hotfixes pendentes` bullets — and **023** — hotfix bullet stale > 72h; 022/023 are never emitted as their own codes), **SPEC-DOC-002L** (stray `.html` under `specs/memory/` must be deleted), and **D-OC-1** (bidirectional orchestration registry consistency). Ids 010/011 (HTML-era image-link/mermaid checks) no longer exist as checks — only a code comment in `features/specs/doctor.py` records their retirement; 013/014/015/025 do not exist (retired/absorbed).
   * **Ledger + governance** (024, 026..038): see the table below.
   * **SPECS-VERSION**: WARN when the tree's `specs_pattern_version` is below the library's canonical one — recommends `dadaia specs upgrade`.
   * **TREE-1..7 + TREE-5M**: canonical `specs/` tree v2 shape. TREE-3 requires `specs/memory/quality-assurance.md` at the top level. The `specs/memory/AGENTS.md` check is **TREE-5M**. CAT-1 and SPEC-DOC-002 use `rglob` for nested atoms.
@@ -85,7 +85,7 @@ Code| What it detects| Severity| Notes
 LINT-1| Any `.md` atom in `specs/memory/` or `specs/memory/product/` fails `lint-memory-atoms.py` validation| ERROR (frontmatter) / WARN (token drift)| Frontmatter: required fields, no extra fields, forbidden headings, wikilink resolution. Token drift: `words × 1.35` vs `token_estimate` > 20% → WARN. Heading allowlist = curated groups ∪ the optional workspace file `specs/memory/.heading-allowlist` (v0.1.49: one exact heading per line, `#` comments ignored — consumers extend without editing the lib-originated script; the file is MEMORY-class, so edit in DEFINITION/CLOSURE)
 SPEC-DOC-002| Check #2: memory files exist as `.md`| ERROR| Now requires `.md`, not `.html`; accepts `##` headings per the allowlist
 SPEC-DOC-002L| Stray `.html` present under `specs/memory/`| ERROR| Those files must be deleted; D-4 forbids committed HTML in the memory folder
-SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (LOGIC in the `doctor_memory` validator; coordinator check-order position #8)| ERROR| The retired HTML-era checks are #10 (image links) and #11 (mermaid script), now no-op stubs; the removed HTML byte-identity check was never 008
+SPEC-DOC-008| **Live**: forbidden changelog/history `##` heading (`Changelog`/`History`/`Histórico`/`Versions`) in a memory `.md` body — memory atoms must be atomic, not changelogs (LOGIC in the `doctor_memory` validator; coordinator check-order position #8)| ERROR| The retired HTML-era checks #10 (image links) and #11 (mermaid script) were removed entirely — a `doctor.py` comment records the retirement, no stub remains; the removed HTML byte-identity check was never 008
 
 ### TREE-1..7 + TREE-5M invariants (canonical tree v2, post v0.2.1)
 

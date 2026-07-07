@@ -9,7 +9,7 @@ tags:
 - distribution
 - install
 - agents
-token_estimate: 900
+token_estimate: 700
 last_updated: '2026-07-04'
 release_origin: v0.1.60
 ---

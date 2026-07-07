@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 2210
-last_updated: '2026-07-04'
-release_origin: v0.1.60
+token_estimate: 3650
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -34,6 +34,13 @@ dependencies). The default local invocation (`pytest`) does not run coverage; th
 (`--cov-fail-under=80`, a hard gate; `COVERAGE_FILE` redirected to the runner temp
 dir), keeping local runs fast and avoiding coverage inflation that hides weak
 contracts.
+
+**Coverage-gate scope note (do not slop-fix):** the 80% gate measures **unit+contract
+only** (`pytest -m "unit or contract" tests/unit tests/contract`). Modules whose
+coverage comes from integration or e2e journeys legitimately read **0%** in the
+contract-coverage report — that is the gate working as designed, not a gap. Never
+"fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
+coverage home.
 
 **Live scale (honest bracket):** the suite collects ≈ 4.3k tests (4,339 as of
 v0.1.53, after the legacy purge trimmed dead-code tests; grows with every release). Rough layer shape: unit is the large base,
@@ -85,6 +92,21 @@ no test may be named after a PR, release, or task id; no test may assert that
 deleted code remains deleted; private constants must not be duplicated into test
 code as the source of truth; one-off debugging tests go to `tests/tmp/` only with
 an expiry note.
+
+**Consistency-contract law:** any new hand-maintained pairing — two tables, files, or
+constant sets that must stay in sync (a mapping and its derived view, a schema and its
+fixtures, a config list and the code consuming it) — ships **with a consistency-contract
+test in the same change**. Introduce the pairing and its contract together; never land
+the pairing first and the guard "later". The contract pins the shared invariant
+(identical key-sets, a capped count, an absence-of-residue grep) so drift fails CI
+instead of rotting silently. Active contracts live in `tests/contract/`.
+
+**Lifecycle-asymmetry coverage law:** every feature documents per-feature coverage for
+the three asymmetric paths creation-path tests routinely miss — **delete/orphan** (the
+entity is removed or left dangling), **dirty input** (malformed, partial, or hostile
+input), and **missing dependency** (a required upstream artifact, file, or service is
+absent). Each feature either carries tests for these paths or records a justified
+absence. Silence is not coverage; an undocumented asymmetric path is a gap.
 
 The frozen no-steal suite (the lease/gate test files pinned since v0.1.50) protects
 the no-steal **invariant** — its assertions, the TTL floor, and the pid veto — not the
@@ -265,8 +287,15 @@ Files the test suite reads or writes at runtime:
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
   plus 5 governance jobs (pr-title, repo-hygiene, backlog-doctor,
-  hotfix-branch-name, verdict-gate). `secret-scan.yml` (gitleaks) is a separate
-  workflow.
+  hotfix-branch-name, verdict-gate).
+- `.github/workflows/release.yml` — the PyPI release pipeline, fired on `main`
+  pushes: a version-vs-tag check job gates everything; five test legs (unit-fast,
+  contract-coverage, integration, e2e-python, e2e-panel) re-run on the release
+  commit; then build (sdist+wheel) → the `release-gate` approval environment →
+  OIDC trusted publishing to PyPI + tag push → a post-publish smoke job
+  (ubuntu/py3.12: `pip install` from PyPI, `dadaia --help`, `dadaia init` in a
+  tmpdir). Owned in memory by [[pypi-distribution]].
+- `.github/workflows/secret-scan.yml` (gitleaks) is a separate workflow.
 - `tests/conftest.py` — the safety guards: `_no_real_venv_in_tests` (autouse; blocks
   real venv/pip provisioning inside tests — disk-exhaustion backstop),
   `_repo_root_write_guard` (autouse per-test repo-root file-set snapshot diff), and a

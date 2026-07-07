@@ -16,8 +16,8 @@ tags:
 - workflows
 - dispatch
 token_estimate: 1700
-last_updated: '2026-07-04'
-release_origin: v0.1.60
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -92,7 +92,8 @@ An agent frontmatter carries **two** unrelated `tier`-named concepts:
 - **Numeric `tier: 1/2/3` (Layer-1 dispatch band)** — a coordination/priority band (1 =
   dispatchers, 2 = curator, 3 = leaf workers; the 3 plugin agents are `tier: 3`).
 - **Registry `Tier` (model-cost class)** — the `deep`/`dispatch`/`fast`/`plugin` literal in
-  `core/model_registry.py`, resolved from the frontmatter `model:` (the 9 core resolve to
+  `core/model_registry.py`, resolved from the frontmatter `model:` (since the PR #115 retier,
+  ratified v0.1.61: 5 core agents resolve to `deep`/fable-5 with per-agent `effort:` and 4 to
   `dispatch`/opus; the 3 plugin agents to `plugin`/sonnet). See [[tech-stack]] "Model
   assignments".
 
@@ -221,7 +222,9 @@ with machine-readable handoff sidecars. Agent↔agent handoffs go to
 `.dadaia/handoff/<context>/`. Audit results go to `specs/audits/<ts>-<session_id_8chars>/`
 (committed Markdown — constitution §11).
 
-`ai-engineer` model assignment: `claude-opus-4-8` (synthesis-heavy harness-mastery workload).
+`ai-engineer` model assignment: `claude-fable-5` with `effort: medium` (synthesis-heavy
+harness-mastery workload; PR #115 retier, ratified v0.1.61 — full split table in
+[[tech-stack]] "Model assignments").
 
 `ai-engineer` exclusive skills (restricted by `harness-skill-scope` rule):
 `ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`.

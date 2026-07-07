@@ -26,7 +26,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W1 — memory truth pass A + PyPI atom + constitution (DEFINITION phase)
 
-- [ ] T-61-10 FR1+FR2+FR3 — stale-claim purge + LINT-1/TREE-5 + NEW `pypi-distribution.md` + constitution 2.1.0.
+- [x] T-61-10 FR1+FR2+FR3 — stale-claim purge + LINT-1/TREE-5 + NEW `pypi-distribution.md` + constitution 2.1.0.
   Owner: product-engineer. **Phase guard: `ACTIVE.md` must read `phase: DEFINITION` for this task's whole span.**
   Write set: `specs/memory/**` (SPEC §8 DEFINITION list), `specs/AGENTS.md`, `specs/constitution.md`,
   `specs/memory/product/{catalog.json,index.md}` (regen). Checklist:

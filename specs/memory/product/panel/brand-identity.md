@@ -10,13 +10,13 @@ tags:
 - css
 - tokens
 token_estimate: 375
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
 
-Defines the canonical palette and CSS tokens of the dadaia-workspace panel, guaranteeing visual consistency across tabs and themes. The tokens' home is `dadaia_workspace/features/panel/views/assets/css/tokens.py` (spacing, radius, shadows, z-index, motion, dimensions and colors), consumed by the `[data-theme="mint|sage|warm"]` selectors. (`views/_assets.py` retains only legacy path constants — the old `PALETTE`/`PANEL_CSS` were removed.)
+Defines the canonical palette and CSS tokens of the dadaia-workspace panel, guaranteeing visual consistency across tabs and themes. The tokens' home is `dadaia_workspace/features/panel/views/assets/css/tokens.py` (spacing, radius, shadows, z-index, motion, dimensions and colors), consumed by the `[data-theme="mint|sage|warm"]` selectors. (The old `views/_assets.py` module was removed entirely, together with its `PALETTE`/`PANEL_CSS` constants — `tokens.py` is the sole token home.)
 
 ## Brand identity
 

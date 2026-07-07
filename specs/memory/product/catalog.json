@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-05T01:15:34Z",
+  "generated_at": "2026-07-07T13:25:53Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -35,7 +35,7 @@
         "telemetry",
         "sessions"
       ],
-      "token_estimate": 1450,
+      "token_estimate": 1500,
       "depends_on": [
         "panel",
         "context-management",
@@ -126,14 +126,37 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1010,
+      "token_estimate": 1590,
       "depends_on": [
-        "workspace-init",
-        "plugin-packs"
+        "plugin-packs",
+        "workspace-init"
       ]
     },
     {
       "rank": 7,
+      "slug": "pypi-distribution",
+      "title": "pypi-distribution",
+      "category": "product",
+      "area": "distribution",
+      "tldr": "The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split.",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (plugin packs and public assets ship in-package), and the documented version-scheme split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x` versions the shipped library (ADR-2 — documented, never renumbered).",
+      "path": "specs/memory/product/distribution/pypi-distribution.md",
+      "tags": [
+        "distribution",
+        "pypi",
+        "release",
+        "packaging"
+      ],
+      "token_estimate": 800,
+      "depends_on": [
+        "quality-assurance",
+        "public-asset-distribution",
+        "plugin-packs",
+        "cross-platform-portability"
+      ]
+    },
+    {
+      "rank": 8,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -157,7 +180,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
@@ -182,7 +205,7 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "harness-pi",
       "title": "Harness — PI (pi-coding-agent)",
       "category": "product",
@@ -197,7 +220,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 525,
+      "token_estimate": 575,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -208,7 +231,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -228,7 +251,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -258,7 +281,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -277,6 +300,7 @@
       "depends_on": [
         "spec-context-project",
         "tech-stack",
+        "plugin-packs",
         "architecture",
         "lifecycle-foundation",
         "dadaia-workflows",
@@ -298,7 +322,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -321,7 +345,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -346,7 +370,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -374,7 +398,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -389,17 +413,18 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1625,
+      "token_estimate": 1675,
       "depends_on": [
         "tech-stack",
         "architecture",
         "public-asset-distribution",
         "lifecycle-foundation",
-        "dadaia-workflows"
+        "dadaia-workflows",
+        "plugin-packs"
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -419,7 +444,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -440,7 +465,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -462,13 +487,13 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
       "area": "platform",
       "tldr": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure.",
-      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and persists the selection to harness_profile.json (absent ⇒ all-four back-compat); PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; ctx-inject.sh retained only as a non-installed fallback.",
+      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and persists the selection to harness_profile.json (absent ⇒ all-four back-compat); PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; no legacy ctx-inject.sh is shipped or installed.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -483,7 +508,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -504,7 +529,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "dadaia-workflows",
       "title": "dadaia-workflows",
       "category": "product",
@@ -518,7 +543,7 @@
         "lifecycle",
         "layer-2"
       ],
-      "token_estimate": 760,
+      "token_estimate": 820,
       "depends_on": [
         "lifecycle-foundation",
         "agent-orchestration",
@@ -528,7 +553,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "lifecycle-foundation",
       "title": "lifecycle-foundation",
       "category": "product",
@@ -543,7 +568,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 5650,
+      "token_estimate": 7120,
       "depends_on": [
         "architecture",
         "tech-stack",
@@ -552,7 +577,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -579,7 +604,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -602,7 +627,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",

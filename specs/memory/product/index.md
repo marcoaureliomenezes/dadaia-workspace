@@ -20,6 +20,7 @@
 | `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
 | `plugin-packs` | plugin-packs | in-package plugin packs enabled per workspace via `dadaia plugin install`; the 3 stub agents carry real behavior on the plugin/sonnet tier once installed. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots. |
+| `pypi-distribution` | pypi-distribution | The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split. |
 
 ### harness
 

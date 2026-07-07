@@ -20,9 +20,9 @@ tags:
 - pi
 - parity
 - multi-platform
-token_estimate: 1625
-last_updated: '2026-07-04'
-release_origin: v0.1.58
+token_estimate: 1675
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -67,7 +67,7 @@ extensions grants execution). The `.pi/SYSTEM.md` carries an inline trust-bounda
 no secrets or operator-local values appear in `public/pi/**` and `[ok] public-privacy`
 must stay green.
 
-## Public surface counts (v0.2.0)
+## Public surface counts (v0.2.1)
 
 | Asset type | Count | Notes |
 |-----------|-------|-------|
@@ -79,7 +79,11 @@ must stay green.
 | Personas | 8 | Layer-2 role mandates (one per non-PM core role) |
 
 Plugin stubs (`frontend-engineer`, `design-specialist`, `devops-engineer`) project as
-empty stubs — no behavior until the corresponding plugin is installed.
+empty stubs — no behavior until the corresponding pack is installed for the workspace
+with `dadaia plugin install <pack>` (`frontend-design` or `devops`; in-package since
+v0.1.60). Installing a pack projects the real agent body over the stub, profile-scoped,
+records the `.dadaia/states/installed_plugins.json` ledger, and core `public install`
+precedence keeps the installed body from being reverted ([[plugin-packs]]).
 
 ## Usage flow
 

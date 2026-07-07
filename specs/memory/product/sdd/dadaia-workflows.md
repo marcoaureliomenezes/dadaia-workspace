@@ -19,9 +19,9 @@ tags:
 - workflows
 - lifecycle
 - layer-2
-token_estimate: 760
-last_updated: '2026-07-04'
-release_origin: v0.1.57
+token_estimate: 820
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ presentation on the stable public path `features/workflows/dadaia_catalog.py`):
 |----------|------|--------------|----------|
 | `release_definition` | `workflows/release_definition.py` | available | `dadaia lifecycle release define` |
 | `backlog_definition` | `workflows/backlog_definition.py` | available | `dadaia lifecycle backlog define` |
-| `implementation` | `pipeline.py` / `phase_workflow.py` | available | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`, and the `implement-review` loop verb) |
-| `closure` | step `close` + `closure_removal_gate` | available | `dadaia lifecycle close` |
+| `implementation` | `pipeline.py` / `phase_workflow.py` | PARTIAL | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`, and the `implement-review` loop verb) |
+| `closure` | step `close` + `closure_removal_gate` | PARTIAL | `dadaia lifecycle close` |
 | `audit` | `workflows/audit.py` (real, fragment+gate) | available | `dadaia lifecycle audit` |
 | `research` | `workflows/research.py` (real, fragment+gate) | available | `dadaia lifecycle research` |
 | `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available | `dadaia lifecycle bug_report` |
@@ -57,8 +57,11 @@ carries several verbs. `implement-review` is a **verb on the `implementation`
 workflow** (the digest-injecting, runner-gated implement/review loop), **not** a new
 workflow. `audit`/`research`/`bug_report` gained container builders + CLI verbs in
 v0.1.56, each **born resolver-governed** on the shared policy seam (no second raw
-`<id>:<effort>` path). The governed catalog was already AVAILABLE for all 7; v0.1.56
-closed the invocability gap.
+`<id>:<effort>` path). Availability labels come from the governed catalog's ADR-E
+vocabulary (`governed_catalog.py`): 5 workflows are `available` (fully fragment-driven
+end-to-end) and `implementation` + `closure` carry the `partial` label — they run, but
+only some of their steps are fragment-driven (the rest are generic). Invocability is
+independent of that label: v0.1.56 closed the invocability gap for all 7.
 
 ## Usage flow
 

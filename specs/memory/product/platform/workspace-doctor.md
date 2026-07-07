@@ -20,8 +20,8 @@ tags:
 - health
 - repair
 token_estimate: 1300
-last_updated: '2026-07-02'
-release_origin: v0.1.48
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 CLI surface: `dadaia doctor [--fix]`
@@ -35,7 +35,7 @@ Validates workspace-state invariants — consistency of `spec_contexts.json` (sc
 With the v2 model (ALIVE/DEAD), two invariants cover the context lifecycle:
 
   * **INV-4:** context with `state=ALIVE` and repo missing from `repos/` → WARN; suggestion: `dadaia context alive <name>`.
-  * **INV-5:** context with `state=DEAD` and repo present in `repos/` → WARN; suggestion: `dadaia context dead <name>` or manual removal.
+  * **INV-5:** context with `state=DEAD` and repo present in `repos/` → AUTO-FIX (`fixable=True`, matching the table below): `dadaia context dead <name>` or manual removal.
 
 The old INV-1, INV-2, INV-3, INV-6 (guards for the legacy global context marker) were removed in v2.
 

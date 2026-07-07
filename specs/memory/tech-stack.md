@@ -10,9 +10,9 @@ tags:
 - dependencies
 - toolchain
 - constraints
-token_estimate: 2345
-last_updated: '2026-07-04'
-release_origin: v0.1.60
+token_estimate: 2460
+last_updated: '2026-07-07'
+release_origin: v0.1.61
 ---
 
 ## Languages
@@ -69,16 +69,24 @@ Per harness (per-runtime truth in `specs/memory/product/harness/` — [[harness-
 carries a numeric `tier` + a registry-known `model`). The eventual source rename
 (`tier:` → `dispatch_band:`) is the `tier-taxonomy-rename` backlog return.
 
-**Core: single model-cost tier in practice:** the **9 core agents** run on `claude-opus-4-8`
-(registry `Tier` = `dispatch`) — no model-cost split in production. Per-dispatch override via
-`DADAIA_MODEL_OVERRIDE` when the dispatcher's policy justifies it.
+**Core: two-model split (retier PR #115, 2026-07-06; ratified by v0.1.61's operational-change
+lane).** The 9 core agents split across two model-cost tiers. **Five agents run on
+`claude-fable-5`** (registry `Tier` = `deep`; Codex renders `gpt-5.5` at
+`model_reasoning_effort=high` via the deep→high mapping), each carrying a per-agent Claude
+`effort:` frontmatter key: `product-engineer: high`, `project-auditor: high`,
+`ai-engineer: medium`, `software-engineer: low`, `qa-engineer: low`. **Four agents run on
+`claude-opus-4-8`** (registry `Tier` = `dispatch`) with no `effort:` override:
+`project-manager`, `software-architect`, `security-reviewer`, `code-reviewer`. Claude Code
+**officially supports per-subagent `effort:` frontmatter** — it is a first-class agent
+frontmatter key, not a custom extension; Codex projections derive their
+`model_reasoning_effort` from the registry tier, not from the Claude key. Per-dispatch
+override via `DADAIA_MODEL_OVERRIDE` when the dispatcher's policy justifies it.
 
 **Plugin agents: off-opus by design (v0.1.60).** When a pack installs ([[plugin-packs]]), the 3
 plugin agents carry `model: claude-sonnet-4-6` (registry `Tier` = `plugin`; Codex renders
 `gpt-5.3-codex`, NOT the opus `gpt-5.5`) — the demonstrable non-opus Layer-1 assignment. The
 `fast`/haiku tier remains unassigned by any agent (the reasoning-persona downgrade is deferred
-to the `fast-tier-persona-validation` backlog return; deep/`claude-fable-5` stays region-locked
-and unused).
+to the `fast-tier-persona-validation` backlog return).
 
 **Efficiency-audit staleness trigger (v0.1.60).** A `dadaia doctor` `DoctorIssue(code="EFF-1")`
 fires when `.dadaia/states/last_efficiency_audit.json`
@@ -94,24 +102,17 @@ append-only, tier}`); `MODEL_MAP` (runtime transforms) and `PRICING_TABLE`
 (telemetry) are derived views, with a key-equality contract test. `dadaia
 public doctor` fails on a `model:` frontmatter that does not resolve in the registry.
 
-**Reserved entry (used by no agent):** the registry still defines
-`claude-fable-5` with `tier="deep"` (and the Codex mapping `deep→high`), but **zero
-core agents resolve to it** — all 9 are `dispatch`-tier opus-4-8.
-`claude-fable-5` is region-restricted; the operator rule is **NEVER** pin an
-agent to Fable-5. The entry remains a reserved registry definition, not a live
-assignment.
-
 Agent| Model| Note
 ---|---|---
-project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator
-project-auditor| `claude-opus-4-8`| Dispatcher / audit fan-out
-product-engineer| `claude-opus-4-8`| Curator / memory guardian
-software-engineer| `claude-opus-4-8`| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-opus-4-8`| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE)
-qa-engineer| `claude-opus-4-8`| Review → commit gate leaf
-security-reviewer| `claude-opus-4-8`| Review → push gate leaf
-code-reviewer| `claude-opus-4-8`| Review → PR gate leaf
+project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator; no `effort:` override
+project-auditor| `claude-fable-5` (`effort: high`)| Dispatcher / audit fan-out
+product-engineer| `claude-fable-5` (`effort: high`)| Curator / memory guardian
+software-engineer| `claude-fable-5` (`effort: low`)| Implementation leaf (absorbs python/node/backend)
+ai-engineer| `claude-fable-5` (`effort: medium`)| AI-entity surface owner (harness-mastery synthesis workload)
+software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE); no `effort:` override
+qa-engineer| `claude-fable-5` (`effort: low`)| Review → commit gate leaf
+security-reviewer| `claude-opus-4-8`| Review → push gate leaf; no `effort:` override
+code-reviewer| `claude-opus-4-8`| Review → PR gate leaf; no `effort:` override
 frontend-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install frontend-design`
 design-specialist (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until the pack installs
 devops-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (devops pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install devops`
@@ -121,7 +122,8 @@ devops-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (de
 Plugin| Status| Scope
 ---|---|---
 `playwright`| Retained| Universal — used by `qa-engineer` (E2E) and `frontend-engineer`; optional packs may widen usage.
-`frontend-design`| Not yet distributed| Plugin pack for `frontend-engineer` + `design-specialist` (the `devops` pack covers `devops-engineer`). No install command exists yet — tracked by backlog `plugin-packs-and-install-command`. Until it ships, core agents handed a plugin-domain task respond `[PLUGIN REQUIRED]` and route to the operator, per `dadaia_workspace/public/rules/plugin-scope.md`.
+`frontend-design`| Installable (in-package since v0.1.60)| Plugin pack for `frontend-engineer` + `design-specialist` (+ skill `browser-frontend-implementation`). Distributed in-package under `public/plugins/`; enabled per workspace with `dadaia plugin install frontend-design` (ledger `.dadaia/states/installed_plugins.json` — [[plugin-packs]]). Until installed in a given workspace, core agents handed a plugin-domain task respond `[PLUGIN REQUIRED]` and route to the operator, per `dadaia_workspace/public/rules/plugin-scope.md`.
+`devops`| Installable (in-package since v0.1.60)| Plugin pack for `devops-engineer` (CI/CD, GitHub Actions, gitflow, deploy; + skill `github-actions-cicd`). Enabled per workspace with `dadaia plugin install devops`; same install-gated routing as `frontend-design` ([[plugin-packs]]).
 `superpowers`| Removed| Uninstalled in P1; native replacements via Tier-A skills.
 `skill-creator`| Removed| Uninstalled in P1; skill authoring is `ai-engineer`'s responsibility, editing `dadaia_workspace/public/skills/` directly.
 `code-simplifier`| Removed| Uninstalled in P1; refactoring stays with `software-architect` + implementers.
