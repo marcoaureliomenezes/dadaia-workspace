@@ -33,7 +33,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W1 — FR1/FR2 schema bump + validator (golden-first → RED-first)
 
-- [ ] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
+- [-] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
   `tests/unit/features/reports/test_handoff_v12_validation.py` (corpus-lock section only). Checklist:
   - Collect every in-tree v1/v1.1 handoff fixture + transcribe the emitter-skill v1.1 example as a fixture; assert
     each passes `ReportsValidationService.validate_file` (hash checks stubbed/absent-path variants as today).
@@ -41,7 +41,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
     fate ledger (re-validated at closure). <!-- AMEND:QAX-4 -->
   - Commit BEFORE any schema/service edit. Precondition for T-62-11. Done: green on the pre-bump tree.
 
-- [ ] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
+- [-] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
   Preconditions: T-62-10 committed. Write set: `public/schemas/handoff-v1.schema.json`,
   `features/reports/validation.py`, `cli/commands/reports.py`, NEW `core/role_atom_map.py`,
   `features/lifecycle/role_atoms.py` (re-export ONLY), `tests/unit/features/reports/test_handoff_v12_validation.py`.
