@@ -249,7 +249,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W5 — gates + ship
 
-- [-] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
+- [x] T-62-60 Full gates + self-hosting reconcile + ship. Owner: software-engineer (+ PM/operator for shell;
   security-reviewer for the push verdict). Preconditions: T-62-11/20/30/40/50 all `[x]`. Checklist:
   - AC-11: `ruff format --check`; `ruff check --no-cache`; `mypy --strict`; full **unpiped** `pytest`;
     `lint-imports --no-cache` (**8 kept / 0 broken**, ignore-cap UNCHANGED); `dadaia specs doctor` exit 0;
@@ -267,7 +267,13 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W6 — closure (CLOSURE phase)
 
-- [ ] T-62-70 CLOSURE + memory + dispositions + archive. Owner: product-engineer. Preconditions: T-62-60 merged.
+- [x] T-62-70 CLOSURE + memory + dispositions + archive. Owner: product-engineer. Preconditions: T-62-60 merged.
+  **Evidence (2026-07-07):** CLOSURE.md written (Summary/Tasks+SHAs/Validations/3 Drifts/Memory/Dispositions/no
+  returns/MOVE); 5 memory atoms rebased on v0.1.61's closed state (`agent-comms` primary, `public-asset-distribution`,
+  `lifecycle-foundation`, `quality-assurance`, `architecture` assess=warranted; tech-stack no change) with
+  `release_origin: v0.1.62`; 3 backlog items flipped `status: delivered` + `delivered_in: v0.1.62` + candidates.md
+  updated; bug terminal event + `git mv` archival + catalog regen + `ACTIVE.md` advance handed to PM per the CLOSURE
+  Archive-decision ordered list.
   Checklist:
   - `ACTIVE.md` phase = `CLOSURE`. Write CLOSURE.md (Summary, Tasks + final SHAs, Validations triples
     {description, command, evidence}, Drifts, Memory updates, Dispositions, Backlog returns, Archive decision MOVE).

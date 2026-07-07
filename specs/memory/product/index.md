@@ -9,7 +9,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.1 separates HTML reports from JSON handoffs in .dadaia/handoff/. |
+| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
 | `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas. |
 

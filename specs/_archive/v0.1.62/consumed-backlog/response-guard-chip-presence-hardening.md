@@ -1,6 +1,7 @@
 ---
 name: response-guard-chip-presence-hardening
-status: candidate
+status: delivered
+delivered_in: v0.1.62
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.59 closure backlog return (W5 AC-9(e) sabotage finding — response-guard null-guards a missing memory chip)

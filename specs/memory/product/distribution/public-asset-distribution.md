@@ -3,16 +3,16 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]), scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-token_estimate: 1590
+token_estimate: 1780
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.62
 ---
 
 ## Purpose
@@ -107,6 +107,31 @@ canonical / every divergent copy is restored" behavior — a hand-authored root 
 the repo's own scoped governance file per the workspace-law text). The `CLAUDE.md` bridge
 **follows its sibling's fate** — written only when the `AGENTS.md` was created/restored; when
 `AGENTS.md` is `[foreign]`, no `CLAUDE.md` is dropped.
+
+**The fan-out write path is contained (defense-in-depth).** A registry `repo_slug` is
+never trusted verbatim: `_consumer_repos_for_root` applies **lexical slug validation** —
+a slug is rejected unless it is a single, relative, non-dot path component (rejects `/`
+or `\` carriers, `.`/`..`, POSIX/Windows absolute incl. drive/UNC forms; both
+`PurePosixPath` and `PureWindowsPath` parts are checked, platform-independent). A
+rejected slug is **non-silent** — one stderr line
+`[reject] repo_slug '<slug>' (unsafe path component) — skipped` — and the derivation
+stays fail-open (never raises); the validation protects both consumers of the helper
+(install fan-out AND doctor). `_install_guardrail_pair` adds a **write-time containment
+assert** (the lexical join's parent must be `repos/`; failure = the same `[reject]`
+line, skip, never write). The validation is deliberately **lexical, not
+`resolve()`-based on the consumer dir**: a symlinked `repos/<slug>` DIRECTORY is a
+legitimate first-party pattern (the CI panel bootstrap does `ln -sfn "$PWD"
+repos/dadaia-workspace`) and stays allowed.
+
+**Destination-file symlinks are refused, never written through.** When a consumer
+`AGENTS.md` or `CLAUDE.md` destination **file** is a symlink (`Path.is_symlink()`,
+including dangling), the fan-out never writes through it — neither `shutil.copy2` nor
+the atomic writer — and classifies it `[foreign] <path> — left untouched (symlink)`; the
+paired file follows its sibling's fate (no orphan drop). A dangling symlink is refused
+too (never treated as "absent → create"). `_doctor_consumer_pair_lines` classifies
+symlinked pair files `[foreign]` (never `[ok]`/`[drift]`/`[missing]`), so `public
+doctor` exits 0 and never prescribes an install that would be refused. The regular-file
+provenance ladder below is unchanged.
 
 **Doctor is provenance-aware on the PAIR.** A single consumer-classification authority
 (`_doctor_consumer_pair_lines`) is the ONLY path that doctors consumer repos — `manager.doctor()`

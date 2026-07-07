@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 3650
+token_estimate: 3760
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.62
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.7k tests (4,701 as of
-v0.1.61; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.8k tests (4,755 passed +
+17 skipped as of v0.1.62; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -191,6 +191,18 @@ v0.1.59's panel overhaul proved the split — the presence-invariant `test_index
 dropped `.memory-chip` that the browser response-guard e2e null-guarded past, and the equality lock
 caught an edit-with-recompute that `TestInlineScriptCspCoverage` passed.
 
+**Required-presence e2e law (v0.1.62) — an e2e guard must assert a data-dependent selector, never
+null-guard it.** A `const el = await page.$(sel); if (el) { … }` branch degrades gracefully: the
+journey reports green with the selector dropped, so the e2e guards nothing (the v0.1.59 AC-9(e)
+sabotage passed "2 passed" through exactly that hole). The pattern is: when the CI fixture
+deterministically seeds the data the selector depends on (the e2e-panel bootstrap seeds ≥ 1 context +
+memory atoms and fast-fails otherwise), an absent selector is an infrastructure failure, not a
+legitimate state — the guard uses required presence (`await page.waitForSelector(sel, { timeout })` →
+act) and the graceful-empty branch is deleted. The panel response-guard e2e (`response-guard.spec.ts`)
+asserts `.memory-chip` in both guards this way, as **defence-in-depth behind the DOM-contract unit
+lock** (`test_index_dom_contract.py`, the primary never-re-baselined guard, byte-identical): a dropped
+selector now fails both the unit lock AND the browser journey.
+
 **Executed-path law (v0.1.60) — a unit test that calls a helper directly proves nothing about
 the wired path.** v0.1.60's FR9 fix added the correct consumer-`AGENTS.md` provenance logic to
 `_doctor_guardrail_pair`, and a unit test that **called that helper directly** went green — but
@@ -325,6 +337,8 @@ Files the test suite reads or writes at runtime:
 - [[public-asset-distribution]] — `tests/contract/test_source_repo_hygiene.py` and
   `tests/unit/features/public/` hold contracts for the public asset pipeline.
 - [[agent-comms]] — `tests/contract/test_handoff_schema_contract.py` protects the
-  handoff-v1.1 JSON schema contract.
+  handoff-v1 family JSON schema contract (current token `handoff-v1.2`);
+  `tests/contract/test_handoff_instruction_adoption.py` pins the 16-surface v1.2
+  emission-instruction adoption.
 - [[sdd-gate-v3]] — `tests/unit/gate/` and `tests/integration/gate/` hold
   the unit and integration tests for the SDD enforcement gate.

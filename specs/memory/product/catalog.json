@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-07T15:48:39Z",
+  "generated_at": "2026-07-07T18:33:01Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -8,16 +8,17 @@
       "title": "agent-comms — Handoff Contract v1",
       "category": "product",
       "area": "agents",
-      "tldr": "handoff-v1.1 separates HTML reports from JSON handoffs in .dadaia/handoff/.",
-      "summary": "the handoff-v1.1 contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. The CLI validates schema and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root.",
+      "tldr": "handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line.",
+      "summary": "the handoff-v1 family contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. Current version handoff-v1.2 requires self_pull.refs — the Layer-1 memory atoms the session actually read (specs/-prefixed, existence-checked, role-map coverage) — with historical v1/v1.1 documents valid forever (transition posture). The CLI validates schema, the v1.2 self_pull conditional, and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
         "agent-comms",
         "handoff",
         "schema"
       ],
-      "token_estimate": 1140,
+      "token_estimate": 1560,
       "depends_on": [
+        "lifecycle-foundation",
         "public-asset-distribution"
       ]
     },
@@ -117,7 +118,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]), scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -126,7 +127,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1590,
+      "token_estimate": 1780,
       "depends_on": [
         "plugin-packs",
         "workspace-init"
@@ -559,7 +560,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--step-model, profile-ids-only). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). The 4 handoff-ledger bodies share ONE FragmentGateWorkflow base + assembly mixin; a declarative role→memory-atom map grounds each step's role at assembly, the active ACTIVE.md phase threads into SpecContext, and a fragment_coherence_doctor (FRAG-COH-1..4) guards fragment/selector/role-map coherence. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_entry_to_step as the single per-step runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--step-model, profile-ids-only). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). The 4 handoff-ledger bodies share ONE FragmentGateWorkflow base + assembly mixin; a declarative role→memory-atom map grounds each step's role at assembly, the active ACTIVE.md phase threads into SpecContext, and a fragment_coherence_doctor (FRAG-COH-1..4) guards fragment/selector/role-map coherence. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_entry_to_step as the single per-step runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Layer-2 emitters produce handoff-v1.2 with self_pull.refs from InjectedContext refs (role-map fallback → honest v1.1 on zero refs); the role→atom map data lives in core/role_atom_map.py (same-object re-export via role_atoms.py). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",
@@ -568,11 +569,12 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 7120,
+      "token_estimate": 7260,
       "depends_on": [
         "architecture",
         "tech-stack",
         "dadaia-workflows",
+        "agent-comms",
         "panel"
       ]
     },
