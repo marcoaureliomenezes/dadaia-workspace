@@ -305,7 +305,7 @@ if memory updates are warranted.
 
 **Does NOT dispatch `project-manager`** — PM and auditor are both Tier-1 and do not nest.
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.1).
+> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## dadaia CLI

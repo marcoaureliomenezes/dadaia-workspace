@@ -140,7 +140,7 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W3 — FR4 instruction adoption (ai-engineer, `public/**`, sequential after W2)
 
-- [ ] T-62-30 All-agent emission-instruction adoption. Owner: ai-engineer. Preconditions: T-62-20 done. Write set:
+- [x] T-62-30 All-agent emission-instruction adoption. Owner: ai-engineer. Preconditions: T-62-20 done. Write set:
   `public/agents/*.md` (9 core), `public/plugins/{frontend-design,devops}/agents/*.md` (3),
   `public/skills/dadaia-handoff-emitter/SKILL.md`, `public/data/handoff-AGENTS.md`,
   `public/lifecycle_fragments/shared/output-handoff.md`, affected prompt goldens. Checklist:
@@ -156,6 +156,41 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
   - Prompt goldens embedding `output-handoff.md`: re-baseline as deliberate recorded amendments (diff = exactly the
     fragment edit); FRAG-COH doctor green before/after.
   - Public-privacy law holds (generic content only). Done: AC-6 both halves asserted; gates green.
+  - **Evidence (done):** 16 surfaces adopted — 12 agent bodies (9 core + 3 plugin: one-line §4 blockquote →
+    `schema handoff-v1.2, with self_pull.refs = the memory atoms this session actually self-pulled/read —
+    specs/-prefixed, context-relative; never list an atom you did not read`), emitter skill (required-fields table
+    gains `self_pull` row; `schema_version` literal → `"handoff-v1.2"`; BOTH examples gain `self_pull.refs` +
+    v1.2 token; version note carries the honest zero-refs v1.1 fallback — the ONLY sanctioned v1.1 emission),
+    `handoff-AGENTS.md` (new leading Write Rule), `output-handoff.md` (new "Self-pull proof (handoff-v1.2)" body
+    section; frontmatter + canonical fragment pins untouched — no `schema_version`/`output_schema` in body).
+  - **AC-6 negative-grep fate ledger (8 survivors, all back-compat/non-instructional):**
+    (1) `skills/dadaia-handoff-emitter/SKILL.md:93` — the honest zero-refs fallback explanation itself (the
+    sanctioned transition-posture mention); (2) `schemas/handoff-v1.schema.json:12` — the version enum
+    (historical v1/v1.1 stay valid forever); (3) `schemas/workflow-step-payload-v1.schema.json:5` — descriptive
+    note that the generic v1.1 schema is never mutated (different payload family, out of scope per W2 ledger);
+    (4) `scripts/lint-memory-atoms.py:110` — allowlisted legitimate memory-atom section-heading literal
+    ("Schema handoff-v1.1"), not an emission instruction (atom heading rename is PE/CLOSURE scope);
+    (5-8) `lifecycle_fragments/shared/{output-handoff,write-scope,memory-selection,anti-slop}.md:8`
+    `output_schema: handoff-v1.1` frontmatter — the fragment's own descriptive domain id (`FragmentSpec.n`
+    metadata), NOT an emit instruction; pinned "distinct concept, stays UNCHANGED" by
+    `test_output_handoff_fragment_canonical.py`; changing it is an L2 metadata/code change outside FR4's
+    instruction surface. No surviving "emit v1.1" instruction anywhere in `public/`.
+  - **AC-6 positive:** NEW `tests/contract/test_handoff_instruction_adoption.py` — file-enumerated 16-surface
+    roster (14 files + the skill's 2 JSON examples as 2 surfaces) + 3 roster-completeness asserts (core-agents
+    set-equality vs the 3 plugin stubs, plugin-agents set-equality, exactly-2-examples ⇒ 16): 19/19 passed.
+  - **Mutation-sanity (captured → reverted):** stripped `self_pull` from `agents/code-reviewer.md` ⇒
+    `test_surface_carries_v12_and_self_pull_instruction[agents/code-reviewer.md]` FAILED naming the surface
+    (1 failed, 18 passed); reverted, 19/19 + fragment-canonical 5/5 green.
+  - **Golden re-baseline (deliberate recorded amendment):** 6 gate goldens re-baselined via
+    `UPDATE_FRAGMENT_GOLDEN=1` — 19 embedded prompts across gate_{audit×2,backlog_definition×1,bug_report×2,
+    pipeline×4,release_definition×8,research×2}.json; machine-verified diff = EXACTLY the 10-line
+    "Self-pull proof (handoff-v1.2)" fragment insertion before `## Rules`, nothing else
+    (VERDICT: EXACT-INSERTION-ONLY). FRAG-COH doctor (`dadaia lifecycle workflow doctor`) exit 0
+    before AND after (pre-existing FRAG-COH-2 body-only warnings unchanged, 0 errors).
+  - **Gates:** ruff format --check 0; ruff check --no-cache 0; mypy --strict 0 (314 files incl. the new
+    contract test); lint-imports 9 kept / 0 broken; full pytest 4736 passed / 17 skipped, exit 0.
+    Public-privacy grep over the diff clean (generic content only). `public stage/install` deferred to W5
+    (T-62-60) per plan.
 
 ## W4 — FR5/FR6 fan-out containment + symlink refusal (∥ W5a permitted — disjoint write sets)
 
