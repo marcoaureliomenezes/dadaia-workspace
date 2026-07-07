@@ -25,7 +25,7 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W1 — FR1/FR2/FR3 uninstall machinery
 
-- [ ] T-63-10 `with_removed` + `uninstall_plugin` + CLI `uninstall`. Owner: software-engineer. Write set:
+- [-] T-63-10 `with_removed` + `uninstall_plugin` + CLI `uninstall`. Owner: software-engineer. Write set:
   `core/models/plugin_pack.py`, `infrastructure/public_assets.py` (plugin block), `cli/commands/plugin.py`,
   `tests/unit/core/test_plugin_pack.py`, `tests/unit/cli/test_plugin_cli.py`, NEW
   `tests/integration/test_plugin_uninstall.py`. Preconditions: SPEC/PLAN/TASKS `Aprovado`; **v0.1.61 landed
@@ -64,7 +64,7 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
   - Done: all W1 tests green; full gates green; conventional commits per marker protocol.
   - Parallelism: none (single owner, shared machinery files).
 
-- [ ] T-63-11 E2E pipeline leg. Owner: software-engineer. Write set:
+- [-] T-63-11 E2E pipeline leg. Owner: software-engineer. Write set:
   `tests/e2e/features/test_plugin_pipeline.py`. Precondition: T-63-10 `[x]`. Extend the existing pipeline with
   install→uninstall→**reinstall** (reinstall lands the real bodies again — proves uninstall leaves a
   re-installable state). **Wall-time bracket (QA63-2 — concrete, not "within budget"):** <!-- AMEND:QA63-2 -->
