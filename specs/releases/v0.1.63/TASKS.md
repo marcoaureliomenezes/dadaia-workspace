@@ -158,7 +158,13 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W4 — FR6 plugin-aware skill-ref integrity
 
-- [ ] T-63-40 Extend the ref check to pack agents. Owner: software-engineer. Write set:
+- [x] T-63-40 Extend the ref check to pack agents. Evidence: additive `_check_plugin_agent_skill_refs`
+  in `codex_doctor.py` (rides the `check_agent_skill_refs` `[drift]` surface per ADR-C3; no call-site
+  change — doctor/stage already gate on `[drift]`); RED captured pre-fix (bogus pack ref ⇒ zero lines,
+  `test_agent_skill_refs.py`); full-sweep `test_all_pack_agent_skill_refs_resolve_full_sweep` green for
+  BOTH packs; AC-8(e) sabotage (sweep early-return) ⇒ 2 post-fix tests FAILED, reverted; core-agent path
+  byte-identical (diff additive); gates: ruff format/check 0, mypy --strict 0, lint-imports 9 kept/0
+  broken, pytest 4778 passed exit 0. Owner: software-engineer. Write set:
   `infrastructure/codex_doctor.py` (or a sibling checker per ADR-C3), `infrastructure/public_assets.py` /
   `cli/commands/public.py` call-site wiring if needed, NEW/extended tests in
   `tests/unit/infrastructure/` (+ `test_plugin_content.py` full-sweep assert). Preconditions: T-63-20 + T-63-30

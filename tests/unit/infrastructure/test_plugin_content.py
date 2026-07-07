@@ -142,6 +142,22 @@ def test_every_pack_agent_carries_required_frontmatter() -> None:
 
 
 @pytest.mark.unit
+def test_all_pack_agent_skill_refs_resolve_full_sweep() -> None:
+    """T-63-40 full-sweep contract (FR6/AC-6): every pack-agent ``skills:`` ref for BOTH
+    shipped packs resolves via the plugin-aware ``check_agent_skill_refs`` sweep — proving
+    the W2/W3 wiring doctor-side. Zero plugin-agent ``[drift]`` lines on the real tree."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+
+    plugin_drift = [
+        r for r in check_agent_skill_refs(_PUBLIC) if r.startswith("[drift] plugin-agent:")
+    ]
+    assert plugin_drift == [], plugin_drift
+    # The sweep actually covered both packs (agents exist where we claim they resolve).
+    for pack in _PACK_SKILLS:
+        assert list((_PLUGINS / pack / "agents").glob("*.md")), f"{pack}: no pack agents swept"
+
+
+@pytest.mark.unit
 def test_exactly_the_two_named_skills_ship_per_pack() -> None:
     """AC-6 (ADR-C1 ceiling): roster map == pack.json skills[] == on-disk skill dirs."""
     skill_dirs = {p.parent.name for p in _PLUGINS.glob("*/skills/*/SKILL.md")}
