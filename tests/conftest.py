@@ -182,6 +182,21 @@ def _no_real_venv_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC-4 hermeticity envelope (v0.1.64 FR3): scrub the entry-harness signal vars.
+
+    A developer running pytest inside a codex TUI carries ``CODEX_SESSION_ID`` (and a PI
+    session may carry the ``DADAIA_ENTRY_HARNESS`` Ring-1 pin). With the lifecycle
+    ``--harness`` default now ``auto``, an unscrubbed suite would auto-default a REAL,
+    credit-spending worker from any test invoking a lifecycle verb without ``--harness``.
+    This scrub makes every test resolve ``fake`` unless it sets a signal explicitly.
+    """
+    from tests.fixtures.harness_env import scrub_entry_signal_env
+
+    scrub_entry_signal_env(monkeypatch)
+
+
+@pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.
 

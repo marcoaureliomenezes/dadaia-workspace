@@ -20,10 +20,22 @@ import os
 import re
 
 __all__ = [
+    "ENTRY_HARNESS_ENV_VAR",
     "HARNESS_SESSION_ID_ENV_VARS",
+    "entry_harness",
     "harness_session_id",
     "sanitize_session_id",
 ]
+
+#: The operator / PI-seam entry-harness pin (v0.1.64 FR3/FR4). Exported by the operator's
+#: shell or by the post-trust PI Ring-1 extension (set-only-when-unset — an operator pin
+#: always wins). Values other than the Layer-2 worker names below are ignored.
+ENTRY_HARNESS_ENV_VAR = "DADAIA_ENTRY_HARNESS"
+
+#: The only values :func:`entry_harness` may return — the Layer-2 worker harnesses.
+#: ``claude`` is deliberately absent: Claude Code is Layer-1-only (LAW 1) and is never
+#: auto-defaulted as a workflow worker.
+_LAYER2_ENTRY_HARNESSES: frozenset[str] = frozenset({"codex", "pi"})
 
 #: Harness-native session-id env vars in resolution order — Claude before Codex, matching
 #: ``hooks/_common.resolve_session_id``. Each is exported by its harness for the live session
@@ -54,4 +66,28 @@ def harness_session_id() -> str | None:
         sanitized = sanitize_session_id(os.environ.get(name))
         if sanitized:
             return sanitized
+    return None
+
+
+def entry_harness() -> str | None:
+    """Resolve the entry-session Layer-2 harness for the ``--harness auto`` sentinel.
+
+    v0.1.64 FR3 (SPEC §9 ADR-3) resolution order:
+
+    1. :data:`ENTRY_HARNESS_ENV_VAR` (``DADAIA_ENTRY_HARNESS``) when it holds ``codex`` or
+       ``pi`` — the operator pin, or the post-trust PI Ring-1 extension's seam (FR4).
+       Any other value (garbage, ``claude``, empty) is IGNORED and resolution falls through.
+    2. ``CODEX_SESSION_ID`` present ⇒ ``"codex"`` (a codex entry session; may be inherited
+       and stale — which is why the CLI's auto-default echoes loudly and ``--harness``
+       always overrides).
+    3. ``None`` — covers a Claude Code entry (Layer-1-only, never a workflow worker) and
+       plain shells / CI, where the caller keeps its previous default (``fake``).
+
+    ``claude`` is never returned. Stdlib-only; this stays a ``core`` leaf (constitution §6).
+    """
+    pin = (os.environ.get(ENTRY_HARNESS_ENV_VAR) or "").strip().lower()
+    if pin in _LAYER2_ENTRY_HARNESSES:
+        return pin
+    if os.environ.get("CODEX_SESSION_ID"):
+        return "codex"
     return None

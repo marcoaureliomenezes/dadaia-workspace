@@ -69,12 +69,14 @@ __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
     "CODEX_SESSION_ENV_VAR",
+    "ENTRY_SIGNAL_ENV_VARS",
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
     "claude_hook_env",
     "codex_hook_env",
     "run_hook_subprocess",
+    "scrub_entry_signal_env",
 ]
 
 #: The native session-id env var Claude Code provides to a hook subprocess.
@@ -82,6 +84,30 @@ CLAUDE_SESSION_ENV_VAR: Final[str] = "CLAUDE_CODE_SESSION_ID"
 
 #: The native session-id env var Codex provides to a hook subprocess.
 CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
+
+#: The entry-harness auto-default signal vars (v0.1.64 FR3/AC-4). A developer running
+#: pytest inside a codex TUI (or a PI session with the Ring-1 pin) legitimately carries
+#: these in the shell; the test envelope must scrub them so a lifecycle verb invoked
+#: without ``--harness`` in a test always resolves ``fake`` — never a real,
+#: credit-spending worker. ``CLAUDE_CODE_SESSION_ID`` is included for symmetry (it is
+#: never an entry signal, but scrubbing it keeps the envelope deterministic).
+ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
+    "DADAIA_ENTRY_HARNESS",
+    CODEX_SESSION_ENV_VAR,
+    CLAUDE_SESSION_ENV_VAR,
+)
+
+
+def scrub_entry_signal_env(monkeypatch: Any) -> None:
+    """Delete the three entry-signal vars from ``os.environ`` for the current test.
+
+    The autouse fixture in the root ``tests/conftest.py`` applies this over the whole
+    suite (the AC-4 hermeticity envelope); tests that exercise the auto-default set the
+    vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
+    """
+    for name in ENTRY_SIGNAL_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
 
 #: ``DADAIA_*`` env vars a test MAY ``setenv`` in-process without tripping the env-contract
 #: ratchet, because each is a documented **operator-shell input or operator override that
@@ -124,6 +150,11 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR/DADAIA_WORKFLOWS_DIR above.
         "DADAIA_PI_SESSIONS_DIR",
+        # Entry-harness pin (v0.1.64 FR3/FR4) — an operator-shell / PI-Ring-1 input read
+        # by production BY DESIGN in core/session_env.entry_harness (the --harness auto
+        # sentinel). Setting it in a test exercises that real env-read path; the autouse
+        # AC-4 envelope scrub (scrub_entry_signal_env) keeps the suite hermetic.
+        "DADAIA_ENTRY_HARNESS",
     }
 )
 

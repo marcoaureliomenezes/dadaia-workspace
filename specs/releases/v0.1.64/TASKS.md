@@ -111,7 +111,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W2 — FR3/FR4 entry-harness auto-default + PI seam
 
-- [ ] T-64-20 `core/session_env.entry_harness()` + lifecycle auto-default + loud echo + hermeticity. Owner:
+- [x] T-64-20 `core/session_env.entry_harness()` + lifecycle auto-default + loud echo + hermeticity. Owner:
   software-engineer. Write set: EDIT `dadaia_workspace/core/session_env.py`,
   `dadaia_workspace/cli/commands/lifecycle.py`, `tests/fixtures/harness_env.py` (+ conftest wiring),
   NEW/EDIT `tests/unit/core/test_session_env.py`, EDIT ≥2 lifecycle CLI test files for the verb-level matrix.
@@ -136,8 +136,15 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
     assert FAILS → revert.
   - Fate ledger — the 12 option sites enumerated with before/after default; existing lifecycle CLI tests that
     passed `--harness` explicitly SURVIVE unchanged. Commit `feat(T-64-20): ...`.
+  - Evidence (2026-07-07): resolver matrix `tests/unit/core/test_session_env.py` (17 pass + CI-scoped skip local);
+    shim matrix `tests/unit/cli/commands/test_lifecycle_harness_map.py`; verb-level `implement` + `pipeline`
+    (echo present pi-entry / absent fake-explicit; echo on stderr so `--json` stdout stays pure). 12 sites
+    pre-change L346/475/645/950/983/1016/1049/1178/1235/1289/1447/1528 default "fake" → post-change "auto"
+    (grep `"auto",` = 12, `"fake", "--harness"` = 0). AC-9 (c) pin-ignored ⇒ 6 FAIL captured+reverted;
+    (d) echo-dropped ⇒ 4 FAIL captured+reverted. Gates: ruff format --check 0, ruff check 0, mypy --strict
+    dadaia_workspace/ 0, lint-imports 9 kept/0 broken, full pytest 4833 passed/18 skipped exit 0.
 
-- [ ] T-64-21 PI entry-signal seam in the Ring-1 extension. Owner: software-engineer (ai-engineer sign-off on the
+- [-] T-64-21 PI entry-signal seam in the Ring-1 extension. Owner: software-engineer (ai-engineer sign-off on the
   `public/**` surface). Write set: EDIT `dadaia_workspace/public/pi/extensions/dadaia-sdd-gate.ts`, NEW grep-level
   contract test (e.g. `tests/contract/test_pi_entry_signal.py`).
   Checklist:

@@ -124,3 +124,87 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     assert payload["steps"][0]["runtime"] == "pi_headless"
     assert payload["steps"][0]["accepted"] is False
     assert payload["blocked"]["reason"]
+
+
+# ---------------------------------------------------------------------------
+# v0.1.64 FR3 (AC-3) — entry-harness auto-default on the multi-step pipeline.
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_defaults_fake_silently_with_no_entry_signal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No --harness + no entry signal ⇒ the pipeline runs fake with NO echo."""
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-auto-fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = json.loads(result.output)
+    assert payload["steps"][0]["runtime"] == "fake"
+    assert "[harness] auto-default:" not in result.stderr
+
+
+def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DADAIA_ENTRY_HARNESS=pi (simulated PI entry session) + no --harness ⇒ the
+    pipeline's first step runs on the real PI adapter path (injected stream — no
+    binary, no credits) and the loud FR3 echo rides stderr, keeping --json pure."""
+    import subprocess as _subprocess
+
+    events = [
+        {"type": "message_start"},
+        {
+            "type": "message_end",
+            "message": {"role": "assistant", "content": "pipeline step via injected pi stream"},
+        },
+    ]
+    stdout = "\n".join(json.dumps(event) for event in events) + "\n"
+
+    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_pi_run)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-auto-pi",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = json.loads(result.stdout)
+    assert payload["steps"][0]["runtime"] == "pi_headless"
+    assert (
+        "[harness] auto-default: pi (from entry session; pass --harness to override)"
+        in result.stderr
+    )
+    # result.output is the COMBINED stream (Click 8.2+); stdout stays pure JSON.
+    assert "[harness]" not in result.stdout
