@@ -62,7 +62,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W2 — wire the PluginStore port (A-1)
 
-- [ ] T-61-20 FR4 — container factory + constructor injection + port-wired contract test (RED-first,
+- [x] T-61-20 FR4 — container factory + constructor injection + port-wired contract test (RED-first,
   **executed-path primary** — Ruling 61-D). Owner: software-engineer. Write set: `dadaia_workspace/container.py`,
   `cli/commands/plugin.py`, `infrastructure/public_assets.py`, NEW
   `tests/contract/test_plugin_store_port_wired.py`. **First implementation wave: pin the branch-point
@@ -86,6 +86,17 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
     `test_json_plugin_store.py` SURVIVES verbatim; integration/E2E SURVIVE byte-identical.
   - Gates: ruff format/check, `mypy --strict`, `lint-imports --no-cache` (8/0 — contract lands in W3), full
     unpiped pytest. Commit `refactor(T-61-20): wire PluginStore port through the composition root (A-1)`.
+  - **Evidence (2026-07-07):** branch-point fate-ledger pin (QA61-4/QAX-4): `pytest --collect-only -q` =
+    **4691 tests collected**. RED pre-fix: `test_plugin_store_port_wired.py` → 2 failed + 2 errors
+    (spy fixture AttributeError — `container.build_plugin_store` absent; AST lens flags
+    `cli/commands/plugin.py` constructing `JsonPluginStore()` directly). AC-9(a) sabotage capture:
+    re-inlined `JsonPluginStore()` in `plugin.py::_read_ledger` ⇒ 2 failed
+    (`test_plugin_list_consumes_container_built_store` + AST lens), reverted ⇒ 4 passed. Gates: ruff
+    format --check exit 0; ruff check --no-cache exit 0; mypy --strict "no issues in 312 source files";
+    lint-imports --no-cache = 8 kept / 0 broken; full unpiped pytest exit 0 — 4678 passed, 17 skipped,
+    1 pre-existing warning (T-1, owned by FR6) — 4695 collected = 4691 + 4 new contract tests. Byte-lock
+    AC-5: plugin goldens (a)/(b) + projection + pipeline + cli + json_plugin_store suites = 36 passed;
+    `git diff` on `tests/integration/_golden/` empty (zero golden re-baseline).
 
 ## W3 — cli-no-infrastructure contract (A-2)
 
