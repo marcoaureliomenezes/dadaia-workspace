@@ -33,13 +33,22 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W1 — FR1/FR2 schema bump + validator (golden-first → RED-first)
 
-- [-] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
+- [x] T-62-10 **AC-1 back-compat corpus lock FIRST.** Owner: software-engineer. Write set: NEW
   `tests/unit/features/reports/test_handoff_v12_validation.py` (corpus-lock section only). Checklist:
   - Collect every in-tree v1/v1.1 handoff fixture + transcribe the emitter-skill v1.1 example as a fixture; assert
     each passes `ReportsValidationService.validate_file` (hash checks stubbed/absent-path variants as today).
   - **First implementation wave (QAX-4):** pin the branch-point `pytest --collect-only -q` count in this task's
     fate ledger (re-validated at closure). <!-- AMEND:QAX-4 -->
   - Commit BEFORE any schema/service edit. Precondition for T-62-11. Done: green on the pre-bump tree.
+  - **Evidence (2026-07-07):** corpus = 5 fixtures (tree carries NO committed `*.handoff.json` — corpus is the
+    fixture docs embedded in tests + the emitter skill): `v1-minimal-report` (test_cli_reports.py),
+    `v1-no-artifact-path` (test_reports_validation_service.py), `v1.1-contract-full`
+    (test_handoff_schema_contract.py), `v1.1-skill-handoff-only` + `v1.1-skill-with-report` (SKILL.md examples
+    transcribed; report-mode hash recomputed against a materialized artifact — literal skill hash is
+    illustrative). Real `StdlibHandoffValidator` + real public schema; 6 tests (5 parametrized + validate_all
+    sweep) GREEN on the pre-bump tree (`6 passed`). **QAX-4 branch-point collect count pin:
+    `pytest --collect-only -q` = 4701 tests collected** (at HEAD 52606197, pre-corpus-file; re-validate at
+    closure).
 
 - [-] T-62-11 Schema bump + map relocation + conditional validator + detection fix. Owner: software-engineer.
   Preconditions: T-62-10 committed. Write set: `public/schemas/handoff-v1.schema.json`,
