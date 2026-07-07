@@ -180,7 +180,7 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W5 — ship
 
-- [-] T-63-50 Ship gates + live-instance propagation. Owner: software-engineer (devops-engineer if pack
+- [x] T-63-50 Ship gates + live-instance propagation. Owner: software-engineer (devops-engineer if pack
   installed; else PM surfaces commands). Preconditions: T-63-10..40 `[x]`. Checklist: AC-9 full gates (ruff
   format/check, mypy --strict, unpiped pytest, lint-imports kept/ignore-cap == base counts, specs doctor exit 0,
   backlog doctor exit 0); `dadaia public stage` → `public doctor` → `public install --target all` → confirming
@@ -196,8 +196,19 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## CLOSURE
 
-- [ ] T-63-60 CLOSURE.md (summary, tasks+SHAs, validations triples, drifts, memory updates, dispositions,
-  archive decision). Owner: product-engineer. Dispositions: `specs/backlog/plugin-uninstall.md` +
+- [x] T-63-60 CLOSURE.md (summary, tasks+SHAs, validations triples, drifts, memory updates, dispositions,
+  archive decision). Owner: product-engineer. **DONE 2026-07-07.** CLOSURE.md written (merge `457e4e10`,
+  PR #120; QA alpha ship-gate APPROVE `2026-07-07T203229Z`; security APPROVE keyed to `71c36c4a`; 3 drifts
+  recorded incl. the Chromium-install CI infra flake and the QA-verified 6-line golden amendments). Memory
+  rebased on the v0.1.61+62 closed states (each atom read before edit, no sibling correction reverted):
+  `plugin-packs.md` primary ("Additive-only" REMOVED, 4+4 rosters, uninstall flow + Mermaid edge; port-seam
+  wording kept verbatim per §0.1), `public-asset-distribution.md` (uninstall-reconciliation paragraph + FR6
+  sweep), `architecture.md` (cli roster + `with_removed` + uninstall/ref-sweep module-map lines),
+  `tech-stack.md` minimal truth edit (Plugin-inventory rows — drift-recorded; no dependency change),
+  `agent-orchestration.md` assessed no-change. Dispositions: both backlog items flipped `status: delivered`
+  + `delivered_in: v0.1.63`; candidates.md rows removed + consume note (removal-on-release); zero returns.
+  PM follow-ups listed in CLOSURE Archive decision (backlog `git mv` + consumed_backlog.json, catalog regen,
+  doctors, release-dir `git mv`, ACTIVE.md → v0.1.64/DEFINITION). Dispositions: `specs/backlog/plugin-uninstall.md` +
   `specs/backlog/plugin-pack-content-libraries.md` → `DELIVERED — v0.1.63`. Memory per SPEC §8: plugin-packs
   atom primary edit (uninstall + rosters; REMOVE "Additive-only"; do NOT restate the PluginStore-port seam —
   v0.1.61's A-1 remit). **Coordination clause EXTENDED (ARCH63-1) + merge order (Ruling 63-B):**

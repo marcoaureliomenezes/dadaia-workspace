@@ -10,9 +10,9 @@ tags:
 - dependencies
 - toolchain
 - constraints
-token_estimate: 2460
+token_estimate: 2500
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.63
 ---
 
 ## Languages
@@ -122,8 +122,8 @@ devops-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (de
 Plugin| Status| Scope
 ---|---|---
 `playwright`| Retained| Universal — used by `qa-engineer` (E2E) and `frontend-engineer`; optional packs may widen usage.
-`frontend-design`| Installable (in-package since v0.1.60)| Plugin pack for `frontend-engineer` + `design-specialist` (+ skill `browser-frontend-implementation`). Distributed in-package under `public/plugins/`; enabled per workspace with `dadaia plugin install frontend-design` (ledger `.dadaia/states/installed_plugins.json` — [[plugin-packs]]). Until installed in a given workspace, core agents handed a plugin-domain task respond `[PLUGIN REQUIRED]` and route to the operator, per `dadaia_workspace/public/rules/plugin-scope.md`.
-`devops`| Installable (in-package since v0.1.60)| Plugin pack for `devops-engineer` (CI/CD, GitHub Actions, gitflow, deploy; + skill `github-actions-cicd`). Enabled per workspace with `dadaia plugin install devops`; same install-gated routing as `frontend-design` ([[plugin-packs]]).
+`frontend-design`| Installable (in-package since v0.1.60)| Plugin pack for `frontend-engineer` + `design-specialist` (+ 4 skills: `browser-frontend-implementation`, `design-system-authoring`, `frontend-component-architecture`, `visual-review-protocol`). Distributed in-package under `public/plugins/`; enabled per workspace with `dadaia plugin install frontend-design`, disabled with `dadaia plugin uninstall` (ledger `.dadaia/states/installed_plugins.json` — [[plugin-packs]]). Until installed in a given workspace, core agents handed a plugin-domain task respond `[PLUGIN REQUIRED]` and route to the operator, per `dadaia_workspace/public/rules/plugin-scope.md`.
+`devops`| Installable (in-package since v0.1.60)| Plugin pack for `devops-engineer` (CI/CD, GitHub Actions, gitflow, deploy; + 4 skills: `github-actions-cicd`, `gitflow-release-engineering`, `container-build-and-deploy`, `cicd-security-hardening`). Enabled per workspace with `dadaia plugin install devops` (uninstall symmetric); same install-gated routing as `frontend-design` ([[plugin-packs]]).
 `superpowers`| Removed| Uninstalled in P1; native replacements via Tier-A skills.
 `skill-creator`| Removed| Uninstalled in P1; skill authoring is `ai-engineer`'s responsibility, editing `dadaia_workspace/public/skills/` directly.
 `code-simplifier`| Removed| Uninstalled in P1; refactoring stays with `software-architect` + implementers.

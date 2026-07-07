@@ -26,7 +26,11 @@ removal-on-release; archived at closure) and returned two items
 `status: delivered`, removed from this index per removal-on-release; all anchors survive
 → archived at CLOSURE to `specs/_archive/v0.1.62/consumed-backlog/`) and also resolved
 the picked HIGH bug `reports-sidecar-version-detection-misroutes-future-tokens`; it
-returned **no** items.
+returned **no** items. **v0.1.63 (plugin platform completion, merged `457e4e10`, PR #120,
+2026-07-07) consumed `plugin-uninstall` + `plugin-pack-content-libraries`** (both
+`status: delivered`, removed from this index per removal-on-release; both anchors survive
+→ archived at CLOSURE to `specs/_archive/v0.1.63/consumed-backlog/`); it also returned
+**no** items — the plugin platform is complete for the 2-pack surface.
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -83,18 +87,6 @@ helpers into ONE shared platform-invariance layer (host-state canonicalization +
 report-list locks + OS-phrase canonicalization) so a byte-golden is cross-platform-stable by
 construction. Anchored at the v0.1.58 golden helpers in `test_install_target_goldens.py` + the
 v0.1.55 golden-authoring law.
-
-### `plugin-pack-content-libraries` — Full plugin pack skill corpora *(2026-07-04)*
-Returned at v0.1.60 closure (Ruling ADR-5 / 12 ceiling). v0.1.60 shipped machinery + ONE
-minimal skill per pack (`browser-frontend-implementation`, `github-actions-cicd`); grow each
-pack's skill set to a complete reviewable library (ai-engineer, public-privacy law). Anchored
-at `core/models/plugin_pack.py#PluginPack`.
-
-### `plugin-uninstall` — `dadaia plugin uninstall` (inverse of install) *(2026-07-04)*
-Returned at v0.1.60 closure (Ruling ADR-2 — additive-only install this release). Drop a pack
-from `installed_plugins.json` + restore the projected core stub over the pack agent body
-(profile-scoped, idempotent, doctor-clean). Anchored at
-`infrastructure/public_assets.py#install_plugin`.
 
 ### `fast-tier-persona-validation` — Fast-tier persona validation (P2) *(2026-07-04)*
 Returned at v0.1.60 closure (Ruling ADR-6). v0.1.60 shipped the off-opus assignment via the 3

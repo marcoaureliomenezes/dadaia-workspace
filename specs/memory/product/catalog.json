@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-07T18:33:01Z",
+  "generated_at": "2026-07-07T21:41:48Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -94,8 +94,8 @@
       "title": "plugin-packs",
       "category": "product",
       "area": "distribution",
-      "tldr": "in-package plugin packs enabled per workspace via `dadaia plugin install`; the 3 stub agents carry real behavior on the plugin/sonnet tier once installed.",
-      "summary": "The plugin-distribution capability — in-package packs under public/plugins/ (frontend-design + devops), the `dadaia plugin install/list/doctor` CLI on a ports-and-adapters seam (PluginPack/InstalledPlugins core model + PluginStore port + JsonPluginStore adapter), a per-workspace installed_plugins.json ledger, profile-scoped projection that overwrites the projected core stub with the pack's real agent body, core-install precedence so a later public install never reverts an installed pack, plugin doctor per-file status, and the three plugin agents (frontend-engineer, design-specialist, devops-engineer) carrying real behavior on the registry plugin/sonnet tier once their pack is installed. Additive-only (no uninstall this release).",
+      "tldr": "in-package plugin packs (4 skills each) enabled via `dadaia plugin install`, disabled via `uninstall`; 3 stub agents gain real behavior once installed.",
+      "summary": "The plugin-distribution capability — in-package packs under public/plugins/ (frontend-design + devops, 4 skills each), the `dadaia plugin install/uninstall/list/doctor` CLI on a ports-and-adapters seam (PluginPack/InstalledPlugins core model + PluginStore port + JsonPluginStore adapter), a per-workspace installed_plugins.json ledger, profile-scoped projection that overwrites the projected core stub with the pack's real agent body, core-install precedence so a later public install never reverts an installed pack, an uninstall inverse (files-first/ledger-last, never-silent drift restore, never-installed equivalence), plugin doctor per-file status, machine-checked pack-agent skill refs, and the three plugin agents (frontend-engineer, design-specialist, devops-engineer) carrying real behavior on the registry plugin/sonnet tier once their pack is installed.",
       "path": "specs/memory/product/distribution/plugin-packs.md",
       "tags": [
         "plugins",
@@ -103,7 +103,7 @@
         "install",
         "agents"
       ],
-      "token_estimate": 700,
+      "token_estimate": 900,
       "depends_on": [
         "public-asset-distribution",
         "agent-orchestration",
@@ -118,7 +118,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -127,7 +127,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1780,
+      "token_estimate": 1880,
       "depends_on": [
         "plugin-packs",
         "workspace-init"
