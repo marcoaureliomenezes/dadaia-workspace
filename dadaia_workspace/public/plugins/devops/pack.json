@@ -5,7 +5,10 @@
     "devops-engineer"
   ],
   "skills": [
-    "github-actions-cicd"
+    "github-actions-cicd",
+    "gitflow-release-engineering",
+    "container-build-and-deploy",
+    "cicd-security-hardening"
   ],
   "rules": []
 }

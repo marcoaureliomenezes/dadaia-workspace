@@ -48,6 +48,9 @@ _PACK_SKILLS: dict[str, list[str]] = {
     ],
     "devops": [
         "github-actions-cicd",
+        "gitflow-release-engineering",
+        "container-build-and-deploy",
+        "cicd-security-hardening",
     ],
 }
 _EXPECTED_SKILLS = {skill for roster in _PACK_SKILLS.values() for skill in roster}

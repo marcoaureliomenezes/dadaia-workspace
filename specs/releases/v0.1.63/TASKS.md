@@ -129,7 +129,21 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W3 — FR5 devops skill corpus
 
-- [-] T-63-30 Three devops skills + wiring + roster append. Owner: ai-engineer. Write set:
+- [x] T-63-30 Three devops skills + wiring + roster append. Owner: ai-engineer. **DONE 2026-07-07.** RED
+  captured: with the 3 new devops skill dirs on disk and the roster map still pinning
+  `devops: [github-actions-cicd]`, `test_exactly_the_two_named_skills_ship_per_pack` FAILED ("pack skill set
+  drifted from the ADR-C1 ceiling: [+cicd-security-hardening, +container-build-and-deploy,
+  +gitflow-release-engineering]"). **Roster-map APPEND (recorded):** `devops: [github-actions-cicd] →
+  [github-actions-cicd, gitflow-release-engineering, container-build-and-deploy, cicd-security-hardening]`
+  (4) — T-63-20's frontend-design roster untouched. Wiring: devops pack.json skills[] → 4; `devops-engineer`
+  frontmatter += all three. **AC-8(f) mutation-sanity (captured → reverted):** dropped
+  `container-build-and-deploy` from pack.json keeping its dir ⇒ roster contract FAILED
+  ("devops/pack.json skills [...] != roster [...]"); reverted ⇒ module green. **Recorded golden amendment
+  (same T-60-11 precedent as T-63-20):** exactly 3 `[ok] stage:plugins/devops/skills/*/SKILL.md` lines added
+  to `doctor_all_four_v0158.json` + `plugin_doctor_report_golden_b_v0160.json` (regen via
+  `UPDATE_INSTALL_GOLDENS=1`; zero runtime-projection lines). Privacy self-check grep clean. Gates: ruff
+  format --check 0, ruff check --no-cache 0, mypy --strict dadaia_workspace/ 0, full unpiped pytest
+  **4771 passed / 17 skipped, exit 0**. Write set:
   `public/plugins/devops/skills/{gitflow-release-engineering,container-build-and-deploy,cicd-security-hardening}/SKILL.md`
   (NEW), `public/plugins/devops/pack.json`, `public/plugins/devops/agents/devops-engineer.md` (frontmatter
   `skills:` only), `tests/unit/infrastructure/test_plugin_content.py` (roster-map APPEND only). Preconditions:

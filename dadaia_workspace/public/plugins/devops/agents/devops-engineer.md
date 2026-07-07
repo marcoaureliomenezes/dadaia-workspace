@@ -15,6 +15,9 @@ tools:
   - Grep
 skills:
   - github-actions-cicd
+  - gitflow-release-engineering
+  - container-build-and-deploy
+  - cicd-security-hardening
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
