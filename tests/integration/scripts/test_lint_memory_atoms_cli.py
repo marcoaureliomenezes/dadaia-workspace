@@ -27,7 +27,6 @@ def _valid_frontmatter(slug: str = "test-atom") -> str:
         "tldr": "A short description.",
         "summary": "One to two sentence summary.",
         "tags": ["test"],
-        "agent_tier": "self-pull",
         "token_estimate": 0,
         "last_updated": "2026-06-01",
         "release_origin": "memory-markdown-source-v1",

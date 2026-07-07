@@ -49,11 +49,6 @@
       "uniqueItems": true,
       "description": "Free-form topic tags for catalog filtering."
     },
-    "agent_tier": {
-      "type": "string",
-      "enum": ["inject", "self-pull"],
-      "description": "DEPRECATED (v0.1.53 FR3): zero runtime consumers. No longer required; still tolerated (retained here so atoms that carry it validate) until the CLOSURE atom strip lands. A later release drops this property entirely."
-    },
     "token_estimate": {
       "type": "integer",
       "minimum": 0,

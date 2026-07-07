@@ -2,14 +2,6 @@
 > `dadaia_workspace/public/data/AGENTS.md` by `dadaia public install`.
 > Do not put project-specific instructions here. Put them in a scoped
 > `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.
-> One-time manual re-sync (v0.1.47 T-47-32): the automated consumer-repo
-> fan-out is structurally dead (backlog `consumer-agents-md-fanout-redesign`);
-> this copy was hand-synced from source as a sanctioned exception.
-
-> **AI agent rules.** This file is generated from
-> `dadaia_workspace/public/data/AGENTS.md` by `dadaia public install`.
-> Do not put project-specific instructions here. Put them in a scoped
-> `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.
 
 # dadaia-workspace — Root Rules
 

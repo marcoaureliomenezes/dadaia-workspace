@@ -168,7 +168,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
     `test_telemetry_corrupt_db.py` AMENDED (fixture form only); e2e-panel legs behavior-invariant — GHA is the
     proof surface, watched at ship (T-61-60).
 
-- [ ] T-61-41 FR6(ai-engineer half) — D-1 schema property drop + self-repo AGENTS.md hand-sync.
+- [x] T-61-41 FR6(ai-engineer half) — D-1 schema property drop + self-repo AGENTS.md hand-sync.
   Owner: ai-engineer. Write set: `public/schemas/memory/memory-frontmatter-v1.schema.json` (+ its contract
   test), `repos/dadaia-workspace/AGENTS.md`. Parallel-safe with T-61-40 (disjoint). Checklist:
   - D-1: remove the expired `agent_tier` property (deprecated v0.1.53; zero carriers verified); pin
@@ -182,6 +182,23 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
   - Fate ledger: schema contract test AMENDED (adds the absence pin); no atom edits (zero carriers).
   - Gates: full local gate set; `public doctor` exit 0. Commit
     `chore(T-61-41): drop expired agent_tier property + self-repo AGENTS.md header hand-sync`.
+  - **Evidence (2026-07-07):** Zero carriers: `grep -rn "^agent_tier:" specs/memory/` → 0 matches (exit 1;
+    remaining `agent_tier` strings are prose/doc mentions, not frontmatter). Schema: `agent_tier` property
+    removed from `memory-frontmatter-v1.schema.json`; pin added
+    (`test_agent_tier_property_absent_from_schema`: `"agent_tier" not in schema["properties"]` and not in
+    `required`). Sabotage AC-9(d): re-added `agent_tier` ⇒
+    `test_agent_tier_property_absent_from_schema FAILED — AssertionError: assert 'agent_tier' not in {...}`
+    ⇒ reverted ⇒ 37 passed. Fixture carriers dropped (schema is `additionalProperties:false`):
+    `tests/unit/scripts/test_lint_memory_atoms.py` (×2) + `tests/integration/scripts/test_lint_memory_atoms_cli.py`
+    (×1 — surfaced by full-suite RED, same defect class). Propagation:
+    `dadaia public stage` → `install --target all` → `public doctor` exit 0 incl. `[ok] public-privacy`.
+    AGENTS.md hand-sync: canonical banner grep `> **AI agent rules.**…` count before=2, after=1; diff = 8 header
+    lines deleted only, body byte-preserved (verified via `diff` vs `git show HEAD:AGENTS.md`). Gates:
+    `ruff format --check` 0 (814 files) · `ruff check --no-cache` 0 · `mypy --strict dadaia_workspace/` Success
+    (312 files) · full unpiped pytest exit 0 — `4684 passed, 17 skipped in 433.40s`, **0 warnings**. Fate
+    ledger: schema contract test AMENDED (absence pin + fixture strip); no atom edits (zero carriers).
+    Note: `public/data/memory-AGENTS.md` + `public/scaffold/memory/AGENTS.md` line 52 ("the schema tolerates
+    it") now stale — FR8 memory-truth pass (product-engineer) to reword.
 
 ## W5 — workspace hygiene + gates + ship
 
