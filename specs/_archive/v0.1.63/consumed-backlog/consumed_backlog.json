@@ -1,0 +1,28 @@
+{
+  "release": "v0.1.63",
+  "consumed": [
+    {
+      "slug": "plugin-uninstall",
+      "shipped_anchors": [
+        "dadaia_workspace/infrastructure/public_assets.py#install_plugin"
+      ],
+      "note": "DELIVERED \u2014 v0.1.63 (archived at CLOSURE, anchor survives \u2014 install_plugin gained its exact inverse). NEW `dadaia plugin uninstall <pack>` (cli/commands/plugin.py: descriptor validation before workspace resolution, unknown pack => BadParameter exit 2; known-not-installed => exit 0 no-change, ADR-U2) delegating to NEW uninstall_plugin in FileSystemPublicAssetManager: staged-pack-tree enumeration as the removal set; profile-scoped (ADR-U3, Ruling 13 symmetry \u2014 claude-only profile never touches .codex/); core-stub re-projection over each pack agent (claude md + codex stub render, the same core-projection slice); deletion of pack-only skill/rule projections + now-empty dirs; [drift-restored]/[drift-removed] never-silent lines for hand-edited projections (ADR-U1 \u2014 runtime projections are lib-owned); unstaged pack => ledger-only drop + non-silent line; FILES FIRST, LEDGER LAST (ADR-U4 \u2014 interrupted uninstall is never a silent half-state, plugin doctor stays ledger-driven); ledger drop via the pure idempotent InstalledPlugins.with_removed through the container-wired PluginStore port (A-1-agnostic clause honored \u2014 v0.1.61's build_plugin_store pattern adopted at rebase). Never-installed equivalence proven BOTH same-run A-vs-B AND against the durable v0.1.60 golden (b) absolute anchor (Ruling 63-F; read-only fixture reuse, zero regen) with direct .codex stub-restore byte asserts; e2e leg (h) proves the re-installable state (install -> uninstall -> reinstall). RED-first: 13 pre-fix failures; AC-8(a)-(d) sabotages captured then reverted. Ship PR #120, squash 457e4e10.",
+      "commits": [
+        "a23a63d1",
+        "65419397"
+      ]
+    },
+    {
+      "slug": "plugin-pack-content-libraries",
+      "shipped_anchors": [
+        "dadaia_workspace/core/models/plugin_pack.py#PluginPack"
+      ],
+      "note": "DELIVERED \u2014 v0.1.63 (archived at CLOSURE, anchor survives \u2014 each PluginPack's skills tuple grew 1 -> 4). Full pack skill corpora under the ADR-C1 hard ceiling BY NAME: frontend-design += design-system-authoring + frontend-component-architecture + visual-review-protocol; devops += gitflow-release-engineering + container-build-and-deploy + cicd-security-hardening (pack totals 4 + 4; ai-engineer sole author; public-privacy law, [ok] public-privacy; frontend-ctx/design-ctx adapters referenced BY NAME never inlined, duplication-marker asserts extended). Wiring: pack.json skills[] == roster == on-disk dirs; design-specialist frontmatter += design-system-authoring + visual-review-protocol, frontend-engineer += frontend-component-architecture, devops-engineer += all three. Ceiling constants amended as a DELIBERATE RECORDED AMENDMENT (ADR-C2, RED-first shown per pack): _PACK_SKILL/_EXPECTED_SKILLS -> per-pack _PACK_SKILLS roster map. FR6 closes the ref blind spot: additive _check_plugin_agent_skill_refs in infrastructure/codex_doctor.py sweeps pack-agent skills: refs against public/skills/ UNION the pack's own plugins/<pack>/skills/ on the check_agent_skill_refs [drift] surface through public doctor (RED-first: pre-fix a bogus pack ref yielded ZERO lines). Recorded golden amendment: exactly 6 [ok] stage: lines per doctor golden (QA-verified exact; zero runtime-projection lines \u2014 golden (b) equivalence semantics intact). AC-8(e)/(f) sabotages captured then reverted. Ship PR #120, squash 457e4e10.",
+      "commits": [
+        "22e88227",
+        "30561711",
+        "c273b33f"
+      ]
+    }
+  ]
+}

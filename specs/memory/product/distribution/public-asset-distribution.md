@@ -3,16 +3,16 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-token_estimate: 1780
+token_estimate: 1880
 last_updated: '2026-07-07'
-release_origin: v0.1.62
+release_origin: v0.1.63
 ---
 
 ## Purpose
@@ -152,6 +152,21 @@ and records the pack in the per-workspace ledger `.dadaia/states/installed_plugi
 installed pack agent. `plugin doctor` reports `[ok]`/`[drift]`/`[missing]` per installed-pack
 file; with no plugin installed the install/doctor surface is byte-identical to the no-plugin
 baseline (golden-locked).
+
+**Plugin uninstall reconciliation.** `dadaia plugin uninstall <pack>` is the exact inverse of
+the pack projection: profile-scoped, it restores the projected **core stubs** over the pack
+agent bodies (the same core-projection slice `public install` runs — `.claude/` md +
+`.codex/` stub render), deletes pack-only skill/rule projections (+ now-empty dirs), and
+drops the ledger entry **last** (files first, ledger last — an interrupted uninstall never
+leaves a silent half-state, because `plugin doctor` stays ledger-driven). A hand-edited
+(drifted) projected pack file is restored/removed anyway — runtime projections are lib-owned —
+but never silently: one `[drift-restored]`/`[drift-removed]` line per file. An
+install→uninstall cycle leaves the runtime surface equivalent to a never-installed workspace
+(asserted same-run A/B and against the durable never-installed golden baseline); `repos/**`
+(the `[foreign]`-protected consumer surface) is disjoint and never touched. Pack-agent
+`skills:` frontmatter refs are machine-checked through the same `public doctor` path: a
+plugin-aware sweep on the `check_agent_skill_refs` `[drift]` surface resolves each ref
+against `public/skills/` ∪ the pack's own `plugins/<pack>/skills/` (non-zero exit on drift).
 
 ## Runtime state touched
 

@@ -1,6 +1,7 @@
 ---
 name: plugin-uninstall
-status: candidate
+status: delivered
+delivered_in: v0.1.63
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.60 closure (Ruling ADR-2 — additive-only install this release)
