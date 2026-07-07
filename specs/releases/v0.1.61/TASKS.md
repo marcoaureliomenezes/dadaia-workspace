@@ -134,7 +134,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W4 — hygiene batch (parallel-safe: disjoint write sets)
 
-- [ ] T-61-40 FR6(SE half) — T-1 pytest-10 fixture + CI-1/CI-2 workflow hygiene (RED-first).
+- [x] T-61-40 FR6(SE half) — T-1 pytest-10 fixture + CI-1/CI-2 workflow hygiene (RED-first).
   Owner: software-engineer. Write set: `tests/integration/test_telemetry_corrupt_db.py`,
   `.github/workflows/ci.yml`, `.github/workflows/release.yml`, NEW `.github/scripts/bootstrap-panel-ws.sh`,
   NEW `tests/contract/test_ci_workflow_hygiene.py`. Checklist:
@@ -150,6 +150,23 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
   - Fate ledger: `test_telemetry_corrupt_db.py` AMENDED (form only); e2e-panel legs behavior-invariant — **GHA is
     the proof surface** (local green does not prove the script; watch CI at ship — QA-atom Rich/width law).
   - Gates: full local gate set. Commit `chore(T-61-40): CI bootstrap dedup + legacy state drop + pytest-10 fix`.
+  - **Evidence (2026-07-07):** RED capture: pre-fix `pytest tests/contract/test_ci_workflow_hygiene.py` →
+    `5 failed in 0.62s` (all 5 assertions RED). Post-fix: `5 passed in 0.44s`. Bootstrap blocks verified
+    verbatim-duplicated (`diff` of extracted bodies → identical) before extraction to
+    `.github/scripts/bootstrap-panel-ws.sh` (36 lines, `#!/usr/bin/env bash`, `set -euo pipefail`, mode 100755
+    in index); `primary_context.json` heredocs deleted — grep over `dadaia_workspace/` confirms only the v1→v2
+    migration *deleter* references the file. Discriminator note: `spec_contexts.json` unusable (release.yml
+    smoke job asserts on it); used `Memory atoms verified OK`. T-1: `degraded_panel` converted to
+    `@staticmethod` under `@pytest.fixture(scope="class")` per pytest class-scoped-instance-method deprecation;
+    assertions invariant; file run `11 passed` with 0 warnings (was `11 passed, 1 warning`
+    PytestRemovedIn10Warning). Sabotage (c): heredoc restored in ci.yml ⇒
+    `test_no_primary_context_json_in_workflows FAILED` (1 failed, 4 passed) → reverted. Sabotage (e): fixture
+    form reverted ⇒ `-W error::pytest.PytestRemovedIn10Warning` → `4 passed, 7 errors` → re-fixed. Gates:
+    `ruff format --check` 0 · `ruff check --no-cache` 0 · `mypy --strict dadaia_workspace/` Success (312 files)
+    · `lint-imports --no-cache` 9 kept / 0 broken · full unpiped pytest exit 0 —
+    `4683 passed, 17 skipped in 395.60s`, **0 warnings** (no warnings-summary section). Fate ledger:
+    `test_telemetry_corrupt_db.py` AMENDED (fixture form only); e2e-panel legs behavior-invariant — GHA is the
+    proof surface, watched at ship (T-61-60).
 
 - [ ] T-61-41 FR6(ai-engineer half) — D-1 schema property drop + self-repo AGENTS.md hand-sync.
   Owner: ai-engineer. Write set: `public/schemas/memory/memory-frontmatter-v1.schema.json` (+ its contract

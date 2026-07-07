@@ -250,7 +250,8 @@ class TestHandlerDegradedResponses:
     """Panel handler returns 503 when service is degraded, 401 when unauthenticated."""
 
     @pytest.fixture(scope="class")
-    def degraded_panel(self, tmp_path_factory: pytest.TempPathFactory):  # type: ignore[override]
+    @staticmethod
+    def degraded_panel(tmp_path_factory: pytest.TempPathFactory):  # type: ignore[misc]
         """Start a panel server backed by a degraded TelemetryService."""
         tmp_path = tmp_path_factory.mktemp("corrupt_test")
         state_dir = tmp_path / "telemetry"
