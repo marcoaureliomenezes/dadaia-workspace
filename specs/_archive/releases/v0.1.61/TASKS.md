@@ -202,7 +202,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W5 — workspace hygiene + gates + ship
 
-- [-] T-61-60 FR7 + AC-10 full gates + ship. Owner: software-engineer (gates) + qa-engineer (ship-gate) +
+- [x] T-61-60 FR7 + AC-10 full gates + ship. Owner: software-engineer (gates) + qa-engineer (ship-gate) +
   security-reviewer (push-gate) + operator/PM (shell hygiene). Write set: none in `specs/**`. Checklist:
   - FR7 (operator/PM shell): `dadaia doctor --fix` (clears `.mypy_cache/` + the stale `tauan-games` lease —
     verify, both may be transient-cleared already); surface `bug-space-war` for operator triage (record decision
@@ -238,7 +238,15 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 ## W6 — closure (CLOSURE phase)
 
-- [ ] T-61-70 FR8 — CLOSURE.md + memory pass B + disposition sweep + archive. Owner: product-engineer.
+- [x] T-61-70 FR8 — CLOSURE.md + memory pass B + disposition sweep + archive. Owner: product-engineer.
+  **Evidence (2026-07-07):** CLOSURE.md written (41/41 dispositions with per-row evidence — AC-11; ADR-1
+  judgment-enforced-only record; #112/#113/#115 ratification; Ruling 61-B closure-order clause); memory pass B
+  landed (`architecture.md` 9-contracts/cap-36/wired-seam/cli-exception, `quality-assurance.md` shared
+  bootstrap + 0-warnings law + 4,701 bracket; `plugin-packs.md` verified true as written, no edit; zero
+  catalog-indexed fields changed → catalog regen expected no-op); returns `platform-seam-todo-retirement` +
+  `specs-doctor-partial-archive-invariant` filed; `selfrepo-agents-md-doubled-header` → `status: delivered` /
+  `delivered_in: v0.1.61` + candidates.md index updated; audit/backlog/release `git mv` + doctors + ACTIVE.md
+  advance handed to PM (PE runs no shell).
   Write set: `specs/releases/v0.1.61/CLOSURE.md`, `specs/memory/**` (pass B), `specs/backlog/**`,
   `specs/audits/**` (mv), `ACTIVE.md`. Checklist:
   - Set `ACTIVE.md` phase = `CLOSURE`. Write CLOSURE.md (Summary, Tasks + SHAs, Validations triples, Drifts,

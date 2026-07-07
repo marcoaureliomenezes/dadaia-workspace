@@ -42,11 +42,16 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.3k tests (4,339 as of
-v0.1.53, after the legacy purge trimmed dead-code tests; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.7k tests (4,701 as of
+v0.1.61; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
+
+**Warning-clean law:** the full unpiped suite runs with **0 warnings** — a warnings
+summary in the pytest output is ship-gate evidence, not noise (the last standing
+`PytestRemovedIn10Warning`, a class-scoped instance-method fixture in the telemetry
+integration tests, was converted to a `@staticmethod` class-scoped fixture in v0.1.61).
 
 **Named-journey coverage (v0.1.51):** the e2e top includes the master lifecycle
 journey (`context create → alive → real-subprocess bind → cross-process ctx-inject →
@@ -247,7 +252,12 @@ normative vision §6.
    integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
    marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;
    e2e-panel is a Playwright/Node job: `npm ci` + `npx playwright install chromium` +
-   `npm run test:e2e` against a bootstrapped panel workspace). A further 5 governance
+   `npm run test:e2e` against a panel workspace bootstrapped by the **shared
+   `.github/scripts/bootstrap-panel-ws.sh` script** — the single bootstrap source used
+   by the e2e-panel legs of BOTH `ci.yml` and `release.yml` (no hand-synced inline
+   copies; no legacy `primary_context.json` state file is written — its only production
+   reference is the v1→v2 migration deleter), guarded by
+   `tests/contract/test_ci_workflow_hygiene.py`). A further 5 governance
    jobs (pr-title, repo-hygiene, backlog-doctor, hotfix-branch-name, verdict-gate)
    gate PR shape, repo/backlog hygiene, and the security push verdict; a separate
    secret-scan workflow runs gitleaks.
@@ -287,10 +297,16 @@ Files the test suite reads or writes at runtime:
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
   plus 5 governance jobs (pr-title, repo-hygiene, backlog-doctor,
-  hotfix-branch-name, verdict-gate).
+  hotfix-branch-name, verdict-gate). The e2e-panel job's workspace bootstrap is the
+  shared `.github/scripts/bootstrap-panel-ws.sh`.
+- `.github/scripts/bootstrap-panel-ws.sh` — the single POSIX bootstrap script for
+  the e2e-panel workspace, called by both `ci.yml` and `release.yml` (extraction
+  killed the hand-synced 39-line duplicate; hygiene pinned by
+  `tests/contract/test_ci_workflow_hygiene.py`).
 - `.github/workflows/release.yml` — the PyPI release pipeline, fired on `main`
   pushes: a version-vs-tag check job gates everything; five test legs (unit-fast,
-  contract-coverage, integration, e2e-python, e2e-panel) re-run on the release
+  contract-coverage, integration, e2e-python, e2e-panel — the e2e-panel leg uses the
+  same shared `bootstrap-panel-ws.sh`) re-run on the release
   commit; then build (sdist+wheel) → the `release-gate` approval environment →
   OIDC trusted publishing to PyPI + tag push → a post-publish smoke job
   (ubuntu/py3.12: `pip install` from PyPI, `dadaia --help`, `dadaia init` in a

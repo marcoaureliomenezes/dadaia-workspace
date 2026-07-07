@@ -15,7 +15,11 @@ never-keep-the-past law. R10 (v0.1.58) consumed `harness-isolation-profiles` +
 both removed from this index per removal-on-release), resolved the two reopened HIGH
 consumer-fan-out data-loss bugs, and returned four items (indexed below). **With R12 the
 R1–R12 operator-approved plan is COMPLETE; the `plugin-scope` deviation class is retired
-(plugin capability is now installable via `dadaia plugin install`).**
+(plugin capability is now installable via `dadaia plugin install`).** **v0.1.61
+(audit-remediation, merged `3965df4c`, PR #116, 2026-07-07) consumed
+`selfrepo-agents-md-doubled-header`** (`status: delivered`, removed from this index per
+removal-on-release; archived at closure) and returned two items
+(`platform-seam-todo-retirement` + `specs-doctor-partial-archive-invariant`, indexed below).
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
@@ -125,9 +129,19 @@ resolved dir is `is_relative_to(repos/)` or reject a multi-component / traversal
 at `workspace_guardrail.py#_install_guardrail_pair`. Override: `REJECTED — trusted-input` if
 `spec_contexts.json` is deemed fully first-party.
 
-### `selfrepo-agents-md-doubled-header` — Self-repo AGENTS.md doubled header (doc-pass) *(2026-07-04)*
-Returned at v0.1.58 closure (doc-pass). `repos/dadaia-workspace/AGENTS.md` carries a doubled
-workspace-law header (v0.1.47 hand-sync artifact); the retained `_is_self_repo` fan-out skip
-means it is never auto-rewritten, so it needs a sanctioned hand-sync to collapse to one header.
-Anchored at `workspace_guardrail.py#_is_self_repo` + the self-repo AGENTS.md.
+### `platform-seam-todo-retirement` — Retire the aged `PLATFORM.has_fcntl` TODOs *(2026-07-07)*
+Returned at v0.1.61 closure (audit A-3 deferral). Replace the in-body `sys.platform` checks in
+the lazy adapter factories (`locking.py#_default_workspace_lock`/`_default_context_lock`,
+`telemetry/service.py#_default_refresh_lock`) with the `PLATFORM.has_fcntl` capability flag.
+Deferred because the locking pair is adjacent to the **frozen v0.1.50 no-steal suite**
+(zero-diff or QA-adjudicated repoint required). Grill correction: the audit's cited anchor
+`features-import-infrastructure-direct-debt` was consumed at R6/v0.1.54 — this is the new
+tracked return. Anchored at `features/spec_context/locking.py#_default_workspace_lock`.
+
+### `specs-doctor-partial-archive-invariant` — Doctor invariant for partial archived release dirs *(2026-07-07)*
+Returned at v0.1.61 closure (audit G-23 doctor gap, ADR-5 deferral). WARNING-severity check
+flagging an `_archive/releases/<id>/` dir carrying none of SPEC/PLAN/TASKS/CLOSURE (the
+v0.1.41 GRILL-only residue class); suggests the `wip-abandoned/` relocation + README
+breadcrumb precedent; honors the SPEC-DOC-027 legacy allowlist. Anchored at
+`features/specs/doctor_release.py#ReleaseValidator`.
 
