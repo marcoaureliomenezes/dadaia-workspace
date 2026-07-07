@@ -25,19 +25,19 @@ QA-2).** A byte-golden of the doctor surface leaks host/OS state through four ch
 is canonicalized at capture so the golden is byte-stable on the 3-OS CI matrix:
 
   * v0.1.55 path/version — every ``tmp_path`` workspace path is stripped to ``<WS>`` and
-    ``os.sep`` normalized to ``/`` (:func:`_norm_path_line`).
+    ``os.sep`` normalized to ``/`` (:func:`tests.helpers.golden_platform.norm_path_line`).
   * v0.1.58 leak (1) host-state cwd-walk — ``_check_public_privacy`` resolves the operator
     denylist by walking up from cwd, so the ``[ok] public-privacy`` marker renders with or
     without the ``(baseline structural scan, no operator denylist)`` suffix depending on the
-    capture tree; both are canonicalized to the bare marker (:func:`_norm_path_line`).
+    capture tree; both are canonicalized to the bare marker (:func:`tests.helpers.golden_platform.norm_path_line`).
   * v0.1.58 leak (2) directory-iteration order — a report list built by iterating a
     directory (e.g. the ``.pi/`` projection lines) has a stable MULTISET but a
     platform-variant SEQUENCE; the golden locks a SORTED multiset, never a byte-sequence
-    (:func:`_sort_line_lists`).
+    (:func:`tests.helpers.golden_platform.sort_line_lists`).
   * v0.1.58 leak (3) OS-phrased exec-probe text — the D-CX-9 probe executes the codex hook
     wrapper, so its error text carries the host OS phrasing (POSIX ``exited 127`` vs Windows
     ``[WinError 193]``); the wrapper path is kept, the OS reason canonicalized
-    (:func:`_canon_env_line`).
+    (:func:`tests.helpers.golden_platform.canon_env_line`).
 
 Additionally, the environmental ``git-dirty`` lines (LIVE source-repo working-tree state,
 not projection behaviour) are dropped (:func:`_is_env_doctor_line`), and the
@@ -54,14 +54,12 @@ A byte diff without that flag is a behaviour regression — fix the consumer, ne
 
 from __future__ import annotations
 
-import json
-import os
-import re
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.golden_platform import assert_golden, is_env_doctor_line, norm_path_line
 
 pytestmark = pytest.mark.integration
 
@@ -74,28 +72,9 @@ _INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
 
 
 # ---------------------------------------------------------------------------
-# Normalization helpers (v0.1.55 path/version + v0.1.58 three-leak-class law)
+# Normalization helpers (v0.1.55 path/version + v0.1.58 three-leak-class law):
+# consolidated into tests/helpers/golden_platform.py (v0.1.64 FR1).
 # ---------------------------------------------------------------------------
-
-
-def _norm_path_line(line: str, ws: Path) -> str:
-    """Normalize a plain-text install/doctor line: strip the fixture root + host-state marker.
-
-    Handles v0.1.55 path/version (fixture ``tmp_path`` → ``<WS>``, ``os.sep`` → ``/``) and
-    v0.1.58 leak-class (1) host-state cwd-walk (the public-privacy baseline-suffix variant is
-    canonicalized to the bare marker — same rationale as the git-dirty exclusion).
-    """
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
-    out = out.replace(
-        "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] public-privacy",
-    )
-    return out.replace("\\", "/")
-
-
-def _is_env_doctor_line(line: str) -> bool:
-    """A doctor line whose content is environmental (LIVE source-repo git state), not behaviour."""
-    return "git-dirty" in line
 
 
 def _is_plugins_line(line: str) -> bool:
@@ -110,40 +89,18 @@ def _is_plugins_line(line: str) -> bool:
     return "stage:plugins/" in line or "/.dadaia/agentic/plugins" in line
 
 
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-
-def _canon_env_line(line: str) -> str:
-    """Canonicalize OS-dependent doctor line text (v0.1.58 leak-class (3) OS-phrased probe).
-
-    The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is the host OS's
-    phrasing (POSIX ``exited 127 ... missing executable``; Windows ``[WinError 193]``). The
-    invariant is that the probe errored for that wrapper — not the OS's words. Keep the
-    wrapper path, canonicalize the reason.
-    """
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
-
-
-def _sort_line_lists(obj: object) -> object:
-    """Sort every list-of-strings in the captured object (v0.1.58 leak-class (2) dir order).
-
-    Directory-iteration order differs across OSes, and iteration order is not a product
-    contract. The golden locks the exact MULTISET per key — order-insensitive,
-    count-preserving. String lines are additionally canonicalized for OS-dependent probe
-    text (:func:`_canon_env_line`).
-    """
-    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
-        return sorted(_canon_env_line(x) for x in obj)
-    if isinstance(obj, dict):
-        return {k: _sort_line_lists(v) for k, v in obj.items()}
-    return obj
-
-
 # ---------------------------------------------------------------------------
 # Capture functions
 # ---------------------------------------------------------------------------
+
+
+def _golden_a_message(what: str) -> str:
+    return (
+        f"{what} diverged from the committed v0.1.60 golden (a) — the change altered "
+        "observable pre-descriptor install/doctor behaviour. Fix the consumer, never the "
+        "golden. If ONLY stage:plugins/* lines moved, that is golden (b)'s territory "
+        "(SPEC AC-5) and must be excluded here — otherwise STOP and adjudicate."
+    )
 
 
 def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
@@ -154,7 +111,7 @@ def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
         ws.mkdir()
         installed = mgr.install(ws, target=target)
         result[target] = [
-            _norm_path_line(line, ws) for line in installed if not _is_plugins_line(line)
+            norm_path_line(line, ws) for line in installed if not _is_plugins_line(line)
         ]
     return result
 
@@ -166,39 +123,15 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
     return [
-        _norm_path_line(line, ws)
+        norm_path_line(line, ws)
         for line in report
-        if not _is_env_doctor_line(line) and not _is_plugins_line(line)
+        if not is_env_doctor_line(line) and not _is_plugins_line(line)
     ]
 
 
 # ---------------------------------------------------------------------------
 # Golden compare / update
 # ---------------------------------------------------------------------------
-
-
-def _assert_golden(path: Path, current_obj: object, what: str) -> None:
-    current_obj = _sort_line_lists(current_obj)
-    current = json.dumps(current_obj, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-    if os.environ.get("UPDATE_INSTALL_GOLDENS"):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(current, encoding="utf-8")
-        pytest.skip(f"regenerated {what} golden (UPDATE_INSTALL_GOLDENS set)")
-    golden = (
-        json.dumps(
-            _sort_line_lists(json.loads(path.read_text(encoding="utf-8"))),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-        + "\n"
-    )
-    assert current == golden, (
-        f"{what} diverged from the committed v0.1.60 golden (a) — the change altered "
-        "observable pre-descriptor install/doctor behaviour. Fix the consumer, never the "
-        "golden. If ONLY stage:plugins/* lines moved, that is golden (b)'s territory "
-        "(SPEC AC-5) and must be excluded here — otherwise STOP and adjudicate."
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -208,12 +141,22 @@ def _assert_golden(path: Path, current_obj: object, what: str) -> None:
 
 def test_pre_descriptor_install_targets_are_byte_identical(tmp_path: Path) -> None:
     """AC-1: install() per-target ``installed`` lists reproduce byte-identically (golden a)."""
-    _assert_golden(_INSTALL_GOLDEN, _capture_install(tmp_path), "plugin-golden-a-install-targets")
+    assert_golden(
+        _INSTALL_GOLDEN,
+        _capture_install(tmp_path),
+        "plugin-golden-a-install-targets",
+        message=_golden_a_message("plugin-golden-a-install-targets"),
+    )
 
 
 def test_pre_descriptor_doctor_report_is_byte_identical(tmp_path: Path) -> None:
     """AC-1: doctor()'s all-four (no-profile) report reproduces byte-identically (golden a)."""
-    _assert_golden(_DOCTOR_GOLDEN, _capture_doctor(tmp_path), "plugin-golden-a-doctor-report")
+    assert_golden(
+        _DOCTOR_GOLDEN,
+        _capture_doctor(tmp_path),
+        "plugin-golden-a-doctor-report",
+        message=_golden_a_message("plugin-golden-a-doctor-report"),
+    )
 
 
 def test_golden_a_capture_is_non_vacuous(tmp_path: Path) -> None:

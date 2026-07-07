@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -12,21 +11,9 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.golden_platform import norm_stderr
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_BOX_CHARS = "│╭╮╰╯─"
-
-
-def _norm_stderr(output: str) -> str:
-    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
-
-    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
-    env-dependent width, splitting ``No such option: --model`` across borders;
-    locally (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace.
-    """
-    text = _ANSI_RE.sub("", output)
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)
+# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
 
 
 _runner = CliRunner()
@@ -186,7 +173,7 @@ def test_lifecycle_implement_rejects_raw_step_model_and_unknown_model(
         ],
     )
     assert dep.exit_code == 2
-    assert "No such option: --model" in _norm_stderr(dep.stderr)
+    assert "No such option: --model" in norm_stderr(dep.stderr)
     assert dep.stdout == ""
 
 

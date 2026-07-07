@@ -42,6 +42,7 @@ from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.workspace_guardrail import _CANONICAL_AGENTS_BANNER
+from tests.helpers.golden_platform import assert_golden, is_env_doctor_line, norm_path_line
 
 # NEVER pass mix_stderr (removed in Click 8.2) — QA-atom law (v0.1.57).
 _runner = CliRunner()
@@ -75,34 +76,7 @@ _HAND_AUTHORED = "# My Game Repo\n\nHand-authored, repo-specific rules. NOT lib-
 _GOLDEN_DIR = Path(__file__).resolve().parent.parent.parent / "integration" / "_golden"
 _DOCTOR_GOLDEN_B = _GOLDEN_DIR / "plugin_doctor_report_golden_b_v0160.json"
 
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-
-def _norm_path_line(line: str, ws: Path) -> str:
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
-    out = out.replace(
-        "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] public-privacy",
-    )
-    return out.replace("\\", "/")
-
-
-def _is_env_doctor_line(line: str) -> bool:
-    return "git-dirty" in line
-
-
-def _canon_env_line(line: str) -> str:
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
-
-
-def _sort_line_lists(obj: object) -> object:
-    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
-        return sorted(_canon_env_line(x) for x in obj)
-    if isinstance(obj, dict):
-        return {k: _sort_line_lists(v) for k, v in obj.items()}
-    return obj
+# Normalization helpers: consolidated into tests/helpers/golden_platform.py (v0.1.64 FR1).
 
 
 def _capture_doctor(tmp_path: Path) -> list[str]:
@@ -111,24 +85,11 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
-    return [_norm_path_line(line, ws) for line in report if not _is_env_doctor_line(line)]
+    return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 
-def _assert_matches_golden(path: Path, current_obj: object, what: str) -> None:
-    current = (
-        json.dumps(_sort_line_lists(current_obj), indent=2, ensure_ascii=False, sort_keys=True)
-        + "\n"
-    )
-    golden = (
-        json.dumps(
-            _sort_line_lists(json.loads(path.read_text(encoding="utf-8"))),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-        + "\n"
-    )
-    assert current == golden, (
+def _golden_b_message(what: str) -> str:
+    return (
         f"{what} diverged from the committed v0.1.60 golden (b) — the descriptors-present "
         "zero-plugin baseline changed. Fix the consumer, never the golden."
     )
@@ -255,7 +216,13 @@ def test_a_fresh_no_plugin_stubs_doctor_green_and_golden_b_bytelock(
     # tests/integration/test_plugin_projection.py — so it is not re-run here to keep the
     # E2E module comfortably inside its ~10s wall-time bound).
     zero_plugin_doctor = _capture_doctor(tmp_path)
-    _assert_matches_golden(_DOCTOR_GOLDEN_B, zero_plugin_doctor, "doctor golden b")
+    assert_golden(
+        _DOCTOR_GOLDEN_B,
+        zero_plugin_doctor,
+        "doctor golden b",
+        update_env=None,  # e2e REPRODUCES the integration-owned golden; it never regenerates it
+        message=_golden_b_message("doctor golden b"),
+    )
 
     # descriptors-present, zero-plugin doctor is GREEN — no [missing]/[drift] blockers (derived
     # from the same single golden capture; the real `dadaia public doctor` CLI exit-0 surface is

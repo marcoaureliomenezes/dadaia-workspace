@@ -30,9 +30,6 @@ A byte diff without that flag is a behaviour regression — fix the consumer, ne
 
 from __future__ import annotations
 
-import json
-import os
-import re
 from pathlib import Path
 
 import pytest
@@ -41,6 +38,7 @@ from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.golden_platform import assert_golden, is_env_doctor_line, norm_path_line
 
 pytestmark = pytest.mark.integration
 
@@ -53,38 +51,9 @@ _INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
 
 
 # ---------------------------------------------------------------------------
-# Normalization helpers (v0.1.55 path/version + v0.1.58 three-leak-class law)
+# Normalization helpers (v0.1.55 path/version + v0.1.58 three-leak-class law):
+# consolidated into tests/helpers/golden_platform.py (v0.1.64 FR1).
 # ---------------------------------------------------------------------------
-
-
-def _norm_path_line(line: str, ws: Path) -> str:
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
-    out = out.replace(
-        "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] public-privacy",
-    )
-    return out.replace("\\", "/")
-
-
-def _is_env_doctor_line(line: str) -> bool:
-    return "git-dirty" in line
-
-
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-
-def _canon_env_line(line: str) -> str:
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
-
-
-def _sort_line_lists(obj: object) -> object:
-    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
-        return sorted(_canon_env_line(x) for x in obj)
-    if isinstance(obj, dict):
-        return {k: _sort_line_lists(v) for k, v in obj.items()}
-    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +68,7 @@ def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
         ws = tmp_path / f"install_{target}"
         ws.mkdir()
         installed = mgr.install(ws, target=target)
-        result[target] = [_norm_path_line(line, ws) for line in installed]
+        result[target] = [norm_path_line(line, ws) for line in installed]
     return result
 
 
@@ -109,26 +78,11 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
-    return [_norm_path_line(line, ws) for line in report if not _is_env_doctor_line(line)]
+    return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 
-def _assert_golden(path: Path, current_obj: object, what: str) -> None:
-    current_obj = _sort_line_lists(current_obj)
-    current = json.dumps(current_obj, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-    if os.environ.get("UPDATE_INSTALL_GOLDENS"):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(current, encoding="utf-8")
-        pytest.skip(f"regenerated {what} golden (UPDATE_INSTALL_GOLDENS set)")
-    golden = (
-        json.dumps(
-            _sort_line_lists(json.loads(path.read_text(encoding="utf-8"))),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-        + "\n"
-    )
-    assert current == golden, (
+def _golden_b_message(what: str) -> str:
+    return (
         f"{what} diverged from the committed v0.1.60 golden (b) — installing zero plugins "
         "changed the descriptors-present baseline. Fix the consumer, never the golden."
     )
@@ -141,12 +95,22 @@ def _assert_golden(path: Path, current_obj: object, what: str) -> None:
 
 def test_descriptors_present_zero_plugin_install_equals_golden_b(tmp_path: Path) -> None:
     """AC-5: install() (all targets) with descriptors present + no plugin == golden (b)."""
-    _assert_golden(_INSTALL_GOLDEN_B, _capture_install(tmp_path), "plugin-golden-b-install-targets")
+    assert_golden(
+        _INSTALL_GOLDEN_B,
+        _capture_install(tmp_path),
+        "plugin-golden-b-install-targets",
+        message=_golden_b_message("plugin-golden-b-install-targets"),
+    )
 
 
 def test_absent_plugin_doctor_byte_equals_golden_b(tmp_path: Path) -> None:
     """AC-5: doctor() with descriptors present + no plugin installed == golden (b)."""
-    _assert_golden(_DOCTOR_GOLDEN_B, _capture_doctor(tmp_path), "plugin-golden-b-doctor-report")
+    assert_golden(
+        _DOCTOR_GOLDEN_B,
+        _capture_doctor(tmp_path),
+        "plugin-golden-b-doctor-report",
+        message=_golden_b_message("plugin-golden-b-doctor-report"),
+    )
 
 
 def test_golden_b_includes_descriptor_stage_lines(tmp_path: Path) -> None:

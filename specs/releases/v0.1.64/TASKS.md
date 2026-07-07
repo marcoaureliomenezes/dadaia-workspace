@@ -57,7 +57,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
     `lint-imports --no-cache` **9 kept / 0 broken** (REBASE NOTE: TASKS' "8/0" predates v0.1.61 — base truth is
     9/0, `_RECORDED_IGNORE_EDGE_CAP = 36`, unchanged by this task).
 
-- [-] T-64-11 Byte-identical adoption by the 13 duplicate sites. Owner: software-engineer.
+- [x] T-64-11 Byte-identical adoption by the 13 duplicate sites. Owner: software-engineer.
   Write set: EDIT `tests/unit/infrastructure/test_install_target_goldens.py`,
   `tests/unit/infrastructure/test_public_assets_profile.py`, `tests/integration/test_plugin_install_goldens.py`,
   `tests/integration/test_plugin_projection.py`, `tests/e2e/features/test_plugin_pipeline.py`,
@@ -75,6 +75,39 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   - AC-9 sabotage (f) re-point one adopter at a re-added stale local copy ⇒ the AC-1 grep test FAILS → revert.
   - Fate ledger — per file: which local helpers DELETED, which adopter imports NEW; grep transcript incl. tests/ +
     docstrings. Commit `refactor(T-64-11): ...`.
+  - **EVIDENCE (2026-07-07, software-engineer):** per-file ledger —
+    `test_install_target_goldens.py` DELETED `_norm_path_line/_norm_panel_body/_is_env_doctor_line/
+    _canon_env_line/_sort_line_lists/_assert_golden/_TS_RE/_DCX9_WRAPPER_RE`, NEW import
+    `assert_golden/is_env_doctor_line/norm_panel_body/norm_path_line` (+ local `_v0158_message`);
+    `test_public_assets_profile.py` cross-test import KILLED, NEW import
+    `is_env_doctor_line/norm_path_line/sort_line_lists` + local `_DOCTOR_GOLDEN` constant;
+    `test_plugin_install_goldens.py` DELETED trio + `_assert_golden` + `_DCX9`, kept local `_is_plugins_line` +
+    `_golden_a_message`, NEW import `assert_golden/is_env_doctor_line/norm_path_line`, docstring refs repointed;
+    `test_plugin_projection.py` same DELETE set, same NEW import + local `_golden_b_message`;
+    `test_plugin_pipeline.py` (e2e) DELETED trio + `_assert_matches_golden`, NEW import with
+    `assert_golden(..., update_env=None)` (reproduction site never regens); bespoke `_squash`
+    (whitespace-DROPPING, not a copy) stays local; 7× CLI files (`test_plugin_cli`, `test_init_harness`,
+    `test_lifecycle_cli`, `test_model_flag_removed_ac9`, `test_implement_review_cli`,
+    `test_lifecycle_fr2_wire_verbs`, `test_lifecycle_verb_governance`) DELETED `_ANSI_RE/_BOX_CHARS/
+    _norm_stderr`, NEW import `norm_stderr`; `test_lifecycle_policy_cli.py` DELETED `_ANSI/_BOX` + the `_norm`
+    body → thin `_norm` delegate to `norm_stderr(..., wide_glyphs=True)`. **REBASE DISCOVERY:**
+    `tests/integration/test_plugin_uninstall.py` (landed v0.1.63 — post-enumeration 14th duplicate site) carried
+    verbatim copies of `_norm_path_line/_is_env_doctor_line/_canon_env_line/_DCX9` — adopted alongside the 13
+    (bespoke `_norm_doctor` composition stays local). AC-1 grep contract test added
+    (`tests/unit/helpers/test_no_local_helper_copies.py`: no re-declared consolidated helper `def` tests-wide,
+    with the SPEC-FR2 bespoke exemptions cited explicitly — `test_fragment_gate_goldens.py`,
+    `test_api_golden.py`, `specs/test_doctor_golden.py` — and the `test_install_target_goldens` cross-import
+    stays dead). **AC-1 PROOF:** `git diff --stat -- 'tests/**/_golden'` EMPTY (zero golden regen); full
+    unpiped pytest with `UPDATE_INSTALL_GOLDENS` unset → **exit 0, 4800 passed / 17 skipped** (branch-point
+    4795 collected + 22 new helper/contract tests = 4817). Grep transcript: `grep -rn "def _norm_path_line|def
+    _canon_env_line|def _sort_line_lists|def _norm_stderr|def _assert_golden|def _assert_matches_golden|def
+    _norm_panel_body|def _is_env_doctor_line" tests/` → only the cited bespoke exemptions;
+    `grep -rn "test_install_target_goldens import" tests/` → none. AC-9 sabotage (f): re-added a stale local
+    `norm_stderr` copy in `test_init_harness.py` ⇒ `test_no_test_file_redeclares_a_consolidated_helper` FAILED →
+    reverted, 22/22 green. Gates: `ruff format --check` 0, `ruff check --no-cache` 0, `mypy --strict
+    dadaia_workspace/` 0 (tests outside CI mypy scope; residual test-file mypy notes verified PRE-EXISTING at
+    merge base), `lint-imports --no-cache` 9 kept / 0 broken, ignore-cap 36 (rebase-true base, supersedes the
+    stale "8/0" text).
 
 ## W2 — FR3/FR4 entry-harness auto-default + PI seam
 

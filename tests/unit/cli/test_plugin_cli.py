@@ -22,22 +22,14 @@ CI width.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.golden_platform import norm_stderr
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_BOX_CHARS = "│╭╮╰╯─"
-
-
-def _norm_stderr(output: str) -> str:
-    """Width-independent normalization of Typer/Rich error output (v0.1.57 QA-atom law)."""
-    text = _ANSI_RE.sub("", output)
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)
+# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
 
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it).
@@ -69,7 +61,7 @@ def test_plugin_install_bad_value_is_bad_parameter(tmp_path: Path, monkeypatch) 
     monkeypatch.chdir(_workspace(tmp_path))
     result = _runner.invoke(app, ["plugin", "install", "bogus"])
     assert result.exit_code == 2
-    norm = _norm_stderr(result.stderr)
+    norm = norm_stderr(result.stderr)
     assert "bogus" in norm, norm
     assert "plugin" in norm, norm
     # The UsageError is on stderr — no partial payload leaks to stdout.
@@ -145,7 +137,7 @@ def test_plugin_uninstall_unknown_pack_is_bad_parameter(tmp_path: Path, monkeypa
     monkeypatch.chdir(_workspace(tmp_path))
     result = _runner.invoke(app, ["plugin", "uninstall", "bogus"])
     assert result.exit_code == 2
-    norm = _norm_stderr(result.stderr)
+    norm = norm_stderr(result.stderr)
     assert "bogus" in norm, norm
     assert result.stdout == ""
 
