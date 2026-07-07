@@ -424,3 +424,51 @@ def test_g_installed_plugins_coexists_with_harness_profile_state(
     _assert_real_pack_body(ws, "frontend-engineer")
     assert not (ws / ".codex" / "agents" / "frontend-engineer.toml").exists(), "codex orphan"
     assert not (ws / ".codex").exists() or not any((ws / ".codex").rglob("frontend-engineer*"))
+
+
+# ---------------------------------------------------------------------------
+# (h/v0.1.63 T-63-11) install → uninstall → REINSTALL through the real CLI —
+# uninstall restores the stubs + drops the ledger, and reinstall lands the real
+# pack bodies again, proving uninstall leaves a fully re-installable state.
+# @pytest.mark.slow, per-test wall-time bracket ≤ ~12s (QA63-2).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow
+def test_h_install_uninstall_reinstall_leaves_reinstallable_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    start = time.monotonic()
+    ws = _init(tmp_path / "ws", "all")
+
+    # Install: real pack bodies land.
+    assert _cli(monkeypatch, ws, "plugin", "install", "frontend-design").exit_code == 0
+    _assert_real_pack_body(ws, "frontend-engineer")
+    _assert_real_pack_body(ws, "design-specialist")
+    assert _ledger_plugins(ws) == ("frontend-design",)
+
+    # Uninstall via the real CLI verb: stubs restored, ledger dropped, doctor green.
+    result = _cli(monkeypatch, ws, "plugin", "uninstall", "frontend-design")
+    assert result.exit_code == 0, result.output
+    assert "frontend-engineer" in result.output and "design-specialist" in result.output
+    for stem in _PLUGIN_AGENTS["frontend-design"]:
+        assert _is_plugin_stub(_claude_agent_text(ws, stem)), f"{stem} not a stub post-uninstall"
+    assert _ledger_plugins(ws) == ()
+    doctor = _cli(monkeypatch, ws, "plugin", "doctor")
+    assert doctor.exit_code == 0, doctor.output
+    assert "no plugin packs installed" in doctor.output
+    assert _cli(monkeypatch, ws, "public", "doctor").exit_code == 0
+
+    # Reinstall: the real bodies land AGAIN — the uninstalled state is re-installable.
+    result = _cli(monkeypatch, ws, "plugin", "install", "frontend-design")
+    assert result.exit_code == 0, result.output
+    _assert_real_pack_body(ws, "frontend-engineer")
+    _assert_real_pack_body(ws, "design-specialist")
+    assert _ledger_plugins(ws) == ("frontend-design",)
+    toml = (ws / ".codex" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
+    assert 'model = "gpt-5.3-codex"' in toml, "reinstall did not re-land the pack codex render"
+
+    elapsed = time.monotonic() - start
+    assert elapsed < 12.0, f"reinstall e2e leg exceeded its ~12s bracket ({elapsed:.1f}s)"

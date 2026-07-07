@@ -78,7 +78,11 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
   - Done: all W1 tests green; full gates green; conventional commits per marker protocol.
   - Parallelism: none (single owner, shared machinery files).
 
-- [-] T-63-11 E2E pipeline leg. Owner: software-engineer. Write set:
+- [x] T-63-11 E2E pipeline leg. Owner: software-engineer. **DONE 2026-07-07.** New leg (h)
+  `test_h_install_uninstall_reinstall_leaves_reinstallable_state` — install → CLI `uninstall` (stubs restored,
+  ledger dropped, `plugin doctor` [not-applicable], `public doctor` exit 0) → reinstall (real bodies + pack
+  codex render land again). `@pytest.mark.slow`; measured **1.02s** (≤ ~12s bracket, QA63-2); module total
+  7.11s, all 6 existing legs SURVIVE green. Write set:
   `tests/e2e/features/test_plugin_pipeline.py`. Precondition: T-63-10 `[x]`. Extend the existing pipeline with
   install→uninstall→**reinstall** (reinstall lands the real bodies again — proves uninstall leaves a
   re-installable state). **Wall-time bracket (QA63-2 — concrete, not "within budget"):** <!-- AMEND:QA63-2 -->
