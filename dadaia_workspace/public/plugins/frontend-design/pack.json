@@ -6,7 +6,10 @@
     "design-specialist"
   ],
   "skills": [
-    "browser-frontend-implementation"
+    "browser-frontend-implementation",
+    "design-system-authoring",
+    "frontend-component-architecture",
+    "visual-review-protocol"
   ],
   "rules": []
 }

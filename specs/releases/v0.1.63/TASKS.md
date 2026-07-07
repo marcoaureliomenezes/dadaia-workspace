@@ -92,7 +92,24 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W2 — FR4 frontend-design skill corpus
 
-- [ ] T-63-20 Three frontend-design skills + wiring + recorded ceiling amendment. Owner: ai-engineer. Write set:
+- [x] T-63-20 Three frontend-design skills + wiring + recorded ceiling amendment. Owner: ai-engineer. **DONE
+  2026-07-07.** RED captured: `test_exactly_the_two_named_skills_ship_per_pack` FAILED against the 3 new skill
+  dirs ("pack skill set drifted from the Ruling 12 ceiling: [+design-system-authoring,
+  +frontend-component-architecture, +visual-review-protocol]"). **Recorded ceiling amendment (roster diff):**
+  `_PACK_SKILL` (1 skill/pack scalar map) + `_EXPECTED_SKILLS` → `_PACK_SKILLS` per-pack roster MAP;
+  `frontend-design: [browser-frontend-implementation] → [browser-frontend-implementation,
+  design-system-authoring, frontend-component-architecture, visual-review-protocol]` (4); devops unchanged at
+  `[github-actions-cicd]` (T-63-30 appends). Contract generalized: roster == pack.json skills[] == on-disk
+  dirs; ctx-adapter duplication assert parametrized to cover `visual-review-protocol` (references
+  `design-ctx`/`frontend-ctx` BY NAME, emit-block markers absent); NEW all-skill frontmatter-law +
+  no-emit-block sweep. **Recorded golden amendment (T-60-11 precedent):** the 3 new staged skills add exactly
+  3 `[ok] stage:plugins/frontend-design/skills/*/SKILL.md` lines to `doctor_all_four_v0158.json` +
+  `plugin_doctor_report_golden_b_v0160.json` (regen via `UPDATE_INSTALL_GOLDENS=1`; zero runtime-projection
+  lines — never-installed-equivalence semantics intact; AC-2/W1 suites green post-regen). Wiring:
+  `design-specialist` frontmatter += design-system-authoring + visual-review-protocol; `frontend-engineer`
+  += frontend-component-architecture. Privacy self-check grep clean (no local paths/names). Gates: ruff
+  format --check 0, ruff check --no-cache 0, mypy --strict dadaia_workspace/ 0, full unpiped pytest
+  **4771 passed / 17 skipped, exit 0**. Write set:
   `public/plugins/frontend-design/skills/{design-system-authoring,frontend-component-architecture,visual-review-protocol}/SKILL.md`
   (NEW), `public/plugins/frontend-design/pack.json`,
   `public/plugins/frontend-design/agents/{design-specialist,frontend-engineer}.md` (frontmatter `skills:` only),
@@ -112,7 +129,7 @@ command + failing test + revert. Rebase-and-reverify note (SPEC §0) applies to 
 
 ## W3 — FR5 devops skill corpus
 
-- [ ] T-63-30 Three devops skills + wiring + roster append. Owner: ai-engineer. Write set:
+- [-] T-63-30 Three devops skills + wiring + roster append. Owner: ai-engineer. Write set:
   `public/plugins/devops/skills/{gitflow-release-engineering,container-build-and-deploy,cicd-security-hardening}/SKILL.md`
   (NEW), `public/plugins/devops/pack.json`, `public/plugins/devops/agents/devops-engineer.md` (frontmatter
   `skills:` only), `tests/unit/infrastructure/test_plugin_content.py` (roster-map APPEND only). Preconditions:
