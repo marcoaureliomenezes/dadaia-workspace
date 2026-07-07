@@ -144,7 +144,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
     (d) echo-dropped ⇒ 4 FAIL captured+reverted. Gates: ruff format --check 0, ruff check 0, mypy --strict
     dadaia_workspace/ 0, lint-imports 9 kept/0 broken, full pytest 4833 passed/18 skipped exit 0.
 
-- [-] T-64-21 PI entry-signal seam in the Ring-1 extension. Owner: software-engineer (ai-engineer sign-off on the
+- [x] T-64-21 PI entry-signal seam in the Ring-1 extension. Owner: software-engineer (ai-engineer sign-off on the
   `public/**` surface). Write set: EDIT `dadaia_workspace/public/pi/extensions/dadaia-sdd-gate.ts`, NEW grep-level
   contract test (e.g. `tests/contract/test_pi_entry_signal.py`).
   Checklist:
@@ -157,6 +157,11 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   - Preconditions: T-64-20 done. Done: grep contract green; `public doctor` `[ok] public-privacy` at W4 (AC-5).
   - Fate ledger — one lib-asset EDIT (manifest-tracked; propagates at W4 via stage/install, never hand-edited in
     projections). Commit `feat(T-64-21): ...`.
+  - Evidence (2026-07-07): guarded pin at factory load (set-only-when-unset) + ARCH64-2 posture header in
+    `dadaia_workspace/public/pi/extensions/dadaia-sdd-gate.ts`; contract `tests/contract/test_pi_entry_signal.py`
+    (canonical guard + exactly-one-assignment + posture needles green; staged copy fail-soft pre-W4 skip).
+    No other TS change; stage/install deferred to W4. Gates: ruff format/check 0, mypy --strict 0,
+    lint-imports 9/0, full pytest 4835 passed/19 skipped exit 0.
 
 ## W3 — FR5 `tier:` → `dispatch_band:` rename (strictly AFTER W1)
 
