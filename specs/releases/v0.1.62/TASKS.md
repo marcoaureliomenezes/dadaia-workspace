@@ -228,14 +228,24 @@ any UNdeclared collision = STOP-and-rescope to PM. <!-- AMEND:ARCHX-1 -->
 
 ## W5a — FR7 response-guard chip assertion (∥ W4 permitted — disjoint write set)
 
-- [ ] T-62-50 Require the memory chip in both e2e guards. Owner: qa-engineer. Write set:
+- [x] T-62-50 Require the memory chip in both e2e guards. Owner: qa-engineer. Write set:
   `tests/e2e/panel/response-guard.spec.ts` ONLY. Checklist:
   - Replace BOTH null-guards (L76-83, L128-131): `await page.waitForSelector('.memory-chip', { timeout: 8000 })` →
-    click → settle; delete the `if (firstChip)` branches; update the module docblock (chip REQUIRED).
+    click → settle; delete the `if (firstChip)` branches; update the module docblock (chip REQUIRED). **DONE** —
+    both guards now `waitForSelector('.memory-chip', { timeout: 8000 })` → `click('.memory-chip')` → networkidle
+    settle; both `if (firstChip)` branches deleted; docblock states the chip is REQUIRED (FR7/ADR-8, defence-in-depth
+    behind the DOM-contract unit lock). Local playwright run (self-started panel fixture, port 5163): `2 passed (9.8s)`.
   - **AC-9 sabotage replay:** rename `.memory-chip` in `features/panel/views/index.py` (v0.1.59 AC-9(e)) ⇒ unit DOM
     lock FAILS AND the local playwright run now FAILS (pre-fix: "2 passed") ⇒ revert ⇒ both green. Captured here.
+    **CAPTURED** — sabotage `class="memory-chip"` → `class="memory-chip-SABOTAGED"` (5 chip anchors, index.py:234-238):
+    (a) unit lock `test_memory_chip_present_with_populated_context` FAILED — `AssertionError: .memory-chip absent`
+    (1 failed / 25 passed); (b) local playwright `2 failed` — BOTH guards timed out at
+    `waitForSelector('.memory-chip', { timeout: 8000 })` (spec.ts:84 / :136), where the pre-fix null-guard yielded
+    "2 passed". Reverted via `git checkout -- index.py`: unit panel suite 578 passed, e2e `2 passed (8.0s)`.
   - Fate ledger: `test_index_dom_contract.py` byte-identical (primary lock SURVIVES); other panel specs untouched.
-  Done: local e2e green; GH e2e-panel job re-proves at W5 push.
+    **VERIFIED** — `git status` post-work shows only `response-guard.spec.ts` + this TASKS.md modified;
+    `tests/unit/features/panel/` 578 passed post-revert; no TS lint configured for `tests/e2e/` (none to run).
+  Done: local e2e green (`2 passed`); GH e2e-panel job re-proves at W5 push.
 
 ## W5 — gates + ship
 

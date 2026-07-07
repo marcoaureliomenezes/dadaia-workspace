@@ -19,6 +19,14 @@
  *   memory chip click). CSP-policy-string console errors are excluded because
  *   they are browser-internal metadata logs, not JS errors from the panel.
  *
+ * The memory chip is REQUIRED (v0.1.62 FR7 / ADR-8): the e2e fixture
+ *   deterministically seeds >= 1 context with memory atoms (bootstrap-panel-ws.sh
+ *   fast-fails otherwise), so a missing `.memory-chip` is a real regression —
+ *   both guards `waitForSelector('.memory-chip')` and fail loudly if absent.
+ *   There is no graceful-empty branch. This is defence-in-depth behind the
+ *   DOM-contract unit lock (test_index_dom_contract.py), which stays the
+ *   primary selector lock.
+ *
  * v0.1.45 redesign: the Agentic (ops) tab, agents grid, personas UI, and Kanban
  *   view were removed. The tour now covers the surviving nav set.
  */
@@ -69,18 +77,17 @@ test('E2E-GUARD-01 — No status >= 400 during full tab tour and memory chip cli
     });
   }
 
-  // Go back to memories tab and click the first memory chip (if any card exists)
+  // Go back to memories tab and click the first memory chip. The chip is
+  // REQUIRED — the fixture seeds >= 1 context, so absence is a regression.
   await page.click('#tab-memories');
   await page.waitForSelector('#section-memories.active', { timeout: 8000 });
 
-  const firstChip = await page.$('.memory-chip');
-  if (firstChip) {
-    // Open chip in the panel (it navigates to /memory-view/...)
-    await firstChip.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-      // networkidle may timeout if the memory frame loads slowly
-    });
-  }
+  // Open chip in the panel (it navigates to /memory-view/...)
+  await page.waitForSelector('.memory-chip', { timeout: 8000 });
+  await page.click('.memory-chip');
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+    // networkidle may timeout if the memory frame loads slowly
+  });
 
   // Build a human-readable failure message listing every failing request
   const message = failedResponses
@@ -121,15 +128,14 @@ test('E2E-GUARD-02 — No console errors during full tab tour and memory chip cl
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
   }
 
-  // Go back to memories tab and click the first memory chip (if any card exists)
+  // Go back to memories tab and click the first memory chip. The chip is
+  // REQUIRED — the fixture seeds >= 1 context, so absence is a regression.
   await page.click('#tab-memories');
   await page.waitForSelector('#section-memories.active', { timeout: 8000 });
 
-  const firstChip = await page.$('.memory-chip');
-  if (firstChip) {
-    await firstChip.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-  }
+  await page.waitForSelector('.memory-chip', { timeout: 8000 });
+  await page.click('.memory-chip');
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
   // Filter known benign browser console entries
   const hardErrors = consoleErrors.filter((e) => {
