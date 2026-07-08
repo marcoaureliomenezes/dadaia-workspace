@@ -91,6 +91,10 @@ def classify_result_payload(payload: dict[str, object], expected_schema: str) ->
        requested ``expected_schema`` id. This is the documented happy path now that the
        prompt contract is coherent (one field ``schema``, one value the transport id).
        It is checked FIRST so a both-valid payload always classifies as strict.
+       ``schema_version`` is accepted as an equivalent label to ``schema`` (FR2, bug:
+       lifecycle-agent-run-result-extraction-too-strict) — a real worker that names the
+       transport id under either field genuinely IS the result object; ``schema`` is
+       checked first so a payload carrying both prefers the documented field name.
     2. **STRUCTURAL (documented fallback)** — a real GPT/Codex worker reliably emits the
        result *object* but labels the ``schema`` field inconsistently across runs (omits
        it, or names the fragment's domain schema instead of the transport id — both
@@ -101,7 +105,7 @@ def classify_result_payload(payload: dict[str, object], expected_schema: str) ->
     3. **NONE** — arbitrary JSON lacking the result shape (no schema match AND no non-empty
        ``artifact_refs``) is rejected; a no-op worker (no payload) yields no result → BLOCK.
     """
-    if payload.get("schema") == expected_schema:
+    if payload.get("schema") == expected_schema or payload.get("schema_version") == expected_schema:
         return ResultMatch.STRICT
     refs = payload.get("artifact_refs")
     if (
@@ -133,19 +137,34 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
     ignored; a non-list yields ``()``. (Before this, only ``str`` items were kept, so the
     object form was silently dropped → empty refs → a real review/create step BLOCKed on
     "missing artifact evidence".)
+
+    FR2 (bug: lifecycle-agent-run-result-extraction-too-strict): when the list-based
+    extraction above yields NOTHING, fall back to a singular ``payload["artifact"]["path"]``
+    as a one-element tuple — a real worker that emits a single ``artifact`` object instead
+    of an ``artifact_refs`` list genuinely reported one produced artifact. The fallback is
+    checked ONLY when ``paths`` is still empty after the list-based pass, so a populated
+    ``artifact_refs`` list always wins (AC2.3) — this never turns "nothing emitted" into
+    "something accepted": a payload with neither a populated list nor a well-formed
+    ``artifact.path`` still yields ``()``, preserving the no-op-worker BLOCK invariant.
     """
     raw = payload.get("artifact_refs")
-    if not isinstance(raw, list):
-        return ()
     paths: list[str] = []
-    for item in raw:
-        if isinstance(item, str) and item.strip():
-            paths.append(item)
-        elif isinstance(item, dict):
-            path = item.get("path")
-            if isinstance(path, str) and path.strip():
-                paths.append(path)
-    return tuple(paths)
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                paths.append(item)
+            elif isinstance(item, dict):
+                path = item.get("path")
+                if isinstance(path, str) and path.strip():
+                    paths.append(path)
+    if paths:
+        return tuple(paths)
+    artifact = payload.get("artifact")
+    if isinstance(artifact, dict):
+        path = artifact.get("path")
+        if isinstance(path, str) and path.strip():
+            return (path,)
+    return ()
 
 
 def extract_result_payload(text: str, expected_schema: str | None) -> dict[str, object] | None:

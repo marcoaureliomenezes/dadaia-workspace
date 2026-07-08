@@ -5,13 +5,13 @@ The operator's two-layer model (v0.1.24 ADR-B) makes the Layer-2 worker model a
 exposes an ordered, finite set of ``(model_id, reasoning_effort)`` options:
 
 - **pi → 4 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex, medium)``,
-  ``(kimi-2.7, high)``
+  ``(moonshotai/kimi-k2.5, high)``
 - **codex → 2 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, medium)``
 
 **Allowlist-validated invariant (ADR-B, opened v0.1.44).** PI runs on the operator's
 *Codex* subscription but its model set is **allowlist-validated**, not GPT-only: a
 curated set of Layer-2-native OpenRouter worker ids (:data:`LAYER2_EXTRA_MODEL_IDS`,
-e.g. ``kimi-2.7``) is permitted alongside the registry codex ids. The retained safety
+e.g. ``moonshotai/kimi-k2.5``) is permitted alongside the registry codex ids. The retained safety
 bound is **no ``claude-*`` id** (including the region-restricted ``claude-fable-5``)
 can ever appear at Layer 2 — claude is never a Layer-2 worker. Layer-1 Claude (the
 ``CLAUDE_SDK`` adapter) is unaffected — this catalog governs Layer-2 worker selection
@@ -72,7 +72,7 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
         HarnessModelOption("gpt-5.5", "high"),
         HarnessModelOption("gpt-5.5", "low"),
         HarnessModelOption("gpt-5.3-codex", "medium"),
-        HarnessModelOption("kimi-2.7", "high"),
+        HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     ),
     CODEX_HARNESS: (
         HarnessModelOption("gpt-5.5", "high"),
@@ -96,7 +96,7 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
 # ``telemetry.pricing.compute_cost`` returns ``None`` ("unknown" — never fabricated)
 # for them. Membership is named and explicit — no wildcard.
 # ---------------------------------------------------------------------------
-LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"kimi-2.7"})
+LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"moonshotai/kimi-k2.5"})
 
 
 def _known_codex_ids() -> frozenset[str]:

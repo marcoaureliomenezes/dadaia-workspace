@@ -103,6 +103,15 @@ class PipelineStep:
     # The governance-resolved concrete model for this step (T-28-A-07). Threaded into the
     # step's scope/request so the adapter runs the policy-selected model. Additive-optional.
     resolved_model: ResolvedModelConfig | None = None
+    # FR7 (T-66-08): additive-optional extra write-scope path globs, threaded from the CLI's
+    # ``--write-scope`` option. ``_scope`` unions these into ``allowed_paths`` for NON-REVIEW
+    # steps only (gated on ``is_review is False`` — never a ``label == "implement"`` string
+    # match, which would silently stop covering any future non-review step and could be
+    # bypassed by a differently-labeled review step; ARCHITECT FINDING MEDIUM-2). Review steps
+    # (``is_review=True``) ALWAYS ignore this field and stay handoff-only — they must never
+    # gain production write rights. Default ``()`` preserves today's handoff-only behavior for
+    # every existing caller that does not set it.
+    extra_allowed_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -162,6 +171,7 @@ class LifecyclePipeline:
         handoff_resolver: WorkflowHandoffResolver | None = None,
         max_review_retries: int = 2,
         specs_dir: Path | None = None,
+        handoff_lookup: Callable[[str, str], str | None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -170,6 +180,13 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # FR8 (v0.1.66, DEC-A(iii)): additive-optional handoff-evidence lookup, threaded
+        # into every ``LifecycleAgentRunner`` this pipeline constructs. Mirrors the
+        # ``specs_dir``/``specs_dir_resolver`` pattern below — wired by
+        # ``build_lifecycle_pipeline`` (closing over ``workspace_root``); ``None`` for a
+        # fixture-constructed pipeline (no enrichment, never inert-by-omission in the real
+        # pipeline path).
+        self._handoff_lookup = handoff_lookup
         # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
         # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
         # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
@@ -250,7 +267,11 @@ class LifecyclePipeline:
                 runtime=runtime.runtime_kind(),
                 prefix=self._prefix,
             )
-            runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
+            runner = LifecycleAgentRunner(
+                runtime=runtime,
+                state_machine=self._state_machine,
+                handoff_lookup=self._handoff_lookup,
+            )
             decision = runner.run(
                 run,
                 AgentRunnerInput(
@@ -477,7 +498,11 @@ class LifecyclePipeline:
             runtime=runtime.runtime_kind(),
             prefix=self._prefix,
         )
-        runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
+        runner = LifecycleAgentRunner(
+            runtime=runtime,
+            state_machine=self._state_machine,
+            handoff_lookup=self._handoff_lookup,
+        )
         return runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
@@ -501,13 +526,22 @@ class LifecyclePipeline:
             # The prior review rejection digest (FR3) trails the step prompt so it reaches the
             # built request verbatim; the multi-step ``run`` path passes no digest (default).
             prompt = f"{prompt}\n\n{digest_suffix}"
+        handoff_glob = f".dadaia/handoff/{self._context}/**"
+        # FR7 (T-66-08): the handoff-dir glob is unioned with the step's
+        # extra_allowed_paths for NON-REVIEW steps only. Gated on step.is_review is False
+        # (ARCHITECT MEDIUM-2) — never a label string match — so review steps
+        # (review_qa/review_security/review_code, is_review=True) ALWAYS stay
+        # handoff-only regardless of what extra_allowed_paths carries.
+        allowed_paths = (
+            (handoff_glob, *step.extra_allowed_paths) if not step.is_review else (handoff_glob,)
+        )
         return PromptScope(
             role=step.role,
             context=self._context,
             release_id=self._release_id,
             task_id=f"{run_id}:{step.label}",
             prompt=prompt,
-            allowed_paths=(f".dadaia/handoff/{self._context}/**",),
+            allowed_paths=allowed_paths,
             required_evidence=(GateEvidenceKind.HANDOFF,),
             model_profile=step.model_profile,
             resolved_model=step.resolved_model,

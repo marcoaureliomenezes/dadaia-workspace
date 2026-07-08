@@ -8,6 +8,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunStatus,
@@ -91,6 +93,10 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert isinstance(argv, list)
     assert argv[:2] == ["/usr/bin/codex", "exec"]
     assert "--ignore-user-config" in argv
+    # FR4 (v0.1.66, AC4.1): --skip-git-repo-check MUST accompany --ignore-user-config
+    # so a governed worker in an untrusted directory never fails codex's own trust
+    # check.
+    assert "--skip-git-repo-check" in argv
     assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"]
     # W1-1: `--ask-for-approval` is interactive-only and rejected by `codex exec` on
     # codex-cli 0.142.4; the adapter must NOT pass it (exec never prompts).
@@ -613,3 +619,73 @@ def test_pi_and_codex_share_one_extraction_helper(tmp_path: Path, monkeypatch: A
     # --- codex run (faked subprocess) ---
     _codex_run_with_message(tmp_path, '{"summary":"ignored by spy"}')
     assert len(calls) == 2, "codex_runtime did not call the shared extract_result_payload helper"
+
+
+# ---------------------------------------------------------------------------
+# v0.1.66 FR5 (T-66-03) — DADAIA_CODEX_SANDBOX env override, single choke point.
+# ---------------------------------------------------------------------------
+
+
+def test_sandbox_env_override_reaches_resolved_config(tmp_path: Path, monkeypatch: Any) -> None:
+    """AC5.1: DADAIA_CODEX_SANDBOX=workspace-write overrides the compiled-in default."""
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
+    config = CodexExecConfig(cwd=tmp_path)
+    assert config.sandbox == "workspace-write"
+    assert config.resolved_sandbox == "workspace-write"
+
+
+def test_sandbox_default_stays_read_only_when_env_unset(tmp_path: Path, monkeypatch: Any) -> None:
+    """AC5.2: with DADAIA_CODEX_SANDBOX unset, the resolved sandbox stays read-only —
+    no behavior change for the unset case (regression guard)."""
+    monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
+    config = CodexExecConfig(cwd=tmp_path)
+    assert config.sandbox == "read-only"
+    assert config.resolved_sandbox == "read-only"
+
+
+def test_sandbox_env_invalid_value_fails_loud_at_construction(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """AC5.3: an unrecognized DADAIA_CODEX_SANDBOX value raises at construction — never
+    a silent pass-through to `codex exec`."""
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "not-a-real-value")
+    with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
+        CodexExecConfig(cwd=tmp_path)
+
+
+def test_sandbox_explicit_caller_value_wins_over_env(tmp_path: Path, monkeypatch: Any) -> None:
+    """An explicit caller-supplied sandbox= always wins over the env var — the env var
+    only substitutes for the sentinel default, never overrides an explicit choice."""
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
+    config = CodexExecConfig(cwd=tmp_path, sandbox="danger-full-access")
+    assert config.sandbox == "danger-full-access"
+
+
+def test_sandbox_explicit_caller_invalid_value_still_fails_loud(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A bad explicit caller value fails loud too — validation is unconditional, not
+    only applied to the env-sourced path (single choke point, architect MEDIUM-1)."""
+    monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
+    with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
+        CodexExecConfig(cwd=tmp_path, sandbox="not-a-real-value")
+
+
+def test_sandbox_override_reaches_the_command_argv(tmp_path: Path, monkeypatch: Any) -> None:
+    """The resolved sandbox value (env-overridden or default) reaches the real
+    `_command()` argv — not just the config object."""
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "danger-full-access")
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text(json.dumps({"summary": "done"}), encoding="utf-8")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(_request())
+
+    argv = captured["argv"]
+    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "danger-full-access"]

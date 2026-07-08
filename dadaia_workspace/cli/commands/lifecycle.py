@@ -1601,6 +1601,15 @@ def pipeline(
         "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
         "profiles list'.",
     ),
+    write_scope: list[str] | None = typer.Option(
+        None,
+        "--write-scope",
+        help="Extra write-scope path glob for the implement step ONLY (repeatable). "
+        "FR7 (T-66-08): unions with the handoff-dir scope so an implement worker may "
+        "legally edit the given production/test path(s); review steps are never "
+        "widened. A full TASKS.md write-set parser is out of scope — supply the paths "
+        "explicitly per invocation.",
+    ),
     show_policy: bool = typer.Option(
         False,
         "--show-policy",
@@ -1684,8 +1693,17 @@ def pipeline(
     # carries only the fake-vs-real selection (so `--harness fake` drives the fake adapter
     # while the snapshot still records the governed harness); there is no separate
     # post-resolve runtime_kind swap.
+    # FR7 (T-66-08): --write-scope threads into extra_allowed_paths for non-review steps
+    # ONLY (gated on step.is_review is False, not a label match — ARCHITECT MEDIUM-2);
+    # review steps are never widened. Today the ladder has exactly one non-review step
+    # (implement); this stays structurally correct if the ladder grows another create step.
+    extra_paths = tuple(write_scope or ())
     base = tuple(
-        replace(step, runtime_kind=step_harness_kinds.get(step.label, default_kind))
+        replace(
+            step,
+            runtime_kind=step_harness_kinds.get(step.label, default_kind),
+            extra_allowed_paths=extra_paths if not step.is_review else (),
+        )
         for step in implementation_ladder(default_kind)
     )
     steps = apply_resolved_policy(base, snapshot)

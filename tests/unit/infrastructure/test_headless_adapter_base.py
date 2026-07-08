@@ -36,8 +36,10 @@ from dadaia_workspace.infrastructure import (
 from dadaia_workspace.infrastructure.headless_adapter_base import (
     _SECRET_NAME_PARTS,
     RedactionMixin,
+    ResultMatch,
     SubprocessAdapterMixin,
     build_prompt_envelope,
+    classify_result_payload,
     filter_env,
     normalize_artifact_refs,
 )
@@ -327,3 +329,54 @@ def test_normalize_artifact_refs_mixed_and_ignores_garbage() -> None:
 def test_normalize_artifact_refs_non_list_or_absent_is_empty() -> None:
     assert normalize_artifact_refs({"artifact_refs": "not-a-list"}) == ()
     assert normalize_artifact_refs({}) == ()
+
+
+# ---------------------------------------------------------------------------
+# FR2 (T-66-05, bug: lifecycle-agent-run-result-extraction-too-strict)
+#
+# Widen classify_result_payload/normalize_artifact_refs tolerance WITHOUT ever
+# loosening the no-op-worker invariant: a genuine no-op worker (no payload at
+# all) must still yield empty artifact_refs and BLOCK. See
+# test_pi_noop_worker_yields_empty_artifact_refs and
+# test_pi_adapter_bare_json_without_result_shape_is_rejected
+# (tests/unit/infrastructure/test_pi_runtime.py:717,471) — both stay
+# byte-identical, unedited by this release.
+# ---------------------------------------------------------------------------
+
+
+def test_classify_result_payload_accepts_schema_version_as_strict_label() -> None:
+    """AC2.1 — ``schema_version`` is an equivalent label to ``schema`` for STRICT.
+
+    A real worker that labels the transport id under ``schema_version`` instead
+    of ``schema`` genuinely IS the result object; it must classify STRICT, not
+    fall through to the (narrower) structural check or NONE.
+    """
+    payload: dict[str, object] = {
+        "schema_version": "agent-run-result-v1",
+        "status": "succeeded",
+        "summary": "done",
+        "artifact_refs": [],
+    }
+    assert classify_result_payload(payload, "agent-run-result-v1") is ResultMatch.STRICT
+
+
+def test_normalize_artifact_refs_harvests_singular_artifact_path_as_fallback() -> None:
+    """AC2.2 — a singular ``artifact.path`` is a one-element fallback when the
+    list-based ``artifact_refs`` extraction yields nothing (key absent entirely)."""
+    payload = {"artifact": {"type": "other", "path": "repos/x/f.py"}}
+    assert normalize_artifact_refs(payload) == ("repos/x/f.py",)
+
+
+def test_normalize_artifact_refs_singular_artifact_never_overrides_populated_list() -> None:
+    """AC2.3 — a populated ``artifact_refs`` list always wins over the singular fallback."""
+    payload = {
+        "artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"],
+        "artifact": {"type": "other", "path": "repos/x/should-not-be-used.py"},
+    }
+    assert normalize_artifact_refs(payload) == (".dadaia/handoff/dadaia-workspace/a.handoff.json",)
+
+
+def test_normalize_artifact_refs_singular_artifact_missing_path_stays_empty() -> None:
+    """Invariant guard: a dict ``artifact`` with no string ``path`` yields no fallback ref."""
+    assert normalize_artifact_refs({"artifact": {"type": "other"}}) == ()
+    assert normalize_artifact_refs({"artifact": "not-a-dict"}) == ()

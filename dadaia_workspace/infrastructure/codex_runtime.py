@@ -45,6 +45,20 @@ _DEFAULT_ENV_ALLOWLIST = (
 
 _VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
 
+#: FR5 (v0.1.66) — the finite set of `codex exec --sandbox` values this adapter accepts,
+#: identical to codex-cli's own accepted set. The compiled-in default is "read-only"; the
+#: env override MUST resolve to one of these or construction fails loudly (AC5.3).
+_VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
+    {"read-only", "workspace-write", "danger-full-access"}
+)
+
+#: FR5 (v0.1.66) — the environment-variable override read at ``CodexExecConfig``
+#: construction (the single choke point — architect finding MEDIUM-1). Overrides the
+#: compiled-in "read-only" default ONLY when the caller did not pass an explicit
+#: ``sandbox=`` value; an explicit caller value always wins over the env var.
+_DADAIA_CODEX_SANDBOX_ENV = "DADAIA_CODEX_SANDBOX"
+_DEFAULT_CODEX_SANDBOX = "read-only"
+
 
 def _as_codex_effort(effort: str) -> CodexEffort:
     """Narrow a resolved reasoning string to the ``CodexEffort`` literal.
@@ -62,13 +76,25 @@ def _as_codex_effort(effort: str) -> CodexEffort:
 
 @dataclass(frozen=True)
 class CodexExecConfig:
-    """Explicit controls for one Codex exec adapter instance."""
+    """Explicit controls for one Codex exec adapter instance.
+
+    FR5 (v0.1.66): ``sandbox`` defaults to ``None`` (a sentinel, not the concrete
+    value) so :meth:`__post_init__` — the single choke point every ``CodexExecConfig``
+    construction passes through, regardless of call site — can tell "caller passed
+    nothing" apart from "caller explicitly chose a value". When ``sandbox is None`` the
+    resolved value is ``DADAIA_CODEX_SANDBOX`` if set, else the compiled-in default
+    ``"read-only"``; an explicit caller-supplied ``sandbox`` always wins over the env
+    var. The resolved value is ALWAYS validated against
+    :data:`_VALID_CODEX_SANDBOX_MODES` before the instance is usable — an unrecognized
+    value (from either the caller or the env var) raises ``ValueError`` at construction,
+    never silently reaching `codex exec` unvalidated.
+    """
 
     cwd: Path
     codex_bin: str = "codex"
     model: str | None = None
     reasoning_effort: CodexEffort | None = None
-    sandbox: str = "read-only"
+    sandbox: str | None = None
     # Retained for back-compat only (W1-1): `codex exec` never prompts — approval is
     # structurally "never" in the exec subcommand — so this policy is no longer emitted
     # into the argv. Passing the interactive-only `--ask-for-approval` flag to exec is
@@ -77,6 +103,35 @@ class CodexExecConfig:
     approval_policy: str = "never"
     env_allowlist: tuple[str, ...] = _DEFAULT_ENV_ALLOWLIST
     timeout_seconds: int = 900
+
+    def __post_init__(self) -> None:
+        resolved = self.sandbox
+        if resolved is None:
+            resolved = os.environ.get(_DADAIA_CODEX_SANDBOX_ENV) or _DEFAULT_CODEX_SANDBOX
+        if resolved not in _VALID_CODEX_SANDBOX_MODES:
+            valid = ", ".join(sorted(_VALID_CODEX_SANDBOX_MODES))
+            raise ValueError(
+                f"invalid Codex sandbox mode {resolved!r}; valid: {valid} "
+                f"(set via CodexExecConfig(sandbox=...) or the {_DADAIA_CODEX_SANDBOX_ENV} "
+                "environment variable)"
+            )
+        # frozen dataclass: __setattr__ is disabled outside __init__/__post_init__, so
+        # the resolved concrete value is stored back via object.__setattr__ (the
+        # documented escape hatch for frozen dataclasses) — every reader of
+        # `self.sandbox` from here on sees the final, validated string, never the
+        # sentinel or an unvalidated env value.
+        object.__setattr__(self, "sandbox", resolved)
+
+    @property
+    def resolved_sandbox(self) -> str:
+        """The final, validated ``str`` sandbox mode — never ``None``.
+
+        ``__post_init__`` always replaces the ``sandbox`` field with a concrete,
+        validated string before construction returns, so this is a type-narrowing
+        accessor (not a second resolution path) for readers like ``_command``.
+        """
+        assert self.sandbox is not None, "CodexExecConfig.__post_init__ always resolves sandbox"
+        return self.sandbox
 
 
 class CodexExecAdapter(SubprocessAdapterMixin):
@@ -193,8 +248,16 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             self._config.codex_bin,
             "exec",
             "--ignore-user-config",
+            # FR4 (v0.1.66): --ignore-user-config discards ~/.codex trust, so a governed
+            # worker running in a directory codex does not auto-trust fails codex's own
+            # "Not inside a trusted directory" check unless this flag is also present.
+            # The outer `dadaia lifecycle` gate (allowed_paths/review gates) remains the
+            # real security boundary regardless of codex's own trust posture (same
+            # reasoning as the sandbox override in FR5) — this flag governs only whether
+            # codex itself refuses to run, not what it is permitted to write.
+            "--skip-git-repo-check",
             "--sandbox",
-            self._config.sandbox,
+            self._config.resolved_sandbox,
             "--cd",
             str(self._config.cwd),
             "--output-last-message",

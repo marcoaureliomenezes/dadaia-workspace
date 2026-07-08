@@ -232,6 +232,46 @@ def test_pi_adapter_nonzero_exit_with_no_output_returns_failed(tmp_path: Path) -
     assert "boom" in (result.error or "")
 
 
+def test_pi_adapter_nonzero_exit_with_setup_stdout_returns_failed(tmp_path: Path) -> None:
+    """AC1.1 (bug: pi-headless-nonzero-exit-misreported).
+
+    A pi setup failure (e.g. missing API key) still emits a JSONL session/event
+    preamble to stdout before dying — there is no usable ``message_end`` in it. On
+    current (buggy) code, ``_result_from_output``'s ``returncode != 0 and not text``
+    guard treats non-empty stdout as a signal the run "completed" and reports
+    SUCCEEDED, discarding the real non-zero exit and the actionable stderr. The fix
+    must classify ANY non-zero returncode as FAILED regardless of stdout content, and
+    ``run()``'s pre-existing stderr-backfill (lines 138-144) must thread the real
+    stderr into ``result.error``.
+    """
+    preamble_stdout = (
+        "\n".join(
+            [
+                json.dumps({"type": "session_start", "session_id": "abc123"}),
+                json.dumps({"type": "message_start"}),
+            ]
+        )
+        + "\n"
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(
+            argv,
+            1,
+            stdout=preamble_stdout,
+            stderr="No API key found for azure-openai-responses.",
+        )
+
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request()
+    )
+
+    assert result.status is AgentRunStatus.FAILED
+    assert result.error == "No API key found for azure-openai-responses."
+
+
 def test_pi_adapter_redacts_anthropic_api_key_from_error(tmp_path: Path) -> None:
     def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0]
@@ -588,8 +628,8 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
     )
 
     # The id is a real, allowlist-validated pi catalog option.
-    option = validate("pi", "kimi-2.7:high")
-    assert option.model_id == "kimi-2.7"
+    option = validate("pi", "moonshotai/kimi-k2.5:high")
+    assert option.model_id == "moonshotai/kimi-k2.5"
 
     captured: list[list[str]] = []
 
@@ -605,7 +645,7 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
         resolved_model=ResolvedModelConfig(
             profile_id="pi-operator-kimi",
             harness="pi",
-            model="kimi-2.7",
+            model="moonshotai/kimi-k2.5",
             reasoning="high",
             source=PolicySource.CLI,
         ),
@@ -621,7 +661,10 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
         "--tools",
         "read,write,edit,bash",
     ]
-    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "kimi-2.7"]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+        "--model",
+        "moonshotai/kimi-k2.5",
+    ]
 
 
 def test_pi_no_model_flag_when_neither_request_nor_config(tmp_path: Path) -> None:

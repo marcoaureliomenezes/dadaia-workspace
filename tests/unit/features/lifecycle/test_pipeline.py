@@ -508,3 +508,68 @@ def test_apply_resolved_policy_preserves_fake_for_dry_run() -> None:
         # The governed model is still threaded for auditability.
         assert step.resolved_model is not None
         assert step.resolved_model.harness == "pi"
+
+
+# ---------------------------------------------------------------------------
+# T-66-08 (FR7) — _scope unions extra_allowed_paths for non-review steps only
+# (AC7.1 / AC7.2). Gated on step.is_review is False (ARCHITECT MEDIUM-2) — NOT
+# a label == "implement" string match, so any create-kind (non-review) step
+# gets the union, and every review step (is_review=True) stays handoff-only.
+# ---------------------------------------------------------------------------
+
+
+def _pipeline_for_scope() -> LifecyclePipeline:
+    return LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="v0.1.66",
+        run_store=_MemoryRunStore(),
+        runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
+    )
+
+
+def _step_with(
+    label: str, *, is_review: bool, extra_allowed_paths: tuple[str, ...]
+) -> PipelineStep:
+    return PipelineStep(
+        label=label,
+        role="software-engineer",
+        from_phase=LifecyclePhase.IMPLEMENTATION,
+        target_phase=LifecyclePhase.QA_REVIEW,
+        runtime_kind=AgentRuntimeKind.FAKE,
+        is_review=is_review,
+        extra_allowed_paths=extra_allowed_paths,
+    )
+
+
+def test_scope_unions_extra_allowed_paths_for_implement_step_ac71() -> None:
+    """AC7.1: extra_allowed_paths fed into _scope for the implement (non-review) step
+    yields allowed_paths containing both the handoff-dir glob AND the extra path."""
+    step = _step_with("implement", is_review=False, extra_allowed_paths=("repos/x/src/**",))
+
+    scope = _pipeline_for_scope()._scope(step, "run1")
+
+    assert ".dadaia/handoff/dadaia-workspace/**" in scope.allowed_paths
+    assert "repos/x/src/**" in scope.allowed_paths
+
+
+def test_scope_ignores_extra_allowed_paths_for_review_step_ac72() -> None:
+    """AC7.2: the same extra_allowed_paths value fed into a review step (is_review=True)
+    is IGNORED — the union only applies to non-review (create) steps; review steps stay
+    handoff-only. Regression guard proving review steps never gain production write
+    rights."""
+    step = _step_with("review_qa", is_review=True, extra_allowed_paths=("repos/x/src/**",))
+
+    scope = _pipeline_for_scope()._scope(step, "run1")
+
+    assert scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
+    assert "repos/x/src/**" not in scope.allowed_paths
+
+
+def test_scope_implement_step_with_no_extra_paths_stays_handoff_only() -> None:
+    """Additive-optional regression guard: an implement-labeled (non-review) step with
+    the default empty extra_allowed_paths behaves exactly as before this FR."""
+    step = _step_with("implement", is_review=False, extra_allowed_paths=())
+
+    scope = _pipeline_for_scope()._scope(step, "run1")
+
+    assert scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)

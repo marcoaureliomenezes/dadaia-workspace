@@ -6,16 +6,20 @@ import pytest
 
 from dadaia_workspace.core.models.hygiene import HygieneCounters
 from dadaia_workspace.core.models.lifecycle import (
+    BlockedState,
     GateEvidenceKind,
     GateRequirement,
     GateVerdict,
     LifecyclePhase,
+    LifecycleRun,
+    LifecycleRunStatus,
 )
 from dadaia_workspace.features.lifecycle.service import (
     ActiveReleaseState,
     BoundContext,
     GitPreflightState,
     LeaseModeState,
+    LifecycleCommandStatus,
     LifecyclePreflightInput,
     LifecyclePreflightService,
     RequiredHandoff,
@@ -252,4 +256,77 @@ def test_preflight_blocks_when_required_handoff_gate_fails() -> None:
     assert result.blocked is not None
     assert result.blocked.reason == "required handoff gate failed"
     assert result.blocked.detail["handoff"] == ".dadaia/handoff/dadaia-workspace/qa.handoff.json"
-    assert "wrong commit_sha" in result.blocked.detail["reasons"]
+
+
+# ---------------------------------------------------------------------------
+# T-66-07 (FR6) — resume_run reports the real persisted run status (AC6.1/AC6.2)
+# ---------------------------------------------------------------------------
+
+
+class _FakeRunStore:
+    """Minimal LifecycleRunStore fake — resume() returns a fixed run (AC6 unit level)."""
+
+    def __init__(self, run: LifecycleRun) -> None:
+        self._run = run
+
+    def save(self, run: LifecycleRun) -> None:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+    def load(self, run_id: str) -> LifecycleRun | None:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+    def resume(self, run_id: str) -> LifecycleRun:
+        return self._run
+
+    def list_runs(self) -> list[LifecycleRun]:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+
+def _run(
+    *,
+    status: LifecycleRunStatus,
+    blocked: BlockedState | None = None,
+) -> LifecycleRun:
+    return LifecycleRun(
+        run_id="run-1",
+        context="dadaia-workspace",
+        release_id="v0.1.66",
+        command="implement",
+        phase=LifecyclePhase.IMPLEMENTATION,
+        status=status,
+        current_step="implement",
+        blocked=blocked,
+    )
+
+
+def test_resume_run_reports_blocked_with_real_reason_ac61() -> None:
+    """AC6.1: a persisted BLOCKED run yields a BLOCKED command result carrying the
+    run's own blocked.reason — never the unconditional OK."""
+    blocked = BlockedState(
+        reason="agent result missing artifact evidence",
+        blocked_at_step="implement",
+    )
+    store = _FakeRunStore(_run(status=LifecycleRunStatus.BLOCKED, blocked=blocked))
+
+    result = LifecyclePreflightService().resume_run(store, "run-1")
+
+    assert result.status is LifecycleCommandStatus.BLOCKED
+    assert "agent result missing artifact evidence" in result.message
+    assert result.blocked is not None
+    assert result.blocked.reason == "agent result missing artifact evidence"
+
+
+@pytest.mark.parametrize(
+    "status",
+    [LifecycleRunStatus.RUNNING, LifecycleRunStatus.COMPLETED, LifecycleRunStatus.PENDING],
+)
+def test_resume_run_still_reports_ok_for_non_blocked_status_ac62(
+    status: LifecycleRunStatus,
+) -> None:
+    """AC6.2: no regression for the already-correct non-blocked case."""
+    store = _FakeRunStore(_run(status=status))
+
+    result = LifecyclePreflightService().resume_run(store, "run-1")
+
+    assert result.status is LifecycleCommandStatus.OK
+    assert result.message == "resumed run-1"

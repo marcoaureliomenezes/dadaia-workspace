@@ -108,6 +108,52 @@ def test_lifecycle_resume_missing_uses_internal_error_exit_code(
 
 
 # ---------------------------------------------------------------------------
+# T-66-07 (FR6) — AC6(repro): resume exits non-zero and surfaces the real
+# blocked reason for a still-blocked run instead of lying "OK resumed".
+# ---------------------------------------------------------------------------
+
+
+def test_lifecycle_resume_cli_exits_nonzero_on_still_blocked_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC6(repro): drives the real ``dadaia lifecycle resume <run_id>`` CLI against a
+    fixture run persisted with status=BLOCKED. On current code this exits 0 with
+    "OK resumed <id>"; after the fix it exits non-zero and the output carries the
+    run's real blocked.reason."""
+    from dadaia_workspace.core.models.lifecycle import (
+        BlockedState,
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+    from dadaia_workspace.infrastructure.json_lifecycle_run_store import (
+        JsonLifecycleRunStore,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    real_reason = "agent result missing artifact evidence"
+    run = LifecycleRun(
+        run_id="run-blocked-1",
+        context="dadaia-workspace",
+        release_id="v0.1.66",
+        command="implement",
+        phase=LifecyclePhase.IMPLEMENTATION,
+        status=LifecycleRunStatus.BLOCKED,
+        current_step="implement",
+        blocked=BlockedState(reason=real_reason, blocked_at_step="implement"),
+    )
+    JsonLifecycleRunStore(workspace).save(run)
+
+    result = _runner.invoke(app, ["lifecycle", "resume", "run-blocked-1"])
+
+    assert result.exit_code != 0, result.output
+    assert real_reason in result.output
+
+
+# ---------------------------------------------------------------------------
 # WS-2 (T-24-06) — LAW 1 harness restriction + LAW 2 discrete model validation
 # ---------------------------------------------------------------------------
 

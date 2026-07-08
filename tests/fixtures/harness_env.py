@@ -155,6 +155,11 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # sentinel). Setting it in a test exercises that real env-read path; the autouse
         # AC-4 envelope scrub (scrub_entry_signal_env) keeps the suite hermetic.
         "DADAIA_ENTRY_HARNESS",
+        # Codex sandbox override (v0.1.66 FR5) — an operator-shell input read by
+        # production BY DESIGN in infrastructure/codex_runtime.CodexExecConfig.__post_init__
+        # (os.environ.get(_DADAIA_CODEX_SANDBOX_ENV)), used to widen the codex sandbox mode
+        # in constrained containers where the read-only default fails under bwrap.
+        "DADAIA_CODEX_SANDBOX",
     }
 )
 

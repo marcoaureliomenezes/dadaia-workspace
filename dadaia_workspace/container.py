@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     )
 
 from dadaia_workspace.core.exceptions import (
+    HandoffSchemaError,
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
@@ -503,6 +504,60 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
     reports_root = workspace_root / ".dadaia" / "handoff"
     validator = StdlibHandoffValidator(schema_path)
     return ReportsValidationService(validator=validator, reports_root=reports_root)
+
+
+def _build_handoff_lookup(workspace_root: Path) -> Callable[[str, str], str | None]:
+    """Compose the FR8 (v0.1.66, DEC-A(iii)) handoff-evidence lookup closure.
+
+    Given ``(context, agent)`` returns the workspace-relative path of a matching,
+    independently-validating handoff file under ``.dadaia/handoff/<context>/`` for the
+    emitter's ``<UTC>-<agent>-<slug>.handoff.json`` naming convention, or ``None`` when
+    none exists. REUSES :func:`build_reports_validation_service`
+    (``ReportsValidationService.validate_file``) rather than forking a second validator
+    (LOW-2) — the exact same logic ``dadaia reports validate`` runs. Candidates are
+    globbed newest-first (by filename, which sorts chronologically for the ISO-8601
+    UTC-prefixed convention) so the most recent matching handoff wins when several exist;
+    the first one that independently validates is returned.
+
+    ``ReportsValidationService`` (via ``StdlibHandoffValidator``) is constructed LAZILY,
+    on first actual lookup call — not at pipeline-construction time. A caller that builds
+    a pipeline against a lightweight fixture root with no staged
+    ``.dadaia/agentic/schemas/handoff-v1.schema.json`` (a legitimate, pre-existing pattern
+    in this codebase's own unit tests) must not fail pipeline construction just because
+    this purely-observability enrichment's dependency isn't staged. A construction failure
+    at lookup time degrades to ``None`` (no enrichment) rather than propagating — FR8 is
+    additive observability, never a hard dependency of the create/review gate itself.
+    """
+    handoff_root = workspace_root / ".dadaia" / "handoff"
+    _validation: ReportsValidationService | None = None
+    _validation_failed = False
+
+    def _lookup(context: str, agent: str) -> str | None:
+        nonlocal _validation, _validation_failed
+        context_dir = handoff_root / context
+        if not context_dir.is_dir():
+            return None
+        if _validation is None and not _validation_failed:
+            try:
+                _validation = build_reports_validation_service(workspace_root)
+            except HandoffSchemaError:
+                # The staged handoff-v1 JSON schema is absent (a fixture-only root, or a
+                # workspace mid-provisioning) — degrade to no enrichment. Never crashes the
+                # gate over an optional observability dependency.
+                _validation_failed = True
+        if _validation is None:
+            return None
+        candidates = sorted(
+            context_dir.glob(f"*-{agent}-*.handoff.json"),
+            reverse=True,
+        )
+        for candidate in candidates:
+            result = _validation.validate_file(candidate)
+            if result.valid:
+                return str(candidate.relative_to(workspace_root))
+        return None
+
+    return _lookup
 
 
 def build_reports_next_service(
@@ -1014,6 +1069,11 @@ def build_lifecycle_pipeline(
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
         # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
         specs_dir=_context_specs_dir(workspace_root, context),
+        # FR8 (v0.1.66, DEC-A(iii)): the real handoff-evidence lookup, closing over
+        # ``workspace_root`` — enriches a "missing artifact evidence" block's detail with a
+        # matching, independently-validating handoff path when one exists. Never converts a
+        # block into a pass (FR2's no-op invariant is untouched).
+        handoff_lookup=_build_handoff_lookup(workspace_root),
     )
 
 
