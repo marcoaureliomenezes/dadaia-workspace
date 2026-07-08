@@ -125,7 +125,7 @@ THEN implementing the fix.
 - **Parallelism:** none — single-file edit, must not race with T-67-06 on the
   same file (serialize).
 
-### T-67-06 — Migrate the entry-pin echo test to the same pattern (hardening) `[-]`
+### T-67-06 — Migrate the entry-pin echo test to the same pattern (hardening) `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_lifecycle_pipeline_cli.py`
@@ -142,7 +142,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC2.3.
 - **Parallelism:** depends on T-67-05 (same file).
 
-### T-67-07 — (F2, new) Migrate the `test_lifecycle_cli.py` sibling broken-pattern site
+### T-67-07 — (F2, new) Migrate the `test_lifecycle_cli.py` sibling broken-pattern site `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_lifecycle_cli.py`
