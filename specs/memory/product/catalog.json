@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-08T07:02:26Z",
+  "generated_at": "2026-07-08T17:08:04Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -198,7 +198,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 640,
+      "token_estimate": 680,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -223,7 +223,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 720,
+      "token_estimate": 740,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -571,7 +571,7 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 7260,
+      "token_estimate": 7560,
       "depends_on": [
         "harness-pi",
         "architecture",

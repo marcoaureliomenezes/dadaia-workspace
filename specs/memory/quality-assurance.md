@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 3960
+token_estimate: 4180
 last_updated: '2026-07-08'
-release_origin: v0.1.65
+release_origin: v0.1.66
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.9k tests (4,941 passed +
-18 skipped as of v0.1.65; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 5.0k tests (4,970 passed +
+18 skipped as of v0.1.66; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -248,6 +248,32 @@ removal in the same commit that lands the fix — so a fix can never silently sh
 into ONE authority that the real entry point calls** (v0.1.60 extracted the consumer
 classification into a single `_doctor_consumer_pair_lines` that `manager.doctor()` and
 `_doctor_guardrail_pair` both delegate to — no parallel legacy path to drift dead).
+
+**Executed-path law extension (v0.1.66) — a loose truthy assertion AND a class-definition-bound
+subprocess default can each independently mask a false positive.** While writing v0.1.66's
+mandatory RED-first executed-path reproductions for the pi/codex Layer-2 adapters, two further
+instances of "the test reports green but never exercised what it claims" surfaced, both now
+durable rules: (1) **a test whose only assertion on a block/failure reason is loose or
+truthy-only** (`assert payload["blocked"]["reason"]`, with no check on the reason's actual
+content) can be satisfied by ANY real failure, not just the one the test intends to reproduce —
+the pre-existing `test_pipeline_runs_first_step_on_pi_harness_end_to_end` passed for years
+against the **real local `pi` binary's own unrelated auth-failure stderr**, never the injected
+fake stream; a block/failure-reason assertion must check the specific content the test double
+produced, not just truthiness. (2) **a subprocess-runner keyword default bound at
+class-definition/import time defeats a later module-attribute monkeypatch.**
+`PiHeadlessAdapter.__init__`'s `runner: Runner = subprocess.run` (and `CodexExecAdapter`'s
+identical pattern) captures the function object ONCE when the class body executes;
+`monkeypatch.setattr("...pi_runtime.subprocess.run", fake)` patches the module attribute
+*after* that capture, so an already-constructed adapter's `self._runner` is still the real
+function — the fake is never reached. The two gotchas compound silently: the real binary runs,
+its real failure output happens to satisfy the loose assertion, and CI stays green. The fix for
+new executed-path tests targeting this seam is to inject the fake explicitly at construction
+time (or patch the factory/branch that constructs the adapter), never rely on a post-hoc
+module-level monkeypatch of a class-default-bound callable — and to assert on the fake's
+specific, distinguishable content. Two bugs were registered, not fixed, for the underlying
+adapter pattern itself (`pi-executed-path-cli-tests-invoke-real-pi-binary`,
+`pi-e2e-test-false-positive-loose-blocked-reason-assertion`) — v0.1.66 routed around the gotcha
+per new test, it did not change the adapters' default-binding shape.
 
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:

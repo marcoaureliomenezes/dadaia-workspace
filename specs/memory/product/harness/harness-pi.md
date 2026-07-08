@@ -13,9 +13,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 720
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+token_estimate: 740
+last_updated: '2026-07-08'
+release_origin: v0.1.66
 ---
 
 ## Purpose
@@ -55,6 +55,21 @@ unless the operator overrides — mechanically, via the post-trust entry-signal 
    shared `headless_adapter_base` env filter) so provider-flexible setups work; it is
    pass-through, not a requirement. Result extraction is the shared
    strict-schema-first path (tolerates bare unfenced JSON).
+   **Non-zero exit is FAILED (v0.1.66, FR1).** `PiHeadlessAdapter._result_from_output`
+   returns `AgentRunStatus.FAILED` whenever the subprocess `returncode != 0`,
+   regardless of whether `stdout` is non-empty — previously a non-empty stdout (e.g. a
+   JSONL session/event preamble with no usable `message_end`) masked a genuine setup
+   failure as `SUCCEEDED`. `run()`'s stderr-backfill threads the real (redacted)
+   `stderr`/`stdout` into `result.error` so the downstream block reason is the actual
+   upstream failure (e.g. "No API key found for azure-openai-responses."), never the
+   generic "agent result missing artifact evidence".
+   **Tolerant result-payload contract, no-op invariant unchanged (v0.1.66, FR2).** The
+   shared extraction (`headless_adapter_base`) now also accepts `schema_version` as an
+   equivalent label to `schema` for strict classification, and falls back to a
+   singular `payload["artifact"]["path"]` as a one-element `artifact_refs` when the
+   list-based extraction yields nothing. A genuine no-op worker — no result object at
+   all — still yields empty `artifact_refs` and BLOCKs exactly as before; the widened
+   acceptance only ever recognizes a payload that genuinely is a result with content.
 5. Telemetry: `features/telemetry/reader/pi.py` ingests session METADATA only from
    `~/.pi/agent/sessions/` (invariant T1 — no message bodies; cost unknown ⇒ never
    fabricated).
@@ -63,8 +78,10 @@ unless the operator overrides — mechanically, via the post-trust entry-signal 
 
 Layer 1: operator preference for PI. Layer 2: every dadaia-workflow step whose
 governed harness resolves to `pi` — model set `(gpt-5.5, high)`, `(gpt-5.5, low)`,
-`(gpt-5.3-codex, medium)`, plus the curated OpenRouter `kimi-2.7:high` (via the
-Layer-2 allowlist + the `pi-openrouter-kimi-high` profile; never a `claude-*` id).
+`(gpt-5.3-codex, medium)`, plus the curated OpenRouter `moonshotai/kimi-k2.5:high`
+(v0.1.66 — corrected from the invalid literal `kimi-2.7`, which OpenRouter rejected;
+via the Layer-2 allowlist + the `pi-openrouter-kimi-high` profile; never a `claude-*`
+id).
 
 ## Differentiator
 

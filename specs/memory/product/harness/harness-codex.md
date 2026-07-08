@@ -12,9 +12,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 640
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+token_estimate: 680
+last_updated: '2026-07-08'
+release_origin: v0.1.66
 ---
 
 ## Purpose
@@ -46,6 +46,23 @@ the echo, the pin, and explicit `--harness fake`).
 4. As a Layer-2 worker: the engine builds the exec argv (model `(id, effort)` discrete;
    no approval flag — exec never prompts), pipes the fragment+persona prompt, and
    extracts the result via the shared strict-schema-first extraction.
+5. **Trust + sandbox posture (v0.1.66, FR4/FR5).** `CodexExecAdapter._command` includes
+   `--skip-git-repo-check` unconditionally alongside `--ignore-user-config`, so a
+   governed worker never fails codex's own "Not inside a trusted directory" trust
+   check when driven from an untrusted-by-codex working directory (the outer
+   `dadaia lifecycle` gate — not codex's own trust flag — is the real access boundary,
+   same reasoning as the `--ignore-user-config` precedent). `CodexExecConfig`'s
+   `sandbox` value is resolvable via the `DADAIA_CODEX_SANDBOX` environment variable,
+   read once at `__post_init__` (the single choke point every construction path
+   passes through): an explicit caller-supplied `sandbox=` always wins over the env
+   var; the resolved value — whether from the caller or the env — is always validated
+   against `{read-only, workspace-write, danger-full-access}` (an unrecognized value
+   raises at construction, never passed through blind to `codex exec`); the
+   compiled-in default stays `read-only` when the env var is unset (no silent security
+   posture downgrade for operators who never set it). The override exists because the
+   `read-only` default's underlying sandbox mechanism (`bwrap`) can fail inside
+   constrained containers ("loopback: Failed RTM_NEWADDR: Operation not permitted");
+   `danger-full-access` is the confirmed bwrap-free unblock for that case.
 
 ## Typical trigger
 
@@ -71,11 +88,13 @@ effort, and rendering fails loudly when two tiers collapse to one `(id, effort)`
 pair; doctor lint D-CX-4 blocks Anthropic tier names (Opus/Sonnet/Haiku) and Claude
 model/path/tool-name leaks in Codex-projected artifacts), `.codex/rules/`
 (Starlark command policy), `.codex/skills/` (context adapters), `.codex/workflows/`
-(reference-only). Wrappers in `.dadaia/hooks/codex-*`. A Codex-only workspace =
-`--target codex` (+ shared `--target agents`). This isolation is now **enforced
-mechanically at init** — `dadaia init --harness codex` scaffolds only the `.codex/`
-surface + the `.dadaia/hooks/codex-*` wrappers and persists the profile
-([[workspace-init]]) — not merely documented.
+(reference-only). Wrappers in `.dadaia/hooks/codex-*`. `DADAIA_CODEX_SANDBOX`
+(operator-set process env var, v0.1.66) overrides the Layer-2 `CODEX_EXEC` worker's
+sandbox default — not a projected file, an env-var input read at adapter construction.
+A Codex-only workspace = `--target codex` (+ shared `--target agents`). This isolation
+is now **enforced mechanically at init** — `dadaia init --harness codex` scaffolds
+only the `.codex/` surface + the `.dadaia/hooks/codex-*` wrappers and persists the
+profile ([[workspace-init]]) — not merely documented.
 
 ## Dependencies
 

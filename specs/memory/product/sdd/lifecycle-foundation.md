@@ -45,9 +45,9 @@ tags:
 - multi-harness
 - hygiene
 - gates
-token_estimate: 7260
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+token_estimate: 7560
+last_updated: '2026-07-08'
+release_origin: v0.1.66
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. **`--step-model <profile-id>` is the sole model-selection surface: the legacy `--model <id>:<effort>` flag and its `_warn_model_deprecated` seam were hard-removed from all 12 run verbs in v0.1.57 (deprecation-expiry — `--model` is now an unknown option, `No such option: --model`, exit 2). The pi/codex subprocess `--model <id>` arg (`pi_runtime.py`) is a different, unchanged flag.**
@@ -120,7 +120,7 @@ The lifecycle foundation moves workflow authority out of broad agent instruction
   v0.1.56 FR4 edge removal made a review-phase step targeting IMPLEMENTATION an illegal transition).
 - `features/lifecycle/gates.py` validates handoff evidence semantically: agent, context, release, verdict, artifact hash, commit SHA, task group, age, and severity thresholds. Its `schema_version` accept-set is `{handoff-v1, handoff-v1.1, handoff-v1.2}` (mirrored by `infrastructure/runtime_files.py`).
 - `features/lifecycle/phase_workflow.py` (`LifecyclePhaseWorkflow`) threads a scoped prompt → factory-selected `AgentRuntimePort` → `LifecycleAgentRunner` gate → legal transition → persisted run, for any single lifecycle step.
-- `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`).
+- `features/lifecycle/pipeline.py` (`LifecyclePipeline`) threads ONE `LifecycleRun` through an ordered phase ladder (IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE), each step running on its declared `AgentRuntimeKind` via an injected runtime factory, persisting at every step and stopping at the first blocked gate. Each `PipelineStep` carries a **discrete model** chosen from the selected harness's catalog (the hardcoded `"sonnet"/"opus"` tiers were removed in v0.1.24; default model is derived from `core/harness_models.py`). **`implement` write scope is a union, operator-extensible (v0.1.66, FR7).** `_scope` previously hardcoded every step's `allowed_paths` to only `.dadaia/handoff/<context>/**`, which structurally prevented an `implement` worker from legally editing any production/test path. `PipelineStep` now carries an additive-optional `extra_allowed_paths: tuple[str, ...] = ()` field, and a new repeatable `--write-scope PATH` CLI option on the `implement` and `pipeline` commands feeds it. For the `implement` step only, `_scope` computes `allowed_paths` as the union of the handoff-dir glob and `extra_allowed_paths`; the `review_qa`/`review_security`/`review_code` steps keep the handoff-only scope unchanged — they never gain production write rights. A full TASKS.md-derived write-set parser remains out of scope; the operator supplies the paths per invocation via `--write-scope`.
 - `core/harness_models.py` is the discrete per-harness model catalog (LAW 2): `harness → ordered model options` with a `validate(harness, model) → (model_id, effort?)` helper, consistent with — but not a tier-view of — `core/model_registry.py`. The per-harness options are enumerated once in [[tech-stack]] §Agent runtimes. Both catalogs are allowlist-validated (a Layer-2 id must be in the union of registry codex ids + `LAYER2_EXTRA_MODEL_IDS`, the curated Layer-2-native set); no `claude-*` id is ever a Layer-2 option. An invalid `(harness, model)` pair is rejected with the valid set.
 - `features/lifecycle/fragments/loader.py` loads + validates the prompt-fragment library at `dadaia_workspace/public/lifecycle_fragments/` (Markdown + frontmatter `id/role/workflow/step/static_inputs/dynamic_inputs/output_schema/max_context_policy`, plus the additive-optional `input_policies` per-input policy map added in v0.1.57; projected + manifest-tracked). `features/lifecycle/context_selector.py` selects dynamic context per step under explicit max-context policies (`exact-files-only`/`summary`/`catalog-only`/`diff-only`/`previous-handoff-only`); `select_all` accepts a per-name `input_policies` override map (v0.1.57), falling back to the fragment-global `max_context_policy` for unlisted inputs (byte-stable when absent). `features/lifecycle/workflows/` carries the executable dadaia-workflow bodies — the 4 handoff-ledger bodies (`release_definition`, `audit`, `research`, `bug_report`) are thin subclasses of the shared `FragmentGateWorkflow` base and `backlog_definition` mixes in `_FragmentAssemblyMixin` (v0.1.57 — see "Prompt-assembly canon" below); the workflow roster and operator invocability are owned by [[dadaia-workflows]]. Every workflow body is fully fragment-driven: each step's prompt is `role + fragment bundle + selected context + role-mapped memory atom + output schema + discrete (harness, model)`; Python owns step order and blocks on missing/rejected handoffs; steps communicate via the workflow-step handoff data plane (see below). `bug_report` writes only ADDITIVE `specs/bugs/**` (enforced at the runner via `core.scope_match.out_of_scope_paths`); `audit` produces disposition-ready output.
 - `features/lifecycle/prompt_builder.py` builds scoped worker prompts; `PromptPrefix.from_sections` assembles a byte-identical, sha256-hashed, order-independent context block, and `build(scope, prefix=)` prepends it verbatim and records `prefix_hash`. The pipeline builds the prefix once and every step reuses the same bytes (provider-cache-friendly). Whole-workspace or repo-wide scopes are rejected. v0.1.24 adds a fragment-suffix path: a workflow step's prompt is assembled from a fragment bundle (not the generic "Run the step" suffix). **Prompt observability (v0.1.24):** each lifecycle run record persists, per step, the fragment ids, dynamic context refs, `prefix_hash`, the discrete model, the runtime kind, the output schema, and the gate result — surfaced in a panel/report view; whole-memory injection is never the default (context selection is scoped).
@@ -484,9 +484,40 @@ result). A no-op worker still yields empty `artifact_refs` → BLOCK; structural
 shadows strict (pinned by a behaviour test). The live end-to-end proof of this contract is
 stated once in "Current limits" below.
 
+**Tolerant contract, invariant preserved (v0.1.66, FR2).** `classify_result_payload` and
+`normalize_artifact_refs` additionally accept: (i) `schema_version` as an equivalent label to
+`schema` for STRICT classification (a worker emitting `schema_version` instead of `schema` is no
+longer rejected); (ii) a singular `payload["artifact"]["path"]` as a one-element `artifact_refs`
+fallback when the list-based extraction yields nothing (list content, when present, always wins
+over the singular fallback — never overridden). The no-op-worker invariant is unchanged and
+non-negotiable: a genuine no-op — no fenced or bare JSON result object present at all — still
+yields empty `artifact_refs` and BLOCKs exactly as before; the widening only ever accepts a
+payload that genuinely is a result object with real content.
+
+**Precise upstream failure reaches the block detail (v0.1.66, FR8).** `_blocked_result`'s
+`not result.artifact_refs` branch (reached only when `result.status IS SUCCEEDED` but no refs
+were extracted) enriches its `detail` dict with a `validated_handoff_path` key when a matching,
+independently-validating handoff file exists on disk under `.dadaia/handoff/<context>/` for the
+step's context/agent naming convention — pure observability, the run still BLOCKs. Combined with
+FR1/FR2 correctly populating `result.status`/`result.error`, the pre-existing `_blocked_result`
+routing (block reason = `result.error or result.summary` when `status is not SUCCEEDED`) now
+surfaces a precise upstream reason end-to-end instead of collapsing every failure into the
+generic "agent result missing artifact evidence" message.
+
 ## Blocking and resume
 
 Preflight failures return typed `BlockedState` data instead of ambiguous prose. In no-approval Codex push scenarios, lifecycle preflight emits a valid blocked handoff with the exact operator command and resume token. The Codex command policy is not widened by this release; blocked/resume is the deterministic product behavior.
+
+**`resume` reports the real run status (v0.1.66, FR6).** `LifecyclePreflightService.resume_run`
+inspects the loaded run's persisted status after `run_store.resume(run_id)`: when the run's
+status is `LifecycleRunStatus.BLOCKED`, it returns a `LifecycleCommandResult` with
+`status=LifecycleCommandStatus.BLOCKED` and a `message` surfacing the run's own
+`blocked.reason` — never an unconditional `OK`. The `resume` CLI command routes this result
+through the existing `_emit_command_result`/`_exit_for_command_result` machinery (the same
+mechanism other verbs already use), so `dadaia lifecycle resume <run_id>` on a still-blocked
+run now exits non-zero with the real block reason, instead of exiting 0 with a misleading
+`"OK resumed <id>"`. This makes the reported status honest; `resume` still does not re-drive or
+re-invoke the blocked step's worker (that remains a distinct, out-of-scope future capability).
 
 ## Hygiene and anti-slop behavior
 
