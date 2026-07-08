@@ -2,8 +2,6 @@
 name: ai-engineer
 description: AI-entity engineer. Exclusive owner of agents/skills/rules/workflows/commands/hooks. Context engineering, prompt design, model tiering. No code, specs, tests, frontend, CI.
 dispatch_band: 3
-model: claude-fable-5
-effort: medium
 activity_class: MUTATING
 lease_relationship: "PM sub-agent during releases; own short session for ad-hoc surface fixes"
 gate_role: "AI-entity implementer"

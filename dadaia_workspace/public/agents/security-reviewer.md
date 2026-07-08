@@ -2,7 +2,6 @@
 name: security-reviewer
 description: "Vulnerability auditor + pre-push checkpoint. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. ADDITIVE evidence only — no lease. Findings: CWE id, file:line, redacted evidence. NEVER writes fixes."
 dispatch_band: 3
-model: claude-opus-4-8
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"
 gate_role: checkpoint-pre-push

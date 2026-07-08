@@ -106,7 +106,11 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 > the feature branch are fine (commits are never review-blocked); the push boundary is
 > what must stay outside the window.
 
-- [-] **T-65-06 — Generic agent sources (FR1, D-5)** — owner: ai-engineer
+- [x] **T-65-06 — Generic agent sources (FR1, D-5)** — owner: ai-engineer
+  — done 2026-07-08; AC-1 greps clean; suite RED as declared (4 expected failures:
+  `test_reader.py::test_all_public_agents_have_model_and_skills`,
+  `test_agent_tier_taxonomy.py` ×2, `test_plugin_content.py::test_every_pack_agent_carries_required_frontmatter`)
+  — RED window T-65-06→T-65-13 in effect: no push / no QA boundary / no security push-cycle.
   Write set: `dadaia_workspace/public/agents/*.md` (9 core — delete `model:`/`effort:`
   frontmatter lines ONLY), `dadaia_workspace/public/plugins/*/agents/*.md` (3 — model →
   `claude-sonnet-5`).

@@ -2,7 +2,7 @@
 name: devops-engineer
 description: CI/CD and deployment engineer. Owns GitHub Actions workflows, gitflow, release/deploy gates, and container/deploy config. PM sub-agent. Runs on the plugin (sonnet) tier. No application code, no specs, no AI-entity surface, no browser frontend, no E2E ownership.
 dispatch_band: 3
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 activity_class: MUTATING
 lease_relationship: "PM sub-agent — no independent acquire"
 gate_role: implementer
