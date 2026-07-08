@@ -25,12 +25,30 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from typing import Protocol
 
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
 )
-from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
+
+
+class AgentModelPolicyServicePort(Protocol):
+    """The feature-service surface these views consume (structural typing).
+
+    The concrete ``features/agents/model_policy.AgentModelPolicyService`` is
+    container-wired; the ``features-no-cross-feature`` independence contract forbids
+    a direct sibling import, so the views depend on this Protocol only.
+    """
+
+    def get_policy(self) -> dict[str, object]: ...
+
+    def templates_payload(self) -> dict[str, object]: ...
+
+    def validate(self, raw: object) -> AgentModelPolicyOverlay: ...
+
+    def apply(self, raw: object) -> dict[str, object]: ...
+
 
 #: Max accepted policy mutation body, in bytes — same envelope as the workflow-policy
 #: mutation views (a real overlay is a few hundred bytes; 64 KiB is a hard ceiling).
@@ -49,7 +67,7 @@ def _json_response(status: int, payload: object) -> tuple[int, str, bytes]:
 
 
 def render_api_agent_model_policy(
-    service: AgentModelPolicyService,
+    service: AgentModelPolicyServicePort,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """GET /api/agent-model-policy — ``{exists, policy, resolved}``.
 
@@ -69,7 +87,7 @@ def render_api_agent_model_policy(
 
 
 def render_api_agent_model_templates(
-    service: AgentModelPolicyService,
+    service: AgentModelPolicyServicePort,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """GET /api/agent-model-templates — built-ins + model choices + effort vocab."""
 
@@ -85,7 +103,7 @@ def render_api_agent_model_templates(
 
 
 def render_put_agent_model_policy(
-    service: AgentModelPolicyService,
+    service: AgentModelPolicyServicePort,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """PUT /api/agent-model-policy — validated, atomic overlay write + re-render (G-2).
 
@@ -113,7 +131,7 @@ def render_put_agent_model_policy(
 
 
 def render_post_agent_model_policy_validate(
-    service: AgentModelPolicyService,
+    service: AgentModelPolicyServicePort,
 ) -> Callable[..., tuple[int, str, bytes]]:
     """POST /api/agent-model-policy/validate — dry-run validation, no write."""
 
@@ -131,7 +149,7 @@ def render_post_agent_model_policy_validate(
 
 
 def _validate_policy_request(
-    service: AgentModelPolicyService,
+    service: AgentModelPolicyServicePort,
     body: bytes,
     content_type: str,
 ) -> AgentModelPolicyOverlay | tuple[int, str, bytes]:

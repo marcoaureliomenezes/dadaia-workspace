@@ -142,7 +142,7 @@ def _theme_switcher_fragment(html: str) -> str:
 # The 6-tab / 6-section nav contract (Ruling A — the nav set is pinned).
 # ---------------------------------------------------------------------------
 
-_SECTIONS = ["memories", "workflows", "sessions", "reports", "academy", "servers"]
+_SECTIONS = ["memories", "workflows", "subagents", "sessions", "reports", "academy", "servers"]
 
 
 @pytest.fixture(scope="module")
