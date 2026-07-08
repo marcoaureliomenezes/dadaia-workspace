@@ -259,7 +259,7 @@ instead of migrating it.
 - **AC:** SPEC "Dependencies and risks" (F4-corrected import-linter risk item).
 - **Parallelism:** none — depends on all implementation waves.
 
-### T-67-11 — Live-suite non-interference matrix + regression re-run + mutation-sanity `[-]`
+### T-67-11 — Live-suite non-interference matrix + regression re-run + mutation-sanity `[x]`
 
 - **Owner:** qa-engineer
 - **Write set:** none (validation only)
