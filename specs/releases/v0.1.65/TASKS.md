@@ -49,7 +49,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   implementation; module is pure (no I/O; `core-no-os-primitives` holds).
   Parallel: safe with W2.
 
-- [ ] **T-65-03 — Schema + overlay store (FR3, D-7)**
+- [-] **T-65-03 — Schema + overlay store (FR3, D-7)**
   Write set: `dadaia_workspace/public/schemas/agent-model-policy-v1.schema.json` (new),
   `dadaia_workspace/infrastructure/json_agent_model_policy_store.py` (new),
   `tests/unit/infrastructure/test_json_agent_model_policy_store.py` (new).
