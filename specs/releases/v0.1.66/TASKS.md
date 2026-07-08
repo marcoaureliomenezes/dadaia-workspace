@@ -116,7 +116,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   UNMODIFIED; both RED captures recorded.
 - **Parallelism:** none — Wave B is serial.
 
-### T-66-05 — FR2: tolerant worker-result contract, no-op invariant preserved
+### T-66-05 — FR2: tolerant worker-result contract, no-op invariant preserved `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/headless_adapter_base.py`
@@ -183,7 +183,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 
 ## Wave C — engine-level fixes (T-66-07 and T-66-08 sequenced on `cli/commands/lifecycle.py` overlap; otherwise disjoint)
 
-### T-66-07 [-] — FR6: `resume` reports the real run status
+### T-66-07 [x] — FR6: `resume` reports the real run status
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/service.py` (the
