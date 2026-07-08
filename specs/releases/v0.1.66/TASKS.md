@@ -104,7 +104,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   green (31/31 scoped tests). Gates: ruff format/check clean, mypy --strict clean
   on `codex_runtime.py`.
 
-### T-66-03 — FR5: codex sandbox env override
+### T-66-03 — FR5: codex sandbox env override `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py` (the
