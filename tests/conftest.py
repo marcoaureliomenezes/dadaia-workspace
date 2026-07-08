@@ -196,6 +196,130 @@ def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
     scrub_entry_signal_env(monkeypatch)
 
 
+_LIVE_OPT_IN_FLAGS: tuple[str, ...] = (
+    "DADAIA_E2E_REAL_WORKER",
+    "DADAIA_PI_LIVE",
+    "DADAIA_CODEX_LIVE",
+    "DADAIA_CLAUDE_LIVE",
+)
+
+
+def _real_worker_opt_in() -> bool:
+    """Single named predicate: True iff ANY live-opt-in flag is set to "1".
+
+    v0.1.67 FR3 (T-67-08, F1-corrected): the union of ALL FOUR established
+    opt-in flags used across ``tests/integration/{pi,codex,claude}_live/`` —
+    ``DADAIA_E2E_REAL_WORKER`` (pi_live smoke + e2e), ``DADAIA_PI_LIVE``
+    (pi_live contract), ``DADAIA_CODEX_LIVE`` (codex_live), ``DADAIA_CLAUDE_LIVE``
+    (claude_live). A guard keyed on a single flag would false-block a
+    legitimate ``DADAIA_CODEX_LIVE=1`` run of the codex_live suite — this is
+    the specific regression the architect review's F1 finding identified.
+    """
+    import os
+
+    return any(os.environ.get(flag) == "1" for flag in _LIVE_OPT_IN_FLAGS)
+
+
+@pytest.fixture(autouse=True)
+def _real_worker_guard(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """FR3 (DEC-C) real-binary guardrail: fail loud instead of silently spawning the
+    real ``pi``/``codex`` binary when a test constructs ``PiHeadlessAdapter`` or
+    ``CodexExecAdapter`` with no explicit ``runner=`` and no live-opt-in flag is set.
+
+    Patches ``PiHeadlessAdapter._resolve_runner`` / ``CodexExecAdapter._resolve_runner``
+    (the call-time indirection FR1 — T-67-02/T-67-04 — introduced) to a sentinel that
+    raises ``RuntimeError`` unless :func:`_real_worker_opt_in` returns ``True``.
+
+    Deliberately NOT a patch of the module-qualified ``subprocess.run`` attribute
+    (``pi_runtime.subprocess.run`` / ``codex_runtime.subprocess.run``): a Python module
+    import is a process-wide singleton, so ``pi_runtime.subprocess IS subprocess``
+    (the same object as the stdlib ``subprocess`` module) — patching that attribute
+    patches the GLOBAL ``subprocess.run`` for the entire test process, breaking every
+    unrelated test that legitimately shells out (git operations, CLI probes, the
+    pre-push gate's own subprocess tests, etc.) — confirmed by a full-suite regression
+    run during T-67-08 development (177 unrelated failures). Patching the two adapter
+    CLASSES' ``_resolve_runner`` bound methods is scoped exclusively to
+    ``PiHeadlessAdapter``/``CodexExecAdapter`` instances and leaves the shared
+    ``subprocess`` module completely untouched, while still firing before any real
+    subprocess is spawned (the same enforcement point FR1's call-time resolution
+    created). A test that injects ``runner=fake_...`` explicitly at construction is
+    UNAFFECTED: the replacement below re-checks ``self._runner is not None`` and
+    returns the injected fake unchanged in that case — only the ``None`` (no explicit
+    runner) branch is replaced with the raising sentinel, mirroring the original
+    ``_resolve_runner`` body exactly except for its fallback target. The ``*_live/``
+    suites set their own opt-in flag before invoking a real adapter, so this guard
+    never fires there.
+
+    **Narrow, explicit, per-test opt-out (NOT a blanket exemption).** AC1(repro)'s
+    own mechanism-proof tests
+    (``test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time``
+    in both ``test_pi_runtime.py`` and ``test_codex_exec_runtime.py``, T-67-01/T-67-03)
+    legitimately construct the adapter with NO ``runner=`` and rely on a
+    POST-construction module-attr monkeypatch of
+    ``pi_runtime.subprocess.run``/``codex_runtime.subprocess.run`` to prove the exact
+    call-time-vs-construction-time distinction FR1 fixes — that IS the mechanism this
+    guard also patches, so the two must compose deliberately rather than collide.
+
+    This is opted OUT of at the call site, not exempted here by name or module: each
+    of those two tests requests the ``real_worker_guard_bypass_for_mechanism_proof``
+    fixture explicitly as a normal test parameter (see its docstring for why each
+    opt-out call site stays hermetic — the test itself installs a fake at the module
+    boundary FIRST and never lets a real subprocess execute). Detection here is via
+    ``request.fixturenames`` — the resolved fixture closure for THIS test item — never
+    a node name list or module-wide exemption; a test must explicitly declare the
+    bypass fixture as a parameter for the reviewer to see it at the call site.
+    """
+    if _real_worker_opt_in():
+        return
+    if "real_worker_guard_bypass_for_mechanism_proof" in request.fixturenames:
+        return
+
+    def _guarded_resolve_runner(self: object) -> object:
+        injected = getattr(self, "_runner", None)
+        if injected is not None:
+            return injected
+        raise RuntimeError(
+            "real pi/codex binary invocation attempted without a live-opt-in flag "
+            "set — set one of DADAIA_E2E_REAL_WORKER, DADAIA_PI_LIVE, "
+            "DADAIA_CODEX_LIVE, DADAIA_CLAUDE_LIVE=1 to opt in, or inject an explicit "
+            "runner= at construction to keep the test hermetic."
+        )
+
+    from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
+
+    monkeypatch.setattr(PiHeadlessAdapter, "_resolve_runner", _guarded_resolve_runner, raising=True)
+    monkeypatch.setattr(CodexExecAdapter, "_resolve_runner", _guarded_resolve_runner, raising=True)
+
+
+@pytest.fixture
+def real_worker_guard_bypass_for_mechanism_proof() -> None:
+    """Explicit, per-test opt-out of :func:`_real_worker_guard`, for the exact two
+    AC1(repro) mechanism-proof tests only (T-67-01 pi half, T-67-03 codex half).
+
+    **Why each opt-out call site stays hermetic (not a real-binary risk):** both
+    tests (a) construct the adapter with no ``runner=``, (b) IMMEDIATELY
+    ``monkeypatch.setattr`` the module-level ``subprocess.run`` attribute on
+    ``pi_runtime``/``codex_runtime`` to a fake BEFORE calling ``.run()``, and
+    (c) assert the fake's call-recorder shows exactly one invocation. Because the
+    module-attr patch is applied before any subprocess is spawned, the real binary is
+    never reached even with this guard bypassed for that one test — the test's own
+    monkeypatch is the hermeticity boundary, not this fixture. A future test that
+    requests this fixture WITHOUT installing its own module-attr fake before calling
+    ``.run()`` would genuinely spawn the real binary — that is exactly the risk this
+    fixture is scoped narrowly to avoid normalizing; do not add new call sites without
+    the same before-first-call monkeypatch discipline documented here.
+
+    This fixture does nothing by itself — ``_real_worker_guard`` (autouse, declared
+    above) detects its presence in the requesting test's resolved fixture closure
+    (``request.fixturenames``) and skips patching ``_resolve_runner`` for that one
+    test only. Requesting it is a plain, visible test-function parameter — an
+    explicit opt-in the reviewer sees at the call site, never a name list or
+    module-wide exemption.
+    """
+    return None
+
+
 @pytest.fixture(autouse=True)
 def _repo_root_write_guard() -> object:
     """Assert no new files appear in protected lib-repo paths during a test.

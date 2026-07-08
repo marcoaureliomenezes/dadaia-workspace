@@ -816,7 +816,9 @@ def test_pi_strict_primacy_is_pinned_by_behaviour(tmp_path: Path) -> None:
 
 
 def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    real_worker_guard_bypass_for_mechanism_proof: None,
 ) -> None:
     """AC1(repro), AC1.1: no explicit ``runner=`` at construction; the module-level
     ``subprocess.run`` attribute is monkeypatched to a fake AFTER construction. The
@@ -826,6 +828,13 @@ def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_ti
     time) this FAILS: the adapter's ``self._runner`` was already bound to the real
     ``subprocess.run`` function object before this monkeypatch ever ran, so the fake
     is never reached and the call-recorder stays empty.
+
+    Requests ``real_worker_guard_bypass_for_mechanism_proof`` (T-67-08, FR3):
+    this test IS the mechanism FR3's guard also patches (the call-time-vs-
+    construction-time fallback to ``subprocess.run``), so it must opt out of the
+    guard explicitly — see that fixture's docstring for why this stays hermetic:
+    the module-level monkeypatch below runs BEFORE ``.run()`` is ever called, so no
+    real subprocess is spawned regardless of the guard's bypass.
     """
     calls: list[object] = []
 
@@ -864,9 +873,6 @@ def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_ti
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True, reason="no guard yet — would spawn/hang on the real binary (T-67-08 step 1, RED)"
-)
 def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_binary(
     tmp_path: Path,
 ) -> None:

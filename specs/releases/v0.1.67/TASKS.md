@@ -142,7 +142,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC2.3.
 - **Parallelism:** depends on T-67-05 (same file).
 
-### T-67-07 — (F2, new) Migrate the `test_lifecycle_cli.py` sibling broken-pattern site `[-]`
+### T-67-07 — (F2, new) Migrate the `test_lifecycle_cli.py` sibling broken-pattern site `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_lifecycle_cli.py`
@@ -176,7 +176,7 @@ instead of migrating it.
 
 ## Wave C — FR3: real-binary guardrail (DEC-C, F1/F6-corrected)
 
-### T-67-08 — Add the autouse real-binary guard (4-flag union) + permanent guard-proof tests, xfail-first
+### T-67-08 — Add the autouse real-binary guard (4-flag union) + permanent guard-proof tests, xfail-first `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/conftest.py`; `tests/unit/infrastructure/test_pi_runtime.py`
