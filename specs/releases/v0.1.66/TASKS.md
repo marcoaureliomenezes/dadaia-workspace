@@ -14,7 +14,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 
 ## Wave A — trivial-looking config fixes, STILL repro-proven (parallel-safe within the wave; T-66-02/03 serialized on `codex_runtime.py`)
 
-### T-66-01 — FR3: valid OpenRouter kimi model id
+### T-66-01 — FR3: valid OpenRouter kimi model id `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/model_profiles.py`,
