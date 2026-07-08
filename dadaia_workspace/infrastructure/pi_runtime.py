@@ -194,7 +194,17 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if message is None:
             # Degraded fallback: no usable message_end. Never crash.
             text = (stdout or "").strip()
-            if returncode != 0 and not text:
+            # FR1 (bug: pi-headless-nonzero-exit-misreported): ANY non-zero returncode is
+            # a FAILED run, regardless of whether stdout carries text — a pi setup failure
+            # (e.g. a missing API key) still emits a JSONL session/event preamble to stdout
+            # before dying, and the old ``and not text`` conjunct let that non-empty
+            # preamble mask the real failure as SUCCEEDED. ``error=""`` here is
+            # deliberate: ``run()``'s existing stderr-backfill (lines 138-144) fires
+            # whenever a FAILED result carries an empty ``error`` and threads the real
+            # (redacted) ``proc.stderr``/``proc.stdout`` in — no additional plumbing
+            # needed here. This mirrors ``CodexExecAdapter.run``'s returncode-first check
+            # (``codex_runtime.py:150-157``).
+            if returncode != 0:
                 return AgentRunResult(
                     status=AgentRunStatus.FAILED,
                     summary="pi headless returned non-zero exit",
