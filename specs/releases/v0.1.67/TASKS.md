@@ -58,7 +58,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC1.1, AC1.3 (pi half), AC1(repro) GREEN half.
 - **Parallelism:** none — depends on T-67-01.
 
-### T-67-03 — RED: codex call-time-interception proof (FAILING on current code) `[-]`
+### T-67-03 — RED: codex call-time-interception proof (FAILING on current code) `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/infrastructure/test_codex_exec_runtime.py` (additive test only)
@@ -73,7 +73,7 @@ THEN implementing the fix.
 - **Parallelism:** SAFE parallel with T-67-01/T-67-02 — disjoint files
   (`test_codex_exec_runtime.py` vs `test_pi_runtime.py`/`pi_runtime.py`).
 
-### T-67-04 — GREEN: codex mechanism fix
+### T-67-04 — GREEN: codex mechanism fix `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py`
