@@ -222,7 +222,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 4 — Panel Sub-agents tab — after T-65-08
 
-- [ ] **T-65-10 — Feature service + wiring (FR8)** — owner: software-engineer
+- [-] **T-65-10 — Feature service + wiring (FR8)** — owner: software-engineer
   Write set: `dadaia_workspace/features/agents/model_policy.py` (new),
   `dadaia_workspace/container.py`, `tests/unit/features/agents/test_model_policy.py` (new).
   Precondition: T-65-03, T-65-08.
