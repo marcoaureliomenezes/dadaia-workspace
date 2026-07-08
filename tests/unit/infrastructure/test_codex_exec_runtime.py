@@ -689,3 +689,52 @@ def test_sandbox_override_reaches_the_command_argv(tmp_path: Path, monkeypatch: 
 
     argv = captured["argv"]
     assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "danger-full-access"]
+
+
+# ---------------------------------------------------------------------------
+# T-67-03 (SPEC v0.1.67 AC1(repro), codex half) — call-time-vs-construction-time
+# runner resolution. Mirrors test_pi_runtime.py's
+# test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time.
+# ---------------------------------------------------------------------------
+
+
+def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC1(repro), AC1.2: no explicit ``runner=`` at construction; the module-level
+    ``subprocess.run`` attribute is monkeypatched to a fake AFTER construction. The
+    fake must be invoked when ``.run()`` executes.
+
+    On current code (``runner: Runner = subprocess.run`` bound at class-definition
+    time) this FAILS: the adapter's ``self._runner`` was already bound to the real
+    ``subprocess.run`` function object before this monkeypatch ever ran, so the fake
+    is never reached and the call-recorder stays empty.
+    """
+    calls: list[object] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        argv = args[0]
+        assert isinstance(argv, list)
+        output_path = Path(argv[argv.index("--output-last-message") + 1])
+        output_path.write_text(
+            json.dumps({"summary": "call-time interception proof"}), encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    # Construct with NO runner= kwarg — the adapter must fall back to a live,
+    # call-time lookup of the module-level `subprocess.run` attribute.
+    adapter = CodexExecAdapter(CodexExecConfig(cwd=tmp_path), environ={})
+
+    # Patch the MODULE attribute strictly AFTER construction — this is the exact
+    # monkeypatch shape used by the (now-fixed) executed-path CLI tests.
+    monkeypatch.setattr("dadaia_workspace.infrastructure.codex_runtime.subprocess.run", fake_run)
+
+    result = adapter.run(_request())
+
+    assert len(calls) == 1, (
+        "the module-level subprocess.run monkeypatch was never reached — the runner "
+        "was bound at class-definition time instead of resolved at call time"
+    )
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "call-time interception proof"

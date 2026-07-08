@@ -39,7 +39,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC1(repro) (pi half).
 - **Parallelism:** none — first task, serial dependency for T-67-02.
 
-### T-67-02 — GREEN: pi mechanism fix `[-]`
+### T-67-02 — GREEN: pi mechanism fix `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/pi_runtime.py`
@@ -58,7 +58,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC1.1, AC1.3 (pi half), AC1(repro) GREEN half.
 - **Parallelism:** none — depends on T-67-01.
 
-### T-67-03 — RED: codex call-time-interception proof (FAILING on current code)
+### T-67-03 — RED: codex call-time-interception proof (FAILING on current code) `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/infrastructure/test_codex_exec_runtime.py` (additive test only)
