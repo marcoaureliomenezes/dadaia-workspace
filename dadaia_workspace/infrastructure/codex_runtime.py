@@ -193,6 +193,14 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             self._config.codex_bin,
             "exec",
             "--ignore-user-config",
+            # FR4 (v0.1.66): --ignore-user-config discards ~/.codex trust, so a governed
+            # worker running in a directory codex does not auto-trust fails codex's own
+            # "Not inside a trusted directory" check unless this flag is also present.
+            # The outer `dadaia lifecycle` gate (allowed_paths/review gates) remains the
+            # real security boundary regardless of codex's own trust posture (same
+            # reasoning as the sandbox override in FR5) — this flag governs only whether
+            # codex itself refuses to run, not what it is permitted to write.
+            "--skip-git-repo-check",
             "--sandbox",
             self._config.sandbox,
             "--cd",

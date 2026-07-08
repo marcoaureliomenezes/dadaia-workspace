@@ -91,6 +91,10 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert isinstance(argv, list)
     assert argv[:2] == ["/usr/bin/codex", "exec"]
     assert "--ignore-user-config" in argv
+    # FR4 (v0.1.66, AC4.1): --skip-git-repo-check MUST accompany --ignore-user-config
+    # so a governed worker in an untrusted directory never fails codex's own trust
+    # check.
+    assert "--skip-git-repo-check" in argv
     assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"]
     # W1-1: `--ask-for-approval` is interactive-only and rejected by `codex exec` on
     # codex-cli 0.142.4; the adapter must NOT pass it (exec never prompts).

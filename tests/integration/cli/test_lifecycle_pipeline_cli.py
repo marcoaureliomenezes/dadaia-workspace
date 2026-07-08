@@ -314,3 +314,124 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
         f"expected the valid OpenRouter id 'moonshotai/kimi-k2.5', got {model_value!r} "
         f"(full argv: {argv})"
     )
+
+
+def _patch_build_agent_runtime_for_codex(
+    monkeypatch: pytest.MonkeyPatch, fake_runner: object
+) -> None:
+    """Inject ``runner=fake_runner`` into the real ``CodexExecAdapter`` construction.
+
+    ``CodexExecAdapter.__init__`` binds its ``runner`` default (``subprocess.run``) at
+    class-definition time (same root cause as
+    ``pi-executed-path-cli-tests-invoke-real-pi-binary``), so a plain
+    ``monkeypatch.setattr("...codex_runtime.subprocess.run", fake)`` never reaches an
+    already-constructed adapter. This patches ``container.build_agent_runtime``'s
+    ``CODEX_EXEC`` branch to pass the fake explicitly at construction — the same seam
+    ``test_codex_exec_runtime.py`` uses — while every other real code path (``_command``,
+    ``.run()``, the full ``LifecyclePipeline``/gate chain) stays real and unfaked.
+    """
+    from pathlib import Path as _Path
+
+    from dadaia_workspace import container
+    from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter, CodexExecConfig
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+
+    real_build_agent_runtime = container.build_agent_runtime
+
+    def patched_build_agent_runtime(
+        kind: object, *, cwd: _Path | None = None, model: object = None
+    ) -> object:
+        from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+
+        if kind is AgentRuntimeKind.CODEX_EXEC:
+            run_dir = cwd or _Path.cwd()
+            codex_config = (
+                CodexExecConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+                if model is not None
+                else CodexExecConfig(cwd=run_dir)
+            )
+            return CodexExecAdapter(
+                codex_config,
+                runner=fake_runner,
+                git=GitSubprocessClient(),
+            )
+        return real_build_agent_runtime(kind, cwd=cwd, model=model)
+
+    monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
+
+
+def test_codex_pipeline_untrusted_dir_no_longer_blocks_on_trust_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-66-02 (FR4, AC4(repro)): the real codex argv must carry
+    ``--skip-git-repo-check`` alongside ``--ignore-user-config``, so a governed worker
+    running in a directory codex does not auto-trust never fails codex's own trust
+    check.
+
+    Drives the real CLI (``--harness codex``), the real ``LifecyclePipeline``/gate
+    chain, and the real ``CodexExecAdapter._command``/``.run()``. Only
+    ``subprocess.run`` is faked (constructor-injected — see
+    ``_patch_build_agent_runtime_for_codex``): the fake inspects the REAL captured argv
+    and returns codex's real trust-error stderr whenever ``--skip-git-repo-check`` is
+    absent, exactly reproducing the user-hit failure mode on current code.
+    """
+    import subprocess as _subprocess
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        assert isinstance(args, list)
+        captured["argv"] = args
+        if "--skip-git-repo-check" not in args:
+            return _subprocess.CompletedProcess(
+                args=args,
+                returncode=1,
+                stdout="",
+                stderr="Not inside a trusted directory and --skip-git-repo-check was "
+                "not specified.",
+            )
+        # Fulfil the --output-last-message contract so a trusted run "succeeds" cleanly.
+        output_path = Path(args[args.index("--output-last-message") + 1])
+        output_path.write_text(
+            json.dumps({"summary": "codex exec completed via injected runner"}),
+            encoding="utf-8",
+        )
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-codex-trust",
+            "--harness",
+            "codex",
+            "--json",
+        ],
+    )
+
+    argv = captured["argv"]
+    # AC4(repro): on current code the argv omits --skip-git-repo-check, so the fake
+    # returns the real trust error and the pipeline blocks with that reason.
+    assert "--skip-git-repo-check" in argv, (
+        f"expected '--skip-git-repo-check' in the real codex argv, got {argv!r} — the "
+        f"fake returned codex's trust error because the flag was absent"
+    )
+    # The step must not have blocked on the trust error once the flag reaches argv.
+    payload = json.loads(result.output)
+    reason = (payload.get("blocked") or {}).get("reason", "")
+    assert "trusted directory" not in reason, (
+        f"pipeline still blocked on the codex trust error: {reason!r} (argv={argv!r})"
+    )

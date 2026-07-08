@@ -64,7 +64,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   --strict clean on `model_profiles.py`/`harness_models.py`, 137/137 scoped tests
   green.
 
-### T-66-02 — FR4: codex adapter passes `--skip-git-repo-check` `[-]`
+### T-66-02 — FR4: codex adapter passes `--skip-git-repo-check` `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py` (the
@@ -84,6 +84,25 @@ this is not optional even for the "trivial config" tasks in Wave A.
 - **Done criterion:** AC4.1, AC4(repro) GREEN; RED capture recorded.
 - **Parallelism:** must land before T-66-03 (same file, sequenced not
   concurrent).
+- **DONE:** RED captured — real `_command()` argv
+  `['codex', 'exec', '--ignore-user-config', '--sandbox', 'read-only', '--cd', ...]`
+  omits `--skip-git-repo-check`; assertion
+  `AssertionError: expected '--skip-git-repo-check' in the real codex argv, got
+  [...] — the fake returned codex's trust error because the flag was absent`
+  fails on current code (no existing CLI-level codex pipeline test existed prior to
+  this task; built one following the FR3 constructor-injection pattern —
+  `container.build_agent_runtime`'s `CODEX_EXEC` branch patched to construct
+  `CodexExecAdapter(..., runner=fake_codex_run, ...)` directly, since
+  `CodexExecAdapter.__init__` has the same class-definition-time `runner` default
+  binding as `PiHeadlessAdapter` — bug `pi-executed-path-cli-tests-invoke-real-pi-binary`
+  applies here too, same workaround). Root cause fixed: added
+  `"--skip-git-repo-check"` to the fixed argv in `_command` (codex_runtime.py),
+  unconditionally alongside `--ignore-user-config`. Added AC4.1 unit pin to
+  `test_codex_exec_runtime.py::test_codex_exec_adapter_builds_controlled_command_and_env`.
+  AC-MUT proof-of-bite: removed the argv token, confirmed both the unit test and
+  the executed-path repro fail with the exact RED above, re-applied, confirmed
+  green (31/31 scoped tests). Gates: ruff format/check clean, mypy --strict clean
+  on `codex_runtime.py`.
 
 ### T-66-03 — FR5: codex sandbox env override
 
