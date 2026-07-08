@@ -319,9 +319,30 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   precedence flip fails units; one-entry balanced mutation fails this contract) and
   recorded in the completion note.
 
-- [-] **T-65-14 — Panel e2e: Sub-agents tab (AC-6)** — owner: qa-engineer
+- [x] **T-65-14 — Panel e2e: Sub-agents tab (AC-6)** — owner: qa-engineer
+  Completion note: `agent-policy.spec.ts` — 4 journeys: (1) roster renders the 9 core
+  agents with model + effort pickers (D-3 5-value vocab asserted) + 3-template
+  selector with `balanced` selected; (2) template apply (subscription-saver) —
+  `clickAndAwaitPut` (T-65-05 helper reused, no PUT/GET race) → G-2 pop-up
+  (claude+codex instructions + rerendered list) → GET reflects template
+  (product-engineer = sonnet-5/xhigh/template, never-Fable-on-security asserted);
+  (3) per-agent override — SE model→opus-4-8 on subscription-saver, AC-3 per-field
+  merge asserted verbatim (model from override, effort xhigh from template,
+  source=override) + UI reload reflects it; (4) Fable-on-security rejection — armed
+  `waitForResponse` on the 400 validate POST, readable error banner naming
+  security-reviewer, NO pop-up, NO write (GET still clean baseline). Clean-overlay
+  (`balanced`, no overrides) restored before/after every test with asserted 200s.
+  RED (mutation-sanity): sabotaged the Apply PUT endpoint in `agent_policy.js`
+  (`/api/agent-model-policy` → `-borked`) — both Apply journeys FAILED (PUT wait
+  timeout), roster + rejection stayed green as expected; reverted. Stability:
+  `--repeat-each=5` → 20/20 passed. Full panel e2e suite: 57 specs (53 baseline
+  + 4 new) — 56 passed / 1 failed: `E2E-TAB-01` exact-tab-list pin, a rendered-truth
+  golden genuinely changed by the T-65-12 Sub-agents tab; updated under T-65-15's
+  golden write set. Run on an isolated panel instance (port 5065; operator's 4999
+  untouched).
   Write set: `tests/e2e/panel/agent-policy.spec.ts` (new),
-  `tests/e2e/panel/helpers.ts` (additive only).
+  `tests/e2e/panel/helpers.ts` (additive only — no change needed; `clickAndAwaitPut`
+  reused as-is).
   Precondition: T-65-12, T-65-05 (reuse the deterministic-wait pattern).
   RED-first by nature (spec written against the running panel).
   Done when: tab activates and renders the 9-agent roster; template select + Apply
