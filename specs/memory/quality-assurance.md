@@ -15,8 +15,8 @@ tags:
   - quality
   - test-architecture
 token_estimate: 3960
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+last_updated: '2026-07-08'
+release_origin: v0.1.65
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.9k tests (4,837 passed +
-18 skipped as of v0.1.64; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.9k tests (4,941 passed +
+18 skipped as of v0.1.65; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -219,6 +219,17 @@ asserts `.memory-chip` in both guards this way, as **defence-in-depth behind the
 lock** (`test_index_dom_contract.py`, the primary never-re-baselined guard, byte-identical): a dropped
 selector now fails both the unit lock AND the browser journey.
 
+**Deterministic-mutation e2e law (v0.1.65) — arm `waitForResponse` on a save PUT BEFORE the
+click; never let a shared banner be the only save signal.** A panel-mutation e2e that clicks
+Save/Apply and then immediately reads the next GET races the server: the round-trip may not have
+landed, and a validate/save banner sharing a CSS class across both outcomes is an ambiguous
+signal. The pattern (the shared `clickAndAwaitPut` helper in `tests/e2e/panel/helpers.ts`): arm
+`page.waitForResponse` for the mutation `PUT` (status 200) **before** the click, click, `await`
+the response, and only then run any GET; restore/teardown PUTs assert 200; assertions tolerate a
+serialized empty-overlay shape (an absent policy key). This closed the v0.1.65 harness-toggle
+flake (FR11) and is the default for the Sub-agents Apply e2e (FR8) from day one — the
+stale-validate-banner must never be the sole save evidence.
+
 **Executed-path law (v0.1.60) — a unit test that calls a helper directly proves nothing about
 the wired path.** v0.1.60's FR9 fix added the correct consumer-`AGENTS.md` provenance logic to
 `_doctor_guardrail_pair`, and a unit test that **called that helper directly** went green — but
@@ -281,12 +292,19 @@ normative vision §6.
    integration, e2e-python, e2e-panel — each with an explicit timeout and a targeted
    marker filter (the `-cross` jobs run the same markers on the Windows/macOS matrix;
    e2e-panel is a Playwright/Node job: `npm ci` + `npx playwright install chromium` +
-   `npm run test:e2e` against a panel workspace bootstrapped by the **shared
-   `.github/scripts/bootstrap-panel-ws.sh` script** — the single bootstrap source used
-   by the e2e-panel legs of BOTH `ci.yml` and `release.yml` (no hand-synced inline
-   copies; no legacy `primary_context.json` state file is written — its only production
-   reference is the v1→v2 migration deleter), guarded by
-   `tests/contract/test_ci_workflow_hygiene.py`). A further 5 governance
+   `npm run test:e2e` against a **hermetic** panel harness (v0.1.65:
+   `tests/e2e/panel/run-panel-e2e-server.sh`, named by the single `playwright.config.ts`
+   `webServer.command` default) — the script builds a disposable temp workspace (never the
+   repo root, never an enclosing real operator workspace), inits it, symlinks
+   `repos/dadaia-workspace` to the checkout for read-only self-repo consumption, stages +
+   installs a real projection INTO the temp workspace, and execs the panel there (default port
+   5065). This replaced the deleted `.github/scripts/bootstrap-panel-ws.sh`, whose
+   write-at-checkout-root bootstrap made `workspace_root == the source-repo root` and tripped
+   the `_is_source_repo_root` production guard on CI (and silently re-rendered the developer's
+   own enclosing workspace locally). `tests/contract/test_ci_workflow_hygiene.py` now pins the
+   anti-duplication invariant that neither `ci.yml` nor `release.yml` may override
+   `PANEL_WEB_SERVER_COMMAND` (the single `playwright.config.ts` default is the only place
+   naming the harness script). A further 5 governance
    jobs (pr-title, repo-hygiene, backlog-doctor, hotfix-branch-name, verdict-gate)
    gate PR shape, repo/backlog hygiene, and the security push verdict; a separate
    secret-scan workflow runs gitleaks.
@@ -326,16 +344,20 @@ Files the test suite reads or writes at runtime:
   typecheck, unit-fast(+cross), contract-coverage(+cross), integration, e2e-python,
   e2e-panel) consuming the layer-specific pytest commands with explicit timeouts,
   plus 5 governance jobs (pr-title, repo-hygiene, backlog-doctor,
-  hotfix-branch-name, verdict-gate). The e2e-panel job's workspace bootstrap is the
-  shared `.github/scripts/bootstrap-panel-ws.sh`.
-- `.github/scripts/bootstrap-panel-ws.sh` — the single POSIX bootstrap script for
-  the e2e-panel workspace, called by both `ci.yml` and `release.yml` (extraction
-  killed the hand-synced 39-line duplicate; hygiene pinned by
-  `tests/contract/test_ci_workflow_hygiene.py`).
+  hotfix-branch-name, verdict-gate). The e2e-panel job runs the hermetic
+  `tests/e2e/panel/run-panel-e2e-server.sh` harness (v0.1.65) via the single
+  `playwright.config.ts` `webServer.command` default — no per-workflow override.
+- `tests/e2e/panel/run-panel-e2e-server.sh` — the hermetic panel-e2e harness (v0.1.65):
+  builds a disposable temp workspace, inits it, symlinks `repos/dadaia-workspace` to the
+  checkout (read-only self-repo consumption; `_is_self_repo` skips writing back into it),
+  stages + installs a real projection into the temp workspace, and execs the panel there
+  (default port 5065). It replaced the deleted `.github/scripts/bootstrap-panel-ws.sh`;
+  the anti-duplication invariant (no `PANEL_WEB_SERVER_COMMAND` override in either
+  workflow) is pinned by `tests/contract/test_ci_workflow_hygiene.py`.
 - `.github/workflows/release.yml` — the PyPI release pipeline, fired on `main`
   pushes: a version-vs-tag check job gates everything; five test legs (unit-fast,
   contract-coverage, integration, e2e-python, e2e-panel — the e2e-panel leg uses the
-  same shared `bootstrap-panel-ws.sh`) re-run on the release
+  same hermetic `tests/e2e/panel/run-panel-e2e-server.sh` harness) re-run on the release
   commit; then build (sdist+wheel) → the `release-gate` approval environment →
   OIDC trusted publishing to PyPI + tag push → a post-publish smoke job
   (ubuntu/py3.12: `pip install` from PyPI, `dadaia --help`, `dadaia init` in a

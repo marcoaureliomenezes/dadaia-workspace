@@ -35,7 +35,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | local control surface (dadaia panel); 6 tabs; Workflows leads with server-SVG diagram-cards + inline per-step model pickers (v0.1.45). |
+| `panel` | panel | local control surface (dadaia panel); 7 tabs incl. Sub-agents (L1 agent model governance); Workflows leads with server-SVG diagram-cards + model pickers. |
 
 ### philosophy
 

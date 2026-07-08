@@ -1,0 +1,19 @@
+{
+  "release": "v0.1.65",
+  "consumed": [
+    {
+      "slug": "l1-agent-model-governance-panel",
+      "shipped_anchors": [
+        "dadaia_workspace/features/agents/reader.py#read_canonical_agents",
+        "dadaia_workspace/core/agent_model_templates.py#resolve_agent_model",
+        "dadaia_workspace/infrastructure/json_agent_model_policy_store.py#JsonAgentModelPolicyStore",
+        "dadaia_workspace/features/panel/views/agent_policy.py#render_api_agent_model_policy"
+      ],
+      "note": "DELIVERED — v0.1.65 (archived at CLOSURE). Mirrors the Layer-2 workflow model-governance stack onto Layer-1. FR1: the 9 core public/agents/*.md bodies drop hardcoded model:/effort: and become model-agnostic; the reader tolerates model-less/effort-less bodies (effort added to the allowlist); the 3 plugin bodies move claude-sonnet-4-6 -> claude-sonnet-5. FR2: NEW core/agent_model_templates.py with 3 built-in templates (balanced DEFAULT, subscription-saver, max-quality), each a full 9-core-agent (model, effort) map, import-time asserts incl. never-Fable-on-security. FR3: NEW public/schemas/agent-model-policy-v1.schema.json + infrastructure/json_agent_model_policy_store.py at .dadaia/states/agent_model_policy.json (atomic temp+rename + .last-good.json; missing=>None !=invalid=>typed error; every FR3 rejection distinct incl. D-7 Fable-on-security). FR4: single resolve_agent_model precedence per-agent override > applied template > balanced (plugin: override > pack default), the ONLY precedence impl. FR5: render_claude_agent D-6 seam shared by install-write/doctor-compare/panel Apply; codex projection consumes the SAME resolved config with model_reasoning_effort via the D-3 clamp (low->low, medium->medium, high->high, xhigh->high, max->high); fail-closed core codex render (F-3); --force re-renders (F-5); plugin effort asymmetry (F-6). FR6: claude-sonnet-5 registry entry (gpt-5.3-codex, tier plugin, pricing 3.00/15.00/3.75/0.30 eff 2026-07-01; D-2). FR7: policy-aware public doctor — claude-md render-compare against render(staged generic + resolved policy), claude-md-only scope (F-1); check_model_resolution validates the RESOLVED roster + plugin staged models; staging manifest still hashes staged bytes. FR8: NEW panel Sub-agents tab (7th) — roster pickers + template selector + explicit Apply (validate -> save overlay -> re-render BOTH L1 projections) + G-2 post-apply pop-up; endpoints GET/PUT /api/agent-model-policy, GET /api/agent-model-templates, POST /api/agent-model-policy/validate. FR9: contract-test rework (template pinning a–g; balanced default; never-Fable-on-security; 9/3 roster counts). D-1 live retier on this instance: balanced default => claude-fable-5 now only on project-manager + software-architect. AC-7 mutation-sanity captured then reverted (resolver-precedence flip; one-entry balanced mutation; Apply-PUT sabotage). Hermetic panel-e2e harness (run-panel-e2e-server.sh) introduced at T-65-14 to fix a source-repo-root guard CI failure + local instance-mutation footgun. Ship PR #124, squash 962a23da (CI fix 9a77abc3).",
+      "commits": [
+        "e52879e1",
+        "962a23da"
+      ]
+    }
+  ]
+}

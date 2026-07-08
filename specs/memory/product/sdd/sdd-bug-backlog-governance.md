@@ -20,8 +20,8 @@ tags:
   - alpha-rc-model
   - backlog-ownership
 token_estimate: 1720
-last_updated: '2026-07-03'
-release_origin: v0.1.55
+last_updated: '2026-07-08'
+release_origin: v0.1.65
 ---
 
 Skill: `dadaia-release-definition` · Rules: `release-governance.md`, `backlog-ownership.md`, `bug-registration-guardrail.md` (always-on)
@@ -100,7 +100,13 @@ The backlog is a deduplicated, conflict-free, non-stale SET, mechanically enforc
   downgrade with an explicit proven-compatible merge.
 - **`dadaia backlog doctor`** (the real enforcement — backlog is ADDITIVE, so the
   file-write gate never blocks it): BL-SCHEMA / BL-DUP /
-  BL-CONFLICT / BL-STALE, non-zero exit on violation. Runs in CI (job
+  BL-CONFLICT / BL-STALE, non-zero exit on violation. **Frontmatter-parse diagnosis
+  (v0.1.65):** when an item's frontmatter is unparseable YAML, the loader captures the
+  failure in `BacklogItem.frontmatter_error` (YAML message + problem-mark line/column) and
+  BL-SCHEMA emits a dedicated `frontmatter YAML parse error: <msg> (line L, column C)` finding,
+  **suppressing** the downstream no-`intents[]` / unresolved-subject findings for that item
+  (they are artifacts of the parse failure, not real gaps) — well-formed files produce
+  byte-identical findings to before. Runs in CI (job
   `backlog-doctor`) and in the **scoped** pre-commit chokepoint: BL-* blocks only
   commits whose staged paths intersect `specs/backlog/**` — pre-existing debt does not
   block an unrelated commit; the full sweep stays in CI. Since v0.1.49 the backlog is

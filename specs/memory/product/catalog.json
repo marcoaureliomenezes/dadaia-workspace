@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-08T01:17:35Z",
+  "generated_at": "2026-07-08T07:02:26Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -50,7 +50,7 @@
       "category": "product",
       "area": "agents",
       "tldr": "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas.",
-      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3 plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs, the two independent tier axes (numeric dispatch band vs registry model-cost Tier), and the Layer-2 persona surface.",
+      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3 plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs, the two independent tier axes (numeric dispatch band vs registry model-cost Tier), the panel-managed Layer-1 agent model governance (model-agnostic sources + 3 templates + overlay + single resolver + render-at-install, never-Fable-on-security), and the Layer-2 persona surface.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -62,6 +62,7 @@
       "depends_on": [
         "plugin-packs",
         "tech-stack",
+        "panel",
         "architecture",
         "dadaia-workflows",
         "harness-codex",
@@ -118,7 +119,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -130,6 +131,7 @@
       "token_estimate": 1880,
       "depends_on": [
         "plugin-packs",
+        "agent-orchestration",
         "workspace-init"
       ]
     },
@@ -257,8 +259,8 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "local control surface (dadaia panel); 6 tabs; Workflows leads with server-SVG diagram-cards + inline per-step model pickers (v0.1.45).",
-      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 6 tabs (Projects / Workflows / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions is an aggregated-cost DASHBOARD ONLY (v0.1.52: 4 stat cards + cost-unknown banner from the server-side /api/sessions aggregate; the list/drawer/detail endpoint are gone), 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune; telemetry SQLite through the pragma'd factory (WAL+busy_timeout, per-call ro connections). NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban DELETED in v0.1.52 (view+route+CSS+tokens+container wiring); /api/lifecycle-runs served with no dedicated UI.",
+      "tldr": "local control surface (dadaia panel); 7 tabs incl. Sub-agents (L1 agent model governance); Workflows leads with server-SVG diagram-cards + model pickers.",
+      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Workflows / Sub-agents / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Sub-agents (v0.1.65) is the Layer-1 agent model-governance surface: a roster of per-agent model + effort pickers + template selector + explicit Apply (validate → save the agent-model-policy overlay → re-render both L1 projections → G-2 post-apply pop-up); endpoints GET/PUT /api/agent-model-policy, GET /api/agent-model-templates, POST /api/agent-model-policy/validate. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions is an aggregated-cost DASHBOARD ONLY (v0.1.52: 4 stat cards + cost-unknown banner from the server-side /api/sessions aggregate; the list/drawer/detail endpoint are gone), 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune; telemetry SQLite through the pragma'd factory (WAL+busy_timeout, per-call ro connections). NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban DELETED in v0.1.52 (view+route+CSS+tokens+container wiring); /api/lifecycle-runs served with no dedicated UI.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",

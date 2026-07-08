@@ -8,16 +8,18 @@ summary: Defines the public default 9-core agent topology with coordinator+sub-a
   per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD
   step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3
   plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs,
-  the two independent tier axes (numeric dispatch band vs registry model-cost Tier), and
-  the Layer-2 persona surface.
+  the two independent tier axes (numeric dispatch band vs registry model-cost Tier), the
+  panel-managed Layer-1 agent model governance (model-agnostic sources + 3 templates +
+  overlay + single resolver + render-at-install, never-Fable-on-security), and the Layer-2
+  persona surface.
 tags:
 - orchestration
 - agents
 - workflows
 - dispatch
 token_estimate: 1700
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+last_updated: '2026-07-08'
+release_origin: v0.1.65
 ---
 
 ## Purpose
@@ -82,7 +84,8 @@ workers.
 `frontend-design`); `devops-engineer` (plugin `devops`). They ship as behavior-less stubs and
 carry real behavior **once their pack is installed** for the workspace via `dadaia plugin
 install <pack>` ([[plugin-packs]]): the pack overwrites the stub with a real agent body on the
-registry `plugin`/sonnet tier (`model: claude-sonnet-4-6`, numeric `dispatch_band: 3`). Until
+registry `plugin`/sonnet tier (pack-provided default `model: claude-sonnet-5`, numeric
+`dispatch_band: 3`; per-agent overlay override layers on top once the pack is installed). Until
 installed in a given workspace, plugin-domain work routes to the operator.
 
 ### Two independent "tier" axes (do not conflate)
@@ -97,15 +100,58 @@ An agent frontmatter carries **two** unrelated concepts once both named "tier"
   window (a stale consumer projection must not warn-spam) — strip tracked by
   `dispatch-band-legacy-fallback-removal`.
 - **Registry `Tier` (model-cost class)** — the `deep`/`dispatch`/`fast`/`plugin` literal in
-  `core/model_registry.py`, resolved from the frontmatter `model:` (since the PR #115 retier,
-  ratified v0.1.61: 5 core agents resolve to `deep`/fable-5 with per-agent `effort:` and 4 to
-  `dispatch`/opus; the 3 plugin agents to `plugin`/sonnet). This axis keeps the name `Tier`.
-  See [[tech-stack]] "Model assignments".
+  `core/model_registry.py`, resolved from the **composed** `model:` (rendered into the
+  projection from policy, v0.1.65 — no longer authored in the source body). Under the
+  no-overlay `balanced` default: `claude-fable-5`→`deep` (only `project-manager` +
+  `software-architect`), `claude-opus-4-8`→`dispatch` (`product-engineer`/`project-auditor`/
+  `security-reviewer`/`code-reviewer`), `claude-sonnet-5`→`plugin`
+  (`ai-engineer`/`software-engineer`/`qa-engineer`). This axis keeps the name `Tier`. **F-4
+  note:** registry `Tier` is a **cost-axis label decoupled from dispatch-band and agent
+  behavior** — core-agent codex effort now comes from the D-3 clamp of the resolved policy
+  effort, not from `codex_effort_for_tier`, so the `Tier` label (incl. sonnet-5's forced
+  `plugin` grouping) no longer drives core-agent effort. See [[tech-stack]] "Model assignments".
 
-The mandatory contract test `tests/contract/test_agent_tier_taxonomy.py` machine-enforces both
-axes on the `dispatch_band` key (every non-plugin core agent carries a numeric `dispatch_band`
-+ a registry-known `model`; the 3 plugin agents carry `dispatch_band: 3` +
-`model: claude-sonnet-4-6`), with the pinned model/effort map unchanged by the rename.
+The mandatory contract test `tests/contract/test_agent_tier_taxonomy.py` (reworked v0.1.65)
+machine-enforces the model governance by pinning **template contents**, not a per-file roster:
+the full verbatim rosters of the 3 built-in templates, `balanced` as the default,
+never-Fable-on-security across every template, each template model resolving in the registry
+with the expected tier, staged core bodies carrying **no** `model:`/`effort:` (numeric
+`dispatch_band` still mandatory), plugin bodies carrying `dispatch_band: 3` +
+`model: claude-sonnet-5`, and the 9-core/3-plugin roster counts.
+
+### Layer-1 agent model governance (v0.1.65)
+
+Layer-1 agent `(model, effort)` is **panel-managed**, mirroring the Layer-2 workflow
+model-governance stack. The 9 core `public/agents/*.md` bodies are **model-agnostic** (no
+`model:`/`effort:`); the pair is **composed at install** from a policy and rendered as the last
+two frontmatter lines of the projected `.claude/agents/<name>.md`, with the SAME resolved config
+feeding the `.codex/agents/*.toml` projection (codex `model_reasoning_effort` via the D-3 clamp
+`low→low, medium→medium, high→high, xhigh→high, max→high`). The policy has three parts:
+
+- **3 built-in templates** (`core/agent_model_templates.py`): `balanced` (DEFAULT),
+  `subscription-saver` (zero Fable), `max-quality` — each a full 9-core-agent `(model, effort)`
+  map, import-time-asserted (9-agent coverage, registry-known models, effort vocabulary,
+  never-Fable-on-security, unique ids, `balanced` default).
+- **Operator overlay** `.dadaia/states/agent_model_policy.json` (schema `agent-model-policy-v1`,
+  `{applied_template, overrides}`), atomic temp+rename write with `.last-good.json` backup;
+  **missing ⇒ defaults (`balanced`) ≠ invalid ⇒ loud typed error**.
+- **Single resolver** `resolve_agent_model` — per-field precedence **per-agent override >
+  applied template > library default (`balanced`)** (plugin agents: override > pack default).
+  It is the ONLY precedence implementation — install, doctor, codex projection, and the panel
+  all consume it.
+
+`public install` **renders** (not copies) core agents through one seam
+`render(staged generic + resolved (model, effort))`; core codex render **fails closed** when no
+model resolves (no silent default); `--force` re-renders to the render output; a plugin agent's
+`effort:` is omitted entirely when unresolved. `public doctor` is policy-aware — it compares
+each projected `.claude/agents/*.md` against `render(staged generic + resolved policy)`
+(claude-md-only scope), so a policy Apply reads `[ok]` and a hand-edited projection reads
+`[drift]`; the staging manifest keeps hashing staged (policy-free) bytes. The operator retiers
+any agent live from the panel **Sub-agents** tab ([[panel]]). **D-7 never-Fable-on-security** is
+enforced at three layers (template import-time assert, overlay store/parse validation, panel
+validate endpoint). On this instance the no-overlay `balanced` default is live — `claude-fable-5`
+runs only on `project-manager` + `software-architect` (D-1 retier, superseding the 2026-07-06
+hardcoded 5-Fable roster).
 
 ### Dispatcher purity (constitution §9)
 
@@ -227,9 +273,9 @@ with machine-readable handoff sidecars. Agent↔agent handoffs go to
 `.dadaia/handoff/<context>/`. Audit results go to `specs/audits/<ts>-<session_id_8chars>/`
 (committed Markdown — constitution §11).
 
-`ai-engineer` model assignment: `claude-fable-5` with `effort: medium` (synthesis-heavy
-harness-mastery workload; PR #115 retier, ratified v0.1.61 — full split table in
-[[tech-stack]] "Model assignments").
+`ai-engineer` model assignment under the no-overlay `balanced` default: `claude-sonnet-5` with
+`effort: high` (harness-mastery synthesis workload) — resolved from policy, not hardcoded; an
+overlay re-tiers it live. Full roster + template detail in [[tech-stack]] "Model assignments".
 
 `ai-engineer` exclusive skills (restricted by `harness-skill-scope` rule):
 `ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`.
