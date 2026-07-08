@@ -177,7 +177,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   test); plugin-pack agent projection resolves override > pack default; overlay loaded
   once per run; invalid overlay fails loud before any write.
 
-- [ ] **T-65-09 — Policy-aware doctor + model-resolution rework (FR7, D-6)** — owner: software-engineer
+- [-] **T-65-09 — Policy-aware doctor + model-resolution rework (FR7, D-6)** — owner: software-engineer
   Write set: `dadaia_workspace/infrastructure/public_assets.py` (doctor compare paths),
   `dadaia_workspace/features/public/model_resolution.py`,
   `dadaia_workspace/features/public/service.py`,
