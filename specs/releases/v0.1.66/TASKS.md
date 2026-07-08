@@ -183,7 +183,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 
 ## Wave C — engine-level fixes (T-66-07 and T-66-08 sequenced on `cli/commands/lifecycle.py` overlap; otherwise disjoint)
 
-### T-66-07 — FR6: `resume` reports the real run status
+### T-66-07 [-] — FR6: `resume` reports the real run status
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/service.py` (the
