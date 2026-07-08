@@ -64,7 +64,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   --strict clean on `model_profiles.py`/`harness_models.py`, 137/137 scoped tests
   green.
 
-### T-66-02 — FR4: codex adapter passes `--skip-git-repo-check`
+### T-66-02 — FR4: codex adapter passes `--skip-git-repo-check` `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py` (the
