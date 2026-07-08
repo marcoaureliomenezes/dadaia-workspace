@@ -160,6 +160,17 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # (os.environ.get(_DADAIA_CODEX_SANDBOX_ENV)), used to widen the codex sandbox mode
         # in constrained containers where the read-only default fails under bwrap.
         "DADAIA_CODEX_SANDBOX",
+        # FR3 (v0.1.67, T-67-08/T-67-09) real-binary live-opt-in flags — read BY DESIGN
+        # by tests/conftest.py's _real_worker_opt_in() (the suite-wide guard predicate)
+        # and independently by each tests/integration/{pi,codex,claude}_live/ suite's own
+        # skipif precondition. Not a production (dadaia_workspace/) reader — the reader is
+        # test infrastructure itself, exercising the real live-opt-in env-read path a
+        # per-flag non-interference proof (T-67-09) must genuinely set via
+        # monkeypatch.setenv rather than simulate.
+        "DADAIA_E2E_REAL_WORKER",
+        "DADAIA_PI_LIVE",
+        "DADAIA_CODEX_LIVE",
+        "DADAIA_CLAUDE_LIVE",
     }
 )
 

@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunStatus,
@@ -801,3 +803,97 @@ def test_pi_strict_primacy_is_pinned_by_behaviour(tmp_path: Path) -> None:
     assert classify_result_payload(both_valid, "agent-run-result-v1") is ResultMatch.STRICT
     assert classify_result_payload(structural_only, "agent-run-result-v1") is ResultMatch.STRUCTURAL
     assert classify_result_payload(not_a_result, "agent-run-result-v1") is ResultMatch.NONE
+
+
+# ---------------------------------------------------------------------------
+# T-67-01 (SPEC v0.1.67 AC1(repro), pi half) — call-time-vs-construction-time
+# runner resolution. Proves the class-definition-time default-argument defect:
+# a module-level ``monkeypatch.setattr("...pi_runtime.subprocess.run", fake)``
+# applied AFTER construction must still be honored when NO ``runner=`` kwarg was
+# passed at construction — i.e. the adapter must resolve its runner at CALL time,
+# not snapshot ``subprocess.run`` once at class-definition time.
+# ---------------------------------------------------------------------------
+
+
+def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    real_worker_guard_bypass_for_mechanism_proof: None,
+) -> None:
+    """AC1(repro), AC1.1: no explicit ``runner=`` at construction; the module-level
+    ``subprocess.run`` attribute is monkeypatched to a fake AFTER construction. The
+    fake must be invoked when ``.run()`` executes.
+
+    On current code (``runner: Runner = subprocess.run`` bound at class-definition
+    time) this FAILS: the adapter's ``self._runner`` was already bound to the real
+    ``subprocess.run`` function object before this monkeypatch ever ran, so the fake
+    is never reached and the call-recorder stays empty.
+
+    Requests ``real_worker_guard_bypass_for_mechanism_proof`` (T-67-08, FR3):
+    this test IS the mechanism FR3's guard also patches (the call-time-vs-
+    construction-time fallback to ``subprocess.run``), so it must opt out of the
+    guard explicitly — see that fixture's docstring for why this stays hermetic:
+    the module-level monkeypatch below runs BEFORE ``.run()`` is ever called, so no
+    real subprocess is spawned regardless of the guard's bypass.
+    """
+    calls: list[object] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=_message_end("call-time interception proof"), stderr=""
+        )
+
+    # Construct with NO runner= kwarg — the adapter must fall back to a live,
+    # call-time lookup of the module-level `subprocess.run` attribute.
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path))
+
+    # Patch the MODULE attribute strictly AFTER construction — this is the exact
+    # monkeypatch shape used by the (now-fixed) executed-path CLI tests.
+    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_run)
+
+    result = adapter.run(_request())
+
+    assert len(calls) == 1, (
+        "the module-level subprocess.run monkeypatch was never reached — the runner "
+        "was bound at class-definition time instead of resolved at call time"
+    )
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "call-time interception proof"
+
+
+# ---------------------------------------------------------------------------
+# T-67-08 (SPEC v0.1.67 FR3, AC3.1) — real-binary guardrail: fails loud instead of
+# silently spawning/hanging on the real `pi` binary when no runner= is injected and
+# no live-opt-in flag is set. This is a PERMANENT regression test pinning the
+# suite-wide autouse guard fixture in tests/conftest.py — kept after this release,
+# not deleted once exercised (per SPEC's TDD mandate step 4).
+# ---------------------------------------------------------------------------
+
+
+def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_binary(
+    tmp_path: Path,
+) -> None:
+    """AC3.1: constructing `PiHeadlessAdapter` with no `runner=` and calling `.run()`
+    with none of the 4 live-opt-in flags set must raise the suite-wide guard's
+    `RuntimeError` — never silently spawn/hang on the real `pi` binary.
+
+    The guard fixture itself lives in `tests/conftest.py` (autouse=True) and patches
+    the module-level `pi_runtime.subprocess.run` to a raising sentinel unless one of
+    `DADAIA_E2E_REAL_WORKER`/`DADAIA_PI_LIVE`/`DADAIA_CODEX_LIVE`/`DADAIA_CLAUDE_LIVE`
+    is `"1"`. This test intentionally does NOT set any of those flags — the ambient
+    test environment's `_scrub_entry_signal_env`/lack of live opt-in is the precondition.
+
+    Safety (F6): before the guard exists, this body must NEVER run a real binary to
+    completion. `timeout_seconds=1` bounds any accidental real-binary spawn to a fast,
+    caught `TimeoutExpired` (adapter.run() maps it to a FAILED result, not a raised
+    RuntimeError) rather than a multi-second/hanging live call — the `xfail(strict=True)`
+    marker records the RED expectation declaratively without ever letting a real
+    subprocess run to completion.
+    """
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path, timeout_seconds=1))
+
+    with pytest.raises(RuntimeError, match="real pi/codex binary invocation attempted"):
+        adapter.run(_request())

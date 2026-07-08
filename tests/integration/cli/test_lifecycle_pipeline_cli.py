@@ -69,8 +69,22 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     genuine ``pi --mode json`` event stream. Only the ``pi`` subprocess and the git
     seam are faked — no real binary, no network, no credits. The engine must record
     the step runtime as ``pi_headless`` and block on the missing verdict (proving the
-    PI worker actually ran and its output flowed through the gate)."""
+    PI worker actually ran and its output flowed through the gate).
+
+    v0.1.67 FR2 (F3-corrected idiom, T-67-05): rewritten from the pre-existing
+    ``monkeypatch.setattr(".pi_runtime.subprocess.run", ...)`` pattern (false-positive
+    bug ``pi-e2e-test-false-positive-loose-blocked-reason-assertion`` — a truthy-only
+    ``assert payload["blocked"]["reason"]`` was equally satisfied by a real-binary auth
+    failure) to the established constructor-injection pattern (belt-and-suspenders,
+    independent of the FR1 mechanism fix — see
+    ``test_pi_openrouter_kimi_profile_reaches_command_with_valid_id`` below for the same
+    shape) plus a ``calls`` call-recorder that only the fake can populate.
+    """
     import subprocess as _subprocess
+
+    from dadaia_workspace import container
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
 
     # A genuine line-delimited pi --mode json stream whose terminal assistant message
     # carries plain text (no APPROVED verdict) -> the implement gate blocks.
@@ -86,15 +100,34 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     ]
     stdout = "\n".join(json.dumps(event) for event in events) + "\n"
 
+    calls: list[object] = []
+
     def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        calls.append(args)
         return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_pi_run)
     # Keep the Ring-2 git seam hermetic (no real repo in the temp workspace).
     monkeypatch.setattr(
         "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
         lambda self, path: (),
     )
+
+    real_build_agent_runtime = container.build_agent_runtime
+
+    def patched_build_agent_runtime(
+        kind: object, *, cwd: Path | None = None, model: object = None
+    ) -> object:
+        from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+
+        if kind is AgentRuntimeKind.PI_HEADLESS:
+            run_dir = cwd or Path.cwd()
+            pi_config = PiHeadlessConfig(cwd=run_dir)
+            return PiHeadlessAdapter(
+                pi_config, runner=fake_pi_run, environ={}, git=GitSubprocessClient()
+            )
+        return real_build_agent_runtime(kind, cwd=cwd, model=model)
+
+    monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
@@ -118,12 +151,17 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     payload = json.loads(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
+    # `calls` proves the FAKE was invoked — a real-binary run leaves this list empty
+    # (F3 correction: the fake-derivation proof, not the fixed block-reason constant).
+    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
     # The CLI resolved `--harness pi` -> PI_HEADLESS -> PiHeadlessAdapter, which ran
     # the injected stream; the engine recorded the worker runtime as pi_headless.
     assert payload["steps"][0]["label"] == "implement"
     assert payload["steps"][0]["runtime"] == "pi_headless"
     assert payload["steps"][0]["accepted"] is False
-    assert payload["blocked"]["reason"]
+    # The create-step gate's fixed constant (agent_runner.py:220) — an honest
+    # structural check, not a claimed fake-content anchor (F3 correction).
+    assert payload["blocked"]["reason"] == "agent result missing artifact evidence"
 
 
 # ---------------------------------------------------------------------------
@@ -162,8 +200,18 @@ def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
 ) -> None:
     """DADAIA_ENTRY_HARNESS=pi (simulated PI entry session) + no --harness ⇒ the
     pipeline's first step runs on the real PI adapter path (injected stream — no
-    binary, no credits) and the loud FR3 echo rides stderr, keeping --json pure."""
+    binary, no credits) and the loud FR3 echo rides stderr, keeping --json pure.
+
+    v0.1.67 FR2 (T-67-06, hardening migration): moved from the broken
+    ``monkeypatch.setattr(".pi_runtime.subprocess.run", ...)`` pattern to the same
+    constructor-injection pattern used by T-67-05, with a ``calls`` call-recorder
+    added. Existing assertions (runtime + stderr echo text) are preserved unchanged.
+    """
     import subprocess as _subprocess
+
+    from dadaia_workspace import container
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
 
     events = [
         {"type": "message_start"},
@@ -174,14 +222,34 @@ def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
     ]
     stdout = "\n".join(json.dumps(event) for event in events) + "\n"
 
+    calls: list[object] = []
+
     def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        calls.append(args)
         return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_pi_run)
     monkeypatch.setattr(
         "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
         lambda self, path: (),
     )
+
+    real_build_agent_runtime = container.build_agent_runtime
+
+    def patched_build_agent_runtime(
+        kind: object, *, cwd: Path | None = None, model: object = None
+    ) -> object:
+        from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+
+        if kind is AgentRuntimeKind.PI_HEADLESS:
+            run_dir = cwd or Path.cwd()
+            pi_config = PiHeadlessConfig(cwd=run_dir)
+            return PiHeadlessAdapter(
+                pi_config, runner=fake_pi_run, environ={}, git=GitSubprocessClient()
+            )
+        return real_build_agent_runtime(kind, cwd=cwd, model=model)
+
+    monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
+
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
     monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
@@ -201,6 +269,7 @@ def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
 
     assert result.exit_code == 3, result.output
     payload = json.loads(result.stdout)
+    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
     assert payload["steps"][0]["runtime"] == "pi_headless"
     assert (
         "[harness] auto-default: pi (from entry session; pass --harness to override)"

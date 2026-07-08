@@ -86,7 +86,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         self,
         config: PiHeadlessConfig,
         *,
-        runner: Runner = subprocess.run,
+        runner: Runner | None = None,
         environ: Mapping[str, str] | None = None,
         git: _GitDiffPort | None = None,
     ) -> None:
@@ -101,6 +101,21 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.PI_HEADLESS
 
+    def _resolve_runner(self) -> Runner:
+        """Resolve the subprocess runner at CALL time, not construction time.
+
+        When no ``runner=`` was injected at construction, ``self._runner`` is
+        ``None`` and this performs a live, module-qualified lookup of
+        ``subprocess.run`` — evaluated fresh on every call, mirroring
+        ``git_subprocess.py``'s pattern. This is what makes
+        ``monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake)``
+        genuinely interceptable: the old ``runner: Runner = subprocess.run``
+        default-argument snapshot bound the real function object once, at
+        class-definition (import) time, so a later monkeypatch of the module
+        attribute never reached an already-constructed adapter.
+        """
+        return self._runner if self._runner is not None else subprocess.run
+
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         if request.runtime is not AgentRuntimeKind.PI_HEADLESS:
             return AgentRunResult(
@@ -111,7 +126,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
 
         args = self._command(request)
         try:
-            proc = self._runner(
+            proc = self._resolve_runner()(
                 args,
                 cwd=self._config.cwd,
                 env=self._env(),
