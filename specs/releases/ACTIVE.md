@@ -1,6 +1,6 @@
 ---
 release: v0.1.66
-phase: IMPLEMENTATION
+phase: CLOSURE
 ---
 
 # Active release: v0.1.66 — Layer-2 Worker Path Remediation
