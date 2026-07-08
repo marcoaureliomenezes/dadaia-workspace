@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-model-policy-v1",
+  "title": "Agent Model Policy Overlay v1",
+  "description": "Operator-editable, validated JSON overlay that selects the Layer-1 agent roster's models: an applied built-in template plus per-agent, per-field overrides. Missing file = library defaults (the 'balanced' template); an invalid file is a loud typed error, never a silent fallback (missing != invalid). One policy governs BOTH L1 projections (.claude/agents/*.md and .codex/agents/*.toml). Hard constraint (G-1/D-7): no combination may resolve claude-fable-5 onto security-reviewer — enforced at template import, store parse, and the panel validate endpoint (semantic checks like registry-known models and known agent names are enforced by the store, beyond this structural schema).",
+  "type": "object",
+  "required": ["schema_version"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "agent-model-policy-v1",
+      "description": "Schema version identifier. Must equal 'agent-model-policy-v1'."
+    },
+    "applied_template": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Id of the built-in template applied as the roster base (e.g. 'balanced', 'subscription-saver', 'max-quality'). Omit to base on the library default ('balanced'). An unknown id is a hard validation error."
+    },
+    "overrides": {
+      "type": "object",
+      "description": "Per-agent overrides keyed by agent name (a core agent or an installed plugin agent). Each override layers on top of the applied template per field: model, effort, or both.",
+      "additionalProperties": {
+        "$ref": "#/$defs/agentOverride"
+      }
+    }
+  },
+  "$defs": {
+    "agentOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Claude model id from core/model_registry (e.g. 'claude-sonnet-5'). Never claude-fable-5 when the agent is security-reviewer (G-1/D-7)."
+        },
+        "effort": {
+          "$ref": "#/$defs/claudeEffort",
+          "description": "Rendered Claude reasoning effort for this agent. The codex model_reasoning_effort derives from it via the fixed clamp map low→low, medium→medium, high→high, xhigh→high, max→high (D-3)."
+        }
+      }
+    },
+    "claudeEffort": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "xhigh", "max"],
+      "description": "The rendered Claude effort vocabulary (D-3)."
+    }
+  }
+}
