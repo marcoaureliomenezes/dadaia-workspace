@@ -209,7 +209,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 - **Parallelism:** must land before or after T-66-08 without overlapping
   edits to `cli/commands/lifecycle.py` — sequenced first.
 
-### T-66-08 — FR7: implement step write scope covers the reserved task
+### T-66-08 [x] — FR7: implement step write scope covers the reserved task
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py` (the
