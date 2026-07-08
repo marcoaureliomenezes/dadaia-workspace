@@ -177,7 +177,27 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   test); plugin-pack agent projection resolves override > pack default; overlay loaded
   once per run; invalid overlay fails loud before any write.
 
-- [-] **T-65-09 — Policy-aware doctor + model-resolution rework (FR7, D-6)** — owner: software-engineer
+- [x] **T-65-09 — Policy-aware doctor + model-resolution rework (FR7, D-6)** — owner: software-engineer
+  Completion note: RED captured — new AC-5 integration tests
+  (`test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched`,
+  `test_doctor_errors_on_invalid_overlay_ok_on_missing`) + 3 model-resolution unit REDs
+  (resolved-roster registry/vocab validation, valid-overlay clean, plugin staged-model
+  scan), plus the T-65-08-declared doctor-gap failures (pi CLI doctor, plugin uninstall
+  golden, doctor goldens ×3). Implemented: interception pinned EXACTLY at the
+  `runtime_expectations` loop — non-plugin `claude:agents/*.md` labels route to
+  `_compare_content(render(staged generic + resolved policy))`; `stage:agents/*` and
+  all non-agent labels stay raw `_compare` (asserted); overlay loaded once per doctor
+  run — invalid ⇒ `[drift] agent-model-policy ERROR` line, missing ⇒ silent balanced;
+  installed-pack claude doctor lines render-compared (override>pack-default); NO
+  `codex_doctor.py` change (F-1). `check_model_resolution(public_dir, overlay)`
+  validates the RESOLVED core roster + plugin staged frontmatter models; key-set check
+  unchanged; loader injected into `PublicAssetService` via `container.build_public_service`
+  (D-4, no features→infrastructure edge). Goldens regenerated for genuinely changed
+  truth ONLY: the new `stage:schemas/agent-model-policy-v1.schema.json` [ok] line
+  (asset added by T-65-03) in doctor_all_four_v0158 + plugin goldens a/b;
+  `test_plugin_projection` expectations updated to the rendered pack-body truth.
+  Full suite: 4816 passed; remaining failures = ONLY the 2 tier-taxonomy contract
+  tests (T-65-13). mypy --strict, ruff format/check, lint-imports (9 kept/0 broken) green.
   Write set: `dadaia_workspace/infrastructure/public_assets.py` (doctor compare paths),
   `dadaia_workspace/features/public/model_resolution.py`,
   `dadaia_workspace/features/public/service.py`,

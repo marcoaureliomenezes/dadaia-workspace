@@ -895,3 +895,79 @@ def test_invalid_overlay_fails_install_loud_before_any_write(tmp_path: Path) -> 
         manager.install(ws, target="all")
     after = (ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
     assert after == before
+
+
+# ---------------------------------------------------------------------------
+# v0.1.65 FR7 (T-65-09) — policy-aware doctor (claude-md-only render-compare)
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
+    tmp_path: Path,
+) -> None:
+    """AC-5, all three directions + F-2 pin.
+
+    1. Immediately after a policy re-render, doctor reports [ok] on every
+       ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
+    2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
+    3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
+       render seam (F-2 — never a global ``_compare`` patch).
+    """
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "agent_model_policy.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agent-model-policy-v1",
+                "applied_template": "max-quality",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager.install(ws, target="all")
+
+    reports = manager.doctor(ws)
+    agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:agents/")]
+    assert agent_lines, "expected claude:agents doctor lines"
+    bad = [r for r in agent_lines if not r.startswith("[ok]")]
+    assert bad == [], f"policy re-render must be doctor-[ok]: {bad}"
+
+    # F-2: the generic↔generic stage compare and non-agent labels stay raw [ok].
+    stage_agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("stage:agents/")]
+    assert stage_agent_lines and all(r.startswith("[ok]") for r in stage_agent_lines), (
+        stage_agent_lines
+    )
+    rule_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:rules/")]
+    assert rule_lines and all(r.startswith("[ok]") for r in rule_lines), rule_lines[:5]
+
+    # Direction 2: a hand-edited claude agent projection is [drift].
+    target = ws / ".claude" / "agents" / "software-engineer.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
+    reports2 = manager.doctor(ws)
+    assert any(
+        r.startswith("[drift]") and r.endswith("claude:agents/software-engineer.md")
+        for r in reports2
+    ), [r for r in reports2 if "software-engineer" in r]
+
+
+def test_doctor_errors_on_invalid_overlay_ok_on_missing(tmp_path: Path) -> None:
+    """FR7: an invalid overlay is a doctor ERROR line; a missing overlay is not."""
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    clean = manager.doctor(ws)
+    assert not any("agent-model-policy ERROR" in r for r in clean), (
+        "missing overlay must not emit an agent-model-policy ERROR line"
+    )
+
+    states = ws / ".dadaia" / "states"
+    (states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
+    reports = manager.doctor(ws)
+    assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports), [
+        r for r in reports if "policy" in r
+    ]

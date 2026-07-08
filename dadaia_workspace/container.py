@@ -239,7 +239,16 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
 
 
 def build_public_service() -> PublicAssetService:
-    return PublicAssetService(public_assets=FileSystemPublicAssetManager())
+    # v0.1.65 FR7 (D-4): the agent-model-policy overlay loader is injected here so the
+    # features-layer service never imports the infrastructure store directly.
+    from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+        JsonAgentModelPolicyStore,
+    )
+
+    return PublicAssetService(
+        public_assets=FileSystemPublicAssetManager(),
+        agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load(),
+    )
 
 
 def build_repos_service() -> ReposService:

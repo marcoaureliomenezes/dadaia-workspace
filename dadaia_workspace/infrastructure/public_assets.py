@@ -16,6 +16,7 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
+    AgentModelPolicyStoreError,
     ResolvedAgentModel,
 )
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
@@ -561,7 +562,11 @@ class FileSystemPublicAssetManager:
         return out
 
     def _doctor_installed_plugins(
-        self, agentic_dir: Path, workspace_root: Path, active: set[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        active: set[str],
+        overlay: AgentModelPolicyOverlay | None = None,
     ) -> list[str]:
         """Report ``[ok]``/``[drift]``/``[missing]`` per installed-pack projected file.
 
@@ -577,7 +582,16 @@ class FileSystemPublicAssetManager:
                 name = md.stem
                 if "claude" in active:
                     dst = workspace_root / ".claude" / "agents" / f"{name}.md"
-                    out.append(self._compare(md, dst, f"plugin:{pack}:claude/agents/{name}.md"))
+                    label = f"plugin:{pack}:claude/agents/{name}.md"
+                    # v0.1.65 FR5/FR7: the installed pack projection is the RENDER
+                    # output (override > pack default), so the doctor expectation is
+                    # the rendered content, not raw pack bytes.
+                    resolved = self._resolve_pack_agent(md, overlay)
+                    if resolved is None:
+                        out.append(self._compare(md, dst, label))
+                    else:
+                        expected = render_claude_agent(md.read_text(encoding="utf-8"), resolved)
+                        out.append(self._compare_content(expected, dst, label))
                 if "codex" in active:
                     toml = workspace_root / ".codex" / "agents" / f"{name}.toml"
                     label = f"plugin:{pack}:codex/agents/{name}.toml"
@@ -606,7 +620,11 @@ class FileSystemPublicAssetManager:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         profile = self._profile_harnesses(workspace_root)
         active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-        return self._doctor_installed_plugins(agentic_dir, workspace_root, active)
+        try:
+            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        except AgentModelPolicyStoreError:
+            overlay = None  # `public doctor` reports the invalid overlay separately
+        return self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay)
 
     # ------------------------------------------------------------------
     # Public API
@@ -807,6 +825,17 @@ class FileSystemPublicAssetManager:
         installed_packs = self._installed_plugins(workspace_root)
         plugin_agent_stems = self._plugin_agent_stems(agentic_dir, installed_packs)
 
+        # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
+        # overlay is a doctor ERROR line (and the render compare below degrades to the
+        # `balanced` defaults); a MISSING overlay is silent and resolves the defaults
+        # (NFR-4 — missing != invalid).
+        overlay: AgentModelPolicyOverlay | None = None
+        try:
+            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        except AgentModelPolicyStoreError as exc:
+            reports.append(f"[drift] agent-model-policy ERROR: {exc}")
+        resolved_models = self._resolved_core_models(overlay)
+
         for expected_src, dst, label, transform in runtime_expectations(
             agentic_dir,
             workspace_root,
@@ -838,6 +867,24 @@ class FileSystemPublicAssetManager:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
+            elif (
+                label.startswith("claude:agents/")
+                and label.endswith(".md")
+                and expected_src.stem in resolved_models
+            ):
+                # v0.1.65 FR7/D-6 — THE pinned interception (F-2): non-plugin core
+                # `claude:agents/*.md` projections are compared against
+                # render(staged generic + resolved policy), never raw staged bytes,
+                # so a policy re-render is [ok] and a hand-edit is [drift]. The
+                # `stage:agents/*.md` (generic↔generic) lines and every non-agent
+                # label stay on the raw `_compare` path above/below — `_compare`
+                # itself is never patched. Codex TOML is NOT doctor-byte-compared
+                # (F-1): its correctness is the T-65-08 install-time lockstep test.
+                expected = render_claude_agent(
+                    expected_src.read_text(encoding="utf-8"),
+                    resolved_models[expected_src.stem],
+                )
+                reports.append(self._compare_content(expected, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
@@ -855,7 +902,7 @@ class FileSystemPublicAssetManager:
         # Installed-pack projected-file doctoring (FR3, AC-5): a stale/out-of-manifest
         # installed-pack file is never silent. Empty when no pack is installed ⇒ zero lines
         # (byte-lock golden b).
-        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active))
+        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay))
 
         # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
         # resolution above is reused here (claude settings.json / codex hooks+config+rules /
