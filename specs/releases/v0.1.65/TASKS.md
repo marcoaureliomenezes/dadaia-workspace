@@ -416,7 +416,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 6 — Instance propagation + manual verification — after W5
 
-- [ ] **T-65-16 — Propagate to THIS instance + live panel check (AC-11, D-1)** — owner: software-engineer
+- [x] **T-65-16 — Propagate to THIS instance + live panel check (AC-11, D-1)** — owner: software-engineer — DONE: stage+install --target all+doctor exit 0 incl. [ok] public-privacy + [ok] model-resolution, no agent [drift] post-render; instance .claude/agents + .codex/agents carry the balanced roster (D-1 LIVE RETIER: this instance re-tiered — fable-5 now only on PM+architect); panel restarted, Sub-agents tab live, /api/agent-model-templates + /api/agent-model-policy verified (applied_template=balanced, resolved sources=template); panel registered on 4999 per dev-server guardrail.
   Write set: none in-repo (workspace projections via CLI only).
   Precondition: T-65-15.
   Done when: from the workspace venv — `dadaia public stage`,
