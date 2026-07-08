@@ -161,7 +161,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   UNMODIFIED; both RED captures recorded.
 - **Parallelism:** none — Wave B is serial.
 
-### T-66-05 — FR2: tolerant worker-result contract, no-op invariant preserved `[-]`
+### T-66-05 — FR2: tolerant worker-result contract, no-op invariant preserved `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/headless_adapter_base.py`
