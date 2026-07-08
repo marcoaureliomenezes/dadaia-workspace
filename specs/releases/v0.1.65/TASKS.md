@@ -319,7 +319,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   precedence flip fails units; one-entry balanced mutation fails this contract) and
   recorded in the completion note.
 
-- [ ] **T-65-14 — Panel e2e: Sub-agents tab (AC-6)** — owner: qa-engineer
+- [-] **T-65-14 — Panel e2e: Sub-agents tab (AC-6)** — owner: qa-engineer
   Write set: `tests/e2e/panel/agent-policy.spec.ts` (new),
   `tests/e2e/panel/helpers.ts` (additive only).
   Precondition: T-65-12, T-65-05 (reuse the deterministic-wait pattern).
