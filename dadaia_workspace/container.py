@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.workflow_model_policy_store import (
         WorkflowModelPolicyStorePort,
     )
+    from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
@@ -64,6 +65,12 @@ from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportW
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
+from dadaia_workspace.features.panel.views.agent_policy import (
+    render_api_agent_model_policy,
+    render_api_agent_model_templates,
+    render_post_agent_model_policy_validate,
+    render_put_agent_model_policy,
+)
 from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
@@ -239,7 +246,16 @@ def build_spec_context_service(workspace_root: Path) -> SpecContextService:
 
 
 def build_public_service() -> PublicAssetService:
-    return PublicAssetService(public_assets=FileSystemPublicAssetManager())
+    # v0.1.65 FR7 (D-4): the agent-model-policy overlay loader is injected here so the
+    # features-layer service never imports the infrastructure store directly.
+    from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+        JsonAgentModelPolicyStore,
+    )
+
+    return PublicAssetService(
+        public_assets=FileSystemPublicAssetManager(),
+        agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load(),
+    )
 
 
 def build_repos_service() -> ReposService:
@@ -782,6 +798,56 @@ def build_local_model_profile_store(
 
     _guard_initialized(workspace_root)
     return JsonLocalModelProfileStore(workspace_root)
+
+
+def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyService":
+    """Compose the panel-facing L1 agent-model-policy service (v0.1.65 FR8 / T-65-10).
+
+    Injects (D-4 — the features module carries no infrastructure import):
+
+    - the concrete :class:`JsonAgentModelPolicyStore` (typed to the feature's store
+      port), whose valid override targets are the 9 core agents plus the INSTALLED
+      plugin agents (FR3);
+    - the **re-render callable** — the agents-only ``public install`` path over both
+      L1 projections (G-2 Apply semantics; profile-scoped like every install);
+    - the **plugin pack defaults** provider — ``{agent_name: pack model}`` parsed from
+      the installed packs' staged bodies (D-5), so the resolved roster covers them.
+    """
+    from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
+    from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+        JsonAgentModelPolicyStore,
+    )
+    from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+        _parse_agent_frontmatter,
+    )
+
+    def _installed_pack_defaults() -> dict[str, str]:
+        states_dir = workspace_root / ".dadaia" / "states"
+        ledger = build_plugin_store().read(states_dir)
+        packs = ledger.plugins if ledger is not None else ()
+        agentic_dir = workspace_root / ".dadaia" / "agentic"
+        defaults: dict[str, str] = {}
+        for pack in packs:
+            for md in sorted((agentic_dir / "plugins" / pack / "agents").glob("*.md")):
+                fm = _parse_agent_frontmatter(md.read_text(encoding="utf-8"))
+                model = str(fm.get("model", "")) or None
+                if model is None:
+                    continue
+                name = str(fm.get("name", "")) or md.stem
+                defaults[name] = model
+        return defaults
+
+    def _rerender_agents() -> list[str]:
+        return build_public_service().install(workspace_root, target="all", only="agents")
+
+    store = JsonAgentModelPolicyStore(
+        workspace_root, plugin_agent_names=frozenset(_installed_pack_defaults())
+    )
+    return AgentModelPolicyService(
+        store=store,
+        rerender=_rerender_agents,
+        plugin_pack_defaults=_installed_pack_defaults,
+    )
 
 
 def build_plugin_store() -> "PluginStore":
@@ -1503,6 +1569,9 @@ def build_panel_views(
     policy_store = build_workflow_model_policy_store(workspace_root)
     run_store = build_lifecycle_run_store(workspace_root)
     fragment_loader = build_fragment_loader()
+    # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
+    # dedicated factory (D-4 — the feature service never imports infrastructure).
+    agent_policy_service = build_agent_model_policy_service(workspace_root)
 
     def _resolver_factory(
         context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
@@ -1542,6 +1611,13 @@ def build_panel_views(
         "api_workflow_model_policy_put": render_put_workflow_model_policy(
             policy_store, _resolver_factory
         ),
+        # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
+        "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
+        "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),
+        "api_agent_model_policy_validate": render_post_agent_model_policy_validate(
+            agent_policy_service
+        ),
+        "api_agent_model_policy_put": render_put_agent_model_policy(agent_policy_service),
         "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
         "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),

@@ -140,3 +140,46 @@ def test_current_tree_resolves_clean() -> None:
 
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
+
+
+# ---------------------------------------------------------------------------
+# v0.1.65 FR7 (T-65-09) — resolved-roster + plugin staged-model validation
+# ---------------------------------------------------------------------------
+
+
+def test_resolved_roster_validates_against_registry_and_vocab(tmp_path: Path) -> None:
+    """FR7: check_model_resolution validates the RESOLVED (model, effort) per core
+    agent — a synthetic overlay carrying an out-of-registry model errors."""
+    from dadaia_workspace.core.models.agent_model_policy import (
+        AgentModelOverride,
+        AgentModelPolicyOverlay,
+    )
+
+    public_dir = tmp_path / "public"
+    public_dir.mkdir()
+    bad_overlay = AgentModelPolicyOverlay(
+        applied_template=None,
+        overrides={"software-engineer": AgentModelOverride(model="claude-ghost-9")},
+    )
+    reports = check_model_resolution(public_dir, overlay=bad_overlay)
+    assert _has_error(reports), reports
+    assert any("software-engineer" in line for line in reports), reports
+
+
+def test_resolved_roster_clean_with_valid_overlay(tmp_path: Path) -> None:
+    from dadaia_workspace.core.models.agent_model_policy import AgentModelPolicyOverlay
+
+    public_dir = tmp_path / "public"
+    public_dir.mkdir()
+    overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
+    reports = check_model_resolution(public_dir, overlay=overlay)
+    assert reports == ["[ok] model-resolution"], reports
+
+
+def test_plugin_staged_model_must_resolve_in_registry(tmp_path: Path) -> None:
+    """FR7: plugin pack staged frontmatter models are validated too."""
+    public_dir = tmp_path / "public"
+    _write_agent(public_dir / "plugins" / "somepack" / "agents", "pack-agent", "claude-bogus-1")
+    reports = check_model_resolution(public_dir)
+    assert _has_error(reports), reports
+    assert any("pack-agent" in line for line in reports), reports

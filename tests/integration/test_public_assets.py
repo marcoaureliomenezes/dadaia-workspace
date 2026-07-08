@@ -762,3 +762,212 @@ def test_install_codex_generates_native_rules_only(tmp_path: Path) -> None:
     )
     assert not (rules_dst / "workspace-protocol.md").exists()
     assert (rules_dst / "dadaia-command-policy.rules").exists()
+
+
+# ---------------------------------------------------------------------------
+# v0.1.65 FR5 (T-65-08) — render-at-install, both harnesses, ONE resolved config
+# ---------------------------------------------------------------------------
+
+
+def _claude_frontmatter(ws: Path, agent: str) -> dict[str, str]:
+    text = (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
+    fm = text.split("---\n", 2)[1]
+    out: dict[str, str] = {}
+    for line in fm.splitlines():
+        if ":" in line and not line.startswith(" "):
+            key, _, value = line.partition(":")
+            out[key] = value.strip()
+    return out
+
+
+def _codex_toml_fields(ws: Path, agent: str) -> dict[str, str]:
+    text = (ws / ".codex" / "agents" / f"{agent}.toml").read_text(encoding="utf-8")
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        if " = " in line and not line.startswith(" "):
+            key, _, value = line.partition(" = ")
+            out[key] = value.strip().strip('"')
+        if line.startswith("developer_instructions"):
+            break
+    return out
+
+
+def test_install_with_no_overlay_renders_balanced_roster_in_lockstep(
+    tmp_path: Path,
+) -> None:
+    """AC-2 + F-1: with no overlay, BOTH projections render the exact ``balanced``
+    roster from the SAME resolved config — this lockstep test IS the codex-correctness
+    assurance (no codex doctor byte-compare exists)."""
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    # balanced (FR2): project-manager fable-5/high; software-engineer sonnet-5/xhigh.
+    pm = _claude_frontmatter(ws, "project-manager")
+    assert (pm["model"], pm["effort"]) == ("claude-fable-5", "high")
+    se = _claude_frontmatter(ws, "software-engineer")
+    assert (se["model"], se["effort"]) == ("claude-sonnet-5", "xhigh")
+    sec = _claude_frontmatter(ws, "security-reviewer")
+    assert sec["model"] == "claude-opus-4-8", "never Fable on security-reviewer (G-1)"
+
+    # Codex projection derives from the SAME resolved config (G-3, D-3 clamp).
+    pm_toml = _codex_toml_fields(ws, "project-manager")
+    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    se_toml = _codex_toml_fields(ws, "software-engineer")
+    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == (
+        "gpt-5.3-codex",
+        "high",  # xhigh clamps to high (D-3)
+    )
+
+
+def test_overlay_change_moves_claude_md_and_codex_toml_in_lockstep(
+    tmp_path: Path,
+) -> None:
+    """AC-3 + F-1 lockstep: an overlay change moves the .claude md AND the .codex toml
+    together at install; repeated install is byte-stable ([skip])."""
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "agent_model_policy.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agent-model-policy-v1",
+                "applied_template": "subscription-saver",
+                "overrides": {"software-engineer": {"model": "claude-opus-4-8"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager.install(ws, target="all")
+
+    # AC-3: SE model from override, effort from the subscription-saver template.
+    se = _claude_frontmatter(ws, "software-engineer")
+    assert (se["model"], se["effort"]) == ("claude-opus-4-8", "xhigh")
+    # Others move per subscription-saver (PM: opus-4-8/high).
+    pm = _claude_frontmatter(ws, "project-manager")
+    assert (pm["model"], pm["effort"]) == ("claude-opus-4-8", "high")
+
+    # Codex moved in lockstep from the SAME resolved config.
+    se_toml = _codex_toml_fields(ws, "software-engineer")
+    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    pm_toml = _codex_toml_fields(ws, "project-manager")
+    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+
+    # Byte-stable repeated install: every agent projection line is a [skip].
+    third = manager.install(ws, target="all")
+    agent_lines = [
+        line
+        for line in third
+        if "/.claude/agents/" in line.replace("\\", "/")
+        or "/.codex/agents/" in line.replace("\\", "/")
+    ]
+    assert agent_lines, "expected agent projection lines"
+    not_skipped = [line for line in agent_lines if not line.startswith("[skip]")]
+    assert not_skipped == [], f"repeated install must be byte-stable: {not_skipped}"
+
+
+def test_invalid_overlay_fails_install_loud_before_any_write(tmp_path: Path) -> None:
+    """NFR-4: invalid overlay ⇒ loud typed error, never a silent fallback; the
+    projection tree is not touched."""
+    from dadaia_workspace.core.models.agent_model_policy import (
+        AgentModelPolicyStoreError,
+    )
+
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+    before = (ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+
+    states = ws / ".dadaia" / "states"
+    (states / "agent_model_policy.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agent-model-policy-v1",
+                "overrides": {"security-reviewer": {"model": "claude-fable-5"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(AgentModelPolicyStoreError):
+        manager.install(ws, target="all")
+    after = (ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+    assert after == before
+
+
+# ---------------------------------------------------------------------------
+# v0.1.65 FR7 (T-65-09) — policy-aware doctor (claude-md-only render-compare)
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
+    tmp_path: Path,
+) -> None:
+    """AC-5, all three directions + F-2 pin.
+
+    1. Immediately after a policy re-render, doctor reports [ok] on every
+       ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
+    2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
+    3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
+       render seam (F-2 — never a global ``_compare`` patch).
+    """
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "agent_model_policy.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agent-model-policy-v1",
+                "applied_template": "max-quality",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager.install(ws, target="all")
+
+    reports = manager.doctor(ws)
+    agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:agents/")]
+    assert agent_lines, "expected claude:agents doctor lines"
+    bad = [r for r in agent_lines if not r.startswith("[ok]")]
+    assert bad == [], f"policy re-render must be doctor-[ok]: {bad}"
+
+    # F-2: the generic↔generic stage compare and non-agent labels stay raw [ok].
+    stage_agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("stage:agents/")]
+    assert stage_agent_lines and all(r.startswith("[ok]") for r in stage_agent_lines), (
+        stage_agent_lines
+    )
+    rule_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:rules/")]
+    assert rule_lines and all(r.startswith("[ok]") for r in rule_lines), rule_lines[:5]
+
+    # Direction 2: a hand-edited claude agent projection is [drift].
+    target = ws / ".claude" / "agents" / "software-engineer.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
+    reports2 = manager.doctor(ws)
+    assert any(
+        r.startswith("[drift]") and r.endswith("claude:agents/software-engineer.md")
+        for r in reports2
+    ), [r for r in reports2 if "software-engineer" in r]
+
+
+def test_doctor_errors_on_invalid_overlay_ok_on_missing(tmp_path: Path) -> None:
+    """FR7: an invalid overlay is a doctor ERROR line; a missing overlay is not."""
+    ws = tmp_path / "ws"
+    manager = FileSystemPublicAssetManager()
+    manager.install(ws, target="all")
+
+    clean = manager.doctor(ws)
+    assert not any("agent-model-policy ERROR" in r for r in clean), (
+        "missing overlay must not emit an agent-model-policy ERROR line"
+    )
+
+    states = ws / ".dadaia" / "states"
+    (states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
+    reports = manager.doctor(ws)
+    assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports), [
+        r for r in reports if "policy" in r
+    ]

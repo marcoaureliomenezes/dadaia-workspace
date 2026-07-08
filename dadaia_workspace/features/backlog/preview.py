@@ -88,6 +88,12 @@ class BacklogItem:
 
     ``intents_error`` is non-``None`` when the ``intents:`` frontmatter was structurally
     invalid (BL-SCHEMA fodder); ``intents`` is then empty.
+
+    ``frontmatter_error`` (FR10, v0.1.65) is non-``None`` when the frontmatter block
+    itself failed to parse as YAML (e.g. an unquoted ``source: text (note: more text)``
+    value). The whole frontmatter is then unavailable — ``status`` is ``None`` and
+    ``intents`` is empty — so downstream no-intents/unresolved diagnostics are noise;
+    the doctor reports the parse error instead.
     """
 
     slug: str
@@ -95,17 +101,42 @@ class BacklogItem:
     status: str | None
     intents: tuple[Intent, ...]
     intents_error: str | None = None
+    frontmatter_error: str | None = None
 
 
-def _parse_frontmatter(content: str) -> dict[str, object] | None:
+def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
+    """Render a YAMLError as ``<msg> (line <L>, column <C>)`` when a mark is available.
+
+    Prefers the short ``problem`` message over ``str(exc)`` (which embeds the mark in a
+    multi-line snippet). Line/column are 1-based; ``line_offset`` shifts the mark's
+    block-relative line to the FILE line the human will open (the frontmatter block
+    starts after the opening ``---`` line).
+    """
+    problem = getattr(exc, "problem", None)
+    message = str(problem) if problem else str(exc)
+    mark = getattr(exc, "problem_mark", None)
+    if mark is not None:
+        return f"{message} (line {mark.line + 1 + line_offset}, column {mark.column + 1})"
+    return message
+
+
+def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | None]:
+    """Parse the frontmatter block; return ``(data, frontmatter_error)``.
+
+    A YAML parse failure is CAPTURED, not swallowed (FR10): the second element carries
+    the formatted YAMLError (message + problem-mark line/column when available) so the
+    doctor can emit a loud parse-error finding instead of misdiagnosing the item as
+    having no ``intents[]``.
+    """
     match = _FRONTMATTER_RE.match(content)
     if match is None:
-        return None
+        return None, None
     try:
         data = yaml.safe_load(match.group(1))
-    except yaml.YAMLError:
-        return None
-    return data if isinstance(data, dict) else None
+    except yaml.YAMLError as exc:
+        # +1: the frontmatter block starts on file line 2 (after the opening ``---``).
+        return None, _format_yaml_error(exc, line_offset=1)
+    return (data if isinstance(data, dict) else None), None
 
 
 def load_backlog_items(backlog_dir: Path) -> list[BacklogItem]:
@@ -127,15 +158,17 @@ def load_backlog_items(backlog_dir: Path) -> list[BacklogItem]:
             content = md.read_text(encoding="utf-8")
         except (OSError, ValueError):
             continue
-        fm = _parse_frontmatter(content) or {}
+        parsed, frontmatter_error = _parse_frontmatter(content)
+        fm = parsed or {}
         status_raw = fm.get("status")
         status = status_raw if isinstance(status_raw, str) else None
         intents: tuple[Intent, ...] = ()
         error: str | None = None
-        try:
-            intents = tuple(parse_intents(fm.get("intents")))
-        except ValueError as exc:
-            error = str(exc)
+        if frontmatter_error is None:
+            try:
+                intents = tuple(parse_intents(fm.get("intents")))
+            except ValueError as exc:
+                error = str(exc)
         items.append(
             BacklogItem(
                 slug=md.stem,
@@ -143,6 +176,7 @@ def load_backlog_items(backlog_dir: Path) -> list[BacklogItem]:
                 status=status,
                 intents=intents,
                 intents_error=error,
+                frontmatter_error=frontmatter_error,
             )
         )
     return items

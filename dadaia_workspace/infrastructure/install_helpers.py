@@ -9,10 +9,16 @@ from __future__ import annotations
 
 import hashlib
 import shutil
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
+from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.models.agent_model_policy import (
+    ResolvedAgentModel,
+    codex_effort_for_claude_effort,
+)
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _atomic_write_text,
@@ -163,6 +169,116 @@ def install_universal_skills(
         installed,
         iter_files_fn,
     )
+
+
+# ---------------------------------------------------------------------------
+# Render-at-install seam (v0.1.65 FR5/D-6)
+# ---------------------------------------------------------------------------
+
+
+def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
+    """Compose a staged generic agent body + its resolved policy (the D-6 seam).
+
+    The SINGLE injection point shared by install-write, doctor-compare, and panel
+    Apply: any pre-existing top-level ``model:``/``effort:`` frontmatter lines are
+    stripped (pack bodies author ``model:`` as their pack default — D-5), then the
+    resolved ``model:`` and ``effort:`` are appended deterministically as the LAST
+    lines of the frontmatter block. ``effort:`` is OMITTED entirely when unresolved
+    (F-6 plugin asymmetry — never empty or placeholder), keeping render output
+    deterministic for the doctor render-compare.
+
+    Raises:
+        PublicAssetError: when *staged_text* carries no closed YAML frontmatter
+            block (a canonical agent body always does).
+    """
+    if not staged_text.startswith("---\n"):
+        raise PublicAssetError(
+            "cannot render agent projection: staged body has no YAML frontmatter block"
+        )
+    end_idx = staged_text.find("\n---\n", 4)
+    if end_idx == -1:
+        raise PublicAssetError(
+            "cannot render agent projection: staged frontmatter block is not closed"
+        )
+    frontmatter = staged_text[4 : end_idx + 1]
+    rest = staged_text[end_idx + 5 :]
+    kept = [line for line in frontmatter.splitlines() if not line.startswith(("model:", "effort:"))]
+    kept.append(f"model: {resolved.model}")
+    if resolved.effort is not None:
+        kept.append(f"effort: {resolved.effort}")
+    return "---\n" + "\n".join(kept) + "\n---\n" + rest
+
+
+def install_claude_agents(
+    agentic_dir: Path,
+    claude_dir: Path,
+    force: bool,
+    installed: list[str],
+    iter_files_fn: Callable[[Path], Iterable[Path]],
+    resolved_models: Mapping[str, ResolvedAgentModel],
+) -> None:
+    """Project staged agents into ``.claude/agents/`` through the render seam (FR5).
+
+    Core agents (present in *resolved_models*) are RENDERED — staged generic body +
+    resolved ``(model, effort)`` — via ``write_generated`` hash-compare; any other
+    staged body (the plugin stubs) is copied verbatim. ``--force`` therefore
+    re-RENDERS a diverged projection back to the render output, never to raw staged
+    bytes (F-5). Orphan projections are pruned exactly like ``copy_tree``.
+    """
+    src_dir = agentic_dir / "agents"
+    dst_dir = claude_dir / "agents"
+    if not src_dir.exists():
+        return
+    managed: set[Path] = set()
+    for src in iter_files_fn(src_dir):
+        rel = src.relative_to(src_dir)
+        managed.add(rel)
+        resolved = resolved_models.get(src.stem)
+        if resolved is None or src.suffix != ".md":
+            copy_file(src, dst_dir / rel, force, installed)
+        else:
+            content = render_claude_agent(src.read_text(encoding="utf-8"), resolved)
+            write_generated(dst_dir / rel, content, force, installed)
+    for dst in iter_files_fn(dst_dir):
+        if dst.relative_to(dst_dir) not in managed:
+            dst.unlink(missing_ok=True)
+            installed.append(f"[prune] {dst}")
+    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
+        if not any(d.iterdir()):
+            d.rmdir()
+
+
+def resolve_codex_agent_model(
+    agent_name: str,
+    staged_model: str | None,
+    resolved: ResolvedAgentModel | None,
+) -> tuple[str, str | None]:
+    """Resolve the ``(claude_model, reasoning_effort)`` for one codex agent render.
+
+    Precedence: resolved policy (core agents + installed pack agents) > staged
+    authored ``model:`` (plugin bodies — F-3 keeps this path) > the legacy
+    ``claude-sonnet-4-6`` default (plugin STUBS only, which author no model).
+
+    Raises:
+        PublicAssetError: F-3 fail-closed — a CORE agent supplied with neither a
+            staged ``model:`` nor a resolved policy model must never render on a
+            silent default (a wiring miss must never ship wrong codex models
+            under green tests).
+    """
+    if resolved is not None:
+        effort = (
+            codex_effort_for_claude_effort(resolved.effort) if resolved.effort is not None else None
+        )
+        return resolved.model, effort
+    if staged_model:
+        return staged_model, None
+    if agent_name in CORE_AGENTS:
+        raise PublicAssetError(
+            f"cannot render codex agent '{agent_name}': core agent has neither a "
+            "staged 'model:' nor a resolved agent-model policy model (F-3 fail-closed "
+            "— the render pipeline must be supplied the resolved policy)"
+        )
+    return "claude-sonnet-4-6", None
 
 
 # ---------------------------------------------------------------------------
@@ -338,8 +454,17 @@ def install_codex_agents(
     workspace_root: Path,
     force: bool,
     installed: list[str],
+    resolved_models: Mapping[str, ResolvedAgentModel] | None = None,
 ) -> None:
-    """Generate .codex/agents/<agent-id>.toml for each canonical agent."""
+    """Generate .codex/agents/<agent-id>.toml for each canonical agent.
+
+    The codex projection consumes the SAME resolved config as the claude render
+    (G-3, v0.1.65 FR5): *resolved_models* supplies the per-agent resolved
+    ``(model, effort)``; the codex model id derives from the registry mapping and
+    ``model_reasoning_effort`` from the D-3 clamp of the resolved effort. A CORE
+    agent with neither a staged ``model:`` nor a resolved policy model fails
+    closed (F-3 — see :func:`resolve_codex_agent_model`).
+    """
     from dadaia_workspace.infrastructure.runtime_transforms.codex import (
         transform_for_codex,
     )
@@ -372,7 +497,12 @@ def install_codex_agents(
         else:
             body = text
         body = transform_for_codex(body, agent_name)
-        claude_model = str(fm.get("model", "claude-sonnet-4-6"))
+        staged_model_raw = fm.get("model")
+        staged_model = str(staged_model_raw) if staged_model_raw else None
+        resolved = resolved_models.get(agent_name) if resolved_models is not None else None
+        claude_model, reasoning_effort = resolve_codex_agent_model(
+            agent_name, staged_model, resolved
+        )
         codex_model = map_model(claude_model)
         description = fm.get("description")
         # The description is the Codex spawn-trigger surface; it must pass through
@@ -387,6 +517,7 @@ def install_codex_agents(
             body,
             description=codex_description,
             claude_model=claude_model,
+            reasoning_effort=reasoning_effort,
         )
         dst = agents_dst / f"{agent_name}.toml"
         if dst.exists() and not force:

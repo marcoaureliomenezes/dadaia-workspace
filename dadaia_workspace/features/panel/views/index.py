@@ -69,6 +69,7 @@ def render_index(
   <link rel="stylesheet" href="/static/projects.css">
   <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/workflow-policy.css">
+  <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
@@ -108,6 +109,7 @@ def render_index(
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
     <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="Workflows">Workflows</button>
+    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Sub-agents">Sub-agents</button>
     <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
@@ -143,6 +145,8 @@ def render_index(
 
     {workflows_section}
 
+    {_render_subagents_section()}
+
     {academy_section}
 
     {sessions_section}
@@ -153,6 +157,7 @@ def render_index(
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
+  <script src="/static/agent-policy.js"></script>
   <script src="/static/workflow-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
@@ -171,6 +176,45 @@ def render_index(
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
 
     return _view
+
+
+def _render_subagents_section() -> str:
+    """The Sub-agents tab scaffold (v0.1.65 FR8) — hydrated by agent_policy.js.
+
+    Static server-rendered shell: section header with the template selector + explicit
+    Apply button, the status banner, the roster mount, and the (hidden) post-apply
+    pop-up that agent_policy.js fills with the G-2 per-harness pickup instructions.
+    """
+    return (
+        '<section id="section-subagents" class="section" '
+        'aria-label="Sub-agent model governance" role="tabpanel" tabindex="0" '
+        'aria-labelledby="tab-subagents">\n'
+        '      <header class="section-header">\n'
+        "        <h2>Sub-agents</h2>\n"
+        '        <div class="ap-toolbar">\n'
+        '          <select id="ap-template-select" class="ap-template-select" '
+        'aria-label="Agent model template"></select>\n'
+        '          <button id="ap-apply-btn" type="button" class="ap-apply-btn">Apply</button>\n'
+        "        </div>\n"
+        "      </header>\n"
+        '      <details class="section-desc">\n'
+        "        <summary>About this section</summary>\n"
+        "        <p>Layer-1 agent model governance — pick a template or set per-agent "
+        "model/effort overrides, then Apply to re-render both harness projections.</p>\n"
+        "      </details>\n"
+        '      <div id="ap-banner" class="ap-banner" hidden></div>\n'
+        '      <div id="ap-roster" aria-live="polite"></div>\n'
+        '      <div id="ap-popup" class="ap-popup" role="dialog" aria-modal="true" '
+        'aria-labelledby="ap-popup-title" hidden>\n'
+        '        <div class="ap-popup-card">\n'
+        '          <h3 id="ap-popup-title">Policy applied</h3>\n'
+        '          <div id="ap-popup-body"></div>\n'
+        '          <button id="ap-popup-close" type="button" class="ap-popup-close-btn">'
+        "Close</button>\n"
+        "        </div>\n"
+        "      </div>\n"
+        "    </section>"
+    )
 
 
 def _empty_state() -> str:

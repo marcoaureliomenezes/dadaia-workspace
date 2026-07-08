@@ -179,12 +179,14 @@ def test_index_tablist_contract() -> None:
     """The nav must expose the current tab order and active default tab.
 
     v0.1.45: the "Agentic" tab (tab-ops) was removed entirely per operator directive.
-    The nav is now 6 tabs: Projects, Workflows, Sessions, Reports, Academy, Servers.
+    v0.1.65 (FR8): the Sub-agents tab was added beside Workflows. The nav is now
+    7 tabs: Projects, Workflows, Sub-agents, Sessions, Reports, Academy, Servers.
     """
     html = _render(_build_service())
     expected = [
         ("tab-memories", "Projects"),
         ("tab-workflows", "Workflows"),
+        ("tab-subagents", "Sub-agents"),
         ("tab-sessions", "Sessions"),
         ("tab-reports", "Reports"),
         ("tab-academy", "Academy"),
@@ -220,6 +222,7 @@ def test_index_tablist_contract() -> None:
     [
         ("section-memories", "tab-memories"),
         ("section-workflows", "tab-workflows"),
+        ("section-subagents", "tab-subagents"),
         ("section-sessions", "tab-sessions"),
         ("section-reports", "tab-reports"),
         ("section-academy", "tab-academy"),
@@ -229,14 +232,15 @@ def test_index_tablist_contract() -> None:
 def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
     """Every top-level section must be connected to its tab for keyboard and screen-reader users.
 
-    v0.1.45: the Agentic tab was removed, leaving 6 tabpanels.
+    v0.1.45: the Agentic tab was removed. v0.1.65 (FR8) added the Sub-agents tab,
+    leaving 7 tabpanels.
     """
     html = _render(_build_service())
     section = _section_fragment(html, section_id)
     assert 'role="tabpanel"' in section
     assert 'tabindex="0"' in section
     assert f'aria-labelledby="{tab_id}"' in section
-    assert html.count('role="tabpanel"') == 6
+    assert html.count('role="tabpanel"') == 7
 
 
 def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:

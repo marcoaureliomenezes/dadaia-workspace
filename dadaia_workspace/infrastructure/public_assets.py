@@ -11,8 +11,14 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.models.agent_model_policy import (
+    AgentModelPolicyOverlay,
+    AgentModelPolicyStoreError,
+    ResolvedAgentModel,
+)
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
 from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
@@ -36,6 +42,7 @@ from dadaia_workspace.infrastructure.install_helpers import (
     copy_file,
     copy_tree,
     install_agents_md,
+    install_claude_agents,
     install_codex_agents,
     install_codex_runtime_adapters,
     install_dadaia_agents_md,
@@ -43,9 +50,14 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_reports_agents_md,
     install_universal_skills,
     remove_stale_files,
+    render_claude_agent,
+    resolve_codex_agent_model,
     runtime_expectations,
     validate_workflows,
     write_generated,
+)
+from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+    JsonAgentModelPolicyStore,
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
@@ -158,7 +170,15 @@ class FileSystemPublicAssetManager:
     def _install_codex_agents(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
-        install_codex_agents(agentic_dir, workspace_root, force, installed)
+        install_codex_agents(
+            agentic_dir,
+            workspace_root,
+            force,
+            installed,
+            resolved_models=self._resolved_core_models(
+                self._load_agent_policy(workspace_root, agentic_dir)
+            ),
+        )
 
     def _install_codex_runtime_adapters(
         self, workspace_root: Path, force: bool, installed: list[str]
@@ -229,6 +249,47 @@ class FileSystemPublicAssetManager:
         return set(profile.harnesses) if profile is not None else None
 
     # ------------------------------------------------------------------
+    # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
+    # ------------------------------------------------------------------
+
+    def _load_agent_policy(
+        self, workspace_root: Path, agentic_dir: Path
+    ) -> AgentModelPolicyOverlay | None:
+        """Load the operator overlay (``None`` when absent ⇒ ``balanced`` defaults).
+
+        Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
+        fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
+        line. Valid override targets are the 9 core agents plus the installed packs'
+        agents (FR3).
+        """
+        plugin_names = frozenset(
+            self._plugin_agent_stems(agentic_dir, self._installed_plugins(workspace_root))
+        )
+        return JsonAgentModelPolicyStore(workspace_root, plugin_agent_names=plugin_names).load()
+
+    @staticmethod
+    def _resolved_core_models(
+        overlay: AgentModelPolicyOverlay | None,
+    ) -> dict[str, ResolvedAgentModel]:
+        """Resolve the full core roster through the single resolver (FR4)."""
+        return {agent: resolve_agent_model(agent, overlay) for agent in CORE_AGENTS}
+
+    def _resolve_pack_agent(
+        self, md_path: Path, overlay: AgentModelPolicyOverlay | None
+    ) -> ResolvedAgentModel | None:
+        """Resolve an installed pack agent: override > pack-provided default (D-5).
+
+        Returns ``None`` when the pack body authors no ``model:`` (defensive — the
+        projection then falls back to the legacy verbatim/staged-model path).
+        """
+        fm = _parse_agent_frontmatter(md_path.read_text(encoding="utf-8"))
+        staged_model = str(fm.get("model", "")) or None
+        if staged_model is None:
+            return None
+        agent_name = str(fm.get("name", "")) or md_path.stem
+        return resolve_agent_model(agent_name, overlay, pack_default=staged_model)
+
+    # ------------------------------------------------------------------
     # Plugin packs (v0.1.60 FR3) — projection, precedence, doctor
     # ------------------------------------------------------------------
 
@@ -252,12 +313,16 @@ class FileSystemPublicAssetManager:
                 stems.add(md.stem)
         return stems
 
-    def _codex_toml_from_md(self, md_path: Path) -> tuple[str, str] | None:
+    def _codex_toml_from_md(
+        self, md_path: Path, resolved: ResolvedAgentModel | None = None
+    ) -> tuple[str, str] | None:
         """Render an agent md into its ``(agent_name, .codex toml content)`` pair.
 
         Mirrors ``install_codex_agents`` for a single agent md: parse frontmatter, strip it,
-        transform Claude-isms out of the body/description, map the Claude model to its Codex
-        id (``claude-sonnet-4-6`` → ``gpt-5.3-codex``), and render the TOML. Shared by the
+        transform Claude-isms out of the body/description, resolve the ``(model, effort)``
+        via :func:`resolve_codex_agent_model` (v0.1.65 FR5: *resolved* policy > staged
+        authored ``model:`` > legacy stub default; a CORE agent with neither fails closed
+        — F-3), map the Claude model to its Codex id, and render the TOML. Shared by the
         pack-body projection (install) and the core-stub restoration (uninstall, v0.1.63 FR2).
         """
         text = md_path.read_text(encoding="utf-8")
@@ -271,7 +336,10 @@ class FileSystemPublicAssetManager:
         else:
             body = text
         body = transform_for_codex(body, agent_name)
-        claude_model = str(fm.get("model", "claude-sonnet-4-6"))
+        staged_model = str(fm.get("model", "")) or None
+        claude_model, reasoning_effort = resolve_codex_agent_model(
+            agent_name, staged_model, resolved
+        )
         description = fm.get("description")
         codex_description = (
             transform_for_codex(str(description), agent_name) if description else None
@@ -282,14 +350,20 @@ class FileSystemPublicAssetManager:
             body,
             description=codex_description,
             claude_model=claude_model,
+            reasoning_effort=reasoning_effort,
         )
         return agent_name, toml_content
 
     def _render_codex_pack_agent(
-        self, md_path: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        md_path: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        resolved: ResolvedAgentModel | None = None,
     ) -> None:
         """Render a pack agent's ``.codex/agents/<name>.toml`` from its body."""
-        rendered = self._codex_toml_from_md(md_path)
+        rendered = self._codex_toml_from_md(md_path, resolved=resolved)
         if rendered is None:
             return
         agent_name, toml_content = rendered
@@ -307,6 +381,7 @@ class FileSystemPublicAssetManager:
         active: set[str],
         force: bool,
         installed: list[str],
+        overlay: AgentModelPolicyOverlay | None = None,
     ) -> None:
         """Project every installed pack's agents/skills/rules over the core projections.
 
@@ -315,6 +390,10 @@ class FileSystemPublicAssetManager:
         pack agent body OVERWRITES the projected core stub (ADR-4 stub replacement); because
         this runs AFTER the core projection loop it is the projection-precedence step
         (AC-4 clobber-safety). A no-op when no pack is installed (byte-lock golden (b)).
+
+        v0.1.65 FR5: pack agents render through the same seam as core agents —
+        override > pack-provided default (D-5), with the F-6 effort asymmetry
+        (``effort:`` omitted when no override supplies one).
         """
         packs = self._installed_plugins(workspace_root)
         if not packs:
@@ -324,10 +403,23 @@ class FileSystemPublicAssetManager:
             if not pack_dir.is_dir():
                 continue
             for md in sorted((pack_dir / "agents").glob("*.md")):
+                resolved = self._resolve_pack_agent(md, overlay)
                 if "claude" in active:
-                    copy_file(md, workspace_root / ".claude" / "agents" / md.name, force, installed)
+                    if resolved is None:
+                        copy_file(
+                            md, workspace_root / ".claude" / "agents" / md.name, force, installed
+                        )
+                    else:
+                        write_generated(
+                            workspace_root / ".claude" / "agents" / md.name,
+                            render_claude_agent(md.read_text(encoding="utf-8"), resolved),
+                            force,
+                            installed,
+                        )
                 if "codex" in active:
-                    self._render_codex_pack_agent(md, workspace_root, force, installed)
+                    self._render_codex_pack_agent(
+                        md, workspace_root, force, installed, resolved=resolved
+                    )
             for skill in sorted(self._iter_files(pack_dir / "skills")):
                 if skill.name == ".gitkeep":
                     continue
@@ -361,7 +453,10 @@ class FileSystemPublicAssetManager:
         store.write(states_dir, ledger.with_added(pack_name))
         profile = self._profile_harnesses(workspace_root)
         active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-        self._project_installed_plugins(agentic_dir, workspace_root, active, force, installed)
+        overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        self._project_installed_plugins(
+            agentic_dir, workspace_root, active, force, installed, overlay=overlay
+        )
         return installed
 
     @staticmethod
@@ -396,14 +491,23 @@ class FileSystemPublicAssetManager:
         if not pack_dir.is_dir():
             out.append(f"[skip] pack '{pack_name}' is not staged — ledger-only removal")
         else:
+            overlay = self._load_agent_policy(workspace_root, agentic_dir)
             # Pack agents: restore the core stub over the pack body (profile-scoped).
             for md in sorted((pack_dir / "agents").glob("*.md")):
                 stub_src = agentic_dir / "agents" / md.name
+                resolved = self._resolve_pack_agent(md, overlay)
                 if "claude" in active:
                     dst = workspace_root / ".claude" / "agents" / md.name
+                    # The projected pack claude file is the RENDER output (FR5), so
+                    # drift is measured against the rendered pack body, not raw bytes.
+                    expected_pack = (
+                        render_claude_agent(md.read_text(encoding="utf-8"), resolved)
+                        if resolved is not None
+                        else md.read_text(encoding="utf-8")
+                    )
                     if (
                         dst.exists()
-                        and dst.read_bytes() != md.read_bytes()
+                        and dst.read_text(encoding="utf-8") != expected_pack
                         and (not stub_src.exists() or dst.read_bytes() != stub_src.read_bytes())
                     ):
                         out.append(f"[drift-restored] {dst}")
@@ -412,7 +516,7 @@ class FileSystemPublicAssetManager:
                 if "codex" in active:
                     dst = workspace_root / ".codex" / "agents" / f"{md.stem}.toml"
                     stub_render = self._codex_toml_from_md(stub_src) if stub_src.exists() else None
-                    pack_render = self._codex_toml_from_md(md)
+                    pack_render = self._codex_toml_from_md(md, resolved=resolved)
                     if dst.exists():
                         current = dst.read_text(encoding="utf-8")
                         if (pack_render is None or current != pack_render[1]) and (
@@ -458,7 +562,11 @@ class FileSystemPublicAssetManager:
         return out
 
     def _doctor_installed_plugins(
-        self, agentic_dir: Path, workspace_root: Path, active: set[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        active: set[str],
+        overlay: AgentModelPolicyOverlay | None = None,
     ) -> list[str]:
         """Report ``[ok]``/``[drift]``/``[missing]`` per installed-pack projected file.
 
@@ -474,7 +582,16 @@ class FileSystemPublicAssetManager:
                 name = md.stem
                 if "claude" in active:
                     dst = workspace_root / ".claude" / "agents" / f"{name}.md"
-                    out.append(self._compare(md, dst, f"plugin:{pack}:claude/agents/{name}.md"))
+                    label = f"plugin:{pack}:claude/agents/{name}.md"
+                    # v0.1.65 FR5/FR7: the installed pack projection is the RENDER
+                    # output (override > pack default), so the doctor expectation is
+                    # the rendered content, not raw pack bytes.
+                    resolved = self._resolve_pack_agent(md, overlay)
+                    if resolved is None:
+                        out.append(self._compare(md, dst, label))
+                    else:
+                        expected = render_claude_agent(md.read_text(encoding="utf-8"), resolved)
+                        out.append(self._compare_content(expected, dst, label))
                 if "codex" in active:
                     toml = workspace_root / ".codex" / "agents" / f"{name}.toml"
                     label = f"plugin:{pack}:codex/agents/{name}.toml"
@@ -503,7 +620,11 @@ class FileSystemPublicAssetManager:
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         profile = self._profile_harnesses(workspace_root)
         active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-        return self._doctor_installed_plugins(agentic_dir, workspace_root, active)
+        try:
+            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        except AgentModelPolicyStoreError:
+            overlay = None  # `public doctor` reports the invalid overlay separately
+        return self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay)
 
     # ------------------------------------------------------------------
     # Public API
@@ -582,6 +703,13 @@ class FileSystemPublicAssetManager:
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
+        # v0.1.65 FR5: load the agent-model policy ONCE per install run and resolve the
+        # core roster through the single resolver (FR4). An invalid overlay raises the
+        # typed store error HERE — loud, before any projection write (NFR-4). A missing
+        # overlay resolves the `balanced` defaults.
+        overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        resolved_models = self._resolved_core_models(overlay)
+
         # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
         # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
         # An explicit --target X always overrides (it never reaches this branch).
@@ -621,9 +749,23 @@ class FileSystemPublicAssetManager:
                         agentic_dir, workspace_root, force, installed, self._iter_files
                     )
             elif item == "claude":
-                self._install_claude(agentic_dir, workspace_root, force, installed, only=only)
+                self._install_claude(
+                    agentic_dir,
+                    workspace_root,
+                    force,
+                    installed,
+                    only=only,
+                    resolved_models=resolved_models,
+                )
             elif item == "codex":
-                self._install_codex(agentic_dir, workspace_root, force, installed, only=only)
+                self._install_codex(
+                    agentic_dir,
+                    workspace_root,
+                    force,
+                    installed,
+                    only=only,
+                    resolved_models=resolved_models,
+                )
             elif item == "pi":
                 self._install_pi(agentic_dir, workspace_root, force, installed, only=only)
 
@@ -636,7 +778,7 @@ class FileSystemPublicAssetManager:
         # stub. A no-op when no pack is installed (byte-lock golden (b)).
         active_harnesses = {item for item in targets if item in L1_ENTRY_HARNESSES}
         self._project_installed_plugins(
-            agentic_dir, workspace_root, active_harnesses, force, installed
+            agentic_dir, workspace_root, active_harnesses, force, installed, overlay=overlay
         )
 
         return installed
@@ -683,6 +825,17 @@ class FileSystemPublicAssetManager:
         installed_packs = self._installed_plugins(workspace_root)
         plugin_agent_stems = self._plugin_agent_stems(agentic_dir, installed_packs)
 
+        # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
+        # overlay is a doctor ERROR line (and the render compare below degrades to the
+        # `balanced` defaults); a MISSING overlay is silent and resolves the defaults
+        # (NFR-4 — missing != invalid).
+        overlay: AgentModelPolicyOverlay | None = None
+        try:
+            overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        except AgentModelPolicyStoreError as exc:
+            reports.append(f"[drift] agent-model-policy ERROR: {exc}")
+        resolved_models = self._resolved_core_models(overlay)
+
         for expected_src, dst, label, transform in runtime_expectations(
             agentic_dir,
             workspace_root,
@@ -714,6 +867,24 @@ class FileSystemPublicAssetManager:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
                 reports.append(f"[unsupported] {label}")
+            elif (
+                label.startswith("claude:agents/")
+                and label.endswith(".md")
+                and expected_src.stem in resolved_models
+            ):
+                # v0.1.65 FR7/D-6 — THE pinned interception (F-2): non-plugin core
+                # `claude:agents/*.md` projections are compared against
+                # render(staged generic + resolved policy), never raw staged bytes,
+                # so a policy re-render is [ok] and a hand-edit is [drift]. The
+                # `stage:agents/*.md` (generic↔generic) lines and every non-agent
+                # label stay on the raw `_compare` path above/below — `_compare`
+                # itself is never patched. Codex TOML is NOT doctor-byte-compared
+                # (F-1): its correctness is the T-65-08 install-time lockstep test.
+                expected = render_claude_agent(
+                    expected_src.read_text(encoding="utf-8"),
+                    resolved_models[expected_src.stem],
+                )
+                reports.append(self._compare_content(expected, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
 
@@ -731,7 +902,7 @@ class FileSystemPublicAssetManager:
         # Installed-pack projected-file doctoring (FR3, AC-5): a stale/out-of-manifest
         # installed-pack file is never silent. Empty when no pack is installed ⇒ zero lines
         # (byte-lock golden b).
-        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active))
+        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay))
 
         # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
         # resolution above is reused here (claude settings.json / codex hooks+config+rules /
@@ -862,10 +1033,24 @@ class FileSystemPublicAssetManager:
         force: bool,
         installed: list[str],
         only: str | None = None,
+        resolved_models: dict[str, ResolvedAgentModel] | None = None,
     ) -> None:
         claude_dir = workspace_root / ".claude"
+        if resolved_models is None:
+            # Direct callers (tests / the panel agents-only re-render) that skip
+            # ``install()`` still render through the resolved policy (FR5).
+            resolved_models = self._resolved_core_models(
+                self._load_agent_policy(workspace_root, agentic_dir)
+            )
         dirs = _CLAUDE_DIRS if only is None else tuple(d for d in _CLAUDE_DIRS if d == only)
         for name in dirs:
+            if name == "agents":
+                # v0.1.65 FR5: core agents are RENDERED (staged generic body +
+                # resolved policy) through the D-6 seam; stubs copy verbatim.
+                install_claude_agents(
+                    agentic_dir, claude_dir, force, installed, self._iter_files, resolved_models
+                )
+                continue
             copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
         if only is None:
             write_generated(
@@ -882,8 +1067,13 @@ class FileSystemPublicAssetManager:
         force: bool,
         installed: list[str],
         only: str | None = None,
+        resolved_models: dict[str, ResolvedAgentModel] | None = None,
     ) -> None:
         codex_dir = workspace_root / ".codex"
+        if resolved_models is None:
+            resolved_models = self._resolved_core_models(
+                self._load_agent_policy(workspace_root, agentic_dir)
+            )
         if only is None or only == "rules":
             self._install_codex_rules(agentic_dir, workspace_root, force, installed)
         if only is None or only == "workflows":
@@ -906,7 +1096,9 @@ class FileSystemPublicAssetManager:
                 agentic_dir, workspace_root, force, installed, self._iter_files
             )
         if only is None or only == "agents":
-            install_codex_agents(agentic_dir, workspace_root, force, installed)
+            install_codex_agents(
+                agentic_dir, workspace_root, force, installed, resolved_models=resolved_models
+            )
             install_codex_runtime_adapters(
                 self._public_dir, workspace_root, force, installed, copy_file
             )

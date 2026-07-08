@@ -68,8 +68,11 @@ EXPECTED_SKILLS = {
     "project-orchestration",
 }
 
-# Required YAML fields in every agent's frontmatter
-_REQUIRED_FRONTMATTER = {"name", "description", "model", "tools"}
+# Required YAML fields in every STAGED agent's frontmatter. v0.1.65 FR1: staged core
+# bodies are model-agnostic (`model:`/`effort:` are injected at install-time by the
+# render seam from the resolved policy), so `model` is no longer required at staging —
+# the AC-1 half is asserted alongside in test_staged_agents_have_required_frontmatter.
+_REQUIRED_FRONTMATTER = {"name", "description", "tools"}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -334,6 +337,14 @@ class TestContentConsistency:
             missing = _REQUIRED_FRONTMATTER - keys
             assert not missing, (
                 f"Agent '{agent_file.name}' is missing required frontmatter fields: {missing}"
+            )
+            # v0.1.65 FR1/AC-1: staged core bodies are model-agnostic — the resolved
+            # `model:`/`effort:` are injected at install time, never staged.
+            assert "model" not in keys, (
+                f"Agent '{agent_file.name}' stages a hardcoded 'model:' (FR1 violation)"
+            )
+            assert "effort" not in keys, (
+                f"Agent '{agent_file.name}' stages a hardcoded 'effort:' (FR1 violation)"
             )
 
     def test_staged_agent_skill_references_are_all_valid(self, tmp_path: Path) -> None:

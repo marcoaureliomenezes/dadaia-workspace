@@ -39,7 +39,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.model_registry import REGISTRY
+from dadaia_workspace.core.models.agent_model_policy import (
+    CLAUDE_EFFORTS,
+    AgentModelPolicyOverlay,
+)
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # Matches a frontmatter ``model:`` line (first match wins).
@@ -50,40 +55,78 @@ def _registry_claude_ids() -> set[str]:
     return {entry.claude_id for entry in REGISTRY}
 
 
-def check_model_resolution(public_dir: Path) -> list[str]:
+def _scan_frontmatter_models(agents_dir: Path, registry_ids: set[str], out: list[str]) -> None:
+    """Append an ERROR line for every authored ``model:`` not resolving in REGISTRY."""
+    if not agents_dir.is_dir():
+        return
+    for md_file in sorted(agents_dir.glob("*.md")):
+        try:
+            text = md_file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = _MODEL_FRONTMATTER_RE.search(text)
+        if match is None:
+            continue
+        model_id = match.group(1)
+        if model_id not in registry_ids:
+            out.append(
+                f"[drift] model-resolution ERROR: agent '{md_file.stem}' declares "
+                f"model '{model_id}' which is not in core.model_registry.REGISTRY "
+                f"(known: {', '.join(sorted(registry_ids))})"
+            )
+
+
+def check_model_resolution(
+    public_dir: Path, overlay: AgentModelPolicyOverlay | None = None
+) -> list[str]:
     """Return doctor report lines for the model-resolution invariants.
 
     Args:
         public_dir: the canonical public-asset source directory (the one that
-            contains ``agents/``). Agent frontmatter is read from
-            ``public_dir / "agents" / "*.md"``.
+            contains ``agents/`` and ``plugins/``). Agent frontmatter is read from
+            ``public_dir / "agents" / "*.md"`` and every
+            ``public_dir / "plugins" / "<pack>" / "agents" / "*.md"``.
+        overlay: the loaded agent-model-policy overlay (v0.1.65 FR7) — ``None``
+            when absent/invalid (an invalid overlay is reported as a doctor ERROR
+            by the asset manager, not here). The RESOLVED (model, effort) per core
+            agent is validated against REGISTRY + the effort vocabulary.
 
     Returns:
         A list of doctor lines. Emits ``[drift]`` ERROR lines on any unknown agent
-        ``model:`` id or any key-set desync, and a single ``[ok] model-resolution``
-        line when every invariant holds.
+        ``model:`` id, an unresolvable core-agent policy resolution, or any key-set
+        desync, and a single ``[ok] model-resolution`` line when every invariant
+        holds.
     """
     out: list[str] = []
     registry_ids = _registry_claude_ids()
 
-    # 1. Agent-frontmatter resolution.
-    agents_dir = public_dir / "agents"
-    if agents_dir.is_dir():
-        for md_file in sorted(agents_dir.glob("*.md")):
-            try:
-                text = md_file.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            match = _MODEL_FRONTMATTER_RE.search(text)
-            if match is None:
-                continue
-            model_id = match.group(1)
-            if model_id not in registry_ids:
-                out.append(
-                    f"[drift] model-resolution ERROR: agent '{md_file.stem}' declares "
-                    f"model '{model_id}' which is not in core.model_registry.REGISTRY "
-                    f"(known: {', '.join(sorted(registry_ids))})"
-                )
+    # 1a. Authored-frontmatter resolution: core/stub bodies (staged core bodies are
+    # model-agnostic since FR1 — the regex simply finds nothing there) PLUS every
+    # plugin pack's staged agent bodies (their authored ``model:`` is the D-5 pack
+    # default consumed by the resolver, so it must be registry-known).
+    _scan_frontmatter_models(public_dir / "agents", registry_ids, out)
+    plugins_dir = public_dir / "plugins"
+    if plugins_dir.is_dir():
+        for pack_dir in sorted(p for p in plugins_dir.iterdir() if p.is_dir()):
+            _scan_frontmatter_models(pack_dir / "agents", registry_ids, out)
+
+    # 1b. RESOLVED-roster validation (v0.1.65 FR7): the resolver's answer for each
+    # core agent — templates assert at import; a present overlay layers on top —
+    # must land on a registry model and a vocabulary effort.
+    for agent in CORE_AGENTS:
+        resolved = resolve_agent_model(agent, overlay)
+        if resolved.model not in registry_ids:
+            out.append(
+                f"[drift] model-resolution ERROR: resolved policy for core agent "
+                f"'{agent}' yields model '{resolved.model}' which is not in "
+                f"core.model_registry.REGISTRY"
+            )
+        if resolved.effort not in CLAUDE_EFFORTS:
+            out.append(
+                f"[drift] model-resolution ERROR: resolved policy for core agent "
+                f"'{agent}' yields effort {resolved.effort!r} outside the vocabulary "
+                f"({', '.join(CLAUDE_EFFORTS)})"
+            )
 
     # 2. Key-set coherence: MODEL_MAP keys == PRICING_TABLE keys == REGISTRY ids.
     # PRICING_TABLE and MODEL_MAP are both DERIVED views over REGISTRY (one in

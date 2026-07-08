@@ -1,26 +1,24 @@
 ---
-release: none
-phase: none
+release: v0.1.65
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.65 — L1 Agent Model Governance & Panel Sub-agents Tab
 
-The four-release queue **v0.1.61 → v0.1.62 → v0.1.63 → v0.1.64 is COMPLETE** —
-all shipped and closed 2026-07-07 (Rulings 61-A/61-B order honored end-to-end):
+Defined 2026-07-07 on branch `feature/v0.1.65`. Picked set (release-governance:
+open bugs outrank plain backlog):
 
-1. **v0.1.61 — Audit Remediation & Memory Truth** — merged `3965df4c` (PR #116),
-   closure `2d308c8d` (PR #117); 41/41 audit dispositions.
-2. **v0.1.62 — Injection Contract & Fan-out Containment** — merged `352969da`
-   (PR #118), closure `b58becc6` (PR #119); HIGH sidecar bug resolved.
-3. **v0.1.63 — Plugin Platform Completion** — merged `457e4e10` (PR #120),
-   closure `1061c26b` (PR #121); uninstall + 4+4 pack skill rosters.
-4. **v0.1.64 — Platform Ergonomics & Tiering** — merged `d8bcdff7` (PR #122),
-   closure on this branch; golden_platform consolidation, entry-harness
-   auto-default + PI pin, `dispatch_band` rename; `fast-tier-persona-validation`
-   REJECTED (PM-ratified, operator-overridable).
+- Backlog centerpiece: `l1-agent-model-governance-panel` (HIGH — mirror the
+  Layer-2 workflow model-governance architecture for the Layer-1 agent roster,
+  panel-managed).
+- Bug `backlog-doctor-yaml-parse-misdiagnosis` (LOW, open).
+- Bug `e2e-panel-harness-toggle-ci-flake` (LOW, open).
 
-**Next-pick debt (outranks plain backlog per release-governance):** open LOW
-bugs `backlog-doctor-yaml-parse-misdiagnosis` +
-`e2e-panel-harness-toggle-ci-flake`; live backlog returns incl.
+Grill session recorded rulings G-1..G-5 (Fable roster / apply mode / one-policy
+two-projections / core-9 roster / 3 templates); refinement report at
+`.dadaia/reports/dadaia-workspace/product-engineer/2026-07-07T193000Z-refine-v0165.html`.
+
+Queue history (concise): v0.1.61 → v0.1.64 all shipped and closed 2026-07-07
+(PRs #116–#123). Remaining next-pick debt after v0.1.65: backlog returns
 `dispatch-band-legacy-fallback-removal`, `platform-seam-todo-retirement`,
 `specs-doctor-partial-archive-invariant`.

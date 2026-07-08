@@ -18,7 +18,14 @@
  * before and after so it never depends on, or leaks, live workspace state.
  */
 import { test, expect } from '@playwright/test';
-import { gotoPanel, activateTab, expandWorkflowCard, authHeaders, BASE_URL } from './helpers';
+import {
+  gotoPanel,
+  activateTab,
+  expandWorkflowCard,
+  authHeaders,
+  clickAndAwaitPut,
+  BASE_URL,
+} from './helpers';
 
 const EMPTY_OVERLAY = {
   schema_version: 'workflow-model-policy-v1',
@@ -33,10 +40,12 @@ const IMPLEMENT_PICKER =
   'details.dadaia-wf-card[data-workflow="implementation"] .wf-step-picker[data-wfp-step="implement"]';
 
 async function restoreEmptyOverlay(request: any): Promise<void> {
-  await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
+  const res = await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     data: EMPTY_OVERLAY,
   });
+  // FR11(b): a silent restore failure would leak state into the next test.
+  expect(res.status()).toBe(200);
 }
 
 async function openImplementPicker(page: any): Promise<void> {
@@ -97,8 +106,10 @@ test('Harness toggle persists through PUT and the catalog diff reflects it', asy
   await page.locator(`${IMPLEMENT_PICKER} .wfp-seg-btn[data-wfp-harness="pi"]`).click();
   await page.locator('#wfp-validate-btn').click();
   await expect(page.locator('#wfp-banner')).toHaveClass(/wfp-banner--ok/, { timeout: 10000 });
-  await page.locator('#wfp-save-btn').click();
-  await expect(page.locator('#wfp-banner')).toHaveClass(/wfp-banner--ok/, { timeout: 10000 });
+  // FR11(a): the banner class is shared between validate and save outcomes, so the
+  // stale validate banner is NOT a save signal. Arm the PUT wait before clicking
+  // save and await the 200 response itself — only then is the GET race-free.
+  await clickAndAwaitPut(page, '#wfp-save-btn', '/api/workflow-model-policy');
 
   // The overlay persisted the implement harness (round-trip through GET).
   const polRes = await request.get(`${BASE_URL}/api/workflow-model-policy?context=default`, {
@@ -107,7 +118,12 @@ test('Harness toggle persists through PUT and the catalog diff reflects it', asy
   expect(polRes.status()).toBe(200);
   const polBody = await polRes.json();
   expect(polBody.exists).toBe(true);
-  const impl = polBody.policy.contexts.default.workflows.implementation;
+  // FR11(c): an empty overlay serializes WITHOUT the `workflows` key — guard the
+  // deep access so a shape regression fails with a readable assertion, not a
+  // TypeError inside the property chain.
+  const workflows = polBody.policy?.contexts?.default?.workflows ?? {};
+  const impl = workflows.implementation;
+  expect(impl, 'persisted overlay must carry contexts.default.workflows.implementation').toBeTruthy();
   expect(impl.harnesses.implement).toBe('pi');
 
   // The catalog default-vs-effective diff reflects the persisted harness change.

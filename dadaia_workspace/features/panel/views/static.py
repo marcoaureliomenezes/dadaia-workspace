@@ -22,6 +22,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
+from dadaia_workspace.features.panel.views.assets.css.agent_policy import AGENT_POLICY_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory_doc import MEMORY_DOC_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
@@ -66,6 +67,7 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
     "workflows.css": ("text/css; charset=utf-8", WORKFLOWS_CSS.encode("utf-8")),
     "workflow-policy.css": ("text/css; charset=utf-8", WORKFLOW_POLICY_CSS.encode("utf-8")),
+    "agent-policy.css": ("text/css; charset=utf-8", AGENT_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
     "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
@@ -88,6 +90,10 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "workflow-policy.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "workflow_policy.js").read_bytes(),
+    ),
+    "agent-policy.js": (
+        "application/javascript; charset=utf-8",
+        (_JS_DIR / "agent_policy.js").read_bytes(),
     ),
     "sessions.js": (
         "application/javascript; charset=utf-8",

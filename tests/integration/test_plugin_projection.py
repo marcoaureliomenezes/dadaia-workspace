@@ -147,6 +147,23 @@ Real browser HTML/CSS/TS/React implementation body — NOT the core stub.
 """
 
 
+#: v0.1.65 FR5 (T-65-08/09): the projected claude pack agent is the RENDER output —
+#: the authored ``model:`` (the D-5 pack default) is re-emitted as the LAST
+#: frontmatter line by the D-6 seam; ``effort:`` is omitted (no override — F-6).
+_PACK_BODY_RENDERED = """---
+name: frontend-engineer
+description: Frontend engineer plugin agent (synthetic W2 fixture).
+tier: 3
+tools: [Read, Write]
+model: claude-sonnet-4-6
+---
+
+# Frontend Engineer (plugin pack body)
+
+Real browser HTML/CSS/TS/React implementation body — NOT the core stub.
+"""
+
+
 def _staged_workspace_with_pack_body(
     tmp_path: Path,
     harnesses: tuple[str, ...] | None = None,
@@ -188,7 +205,7 @@ def test_plugin_install_projects_real_body_over_stub(tmp_path: Path) -> None:
     mgr.install_plugin(ws, _PACK)
 
     projected = _claude_agent(ws).read_text(encoding="utf-8")
-    assert projected == _PACK_BODY
+    assert projected == _PACK_BODY_RENDERED
     assert "[PLUGIN REQUIRED]" not in projected
     # Ledger records the pack (not per-harness).
     ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
@@ -205,7 +222,7 @@ def test_plugin_install_is_idempotent(tmp_path: Path) -> None:
     mgr.install_plugin(ws, _PACK)
     lines = mgr.install_plugin(ws, _PACK)
     assert all(not ln.startswith("[ok]   ") for ln in lines), lines
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
 
 
 def test_core_install_keeps_pack_body_precedence(tmp_path: Path) -> None:
@@ -216,11 +233,11 @@ def test_core_install_keeps_pack_body_precedence(tmp_path: Path) -> None:
     """
     ws, mgr = _staged_workspace_with_pack_body(tmp_path)
     mgr.install_plugin(ws, _PACK)
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
 
     mgr.install(ws, target="all", force=True)
 
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
 
 
 def test_claude_only_profile_projects_no_codex_orphan(tmp_path: Path) -> None:
@@ -228,7 +245,7 @@ def test_claude_only_profile_projects_no_codex_orphan(tmp_path: Path) -> None:
     ws, mgr = _staged_workspace_with_pack_body(tmp_path, harnesses=("claude",))
     mgr.install_plugin(ws, _PACK)
 
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY
+    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
     # No .codex/ orphan — the claude-only profile never projects a codex agent.
     assert not (ws / ".codex" / "agents" / f"{_AGENT}.toml").exists()
     # The ledger records the pack, not a per-harness selection.

@@ -1,15 +1,30 @@
 """PublicAssetService — stage, install and diagnose distributed agent artifacts."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core.models.agent_model_policy import (
+    AgentModelPolicyOverlay,
+    AgentModelPolicyStoreError,
+)
 from dadaia_workspace.core.protocols.storage import PublicAssetManager
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
+#: Loads the agent-model-policy overlay for a workspace root (v0.1.65 FR7). Injected by
+#: the composition root (``container.build_public_service``) so this feature module
+#: carries no ``features -> infrastructure`` import edge (D-4).
+AgentPolicyLoader = Callable[[Path], AgentModelPolicyOverlay | None]
+
 
 class PublicAssetService:
-    def __init__(self, public_assets: PublicAssetManager) -> None:
+    def __init__(
+        self,
+        public_assets: PublicAssetManager,
+        agent_policy_loader: AgentPolicyLoader | None = None,
+    ) -> None:
         self._public_assets = public_assets
+        self._agent_policy_loader = agent_policy_loader
 
     def stage(self, workspace_root: Path) -> list[str]:
         return self._public_assets.stage(workspace_root)
@@ -36,5 +51,14 @@ class PublicAssetService:
         # canonical packaged public/ source (same dir the asset manager stages from),
         # not the workspace projection, so it validates the source of truth.
         public_dir = Path(__file__).resolve().parent.parent.parent / "public"
-        reports.extend(check_model_resolution(public_dir))
+        # v0.1.65 FR7: validate the RESOLVED roster (templates + overlay) too. An
+        # invalid overlay is already reported as a doctor ERROR line by the asset
+        # manager's doctor pass, so it degrades to defaults here (no duplicate line).
+        overlay: AgentModelPolicyOverlay | None = None
+        if self._agent_policy_loader is not None:
+            try:
+                overlay = self._agent_policy_loader(workspace_root)
+            except AgentModelPolicyStoreError:
+                overlay = None
+        reports.extend(check_model_resolution(public_dir, overlay=overlay))
         return reports

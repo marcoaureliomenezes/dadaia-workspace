@@ -6,7 +6,7 @@ already locked the projection MECHANISM with a synthetic body; this module asser
 shipped content:
 
 * **AC-6** — each pack agent carries the required frontmatter (``name`` matching ``pack.json``,
-  ``dispatch_band: 3``, ``model: claude-sonnet-4-6``, a ``tools`` list); a real in-tmp install +
+  ``dispatch_band: 3``, ``model: claude-sonnet-5``, a ``tools`` list); a real in-tmp install +
   ``install_plugin`` renders the projected ``.codex/agents/<name>.toml`` on the sonnet/plugin
   tier — ``model = "gpt-5.3-codex"``, NOT ``gpt-5.5`` (ARCH-2: the Codex ``model`` field is the
   discriminator, ``model_reasoning_effort`` is not); ``[ok] public-privacy`` holds with the pack
@@ -56,7 +56,7 @@ _PACK_SKILLS: dict[str, list[str]] = {
 _EXPECTED_SKILLS = {skill for roster in _PACK_SKILLS.values() for skill in roster}
 
 # Claude → Codex model mapping under test (registry single source of truth).
-_PLUGIN_CLAUDE_MODEL = "claude-sonnet-4-6"
+_PLUGIN_CLAUDE_MODEL = "claude-sonnet-5"
 _PLUGIN_CODEX_MODEL = "gpt-5.3-codex"
 _OPUS_CODEX_MODEL = "gpt-5.5"
 
@@ -120,7 +120,7 @@ def _projected_codex_toml(ws: Path, agent: str) -> str:
 
 @pytest.mark.unit
 def test_every_pack_agent_carries_required_frontmatter() -> None:
-    """AC-6: name matches pack.json, dispatch_band: 3, model: claude-sonnet-4-6, tools list present."""
+    """AC-6: name matches pack.json, dispatch_band: 3, model: claude-sonnet-5, tools list present."""
     seen: list[str] = []
     for pack in _pack_names():
         for agent in _pack_agents(pack):
