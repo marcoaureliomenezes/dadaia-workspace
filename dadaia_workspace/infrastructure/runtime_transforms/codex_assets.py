@@ -124,6 +124,7 @@ def _render_codex_agent_toml(
     developer_instructions: str,
     description: str | None = None,
     claude_model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -132,8 +133,11 @@ def _render_codex_agent_toml(
     - ``description`` — basic string when available
     - ``model`` — basic string
     - ``sandbox_mode`` — conservative role boundary
-    - ``model_reasoning_effort`` — explicit reasoning profile (derived from the
-      registry tier of *claude_model* via the per-runtime tier view)
+    - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
+      when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
+      v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
+      via the per-runtime tier view (legacy path — plugin bodies/stubs without a
+      resolved policy)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
     The function avoids external TOML serialiser dependencies; it builds the
@@ -154,7 +158,8 @@ def _render_codex_agent_toml(
     if description:
         lines.append(f"description = {_toml_escape(description)}\n")
     sandbox_mode = "read-only" if name in _CODEX_READ_ONLY_AGENTS else "workspace-write"
-    reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
+    if reasoning_effort is None:
+        reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
     lines.extend(
         [
             f"model = {_toml_escape(model)}\n",

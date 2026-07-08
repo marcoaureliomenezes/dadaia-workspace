@@ -138,7 +138,22 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   Done when: `model`/`effort` stay allowlisted; no unknown-field warning regression; the
   legacy `tier:` fallback untouched.
 
-- [-] **T-65-08 — Render-at-install, both harnesses (FR5, D-3, D-6)** — owner: software-engineer
+- [x] **T-65-08 — Render-at-install, both harnesses (FR5, D-3, D-6)** — owner: software-engineer
+  Completion note: RED captured — `tests/unit/infrastructure/test_render_at_install.py`
+  collection ImportError (seam absent) + 3 integration REDs (balanced lockstep,
+  overlay lockstep + byte-stable [skip], invalid-overlay loud fail-before-write).
+  Implemented: `render_claude_agent` D-6 seam (model: then effort: as last
+  frontmatter lines; strips authored model/effort; effort OMITTED when unresolved —
+  F-6); `install_claude_agents` renders core agents via `write_generated` (F-5:
+  --force re-renders — asserted); codex projection consumes the SAME resolved config
+  via `resolve_codex_agent_model` (D-3 clamp; F-3 fail-closed `PublicAssetError` for
+  a core agent with neither staged nor resolved model — RED unit tests on both
+  `install_codex_agents` and `_codex_toml_from_md`); overlay loaded ONCE per install
+  run; pack agents render override>pack-default across install/plugin-install/
+  uninstall; `test_plugin_content` restored to sonnet-5. Known interim RED handed to
+  T-65-09: doctor still raw-compares `claude:agents/*` (2 integration doctor-surface
+  failures + doctor goldens) — closed by the T-65-09 render-compare. mypy --strict +
+  ruff + lint-imports (9 kept / 0 broken) green.
   Write set: `dadaia_workspace/infrastructure/install_helpers.py`,
   `dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py`,
   `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/container.py`,
