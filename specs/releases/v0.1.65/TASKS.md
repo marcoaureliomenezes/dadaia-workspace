@@ -295,7 +295,22 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   verbatim; `_CSP_SCRIPT_HASH_*` recomputed if any inline script changed; existing tabs
   visually unaffected.
 
-- [-] **T-65-13 — Contract-test rework (FR9, AC-7)** — owner: software-engineer
+- [x] **T-65-13 — Contract-test rework (FR9, AC-7)** — owner: software-engineer
+  Completion note: RED = the 2 declared RED-window failures
+  (`test_core_agents_carry_numeric_tier_and_pinned_model_effort`,
+  `test_plugin_agents_carry_tier3_sonnet_plugin_model`) captured failing on the old
+  per-file pins before the rework. Reworked to FR9 pins (a)–(g): 3-template FR2
+  table verbatim (`_EXPECTED_TEMPLATES`), balanced single default,
+  never-Fable-on-security across all templates, registry tiers
+  (fable-5→deep, opus-4-8→dispatch, sonnet-5→plugin), staged core bodies
+  model-/effort-less with numeric mandatory `dispatch_band`, plugin bodies
+  `dispatch_band: 3` + `claude-sonnet-5`, 9/3 roster counts. Backlog-anchored test
+  NAMES preserved (both v0.1.60/64 names kept; no backlog anchor pins a function
+  name — grep verified). AC-7 mutation-sanity verified once and reverted:
+  (1) resolver precedence flip (override branch disabled) → 5 unit failures incl.
+  the AC-3 merge test; (2) one-entry `balanced` mutation (qa-engineer high→medium)
+  → `test_builtin_templates_pin_the_fr2_table_verbatim` FAILS. 8/8 green after;
+  mypy --strict + ruff clean.
   Write set: `tests/contract/test_agent_tier_taxonomy.py`.
   Precondition: T-65-02, T-65-06.
   Done when: pins (a)–(g) of FR9 (template contents verbatim, balanced default,
