@@ -17,7 +17,10 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 1 — Foundation (core + store) — owner: software-engineer
 
-- [-] **T-65-01 — `claude-sonnet-5` registry entry (FR6, D-2)**
+- [x] **T-65-01 — `claude-sonnet-5` registry entry (FR6, D-2)**
+  Completion note: RED `test_sonnet_5_entry_present_with_expected_mapping_tier_and_pricing`
+  (+ mapping/pricing derived-view REDs) captured failing before the registry edit; all
+  registry-consuming suites green after.
   Write set: `dadaia_workspace/core/model_registry.py`,
   `tests/unit/core/test_model_registry.py`,
   `tests/unit/infrastructure/runtime_transforms/test_model_mapping.py`,

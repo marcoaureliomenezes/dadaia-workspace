@@ -253,6 +253,14 @@ class TestRegistryDerivedView:
         for claude_id, rows in PRICING_TABLE.items():
             assert set(rows) == set(index[claude_id].pricing)
 
+    def test_sonnet_5_priced_via_derived_view(self) -> None:
+        """FR6/D-2 (v0.1.65): sonnet-5 costs at the sonnet cost class from 2026-07-01."""
+        usage = {"input_tokens": 1_000_000, "output_tokens": 1_000_000}
+        # 3.00 + 15.00 = $18.00 = 18_000_000 micro-USD.
+        assert compute_cost(usage, "claude-sonnet-5", date(2026, 7, 1)) == 18_000_000
+        # Before the effective date there is no applicable row.
+        assert compute_cost(usage, "claude-sonnet-5", date(2026, 6, 30)) is None
+
     def test_fable_5_priced_via_derived_view(self) -> None:
         usage = {"input_tokens": 1_000_000, "output_tokens": 1_000_000}
         # 10.00 + 50.00 = $60.00 = 60_000_000 micro-USD.

@@ -129,6 +129,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         tier="plugin",
     ),
     ModelEntry(
+        # v0.1.65 FR6/D-2: sonnet-5 shares sonnet-4-6's cost class and codex
+        # mapping. ``tier="plugin"`` is a FORCED cost-axis label (decoupled from
+        # dispatch-band/agent behavior — D-2 addendum, F-4); any other tier
+        # violates the _codex_id_for_tier / codex_tier_views invariants. The
+        # 'plugin' tier-NAME mismatch is a tracked backlog return.
+        claude_id="claude-sonnet-5",
+        codex_id="gpt-5.3-codex",
+        pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2026, 7, 1)),),
+        tier="plugin",
+    ),
+    ModelEntry(
         # Haiku drift resolved: canonical id is haiku-4-5; the historical
         # haiku-tier pricing (was keyed under the dropped ``claude-haiku-3-5``)
         # is preserved here so past telemetry costed at the haiku tier resolves.

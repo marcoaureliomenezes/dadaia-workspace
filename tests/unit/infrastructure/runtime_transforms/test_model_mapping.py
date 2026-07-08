@@ -41,6 +41,11 @@ def test_fable_5_maps_to_gpt55() -> None:
     assert map_model("claude-fable-5") == "gpt-5.5"
 
 
+def test_sonnet_5_maps_to_gpt53_codex() -> None:
+    """FR6/D-2 (v0.1.65): sonnet-5 shares sonnet-4-6's codex mapping."""
+    assert map_model("claude-sonnet-5") == "gpt-5.3-codex"
+
+
 def test_unknown_identifier_raises_value_error() -> None:
     unknown = "claude-unknown-9-9"
     with pytest.raises(ValueError) as exc_info:

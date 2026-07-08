@@ -208,6 +208,24 @@ def test_codex_tier_views_raises_when_tier_maps_to_multiple_ids() -> None:
         mr.REGISTRY = original  # type: ignore[misc]
 
 
+def test_sonnet_5_entry_present_with_expected_mapping_tier_and_pricing() -> None:
+    """FR6/D-2 (v0.1.65): claude-sonnet-5 → gpt-5.3-codex, tier 'plugin' (forced
+    cost-axis label, sonnet cost class), pricing 3.00/15.00/3.75/0.30 from 2026-07-01."""
+    index = registry_by_claude_id()
+    assert "claude-sonnet-5" in index
+    sonnet5 = index["claude-sonnet-5"]
+    assert sonnet5.codex_id == "gpt-5.3-codex"
+    assert sonnet5.tier == "plugin"
+    current = current_pricing(sonnet5)
+    assert (
+        current.input_per_mtok,
+        current.output_per_mtok,
+        current.cache_creation_per_mtok,
+        current.cache_read_per_mtok,
+        current.effective_from,
+    ) == (3.00, 15.00, 3.75, 0.30, date(2026, 7, 1))
+
+
 def test_fable_5_entry_present_with_expected_pricing() -> None:
     index = registry_by_claude_id()
     assert "claude-fable-5" in index
