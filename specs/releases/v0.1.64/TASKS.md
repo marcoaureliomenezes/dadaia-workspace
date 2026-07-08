@@ -187,7 +187,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
     recorded for T-64-31: `tests/contract/test_agent_tier_taxonomy.py` = 2 failed / 2 passed (contract
     still reads `tier`; core + plugin band asserts get None) — expected RED, fix owned by T-64-31.
 
-- [ ] T-64-31 Parser/model/renderer/tests rename (tolerate-then-strip) + deliberate golden regens. Owner:
+- [x] T-64-31 Parser/model/renderer/tests rename (tolerate-then-strip) + deliberate golden regens. Owner:
   software-engineer. Write set: EDIT `dadaia_workspace/features/agents/reader.py`,
   `dadaia_workspace/features/agents/__init__.py`, `dadaia_workspace/core/models/agent.py`,
   `dadaia_workspace/features/panel/views/api_agents.py`, `tests/contract/test_agent_tier_taxonomy.py`,
@@ -208,6 +208,37 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   - Preconditions: T-64-30 done. Done: AC-6 full (RED-first shown: pre-change contract test reads `tier`).
   - AC-9 sabotage (e) reader rejects legacy `tier:` ⇒ fallback test FAILS → revert.
   - Fate ledger — every EDIT + every REGEN-golden with its diff transcript. Commit `feat(T-64-31): ...`.
+  - Evidence (2026-07-07): Fate ledger — 10 EDITs: `dadaia_workspace/features/agents/reader.py` (allowlist
+    carries BOTH `dispatch_band` + legacy `tier`; prefer `dispatch_band`, SILENT legacy fallback — no new
+    warning; missing-both default-3 warning renamed to name `dispatch_band`; `MissingDispatchBandError` +
+    alias `MissingTierError = MissingDispatchBandError`), `features/agents/__init__.py` (re-exports both),
+    `core/models/agent.py` (`AgentDTO.tier` → `dispatch_band`), `features/panel/views/api_agents.py`
+    (renders `"dispatch_band"`), `tests/contract/test_agent_tier_taxonomy.py` (assertions read
+    `dispatch_band`; `_CORE_MODEL_EFFORT` + `_MODEL_TIER` maps + roster counts BYTE-UNCHANGED; fn names
+    kept — backlog BL-SCHEMA anchors pin them), `tests/unit/features/agents/test_reader.py` (band tests
+    renamed + NEW AC-6 fallback test `test_legacy_tier_only_body_resolves_band_silently`: legacy-only body
+    → band resolved, stderr EMPTY; `dispatch_band` beats stale `tier`; alias-identity assert),
+    `tests/unit/features/panel/test_api_agents.py`, `tests/unit/features/panel/test_api_golden.py`,
+    `tests/unit/infrastructure/test_install_target_goldens.py`,
+    `tests/unit/infrastructure/test_plugin_content.py` (fixtures/asserts → `dispatch_band`). RED-first
+    (AC-6 full): pre-change baseline captured — 2 contract FAILED + `test_plugin_content` AC-6 FAILED +
+    `test_reader` topology FAILED (T-64-30 body rename) → all GREEN post-change. 2 REGEN-goldens (AC-7,
+    via the W1 `assert_golden` mechanism under `UPDATE_API_GOLDEN` / `UPDATE_INSTALL_GOLDENS`):
+    `tests/unit/features/panel/_golden/api_golden_v0155.json` — multiset diff: removed {tier: 1}, added
+    {dispatch_band: 1}; `tests/unit/infrastructure/_golden/panel_runtime_validation_v0158.json` —
+    removed {tier: 4}, added {dispatch_band: 4}; BOTH verified byte-equal to old-bytes-with-token-rename
+    (zero other delta, zero removals). VERIFIED (not assumed) no-regen:
+    `install_target_resolution_v0158.json` + `doctor_all_four_v0158.json` byte-unchanged under the regen
+    env (0 `tier` tokens in either). AC-9(e) sabotage: reader raised `MissingDispatchBandError` on legacy
+    `tier` ⇒ `test_legacy_tier_only_body_resolves_band_silently` FAILED (captured) → reverted. Stale-ref
+    grep (`\.tier\b`/textual, dadaia_workspace/ + tests/): surviving hits are ONLY the registry Tier
+    model-cost axis (`core/model_registry.py`, `runtime_transforms/codex_assets.py:118`,
+    `infrastructure/codex_runtime.py:229`, registry-tier asserts in the contract test) + the deliberate
+    deprecation alias + the deliberate legacy-fallback window (strip tracked by
+    `dispatch-band-legacy-fallback-removal`). Gates: `ruff format --check` exit 0 (829 files),
+    `ruff check --no-cache` exit 0, `mypy --strict dadaia_workspace/` exit 0 (313 files),
+    `lint-imports --no-cache` 9 kept / 0 broken, full unpiped `pytest` exit 0 — 4836 passed / 19 skipped
+    (the T-64-30 RED contract now GREEN).
 
 ## W4 — gates + projection ship
 

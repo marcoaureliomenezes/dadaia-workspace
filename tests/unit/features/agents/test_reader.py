@@ -687,94 +687,154 @@ _TIER2_AGENTS = {"product-engineer"}
 _TIER3_SAMPLE = {"software-engineer", "qa-engineer", "ai-engineer"}
 
 
-def test_all_agents_have_tier_field(
+def test_all_agents_have_dispatch_band_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Every loaded public agent must have a tier ∈ {1, 2, 3}."""
+    """Every loaded public agent must have a dispatch_band ∈ {1, 2, 3}."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
     assert len(agents) > 0, "Expected at least one public agent to be loaded"
     for agent in agents:
-        assert agent.tier in {1, 2, 3}, (
-            f"Agent {agent.id!r} has invalid tier {agent.tier!r} — must be 1, 2, or 3"
+        assert agent.dispatch_band in {1, 2, 3}, (
+            f"Agent {agent.id!r} has invalid dispatch_band {agent.dispatch_band!r} "
+            "— must be 1, 2, or 3"
         )
 
 
-def test_tier_mapping_matches_topology(
+def test_dispatch_band_mapping_matches_topology(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """PM + auditor → tier 1; product-engineer → tier 2; sample leaf agents → tier 3."""
+    """PM + auditor → band 1; product-engineer → band 2; sample leaf agents → band 3."""
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
     by_id = {a.id: a for a in agents}
 
     for aid in _TIER1_AGENTS:
         assert aid in by_id, f"Expected T1 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 1, f"Agent {aid!r} should be tier 1, got {by_id[aid].tier}"
+        assert by_id[aid].dispatch_band == 1, (
+            f"Agent {aid!r} should be band 1, got {by_id[aid].dispatch_band}"
+        )
 
     for aid in _TIER2_AGENTS:
         assert aid in by_id, f"Expected T2 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 2, f"Agent {aid!r} should be tier 2, got {by_id[aid].tier}"
+        assert by_id[aid].dispatch_band == 2, (
+            f"Agent {aid!r} should be band 2, got {by_id[aid].dispatch_band}"
+        )
 
     for aid in _TIER3_SAMPLE:
         assert aid in by_id, f"Expected T3 agent {aid!r} in public roster"
-        assert by_id[aid].tier == 3, f"Agent {aid!r} should be tier 3, got {by_id[aid].tier}"
+        assert by_id[aid].dispatch_band == 3, (
+            f"Agent {aid!r} should be band 3, got {by_id[aid].dispatch_band}"
+        )
 
 
-def test_invalid_tier_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An agent file with a present-but-invalid 'tier' value raises MissingTierError.
+def test_invalid_dispatch_band_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A present-but-invalid band value raises MissingDispatchBandError.
 
     Invalid means: non-integer (e.g. 'foo') or out-of-range (e.g. 5, 0).
     The agent is skipped (not raised) when read_canonical_agents is called.
+    The deprecated ``MissingTierError`` alias resolves to the same class
+    (v0.1.64 tolerate-then-strip window).
     """
-    from dadaia_workspace.features.agents.reader import MissingTierError, _raw_to_dto
+    from dadaia_workspace.features.agents.reader import (
+        MissingDispatchBandError,
+        MissingTierError,
+        _raw_to_dto,
+    )
 
-    # Non-integer tier → raises
-    with pytest.raises(MissingTierError, match="non-integer 'tier'"):
-        _raw_to_dto({"name": "bad-tier-agent", "description": "Bad tier.", "tier": "foo"})
+    assert MissingTierError is MissingDispatchBandError
 
-    # Out-of-range tier → raises
-    with pytest.raises(MissingTierError, match="invalid 'tier' value"):
-        _raw_to_dto({"name": "bad-tier-agent", "description": "Bad tier.", "tier": 7})
+    # Non-integer band → raises
+    with pytest.raises(MissingDispatchBandError, match="non-integer 'dispatch_band'"):
+        _raw_to_dto({"name": "bad-band-agent", "description": "Bad band.", "dispatch_band": "foo"})
 
-    # Via read_canonical_agents with invalid tier: must be skipped (not raised)
+    # Out-of-range band → raises
+    with pytest.raises(MissingDispatchBandError, match="invalid 'dispatch_band' value"):
+        _raw_to_dto({"name": "bad-band-agent", "description": "Bad band.", "dispatch_band": 7})
+
+    # Via read_canonical_agents with invalid band: must be skipped (not raised)
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     _write_agent(
         _agentic_dir(tmp_path),
-        "bad-tier-agent.md",
-        "name: bad-tier-agent\ndescription: Invalid tier.\ntier: 99\n",
-        "# BadTier\n",
+        "bad-band-agent.md",
+        "name: bad-band-agent\ndescription: Invalid band.\ndispatch_band: 99\n",
+        "# BadBand\n",
     )
     agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
-    assert "bad-tier-agent" not in names
+    assert "bad-band-agent" not in names
 
 
-def test_missing_tier_defaults_to_3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An agent file with no 'tier' frontmatter field defaults to tier=3 with a warning.
+def test_missing_dispatch_band_defaults_to_3(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An agent with neither 'dispatch_band' nor legacy 'tier' defaults to 3 with a warning.
 
-    This preserves compatibility for staged files that do not yet declare tier.
+    This preserves compatibility for staged files that do not yet declare a band;
+    the warning text names 'dispatch_band' (v0.1.64 FR5).
     """
     from dadaia_workspace.features.agents.reader import _raw_to_dto
 
-    # Direct call: missing tier → tier == 3 (no exception)
-    dto = _raw_to_dto({"name": "no-tier-agent", "description": "No tier."})
+    # Direct call: missing band → dispatch_band == 3 (no exception)
+    dto = _raw_to_dto({"name": "no-band-agent", "description": "No band."})
     assert dto is not None
-    assert dto.tier == 3
+    assert dto.dispatch_band == 3
+    captured = capsys.readouterr()
+    assert "missing the 'dispatch_band'" in captured.err
 
-    # Via read_canonical_agents: agent is present (not skipped), tier == 3
+    # Via read_canonical_agents: agent is present (not skipped), band == 3
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     _write_agent(
         _agentic_dir(tmp_path),
-        "no-tier-agent.md",
-        "name: no-tier-agent\ndescription: Missing tier.\n",
-        "# NoTier\n",
+        "no-band-agent.md",
+        "name: no-band-agent\ndescription: Missing band.\n",
+        "# NoBand\n",
     )
     agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     names = {a.id for a in agents}
-    assert "no-tier-agent" in names
-    agent = next(a for a in agents if a.id == "no-tier-agent")
-    assert agent.tier == 3
+    assert "no-band-agent" in names
+    agent = next(a for a in agents if a.id == "no-band-agent")
+    assert agent.dispatch_band == 3
+
+
+def test_legacy_tier_only_body_resolves_band_silently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-6 fallback: a legacy ``tier:``-only body resolves its band SILENTLY.
+
+    A stale consumer projection still carries ``tier:`` until re-install; the reader
+    must resolve the band from it with NO warning (no warn-spam) and NO error
+    (v0.1.64 FR5 tolerate-then-strip). ``dispatch_band:`` wins when both are present.
+    """
+    from dadaia_workspace.features.agents.reader import _raw_to_dto
+
+    # Direct call: legacy tier only → band resolved, silent.
+    dto = _raw_to_dto({"name": "legacy-agent", "description": "Legacy tier.", "tier": 2})
+    assert dto is not None
+    assert dto.dispatch_band == 2
+    captured = capsys.readouterr()
+    assert captured.err == "", f"legacy tier fallback must be silent, got: {captured.err!r}"
+
+    # Preference: dispatch_band beats a stale legacy tier when both are present.
+    dto2 = _raw_to_dto(
+        {"name": "both-agent", "description": "Both keys.", "dispatch_band": 1, "tier": 3}
+    )
+    assert dto2 is not None
+    assert dto2.dispatch_band == 1
+
+    # Via read_canonical_agents on a legacy file: present, band resolved, silent.
+    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+    _write_agent(
+        _agentic_dir(tmp_path),
+        "legacy-agent.md",
+        "name: legacy-agent\ndescription: Legacy tier.\ntier: 2\n",
+        "# Legacy\n",
+    )
+    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
+    agent = next(a for a in agents if a.id == "legacy-agent")
+    assert agent.dispatch_band == 2
+    captured = capsys.readouterr()
+    assert "WARNING" not in captured.err
 
 
 def test_get_prompt_unreadable_file_raises_not_found(
@@ -837,7 +897,7 @@ def test_non_plugin_agent_defaults_plugin_false(
         "software-engineer.md",
         (
             "name: software-engineer\ndescription: Implementer.\n"
-            "tier: 3\nmodel: claude-opus-4-8\ngate_role: implementer\n"
+            "dispatch_band: 3\nmodel: claude-opus-4-8\ngate_role: implementer\n"
         ),
         "# se\n",
     )
@@ -847,10 +907,10 @@ def test_non_plugin_agent_defaults_plugin_false(
     assert dto.gate_role == "implementer"
 
 
-def test_plugin_stub_missing_tier_does_not_warn(
+def test_plugin_stub_missing_dispatch_band_does_not_warn(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Plugin stubs omit ``tier`` by design — no missing-tier stderr warning."""
+    """Plugin stubs omit ``dispatch_band`` by design — no missing-band stderr warning."""
     monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
     _write_agent(
         _agentic_dir(tmp_path),
@@ -860,4 +920,4 @@ def test_plugin_stub_missing_tier_does_not_warn(
     )
     read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
     captured = capsys.readouterr()
-    assert "missing the 'tier'" not in captured.err
+    assert "missing the 'dispatch_band'" not in captured.err

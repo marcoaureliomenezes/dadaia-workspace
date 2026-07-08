@@ -132,13 +132,13 @@ def _make_dto(
     tools: list[str] | None = None,
     model: str = "claude-sonnet-4-6",
     max_turns: int | None = 60,
-    tier: int = 3,
+    dispatch_band: int = 3,
 ) -> AgentDTO:
     return AgentDTO(
         id=agent_id,
         name=name or agent_id,
         description=description,
-        tier=tier,
+        dispatch_band=dispatch_band,
         skills=skills or [],
         tools=tools or [],
         model=model,
@@ -190,7 +190,7 @@ class TestResponseShape:
             "agent_id",
             "display_name",
             "description",
-            "tier",
+            "dispatch_band",
             "status",
             "skills",
             "tools",
@@ -348,20 +348,21 @@ class TestWindowValidation:
 class TestTierFieldInResponse:
     """Tier integer is passed through by /api/agents responses."""
 
-    def test_tier_value_in_valid_set(self) -> None:
-        """Every agent's 'tier' must be an integer in {1, 2, 3}."""
+    def test_dispatch_band_value_in_valid_set(self) -> None:
+        """Every agent's 'dispatch_band' must be an integer in {1, 2, 3}."""
         agents = [
-            _make_dto(agent_id="tier-one", tier=1),
-            _make_dto(agent_id="tier-two", tier=2),
-            _make_dto(agent_id="tier-three", tier=3),
+            _make_dto(agent_id="tier-one", dispatch_band=1),
+            _make_dto(agent_id="tier-two", dispatch_band=2),
+            _make_dto(agent_id="tier-three", dispatch_band=3),
         ]
         summaries = [_make_agent_summary(agent_id=agent.id) for agent in agents]
         svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService(summaries))
         _, _, data = _api_data(svc)
 
         for card in data["agents"]:
-            assert card["tier"] in {1, 2, 3}, (
-                f"Agent {card.get('agent_id')!r} has invalid tier {card.get('tier')!r}"
+            assert card["dispatch_band"] in {1, 2, 3}, (
+                f"Agent {card.get('agent_id')!r} has invalid dispatch_band "
+                f"{card.get('dispatch_band')!r}"
             )
 
 
@@ -389,9 +390,9 @@ def _make_agent_summary_with_provider(
 
 def _build_mixed_runtime_service() -> PanelService:
     agents = [
-        _make_dto(agent_id="agent-claude", tier=3),
-        _make_dto(agent_id="agent-codex", tier=3),
-        _make_dto(agent_id="agent-both", tier=3),
+        _make_dto(agent_id="agent-claude", dispatch_band=3),
+        _make_dto(agent_id="agent-codex", dispatch_band=3),
+        _make_dto(agent_id="agent-both", dispatch_band=3),
     ]
     summaries = [
         _make_agent_summary_with_provider("agent-claude", ["claude"]),
@@ -432,7 +433,7 @@ class TestRuntimeFilter:
         runtime: str,
         expected_present: bool,
     ) -> None:
-        agents = [_make_dto(agent_id="ghost-agent", tier=3)]
+        agents = [_make_dto(agent_id="ghost-agent", dispatch_band=3)]
         tel = FakeTelemetryService(agent_summaries=[])
         svc = _make_service(agents=agents, telemetry_stub=tel)
         _, _, data = _api_data(svc, qs={"runtime": [runtime]})
@@ -501,7 +502,7 @@ def test_plugin_stubs_excluded_from_roster() -> None:
             id="design-specialist",
             name="design-specialist",
             description="[PLUGIN] stub.",
-            tier=3,
+            dispatch_band=3,
             plugin=True,
         ),
     ]
@@ -565,7 +566,7 @@ def test_model_inherited_flag_when_no_model_frontmatter() -> None:
             id="no-model-agent",
             name="no-model-agent",
             description="No model frontmatter.",
-            tier=3,
+            dispatch_band=3,
             model=None,
         )
     ]

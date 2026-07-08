@@ -141,7 +141,7 @@ def _canonical_agents() -> list[AgentDTO]:
             id=agent_id,
             name=agent_id,
             description=f"{agent_id} agent.",
-            tier=3,
+            dispatch_band=3,
             skills=[],
             tools=["Read", "Write"],
             model="claude-opus-4-8",

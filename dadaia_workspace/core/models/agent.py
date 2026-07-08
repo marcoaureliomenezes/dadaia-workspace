@@ -27,7 +27,7 @@ class AgentDTO:
     id: str
     name: str
     description: str
-    tier: int = 0  # 1 = orchestrator, 2 = curator, 3 = leaf specialist
+    dispatch_band: int = 0  # 1 = orchestrator, 2 = curator, 3 = leaf specialist
     skills: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     model: str | None = None
