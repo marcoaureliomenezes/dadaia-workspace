@@ -67,7 +67,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 2 — Bug fixes (parallel with Wave 1 — disjoint write sets)
 
-- [ ] **T-65-04 — backlog doctor YAML parse misdiagnosis (FR10)** — owner: software-engineer
+- [-] **T-65-04 — backlog doctor YAML parse misdiagnosis (FR10)** — owner: software-engineer
   Write set: `dadaia_workspace/features/backlog/preview.py`,
   `dadaia_workspace/features/backlog/doctor.py`,
   `tests/unit/features/backlog/` (loader + doctor tests).
