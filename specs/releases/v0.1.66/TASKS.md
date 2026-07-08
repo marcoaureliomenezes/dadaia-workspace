@@ -91,7 +91,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 
 ## Wave B — pi/codex result-contract fixes (serial: T-66-04 before T-66-05 before T-66-06 — each builds on the prior's fix being present so the executed-path tests compose correctly)
 
-### T-66-04 — FR1: pi non-zero exit reported as FAILED
+### T-66-04 — FR1: pi non-zero exit reported as FAILED `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/pi_runtime.py` (the
