@@ -61,7 +61,14 @@ export async function gotoPanel(page: Page, options?: { path?: string }): Promis
  */
 export async function activateTab(
   page: Page,
-  sectionId: 'memories' | 'servers' | 'sessions' | 'reports' | 'academy' | 'workflows'
+  sectionId:
+    | 'memories'
+    | 'servers'
+    | 'sessions'
+    | 'reports'
+    | 'academy'
+    | 'workflows'
+    | 'subagents'
 ): Promise<void> {
   const tabId = `#tab-${sectionId}`;
   await page.click(tabId);

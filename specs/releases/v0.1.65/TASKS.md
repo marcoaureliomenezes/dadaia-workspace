@@ -352,10 +352,61 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 5 — Verification tail — after all above
 
-- [-] **T-65-15 — Golden + AC re-verification sweep (AC-1..AC-10)** — owner: qa-engineer
-  Write set: `tests/**` golden files ONLY where rendered truth genuinely changed
-  (api/panel/install goldens; the 16 files matching
-  `grep -rl "claude-fable-5\|claude-opus-4-8\|claude-sonnet-4-6" tests/` at spec time).
+- [x] **T-65-15 — Golden + AC re-verification sweep (AC-1..AC-10)** — owner: qa-engineer
+  Completion note (merge-base `d2b94585`):
+  **Golden triage.** Diffed every golden touched on the branch vs merge-base:
+  `doctor_all_four_v0158.json` + `plugin_doctor_report_golden_{a,b}_v0160.json` each
+  carry exactly one added line (`[ok] stage:schemas/agent-model-policy-v1.schema.json`)
+  — genuine truth from T-65-09 (the new FR3 schema asset now stages). No other golden
+  under `tests/**/_golden/` changed on the branch; `api_golden_v0155.json`,
+  `panel_runtime_validation_v0158.json`, and the install-target goldens are
+  byte-identical to merge-base (zero-diff, confirmed) despite referencing
+  `claude-fable-5`/`claude-opus-4-8` strings — no silent re-baselining. The
+  `grep -rl "claude-fable-5\|claude-opus-4-8\|claude-sonnet-4-6" tests/` set has grown
+  to 39 files since spec time (new template/policy/e2e test files); every hit is a
+  genuine test-content reference to a registry model id, not an unexplained golden
+  churn. Frozen v0.1.50 no-steal suite: zero-diff vs merge-base (no lease/steal test
+  file touched). Fixed 1 rendered-truth regression found only by the full e2e-panel run
+  below: `tab-navigation.spec.ts` E2E-TAB-01/03/04 pinned the pre-FR8 6-tab list;
+  updated to the 7-tab truth (`Sub-agents` beside `Workflows`) + `helpers.ts`
+  `activateTab` union extended with `'subagents'` (additive) — genuine truth change
+  from T-65-12, not a re-baseline of a behavior bug.
+  **AC-by-AC evidence** (all commands run fresh this session):
+  AC-1 — `grep -rn "^model:\|^effort:" dadaia_workspace/public/agents/` → 0 hits (core
+  bodies model-agnostic).
+  AC-2 — `test_install_with_no_overlay_renders_balanced_roster_in_lockstep` (PASS).
+  AC-3 — `test_overlay_change_moves_claude_md_and_codex_toml_in_lockstep` +
+  `test_agent_model_templates.py::…AC-3…` + e2e "Per-agent override round-trips…
+  AC-3 per-field merge" (PASS ×3).
+  AC-4 — `test_api_agent_policy.py::…AC-4: unknown agent/model/effort/template +
+  Fable-on-security…` + `test_json_agent_model_policy_store.py` store-parse rejections
+  (PASS).
+  AC-5 — `test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched`
+  (PASS, all 3 directions + F-2 pin).
+  AC-6 — `agent-policy.spec.ts` (T-65-14) — 4/4 e2e journeys PASS, 20/20 stability,
+  mutation-sanity RED captured.
+  AC-7 — recorded once at T-65-13 (resolver precedence flip → 5 unit fails incl. AC-3
+  merge test; one-entry `balanced` mutation → contract test fails); re-confirmed live
+  this session via T-65-14's own mutation-sanity (Apply-PUT sabotage → 2 e2e fails).
+  AC-8 — `test_frontmatter_yaml_parse_error.py` (PASS, 4 tests).
+  AC-9 — re-ran `workflow-policy-harness-toggle.spec.ts --repeat-each=10` fresh (20
+  executions) → 20/20 PASS.
+  AC-10 — full gate battery below, all green.
+  AC-11 — out of scope for this task (T-65-16).
+  **Full gate battery** (fresh, this session, `.dadaia/.venv`-equivalent repo venv):
+  `ruff format --check .` → 842 files already formatted (0 diff). `ruff check
+  --no-cache .` → all checks passed. `mypy --strict dadaia_workspace/` (CI-canonical
+  scope) → Success, no issues found in 319 source files. `lint-imports --config
+  setup.cfg --no-cache` → 9 kept / 0 broken. `pytest -p no:cacheprovider -q` (full
+  suite, unit+contract+integration+e2e-python) → **4941 passed, 0 failed, 18 skipped**
+  (526s wall once, 410s on a clean-tree rerun after removing a stray
+  `.import_linter_cache/` this session's own earlier bare `lint-imports` run had left —
+  not a product bug, repo-hygiene self-correction). Full Playwright e2e-panel suite
+  (isolated port 5066, operator's 4999 untouched) → **57 specs, 56 passed / 1 skipped**
+  (the pre-existing LAN-IPv4-conditional skip), 0 failed.
+  Write set: `tests/e2e/panel/tab-navigation.spec.ts`,
+  `tests/e2e/panel/helpers.ts` (the only rendered-truth golden regen this task
+  required).
   Precondition: T-65-01..T-65-14 all `[x]`-eligible (implementation complete).
   Done when: each golden diff is triaged at merge-base (never re-baselined to silence a
   behavior bug); AC-1..AC-10 each verified with command + evidence recorded in the task
