@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.models.lifecycle import (
@@ -119,9 +120,20 @@ class LifecycleAgentRunner:
         *,
         runtime: AgentRuntimePort,
         state_machine: LifecycleStateMachine | None = None,
+        handoff_lookup: Callable[[str, str], str | None] | None = None,
     ) -> None:
         self._runtime = runtime
         self._state_machine = state_machine or LifecycleStateMachine()
+        # FR8 (v0.1.66, DEC-A(iii)): additive-optional lookup closing over the real
+        # ``.dadaia/handoff/<context>/`` tree (injected by ``build_lifecycle_pipeline`` /
+        # ``build_lifecycle_phase_workflow``, mirroring the ``specs_dir_resolver`` pattern in
+        # ``LifecyclePhaseWorkflow``). Given ``(context, agent)`` it returns the
+        # workspace-relative path of a matching, independently-validating handoff file, or
+        # ``None`` when none exists — REUSES the existing ``dadaia reports validate`` logic
+        # (``ReportsValidationService``) rather than forking a second validator (LOW-2). A
+        # fixture-constructed runner with no lookup injected enriches nothing (``None`` is
+        # the safe default — never fabricates a path).
+        self._handoff_lookup = handoff_lookup
 
     def evaluate_gate(
         self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
@@ -196,7 +208,17 @@ class LifecycleAgentRunner:
         if data.is_review and result.structured_output.get("verdict") != "APPROVED":
             return self._blocked(lifecycle_run, data, "agent result missing APPROVED verdict")
         if not result.artifact_refs:
-            return self._blocked(lifecycle_run, data, "agent result missing artifact evidence")
+            # FR8 (DEC-A(iii)): enrich the block's detail with a matching, independently-
+            # validating handoff file's path when one exists for this step's context/agent —
+            # observability only. This NEVER converts the block into a pass (FR2's no-op
+            # invariant is untouched: artifact_refs is still empty, the gate still BLOCKs).
+            detail: dict[str, str] = {}
+            validated_path = self._lookup_validated_handoff(lifecycle_run, data)
+            if validated_path is not None:
+                detail["validated_handoff_path"] = validated_path
+            return self._blocked(
+                lifecycle_run, data, "agent result missing artifact evidence", detail=detail
+            )
         out_of_scope = self._out_of_scope_paths(
             data.request,
             (*result.artifact_refs, *self._changed_paths(result)),
@@ -209,6 +231,21 @@ class LifecycleAgentRunner:
                 detail={"out_of_scope": ",".join(out_of_scope)},
             )
         return None
+
+    def _lookup_validated_handoff(
+        self,
+        lifecycle_run: LifecycleRun,
+        data: AgentRunnerInput,
+    ) -> str | None:
+        """Resolve a matching, independently-validating handoff path for this step (FR8).
+
+        Delegates entirely to the injected ``handoff_lookup`` callable (``None`` when not
+        wired — e.g. a fixture-constructed runner in a unit test). Never raises: a lookup
+        failure degrades to no enrichment, never to a blocked→pass conversion or a crash.
+        """
+        if self._handoff_lookup is None:
+            return None
+        return self._handoff_lookup(lifecycle_run.context, data.request.role)
 
     def _blocked(
         self,

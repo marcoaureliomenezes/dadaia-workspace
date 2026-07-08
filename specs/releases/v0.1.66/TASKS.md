@@ -224,7 +224,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   before and after; RED captures recorded.
 - **Parallelism:** none — Wave B is serial.
 
-### T-66-06 — FR8: precise upstream failure detail enrichment `[-]`
+### T-66-06 — FR8: precise upstream failure detail enrichment `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/agent_runner.py` (the
