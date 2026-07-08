@@ -249,6 +249,14 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   all` → confirming `dadaia public doctor` (`[ok] public-privacy`, exit 0) — projections (incl. `.pi/` extension +
   renamed agent frontmatter) reconciled via the pipeline only. Reviews per release-governance cadence; push rides
   the security-verdict chokepoint. Done: transcripts on this line (AC-10). Commit `chore(T-64-40): ...`.
+  - **AC-10 evidence (2026-07-07, PM shell):** unpiped pytest exit 0 — **4837 passed, 18 skipped** · ruff
+    format --check 0 · ruff check --no-cache 0 · mypy --strict 0 · lint-imports --no-cache **9 kept / 0
+    broken, ignore-cap 36** (rebase note: TASKS' "8/0" predates v0.1.61's 9th contract) · specs doctor exit 0
+    · backlog doctor clean (after the recorded `golden-platform-normalization-layer` anchor repoint —
+    T-64-11's helper deletion broke it; commit `dc3a5c8b`) · frozen v0.1.50 suite zero-diff vs main ·
+    instance re-projection `stage → install --target all → doctor` all exit 0 with `[ok] public-privacy`
+    (renamed frontmatter + the .pi/ guarded pin projected via the pipeline only). Task SHAs: W1 `5797a1de` +
+    `1ddae485`, W2 `b4d744bd` + `3ed64aac`, W3 `5c1a7f1b` + `521deb01`.
 
 ## W5 — CLOSURE (MEMORY phase)
 
