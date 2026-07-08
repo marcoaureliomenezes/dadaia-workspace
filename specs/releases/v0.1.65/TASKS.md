@@ -295,7 +295,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   verbatim; `_CSP_SCRIPT_HASH_*` recomputed if any inline script changed; existing tabs
   visually unaffected.
 
-- [ ] **T-65-13 — Contract-test rework (FR9, AC-7)** — owner: software-engineer
+- [-] **T-65-13 — Contract-test rework (FR9, AC-7)** — owner: software-engineer
   Write set: `tests/contract/test_agent_tier_taxonomy.py`.
   Precondition: T-65-02, T-65-06.
   Done when: pins (a)–(g) of FR9 (template contents verbatim, balanced default,
