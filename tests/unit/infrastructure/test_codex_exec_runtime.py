@@ -738,3 +738,30 @@ def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_ti
     )
     assert result.status is AgentRunStatus.SUCCEEDED
     assert result.summary == "call-time interception proof"
+
+
+# ---------------------------------------------------------------------------
+# T-67-08 (SPEC v0.1.67 FR3, AC3.2) — real-binary guardrail, codex mirror. See
+# test_pi_runtime.py's test_no_runner_injected_and_no_live_flag_raises_guard_error_
+# instead_of_real_binary for the full rationale. PERMANENT regression test.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.xfail(
+    strict=True, reason="no guard yet — would spawn/hang on the real binary (T-67-08 step 1, RED)"
+)
+def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_binary(
+    tmp_path: Path,
+) -> None:
+    """AC3.2: constructing `CodexExecAdapter` with no `runner=` and calling `.run()`
+    with none of the 4 live-opt-in flags set must raise the suite-wide guard's
+    `RuntimeError` — never silently spawn/hang on the real `codex` binary.
+
+    Safety (F6): `timeout_seconds=1` bounds any accidental real-binary spawn to a fast,
+    caught `TimeoutExpired` rather than a hanging live call — this body never lets a
+    real subprocess run to completion, even before the guard exists.
+    """
+    adapter = CodexExecAdapter(CodexExecConfig(cwd=tmp_path, timeout_seconds=1), environ={})
+
+    with pytest.raises(RuntimeError, match="real pi/codex binary invocation attempted"):
+        adapter.run(_request())

@@ -853,3 +853,41 @@ def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_ti
     )
     assert result.status is AgentRunStatus.SUCCEEDED
     assert result.summary == "call-time interception proof"
+
+
+# ---------------------------------------------------------------------------
+# T-67-08 (SPEC v0.1.67 FR3, AC3.1) — real-binary guardrail: fails loud instead of
+# silently spawning/hanging on the real `pi` binary when no runner= is injected and
+# no live-opt-in flag is set. This is a PERMANENT regression test pinning the
+# suite-wide autouse guard fixture in tests/conftest.py — kept after this release,
+# not deleted once exercised (per SPEC's TDD mandate step 4).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.xfail(
+    strict=True, reason="no guard yet — would spawn/hang on the real binary (T-67-08 step 1, RED)"
+)
+def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_binary(
+    tmp_path: Path,
+) -> None:
+    """AC3.1: constructing `PiHeadlessAdapter` with no `runner=` and calling `.run()`
+    with none of the 4 live-opt-in flags set must raise the suite-wide guard's
+    `RuntimeError` — never silently spawn/hang on the real `pi` binary.
+
+    The guard fixture itself lives in `tests/conftest.py` (autouse=True) and patches
+    the module-level `pi_runtime.subprocess.run` to a raising sentinel unless one of
+    `DADAIA_E2E_REAL_WORKER`/`DADAIA_PI_LIVE`/`DADAIA_CODEX_LIVE`/`DADAIA_CLAUDE_LIVE`
+    is `"1"`. This test intentionally does NOT set any of those flags — the ambient
+    test environment's `_scrub_entry_signal_env`/lack of live opt-in is the precondition.
+
+    Safety (F6): before the guard exists, this body must NEVER run a real binary to
+    completion. `timeout_seconds=1` bounds any accidental real-binary spawn to a fast,
+    caught `TimeoutExpired` (adapter.run() maps it to a FAILED result, not a raised
+    RuntimeError) rather than a multi-second/hanging live call — the `xfail(strict=True)`
+    marker records the RED expectation declaratively without ever letting a real
+    subprocess run to completion.
+    """
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path, timeout_seconds=1))
+
+    with pytest.raises(RuntimeError, match="real pi/codex binary invocation attempted"):
+        adapter.run(_request())
