@@ -352,7 +352,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 5 — Verification tail — after all above
 
-- [ ] **T-65-15 — Golden + AC re-verification sweep (AC-1..AC-10)** — owner: qa-engineer
+- [-] **T-65-15 — Golden + AC re-verification sweep (AC-1..AC-10)** — owner: qa-engineer
   Write set: `tests/**` golden files ONLY where rendered truth genuinely changed
   (api/panel/install goldens; the 16 files matching
   `grep -rl "claude-fable-5\|claude-opus-4-8\|claude-sonnet-4-6" tests/` at spec time).
