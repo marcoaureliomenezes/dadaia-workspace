@@ -222,7 +222,18 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 4 — Panel Sub-agents tab — after T-65-08
 
-- [-] **T-65-10 — Feature service + wiring (FR8)** — owner: software-engineer
+- [x] **T-65-10 — Feature service + wiring (FR8)** — owner: software-engineer
+  Completion note: RED captured as collection failure (ModuleNotFoundError) of
+  `tests/unit/features/agents/test_model_policy.py` before the module existed; 7 tests
+  green after. `AgentModelPolicyService` (get_policy/{exists,policy,resolved},
+  resolved_roster source-tagged override|template|default|pack via the FR4 resolver,
+  templates_payload, validate=store.parse, apply = validate → save → injected
+  re-render → summary + G-2 per-harness instructions; invalid apply never saves nor
+  re-renders). Store port declared in the feature module (Protocol);
+  `container.build_agent_model_policy_service` wires the concrete store (plugin agent
+  names from the installed-pack ledger), pack-defaults provider, and the agents-only
+  `install(target="all", only="agents")` re-render. mypy --strict, ruff,
+  lint-imports (9 kept / 0 broken) green in-wave.
   Write set: `dadaia_workspace/features/agents/model_policy.py` (new),
   `dadaia_workspace/container.py`, `tests/unit/features/agents/test_model_policy.py` (new).
   Precondition: T-65-03, T-65-08.
