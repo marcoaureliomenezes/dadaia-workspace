@@ -1,6 +1,7 @@
 ---
 name: golden-platform-normalization-layer
-status: candidate
+status: delivered
+delivered_in: v0.1.64
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.58 closure backlog return (three-round golden CI saga — security reviewer meta-observation)

@@ -17,7 +17,7 @@ tags:
 - dispatch
 token_estimate: 1700
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.64
 ---
 
 ## Purpose
@@ -82,25 +82,30 @@ workers.
 `frontend-design`); `devops-engineer` (plugin `devops`). They ship as behavior-less stubs and
 carry real behavior **once their pack is installed** for the workspace via `dadaia plugin
 install <pack>` ([[plugin-packs]]): the pack overwrites the stub with a real agent body on the
-registry `plugin`/sonnet tier (`model: claude-sonnet-4-6`, numeric `tier: 3`). Until installed
-in a given workspace, plugin-domain work routes to the operator.
+registry `plugin`/sonnet tier (`model: claude-sonnet-4-6`, numeric `dispatch_band: 3`). Until
+installed in a given workspace, plugin-domain work routes to the operator.
 
 ### Two independent "tier" axes (do not conflate)
 
-An agent frontmatter carries **two** unrelated `tier`-named concepts:
+An agent frontmatter carries **two** unrelated concepts once both named "tier"
+(disambiguated at source in v0.1.64):
 
-- **Numeric `tier: 1/2/3` (Layer-1 dispatch band)** — a coordination/priority band (1 =
-  dispatchers, 2 = curator, 3 = leaf workers; the 3 plugin agents are `tier: 3`).
+- **Numeric `dispatch_band: 1/2/3` (Layer-1 dispatch band)** — a coordination/priority band
+  (1 = dispatchers, 2 = curator, 3 = leaf workers; the 3 plugin agents are
+  `dispatch_band: 3`). Renamed from the legacy `tier:` key, which the reader
+  (`features/agents/reader.py`) still tolerates as a **silent** fallback during the strip
+  window (a stale consumer projection must not warn-spam) — strip tracked by
+  `dispatch-band-legacy-fallback-removal`.
 - **Registry `Tier` (model-cost class)** — the `deep`/`dispatch`/`fast`/`plugin` literal in
   `core/model_registry.py`, resolved from the frontmatter `model:` (since the PR #115 retier,
   ratified v0.1.61: 5 core agents resolve to `deep`/fable-5 with per-agent `effort:` and 4 to
-  `dispatch`/opus; the 3 plugin agents to `plugin`/sonnet). See [[tech-stack]] "Model
-  assignments".
+  `dispatch`/opus; the 3 plugin agents to `plugin`/sonnet). This axis keeps the name `Tier`.
+  See [[tech-stack]] "Model assignments".
 
 The mandatory contract test `tests/contract/test_agent_tier_taxonomy.py` machine-enforces both
-axes (every non-plugin core agent carries a numeric `tier` + a registry-known `model`; the 3
-plugin agents carry `tier: 3` + `model: claude-sonnet-4-6`); the eventual source-level rename
-(`tier:` → `dispatch_band:`) is tracked as the `tier-taxonomy-rename` backlog return.
+axes on the `dispatch_band` key (every non-plugin core agent carries a numeric `dispatch_band`
++ a registry-known `model`; the 3 plugin agents carry `dispatch_band: 3` +
+`model: claude-sonnet-4-6`), with the pinned model/effort map unchanged by the rename.
 
 ### Dispatcher purity (constitution §9)
 

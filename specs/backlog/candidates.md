@@ -30,13 +30,25 @@ returned **no** items. **v0.1.63 (plugin platform completion, merged `457e4e10`,
 2026-07-07) consumed `plugin-uninstall` + `plugin-pack-content-libraries`** (both
 `status: delivered`, removed from this index per removal-on-release; both anchors survive
 → archived at CLOSURE to `specs/_archive/v0.1.63/consumed-backlog/`); it also returned
-**no** items — the plugin platform is complete for the 2-pack surface.
+**no** items — the plugin platform is complete for the 2-pack surface. **v0.1.64 (platform
+ergonomics & tiering, merged `d8bcdff7`, PR #122, 2026-07-07 — LAST of the fixed four-release
+queue) consumed `golden-platform-normalization-layer` + `workflow-spawn-entry-harness-autodefault`
++ `tier-taxonomy-rename`** (all three `status: delivered`, removed from this index per
+removal-on-release; anchors survive — the golden-platform anchor deliberately repointed to its
+consolidated home `tests/helpers/golden_platform.py#norm_path_line` at `dc3a5c8b` — → archived
+at CLOSURE to `specs/_archive/v0.1.64/consumed-backlog/`) **and dispositioned
+`fast-tier-persona-validation` `REJECTED — premise-dead post-2026-07-06 retier`** (PM-ratified
+per its SPEC §8; terminal file stays in `specs/backlog/` with the override path recorded,
+removed from this index); it returned one item (`dispatch-band-legacy-fallback-removal`,
+indexed below).
 
 Architecture baseline: two-layer model, Layer-1 entry harnesses `{claude, codex, pi}`,
 Layer-2 = `dadaia lifecycle` Python workflow bodies driving pi/codex workers.
 
-**Open-bug debt (outranks plain backlog at pick):** none — the last open bug
-(`bugs-append-bound-session-falls-through-to-cwd-specs`) was resolved by R2/v0.1.50.
+**Open-bug debt (outranks plain backlog at pick):** two LOW —
+`backlog-doctor-yaml-parse-misdiagnosis` + `e2e-panel-harness-toggle-ci-flake` (the latter
+filed at v0.1.62 closure). Neither was picked into the v0.1.61–64 queue; both ride the next
+pick per bug-always-solved.
 
 ---
 
@@ -74,38 +86,21 @@ grill on the picked set before SPEC.
 
 ## MEDIUM
 
-### `workflow-spawn-entry-harness-autodefault` — Workflow-spawn entry-harness auto-default *(2026-07-04)*
-Returned at v0.1.58 closure (FR6 / Ruling F). Auto-default the Layer-2 worker harness from
-the entry harness (enter codex ⇒ `--harness codex`, enter pi ⇒ `--harness pi`; explicit flag
-wins). Deferred because PI has no session env var (`core/session_env.py` carries only
-`CLAUDE_CODE_SESSION_ID` + `CODEX_SESSION_ID`) and claude is L1-only. Override: codex-only
-best-effort default now.
-
-### `golden-platform-normalization-layer` — Consolidated golden platform-normalization layer *(2026-07-04)*
-Returned at v0.1.58 closure (three-round CI saga). Consolidate the per-test golden-normalization
-helpers into ONE shared platform-invariance layer (host-state canonicalization + sorted-multiset
-report-list locks + OS-phrase canonicalization) so a byte-golden is cross-platform-stable by
-construction. Anchored at the v0.1.58 golden helpers in `test_install_target_goldens.py` + the
-v0.1.55 golden-authoring law.
-
-### `fast-tier-persona-validation` — Fast-tier persona validation (P2) *(2026-07-04)*
-Returned at v0.1.60 closure (Ruling ADR-6). v0.1.60 shipped the off-opus assignment via the 3
-plugin agents on the `plugin`/sonnet tier but deferred moving a reasoning-heavy core persona to
-the unused `fast`/haiku tier (deep/`claude-fable-5` region-locked; no live operator to validate
-equal quality). Assign one mechanical Layer-1 lane to the `fast` tier + operator-live
-equal-quality validation. Anchored at `core/model_registry.py#Tier`.
+*(none open — `workflow-spawn-entry-harness-autodefault` and
+`golden-platform-normalization-layer` were consumed by v0.1.64;
+`fast-tier-persona-validation` was dispositioned REJECTED at v0.1.64.)*
 
 ---
 
 ## LOW
 
-### `tier-taxonomy-rename` — Rename frontmatter `tier:` → `dispatch_band:` *(2026-07-04)*
-Returned at v0.1.60 closure (Ruling 17). Agent frontmatter carries two unrelated `tier`-named
-concepts (numeric dispatch band vs registry model-cost `Tier`); v0.1.60 FR6 documented +
-machine-guarded them (`test_agent_tier_taxonomy.py`) but did not rename. Rename `tier:` →
-`dispatch_band:` across all agent bodies + the parsers/renderers that read it + the contract
-test. Anchored at
-`tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_pinned_model_effort`.
+### `dispatch-band-legacy-fallback-removal` — Strip the legacy `tier:` reader fallback *(2026-07-07)*
+Returned at v0.1.64 closure (FR5/ADR-4 tolerate-then-strip; deprecation-expiry law). Remove
+the silent legacy `tier:` frontmatter fallback in `features/agents/reader.py#_raw_to_dto`,
+drop `tier` from `_ALLOWED_FIELDS`, and delete the `MissingTierError = MissingDispatchBandError`
+alias + its `__init__.py` re-export; invert the AC-6 fallback test. Eligible from
+**2026-08-01** (one consumer re-projection window). Anchored at
+`dadaia_workspace/features/agents/reader.py#_raw_to_dto`.
 
 ### `platform-seam-todo-retirement` — Retire the aged `PLATFORM.has_fcntl` TODOs *(2026-07-07)*
 Returned at v0.1.61 closure (audit A-3 deferral). Replace the in-body `sys.platform` checks in

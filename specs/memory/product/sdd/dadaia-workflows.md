@@ -2,7 +2,7 @@
 slug: dadaia-workflows
 title: dadaia-workflows
 category: product
-tldr: The 7 governed Layer-2 workflows, all operator-invocable since v0.1.56 via ~12 CLI verbs; every model step gets fragment + persona.
+tldr: The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona.
 summary: >-
   The roster and invocability truth of the dadaia-workflows: 7 workflows defined in
   the governed catalog (release_definition, implementation, backlog_definition,
@@ -19,9 +19,9 @@ tags:
 - workflows
 - lifecycle
 - layer-2
-token_estimate: 820
+token_estimate: 900
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.64
 ---
 
 ## Purpose
@@ -66,9 +66,16 @@ independent of that label: v0.1.56 closed the invocability gap for all 7.
 ## Usage flow
 
 1. An entry harness (or the operator) invokes a verb:
-   `dadaia lifecycle <verb> --release-id <id> --harness {pi|codex|fake} [--step-model <step>=<profile-id>]`
+   `dadaia lifecycle <verb> --release-id <id> [--harness {auto|pi|codex|fake}] [--step-model <step>=<profile-id>]`
    (the legacy `--model <id>:<effort>` flag was hard-removed in v0.1.57 —
    `--step-model <profile-id>` is the sole model-selection surface).
+   **`--harness` defaults to `auto` (v0.1.64):** resolved via
+   `core/session_env.entry_harness()` — `DADAIA_ENTRY_HARNESS` pin (codex|pi) >
+   `CODEX_SESSION_ID` ⇒ codex > `fake` (Claude entry / plain shells / CI). An explicit flag
+   always wins, and any real-worker auto-default prints one loud
+   `[harness] auto-default: <name> (from entry session; pass --harness to override)` line on
+   stderr — never silent; the test envelope + CI are hermetically scrubbed of the entry-signal
+   vars.
 2. The policy resolver freezes the per-step `(harness, profile, model)` snapshot before
    step 1 ([[lifecycle-foundation]] — control plane).
 3. For each model-driven step, the prompt is assembled as **persona (role directive) +

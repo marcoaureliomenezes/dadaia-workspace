@@ -10,9 +10,9 @@ tags:
 - dependencies
 - toolchain
 - constraints
-token_estimate: 2500
+token_estimate: 2600
 last_updated: '2026-07-07'
-release_origin: v0.1.63
+release_origin: v0.1.64
 ---
 
 ## Languages
@@ -56,18 +56,20 @@ Per harness (per-runtime truth in `specs/memory/product/harness/` — [[harness-
   * **Codex (OpenAI)**: Layer 1 (TUI) and Layer 2 (`CODEX_EXEC` via `codex exec`). Doctor checks D-CX-1..8. 12 TOML agents in `.codex/agents/` (9 core + 3 plugin stubs) with registry-derived tiering — tier-view mechanics, the D-CX-4 lint, and the live-verification harness are owned by [[harness-codex]]. Zero `claude-*`/Opus/Sonnet/Haiku leaks. Command policy `.codex/rules/*.rules` in `prefix_rule(...)` with venv-form paths. **Hooks run only in interactive sessions** — headless `codex exec` fires no hooks ([[harness-codex]]). Workflows in `.codex/workflows/` (reference-only). Layer-2 models: `(gpt-5.5,high)` / `(gpt-5.5,medium)`.
   * **PI (`@earendil-works/pi-coding-agent`)**: Layer 1 (entry harness) **and** Layer 2 (`PI_HEADLESS`), selectable per step via `--harness pi` / `--step-harness x=pi`. The `PiHeadlessAdapter` (`infrastructure/pi_runtime.py`) drives a PI worker via `pi --mode json` (subprocess, injectable runner, no PI client at module load). PI is an **OPTIONAL external CLI runtime installed by the operator**, invoked as an external binary — **NEVER** a locked/pinned dependency: it is not a Python dependency at all (absent from the lockfile), it is not imported in build/test, and the build stays offline-first without it. **Auth: PI runs under the operator's Codex subscription via `~/.pi/agent/auth.json`** (provider openai-codex) — no Anthropic key is required. **Layer-2 models (4):** `(gpt-5.5,high)` / `(gpt-5.5,low)` / `(gpt-5.3-codex,medium)` / **`kimi-2.7:high`** — the curated OpenRouter id via `LAYER2_EXTRA_MODEL_IDS` (`core/harness_models.py`), selectable through the built-in profile `pi-openrouter-kimi-high`; `kimi-*` ids have no pricing row in the registry (cost `None`, never fabricated). The `pi --mode json` event-stream schema is verified by the opt-in tests `DADAIA_PI_LIVE=1` / `DADAIA_E2E_REAL_WORKER=1` (`tests/integration/pi_live/`, **not** CI-gated). Live-verified build: `pi` **0.79.3**. **PI telemetry:** `features/telemetry/reader/pi.py` ingests **metadata only** from `~/.pi/agent/sessions/` (invariant T1 — no body/content; cost never faked); degrades idle on IO/parse failure.
   * **CLI versions:** `pi` 0.79.3 live-verified; the verified `codex` version has not been captured yet (do not invent).
+  * **Workflow `--harness` default = `auto` (v0.1.64):** every `dadaia lifecycle` run verb defaults `--harness` to the sentinel `auto`, resolved by `core/session_env.entry_harness()` — `DADAIA_ENTRY_HARNESS` ∈ {codex, pi} (the operator/PI-seam pin) > `CODEX_SESSION_ID` present ⇒ `codex` > `fake` (Claude entry — Layer-1-only — and plain shells/CI). An explicit `--harness` always wins; every real-worker auto-default prints one loud `[harness] auto-default: <name> (from entry session; pass --harness to override)` line on stderr (resolving `fake` prints nothing). The pytest lifecycle envelope and the GHA quality jobs are asserted free of the three entry-signal vars, so no defaulted test or CI step can spawn a real worker.
 
 
 
 ## Model assignments (9 core agents + 3 plugin agents)
 
-**Two independent "tier" axes (do not conflate).** A frontmatter carries a numeric
-`tier: 1/2/3` (a Layer-1 **dispatch band**: 1 dispatchers, 2 curator, 3 leaf workers) AND a
-`model:` that resolves to a registry **`Tier`** (`deep`/`dispatch`/`fast`/`plugin`, the
-**model-cost class**). These are unrelated concepts sharing the word "tier"; the mandatory
+**Two independent axes, disambiguated at source (v0.1.64).** A frontmatter carries a numeric
+`dispatch_band: 1/2/3` (the Layer-1 **dispatch band**: 1 dispatchers, 2 curator, 3 leaf
+workers — renamed from the legacy `tier:` key, which the reader still tolerates silently
+during the strip window tracked by `dispatch-band-legacy-fallback-removal`) AND a `model:`
+that resolves to a registry **`Tier`** (`deep`/`dispatch`/`fast`/`plugin`, the **model-cost
+class** — this axis keeps the name `Tier`). The mandatory
 `tests/contract/test_agent_tier_taxonomy.py` machine-enforces both (every non-plugin core agent
-carries a numeric `tier` + a registry-known `model`). The eventual source rename
-(`tier:` → `dispatch_band:`) is the `tier-taxonomy-rename` backlog return.
+carries a numeric `dispatch_band` + a registry-known `model`).
 
 **Core: two-model split (retier PR #115, 2026-07-06; ratified by v0.1.61's operational-change
 lane).** The 9 core agents split across two model-cost tiers. **Five agents run on
@@ -85,8 +87,10 @@ override via `DADAIA_MODEL_OVERRIDE` when the dispatcher's policy justifies it.
 **Plugin agents: off-opus by design (v0.1.60).** When a pack installs ([[plugin-packs]]), the 3
 plugin agents carry `model: claude-sonnet-4-6` (registry `Tier` = `plugin`; Codex renders
 `gpt-5.3-codex`, NOT the opus `gpt-5.5`) — the demonstrable non-opus Layer-1 assignment. The
-`fast`/haiku tier remains unassigned by any agent (the reasoning-persona downgrade is deferred
-to the `fast-tier-persona-validation` backlog return).
+`fast`/haiku tier remains **registry-defined but unassigned by design** — it prices historical
+haiku telemetry events (the `fast-tier-persona-validation` item was dispositioned REJECTED,
+premise-dead post-retier, at v0.1.64; a revival must carry the recorded operator-live
+equal-quality checkpoint AC — archived v0.1.64 SPEC §8).
 
 **Efficiency-audit staleness trigger (v0.1.60).** A `dadaia doctor` `DoctorIssue(code="EFF-1")`
 fires when `.dadaia/states/last_efficiency_audit.json`
@@ -128,10 +132,11 @@ Plugin| Status| Scope
 `skill-creator`| Removed| Uninstalled in P1; skill authoring is `ai-engineer`'s responsibility, editing `dadaia_workspace/public/skills/` directly.
 `code-simplifier`| Removed| Uninstalled in P1; refactoring stays with `software-architect` + implementers.
 
-## Schema handoff-v1.1
+## Schema handoff-v1 family
 
 The JSON sidecar contract between agents is versioned in
-`dadaia_workspace/public/schemas/handoff-v1.schema.json`; current version **v1.1**.
+`dadaia_workspace/public/schemas/handoff-v1.schema.json`; current token **v1.2**
+(the `self_pull.refs` audit line; v1/v1.1 documents stay valid forever).
 Field-level contract, validation CLI, and emission defaults: [[agent-comms]].
 
 ## Approved dependencies
@@ -229,4 +234,4 @@ How to run, test, lint, and package:
     dadaia backlog doctor --explain         # shows how a proposed subject resolves (anchor | UNRESOLVED | AMBIGUOUS)
 
     # backlog_definition dadaia-workflow (features/lifecycle/workflows/backlog_definition.py, v0.1.26)
-    dadaia lifecycle backlog define --harness {pi|codex|fake} --model <id>   # workflow §4 ORIENTED; Python-owned gates; LAW 1/LAW 2 (claude rejected)
+    dadaia lifecycle backlog define [--harness {auto|pi|codex|fake}] [--step-model <step>=<profile-id>]   # Python-owned gates; LAW 1/LAW 2 (claude rejected); --harness defaults to auto (entry-session resolution, v0.1.64)
