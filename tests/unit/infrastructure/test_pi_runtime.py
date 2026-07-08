@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunStatus,
@@ -801,3 +803,53 @@ def test_pi_strict_primacy_is_pinned_by_behaviour(tmp_path: Path) -> None:
     assert classify_result_payload(both_valid, "agent-run-result-v1") is ResultMatch.STRICT
     assert classify_result_payload(structural_only, "agent-run-result-v1") is ResultMatch.STRUCTURAL
     assert classify_result_payload(not_a_result, "agent-run-result-v1") is ResultMatch.NONE
+
+
+# ---------------------------------------------------------------------------
+# T-67-01 (SPEC v0.1.67 AC1(repro), pi half) — call-time-vs-construction-time
+# runner resolution. Proves the class-definition-time default-argument defect:
+# a module-level ``monkeypatch.setattr("...pi_runtime.subprocess.run", fake)``
+# applied AFTER construction must still be honored when NO ``runner=`` kwarg was
+# passed at construction — i.e. the adapter must resolve its runner at CALL time,
+# not snapshot ``subprocess.run`` once at class-definition time.
+# ---------------------------------------------------------------------------
+
+
+def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC1(repro), AC1.1: no explicit ``runner=`` at construction; the module-level
+    ``subprocess.run`` attribute is monkeypatched to a fake AFTER construction. The
+    fake must be invoked when ``.run()`` executes.
+
+    On current code (``runner: Runner = subprocess.run`` bound at class-definition
+    time) this FAILS: the adapter's ``self._runner`` was already bound to the real
+    ``subprocess.run`` function object before this monkeypatch ever ran, so the fake
+    is never reached and the call-recorder stays empty.
+    """
+    calls: list[object] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=_message_end("call-time interception proof"), stderr=""
+        )
+
+    # Construct with NO runner= kwarg — the adapter must fall back to a live,
+    # call-time lookup of the module-level `subprocess.run` attribute.
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path))
+
+    # Patch the MODULE attribute strictly AFTER construction — this is the exact
+    # monkeypatch shape used by the (now-fixed) executed-path CLI tests.
+    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_run)
+
+    result = adapter.run(_request())
+
+    assert len(calls) == 1, (
+        "the module-level subprocess.run monkeypatch was never reached — the runner "
+        "was bound at class-definition time instead of resolved at call time"
+    )
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.summary == "call-time interception proof"

@@ -20,7 +20,7 @@ THEN implementing the fix.
 
 ## Wave A — FR1: adapter mechanism fix (DEC-A)
 
-### T-67-01 — RED: pi call-time-interception proof (FAILING on current code)
+### T-67-01 — RED: pi call-time-interception proof (FAILING on current code) `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/infrastructure/test_pi_runtime.py` (additive test only)
