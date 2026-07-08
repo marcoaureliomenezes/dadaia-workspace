@@ -138,7 +138,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   Done when: `model`/`effort` stay allowlisted; no unknown-field warning regression; the
   legacy `tier:` fallback untouched.
 
-- [ ] **T-65-08 — Render-at-install, both harnesses (FR5, D-3, D-6)** — owner: software-engineer
+- [-] **T-65-08 — Render-at-install, both harnesses (FR5, D-3, D-6)** — owner: software-engineer
   Write set: `dadaia_workspace/infrastructure/install_helpers.py`,
   `dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py`,
   `dadaia_workspace/infrastructure/public_assets.py`, `dadaia_workspace/container.py`,
