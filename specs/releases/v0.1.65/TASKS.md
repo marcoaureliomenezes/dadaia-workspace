@@ -243,7 +243,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   Done when: store + re-render injected (no features→infrastructure import;
   `lint-imports` green in-wave).
 
-- [ ] **T-65-11 — API endpoints (FR8)** — owner: software-engineer
+- [-] **T-65-11 — API endpoints (FR8)** — owner: software-engineer
   Write set: `dadaia_workspace/features/panel/views/agent_policy.py` (new),
   `dadaia_workspace/features/panel/handler.py` (routes only),
   `tests/unit/features/panel/test_api_agent_policy.py` (new).
