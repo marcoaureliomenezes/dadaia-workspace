@@ -242,7 +242,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W4 — gates + projection ship
 
-- [-] T-64-40 Full gates + instance re-projection. Owner: software-engineer (orchestrated; shell via PM/operator).
+- [x] T-64-40 Full gates + instance re-projection. Owner: software-engineer (orchestrated; shell via PM/operator).
   Checklist: `ruff format --check` + `ruff check --no-cache` + `mypy --strict` + full **unpiped** `pytest` +
   `lint-imports --no-cache` (8/0, ignore-cap unchanged) + `dadaia specs doctor` (exit 0) + `dadaia backlog doctor`
   (exit 0); v0.1.50 frozen no-steal suite **zero-diff**; `dadaia public stage` → `dadaia public install --target
@@ -260,7 +260,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W5 — CLOSURE (MEMORY phase)
 
-- [ ] T-64-50 CLOSURE.md + disposition sweep + memory truth + archive. Owner: product-engineer.
+- [x] T-64-50 CLOSURE.md + disposition sweep + memory truth + archive. Owner: product-engineer.
   Checklist: ACTIVE.md → CLOSURE (orchestrator); CLOSURE.md per skill template (Summary / Tasks+SHAs / Validations
   triples / Drifts / Memory updates / **Dispositions**: 3× `DELIVERED — v0.1.64` +
   `fast-tier-persona-validation` `REJECTED — premise-dead post-2026-07-06 retier` **after the operator
@@ -275,3 +275,23 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
   corrections); catalog regen includes all prior tldr/summary deltas. `dadaia specs doctor` exit 0;
   `git mv specs/releases/v0.1.64 specs/_archive/releases/v0.1.64` (surfaced to operator/devops).
   Preconditions: T-64-40 done + trio reviews green. Done: archive complete, ACTIVE.md advanced.
+  - **EVIDENCE (2026-07-07, product-engineer):** CLOSURE.md written (Summary / Tasks+SHAs /
+    Validations triples / 4 Drifts / Memory updates / Dispositions incl. the FR6 SPEC-§8
+    operator-checkpoint record (PM-ratified, override→DEFERRED+AC-OPCHECK documented) /
+    Backlog returns / consumed payload / Archive MOVE). Memory rebase per Ruling 64-B — all
+    three siblings' closed states read first, none reverted: `quality-assurance.md` (shared
+    golden_platform module law, 14 sites, bracket 4837/18sk), `tech-stack.md` (dispatch_band
+    two-axis wording; `--harness auto` chain; fast-tier REJECTED row; + 2 drift-recorded truth
+    fixes: handoff family token v1.2 heading/row + stale `--model` command line),
+    `agent-orchestration.md` (band-key rename + taxonomy-test pointer),
+    `dadaia-workflows.md` + `lifecycle-foundation.md` (auto default + loud echo + hermeticity),
+    `harness-pi.md` (ARCH64-2 posture: session-wide credit-affecting pin, set-only-when-unset,
+    loud echo, never telemetry-derived), `harness-codex.md` (CODEX_SESSION_ID entry signal);
+    `.heading-allowlist` += `Schema handoff-v1 family`. Dispositions: 3× `delivered`
+    (`delivered_in: v0.1.64`) + `fast-tier-persona-validation` `rejected` (reason in
+    frontmatter + body); NEW return `dispatch-band-legacy-fallback-removal` (anchor
+    `features/agents/reader.py#_raw_to_dto`, expiry 2026-08-01); candidates.md updated
+    (removal-on-release + open-bug debt line = the 2 LOW bugs).
+    `golden-normalizer-residual-consolidation` assessed NOT filed (exemptions deliberate +
+    contract-pinned). PM follow-ups: consumed_backlog.json + git mv ×4 + catalog regen +
+    doctors + ACTIVE → `release: none` / `phase: none` (queue complete).

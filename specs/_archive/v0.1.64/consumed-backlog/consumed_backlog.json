@@ -1,0 +1,38 @@
+{
+  "release": "v0.1.64",
+  "consumed": [
+    {
+      "slug": "golden-platform-normalization-layer",
+      "shipped_anchors": [
+        "tests/helpers/golden_platform.py#norm_path_line"
+      ],
+      "note": "DELIVERED \u2014 v0.1.64 (archived at CLOSURE; anchor deliberately repointed dc3a5c8b to the consolidated home \u2014 the consolidation IS the deletion of the old per-test helpers, QA-adjudicated). NEW tests/helpers/golden_platform.py: norm_path_line / norm_panel_body / canon_env_line / sort_line_lists / is_env_doctor_line / norm_stderr(wide_glyphs) / assert_golden(update_env='UPDATE_INSTALL_GOLDENS', update_env=None for never-regen sites) with the six-class leak-taxonomy docstring (host-state, iteration-order, OS-phrase, path/version, clock, Rich-width) citing the v0.1.58 three-round commits. Byte-identical adoption by all 14 duplicate sites (13 enumerated + rebase-discovered test_plugin_uninstall.py): zero bytes changed under tests/**/_golden, suite green with the regen flag unset, cross-test import killed; tests-wide grep contract test_no_local_helper_copies.py pins that no consolidated helper is re-declared (bespoke exemptions cited: test_fragment_gate_goldens.py, test_api_golden.py, specs/test_doctor_golden.py). AC-9 sabotages a/b/f captured then reverted. Ship PR #122, squash d8bcdff7.",
+      "commits": [
+        "5797a1de",
+        "1ddae485"
+      ]
+    },
+    {
+      "slug": "workflow-spawn-entry-harness-autodefault",
+      "shipped_anchors": [
+        "dadaia_workspace/core/session_env.py#harness_session_id"
+      ],
+      "note": "DELIVERED \u2014 v0.1.64 (archived at CLOSURE, anchor survives \u2014 session_env gained entry_harness() beside it). Implements the ratified AGENTS.md convention: --harness defaults to the sentinel 'auto' at all 12 lifecycle run-verb option sites, resolved by ONE shared shim via core/session_env.entry_harness() \u2014 DADAIA_ENTRY_HARNESS in {codex, pi} (operator/PI-seam pin) > CODEX_SESSION_ID => codex > None => fake (Claude entry is Layer-1-only). Explicit --harness unchanged; loud '[harness] auto-default: <name> (from entry session; pass --harness to override)' stderr line on every real-worker auto-default (fake prints nothing; --json stdout pure). Hermetic both halves (QA64-1): autouse scrub of the three entry-signal vars over the lifecycle CLI test envelope + a CI-scoped assert (GITHUB_ACTIONS-gated, skipped locally) that proved itself green on PR #122's first pass. PI seam (FR4/ADR-3, exceeding the item's sanctioned codex-only fallback): the Ring-1 extension dadaia-sdd-gate.ts exports the pin set-only-when-unset at factory load, with the ARCH64-2 posture (session-wide credit-affecting; loud echo; never telemetry-derived; pre-trust honestly fake) in the header + memory; grep-level contract test_pi_entry_signal.py. AC-3 matrix RED-first vs the literal 'fake'; AC-9 sabotages c/d captured then reverted. Ship PR #122, squash d8bcdff7.",
+      "commits": [
+        "b4d744bd",
+        "3ed64aac"
+      ]
+    },
+    {
+      "slug": "tier-taxonomy-rename",
+      "shipped_anchors": [
+        "tests/contract/test_agent_tier_taxonomy.py#test_core_agents_carry_numeric_tier_and_pinned_model_effort"
+      ],
+      "note": "DELIVERED \u2014 v0.1.64 (archived at CLOSURE, anchor survives \u2014 test function names deliberately kept for BL-SCHEMA anchoring; assertions now read dispatch_band). Source rename tier: -> dispatch_band: across the 12 agent bodies (values unchanged; 3 stubs tier-less, untouched; Ruling 64-A: LAST writer of the bodies \u2014 v61 AC-1 line-diff + v62 AC-6 12/12 handoff-v1.2/self_pull greps re-verified post-rename) + reader (prefer dispatch_band, SILENT legacy tier fallback for stale consumer projections, missing-both default-3 warning renamed, MissingDispatchBandError + MissingTierError alias, allowlist carries both keys for the window) + AgentDTO.dispatch_band + api_agents renders 'dispatch_band' (no JS consumer \u2014 read fact) + contract/reader/panel tests. Tolerate-then-strip per the v0.1.53 agent_tier precedent; strip filed as dispatch-band-legacy-fallback-removal (eligible 2026-08-01). Two deliberate golden regens via the W1 assert_golden mechanism, each multiset-diff-proven EXACTLY the token rename (api_golden_v0155: tier x1; panel_runtime_validation_v0158: tier x4; install/doctor goldens VERIFIED regen-free). Definition corrected the dossier's stale claim that the Codex projection reads numeric tier (it derives effort from the registry Tier via model: only). AC-6 RED-first; AC-9 sabotage e captured then reverted. Ship PR #122, squash d8bcdff7.",
+      "commits": [
+        "5c1a7f1b",
+        "521deb01"
+      ]
+    }
+  ]
+}

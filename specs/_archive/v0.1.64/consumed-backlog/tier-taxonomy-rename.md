@@ -1,6 +1,7 @@
 ---
 name: tier-taxonomy-rename
-status: candidate
+status: delivered
+delivered_in: v0.1.64
 opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.60 closure (Ruling 17 — FR6 documents + machine-guards but does not rename)

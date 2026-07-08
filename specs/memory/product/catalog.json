@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-07T21:41:48Z",
+  "generated_at": "2026-07-08T01:17:35Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -196,7 +196,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 575,
+      "token_estimate": 640,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -211,7 +211,7 @@
       "title": "Harness — PI (pi-coding-agent)",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer harness: post-trust Ring-1 Layer-1 entry + PI_HEADLESS worker; auths on the operator's Codex subscription; widest Layer-2 model set.",
+      "tldr": "Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator's Codex subscription.",
       "summary": "Capability and scaffold truth for the PI harness at both agentic layers — the post-trust Ring-1 extension, the PI_HEADLESS worker transport and auth, the model set including the OpenRouter allowlist, telemetry posture, and what a PI-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-pi.md",
       "tags": [
@@ -221,7 +221,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 575,
+      "token_estimate": 720,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -535,7 +535,7 @@
       "title": "dadaia-workflows",
       "category": "product",
       "area": "sdd",
-      "tldr": "The 7 governed Layer-2 workflows, all operator-invocable since v0.1.56 via ~12 CLI verbs; every model step gets fragment + persona.",
+      "tldr": "The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona.",
       "summary": "The roster and invocability truth of the dadaia-workflows: 7 workflows defined in the governed catalog (release_definition, implementation, backlog_definition, closure, audit, research, bug_report), now ALL operator-invocable (v0.1.56), surfaced by these CLI verbs: release define, backlog define, pipeline, implement, review qa|security|code, close, audit, research, bug_report, implement-review (~12 verbs on 7 workflows — implement-review is a verb on the implementation workflow, not a new workflow). audit/research/bug_report gained container builders + CLI verbs, born resolver-governed on the shared policy seam (no second raw id:effort path). Every model-driven step prompt on every verb carries its fragment AND its persona. Engine mechanics live in lifecycle-foundation.",
       "path": "specs/memory/product/sdd/dadaia-workflows.md",
       "tags": [
@@ -544,7 +544,7 @@
         "lifecycle",
         "layer-2"
       ],
-      "token_estimate": 820,
+      "token_estimate": 900,
       "depends_on": [
         "lifecycle-foundation",
         "agent-orchestration",
@@ -571,6 +571,7 @@
       ],
       "token_estimate": 7260,
       "depends_on": [
+        "harness-pi",
         "architecture",
         "tech-stack",
         "dadaia-workflows",

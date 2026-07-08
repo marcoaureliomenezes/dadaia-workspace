@@ -47,10 +47,22 @@ tags:
 - gates
 token_estimate: 7260
 last_updated: '2026-07-07'
-release_origin: v0.1.62
+release_origin: v0.1.64
 ---
 
 CLI surface: `dadaia lifecycle status`, `preflight`, `hygiene status`, `hygiene clean`, `report`, `resume`, `slop`, `clean`, `backlog define`, `release define`, `implement`, `review qa`, `review security`, `review code`, `close`, `pipeline`, `audit`, `research`, `bug_report`, `implement-review`, `workflow policy show`, `workflow profiles list`, `workflow doctor`, `handoffs doctor`. Run verbs accept `--step-model <step>=<profile-id>` (profile ids only) + `--json`; `--show-policy` stays pipeline-only. **`--step-model <profile-id>` is the sole model-selection surface: the legacy `--model <id>:<effort>` flag and its `_warn_model_deprecated` seam were hard-removed from all 12 run verbs in v0.1.57 (deprecation-expiry — `--model` is now an unknown option, `No such option: --model`, exit 2). The pi/codex subprocess `--model <id>` arg (`pi_runtime.py`) is a different, unchanged flag.**
+**`--harness` defaults to the sentinel `auto` on all 12 run-verb option sites (v0.1.64):** ONE
+shared resolver shim maps `auto` → `core/session_env.entry_harness() or "fake"`
+(`DADAIA_ENTRY_HARNESS` ∈ {codex, pi} — the operator/PI-seam pin — > `CODEX_SESSION_ID` ⇒
+codex > `None` ⇒ fake; Claude entry maps to fake, Layer-1-only). An explicit `--harness` is
+unchanged behavior; a real-worker auto-default prints the loud
+`[harness] auto-default: <name> (from entry session; pass --harness to override)` line on
+stderr (`--json` stdout stays pure; resolving `fake` prints nothing). Hermeticity is asserted,
+not assumed: an autouse fixture scrubs the three entry-signal vars from the lifecycle CLI test
+envelope, and a CI-scoped assert (active only under `GITHUB_ACTIONS`) proves the GHA quality
+jobs' env carries none of them — no defaulted test or CI shell step can spawn a real worker.
+The PI entry signal is the dadaia-owned post-trust pin exported by the Ring-1 extension
+([[harness-pi]] — session-wide, credit-affecting, set-only-when-unset, never telemetry-derived).
 
 The engine is the **Layer-2** half of the two-layer model (see [[architecture]] for the
 full two-layer picture): a Layer-1 entry harness invokes `dadaia lifecycle`, which threads

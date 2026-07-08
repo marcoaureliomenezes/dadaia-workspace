@@ -2,7 +2,7 @@
 slug: harness-pi
 title: Harness — PI (pi-coding-agent)
 category: product
-tldr: 'Dual-layer harness: post-trust Ring-1 Layer-1 entry + PI_HEADLESS worker; auths on the operator''s Codex subscription; widest Layer-2 model set.'
+tldr: 'Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator''s Codex subscription.'
 summary: Capability and scaffold truth for the PI harness at both agentic layers — the
   post-trust Ring-1 extension, the PI_HEADLESS worker transport and auth, the model
   set including the OpenRouter allowlist, telemetry posture, and what a PI-only
@@ -13,9 +13,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 575
+token_estimate: 720
 last_updated: '2026-07-07'
-release_origin: v0.1.61
+release_origin: v0.1.64
 ---
 
 ## Purpose
@@ -27,7 +27,7 @@ projected `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` handler blocks write/e
 before disk by delegating to the same Python `pre_gate` the other harnesses use.
 Layer 2: the `PI_HEADLESS` worker — `pi --mode json` driven one-shot per step, Ring-2
 bounded. In a PI entry session, dadaia-workflows default the Layer-2 harness to `pi`
-unless the operator overrides to `codex`.
+unless the operator overrides — mechanically, via the post-trust entry-signal pin below.
 
 ## Usage flow
 
@@ -36,7 +36,18 @@ unless the operator overrides to `codex`.
 2. Layer-1 governance: `AGENTS.md` up-tree + post-trust extension gate + git
    chokepoints. **Trust boundary:** `.pi/**` is post-trust executable TypeScript — a
    deliberate privilege grant, lib-originated and manifest-tracked, never hand-edited.
-3. As a Layer-2 worker: the engine invokes `pi --mode json --model <id>` with the
+3. **Entry-signal seam (post-trust):** at factory load the Ring-1 extension
+   (`dadaia-sdd-gate.ts`) sets `process.env.DADAIA_ENTRY_HARNESS = "pi"` **only when
+   unset**, so PI tool subprocesses (bash → `dadaia lifecycle …`) auto-default
+   `--harness` to `pi`. **Security posture: the pin is session-wide and
+   credit-affecting** — every child process of the PI session inherits it, and an
+   auto-defaulted `pi` worker spends real credits. The guardrails are structural:
+   **set-only-when-unset** (an operator pin always wins); the **loud
+   `[harness] auto-default:` echo** guards every real-worker auto-default (never
+   silent); and the signal is **never derived from telemetry** (no session-file/mtime
+   heuristics — the pin is the extension's explicit, post-trust act). Pre-trust
+   (extension not loaded) there is no signal and the default honestly stays `fake`.
+4. As a Layer-2 worker: the engine invokes `pi --mode json --model <id>` with the
    fragment+persona step prompt; auth comes from `~/.pi/agent/auth.json` under the
    operator's **Codex subscription** (provider openai-codex) — PI itself requires no
    Anthropic key. Qualification: the PI worker env allowlist **deliberately passes
@@ -44,7 +55,7 @@ unless the operator overrides to `codex`.
    shared `headless_adapter_base` env filter) so provider-flexible setups work; it is
    pass-through, not a requirement. Result extraction is the shared
    strict-schema-first path (tolerates bare unfenced JSON).
-4. Telemetry: `features/telemetry/reader/pi.py` ingests session METADATA only from
+5. Telemetry: `features/telemetry/reader/pi.py` ingests session METADATA only from
    `~/.pi/agent/sessions/` (invariant T1 — no message bodies; cost unknown ⇒ never
    fabricated).
 

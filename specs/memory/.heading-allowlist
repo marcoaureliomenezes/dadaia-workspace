@@ -7,3 +7,7 @@ Model assignments (9 core agents + 3 plugin agents)
 Harness profiles
 Prompt-assembly canon (v0.1.57)
 Public surface counts (v0.2.1)
+# v0.1.64 closure: tech-stack heading renamed from "Schema handoff-v1.1" (stale token) to
+# the version-stable family name; the lint script's Group-C entry keeps the old string,
+# so the new canon heading is allowlisted here.
+Schema handoff-v1 family

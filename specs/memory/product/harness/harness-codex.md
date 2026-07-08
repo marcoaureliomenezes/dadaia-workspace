@@ -12,9 +12,9 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 575
-last_updated: '2026-07-04'
-release_origin: v0.1.58
+token_estimate: 640
+last_updated: '2026-07-07'
+release_origin: v0.1.64
 ---
 
 ## Purpose
@@ -24,7 +24,12 @@ Codex is a **dual-layer** harness. Layer 1: the operator's `codex` TUI, governed
 `CODEX_EXEC` worker — `codex exec` driven headless by a dadaia-workflow, one-shot per
 step, bounded by Ring-2 (git-diff `changed_paths`) + the git chokepoints. In a Codex
 entry session, dadaia-workflows are the preferred execution path, defaulting the
-Layer-2 harness to `codex` unless the operator overrides to `pi`.
+Layer-2 harness to `codex` unless the operator overrides to `pi`. **Entry signal
+(v0.1.64):** a present `CODEX_SESSION_ID` auto-defaults every `dadaia lifecycle` verb's
+`--harness` to `codex` (a `DADAIA_ENTRY_HARNESS` pin beats it; an explicit flag always
+wins; every real-worker auto-default prints the loud `[harness] auto-default:` echo —
+a stale id inherited from a parent shell could auto-spend codex credits, mitigated by
+the echo, the pin, and explicit `--harness fake`).
 
 ## Usage flow
 

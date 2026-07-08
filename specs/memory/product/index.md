@@ -28,7 +28,7 @@
 |------|-------|------|
 | `harness-claude-code` | Harness — Claude Code | Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks). |
 | `harness-codex` | Harness — Codex | Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection. |
-| `harness-pi` | Harness — PI (pi-coding-agent) | Dual-layer harness: post-trust Ring-1 Layer-1 entry + PI_HEADLESS worker; auths on the operator's Codex subscription; widest Layer-2 model set. |
+| `harness-pi` | Harness — PI (pi-coding-agent) | Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator's Codex subscription. |
 
 ### panel
 
@@ -61,7 +61,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `dadaia-workflows` | dadaia-workflows | The 7 governed Layer-2 workflows, all operator-invocable since v0.1.56 via ~12 CLI verbs; every model step gets fragment + persona. |
+| `dadaia-workflows` | dadaia-workflows | The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona. |
 | `lifecycle-foundation` | lifecycle-foundation | Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bug store + backlog-consistency engine + bug/backlog → release governance (grill, disposition, audit-disposition law, security-gated push). |
 | `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition. |

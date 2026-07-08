@@ -14,9 +14,9 @@ tags:
   - ci
   - quality
   - test-architecture
-token_estimate: 3760
+token_estimate: 3960
 last_updated: '2026-07-07'
-release_origin: v0.1.62
+release_origin: v0.1.64
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 4.8k tests (4,755 passed +
-17 skipped as of v0.1.62; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 4.9k tests (4,837 passed +
+18 skipped as of v0.1.64; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -167,9 +167,25 @@ one round at a time on the `-cross` matrix and each fixed **test-only**
 
 The meta-lesson: three per-round patches to the SAME golden-capture harness is the signal to build ONE
 consolidated platform-invariance layer at capture (host-state canonicalization + sorted-multiset locks
-+ OS-phrase canonicalization) rather than re-discovering each leak class one CI round at a time —
-tracked by the backlog return `golden-platform-normalization-layer`. Assume nothing renders identically
-cross-platform until the golden is proven byte-stable on the `-cross` jobs.
++ OS-phrase canonicalization) rather than re-discovering each leak class one CI round at a time. Assume
+nothing renders identically cross-platform until the golden is proven byte-stable on the `-cross` jobs.
+
+**Shared platform-invariance module (v0.1.64) — `tests/helpers/golden_platform.py` is the ONE
+capture-time normalization layer.** The consolidated code home of the v0.1.55/58 laws: pure
+stdlib functions `norm_path_line`, `norm_panel_body`, `canon_env_line`, `sort_line_lists`,
+`is_env_doctor_line`, `norm_stderr` (with a `wide_glyphs` variant), and the
+`assert_golden(path, obj, what, *, update_env="UPDATE_INSTALL_GOLDENS")` compare/update
+mechanism (regen only under the env flag; `update_env=None` for reproduction sites that never
+regen; "fix the consumer, never the golden" message). Its docstring carries the six-class
+leak taxonomy (host-state, iteration-order, OS-phrase, path/version, clock, Rich-width) with
+the v0.1.58 three-round commits as the rationale record. All 14 former duplicate sites
+(5 golden-trio files + 8 `_norm_stderr` CLI copies + the `test_plugin_uninstall.py`
+rebase-discovered site) import from it — adoption was proven **byte-identical** (zero golden
+regen), and `tests/unit/helpers/test_no_local_helper_copies.py` greps tests-wide that no
+consolidated helper is ever re-declared locally (bespoke exemptions cited explicitly:
+`test_fragment_gate_goldens.py`, `test_api_golden.py`, `specs/test_doctor_golden.py` — each
+carries test-specific scrubs and may adopt shared primitives only where drop-in). A new
+byte-golden MUST capture through this module — never a fresh local helper.
 
 **Intentional-restyle lock pattern (v0.1.59) — presence-invariant + zero-touch equality lock.** When a
 release **deliberately restyles a rendered surface** (a UX/visual overhaul where the markup/CSS
@@ -225,7 +241,8 @@ classification into a single `_doctor_consumer_pair_lines` that `manager.doctor(
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:
 --model` usage error) MUST normalize the stream first: strip ANSI escapes and collapse box-drawing
-characters + whitespace to single spaces (the shared `_norm_stderr`-style helper), then run the
+characters + whitespace to single spaces (the shared `tests.helpers.golden_platform.norm_stderr`
+helper — since v0.1.64 the ONE home of this normalization; never a fresh local copy), then run the
 substring check on the normalized text. The reason is that GitHub Actions enables Rich's ANSI + panel
 boxing at a different terminal width than the local run, so Click renders the usage error **inside a
 Rich-drawn box** with line-wrapping and box characters injected mid-string — a flat, width-dependent
