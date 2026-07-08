@@ -1,6 +1,6 @@
 ---
 release: v0.1.65
-phase: DEFINITION
+phase: IMPLEMENTATION
 ---
 
 # Active release: v0.1.65 — L1 Agent Model Governance & Panel Sub-agents Tab
