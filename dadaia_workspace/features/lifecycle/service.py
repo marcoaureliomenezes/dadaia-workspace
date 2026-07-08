@@ -14,6 +14,7 @@ from dadaia_workspace.core.models.lifecycle import (
     GateEvidence,
     GateRequirement,
     LifecyclePhase,
+    LifecycleRunStatus,
 )
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort, RuntimeFileRef
 from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
@@ -208,13 +209,28 @@ class LifecyclePreflightService:
         )
 
     def resume_run(self, run_store: LifecycleRunStore, run_id: str) -> LifecycleCommandResult:
-        """Resume a lifecycle run and translate persistence failures to typed output."""
+        """Resume a lifecycle run and translate persistence failures to typed output.
+
+        FR6 (T-66-07): a resumed run that is still ``BLOCKED`` must not be reported as
+        an unconditional OK — it never actually advanced. Inspect the loaded run's
+        persisted status and, when it is BLOCKED, surface the run's own
+        ``blocked.reason`` as a BLOCKED command result so the CLI exits non-zero with
+        the real reason instead of a dishonest "OK resumed". Re-driving the blocked
+        step is a separate, deferred capability (out of scope here) — this only makes
+        the reported status honest.
+        """
         try:
             run = run_store.resume(run_id)
         except LifecycleRunStoreError as exc:
             return LifecycleCommandResult(
                 status=LifecycleCommandStatus.INTERNAL_ERROR,
                 message=str(exc),
+            )
+        if run.status is LifecycleRunStatus.BLOCKED and run.blocked is not None:
+            return LifecycleCommandResult(
+                status=LifecycleCommandStatus.BLOCKED,
+                message=run.blocked.reason,
+                blocked=run.blocked,
             )
         return LifecycleCommandResult(
             status=LifecycleCommandStatus.OK,
