@@ -266,7 +266,23 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   persists + triggers re-render; foreign Host → 403.
   Done when: AC-4 messages surface verbatim through the API.
 
-- [-] **T-65-12 — UI tab + post-apply pop-up (FR8, G-2)** — owner: software-engineer
+- [x] **T-65-12 — UI tab + post-apply pop-up (FR8, G-2)** — owner: software-engineer
+  Completion note: RED captured — `test_index_dom_contract.py` `_SECTIONS` extended
+  with `subagents` (2 failures: missing tab id + section panel) before the UI landed;
+  `test_views_index.py` tablist/tabpanel contracts updated to the 7-tab truth (genuine
+  behavior change, not re-baselining). Implemented: nav tab "Sub-agents"
+  (`data-section="subagents"`) beside Workflows; `section-subagents` scaffold in
+  `index.py` (template selector + explicit Apply toolbar, banner, roster mount, hidden
+  post-apply dialog); `assets/js/agent_policy.js` (lazy tab-click load; roster table
+  with per-agent model + effort pickers `low|medium|high|xhigh|max`; template selector;
+  Apply = validate-before-save POST→PUT; post-apply pop-up rendering the server's G-2
+  per-harness instructions verbatim + the re-rendered file list; all DOM values
+  escHtml'd); scoped token-anchored `assets/css/agent_policy.py` (.ap-*, one control
+  language); both registered in `static.py`. NO inline script changed —
+  `_CSP_SCRIPT_HASH_*` unchanged by construction, CSP coverage test green.
+  Independence fix: views type the service via a structural
+  `AgentModelPolicyServicePort` Protocol (no features→features import; lint-imports
+  stays 9 kept / 0 broken). Panel + agents suites 656 green; mypy --strict + ruff green.
   Write set: `dadaia_workspace/features/panel/views/index.py`,
   `dadaia_workspace/features/panel/views/assets/js/agent_policy.js` (new),
   `dadaia_workspace/features/panel/views/assets/css/` (scoped, new),
