@@ -266,7 +266,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   persists + triggers re-render; foreign Host → 403.
   Done when: AC-4 messages surface verbatim through the API.
 
-- [ ] **T-65-12 — UI tab + post-apply pop-up (FR8, G-2)** — owner: software-engineer
+- [-] **T-65-12 — UI tab + post-apply pop-up (FR8, G-2)** — owner: software-engineer
   Write set: `dadaia_workspace/features/panel/views/index.py`,
   `dadaia_workspace/features/panel/views/assets/js/agent_policy.js` (new),
   `dadaia_workspace/features/panel/views/assets/css/` (scoped, new),
