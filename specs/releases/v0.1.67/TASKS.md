@@ -176,7 +176,7 @@ instead of migrating it.
 
 ## Wave C — FR3: real-binary guardrail (DEC-C, F1/F6-corrected)
 
-### T-67-08 — Add the autouse real-binary guard (4-flag union) + permanent guard-proof tests, xfail-first `[-]`
+### T-67-08 — Add the autouse real-binary guard (4-flag union) + permanent guard-proof tests, xfail-first `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/conftest.py`; `tests/unit/infrastructure/test_pi_runtime.py`
@@ -214,7 +214,7 @@ instead of migrating it.
 - **Parallelism:** none — single shared-file (`conftest.py`) task, run after
   Wave A completes.
 
-### T-67-09 — (F1, new) Per-flag guard non-interference proofs
+### T-67-09 — (F1, new) Per-flag guard non-interference proofs `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** a small contract-style test (implementer's choice of file

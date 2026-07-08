@@ -33,6 +33,7 @@ Session-level pollution guard (_session_root_pollution_guard):
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -268,9 +269,20 @@ def _real_worker_guard(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
     ``request.fixturenames`` — the resolved fixture closure for THIS test item — never
     a node name list or module-wide exemption; a test must explicitly declare the
     bypass fixture as a parameter for the reviewer to see it at the call site.
+
+    **Call-time (not fixture-setup-time) opt-in re-check.** The patched replacement
+    below re-evaluates :func:`_real_worker_opt_in` INSIDE itself, at the moment
+    ``.run()`` actually calls ``_resolve_runner()`` — not only once here at fixture
+    setup. This is deliberate, not incidental: ``monkeypatch.setenv`` performed inside
+    a test's OWN body (or a fixture it explicitly requests) runs strictly AFTER this
+    autouse fixture's setup phase (pytest's autouse-before-explicit ordering), so a
+    test that legitimately sets one of the 4 flags itself — e.g. a per-flag
+    non-interference proof (T-67-09) — would otherwise see a guard that was already
+    "decided" against a stale, pre-setenv environment snapshot. Re-checking at call
+    time means the guard reflects the environment as of the actual subprocess-boundary
+    call, the same call-time-over-construction-time principle FR1 established for the
+    runner seam itself.
     """
-    if _real_worker_opt_in():
-        return
     if "real_worker_guard_bypass_for_mechanism_proof" in request.fixturenames:
         return
 
@@ -278,6 +290,8 @@ def _real_worker_guard(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
         injected = getattr(self, "_runner", None)
         if injected is not None:
             return injected
+        if _real_worker_opt_in():
+            return subprocess.run
         raise RuntimeError(
             "real pi/codex binary invocation attempted without a live-opt-in flag "
             "set — set one of DADAIA_E2E_REAL_WORKER, DADAIA_PI_LIVE, "
