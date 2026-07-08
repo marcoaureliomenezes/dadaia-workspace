@@ -15,10 +15,14 @@
  * card PRESENCE → ABSENCE (with an unrelated card as the liveness control), the
  * strongest content assertion this surface exposes.
  *
- * Safety: the registry is mutated ONLY when it lives inside the checkout — the
- * shape the CI job bootstraps (`init --workspace $PWD` + seeded registry). In a
- * local run the panel resolves the operator's LIVE workspace (the repo root is
- * never a workspace — hygiene law), so this spec deterministically skips rather
+ * Safety (T-65-14 CI-fix amendment): the registry is mutated ONLY at
+ * `PANEL_TEST_REGISTRY` — the hermetic temp workspace's
+ * `.dadaia/states/spec_contexts.json` (see run-panel-e2e-server.sh), never the
+ * checkout and never an operator's real live workspace. CI pins a known
+ * `PANEL_E2E_WS`/`PANEL_TEST_REGISTRY` pair (ci.yml / release.yml) so this spec
+ * runs for real; a local run that does NOT set `PANEL_TEST_REGISTRY` resolves the
+ * default (the checkout root, which never carries `.dadaia/states/
+ * spec_contexts.json` — hygiene law), so the spec deterministically skips rather
  * than ever touching live state. AC-4's evidence is the `e2e-panel` CI run.
  */
 

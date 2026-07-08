@@ -20,8 +20,9 @@
  *   they are browser-internal metadata logs, not JS errors from the panel.
  *
  * The memory chip is REQUIRED (v0.1.62 FR7 / ADR-8): the e2e fixture
- *   deterministically seeds >= 1 context with memory atoms (bootstrap-panel-ws.sh
- *   fast-fails otherwise), so a missing `.memory-chip` is a real regression —
+ *   deterministically seeds >= 1 context with memory atoms (run-panel-e2e-server.sh
+ *   fast-fails otherwise — T-65-14 CI-fix amendment), so a missing `.memory-chip` is
+ *   a real regression —
  *   both guards `waitForSelector('.memory-chip')` and fail loudly if absent.
  *   There is no graceful-empty branch. This is defence-in-depth behind the
  *   DOM-contract unit lock (test_index_dom_contract.py), which stays the

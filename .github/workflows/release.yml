@@ -109,8 +109,6 @@ jobs:
           python-version: "3.12"
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
-      - name: Bootstrap panel workspace
-        run: .github/scripts/bootstrap-panel-ws.sh
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: "22"
@@ -125,7 +123,15 @@ jobs:
       - name: playwright panel e2e
         working-directory: tests/e2e
         env:
-          PANEL_WEB_SERVER_COMMAND: poetry run python -m dadaia_workspace.cli.main panel --port 4999 --no-open
+          # See ci.yml's e2e-panel job for the full root-cause note
+          # (T-65-14 CI-fix amendment). run-panel-e2e-server.sh bootstraps a
+          # hermetic temp workspace itself; the old bootstrap script +
+          # hardcoded --port 4999 override are retired.
+          PANEL_E2E_PYTHON: poetry run python
+          # Pin the hermetic temp workspace (AC-4 spec-context-operation-journey
+          # needs a known PANEL_TEST_REGISTRY to run for real, not skip).
+          PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
+          PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
         run: npm run test:e2e
 
   build:

@@ -350,6 +350,82 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   pop-up asserted; per-agent override round-trips; clean-overlay restore before/after
   with asserted 200s; suite green locally.
 
+  > **Amendment note (2026-07-08, qa-engineer, T-65-14 CI-fix):** the GHA
+  > `E2E panel (Playwright)` job (PR #124) failed all 4 `agent-policy.spec.ts` journeys
+  > with HTTP 500 on their seed/Apply PUT. Root cause: the panel resolves
+  > `workspace_root` by walking up from its own process cwd at startup
+  > (`core/workspace_resolver.resolve_workspace_root`). The e2e harness launched the
+  > panel with `webServer.cwd: REPO_ROOT` (`playwright.config.ts`) paired with
+  > `.github/scripts/bootstrap-panel-ws.sh`, which wrote
+  > `.dadaia/states/spec_contexts.json` directly at that same checkout root — making
+  > `workspace_root == the source repo root`. Any PUT that re-renders L1 projections
+  > (the agent-model-policy Apply path, `public install(..., only="agents")`) was then
+  > correctly refused by the `_is_source_repo_root` production guard
+  > (`infrastructure/public_assets.py`) — production behavior was CORRECT; the harness
+  > was not hermetic. Dual symptom: locally the same walk-up instead escaped the
+  > (unpolluted) checkout and found the developer's own enclosing real
+  > dadaia-workspace instance, silently re-rendering its live `.claude/agents/*.md`.
+  >
+  > RED reproduction (before the fix, honest capture — not from CI logs): built a
+  > directory satisfying the exact `_is_source_repo_root` predicate (a `pyproject.toml`
+  > naming `dadaia-workspace` + a `dadaia_workspace/public` dir), initialized it as a
+  > workspace, started the panel with cwd there, and PUT a valid overlay to
+  > `/api/agent-model-policy` → `HTTP 500` with
+  > `PanelHandler: mutation route error: Refusing to project public runtime assets
+  > into the dadaia-workspace source repository root...` in the server log — the exact
+  > CI symptom, reproduced honestly outside CI.
+  >
+  > Fix (hermetic, root cause — no production Python touched, and
+  > `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1` was considered and rejected as the
+  > primary fix per the assignment: it would keep polluting the source checkout and
+  > hide the local instance-mutation problem): new
+  > `tests/e2e/panel/run-panel-e2e-server.sh` builds a disposable temp workspace
+  > (never the repo root, never an enclosing real operator workspace), inits it,
+  > symlinks `repos/dadaia-workspace` to THIS checkout (`_is_self_repo` skips writing
+  > back into it — read-only consumption of real specs/memory for the Projects tab),
+  > stages + installs a real projection INTO the temp workspace, and execs the panel
+  > there. `playwright.config.ts`'s default `webServer.command` now runs this script
+  > (env-overridable: `PANEL_E2E_PYTHON`, `PANEL_E2E_WS`); default port moved
+  > 4999 → 5065 (`helpers.ts` + `playwright.config.ts`, kept in lockstep) — 4999 is the
+  > conventional operator-local live panel port. `ci.yml` / `release.yml` e2e-panel
+  > legs: dropped the "Bootstrap panel workspace" step + the hardcoded
+  > `--port 4999` `PANEL_WEB_SERVER_COMMAND` override (both retired); added
+  > `PANEL_E2E_PYTHON: poetry run python` and a pinned `PANEL_E2E_WS`/
+  > `PANEL_TEST_REGISTRY` pair (`${{ runner.temp }}/dadaia-panel-e2e-ws`) so
+  > `spec-context-operation-journey.spec.ts` (AC-4) keeps running for real in CI
+  > instead of silently regressing to its local-dev skip branch (its `PANEL_TEST_REGISTRY`
+  > default is the checkout root, which never carries a registry — the skip guard is
+  > unchanged, only now driven by an explicit env pin rather than an accidental
+  > cwd coincidence). Deleted the now-dead `.github/scripts/bootstrap-panel-ws.sh`
+  > (both workflows were its only callers) and updated its contract test
+  > (`tests/contract/test_ci_workflow_hygiene.py`, CI-2 v0.1.61 FR6) to the new
+  > anti-duplication invariant: neither workflow may override
+  > `PANEL_WEB_SERVER_COMMAND` (the single `playwright.config.ts` default is now the
+  > only place naming the bootstrap script, so an override is the only way the two
+  > legs could diverge again); the discriminator/executable-bit checks now point at
+  > `tests/e2e/panel/run-panel-e2e-server.sh`.
+  >
+  > Verification (this session, `feature/v0.1.65`): RED reproduced honestly (above,
+  > outside CI) before the fix; GET/PUT verified 500→200 against the new hermetic
+  > harness directly; full local `poetry run pytest` green (unit+contract+integration);
+  > `ruff format --check` / `ruff check --no-cache` / `mypy --strict` clean on the
+  > touched Python contract test. Full panel e2e suite (58 tests, `chromium`) —
+  > **58/58 passed**, including `spec-context-operation-journey.spec.ts` running for
+  > real (not skipped) under a pinned `PANEL_E2E_WS`/`PANEL_TEST_REGISTRY`.
+  > `agent-policy.spec.ts --repeat-each=5` — **20/20 passed**. Confirmed the operator's
+  > live workspace was never touched: `git status --short` on the checkout shows only
+  > the intended source edits; `find .claude/agents .codex/agents .dadaia/agentic
+  > -newermt <session-start>` returned zero results across the entire session (RED
+  > repro + GREEN repro + full suite + repeat-each runs).
+  > Write set (amendment): `tests/e2e/panel/run-panel-e2e-server.sh` (new),
+  > `tests/e2e/panel/playwright.config.ts`, `tests/e2e/panel/helpers.ts`,
+  > `tests/e2e/panel/response-guard.spec.ts` (comment only),
+  > `tests/e2e/panel/spec-context-operation-journey.spec.ts` (header comment only —
+  > behavior unchanged, safety mechanism re-described),
+  > `.github/workflows/ci.yml`, `.github/workflows/release.yml`,
+  > `tests/contract/test_ci_workflow_hygiene.py`; deleted
+  > `.github/scripts/bootstrap-panel-ws.sh`.
+
 ## Wave 5 — Verification tail — after all above
 
 - [x] **T-65-15 — Golden + AC re-verification sweep (AC-1..AC-10)** — owner: qa-engineer

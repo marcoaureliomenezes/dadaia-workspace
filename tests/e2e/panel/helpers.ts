@@ -30,7 +30,10 @@ function resolvePanelToken(): string {
 }
 
 export const PANEL_TOKEN: string = resolvePanelToken();
-export const PANEL_PORT: number = parseInt(process.env.PANEL_TEST_PORT || '4999', 10);
+// 4999 is the conventional operator-local live panel port — the e2e webServer
+// must never collide with it (T-65-14 CI-fix amendment; kept in lockstep
+// with playwright.config.ts's own PANEL_PORT fallback).
+export const PANEL_PORT: number = parseInt(process.env.PANEL_TEST_PORT || '5065', 10);
 export const BASE_URL: string = `http://127.0.0.1:${PANEL_PORT}`;
 
 // ---------------------------------------------------------------------------

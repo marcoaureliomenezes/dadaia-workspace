@@ -1,4 +1,4 @@
-"""CI workflow hygiene contract (v0.1.61 FR6 CI-1/CI-2).
+"""CI workflow hygiene contract (v0.1.61 FR6 CI-1/CI-2; amended T-65-14 CI-fix).
 
 Pins three invariants over the GitHub Actions workflow YAMLs:
 
@@ -6,8 +6,16 @@ Pins three invariants over the GitHub Actions workflow YAMLs:
       occurrences of that filename anywhere under ``.github/workflows/``. The only
       production references to the file are the v1→v2 migration *deleter*
       (``features/migrate/state_v2.py``); nothing requires it to exist.
-  (b) CI-2 — both ``ci.yml`` and ``release.yml`` invoke the shared bootstrap script
-      ``.github/scripts/bootstrap-panel-ws.sh`` instead of carrying the block inline.
+  (b) CI-2 — neither ``ci.yml`` nor ``release.yml`` overrides
+      ``PANEL_WEB_SERVER_COMMAND``. The hermetic bootstrap (T-65-14 CI-fix amendment:
+      the v0.1.61 shared script was retired because it wrote ``spec_contexts.json``
+      directly at the checkout root, making ``workspace_root`` == the source repo
+      root — refused by the ``_is_source_repo_root`` production guard on any
+      re-rendering PUT) now lives ONLY behind ``playwright.config.ts``'s default
+      ``webServer.command`` (``tests/e2e/panel/run-panel-e2e-server.sh``). Since
+      there is exactly one playwright config, an env override in either workflow
+      would be the sole way the two legs could diverge again — so its absence in
+      both is the anti-duplication invariant now.
   (c) CI-2 — no inline duplicate of the bootstrap body remains: the distinctive
       bootstrap-body line (``Memory atoms verified OK``) appears 0 times in the
       workflow YAMLs and exactly once in the shared script (which must exist and be
@@ -29,8 +37,8 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS_DIR = _REPO_ROOT / ".github" / "workflows"
-_BOOTSTRAP_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "bootstrap-panel-ws.sh"
-_SCRIPT_REF = ".github/scripts/bootstrap-panel-ws.sh"
+_BOOTSTRAP_SCRIPT = _REPO_ROOT / "tests" / "e2e" / "panel" / "run-panel-e2e-server.sh"
+_SCRIPT_REF = "tests/e2e/panel/run-panel-e2e-server.sh"
 
 # A line unique to the bootstrap block body — present exactly once in the shared
 # script, and never inline in any workflow YAML. (``spec_contexts.json`` is NOT
@@ -56,10 +64,20 @@ def test_no_primary_context_json_in_workflows() -> None:
 
 
 @pytest.mark.parametrize("workflow", ["ci.yml", "release.yml"])
-def test_workflows_call_shared_bootstrap_script(workflow: str) -> None:
-    """CI-2: both e2e-panel legs must call the shared bootstrap script."""
+def test_workflows_do_not_override_web_server_command(workflow: str) -> None:
+    """CI-2 (amended): neither e2e-panel leg overrides PANEL_WEB_SERVER_COMMAND.
+
+    playwright.config.ts's own default (the hermetic run-panel-e2e-server.sh) is the
+    sole source of truth for how the panel webServer is bootstrapped and launched; an
+    override in either workflow YAML would be the only way the two legs could
+    reintroduce a hand-synced-copy divergence (the CI-2 audit finding this contract
+    guards).
+    """
     text = (_WORKFLOWS_DIR / workflow).read_text(encoding="utf-8")
-    assert _SCRIPT_REF in text, f"{workflow} does not reference {_SCRIPT_REF}"
+    assert "PANEL_WEB_SERVER_COMMAND" not in text, (
+        f"{workflow} overrides PANEL_WEB_SERVER_COMMAND — this bypasses the shared "
+        f"hermetic bootstrap ({_SCRIPT_REF}) and reopens the CI-2 divergence risk"
+    )
 
 
 def test_no_inline_bootstrap_body_duplicate() -> None:
