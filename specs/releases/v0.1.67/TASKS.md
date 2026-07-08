@@ -241,7 +241,7 @@ instead of migrating it.
 
 ## Wave D — Validation (qa-engineer)
 
-### T-67-10 — Full non-live suite + import-linter (F4-corrected expectation) `[-]`
+### T-67-10 — Full non-live suite + import-linter (F4-corrected expectation) `[x]`
 
 - **Owner:** qa-engineer
 - **Write set:** none (validation only — may add a `.dadaia/reports/` /
@@ -259,7 +259,7 @@ instead of migrating it.
 - **AC:** SPEC "Dependencies and risks" (F4-corrected import-linter risk item).
 - **Parallelism:** none — depends on all implementation waves.
 
-### T-67-11 — Live-suite non-interference matrix + regression re-run + mutation-sanity
+### T-67-11 — Live-suite non-interference matrix + regression re-run + mutation-sanity `[-]`
 
 - **Owner:** qa-engineer
 - **Write set:** none (validation only)
