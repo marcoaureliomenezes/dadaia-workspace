@@ -11,3 +11,6 @@ Public surface counts (v0.2.1)
 # the version-stable family name; the lint script's Group-C entry keeps the old string,
 # so the new canon heading is allowlisted here.
 Schema handoff-v1 family
+# v0.1.65 closure: panel.md gained the Sub-agents (Layer-1 agent model governance) control
+# plane; its H2 section heading is a new legitimate current-canon heading.
+Sub-agents control plane (v0.1.65)

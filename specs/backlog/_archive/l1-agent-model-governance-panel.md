@@ -1,6 +1,7 @@
 ---
 name: l1-agent-model-governance-panel
-status: candidate
+status: delivered
+delivered_in: v0.1.65
 opened: 2026-07-07
 owner: project-manager (curates)
 source: "operator demand 2026-07-07 (major new capability) — mirror the proven Layer-2 workflow model-governance architecture for Layer-1 sub-agents so operators can retier agents without a library deploy"

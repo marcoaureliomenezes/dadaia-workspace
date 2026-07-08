@@ -11,8 +11,8 @@ tags:
 - toolchain
 - constraints
 token_estimate: 2600
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+last_updated: '2026-07-08'
+release_origin: v0.1.65
 ---
 
 ## Languages
@@ -71,22 +71,41 @@ class** — this axis keeps the name `Tier`). The mandatory
 `tests/contract/test_agent_tier_taxonomy.py` machine-enforces both (every non-plugin core agent
 carries a numeric `dispatch_band` + a registry-known `model`).
 
-**Core: two-model split (retier PR #115, 2026-07-06; ratified by v0.1.61's operational-change
-lane).** The 9 core agents split across two model-cost tiers. **Five agents run on
-`claude-fable-5`** (registry `Tier` = `deep`; Codex renders `gpt-5.5` at
-`model_reasoning_effort=high` via the deep→high mapping), each carrying a per-agent Claude
-`effort:` frontmatter key: `product-engineer: high`, `project-auditor: high`,
-`ai-engineer: medium`, `software-engineer: low`, `qa-engineer: low`. **Four agents run on
-`claude-opus-4-8`** (registry `Tier` = `dispatch`) with no `effort:` override:
-`project-manager`, `software-architect`, `security-reviewer`, `code-reviewer`. Claude Code
-**officially supports per-subagent `effort:` frontmatter** — it is a first-class agent
-frontmatter key, not a custom extension; Codex projections derive their
-`model_reasoning_effort` from the registry tier, not from the Claude key. Per-dispatch
-override via `DADAIA_MODEL_OVERRIDE` when the dispatcher's policy justifies it.
+**Core agent (model, effort) is policy-governed, not hardcoded (v0.1.65).** The 9 core
+`public/agents/*.md` bodies are **model-agnostic** — they carry no `model:`/`effort:`
+frontmatter. The concrete `(model, effort)` pair is **composed at install time** from a policy
+and rendered as the last two frontmatter lines of the projected `.claude/agents/<name>.md`
+(and fed to the codex projection). The policy has three parts (mirrors the Layer-2 workflow
+model-governance stack — [[agent-orchestration]] "Layer-1 agent model governance"): a
+library-shipped registry of **3 built-in templates** (`balanced` DEFAULT, `subscription-saver`,
+`max-quality` — `core/agent_model_templates.py`), an operator **overlay**
+(`.dadaia/states/agent_model_policy.json`, schema `agent-model-policy-v1`,
+`{applied_template, overrides}`), and a **single resolver** `resolve_agent_model` whose
+per-field precedence is **per-agent override > applied template > `balanced`**. The operator
+retiers agents live from the panel **Sub-agents** tab ([[panel]]). Claude effort vocabulary is
+`low|medium|high|xhigh|max` (officially-supported first-class agent frontmatter); the Codex
+`model_reasoning_effort` is derived from the **resolved per-agent effort** via the fixed D-3
+clamp `low→low, medium→medium, high→high, xhigh→high, max→high` (no longer tier-only).
+Per-dispatch override via `DADAIA_MODEL_OVERRIDE` still applies.
 
-**Plugin agents: off-opus by design (v0.1.60).** When a pack installs ([[plugin-packs]]), the 3
-plugin agents carry `model: claude-sonnet-4-6` (registry `Tier` = `plugin`; Codex renders
-`gpt-5.3-codex`, NOT the opus `gpt-5.5`) — the demonstrable non-opus Layer-1 assignment. The
+**`balanced` — the no-overlay default (live on this instance, v0.1.65 D-1 retier).** With no
+overlay, install renders the `balanced` roster, which **supersedes the 2026-07-06 hardcoded
+5-Fable retier**: `claude-fable-5` (registry `Tier` = `deep`; Codex `gpt-5.5`) now runs on
+**only `project-manager` + `software-architect`**; `claude-opus-4-8` (`Tier` = `dispatch`;
+Codex `gpt-5.5`) on `product-engineer`/`project-auditor`/`security-reviewer`/`code-reviewer`;
+`claude-sonnet-5` (`Tier` = `plugin`; Codex `gpt-5.3-codex`) on
+`ai-engineer`/`software-engineer`/`qa-engineer`. **Hard constraint (D-7):
+`claude-fable-5` is NEVER assigned to `security-reviewer`** — its cyber-safety classifiers can
+refuse security-review-shaped work — enforced at three layers (template import-time assert,
+overlay store/parse validation, panel validate endpoint). The `subscription-saver` template
+runs zero Fable (opus on the three strategic roles, sonnet-5 elsewhere); `max-quality` widens
+Fable/opus. Full per-template rosters are pinned verbatim by
+`tests/contract/test_agent_tier_taxonomy.py`.
+
+**Plugin agents: off-opus by design (v0.1.60; sonnet-5 since v0.1.65).** When a pack installs
+([[plugin-packs]]), the 3 plugin agents carry `model: claude-sonnet-5` (registry `Tier` =
+`plugin`; Codex renders `gpt-5.3-codex`, NOT the opus `gpt-5.5`) as the pack-provided default,
+with the same per-agent override capability layered on top when the pack is installed. The
 `fast`/haiku tier remains **registry-defined but unassigned by design** — it prices historical
 haiku telemetry events (the `fast-tier-persona-validation` item was dispositioned REJECTED,
 premise-dead post-retier, at v0.1.64; a revival must carry the recorded operator-live
@@ -104,22 +123,34 @@ exit stays 0.
 model ids/pricing/tier (`ModelEntry{claude_id, codex_id, pricing dated
 append-only, tier}`); `MODEL_MAP` (runtime transforms) and `PRICING_TABLE`
 (telemetry) are derived views, with a key-equality contract test. `dadaia
-public doctor` fails on a `model:` frontmatter that does not resolve in the registry.
+public doctor` fails on a resolved `model:` that does not resolve in the registry.
+`claude-sonnet-5` was added in v0.1.65 (`codex_id="gpt-5.3-codex"`, `Tier="plugin"`,
+pricing `(3.00, 15.00, 3.75, 0.30)` effective 2026-07-01). **F-4 note:** sonnet-5's
+`plugin` `Tier` is a **forced cost-axis label, decoupled from dispatch-band and agent
+behavior** — sonnet-5 shares sonnet-4-6's cost class and any other tier would violate the
+`_codex_id_for_tier`/`codex_tier_views` invariants; core-agent codex effort now comes from the
+D-3 clamp of the resolved policy effort, not from `codex_effort_for_tier`, so the `plugin`
+label no longer drives core-agent effort. The `plugin` tier-NAME mismatch is a tracked backlog
+return, out of scope this release.
 
-Agent| Model| Note
+**Resolved roster under the no-overlay `balanced` default (this instance, v0.1.65).** The
+`(model, effort)` pair below is *rendered into the projection*, not authored in the source
+body; an operator overlay re-tiers any row live.
+
+Agent| Model (effort)| Note
 ---|---|---
-project-manager| `claude-opus-4-8`| Dispatcher / lease coordinator; no `effort:` override
-project-auditor| `claude-fable-5` (`effort: high`)| Dispatcher / audit fan-out
-product-engineer| `claude-fable-5` (`effort: high`)| Curator / memory guardian
-software-engineer| `claude-fable-5` (`effort: low`)| Implementation leaf (absorbs python/node/backend)
-ai-engineer| `claude-fable-5` (`effort: medium`)| AI-entity surface owner (harness-mastery synthesis workload)
-software-architect| `claude-opus-4-8`| Architectural review leaf (ADDITIVE); no `effort:` override
-qa-engineer| `claude-fable-5` (`effort: low`)| Review → commit gate leaf
-security-reviewer| `claude-opus-4-8`| Review → push gate leaf; no `effort:` override
-code-reviewer| `claude-opus-4-8`| Review → PR gate leaf; no `effort:` override
-frontend-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install frontend-design`
-design-specialist (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until the pack installs
-devops-engineer (plugin)| `claude-sonnet-4-6` (when installed)| Plugin agent (devops pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install devops`
+project-manager| `claude-fable-5` (`effort: high`)| Dispatcher / lease coordinator
+software-architect| `claude-fable-5` (`effort: high`)| Architectural review leaf (ADDITIVE)
+product-engineer| `claude-opus-4-8` (`effort: high`)| Curator / memory guardian
+project-auditor| `claude-opus-4-8` (`effort: xhigh`)| Dispatcher / audit fan-out
+security-reviewer| `claude-opus-4-8` (`effort: xhigh`)| Review → push gate leaf; **NEVER `claude-fable-5`** (D-7)
+code-reviewer| `claude-opus-4-8` (`effort: high`)| Review → PR gate leaf
+ai-engineer| `claude-sonnet-5` (`effort: high`)| AI-entity surface owner (harness-mastery synthesis workload)
+software-engineer| `claude-sonnet-5` (`effort: xhigh`)| Implementation leaf (absorbs python/node/backend)
+qa-engineer| `claude-sonnet-5` (`effort: high`)| Review → commit gate leaf
+frontend-engineer (plugin)| `claude-sonnet-5` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install frontend-design`
+design-specialist (plugin)| `claude-sonnet-5` (when installed)| Plugin agent (frontend-design pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until the pack installs
+devops-engineer (plugin)| `claude-sonnet-5` (when installed)| Plugin agent (devops pack); registry `plugin` tier / Codex `gpt-5.3-codex`; core stub carries no `model:` until `dadaia plugin install devops`
 
 ## Plugin inventory
 

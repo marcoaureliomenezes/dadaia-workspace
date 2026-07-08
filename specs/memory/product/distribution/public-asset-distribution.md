@@ -3,7 +3,7 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
@@ -11,8 +11,8 @@ tags:
 - projection
 - privacy
 token_estimate: 1880
-last_updated: '2026-07-07'
-release_origin: v0.1.63
+last_updated: '2026-07-08'
+release_origin: v0.1.65
 ---
 
 ## Purpose
@@ -42,10 +42,36 @@ hash, the file is overwritten without requiring `--force`. This makes plain `ins
 the correct propagation step for all legitimate source edits. `--force` is reserved
 for repairing locally-divergent projections (e.g. a file an operator edited in-place).
 
+**Core agents are RENDERED, not copied (v0.1.65).** The 9 core `agents/*.md` bodies are staged
+generic (no `model:`/`effort:`); at install each is composed through one seam
+`render(staged generic body + resolved (model, effort))` — the resolved pair comes from the
+agent-model policy ([[agent-orchestration]] "Layer-1 agent model governance": 3 templates +
+`.dadaia/states/agent_model_policy.json` overlay + single resolver, precedence override >
+template > `balanced`). The rendered `model:` then `effort:` lines are appended as the last
+frontmatter lines of `.claude/agents/<name>.md`, and the SAME resolved config feeds the codex
+projection (`.codex/agents/*.toml` codex model id via the registry mapping;
+`model_reasoning_effort` from the resolved effort via the D-3 clamp). Core codex render **fails
+closed** when neither a staged nor a resolved model is supplied (no silent default); `--force`
+re-renders to the render output (never raw staged bytes); a plugin agent's `effort:` is omitted
+entirely when unresolved. No overlay ⇒ render `balanced`, deterministic and byte-stable across
+repeated installs. The staging **manifest keeps hashing staged (policy-free) bytes** — only the
+projection write/compare goes through the render seam. The new schema asset
+`schemas/agent-model-policy-v1.schema.json` stages like any other asset.
+
 `dadaia public doctor` performs three comparison passes: source vs staging, staging
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
 returns a non-zero exit code, giving an accurate all-clear only when all three tiers
 agree. The `dadaia-workspace-dev-guardrail` rule reflects this corrected workflow.
+**Policy-aware for agents (v0.1.65):** the staging↔projected pass for a non-plugin
+`claude:agents/*.md` label compares against `render(staged generic + resolved policy)`, not raw
+staged bytes — so an operator policy Apply reads `[ok]` and a hand-edited `.claude/agents/*.md`
+reads `[drift]`. The overlay is loaded once per doctor run (missing ⇒ silent `balanced`; invalid
+⇒ an `[drift] agent-model-policy ERROR` line); `stage:agents/*.md` (generic↔generic) and every
+non-agent label stay on the raw compare path. The render-compare guarantee is **claude-md-only**
+— codex agent TOMLs are structural-checked only (`check_codex_drift`, no byte-compare); codex
+model/effort correctness is asserted install-time by the lockstep integration test.
+`features/public/model_resolution.py#check_model_resolution` validates the RESOLVED core roster
+(registry + effort vocabulary) + plugin staged models.
 
 `dadaia public doctor` also includes a public privacy gate. It scans source/staged
 public assets with a denylist for private identifiers and reports
