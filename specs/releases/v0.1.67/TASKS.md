@@ -241,7 +241,7 @@ instead of migrating it.
 
 ## Wave D — Validation (qa-engineer)
 
-### T-67-10 — Full non-live suite + import-linter (F4-corrected expectation)
+### T-67-10 — Full non-live suite + import-linter (F4-corrected expectation) `[-]`
 
 - **Owner:** qa-engineer
 - **Write set:** none (validation only — may add a `.dadaia/reports/` /
