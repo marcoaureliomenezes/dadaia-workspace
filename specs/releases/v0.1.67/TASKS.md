@@ -214,7 +214,7 @@ instead of migrating it.
 - **Parallelism:** none — single shared-file (`conftest.py`) task, run after
   Wave A completes.
 
-### T-67-09 — (F1, new) Per-flag guard non-interference proofs `[-]`
+### T-67-09 — (F1, new) Per-flag guard non-interference proofs `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** a small contract-style test (implementer's choice of file
