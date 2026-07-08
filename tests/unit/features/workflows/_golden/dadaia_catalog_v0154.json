@@ -39,7 +39,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -74,7 +74,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 2,
@@ -109,7 +109,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,
@@ -144,7 +144,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 4,
@@ -178,7 +178,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 5,
@@ -213,7 +213,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 6,
@@ -248,7 +248,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 7,
@@ -283,7 +283,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 8,
@@ -341,7 +341,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -377,7 +377,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 2,
@@ -410,7 +410,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,
@@ -444,7 +444,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 4,
@@ -488,7 +488,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -535,7 +535,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,
@@ -580,7 +580,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 5,
@@ -613,7 +613,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 6,
@@ -671,7 +671,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -726,7 +726,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -757,7 +757,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 2,
@@ -790,7 +790,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,
@@ -847,7 +847,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -880,7 +880,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 2,
@@ -913,7 +913,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,
@@ -970,7 +970,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 1,
@@ -1003,7 +1003,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 2,
@@ -1036,7 +1036,7 @@
               "gpt-5.5:high",
               "gpt-5.5:low",
               "gpt-5.3-codex:medium",
-              "kimi-2.7:high"
+              "moonshotai/kimi-k2.5:high"
             ]
           },
           "order": 3,

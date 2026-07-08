@@ -14,7 +14,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
 
 ## Wave A — trivial-looking config fixes, STILL repro-proven (parallel-safe within the wave; T-66-02/03 serialized on `codex_runtime.py`)
 
-### T-66-01 — FR3: valid OpenRouter kimi model id `[-]`
+### T-66-01 — FR3: valid OpenRouter kimi model id `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/model_profiles.py`,
@@ -37,6 +37,32 @@ this is not optional even for the "trivial config" tasks in Wave A.
 - **Done criterion:** AC3.1, AC3.2, AC3.3, AC3(repro) all GREEN; repro test
   confirmed it was RED before the fix (recorded).
 - **Parallelism:** disjoint from T-66-02/T-66-03/T-66-04..T-66-08.
+- **DONE:** RED captured —
+  `AssertionError: expected the valid OpenRouter id 'moonshotai/kimi-k2.5', got
+  'kimi-2.7' (full argv: ['pi', '--mode', 'json', '--tools', 'read,write,edit,bash',
+  '--model', 'kimi-2.7', '-p'])`. Root cause fixed: 3 coordinated literals
+  (`model_profiles.py:102-103`, `harness_models.py:75,99`) + the pinning test +
+  6 downstream tests/1 golden fixture that assert the catalog/label directly (all
+  legitimately updated, none weakened). GOTCHA found + registered as bug
+  `pi-executed-path-cli-tests-invoke-real-pi-binary` (MEDIUM,
+  `specs/bugs/20260708T15Z-00.jsonl`):  `PiHeadlessAdapter.__init__`'s
+  `runner: Runner = subprocess.run` default binds at class-definition time, so
+  `monkeypatch.setattr("...pi_runtime.subprocess.run", fake)` never reaches an
+  already-constructed adapter's `self._runner` — the pre-existing CLI-level pi test
+  (`test_pipeline_runs_first_step_on_pi_harness_end_to_end`) was a latent
+  false-positive that actually invoked the real `pi` binary on PATH. Routed around
+  (not fixed, out of Wave-A scope) by monkeypatching
+  `container.build_agent_runtime`'s `PI_HEADLESS` branch to construct
+  `PiHeadlessAdapter(..., runner=fake_pi_run, ...)` directly — the same
+  constructor-injection seam `test_pi_runner_ring2.py`/`test_codex_exec_runtime.py`
+  already use — while keeping the CLI, `--step-model` resolution, and the full
+  `LifecyclePipeline`/gate chain real. AC-MUT proof-of-bite: reverted
+  `model_id="moonshotai/kimi-k2.5"` → `"kimi-2.7"` in `model_profiles.py`, confirmed
+  `_assert_profiles_resolve()` raises at import time (`ValueError: profile
+  'pi-openrouter-kimi-high' resolves to kimi-2.7:high, not a pi catalog option`),
+  re-applied the fix, confirmed green again. Gates: ruff format/check clean, mypy
+  --strict clean on `model_profiles.py`/`harness_models.py`, 137/137 scoped tests
+  green.
 
 ### T-66-02 — FR4: codex adapter passes `--skip-git-repo-check`
 

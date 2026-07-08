@@ -99,12 +99,14 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
     WorkflowModelProfile(
         id="pi-openrouter-kimi-high",
         harness="pi",
-        label="OpenRouter — kimi-2.7 (high)",
-        model_id="kimi-2.7",
+        label="OpenRouter — kimi-k2.5 (high)",
+        model_id="moonshotai/kimi-k2.5",
         effort="high",
-        purpose="OpenRouter kimi-2.7 (high reasoning) as a governed PI worker (v0.1.44 "
-        "allowlist-validated Layer-2-native id). Carries no registry pricing row — cost "
-        "reports 'unknown', never fabricated.",
+        purpose="OpenRouter moonshotai/kimi-k2.5 (high reasoning) as a governed PI worker "
+        "(v0.1.44 allowlist-validated Layer-2-native id; corrected to the valid "
+        "OpenRouter-namespaced id in v0.1.66 FR3 — the prior 'kimi-2.7' literal was "
+        "rejected by OpenRouter). Carries no registry pricing row — cost reports "
+        "'unknown', never fabricated.",
     ),
 )
 

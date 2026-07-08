@@ -243,10 +243,11 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
 
     Selecting the kimi profile on a pi step, saving via PUT, reloading via GET, and
     resolving the persisted overlay all agree: the persisted value is the PROFILE ID
-    ``pi-openrouter-kimi-high`` (not a raw ``kimi-2.7:high`` — the resolver rejects raw
-    ids), and the resolver resolves that profile to the discrete pi option
-    ``kimi-2.7:high`` (model ``kimi-2.7`` at effort ``high``). No changes to the overlay
-    store or resolver — only a new built-in profile makes kimi reachable.
+    ``pi-openrouter-kimi-high`` (not a raw ``moonshotai/kimi-k2.5:high`` — the resolver
+    rejects raw ids), and the resolver resolves that profile to the discrete pi option
+    ``moonshotai/kimi-k2.5:high`` (model ``moonshotai/kimi-k2.5`` at effort ``high``;
+    v0.1.66 FR3 corrected the id from the invalid ``kimi-2.7``). No changes to the
+    overlay store or resolver — only a new built-in profile makes kimi reachable.
     """
     store = _store(tmp_path)
     factory = _factory(store)
@@ -281,16 +282,17 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
     persisted = got["policy"]["contexts"]["default"]["workflows"]["implementation"]
     assert persisted["steps"]["implement"] == "pi-openrouter-kimi-high"
 
-    # The resolver resolves the persisted profile to the pi kimi-2.7:high option.
+    # The resolver resolves the persisted profile to the pi moonshotai/kimi-k2.5:high
+    # option.
     resolver = factory("default")
     snapshot = resolver.resolve("implementation", context="default")
     entry = snapshot.step("implement")
     assert entry is not None
     assert entry.harness == "pi"
     assert entry.model_profile == "pi-openrouter-kimi-high"
-    assert entry.model == "kimi-2.7"
+    assert entry.model == "moonshotai/kimi-k2.5"
     assert entry.reasoning == "high"
-    assert f"{entry.model}:{entry.reasoning}" == "kimi-2.7:high"
+    assert f"{entry.model}:{entry.reasoning}" == "moonshotai/kimi-k2.5:high"
 
 
 # ---------------------------------------------------------------------------

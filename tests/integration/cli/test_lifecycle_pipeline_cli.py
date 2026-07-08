@@ -208,3 +208,109 @@ def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
     )
     # result.output is the COMBINED stream (Click 8.2+); stdout stays pure JSON.
     assert "[harness]" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# v0.1.66 Wave A — FR3/FR4/FR5 executed-path reproductions (T-66-01..T-66-03).
+# ---------------------------------------------------------------------------
+
+
+def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-66-01 (FR3, AC3(repro)): ``--step-model implement=pi-openrouter-kimi-high``
+    must reach the real ``pi`` subprocess argv with a valid OpenRouter model id.
+
+    Drives the real CLI (``--step-model`` parsing, the real
+    ``WorkflowExecutionPolicyResolver``, ``apply_resolved_policy``, the real
+    ``LifecyclePipeline``/``LifecycleAgentRunner``/``LifecycleStateMachine`` chain) end
+    to end. Only the outermost I/O boundary is faked: ``container.build_agent_runtime``'s
+    ``PI_HEADLESS`` branch is patched to inject ``runner=fake_pi_run`` at
+    ``PiHeadlessAdapter`` CONSTRUCTION (the same seam ``test_pi_runner_ring2.py`` and
+    ``test_codex_exec_runtime.py`` use), because ``PiHeadlessAdapter.__init__`` binds its
+    ``runner`` default (``subprocess.run``) at class-definition time — a later
+    ``monkeypatch.setattr("...pi_runtime.subprocess.run", ...)`` does not reach an
+    already-bound default (registered as bug
+    ``pi-executed-path-cli-tests-invoke-real-pi-binary``). Everything above the
+    constructor call — ``_command``'s real argv assembly, the real ``.run()`` body, the
+    real gate — still runs unmodified, so this proves the real command-construction
+    path, not just the profile registry in isolation.
+    """
+    import subprocess as _subprocess
+
+    from dadaia_workspace import container
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
+
+    captured: dict[str, list[str]] = {}
+
+    events = [
+        {"type": "message_start"},
+        {
+            "type": "message_end",
+            "message": {"role": "assistant", "content": "implementation via kimi profile"},
+        },
+    ]
+    stdout = "\n".join(json.dumps(event) for event in events) + "\n"
+
+    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        assert isinstance(args, list)
+        captured["argv"] = args
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+
+    real_build_agent_runtime = container.build_agent_runtime
+
+    def patched_build_agent_runtime(
+        kind: object, *, cwd: Path | None = None, model: object = None
+    ) -> object:
+        from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+
+        if kind is AgentRuntimeKind.PI_HEADLESS:
+            run_dir = cwd or Path.cwd()
+            pi_config = (
+                PiHeadlessConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
+                if model is not None
+                else PiHeadlessConfig(cwd=run_dir)
+            )
+            return PiHeadlessAdapter(
+                pi_config, runner=fake_pi_run, environ={}, git=GitSubprocessClient()
+            )
+        return real_build_agent_runtime(kind, cwd=cwd, model=model)
+
+    monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-kimi",
+            "--harness",
+            "pi",
+            "--step-model",
+            "implement=pi-openrouter-kimi-high",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    argv = captured["argv"]
+    assert "--model" in argv, argv
+    model_value = argv[argv.index("--model") + 1]
+    # AC3(repro): on current code this captures the invalid literal "kimi-2.7" (fails
+    # OpenRouter's id contract); after the fix it must be the valid, namespaced id.
+    assert model_value == "moonshotai/kimi-k2.5", (
+        f"expected the valid OpenRouter id 'moonshotai/kimi-k2.5', got {model_value!r} "
+        f"(full argv: {argv})"
+    )

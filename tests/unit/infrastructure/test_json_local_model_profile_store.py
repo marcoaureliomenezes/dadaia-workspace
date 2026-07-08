@@ -191,11 +191,11 @@ def test_save_uses_atomic_write_no_temp_leftover(tmp_path: Path) -> None:
 def test_allowlisted_openrouter_model_id_accepted(tmp_path: Path) -> None:
     # AC-5 (v0.1.44): an operator pi profile naming an allowlisted OpenRouter id loads.
     good = _valid_profile()
-    good["model_id"] = "kimi-2.7"
+    good["model_id"] = "moonshotai/kimi-k2.5"
     store = _write(_workspace(tmp_path), _valid_store([good]))
     profiles = store.load()
     assert len(profiles) == 1
-    assert profiles[0].model_id == "kimi-2.7"
+    assert profiles[0].model_id == "moonshotai/kimi-k2.5"
 
 
 def test_model_id_outside_allowlist_union_rejected(tmp_path: Path) -> None:

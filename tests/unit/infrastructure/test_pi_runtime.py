@@ -628,8 +628,8 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
     )
 
     # The id is a real, allowlist-validated pi catalog option.
-    option = validate("pi", "kimi-2.7:high")
-    assert option.model_id == "kimi-2.7"
+    option = validate("pi", "moonshotai/kimi-k2.5:high")
+    assert option.model_id == "moonshotai/kimi-k2.5"
 
     captured: list[list[str]] = []
 
@@ -645,7 +645,7 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
         resolved_model=ResolvedModelConfig(
             profile_id="pi-operator-kimi",
             harness="pi",
-            model="kimi-2.7",
+            model="moonshotai/kimi-k2.5",
             reasoning="high",
             source=PolicySource.CLI,
         ),
@@ -661,7 +661,10 @@ def test_pi_openrouter_model_id_passes_through_unchanged(tmp_path: Path) -> None
         "--tools",
         "read,write,edit,bash",
     ]
-    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "kimi-2.7"]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+        "--model",
+        "moonshotai/kimi-k2.5",
+    ]
 
 
 def test_pi_no_model_flag_when_neither_request_nor_config(tmp_path: Path) -> None:

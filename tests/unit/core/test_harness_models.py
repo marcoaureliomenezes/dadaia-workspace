@@ -1,7 +1,7 @@
 """Unit tests for the discrete per-harness Layer-2 model catalog (T-24-04, WS-2).
 
 LAW 2 (v0.1.44, supersedes ADR-B): pi → 4 discrete options (incl. OpenRouter
-``kimi-2.7``), codex → 2; both allowlist-validated; never
+``moonshotai/kimi-k2.5``), codex → 2; both allowlist-validated; never
 ``claude-*``. Every catalog id resolves via the union of ``model_registry.REGISTRY``
 codex ids and the curated Layer-2 allowlist (``LAYER2_EXTRA_MODEL_IDS``).
 """
@@ -25,7 +25,7 @@ from dadaia_workspace.core.model_registry import REGISTRY
 
 
 def test_pi_has_exactly_four_options() -> None:
-    # v0.1.44: pi opened to the curated OpenRouter set (kimi-2.7), so 3 → 4.
+    # v0.1.44: pi opened to the curated OpenRouter set (moonshotai/kimi-k2.5), so 3 → 4.
     assert len(options_for(PI_HARNESS)) == 4
 
 
@@ -38,7 +38,7 @@ def test_pi_catalog_is_the_confirmed_operator_set() -> None:
         HarnessModelOption("gpt-5.5", "high"),
         HarnessModelOption("gpt-5.5", "low"),
         HarnessModelOption("gpt-5.3-codex", "medium"),
-        HarnessModelOption("kimi-2.7", "high"),
+        HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     )
 
 
@@ -113,7 +113,7 @@ def test_model_choices_are_disambiguated_pairs() -> None:
         "gpt-5.5:high",
         "gpt-5.5:low",
         "gpt-5.3-codex:medium",
-        "kimi-2.7:high",
+        "moonshotai/kimi-k2.5:high",
     )
 
 
@@ -127,8 +127,8 @@ def test_options_for_unknown_harness_is_empty() -> None:
 
 
 def test_layer2_extra_model_ids_is_the_curated_named_set() -> None:
-    """The allowlist is a minimal, explicitly-named set (no wildcard) — this release: kimi-2.7."""
-    assert set(harness_models.LAYER2_EXTRA_MODEL_IDS) == {"kimi-2.7"}
+    """The allowlist is a minimal, explicitly-named set (no wildcard) — this release: moonshotai/kimi-k2.5."""
+    assert set(harness_models.LAYER2_EXTRA_MODEL_IDS) == {"moonshotai/kimi-k2.5"}
 
 
 def test_known_layer2_model_ids_is_codex_union_extra() -> None:
@@ -138,14 +138,14 @@ def test_known_layer2_model_ids_is_codex_union_extra() -> None:
     for entry in REGISTRY:
         assert entry.codex_id in known
     # ... and the curated OpenRouter id.
-    assert "kimi-2.7" in known
+    assert "moonshotai/kimi-k2.5" in known
     assert known == frozenset(e.codex_id for e in REGISTRY) | harness_models.LAYER2_EXTRA_MODEL_IDS
 
 
 def test_registry_is_unchanged_by_harness_models_allowlist() -> None:
     """R6: the OpenRouter ids are NOT inserted into model_registry.REGISTRY."""
     codex_ids = {entry.codex_id for entry in REGISTRY}
-    assert "kimi-2.7" not in codex_ids
+    assert "moonshotai/kimi-k2.5" not in codex_ids
     # No registry entry was fabricated to carry the OpenRouter id.
     assert all(not entry.codex_id.startswith("kimi") for entry in REGISTRY)
 
@@ -157,7 +157,7 @@ def test_codex_tier_views_does_not_raise_with_allowlist_present() -> None:
     views = codex_tier_views()
     assert len(views) >= 1
     # No tier collapsed onto a fabricated OpenRouter id.
-    assert all(view.codex_id != "kimi-2.7" for view in views)
+    assert all(view.codex_id != "moonshotai/kimi-k2.5" for view in views)
 
 
 # ---------------------------------------------------------------------------
@@ -167,19 +167,23 @@ def test_codex_tier_views_does_not_raise_with_allowlist_present() -> None:
 
 def test_pi_catalog_contains_the_openrouter_option() -> None:
     """The curated OpenRouter id is a present, selectable pi option, validated via the union."""
-    assert HarnessModelOption("kimi-2.7", "high") in options_for(PI_HARNESS)
-    assert validate(PI_HARNESS, "kimi-2.7:high") == HarnessModelOption("kimi-2.7", "high")
-    assert validate(PI_HARNESS, "kimi-2.7") == HarnessModelOption("kimi-2.7", "high")
+    assert HarnessModelOption("moonshotai/kimi-k2.5", "high") in options_for(PI_HARNESS)
+    assert validate(PI_HARNESS, "moonshotai/kimi-k2.5:high") == HarnessModelOption(
+        "moonshotai/kimi-k2.5", "high"
+    )
+    assert validate(PI_HARNESS, "moonshotai/kimi-k2.5") == HarnessModelOption(
+        "moonshotai/kimi-k2.5", "high"
+    )
 
 
 def test_codex_catalog_unchanged_no_openrouter_id() -> None:
     """The codex catalog is NOT opened — codex runs only on registry codex ids."""
-    assert all(opt.model_id != "kimi-2.7" for opt in options_for(CODEX_HARNESS))
+    assert all(opt.model_id != "moonshotai/kimi-k2.5" for opt in options_for(CODEX_HARNESS))
 
 
 def test_assert_ids_known_accepts_openrouter_id_via_union() -> None:
     """The relaxed invariant accepts an allowlisted OpenRouter id."""
-    catalog = {PI_HARNESS: (HarnessModelOption("kimi-2.7", "high"),)}
+    catalog = {PI_HARNESS: (HarnessModelOption("moonshotai/kimi-k2.5", "high"),)}
     with mock.patch.object(harness_models, "_CATALOG", catalog):
         harness_models._assert_ids_known()  # must not raise
 

@@ -248,8 +248,9 @@ def test_profiles_surface_full_pi_model_choices_incl_openrouter_kimi() -> None:
     """T-45-06: the profiles endpoint carries the full per-harness allowed model set.
 
     The pi harness surfaces the complete ``known_layer2_model_ids()`` catalog including the
-    curated OpenRouter id — value ``kimi-2.7:high`` (effort suffix NOT stripped), labelled
-    "OpenRouter — kimi-2.7 (high)".
+    curated OpenRouter id — value ``moonshotai/kimi-k2.5:high`` (effort suffix NOT
+    stripped; v0.1.66 FR3 corrected the id from the invalid ``kimi-2.7``), labelled
+    "OpenRouter — moonshotai/kimi-k2.5 (high)".
     """
     view = render_api_workflow_model_profiles()
     status, payload = _decode(view())
@@ -260,23 +261,23 @@ def test_profiles_surface_full_pi_model_choices_incl_openrouter_kimi() -> None:
 
     pi_values = [c["value"] for c in choices["pi"]]
     # The exact effort-suffixed value is present and un-stripped.
-    assert "kimi-2.7:high" in pi_values
+    assert "moonshotai/kimi-k2.5:high" in pi_values
     # The full model_choices('pi') set is surfaced (no narrowing).
     assert set(pi_values) == {
         "gpt-5.5:high",
         "gpt-5.5:low",
         "gpt-5.3-codex:medium",
-        "kimi-2.7:high",
+        "moonshotai/kimi-k2.5:high",
     }
 
-    kimi = next(c for c in choices["pi"] if c["value"] == "kimi-2.7:high")
-    assert kimi["label"] == "OpenRouter — kimi-2.7 (high)"
+    kimi = next(c for c in choices["pi"] if c["value"] == "moonshotai/kimi-k2.5:high")
+    assert kimi["label"] == "OpenRouter — moonshotai/kimi-k2.5 (high)"
 
     # A registry (non-OpenRouter) id is labelled without the OpenRouter prefix.
     gpt = next(c for c in choices["pi"] if c["value"] == "gpt-5.5:high")
     assert gpt["label"] == "gpt-5.5 (high)"
     # codex does not carry the OpenRouter kimi option.
-    assert "kimi-2.7:high" not in [c["value"] for c in choices["codex"]]
+    assert "moonshotai/kimi-k2.5:high" not in [c["value"] for c in choices["codex"]]
 
 
 # ---------------------------------------------------------------------------
