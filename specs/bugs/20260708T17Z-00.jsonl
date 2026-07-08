@@ -1,0 +1,7 @@
+{"bug_id": "pi-headless-nonzero-exit-misreported", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:01:55Z"}
+{"bug_id": "lifecycle-agent-run-result-extraction-too-strict", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:01:57Z"}
+{"bug_id": "pi-openrouter-kimi-profile-invalid-model-id", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:01:58Z"}
+{"bug_id": "codex-exec-adapter-missing-skip-git-repo-check", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:01:59Z"}
+{"bug_id": "codex-exec-sandbox-default-fails-in-container", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:02:01Z"}
+{"bug_id": "lifecycle-resume-reports-ok-without-advancing", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:02:02Z"}
+{"bug_id": "lifecycle-implement-step-write-scope-too-narrow", "event": "resolved", "release": "v0.1.66", "reported_by": "software-engineer", "ts": "2026-07-08T17:02:03Z"}

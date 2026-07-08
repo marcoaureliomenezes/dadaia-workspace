@@ -1,22 +1,21 @@
 ---
-release: v0.1.66
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.66 — Layer-2 Worker Path Remediation
+# Active release: none
 
-Defined from 7 registered bugs (`specs/bugs/20260708T15Z-00.jsonl`, all open,
-5 HIGH + 2 MEDIUM) surfaced by a remote user blocked running `dd-chain-capture
-v0.2.0` through `dadaia lifecycle pipeline` on both the `pi` and `codex`
-Layer-2 worker paths. Intake: `specs/backlog/remote-bugs/*.md` (5 reports).
-Mandatory `dadaia-grill-me` session completed; refinement report at
-`.dadaia/reports/dadaia-workspace/product-engineer/2026-07-08T153000Z-refine-v0166.html`.
+**v0.1.66 — Layer-2 Worker Path Remediation** shipped and closed 2026-07-08:
+merged `70c9760c` (PR #126, all CI green incl. post-merge main); closure on
+`chore/v0.1.66-closure`. Fixed 7 dadaia-workspace product bugs blocking a remote
+user's Layer-2 (pi/codex) workflows — each root-cause, reproduced RED-first on
+the real executed path, proven GREEN, plus a real-binary pi/codex smoke. All 7
+carry `resolved` terminal events.
 
-**Prior release:** v0.1.65 shipped and closed 2026-07-08 (merged `962a23da`,
-PR #124). Bug ledger was 0 open before this intake landed.
-
-**Operator hard mandate (folded into SPEC's "Reproduction & TDD mandate"
-section):** every FR requires a RED-first executed-path reproduction test
-(driving the real `dadaia lifecycle` CLI, not a helper call) that fails for the
-exact reason the user hit, a root-cause fix with no workarounds/config
-band-aids/test-only shims, and the same test GREEN after the fix.
+**Next-pick debt (outranks plain backlog per release-governance):** 2 open bugs
+discovered mid-release — `pi-e2e-test-false-positive-loose-blocked-reason-assertion`
+(HIGH) and `pi-executed-path-cli-tests-invoke-real-pi-binary` (MEDIUM), both the
+executed-path/false-positive-test class. Live backlog: `panel-tab-reorg-agentic-layers`
+(candidate), `dispatch-band-legacy-fallback-removal` (eligible 2026-08-01),
+`platform-seam-todo-retirement`, `specs-doctor-partial-archive-invariant`.
+Operator-pending: optional PyPI deploy (v0.1.61–66 unpublished).
