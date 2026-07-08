@@ -104,7 +104,7 @@ this is not optional even for the "trivial config" tasks in Wave A.
   green (31/31 scoped tests). Gates: ruff format/check clean, mypy --strict clean
   on `codex_runtime.py`.
 
-### T-66-03 — FR5: codex sandbox env override `[-]`
+### T-66-03 — FR5: codex sandbox env override `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py` (the
@@ -131,6 +131,35 @@ this is not optional even for the "trivial config" tasks in Wave A.
 - **Done criterion:** AC5.1, AC5.2, AC5.3, AC5(repro) all GREEN; RED capture
   recorded.
 - **Parallelism:** sequenced after T-66-02.
+- **DONE:** RED captured — executed-path `test_codex_pipeline_sandbox_override_
+  avoids_container_bwrap_failure`:
+  `AssertionError: expected '--sandbox workspace-write' in the real codex argv,
+  got ['codex', 'exec', '--ignore-user-config', '--skip-git-repo-check',
+  '--sandbox', 'read-only', ...] — the fake returned the bwrap failure because
+  the env override never reached argv`; plus 5/6 new unit tests RED (the 6th,
+  the unset-default regression guard, correctly PASSED pre-fix too — it asserts
+  no-change-for-the-unset-case). Root cause fixed per architect finding
+  MEDIUM-1 (single choke point): `CodexExecConfig.sandbox` changed to a
+  sentinel `str | None = None`; `__post_init__` — the one path EVERY
+  construction passes through, both `container.py` call sites (`model is
+  not None` / `model is None`) and any future call site — resolves
+  `DADAIA_CODEX_SANDBOX` only when the caller passed no explicit `sandbox=`
+  (an explicit caller value always wins over the env var), then ALWAYS
+  validates the resolved value against `{read-only, workspace-write,
+  danger-full-access}` regardless of source, raising `ValueError` on a bad
+  value from either the caller or the env — and stores the resolved concrete
+  string back via `object.__setattr__` (frozen-dataclass escape hatch) so
+  `_command` reads a plain, pre-validated `str` via the new
+  `resolved_sandbox` typed accessor (avoids a `str | None` leak into the
+  `list[str]` argv — confirmed by mypy --strict). Confirmed
+  `DADAIA_CODEX_SANDBOX=danger-full-access` reaches the real
+  `--sandbox danger-full-access` argv end-to-end
+  (`test_sandbox_override_reaches_the_command_argv`, GREEN) — the bwrap-free
+  value that actually unblocks the reported container failure. AC-MUT
+  proof-of-bite: reverted the whole `__post_init__`/sentinel-default patch,
+  confirmed 6/7 new tests fail (the regression guard stays green, as
+  designed), re-applied, confirmed 39/39 scoped tests green. Gates: ruff
+  format/check clean, mypy --strict clean on `codex_runtime.py`.
 
 ---
 

@@ -435,3 +435,127 @@ def test_codex_pipeline_untrusted_dir_no_longer_blocks_on_trust_error(
     assert "trusted directory" not in reason, (
         f"pipeline still blocked on the codex trust error: {reason!r} (argv={argv!r})"
     )
+
+
+def test_codex_pipeline_sandbox_override_avoids_container_bwrap_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-66-03 (FR5, AC5(repro)): ``DADAIA_CODEX_SANDBOX=workspace-write`` must reach the
+    real ``--sandbox`` argv, so a governed worker running inside a constrained container
+    (no ``bwrap`` loopback network capability) never fails codex's own sandbox setup on
+    the compiled-in ``read-only`` default.
+
+    Drives the real CLI (``--harness codex``), the real ``LifecyclePipeline``/gate
+    chain, and the real ``CodexExecAdapter._command``/``.run()``/``CodexExecConfig``
+    construction (the single choke point that resolves the env override — architect
+    finding MEDIUM-1). Only ``subprocess.run`` is faked (constructor-injected — see
+    ``_patch_build_agent_runtime_for_codex``): the fake inspects the REAL captured argv
+    and returns the real bwrap-failure stderr whenever ``--sandbox`` is ``read-only``,
+    exactly reproducing the user-hit container failure mode on current code.
+    """
+    import subprocess as _subprocess
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        assert isinstance(args, list)
+        captured["argv"] = args
+        sandbox_value = args[args.index("--sandbox") + 1] if "--sandbox" in args else None
+        if sandbox_value == "read-only":
+            return _subprocess.CompletedProcess(
+                args=args,
+                returncode=1,
+                stdout="",
+                stderr="bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+            )
+        output_path = Path(args[args.index("--output-last-message") + 1])
+        output_path.write_text(
+            json.dumps({"summary": "codex exec completed via injected runner"}),
+            encoding="utf-8",
+        )
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-codex-sandbox",
+            "--harness",
+            "codex",
+            "--json",
+        ],
+    )
+
+    argv = captured["argv"]
+    # AC5(repro): on current code nothing reads DADAIA_CODEX_SANDBOX, so the argv still
+    # carries read-only, the fake returns the real bwrap failure, and the pipeline
+    # blocks on it.
+    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"], (
+        f"expected '--sandbox workspace-write' in the real codex argv, got {argv!r} — "
+        f"the fake returned the bwrap failure because the env override never reached argv"
+    )
+    payload = json.loads(result.output)
+    reason = (payload.get("blocked") or {}).get("reason", "")
+    assert "bwrap" not in reason, (
+        f"pipeline still blocked on the container bwrap failure: {reason!r} (argv={argv!r})"
+    )
+
+
+def test_codex_pipeline_sandbox_default_stays_read_only_when_env_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC5.2 regression guard, executed-path: with no env override, the real argv still
+    carries the compiled-in `--sandbox read-only` default — no behavior change for the
+    already-correct unset case."""
+    import subprocess as _subprocess
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        assert isinstance(args, list)
+        captured["argv"] = args
+        output_path = Path(args[args.index("--output-last-message") + 1])
+        output_path.write_text(json.dumps({"summary": "codex exec completed"}), encoding="utf-8")
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+    monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--run-id",
+            "pipe-codex-sandbox-default",
+            "--harness",
+            "codex",
+            "--json",
+        ],
+    )
+
+    argv = captured["argv"]
+    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "read-only"]
