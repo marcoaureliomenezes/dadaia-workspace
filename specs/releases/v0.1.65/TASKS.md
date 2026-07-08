@@ -31,7 +31,11 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   Done when: entry added; `registry_by_claude_id`/`codex_tier_views` invariants pass;
   derived MODEL_MAP/PRICING_TABLE tests updated. Parallel: safe with W2.
 
-- [-] **T-65-02 — Core policy model + template registry + resolver (FR2, FR4, D-3, D-4)**
+- [x] **T-65-02 — Core policy model + template registry + resolver (FR2, FR4, D-3, D-4)**
+  Completion note: RED captured as collection failure (ModuleNotFoundError) of
+  `tests/unit/core/test_agent_model_templates.py` before the core modules existed;
+  28 tests green after (template asserts, D-3 clamp table, FR4 precedence matrix incl.
+  AC-3 merge + F-6 pack asymmetry). mypy/ruff/lint-imports (9 kept / 0 broken) green.
   Write set: `dadaia_workspace/core/models/agent_model_policy.py` (new),
   `dadaia_workspace/core/agent_model_templates.py` (new),
   `tests/unit/core/test_agent_model_templates.py` (new).
