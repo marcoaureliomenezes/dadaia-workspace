@@ -229,6 +229,9 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
         AuthClass.BEARER,
     ),
     (r"^/api/workflow-model-policy$", "api_workflow_model_policy", AuthClass.BEARER),
+    # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
+    (r"^/api/agent-model-policy$", "api_agent_model_policy", AuthClass.BEARER),
+    (r"^/api/agent-model-templates$", "api_agent_model_templates", AuthClass.BEARER),
     (r"^/api/lifecycle-runs$", "api_lifecycle_runs", AuthClass.BEARER),
     (r"^/api/workflow-step-ledger$", "api_workflow_step_ledger", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)
@@ -300,9 +303,12 @@ _QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
 # type and call the view with ``body`` / ``content_type`` / ``qs``.
 _PUT_ROUTE_TABLE: list[tuple[str, str]] = [
     (r"^/api/workflow-model-policy$", "api_workflow_model_policy_put"),
+    # L1 agent model-governance Apply (v0.1.65 FR8 / G-2 — T-65-11).
+    (r"^/api/agent-model-policy$", "api_agent_model_policy_put"),
 ]
 _POST_BODY_ROUTE_TABLE: list[tuple[str, str]] = [
     (r"^/api/workflow-model-policy/validate$", "api_workflow_model_policy_validate"),
+    (r"^/api/agent-model-policy/validate$", "api_agent_model_policy_validate"),
 ]
 _COMPILED_PUT_ROUTE_TABLE: list[tuple[re.Pattern[str], str]] = [
     (re.compile(pat), name) for pat, name in _PUT_ROUTE_TABLE

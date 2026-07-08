@@ -243,7 +243,19 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   Done when: store + re-render injected (no features→infrastructure import;
   `lint-imports` green in-wave).
 
-- [-] **T-65-11 — API endpoints (FR8)** — owner: software-engineer
+- [x] **T-65-11 — API endpoints (FR8)** — owner: software-engineer
+  Completion note: RED captured as collection failure (ModuleNotFoundError) of
+  `tests/unit/features/panel/test_api_agent_policy.py` before the view module
+  existed; 16 tests green after. `views/agent_policy.py` mirrors the workflow-policy
+  pipeline exactly (415 → 413 → 400 invalid-JSON → 400 non-object root → 400
+  shape/semantic via the shared store parse — AC-4 messages verbatim incl. D-7);
+  GET `{exists, policy, resolved}` (invalid overlay ⇒ 409, missing ≠ invalid);
+  templates payload (3 rosters + registry models + effort vocab); PUT = validate →
+  atomic save → re-render BOTH projections (G-2), response carries `rerendered` +
+  per-harness `instructions`. Routes registered in `_ROUTE_TABLE` (GET ×2, BEARER),
+  `_PUT_ROUTE_TABLE`, `_POST_BODY_ROUTE_TABLE`; foreign Host → 403 asserted at the
+  handler layer. Full panel unit suite 592→608 green; mypy --strict, ruff,
+  lint-imports (9 kept / 0 broken) green.
   Write set: `dadaia_workspace/features/panel/views/agent_policy.py` (new),
   `dadaia_workspace/features/panel/handler.py` (routes only),
   `tests/unit/features/panel/test_api_agent_policy.py` (new).

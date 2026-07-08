@@ -65,6 +65,12 @@ from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportW
 from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
+from dadaia_workspace.features.panel.views.agent_policy import (
+    render_api_agent_model_policy,
+    render_api_agent_model_templates,
+    render_post_agent_model_policy_validate,
+    render_put_agent_model_policy,
+)
 from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
@@ -1563,6 +1569,9 @@ def build_panel_views(
     policy_store = build_workflow_model_policy_store(workspace_root)
     run_store = build_lifecycle_run_store(workspace_root)
     fragment_loader = build_fragment_loader()
+    # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
+    # dedicated factory (D-4 — the feature service never imports infrastructure).
+    agent_policy_service = build_agent_model_policy_service(workspace_root)
 
     def _resolver_factory(
         context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
@@ -1602,6 +1611,13 @@ def build_panel_views(
         "api_workflow_model_policy_put": render_put_workflow_model_policy(
             policy_store, _resolver_factory
         ),
+        # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
+        "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
+        "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),
+        "api_agent_model_policy_validate": render_post_agent_model_policy_validate(
+            agent_policy_service
+        ),
+        "api_agent_model_policy_put": render_put_agent_model_policy(agent_policy_service),
         "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
         "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),
