@@ -5,7 +5,7 @@ opened: 2026-07-04
 owner: project-manager (curates)
 source: v0.1.58 closure backlog return (three-round golden CI saga — security reviewer meta-observation)
 intents:
-  - subject: { kind: code, ref: "tests/unit/infrastructure/test_install_target_goldens.py#_norm_path_line" }
+  - subject: { kind: code, ref: "tests/helpers/golden_platform.py#norm_path_line" }
     change: "consolidate the per-test golden-normalization helpers into ONE shared platform-invariance layer for golden capture. v0.1.58's W1 goldens leaked THREE environmental-state classes that turned CI red one round at a time on the -cross matrix — (1) host denylist state read from cwd (60f42904), (2) directory-iteration order Windows vs Linux (c02e74f6), (3) OS-phrased exec-probe text exited-127 vs WinError-193 (1dadfafe) — each fixed test-only with a bespoke helper (_norm_path_line, _sort_line_lists, _canon_env_line). Extract these into a single reusable platform-invariance module (host-state canonicalization + sorted-multiset report-list locks + OS-phrase canonicalization) so a new byte-golden is platform-invariant BY CONSTRUCTION, not by re-discovering each leak class in a fresh CI round. Extends the v0.1.55 golden-authoring law (specs/memory/quality-assurance.md)."
 ---
 

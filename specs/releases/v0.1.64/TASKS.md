@@ -242,7 +242,7 @@ mutation-sanity: each new test class is sabotaged → shown to FAIL → reverted
 
 ## W4 — gates + projection ship
 
-- [ ] T-64-40 Full gates + instance re-projection. Owner: software-engineer (orchestrated; shell via PM/operator).
+- [-] T-64-40 Full gates + instance re-projection. Owner: software-engineer (orchestrated; shell via PM/operator).
   Checklist: `ruff format --check` + `ruff check --no-cache` + `mypy --strict` + full **unpiped** `pytest` +
   `lint-imports --no-cache` (8/0, ignore-cap unchanged) + `dadaia specs doctor` (exit 0) + `dadaia backlog doctor`
   (exit 0); v0.1.50 frozen no-steal suite **zero-diff**; `dadaia public stage` → `dadaia public install --target
