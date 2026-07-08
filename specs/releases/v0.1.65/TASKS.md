@@ -67,7 +67,14 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 
 ## Wave 2 — Bug fixes (parallel with Wave 1 — disjoint write sets)
 
-- [-] **T-65-04 — backlog doctor YAML parse misdiagnosis (FR10)** — owner: software-engineer
+- [x] **T-65-04 — backlog doctor YAML parse misdiagnosis (FR10)** — owner: software-engineer
+  Completion note: RED captured — repro fixture (unquoted `source: text (note: …)` +
+  valid `intents[]`) failed 4 tests before the fix
+  (`tests/unit/features/backlog/test_frontmatter_yaml_parse_error.py`). After: loader
+  captures `frontmatter_error` (YAML problem + mark, file-line corrected +1 for the
+  opening `---`); doctor emits `frontmatter YAML parse error: … (line L, column C)` and
+  suppresses downstream no-intents/unresolved/status findings for that item; all
+  pre-existing backlog integration suites green untouched (16 passed).
   Write set: `dadaia_workspace/features/backlog/preview.py`,
   `dadaia_workspace/features/backlog/doctor.py`,
   `tests/unit/features/backlog/` (loader + doctor tests).

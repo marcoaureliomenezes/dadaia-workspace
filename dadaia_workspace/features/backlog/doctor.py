@@ -132,6 +132,20 @@ def _is_intents_exempt(status: str | None) -> bool:
 def _check_schema(ctx: DoctorContext) -> list[Finding]:
     findings: list[Finding] = []
     for item in ctx.items:
+        # FR10 (v0.1.65): a frontmatter that failed to parse as YAML is its own loud
+        # BL-SCHEMA ERROR, and every downstream diagnostic (no-intents, unresolved
+        # subjects, status) is suppressed for that item — they are all artifacts of
+        # the parse failure, not independent findings.
+        if item.frontmatter_error is not None:
+            findings.append(
+                Finding(
+                    BacklogDoctorCode.BL_SCHEMA,
+                    Severity.ERROR,
+                    f"frontmatter YAML parse error: {item.frontmatter_error}",
+                    slug=item.slug,
+                )
+            )
+            continue
         # A malformed ``intents:`` frontmatter is always BL-SCHEMA, at ANY status.
         if item.intents_error is not None:
             findings.append(
