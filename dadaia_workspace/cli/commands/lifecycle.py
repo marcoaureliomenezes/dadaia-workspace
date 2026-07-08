@@ -18,6 +18,7 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
+from dadaia_workspace.core.session_env import entry_harness
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
 from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
@@ -343,7 +344,9 @@ def backlog_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Default Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_harness: list[str] | None = typer.Option(
         None,
@@ -370,6 +373,7 @@ def backlog_define(
     whole sequence; ``claude`` is rejected (LAW 1); the per-step model is profile-ids-only
     via ``--step-model`` (D-3) — the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -472,7 +476,9 @@ def release_define(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Default Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Default Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_harness: list[str] | None = typer.Option(
         None,
@@ -497,6 +503,7 @@ def release_define(
     missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
     advances the release to IMPLEMENTATION only when every gate passed.
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -642,7 +649,9 @@ def implement(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -653,6 +662,7 @@ def implement(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the implementation step on a selectable harness."""
+    harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="implement",
         role="software-engineer",
@@ -667,6 +677,30 @@ def implement(
         step_model=step_model,
         json_output=json_output,
     )
+
+
+def _resolve_default_harness(harness: str) -> str:
+    """Resolve the ``auto`` default sentinel to a concrete Layer-2 harness name (FR3).
+
+    The single shim behind every ``--harness`` option (12 sites, default ``"auto"``):
+    an explicit value passes through unchanged; ``auto`` resolves to
+    :func:`~dadaia_workspace.core.session_env.entry_harness` (``DADAIA_ENTRY_HARNESS``
+    pin > ``CODEX_SESSION_ID`` ⇒ codex) or the previous default ``"fake"`` when no entry
+    signal is present. Auto-defaulting a REAL worker (codex/pi) is never silent: the
+    loud echo prints BEFORE any spawn, on **stderr** so ``--json`` stdout stays pure.
+    Resolving to ``fake`` (or an explicit value) prints nothing — current behavior
+    preserved. Kind validation (incl. the LAW-1 ``claude`` rejection) stays in
+    :func:`_resolve_harness`, which each verb calls on the returned name.
+    """
+    if harness.lower() != "auto":
+        return harness
+    resolved = entry_harness() or "fake"
+    if resolved != "fake":
+        typer.echo(
+            f"[harness] auto-default: {resolved} (from entry session; pass --harness to override)",
+            err=True,
+        )
+    return resolved
 
 
 def _resolve_harness(harness: str) -> AgentRuntimeKind:
@@ -947,7 +981,9 @@ def review_qa(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -958,6 +994,7 @@ def review_qa(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the QA review gate on a selectable harness."""
+    harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="qa",
         role="qa-engineer",
@@ -980,7 +1017,9 @@ def review_security(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -991,6 +1030,7 @@ def review_security(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the security review gate on a selectable harness."""
+    harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="security",
         role="security-reviewer",
@@ -1013,7 +1053,9 @@ def review_code(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1024,6 +1066,7 @@ def review_code(
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the code review gate on a selectable harness."""
+    harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="code",
         role="code-reviewer",
@@ -1046,7 +1089,9 @@ def close(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1066,6 +1111,7 @@ def close(
     guarded post-step so a removal error surfaces clearly without corrupting the
     closure result.
     """
+    harness = _resolve_default_harness(harness)
 
     def _apply_closure_removal(_result: PhaseWorkflowResult) -> dict[str, Any]:
         from dadaia_workspace import container
@@ -1175,7 +1221,9 @@ def audit(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("audit", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1192,6 +1240,7 @@ def audit(
     step 1 (LAW 7). ``--harness fake`` walks the whole sequence; ``--step-model`` is
     profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -1232,7 +1281,9 @@ def research(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("research", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1249,6 +1300,7 @@ def research(
     recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); the legacy
     ``--model`` flag was removed in v0.1.57 (FR6).
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -1286,7 +1338,9 @@ def bug_report(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("bug-report", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1304,6 +1358,7 @@ def bug_report(
     so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); the legacy
     ``--model`` flag was removed in v0.1.57 (FR6).
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -1444,7 +1499,9 @@ def implement_review(
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement-review", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
-        "fake", "--harness", help="Layer-2 harness: fake|codex|pi (claude is Layer-1 only)."
+        "auto",
+        "--harness",
+        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1470,6 +1527,7 @@ def implement_review(
     REJECTED rounds BLOCKS it. ``--harness fake`` drives it deterministically; ``--step-model``
     is profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     """
+    harness = _resolve_default_harness(harness)
     from dadaia_workspace.features.lifecycle.pipeline import (
         PipelineStep,
         apply_resolved_policy,
@@ -1525,7 +1583,11 @@ def pipeline(
     context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option("fake", "--harness", help="Default harness for all steps."),
+    harness: str = typer.Option(
+        "auto",
+        "--harness",
+        help="Default harness for all steps: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
+    ),
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
@@ -1553,6 +1615,7 @@ def pipeline(
     (CLI > overlay > library default). The resolved policy is snapshotted onto the run
     before the first step (LAW 7). ``--show-policy`` prints the resolved policy and exits.
     """
+    harness = _resolve_default_harness(harness)
     from dataclasses import replace
 
     from dadaia_workspace import container

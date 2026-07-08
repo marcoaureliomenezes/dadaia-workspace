@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -12,21 +11,9 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.golden_platform import norm_stderr
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_BOX_CHARS = "│╭╮╰╯─"
-
-
-def _norm_stderr(output: str) -> str:
-    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
-
-    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
-    env-dependent width, splitting ``No such option: --model`` across borders;
-    locally (non-tty) it stays plain. Strip ANSI + box glyphs, collapse whitespace.
-    """
-    text = _ANSI_RE.sub("", output)
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)
+# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
 
 
 _runner = CliRunner()
@@ -186,7 +173,7 @@ def test_lifecycle_implement_rejects_raw_step_model_and_unknown_model(
         ],
     )
     assert dep.exit_code == 2
-    assert "No such option: --model" in _norm_stderr(dep.stderr)
+    assert "No such option: --model" in norm_stderr(dep.stderr)
     assert dep.stdout == ""
 
 
@@ -229,3 +216,146 @@ def test_claude_not_a_workflow_harness_choice() -> None:
 
     assert "claude" not in _HARNESS_KINDS
     assert set(_HARNESS_KINDS) == {"fake", "codex", "pi"}
+
+
+# ---------------------------------------------------------------------------
+# v0.1.64 FR3 (AC-3/AC-4) — entry-harness auto-default on a single-step verb.
+# ---------------------------------------------------------------------------
+
+_AUTO_ECHO_PI = "[harness] auto-default: pi (from entry session; pass --harness to override)"
+
+
+def _inject_pi_stream(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake the ``pi --mode json`` subprocess + git seam — no real binary, no credits."""
+    import json as _json
+    import subprocess as _subprocess
+
+    events = [
+        {"type": "message_start"},
+        {
+            "type": "message_end",
+            "message": {"role": "assistant", "content": "step executed via injected pi stream"},
+        },
+    ]
+    stdout = "\n".join(_json.dumps(event) for event in events) + "\n"
+
+    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("dadaia_workspace.infrastructure.pi_runtime.subprocess.run", fake_pi_run)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
+        lambda self, path: (),
+    )
+
+
+def test_implement_defaults_fake_silently_with_no_entry_signal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-3: no --harness + no entry signal ⇒ fake, NO echo (behavior unchanged)."""
+    import json as _json
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    result = _runner.invoke(
+        app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = _json.loads(result.output)
+    assert payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in result.stderr
+
+
+def test_implement_auto_defaults_pi_from_entry_pin_with_loud_echo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-3: DADAIA_ENTRY_HARNESS=pi + no --harness ⇒ pi worker + the loud echo.
+
+    Only the pi subprocess stream is injected (no real binary, no credits); the engine
+    records the step runtime as ``pi_headless`` — proof the auto-default reached the
+    real adapter path, not just the resolver.
+    """
+    import json as _json
+
+    _inject_pi_stream(monkeypatch)
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
+
+    result = _runner.invoke(
+        app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = _json.loads(result.stdout)
+    assert payload["runtime"] == "pi_headless"
+    # AC-9 sabotage (d): dropping the loud echo fails exactly here.
+    assert _AUTO_ECHO_PI in result.stderr
+    # --json stdout stays pure JSON — the echo rides stderr.
+    # result.output is the COMBINED stream (Click 8.2+); stdout stays pure JSON.
+    assert "[harness]" not in result.stdout
+
+
+def test_implement_explicit_fake_wins_over_entry_pin_no_echo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-3: explicit --harness fake always wins — no auto-default, no echo."""
+    import json as _json
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
+
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "implement",
+            "--release-id",
+            "multiharness-engine-v0116",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = _json.loads(result.stdout)
+    assert payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in result.stderr
+
+
+def test_implement_envelope_hermetic_against_developer_codex_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-4: a simulated developer CODEX_SESSION_ID + the shared envelope scrub still
+    resolves ``fake`` — a defaulted test can never spawn a real worker."""
+    import json as _json
+
+    from tests.fixtures.harness_env import scrub_entry_signal_env
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("CODEX_SESSION_ID", "developer-codex-tui-sess")
+    scrub_entry_signal_env(monkeypatch)
+
+    result = _runner.invoke(
+        app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
+    )
+
+    assert result.exit_code == 3, result.output
+    payload = _json.loads(result.output)
+    assert payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in result.stderr
+
+
+def test_implement_help_text_names_auto_default() -> None:
+    """FR3: the --harness help names the auto sentinel + the Layer-1 claude exclusion."""
+    result = _runner.invoke(app, ["lifecycle", "implement", "--help"])
+
+    assert result.exit_code == 0, result.output
+    # Strip Rich box glyphs + collapse whitespace so the assert survives help wrapping.
+    normalized = " ".join("".join(" " if ch in "│╭╮╰╯─" else ch for ch in result.output).split())
+    assert "auto (entry session)" in normalized

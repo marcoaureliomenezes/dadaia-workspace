@@ -13,26 +13,22 @@ glyphs and collapses whitespace so a substring assert is stable regardless of wi
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.golden_platform import norm_stderr
 
 _runner = CliRunner()
 
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
-# Box-drawing + decorative glyphs Rich injects around error panels.
-_BOX = re.compile(r"[─-╿‘’“”]")
+# _norm: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1) —
+# the wide-glyph variant (box-drawing block + smart quotes, stripped).
 
 
 def _norm(text: str) -> str:
-    """Strip ANSI + box glyphs and collapse whitespace for width-independent asserts."""
-    text = _ANSI.sub("", text)
-    text = _BOX.sub(" ", text)
-    return " ".join(text.split())
+    return norm_stderr(text, wide_glyphs=True)
 
 
 def _init_states(path: Path) -> Path:

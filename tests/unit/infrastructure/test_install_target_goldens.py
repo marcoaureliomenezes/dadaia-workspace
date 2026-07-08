@@ -39,9 +39,6 @@ A byte diff without that flag is a behaviour regression — fix the consumer, ne
 
 from __future__ import annotations
 
-import json
-import os
-import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -54,6 +51,12 @@ from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
 from dadaia_workspace.features.panel.views.api_workflows import render_api_workflows_list
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.golden_platform import (
+    assert_golden,
+    is_env_doctor_line,
+    norm_panel_body,
+    norm_path_line,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -66,44 +69,9 @@ _DOCTOR_GOLDEN = _GOLDEN_DIR / "doctor_all_four_v0158.json"
 _INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
 _RUNTIMES = ("claude", "codex", "pi", "bogus")
 
-# Any ISO-8601 timestamp (with or without fractional seconds / offset / Z).
-_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?")
-
-
-# ---------------------------------------------------------------------------
-# Normalization helpers (v0.1.55 platform-invariant law)
-# ---------------------------------------------------------------------------
-
-
-def _norm_path_line(line: str, ws: Path) -> str:
-    """Normalize a plain-text install/doctor line: strip the fixture root, canonicalize sep.
-
-    The public-privacy ok-marker is HOST-dependent, not projection behaviour:
-    privacy_check resolves the operator denylist by walking up from cwd, so a
-    workspace with .dadaia/states/privacy_denylist.json emits the bare marker
-    while a fresh checkout (CI) emits the "(baseline structural scan, no
-    operator denylist)" variant. Normalize both to the bare marker — same
-    rationale as the git-dirty exclusion in _is_env_doctor_line.
-    """
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
-    out = out.replace(
-        "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] public-privacy",
-    )
-    return out.replace("\\", "/")
-
-
-def _norm_panel_body(body: bytes, ws: Path) -> str:
-    """Normalize a panel JSON body: strip the fixture root, canonicalize timestamps."""
-    text = body.decode("utf-8")
-    ws_escaped = json.dumps(str(ws))[1:-1]
-    text = text.replace(ws.as_posix(), "<WS>").replace(ws_escaped, "<WS>").replace(str(ws), "<WS>")
-    return _TS_RE.sub("<TS>", text)
-
-
-def _is_env_doctor_line(line: str) -> bool:
-    """A doctor line whose content is environmental (source-repo git state), not behaviour."""
-    return "git-dirty" in line
+# Normalization helpers (v0.1.55 platform-invariant law): consolidated into
+# tests/helpers/golden_platform.py (v0.1.64 FR1) — norm_path_line, norm_panel_body,
+# is_env_doctor_line, sort_line_lists/canon_env_line, assert_golden.
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +141,7 @@ def _canonical_agents() -> list[AgentDTO]:
             id=agent_id,
             name=agent_id,
             description=f"{agent_id} agent.",
-            tier=3,
+            dispatch_band=3,
             skills=[],
             tools=["Read", "Write"],
             model="claude-opus-4-8",
@@ -209,7 +177,7 @@ def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
         ws = tmp_path / f"install_{target}"
         ws.mkdir()
         installed = mgr.install(ws, target=target)
-        result[target] = [_norm_path_line(line, ws) for line in installed]
+        result[target] = [norm_path_line(line, ws) for line in installed]
     return result
 
 
@@ -224,7 +192,7 @@ def _capture_panel(tmp_path: Path) -> dict[str, dict[str, object]]:
             result[f"{name}:{runtime}"] = {
                 "status": status,
                 "content_type": content_type,
-                "body": _norm_panel_body(body, tmp_path),
+                "body": norm_panel_body(body, tmp_path),
             }
     return result
 
@@ -235,65 +203,16 @@ def _capture_doctor(tmp_path: Path) -> list[str]:
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
-    return [_norm_path_line(line, ws) for line in report if not _is_env_doctor_line(line)]
+    return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 
 # ---------------------------------------------------------------------------
-# Golden compare / update
+# Golden compare / update — tests.helpers.golden_platform.assert_golden
 # ---------------------------------------------------------------------------
 
 
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-
-def _canon_env_line(line: str) -> str:
-    """Canonicalize OS-dependent doctor line text (platform-invariant law).
-
-    The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is the
-    host OS's phrasing (Linux: "exited 127 ... missing executable .../python";
-    Windows: "launch failed ... [WinError 193] ..."). The invariant is that the
-    probe errored for that wrapper — not the OS's words. Keep the wrapper path,
-    canonicalize the reason.
-    """
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
-
-
-def _sort_line_lists(obj: object) -> object:
-    """Sort every list-of-strings in the captured object (platform-invariant law).
-
-    Directory-iteration order differs across OSes (Windows yielded
-    ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse),
-    and iteration order is not a product contract. The golden locks the exact
-    MULTISET of lines per key — order-insensitive, count-preserving. String
-    lines are additionally canonicalized for OS-dependent probe text
-    (:func:`_canon_env_line`).
-    """
-    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
-        return sorted(_canon_env_line(x) for x in obj)
-    if isinstance(obj, dict):
-        return {k: _sort_line_lists(v) for k, v in obj.items()}
-    return obj
-
-
-def _assert_golden(path: Path, current_obj: object, what: str) -> None:
-    current_obj = _sort_line_lists(current_obj)
-    current = json.dumps(current_obj, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-    if os.environ.get("UPDATE_INSTALL_GOLDENS"):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(current, encoding="utf-8")
-        pytest.skip(f"regenerated {what} golden (UPDATE_INSTALL_GOLDENS set)")
-    golden = (
-        json.dumps(
-            _sort_line_lists(json.loads(path.read_text(encoding="utf-8"))),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-        + "\n"
-    )
-    assert current == golden, (
+def _v0158_message(what: str) -> str:
+    return (
         f"{what} diverged from the committed v0.1.58 W1 golden — the change altered "
         "observable behaviour. Fix the consumer, never the golden."
     )
@@ -306,17 +225,32 @@ def _assert_golden(path: Path, current_obj: object, what: str) -> None:
 
 def test_install_target_resolution_is_byte_identical(tmp_path: Path) -> None:
     """AC-1: install() per-target ``installed`` lists reproduce byte-identically."""
-    _assert_golden(_INSTALL_GOLDEN, _capture_install(tmp_path), "install-target-resolution")
+    assert_golden(
+        _INSTALL_GOLDEN,
+        _capture_install(tmp_path),
+        "install-target-resolution",
+        message=_v0158_message("install-target-resolution"),
+    )
 
 
 def test_panel_runtime_validation_is_byte_identical(tmp_path: Path) -> None:
     """AC-1: panel runtime accept/reject responses reproduce byte-identically."""
-    _assert_golden(_PANEL_GOLDEN, _capture_panel(tmp_path), "panel-runtime-validation")
+    assert_golden(
+        _PANEL_GOLDEN,
+        _capture_panel(tmp_path),
+        "panel-runtime-validation",
+        message=_v0158_message("panel-runtime-validation"),
+    )
 
 
 def test_doctor_all_four_report_is_byte_identical(tmp_path: Path) -> None:
     """AC-1/Q2/A4: doctor()'s all-four (no-profile) report is the FR3 back-compat lock."""
-    _assert_golden(_DOCTOR_GOLDEN, _capture_doctor(tmp_path), "doctor-all-four")
+    assert_golden(
+        _DOCTOR_GOLDEN,
+        _capture_doctor(tmp_path),
+        "doctor-all-four",
+        message=_v0158_message("doctor-all-four"),
+    )
 
 
 def test_panel_runtime_accept_reject_is_discriminating(tmp_path: Path) -> None:

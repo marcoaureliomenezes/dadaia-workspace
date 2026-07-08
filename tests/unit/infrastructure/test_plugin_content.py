@@ -6,7 +6,7 @@ already locked the projection MECHANISM with a synthetic body; this module asser
 shipped content:
 
 * **AC-6** — each pack agent carries the required frontmatter (``name`` matching ``pack.json``,
-  ``tier: 3``, ``model: claude-sonnet-4-6``, a ``tools`` list); a real in-tmp install +
+  ``dispatch_band: 3``, ``model: claude-sonnet-4-6``, a ``tools`` list); a real in-tmp install +
   ``install_plugin`` renders the projected ``.codex/agents/<name>.toml`` on the sonnet/plugin
   tier — ``model = "gpt-5.3-codex"``, NOT ``gpt-5.5`` (ARCH-2: the Codex ``model`` field is the
   discriminator, ``model_reasoning_effort`` is not); ``[ok] public-privacy`` holds with the pack
@@ -63,7 +63,7 @@ _OPUS_CODEX_MODEL = "gpt-5.5"
 
 # ---------------------------------------------------------------------------
 # Minimal frontmatter scalar parser (stdlib-only, mirrors the no-PyYAML rule).
-# `_parse_agent_frontmatter` drops `tier`, so parse the scalars directly here.
+# `_parse_agent_frontmatter` drops `dispatch_band`, so parse the scalars directly here.
 # ---------------------------------------------------------------------------
 
 
@@ -120,7 +120,7 @@ def _projected_codex_toml(ws: Path, agent: str) -> str:
 
 @pytest.mark.unit
 def test_every_pack_agent_carries_required_frontmatter() -> None:
-    """AC-6: name matches pack.json, tier: 3, model: claude-sonnet-4-6, tools list present."""
+    """AC-6: name matches pack.json, dispatch_band: 3, model: claude-sonnet-4-6, tools list present."""
     seen: list[str] = []
     for pack in _pack_names():
         for agent in _pack_agents(pack):
@@ -131,7 +131,9 @@ def test_every_pack_agent_carries_required_frontmatter() -> None:
             assert fm.get("name") == agent, (
                 f"{pack}/{agent}: frontmatter name '{fm.get('name')}' != pack.json '{agent}'"
             )
-            assert fm.get("tier") == "3", f"{pack}/{agent}: tier must be 3, got {fm.get('tier')!r}"
+            assert fm.get("dispatch_band") == "3", (
+                f"{pack}/{agent}: dispatch_band must be 3, got {fm.get('dispatch_band')!r}"
+            )
             assert fm.get("model") == _PLUGIN_CLAUDE_MODEL, (
                 f"{pack}/{agent}: model must be {_PLUGIN_CLAUDE_MODEL}, got {fm.get('model')!r}"
             )

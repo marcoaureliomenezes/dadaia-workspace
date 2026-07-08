@@ -37,14 +37,18 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 # Reuse the EXACT W1 golden normalizer + committed golden (Q2/A4 byte-equality lock) — the
 # same path-normalization and git-dirty line exclusion the W1 doctor golden was captured
 # with, so the absent-profile assertion below is a real byte-equality, not a paraphrase.
-from tests.unit.infrastructure.test_install_target_goldens import (
-    _DOCTOR_GOLDEN,
-    _is_env_doctor_line,
-    _norm_path_line,
-    _sort_line_lists,
+# v0.1.64 FR2: the normalizers come from the shared platform-invariance module (the old
+# cross-test-module import of test_install_target_goldens is gone); the golden path is a
+# local constant pointing at the SAME committed v0.1.58 W1 golden file.
+from tests.helpers.golden_platform import (
+    is_env_doctor_line,
+    norm_path_line,
+    sort_line_lists,
 )
 
 pytestmark = pytest.mark.unit
+
+_DOCTOR_GOLDEN = Path(__file__).resolve().parent / "_golden" / "doctor_all_four_v0158.json"
 
 _BLOCKER_PREFIXES = ("[missing]", "[drift]", "[fail]")
 
@@ -361,11 +365,10 @@ def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> No
     mgr.install(ws, target="all")
 
     report = mgr.doctor(ws)
-    normalized = [_norm_path_line(line, ws) for line in report if not _is_env_doctor_line(line)]
+    normalized = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
-    golden = _sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))
-    normalized = _sort_line_lists(normalized)
-    assert normalized == golden, (
+    golden = sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))
+    assert sort_line_lists(normalized) == golden, (
         "absent-profile doctor diverged from the W1 all-four golden — FR3 broke back-compat."
     )
 

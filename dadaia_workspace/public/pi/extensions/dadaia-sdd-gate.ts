@@ -28,6 +28,20 @@
 // fail-open contract.
 //
 // Runs on PI's Node runtime via `node:child_process.spawnSync` (not Bun).
+//
+// Entry-harness signal (v0.1.64 FR4; ARCH64-2 security posture). PI exposes no native
+// session env var, so at factory load this extension pins the dadaia-owned entry signal
+// `DADAIA_ENTRY_HARNESS = "pi"` — ONLY when unset (an operator pin always wins). PI tool
+// subprocesses (bash -> `dadaia lifecycle ...`) inherit it, so the lifecycle CLI's
+// `--harness auto` default resolves `pi`. Post-trust semantics: pre-trust (extension not
+// loaded) there is NO signal and the auto-default stays `fake`. The pin carries no
+// secrets and no operator-local paths (public-privacy law). ARCH64-2 posture: the pin is
+// SESSION-WIDE and CREDIT-AFFECTING — every child process of the PI session inherits it,
+// and an auto-defaulted `pi` worker spends real credits. The guardrails are structural:
+// (1) set-only-when-unset (an operator pin always wins); (2) the FR3 loud echo guards
+// EVERY real-worker auto-default (never silent); (3) the signal is NEVER derived from
+// telemetry (no session-file/mtime heuristics — the pin is this extension's explicit,
+// post-trust act).
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -88,6 +102,11 @@ function resolvePythonBin(ws: string): string {
 }
 
 const factory = (pi: ExtensionAPI): void => {
+  // Entry-harness pin (v0.1.64 FR4) — guarded: set-only-when-unset, so an operator's
+  // explicit DADAIA_ENTRY_HARNESS always wins. See the ARCH64-2 posture in the header.
+  if (!process.env.DADAIA_ENTRY_HARNESS) {
+    process.env.DADAIA_ENTRY_HARNESS = "pi";
+  }
   pi.on("tool_call", (event, ctx): ToolCallEventResult | void => {
     try {
       const mapped = TOOL_NAME_MAP[event.toolName];

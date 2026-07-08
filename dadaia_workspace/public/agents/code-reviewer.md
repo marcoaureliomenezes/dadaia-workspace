@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: PR/branch reviewer + pre-PR checkpoint. 6-axis review (architecture/patterns/tests/security/perf/dead code) via gh CLI. ADDITIVE evidence only — no lease. Emits report with severity + recommendation. NEVER edits code or approves PRs.
-tier: 3
+dispatch_band: 3
 model: claude-opus-4-8
 activity_class: ADDITIVE
 lease_relationship: "no lease — concurrent"

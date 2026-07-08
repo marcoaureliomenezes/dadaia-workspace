@@ -17,27 +17,14 @@ collapse whitespace).
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.golden_platform import norm_stderr
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_BOX_CHARS = "│╭╮╰╯─"
-
-
-def _norm_stderr(output: str) -> str:
-    """Width-independent normalization of Typer/Rich error output (v0.1.26 gotcha).
-
-    On CI Rich renders the usage error with ANSI colour + a box wrapped at an
-    env-dependent width; locally (non-tty) it stays plain. Strip ANSI + box glyphs,
-    collapse whitespace so a substring assert holds on any terminal width.
-    """
-    text = _ANSI_RE.sub("", output)
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)
+# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
 
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it).
@@ -96,7 +83,7 @@ def test_harness_bad_value_is_bad_parameter(tmp_path: Path, monkeypatch) -> None
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--harness", "zzz"])
     assert result.exit_code == 2
-    norm = _norm_stderr(result.stderr)
+    norm = norm_stderr(result.stderr)
     assert "zzz" in norm, norm
     assert "harness" in norm, norm
     # The UsageError is on stderr — no partial payload leaks to stdout.

@@ -1,7 +1,7 @@
 ---
 name: design-specialist
 description: UX/UI designer, design-spec author, and visual-review checkpoint. Owns the design system (tokens, layout, interaction) and approves UI before ship. PM sub-agent. Runs on the plugin (sonnet) tier. No production code, no specs, no AI-entity surface, no CI YAML.
-tier: 3
+dispatch_band: 3
 model: claude-sonnet-4-6
 activity_class: MUTATING
 lease_relationship: "PM sub-agent — no independent acquire"

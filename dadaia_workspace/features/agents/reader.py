@@ -41,6 +41,7 @@ __all__ = [
     "AgentsProvider",
     "FileSystemAgentsProvider",
     "InvalidAgentIdError",
+    "MissingDispatchBandError",
     "MissingTierError",
     "get_prompt",
     "read_canonical_agents",
@@ -73,7 +74,8 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
     {
         "name",
         "description",
-        "tier",  # orchestration tier: 1 = orchestrator, 2 = curator, 3 = leaf specialist
+        "dispatch_band",  # dispatch band: 1 = orchestrator, 2 = curator, 3 = leaf specialist
+        "tier",  # LEGACY spelling of dispatch_band — tolerated during the v0.1.64 rename window
         "skills",
         "tools",
         "model",
@@ -90,13 +92,20 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
 )
 
 
-class MissingTierError(ValueError):
-    """Raised when an agent frontmatter has an invalid (non-int or out-of-range) 'tier' value.
+class MissingDispatchBandError(ValueError):
+    """Raised when an agent frontmatter has an invalid (non-int or out-of-range) band value.
 
-    Note: a *missing* tier field is tolerated — it defaults to 3 with a stderr warning.
-    This error is only raised when 'tier' is present but invalid (non-integer or not in
-    {1, 2, 3}), so that typos produce loud failures while stale staged files are tolerated.
+    The band key is ``dispatch_band`` (preferred) or the legacy ``tier`` spelling
+    (silently tolerated during the v0.1.64 rename window). Note: a *missing* band field
+    is tolerated — it defaults to 3 with a stderr warning. This error is only raised
+    when the band is present but invalid (non-integer or not in {1, 2, 3}), so that
+    typos produce loud failures while stale staged files are tolerated.
     """
+
+
+#: Deprecated alias kept for the v0.1.64 tolerate-then-strip window
+#: (removal tracked by the ``dispatch-band-legacy-fallback-removal`` backlog return).
+MissingTierError = MissingDispatchBandError
 
 
 def _resolve_agents_dir(workspace_root: Path) -> Path | None:
@@ -150,30 +159,36 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         description = ""
 
     # Plugin stubs (``plugin: true``) carry no behavior and intentionally omit
-    # the full frontmatter (tier/model/etc.). They are excluded from the panel
-    # roster downstream, so suppress the missing-tier warning for them.
+    # the full frontmatter (dispatch_band/model/etc.). They are excluded from the
+    # panel roster downstream, so suppress the missing-band warning for them.
     is_plugin_stub = raw.get("plugin") is True
 
-    # tier: int in {1, 2, 3}; missing → default 3 with warning; invalid → MissingTierError
-    tier_raw = raw.get("tier")
-    if tier_raw is None:
+    # dispatch_band: int in {1, 2, 3}. Preferred key is 'dispatch_band'; the legacy
+    # 'tier' spelling is a SILENT fallback during the v0.1.64 rename window (a stale
+    # consumer projection must not warn-spam). Missing both → default 3 with warning;
+    # invalid → MissingDispatchBandError.
+    band_raw = raw.get("dispatch_band")
+    if band_raw is None:
+        band_raw = raw.get("tier")
+    if band_raw is None:
         if not is_plugin_stub:
             sys.stderr.write(
-                f"agent_reader: WARNING — '{name}' is missing the 'tier' frontmatter field; "
-                "defaulting to tier=3 (leaf specialist). "
-                "Add 'tier: 3' (or 1/2) to silence this warning.\n"
+                f"agent_reader: WARNING — '{name}' is missing the 'dispatch_band' frontmatter "
+                "field; defaulting to dispatch_band=3 (leaf specialist). "
+                "Add 'dispatch_band: 3' (or 1/2) to silence this warning.\n"
             )
-        tier = 3
+        dispatch_band = 3
     else:
         try:
-            tier = int(tier_raw)
+            dispatch_band = int(band_raw)
         except (ValueError, TypeError) as exc:
-            raise MissingTierError(
-                f"agent_reader: '{name}' has non-integer 'tier' value {tier_raw!r}"
+            raise MissingDispatchBandError(
+                f"agent_reader: '{name}' has non-integer 'dispatch_band' value {band_raw!r}"
             ) from exc
-        if tier not in {1, 2, 3}:
-            raise MissingTierError(
-                f"agent_reader: '{name}' has invalid 'tier' value {tier!r} — must be 1, 2, or 3"
+        if dispatch_band not in {1, 2, 3}:
+            raise MissingDispatchBandError(
+                f"agent_reader: '{name}' has invalid 'dispatch_band' value {dispatch_band!r} "
+                "— must be 1, 2, or 3"
             )
 
     # maxTurns (camelCase) takes priority over max_turns (snake_case)
@@ -215,7 +230,7 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         id=name,
         name=name,
         description=description.strip(),
-        tier=tier,
+        dispatch_band=dispatch_band,
         skills=skills,
         tools=tools,
         model=model,
@@ -365,7 +380,7 @@ def read_canonical_agents(
     for raw in raw_list:
         try:
             dto = _raw_to_dto(raw)
-        except MissingTierError as exc:
+        except MissingDispatchBandError as exc:
             logger.warning("agent_reader: skipping agent — %s", exc)
             continue
         if dto is not None:

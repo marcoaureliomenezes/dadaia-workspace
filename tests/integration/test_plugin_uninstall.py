@@ -23,7 +23,6 @@ Layer: integration — real stage/install/doctor via ``FileSystemPublicAssetMana
 from __future__ import annotations
 
 import json
-import re
 import time
 from pathlib import Path
 
@@ -34,6 +33,7 @@ from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.golden_platform import canon_env_line, is_env_doctor_line, norm_path_line
 
 pytestmark = pytest.mark.integration
 
@@ -46,36 +46,14 @@ _PACK_SKILL_DIR = "browser-frontend-implementation"
 
 
 # ---------------------------------------------------------------------------
-# Golden (b) normalization — replicated from test_plugin_projection.py verbatim.
+# Golden (b) normalization — tests/helpers/golden_platform.py (v0.1.64 FR1; this file
+# was a rebase-discovered 14th duplicate site, adopted alongside the 13).
 # ---------------------------------------------------------------------------
-
-_DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
-)
-
-
-def _norm_path_line(line: str, ws: Path) -> str:
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
-    out = out.replace(
-        "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] public-privacy",
-    )
-    return out.replace("\\", "/")
-
-
-def _is_env_doctor_line(line: str) -> bool:
-    return "git-dirty" in line
-
-
-def _canon_env_line(line: str) -> str:
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
 
 
 def _norm_doctor(report: list[str], ws: Path) -> list[str]:
     return sorted(
-        _canon_env_line(_norm_path_line(line, ws))
-        for line in report
-        if not _is_env_doctor_line(line)
+        canon_env_line(norm_path_line(line, ws)) for line in report if not is_env_doctor_line(line)
     )
 
 
@@ -175,7 +153,7 @@ def test_ac2_install_uninstall_cycle_equals_never_installed(tmp_path: Path) -> N
     # (ii) Absolute anchor (Ruling 63-F): side B == the durable v0.1.60 golden (b)
     # never-installed baseline — READ-ONLY fixture reuse, zero regen.
     golden = sorted(
-        _canon_env_line(line) for line in json.loads(_DOCTOR_GOLDEN_B.read_text(encoding="utf-8"))
+        canon_env_line(line) for line in json.loads(_DOCTOR_GOLDEN_B.read_text(encoding="utf-8"))
     )
     assert doctor_b == golden, "post-uninstall doctor surface diverges from golden (b)"
 

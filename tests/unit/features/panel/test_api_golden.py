@@ -312,7 +312,7 @@ def _make_dto() -> AgentDTO:
         id="software-engineer",
         name="software-engineer",
         description="A software engineer agent.",
-        tier=3,
+        dispatch_band=3,
         skills=["dadaia-task-manager"],
         tools=["Read", "Write"],
         model="claude-opus-4-8",

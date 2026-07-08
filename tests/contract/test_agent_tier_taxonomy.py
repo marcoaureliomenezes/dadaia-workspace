@@ -3,24 +3,25 @@
 The word "tier" names two distinct axes and this contract machine-enforces the split NOW
 (not merely documents it):
 
-  * the numeric frontmatter ``tier: 1/2/3`` = the agent dispatch/priority band;
+  * the numeric frontmatter ``dispatch_band: 1/2/3`` = the agent dispatch/priority band
+    (renamed from the legacy ``tier:`` spelling in v0.1.64 FR5);
   * the registry ``Tier`` (``deep``/``dispatch``/``fast``/``plugin``) = the model-cost class
     resolved from the frontmatter ``model:`` via ``core/model_registry``.
 
 Assertions (AC-9, amended by the 2026-07-06 operator retier):
   * every NON-plugin core agent (``public/agents/*.md`` without ``plugin: true``) carries a
-    numeric ``tier`` AND a registry-known ``model``. The core roster is split by operator
+    numeric ``dispatch_band`` AND a registry-known ``model``. The core roster is split by operator
     decision (2026-07-06): FIVE agents run ``claude-fable-5`` (registry tier ``deep``) with a
     pinned per-agent Claude ``effort`` — product-engineer/high, project-auditor/high,
     ai-engineer/medium, software-engineer/low, qa-engineer/low — and the remaining FOUR
     (project-manager, software-architect, security-reviewer, code-reviewer) keep
     ``claude-opus-4-8`` (registry tier ``dispatch``) with no ``effort`` override;
   * the 3 plugin agents (the real bodies at ``public/plugins/*/agents/*.md``) carry
-    ``tier: 3`` + ``model: claude-sonnet-4-6`` (registry tier ``plugin``).
+    ``dispatch_band: 3`` + ``model: claude-sonnet-4-6`` (registry tier ``plugin``).
 
 This is NON-OPTIONAL: it must fail loudly if a core agent's model/effort drifts from the
-pinned map, or if the roster count drifts. The eventual source-level
-``tier:`` → ``dispatch_band:`` rename is tracked as backlog return ``tier-taxonomy-rename``.
+pinned map, or if the roster count drifts. The source-level ``tier:`` → ``dispatch_band:``
+rename landed in v0.1.64 FR5 (formerly tracked as backlog return ``tier-taxonomy-rename``).
 """
 
 from __future__ import annotations
@@ -102,9 +103,9 @@ def test_core_agents_carry_numeric_tier_and_pinned_model_effort() -> None:
     seen: set[str] = set()
     for md in _core_agents():
         fm = _frontmatter(md)
-        tier = fm.get("tier")
-        assert isinstance(tier, int) and not isinstance(tier, bool), (
-            f"{md.name}: 'tier' must be a numeric band, got {tier!r}"
+        dispatch_band = fm.get("dispatch_band")
+        assert isinstance(dispatch_band, int) and not isinstance(dispatch_band, bool), (
+            f"{md.name}: 'dispatch_band' must be a numeric band, got {dispatch_band!r}"
         )
         assert md.stem in _CORE_MODEL_EFFORT, f"{md.name}: not in the pinned roster map"
         expected_model, expected_effort = _CORE_MODEL_EFFORT[md.stem]
@@ -131,8 +132,9 @@ def test_plugin_agents_carry_tier3_sonnet_plugin_model() -> None:
     registry = registry_by_claude_id()
     for md in _plugin_body_agents():
         fm = _frontmatter(md)
-        assert fm.get("tier") == 3, (
-            f"{md.name}: plugin agent must carry 'tier: 3', got {fm.get('tier')!r}"
+        assert fm.get("dispatch_band") == 3, (
+            f"{md.name}: plugin agent must carry 'dispatch_band: 3', "
+            f"got {fm.get('dispatch_band')!r}"
         )
         model = fm.get("model")
         assert model == "claude-sonnet-4-6", (
