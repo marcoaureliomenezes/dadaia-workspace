@@ -108,6 +108,34 @@ export async function expandWorkflowCard(page: Page, workflowId: string): Promis
   );
 }
 
+/**
+ * Deterministic save wait (FR11, v0.1.65): arm a `waitForResponse` for the
+ * matching PUT BEFORE clicking the trigger, then await the 200 response.
+ *
+ * Rationale: the workflow-policy banner reuses the same `wfp-banner--ok` class
+ * for validate and save outcomes, so a post-save banner assertion can pass
+ * instantly against the STALE validate banner while the save PUT is still in
+ * flight — any follow-up GET then races the write (the CI flake in
+ * `e2e-panel-harness-toggle-ci-flake`). Awaiting the PUT response itself is the
+ * only deterministic save signal.
+ */
+export async function clickAndAwaitPut(
+  page: Page,
+  triggerSelector: string,
+  apiPathFragment: string,
+  timeout = 10_000
+): Promise<void> {
+  const putResponse = page.waitForResponse(
+    (res) =>
+      res.url().includes(apiPathFragment) &&
+      res.request().method() === 'PUT' &&
+      res.status() === 200,
+    { timeout }
+  );
+  await page.locator(triggerSelector).click();
+  await putResponse;
+}
+
 // ---------------------------------------------------------------------------
 // API helpers (direct HTTP, no browser rendering)
 // ---------------------------------------------------------------------------

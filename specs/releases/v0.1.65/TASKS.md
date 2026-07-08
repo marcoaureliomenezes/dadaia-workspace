@@ -70,7 +70,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   when available); downstream no-intents/unresolved findings suppressed for that item;
   existing well-formed-file findings byte-identical (regression tests untouched and green).
 
-- [-] **T-65-05 — e2e harness-toggle flake hardening (FR11, D-8)** — owner: qa-engineer
+- [x] **T-65-05 — e2e harness-toggle flake hardening (FR11, D-8)** — owner: qa-engineer
   Write set: `tests/e2e/panel/workflow-policy-harness-toggle.spec.ts`
   (+ `tests/e2e/panel/helpers.ts` only if a shared save-wait helper is extracted).
   Precondition: none.
