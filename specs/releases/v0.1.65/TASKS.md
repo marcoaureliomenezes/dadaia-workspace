@@ -121,7 +121,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   by the Wave-3 RED-window discipline note above (F-7: no push / QA boundary /
   security push-cycle inside the window).
 
-- [ ] **T-65-07 — Reader tolerance (FR1)** — owner: software-engineer
+- [-] **T-65-07 — Reader tolerance (FR1)** — owner: software-engineer
   Write set: `dadaia_workspace/features/agents/reader.py`,
   `tests/unit/features/agents/test_reader.py`.
   Precondition: T-65-06.
