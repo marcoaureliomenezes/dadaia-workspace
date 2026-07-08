@@ -73,7 +73,7 @@ THEN implementing the fix.
 - **Parallelism:** SAFE parallel with T-67-01/T-67-02 — disjoint files
   (`test_codex_exec_runtime.py` vs `test_pi_runtime.py`/`pi_runtime.py`).
 
-### T-67-04 — GREEN: codex mechanism fix `[-]`
+### T-67-04 — GREEN: codex mechanism fix `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/codex_runtime.py`
@@ -92,7 +92,7 @@ THEN implementing the fix.
 
 ## Wave B — FR2: false-positive test rewrite + idiom convergence (DEC-B, F2/F3-corrected)
 
-### T-67-05 — Rewrite the pre-existing false-positive pi executed-path test
+### T-67-05 — Rewrite the pre-existing false-positive pi executed-path test `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_lifecycle_pipeline_cli.py`
