@@ -20,7 +20,7 @@ THEN implementing the fix.
 
 ## Wave A — FR1: adapter mechanism fix (DEC-A)
 
-### T-67-01 — RED: pi call-time-interception proof (FAILING on current code) `[-]`
+### T-67-01 — RED: pi call-time-interception proof (FAILING on current code) `[x]`
 
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/infrastructure/test_pi_runtime.py` (additive test only)
@@ -39,7 +39,7 @@ THEN implementing the fix.
 - **AC:** SPEC AC1(repro) (pi half).
 - **Parallelism:** none — first task, serial dependency for T-67-02.
 
-### T-67-02 — GREEN: pi mechanism fix
+### T-67-02 — GREEN: pi mechanism fix `[-]`
 
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/infrastructure/pi_runtime.py`
