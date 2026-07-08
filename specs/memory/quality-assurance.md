@@ -16,7 +16,7 @@ tags:
   - test-architecture
 token_estimate: 4180
 last_updated: '2026-07-08'
-release_origin: v0.1.66
+release_origin: v0.1.67
 ---
 
 ## Purpose
@@ -42,8 +42,8 @@ contract-coverage report — that is the gate working as designed, not a gap. Ne
 "fix" such a row by adding slop unit tests; the integration/e2e layer is its honest
 coverage home.
 
-**Live scale (honest bracket):** the suite collects ≈ 5.0k tests (4,970 passed +
-18 skipped as of v0.1.66; grows with every release). Rough layer shape: unit is the large base,
+**Live scale (honest bracket):** the suite collects ≈ 5.0k tests (4,978 passed +
+0 skipped as of v0.1.67; grows with every release). Rough layer shape: unit is the large base,
 contract and integration are the mid hundreds each, e2e is the small top. Budgets are
 brackets, not pins — re-validate against `pytest --collect-only -q | tail -1` at
 closure.
@@ -274,6 +274,44 @@ specific, distinguishable content. Two bugs were registered, not fixed, for the 
 adapter pattern itself (`pi-executed-path-cli-tests-invoke-real-pi-binary`,
 `pi-e2e-test-false-positive-loose-blocked-reason-assertion`) — v0.1.66 routed around the gotcha
 per new test, it did not change the adapters' default-binding shape.
+
+**Executed-path law — root-cause fix and durable protection (v0.1.67).** v0.1.66 routed
+around the class-definition-time subprocess-default gotcha per new test; v0.1.67 fixed
+the mechanism directly and added a suite-wide guard so the defect class cannot silently
+recur. Three durable rules: (1) **a subprocess runner must be resolved at call time, not
+bound as a class-definition-time default.** `PiHeadlessAdapter` and `CodexExecAdapter`
+now declare `runner: Runner | None = None` and resolve the actual callable inside
+`.run()` on every invocation (`self._runner if self._runner is not None else
+subprocess.run`, a plain module-qualified attribute lookup performed after any
+`monkeypatch.setattr` has run) — the identical pattern `git_subprocess.py`'s `_run()`
+helper already used correctly. This is behaviorally identical to the old default from
+the caller's perspective (the same function is ultimately invoked when no `runner=` is
+passed); only the WHEN of the lookup changes, so the fix carries zero production risk.
+(2) **the correct fake-derivation proof for an executed-path test is a call-recorder
+plus a structural field the fake's own behaviour drives — never a loose truthy
+assertion, and never an assertion anchored on a field that is a fixed constant
+regardless of which binary ran.** A no-artifact CREATE step blocks on the fixed string
+`"agent result missing artifact evidence"` irrespective of the fake stream's content;
+asserting substring-in-that-constant reopens the exact false positive a real-binary
+auth failure with no artifacts would also satisfy. The idiom: a `calls: list[object] =
+[]` closure the fake appends its own `args` to (`assert len(calls) == 1` — only the fake
+could have appended), paired with a structural-field assertion the fake's behaviour
+drives (e.g. `payload["steps"][0]["runtime"]`, `["accepted"]`). (3) **the durable
+protection against recurrence is a suite-wide `autouse` guard, not per-test discipline.**
+A `tests/conftest.py` fixture patches both adapters' module-qualified `subprocess.run`
+to a sentinel that raises `RuntimeError` unless the test has opted into one of the
+**four** established live-test flags (`DADAIA_E2E_REAL_WORKER`, `DADAIA_PI_LIVE`,
+`DADAIA_CODEX_LIVE`, `DADAIA_CLAUDE_LIVE` — a single named union predicate, not four
+inline checks) — any test constructing either adapter with no explicit `runner=` and no
+live opt-in now fails loud with a `RuntimeError` the moment it would reach the real
+binary, instead of silently succeeding against it. The guard's own RED state was proven
+via `xfail(strict=True)` (never a live, un-wrapped real-binary spawn in CI — a
+`strict=True` xfail that unexpectedly passes is itself a hard failure, the correct
+signal for a test whose failure mode is a dangerous side effect); its exemption is
+scoped to exactly the two permanent mechanism-proof tests that must construct an
+adapter with no `runner=` to prove the guard fires. Proven non-interfering against all
+four live-opt-in flags with real binaries (the `DADAIA_CODEX_LIVE` case was checked
+explicitly, never inferred from another flag's run).
 
 **CLI stderr-assertion law (v0.1.57) — normalize width-variant Rich rendering before asserting.**
 Any test that asserts a **substring** against a CLI's `result.stderr` (e.g. a Click `No such option:

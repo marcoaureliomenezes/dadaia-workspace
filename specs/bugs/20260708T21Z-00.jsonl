@@ -1,0 +1,2 @@
+{"bug_id": "pi-e2e-test-false-positive-loose-blocked-reason-assertion", "event": "resolved", "release": "v0.1.67", "reported_by": "software-engineer", "ts": "2026-07-08T21:32:09Z"}
+{"bug_id": "pi-executed-path-cli-tests-invoke-real-pi-binary", "event": "resolved", "release": "v0.1.67", "reported_by": "software-engineer", "ts": "2026-07-08T21:32:10Z"}
