@@ -106,7 +106,7 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
 > the feature branch are fine (commits are never review-blocked); the push boundary is
 > what must stay outside the window.
 
-- [ ] **T-65-06 — Generic agent sources (FR1, D-5)** — owner: ai-engineer
+- [-] **T-65-06 — Generic agent sources (FR1, D-5)** — owner: ai-engineer
   Write set: `dadaia_workspace/public/agents/*.md` (9 core — delete `model:`/`effort:`
   frontmatter lines ONLY), `dadaia_workspace/public/plugins/*/agents/*.md` (3 — model →
   `claude-sonnet-5`).
