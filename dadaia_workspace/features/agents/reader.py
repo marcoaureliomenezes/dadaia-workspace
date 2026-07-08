@@ -79,6 +79,7 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "skills",
         "tools",
         "model",
+        "effort",  # rendered reasoning effort — PROJECTED files carry it (v0.1.65 FR1/FR5)
         "maxTurns",  # frontmatter key (camelCase)
         "max_turns",  # alternative snake_case spelling
         "input_contract",

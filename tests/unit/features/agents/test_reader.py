@@ -645,18 +645,73 @@ def test_all_public_agent_files_are_loadable(
 def test_all_public_agents_have_model_and_skills(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Every non-plugin-stub public agent declares a runtime model and at least one skill.
+    """Staged core agent sources are model-agnostic (v0.1.65 FR1) but keep skills.
+
+    Since T-65-06 the 9 core ``public/agents/*.md`` bodies carry NO ``model:`` /
+    ``effort:`` frontmatter — the reader must tolerate that (DTO ``model=None``).
+    PROJECTED ``.claude/agents/*.md`` files carry both keys (render-at-install,
+    FR5); the staged sources here must not. Skills stay mandatory.
 
     Plugin stubs (frontend-engineer, design-specialist, devops-engineer) intentionally
-    omit model and skills — they are skipped here.
+    omit skills — they are skipped here.
     """
     monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
     agents = _public_agents()
     core_agents = [a for a in agents if not _is_plugin_stub(a)]
-    missing_model = [agent.id for agent in core_agents if not agent.model]
+    with_model = [agent.id for agent in core_agents if agent.model is not None]
     missing_skills = [agent.id for agent in core_agents if not agent.skills]
-    assert missing_model == [], f"Core public agents missing model: {missing_model}"
+    assert with_model == [], (
+        f"Staged core public agents must be model-agnostic (FR1); found model: {with_model}"
+    )
     assert missing_skills == [], f"Core public agents missing skills: {missing_skills}"
+
+
+def test_model_less_effort_less_generic_body_reads_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """FR1 (T-65-07): a generic body with neither ``model:`` nor ``effort:`` reads
+    with no warning and ``model=None`` — the reader tolerates model-agnostic sources."""
+    agents_dir = _agentic_dir(tmp_path)
+    _write_agent(
+        agents_dir,
+        "generic.md",
+        "name: generic\ndescription: model-agnostic body\ndispatch_band: 3\n",
+    )
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(agents_dir))
+    with caplog.at_level("WARNING", logger="dadaia_workspace.features.agents.reader"):
+        agents = read_canonical_agents(
+            workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+        )
+    (agent,) = agents
+    assert agent.model is None
+    assert caplog.records == [], [r.getMessage() for r in caplog.records]
+
+
+def test_model_and_effort_stay_allowlisted_on_projected_body(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """FR1 (T-65-07): PROJECTED files still carry ``model:`` AND ``effort:`` — both
+    keys remain allowlisted, so reading a rendered projection emits no unknown-field
+    warning."""
+    agents_dir = _agentic_dir(tmp_path)
+    _write_agent(
+        agents_dir,
+        "rendered.md",
+        "name: rendered\ndescription: projected body\ndispatch_band: 3\n"
+        "model: claude-sonnet-5\neffort: xhigh\n",
+    )
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(agents_dir))
+    with caplog.at_level("WARNING", logger="dadaia_workspace.features.agents.reader"):
+        agents = read_canonical_agents(
+            workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+        )
+    (agent,) = agents
+    assert agent.model == "claude-sonnet-5"
+    assert caplog.records == [], [r.getMessage() for r in caplog.records]
 
 
 def test_public_agent_roster_uses_unified_software_engineer(

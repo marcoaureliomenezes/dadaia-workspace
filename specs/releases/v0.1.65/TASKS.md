@@ -121,7 +121,15 @@ All paths are repo-relative (`repos/dadaia-workspace/`).
   by the Wave-3 RED-window discipline note above (F-7: no push / QA boundary /
   security push-cycle inside the window).
 
-- [-] **T-65-07 — Reader tolerance (FR1)** — owner: software-engineer
+- [x] **T-65-07 — Reader tolerance (FR1)** — owner: software-engineer
+  Completion note: RED captured —
+  `test_model_and_effort_stay_allowlisted_on_projected_body` failed with
+  `unknown frontmatter fields ['effort'] — dropping` before the fix; fix = `effort`
+  added to the reader `_ALLOWED_FIELDS` allowlist (model already tolerated absent →
+  DTO `model=None`, covered by the new `test_model_less_effort_less_generic_body_reads_clean`).
+  `test_all_public_agents_have_model_and_skills` reworked to FR1 truth (staged core
+  bodies model-agnostic; skills mandatory). Legacy `tier:` fallback untouched.
+  54/54 reader tests green; mypy --strict + ruff clean.
   Write set: `dadaia_workspace/features/agents/reader.py`,
   `tests/unit/features/agents/test_reader.py`.
   Precondition: T-65-06.
