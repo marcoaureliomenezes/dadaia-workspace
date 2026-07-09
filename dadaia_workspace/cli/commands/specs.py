@@ -88,6 +88,11 @@ def doctor(
         "--specs-dir",
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
+    context: str | None = typer.Option(
+        None,
+        "--context",
+        help=("Context name; resolves repos/<context>/specs. Mutually exclusive with --specs-dir."),
+    ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
     ),
@@ -111,8 +116,17 @@ def doctor(
         ),
     ),
 ) -> None:
-    """Run structural checks on the SDD specs tree."""
-    target = _resolve_specs_dir(specs_dir)
+    """Run structural checks on the SDD specs tree.
+
+    v0.1.69 FR2.2: ``--context`` resolves ``repos/<context>/specs`` directly (via
+    ``resolve_workspace_root``), mutually exclusive with ``--specs-dir``.
+    """
+    if specs_dir is not None and context is not None:
+        raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
+    if context is not None:
+        target = (resolve_workspace_root() / "repos" / context / "specs").resolve()
+    else:
+        target = _resolve_specs_dir(specs_dir)
     if public_dir is not None:
         resolved_public: Path | None = Path(public_dir).resolve()
     else:

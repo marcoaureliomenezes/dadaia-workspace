@@ -239,9 +239,15 @@ def clean(
 
 @app.command()
 def preflight(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str | None = typer.Option(None, "--release-id", help="Release id."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run lifecycle preflight."""
+    """Run lifecycle preflight.
+
+    v0.1.69 FR2.1: accepts ``--context``/``--release-id`` (default ``dadaia-workspace``),
+    the CLI surface FR3 (T-69-07) wires to the real ``LifecyclePreflightInput`` assembly.
+    """
     service = _preflight_service()
     _emit_command_result(service.unresolved_runtime_preflight(), json_output=json_output)
 

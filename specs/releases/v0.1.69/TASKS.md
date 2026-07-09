@@ -63,7 +63,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `--context` (AC2.3), documenting the F2 decision.
 - **AC:** SPEC AC2(repro) RED half, AC2.3.
 
-### T-69-05 — GREEN: add --context/--release-id to preflight + specs doctor `[-]`
+### T-69-05 — GREEN: add --context/--release-id to preflight + specs doctor `[x]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`,
   `dadaia_workspace/cli/commands/specs.py`
