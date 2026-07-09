@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
     from dadaia_workspace.core.models.workflow_execution import (
         WorkflowModelPolicyOverlay,
         WorkflowPolicySnapshot,
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
         WorkflowCatalog,
         WorkflowExecutionPolicyResolver,
     )
+    from dadaia_workspace.features.lifecycle.service import LifecyclePreflightInput
     from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import (
         WorkflowHandoffDoctor,
     )
@@ -677,6 +679,187 @@ def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePrefligh
     """Compose lifecycle preflight service."""
     _guard_initialized(workspace_root)
     return LifecyclePreflightService()
+
+
+def _expected_phase_for_active_phase(raw_phase: str | None) -> "LifecyclePhase":
+    """Resolve the preflight ``expected_phase`` from an ``ACTIVE.md`` phase token (FR3).
+
+    Maps an ``ACTIVE.md`` ``phase:`` token (release-lifecycle vocabulary) to the
+    corresponding step-lifecycle
+    :class:`~dadaia_workspace.core.models.lifecycle.LifecyclePhase`.
+    ``DEFINITION``/``SPEC``/``PLAN``/``TASKS`` all precede implementation and map to
+    ``RELEASE_DEFINITION``; anything unrecognized (incl. ``BLOCKED``/absent) degrades to
+    ``IMPLEMENTATION`` — the safest default (most releases spend most of their life
+    there, and a preflight run is itself an implementation-phase diagnostic).
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
+
+    normalized = (raw_phase or "").strip().upper()
+    mapping: dict[str, LifecyclePhase] = {
+        "DEFINITION": LifecyclePhase.RELEASE_DEFINITION,
+        "SPEC": LifecyclePhase.RELEASE_DEFINITION,
+        "PLAN": LifecyclePhase.RELEASE_DEFINITION,
+        "TASKS": LifecyclePhase.RELEASE_DEFINITION,
+        "IMPLEMENTATION": LifecyclePhase.IMPLEMENTATION,
+        "CLOSURE": LifecyclePhase.CLOSURE,
+    }
+    return mapping.get(normalized, LifecyclePhase.IMPLEMENTATION)
+
+
+def _required_mode_for_expected_phase(expected_phase: "LifecyclePhase") -> str:
+    """Resolve the preflight ``required_mode`` policy from the expected phase (FR3).
+
+    Only ``CLOSURE`` calls for ``review`` (the closing gate ladder); every other phase —
+    including the release-definition phases, which still require a session bound to
+    actually edit SPEC/PLAN/TASKS — requires ``implementation``.
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
+
+    if expected_phase is LifecyclePhase.CLOSURE:
+        return "review"
+    return "implementation"
+
+
+def build_lifecycle_preflight_input(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str | None = None,
+) -> "LifecyclePreflightInput":
+    """Compose the real preflight-input probe assembly (v0.1.69 FR3).
+
+    ``LifecyclePreflightInput``'s state classes (``ActiveReleaseState``,
+    ``GitPreflightState``, ``SpecsDoctorState``, ``LeaseModeState``, ``HygieneCounters``)
+    had ZERO production producers before this builder — only
+    ``test_preflight_service.py`` hand-fed them. This composes each from an EXISTING
+    reader (never a second/forked implementation):
+
+    * ``active_release`` ← ``ACTIVE.md`` via the shared ``read_active_md`` parser
+      (``features.specs.doctor_common``, the same reader ``specs doctor``/CLI verbs use).
+    * ``git`` ← ``GitSubprocessClient`` (``infrastructure.git_subprocess`` — the same
+      client every other git-backed builder in this module composes) against
+      ``repos/<context>``.
+    * ``specs_doctor`` ← a real ``SpecsDoctor(specs_dir).check()`` run (the same doctor
+      ``dadaia specs doctor`` invokes); ``ok`` is true iff no ERROR-severity issue fired.
+    * ``lease``/``binding`` ← ``features.spec_context.{lease, session_identity}`` — the
+      same incumbent-pointer + lease-record readers ``context show``/``bind`` use.
+    * ``hygiene`` ← ``build_lifecycle_hygiene_service(workspace_root).status()``
+      (unchanged, reused directly).
+    * ``expected_phase``/``required_mode`` ← a small policy derived from the ACTIVE.md
+      phase token (:func:`_expected_phase_for_active_phase` /
+      :func:`_required_mode_for_expected_phase`).
+
+    ``release_id=None`` defaults to the context's ACTIVE.md release id (a bare
+    ``preflight --context <ctx>`` with no explicit ``--release-id`` targets whatever
+    release is currently active).
+    """
+    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
+    from dadaia_workspace.features.lifecycle.service import (
+        ActiveReleaseState,
+        BoundContext,
+        GitPreflightState,
+        LeaseModeState,
+        LifecyclePreflightInput,
+        SpecsDoctorState,
+    )
+    from dadaia_workspace.features.spec_context import lease as _lease
+    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.features.specs import Severity, SpecsDoctor
+    from dadaia_workspace.features.specs.doctor_common import read_active_md
+    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+
+    _guard_initialized(workspace_root)
+    specs_dir = _context_specs_dir(workspace_root, context)
+    repo_dir = workspace_root / "repos" / context
+
+    # --- active-release ← ACTIVE.md ------------------------------------------------
+    active_md_release, _segment, active_md_phase, _err = read_active_md(
+        specs_dir / "releases" / "ACTIVE.md"
+    )
+    active_release = ActiveReleaseState(release_id=active_md_release, phase=active_md_phase)
+    resolved_release_id = release_id if release_id is not None else (active_md_release or "")
+
+    # --- expected_phase / required_mode policy -------------------------------------
+    expected_phase: LifecyclePhase = _expected_phase_for_active_phase(active_md_phase)
+    required_mode = _required_mode_for_expected_phase(expected_phase)
+
+    # --- git ← GitSubprocessClient --------------------------------------------------
+    # v0.1.69 FR3: reuses the SAME infrastructure git adapter every other builder in this
+    # module composes — never a second/forked git implementation. upstream_branch()/
+    # unpushed_commit_count() are the two producer-specific reads this state needs.
+    git_client = GitSubprocessClient()
+    if repo_dir.is_dir() and git_client.is_git_root(repo_dir):
+        dirty_paths = tuple(git_client.diff_name_only(repo_dir))
+        upstream_branch = git_client.upstream_branch(repo_dir)
+        unpushed_commit_count = (
+            git_client.unpushed_commit_count(repo_dir) if upstream_branch is not None else 0
+        )
+        git_state = GitPreflightState(
+            dirty_paths=dirty_paths,
+            upstream_branch=upstream_branch,
+            unpushed_commit_count=unpushed_commit_count,
+        )
+    else:
+        # No repo on disk (e.g. the self-hosting workspace-root specs tree, or a context
+        # never cloned): nothing to report dirty/unpushed on; no upstream to demand.
+        git_state = GitPreflightState()
+
+    # --- specs_doctor ← a real SpecsDoctor run --------------------------------------
+    doctor_issues = SpecsDoctor(specs_dir).check()
+    doctor_errors = [i for i in doctor_issues if i.severity is Severity.ERROR]
+    specs_doctor_state = SpecsDoctorState(
+        ok=not doctor_errors,
+        summary=(
+            "; ".join(f"{i.code}: {i.description}" for i in doctor_errors) if doctor_errors else ""
+        ),
+    )
+
+    # --- binding + lease/mode ← session_identity / lease ----------------------------
+    identity = session_identity.resolve_identity(workspace_root, context)
+    incumbent_sid = identity.get("incumbent")
+    incumbent_mode = identity.get("mode")
+    binding: BoundContext | None = None
+    if incumbent_sid:
+        rec = session_identity.read_session(workspace_root, incumbent_sid)
+        if rec is not None:
+            binding = BoundContext(
+                context=str(rec.get("context") or context),
+                release_id=str(rec.get("release") or resolved_release_id),
+                mode=str(rec.get("mode") or incumbent_mode or ""),
+                session_id=incumbent_sid,
+            )
+
+    lease_record = _lease.read_record(workspace_root, context)
+    live_foreign_holder = False
+    holder_session_id: str | None = None
+    if lease_record is not None:
+        holder_session_id = str(lease_record.get("session_id") or "") or None
+        # is_held() is the single canonical liveness verdict (core.lock_liveness.is_stale,
+        # wrapped) — never a forked liveness check.
+        if _lease.is_held(workspace_root, context) and holder_session_id != incumbent_sid:
+            live_foreign_holder = True
+    lease_state = LeaseModeState(
+        mode=str(incumbent_mode or ""),
+        holder_session_id=holder_session_id,
+        live_foreign_holder=live_foreign_holder,
+    )
+
+    # --- hygiene ← the existing lifecycle hygiene service ---------------------------
+    hygiene_counters = build_lifecycle_hygiene_service(workspace_root).status()
+
+    return LifecyclePreflightInput(
+        context=context,
+        release_id=resolved_release_id,
+        expected_phase=expected_phase,
+        required_mode=required_mode,
+        current_step="preflight",
+        binding=binding,
+        active_release=active_release,
+        git=git_state,
+        specs_doctor=specs_doctor_state,
+        lease=lease_state,
+        hygiene=hygiene_counters,
+    )
 
 
 def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:

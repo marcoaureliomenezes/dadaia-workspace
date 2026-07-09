@@ -239,11 +239,39 @@ def clean(
 
 @app.command()
 def preflight(
+    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    release_id: str | None = typer.Option(None, "--release-id", help="Release id."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run lifecycle preflight."""
+    """Run lifecycle preflight.
+
+    v0.1.69 FR3: ``--context``/``--release-id`` (default ``dadaia-workspace``) feed the real
+    ``LifecyclePreflightInput`` assembly (``container.build_lifecycle_preflight_input``),
+    composed from existing readers (ACTIVE.md, git, specs-doctor, session-identity/lease,
+    hygiene) and evaluated by ``service.preflight(data)``. A blocked result carries a
+    specific reason and (whenever applicable) a non-null ``operator_command`` — the
+    always-BLOCKED ``unresolved_runtime_preflight`` stub is retired.
+    """
+    from dadaia_workspace import container
+
+    workspace_root = resolve_workspace_root()
     service = _preflight_service()
-    _emit_command_result(service.unresolved_runtime_preflight(), json_output=json_output)
+    data = container.build_lifecycle_preflight_input(
+        workspace_root, context=context, release_id=release_id
+    )
+    result = service.preflight(data)
+    if result.ok:
+        command_result = LifecycleCommandResult(
+            status=LifecycleCommandStatus.OK, message="preflight passed"
+        )
+    else:
+        assert result.blocked is not None
+        command_result = LifecycleCommandResult(
+            status=LifecycleCommandStatus.BLOCKED,
+            message=result.blocked.reason,
+            blocked=result.blocked,
+        )
+    _emit_command_result(command_result, json_output=json_output)
 
 
 @app.command()

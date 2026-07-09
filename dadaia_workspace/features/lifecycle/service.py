@@ -192,22 +192,6 @@ class LifecyclePreflightService:
 
         return LifecyclePreflightResult(ok=True, evidence=handoff_result.evidence)
 
-    def unresolved_runtime_preflight(
-        self, current_step: str = "preflight"
-    ) -> LifecycleCommandResult:
-        """Return the deterministic blocked state used until runtime probes are wired."""
-        blocked = BlockedState(
-            reason="lifecycle preflight requires resolved runtime inputs",
-            blocked_at_step=current_step,
-            resume_token=f"unresolved:{current_step}",
-            detail={"current_step": current_step},
-        )
-        return LifecycleCommandResult(
-            status=LifecycleCommandStatus.BLOCKED,
-            message=blocked.reason,
-            blocked=blocked,
-        )
-
     def resume_run(self, run_store: LifecycleRunStore, run_id: str) -> LifecycleCommandResult:
         """Resume a lifecycle run and translate persistence failures to typed output.
 

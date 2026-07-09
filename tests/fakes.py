@@ -54,6 +54,8 @@ class FakeGitClient:
         self._branches: dict[Path, str] = {}
         self._untracked: dict[Path, list[str]] = {}
         self._remote_urls: dict[Path, str] = {}
+        self._upstream_branches: dict[Path, str | None] = {}
+        self._unpushed_commit_counts: dict[Path, int] = {}
 
     def clone(self, url: str, dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -86,6 +88,22 @@ class FakeGitClient:
 
     def remote_url(self, path: Path) -> str:
         return self._remote_urls.get(path, "")
+
+    def upstream_branch(self, path: Path) -> str | None:
+        """Configurable via ``self._upstream_branches[path] = "origin/main"``.
+
+        Defaults to ``None`` (no upstream configured) — mirrors
+        :class:`SubprocessGitClient`'s behavior on a checkout with no tracking branch.
+        """
+        return self._upstream_branches.get(path)
+
+    def unpushed_commit_count(self, path: Path) -> int:
+        """Configurable via ``self._unpushed_commit_counts[path] = 3``.
+
+        Defaults to ``0`` (nothing pending) — mirrors
+        :class:`SubprocessGitClient`'s behavior when there is no upstream to compare.
+        """
+        return self._unpushed_commit_counts.get(path, 0)
 
 
 class FakeCourseStore:

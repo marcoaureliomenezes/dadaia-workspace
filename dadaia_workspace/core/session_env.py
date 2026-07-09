@@ -41,7 +41,16 @@ _LAYER2_ENTRY_HARNESSES: frozenset[str] = frozenset({"codex", "pi"})
 #: ``hooks/_common.resolve_session_id``. Each is exported by its harness for the live session
 #: and may be INHERITED from a parent shell and stale (the audit F-1 rotated-sid source), so a
 #: consumer that maps this id to a bound context MUST guard on the record's liveness.
-HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID")
+#:
+#: ``CODEX_THREAD_ID`` (v0.1.69 FR1.1, bug ``codex-thread-id-bind-resolution-breaks-cli``) is
+#: ordered AFTER ``CODEX_SESSION_ID`` deliberately: a modern Codex tool subprocess exposes
+#: ``CODEX_THREAD_ID`` *instead of* ``CODEX_SESSION_ID``, but when both happen to be present
+#: ``CODEX_SESSION_ID`` remains the preferred value (AC1.2).
+HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
+    "CLAUDE_CODE_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+)
 
 _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
@@ -77,9 +86,11 @@ def entry_harness() -> str | None:
     1. :data:`ENTRY_HARNESS_ENV_VAR` (``DADAIA_ENTRY_HARNESS``) when it holds ``codex`` or
        ``pi`` — the operator pin, or the post-trust PI Ring-1 extension's seam (FR4).
        Any other value (garbage, ``claude``, empty) is IGNORED and resolution falls through.
-    2. ``CODEX_SESSION_ID`` present ⇒ ``"codex"`` (a codex entry session; may be inherited
-       and stale — which is why the CLI's auto-default echoes loudly and ``--harness``
-       always overrides).
+    2. ``CODEX_SESSION_ID`` **or** ``CODEX_THREAD_ID`` present ⇒ ``"codex"`` (a codex entry
+       session; may be inherited and stale — which is why the CLI's auto-default echoes
+       loudly and ``--harness`` always overrides). ``CODEX_THREAD_ID`` is the id a modern
+       Codex tool subprocess exposes *instead of* ``CODEX_SESSION_ID`` (v0.1.69 FR1.2, bug
+       ``codex-thread-id-bind-resolution-breaks-cli``).
     3. ``None`` — covers a Claude Code entry (Layer-1-only, never a workflow worker) and
        plain shells / CI, where the caller keeps its previous default (``fake``).
 
@@ -88,6 +99,6 @@ def entry_harness() -> str | None:
     pin = (os.environ.get(ENTRY_HARNESS_ENV_VAR) or "").strip().lower()
     if pin in _LAYER2_ENTRY_HARNESSES:
         return pin
-    if os.environ.get("CODEX_SESSION_ID"):
+    if os.environ.get("CODEX_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"):
         return "codex"
     return None

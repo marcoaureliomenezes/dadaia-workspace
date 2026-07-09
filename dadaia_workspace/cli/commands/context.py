@@ -203,12 +203,20 @@ def show(
             print(json.dumps({"context": None}, indent=2))
         else:
             data = _ctx_to_dict(ctx)
-            # Add session sub-object (AC-T10d-6)
+            # Add session sub-object (AC-T10d-6). v0.1.69 FR4 (bug
+            # context-bind-success-not-reflected-in-context-show): resolution order is
+            # the explicit DADAIA_SESSION_ID override FIRST, then — when absent, the
+            # normal case after a bare `dadaia context bind` with no `eval $(...)` — the
+            # CONTEXT's incumbent pointer that `bind` already refreshes
+            # (session_identity.set_incumbent). A stale/absent pointer still yields
+            # `session: null` (AC4.2, unchanged behavior).
+            workspace_root = resolve_workspace_root()
+            sessions_dir = _sessions_dir(workspace_root)
             session_id = os.environ.get("DADAIA_SESSION_ID")
+            if not session_id:
+                session_id = session_identity.read_incumbent_ptr(workspace_root, ctx.name)
             session_obj = None
             if session_id:
-                workspace_root = resolve_workspace_root()
-                sessions_dir = _sessions_dir(workspace_root)
                 session_data = _load_session(sessions_dir, session_id)
                 if session_data and not _session_is_stale(session_data):
                     session_obj = session_data

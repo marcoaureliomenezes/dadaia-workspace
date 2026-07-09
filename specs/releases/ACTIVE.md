@@ -1,28 +1,23 @@
 ---
-release: none
-phase: none
+release: v0.1.69
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.69 — Context Resolution, Session Observability & CLI Surface
 
-**v0.1.68 — Lifecycle Evidence/Handoff Engine Correctness** shipped and closed
-2026-07-09: merged `b1e469f8` (PR #130, all CI green incl. post-merge main);
-closure on `chore/v0.1.68-closure`. Fixed 3 HIGH lifecycle-engine bugs at root
-cause (FR1 removed the run-unscopable block-evidence disk-glob; FR2 terminal
-review declares no phantom consumer; FR3 derives implement write-scope from
-TASKS.md) + added the missing full-pipeline E2E. QA PASS 4996/0 with
-mutation-sanity; ledger 3 resolved. Specs archived to `specs/_archive/releases/v0.1.68/`.
+**Phase:** IMPLEMENTATION (SPEC/PLAN/TASKS Aprovado; architect REVISE F1a/F1b/F2/F3 folded).
 
-**Remediation arc (3 releases dispositioning 9 live dd-chain-capture bugs):**
-- ✅ **A — v0.1.68** lifecycle evidence/handoff engine (3 HIGH) — CLOSED
-- ⏭️ **B — v0.1.69** context resolution, session observability & CLI surface —
-  `codex-thread-id-bind-resolution-breaks-cli` (CRITICAL),
-  `lifecycle-diagnostic-commands-missing-context-options` (HIGH),
-  `lifecycle-preflight-unusable-resolved-runtime-inputs` (MEDIUM),
-  `context-bind-success-not-reflected-in-context-show` (MEDIUM)
-- ⏭️ **C — v0.1.70** contract/hygiene drift —
-  `specs-doctor-rejects-current-memory-agent-tier-frontmatter` (HIGH),
-  `remote-bugs-gitignore-blocks-new-intake` (HIGH)
+Second of three remediation releases dispositioning the 9 live lifecycle/CLI bugs
+reported against `dd-chain-capture v0.2.0` (remote HEAD == main). Release A
+(v0.1.68) fixed the engine; Release B fixes the layer an operator touches first:
+context resolution, session observability, and the diagnostic CLI surface — so a
+bound context is actually visible to every command.
 
-Ledger: 6 open. Memory consolidation + remote-bugs archival + full post-mortem
-happen once, after Release C.
+**Picked bugs (4):**
+- `codex-thread-id-bind-resolution-breaks-cli` (**CRITICAL**)
+- `lifecycle-diagnostic-commands-missing-context-options` (HIGH)
+- `lifecycle-preflight-unusable-resolved-runtime-inputs` (MEDIUM)
+- `context-bind-success-not-reflected-in-context-show` (MEDIUM)
+
+**Release C (v0.1.70)** — contract/hygiene drift (agent_tier docs, gitignore
+intake) — follows. Memory consolidation + remote-bugs archival + post-mortem after C.
