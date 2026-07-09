@@ -1,0 +1,4 @@
+{"bug_id": "pipeline-write-scope-parser-wrong-grammar", "context": "dadaia-workspace", "event": "resolved", "release": "v0.1.71", "reported_by": "claude-fable-5", "ts": "2026-07-09T16:04:01Z"}
+{"bug_id": "lifecycle-status-handoffs-doctor-missing-context", "context": "dadaia-workspace", "event": "resolved", "release": "v0.1.71", "reported_by": "claude-fable-5", "ts": "2026-07-09T16:04:03Z"}
+{"bug_id": "context-show-noarg-ignores-bound-session", "context": "dadaia-workspace", "event": "resolved", "release": "v0.1.71", "reported_by": "claude-fable-5", "ts": "2026-07-09T16:04:04Z"}
+{"bug_id": "handoffs-doctor-blocks-terminal-promote-to-evidence", "context": "dadaia-workspace", "event": "resolved", "release": "v0.1.71", "reported_by": "claude-fable-5", "ts": "2026-07-09T16:04:06Z"}
