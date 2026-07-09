@@ -40,7 +40,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave B — FR2: gitignore intake
 
-### T-70-03 — RED: remote-bugs intake is git-ignored `[-]`
+### T-70-03 — RED: remote-bugs intake is git-ignored `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/test_governance_intake_not_gitignored.py` (new)
 - **Task:** Executed-path repo-hygiene test: write a probe `*.md` under
