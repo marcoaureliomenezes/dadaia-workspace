@@ -104,7 +104,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave D — FR4: context show reads the incumbent pointer
 
-### T-69-08 — RED: bind not reflected in show `[ ]`
+### T-69-08 — RED: bind not reflected in show `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_context_show_reflects_bind.py` (new)
 - **Task:** `tmp_path` workspace, `DADAIA_SESSION_ID` unset: `context bind <ctx>
