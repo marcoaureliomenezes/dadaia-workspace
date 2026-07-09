@@ -22,7 +22,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   rejected/removed. CONFIRM RED (all four lie today).
 - **AC:** SPEC AC1(repro) RED half, AC1.1.
 
-### T-70-02 — GREEN: correct the four agent_tier surfaces + re-project `[ ]`
+### T-70-02 — GREEN: correct the four agent_tier surfaces + re-project `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/public/scaffold/memory/AGENTS.md`,
   `dadaia_workspace/public/data/memory-AGENTS.md`,
