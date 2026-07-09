@@ -1,17 +1,18 @@
 """T-69-06/T-69-07 (FR3, bug ``lifecycle-preflight-unusable-resolved-runtime-inputs``, MEDIUM).
 
-RED (T-69-06): today the ``preflight`` CLI command calls
+Pre-fix (T-69-06 RED): the ``preflight`` CLI command called
 ``service.unresolved_runtime_preflight()`` — the deterministic, always-BLOCKED stub — and
-NEVER calls ``service.preflight(data)``. This test spies on
-``LifecyclePreflightService.preflight`` and asserts it is unreached, and that the emitted
-reason is exactly the generic stub string forbidden by AC3.1.
+NEVER called ``service.preflight(data)``. The emitted reason was exactly the generic stub
+string forbidden by AC3.1, and a spy on ``LifecyclePreflightService.preflight`` proved it
+was unreached.
 
-GREEN (T-69-07): the CLI wires the real ``build_lifecycle_preflight_input`` +
-``service.preflight(data)`` path; the stub is retired as the production caller. A
-dirty/unbound checkout correctly BLOCKS with a SPECIFIC reason and a non-null
-``operator_command`` (AC3.1) — never the generic stub string. This module's SAME test file
-carries both the RED assertion (superseded here to its GREEN form, matching the T-69-04
-pattern) and the AC3.1/AC3.2 GREEN assertions.
+Post-fix (T-69-07 GREEN, this module's final form — the RED assertions are converted in
+place, matching the T-69-04 pattern): the CLI wires the real
+``build_lifecycle_preflight_input`` + ``service.preflight(data)`` path; the stub method
+itself is DELETED from ``service.py`` (retired, not merely unreached — the only production
+caller was ``lifecycle.py``). A dirty/unbound checkout correctly BLOCKS with a SPECIFIC
+reason and a non-null ``operator_command`` (AC3.1) — never the generic stub string; a spy
+on ``service.preflight`` confirms it IS the code path taken (AC3.2).
 """
 
 from __future__ import annotations
@@ -107,7 +108,7 @@ def test_preflight_never_emits_generic_unresolved_stub_reason_ac31(
 def test_preflight_calls_real_service_preflight_not_stub_ac32(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.2: a spy on service.preflight confirms it IS invoked (the stub is not called)."""
+    """AC3.2: a spy on service.preflight confirms it IS invoked (the stub is retired)."""
     ws = _mk_workspace(tmp_path)
     monkeypatch.chdir(ws)
 
@@ -118,19 +119,7 @@ def test_preflight_calls_real_service_preflight_not_stub_ac32(
         calls.append(data)
         return original(self, data)  # type: ignore[arg-type]
 
-    stub_calls: list[object] = []
-    original_stub = service_module.LifecyclePreflightService.unresolved_runtime_preflight
-
-    def _stub_spy(self: object, current_step: str = "preflight") -> object:
-        stub_calls.append(current_step)
-        return original_stub(self, current_step)  # type: ignore[arg-type]
-
     monkeypatch.setattr(service_module.LifecyclePreflightService, "preflight", _spy)
-    monkeypatch.setattr(
-        service_module.LifecyclePreflightService,
-        "unresolved_runtime_preflight",
-        _stub_spy,
-    )
 
     _runner.invoke(
         app,
@@ -138,4 +127,6 @@ def test_preflight_calls_real_service_preflight_not_stub_ac32(
     )
 
     assert len(calls) == 1, "service.preflight(data) must be called exactly once"
-    assert not stub_calls, "the retired unresolved_runtime_preflight stub must never be called"
+    assert not hasattr(service_module.LifecyclePreflightService, "unresolved_runtime_preflight"), (
+        "the unresolved_runtime_preflight stub must be RETIRED (deleted), not merely unused"
+    )

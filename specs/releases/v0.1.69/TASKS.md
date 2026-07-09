@@ -86,7 +86,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `build_lifecycle_preflight_input` (import error / absent). CONFIRM RED.
 - **AC:** SPEC AC3(repro) RED half, AC3.1 (stub-never side).
 
-### T-69-07 — GREEN: build_lifecycle_preflight_input + wire, retire stub `[-]`
+### T-69-07 — GREEN: build_lifecycle_preflight_input + wire, retire stub `[x]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/container.py`,
   `dadaia_workspace/features/lifecycle/service.py`,

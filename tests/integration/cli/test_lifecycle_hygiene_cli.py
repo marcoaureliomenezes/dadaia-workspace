@@ -62,6 +62,14 @@ def test_lifecycle_preflight_json_returns_blocked_without_codex(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # v0.1.69 FR3 (T-69-07, bug lifecycle-preflight-unusable-resolved-runtime-inputs):
+    # `preflight` no longer calls the generic always-BLOCKED
+    # `unresolved_runtime_preflight` stub (retired/deleted) — it now runs the REAL
+    # LifecyclePreflightInput assembly. A fresh, never-bound workspace with no context
+    # repo correctly blocks at the FIRST real check (`_check_binding`: "context is not
+    # bound") instead of the old generic stub reason. This is the AC3.1 contract itself
+    # (a specific, actionable reason — never the generic stub string), so the assertion
+    # is corrected in place rather than weakened.
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
@@ -70,10 +78,12 @@ def test_lifecycle_preflight_json_returns_blocked_without_codex(
     assert result.exit_code == 3
     payload = _json_output(result.output)
     assert payload["status"] == "BLOCKED"
-    assert payload["message"] == "lifecycle preflight requires resolved runtime inputs"
+    assert payload["message"] != "lifecycle preflight requires resolved runtime inputs"
+    assert payload["message"] == "context is not bound"
     blocked = payload["blocked"]
     assert isinstance(blocked, dict)
     assert blocked["blocked_at_step"] == "preflight"
+    assert blocked["operator_command"] is not None
 
 
 def test_lifecycle_hygiene_status_json_reports_counters(

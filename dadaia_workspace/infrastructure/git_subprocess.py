@@ -184,6 +184,31 @@ class GitSubprocessClient:
             changed.update(line.strip() for line in untracked.stdout.splitlines() if line.strip())
         return tuple(sorted(changed))
 
+    def upstream_branch(self, path: Path) -> str | None:
+        """Return the configured upstream tracking branch (e.g. ``origin/main``), or ``None``.
+
+        v0.1.69 FR3: the lifecycle preflight git-state producer needs this to detect a
+        checkout with no upstream configured (``git push --set-upstream`` not yet run).
+        ``None`` when ``git rev-parse --abbrev-ref @{u}`` fails (no upstream, not a repo).
+        """
+        result = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip() or None
+
+    def unpushed_commit_count(self, path: Path) -> int:
+        """Return the count of local commits not yet on the upstream tracking branch.
+
+        v0.1.69 FR3: the lifecycle preflight git-state producer's "unpushed commits
+        pending" check. Returns ``0`` when there is no upstream (nothing to compare) or
+        the count cannot be parsed — never raises.
+        """
+        result = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=path)
+        if result.returncode != 0:
+            return 0
+        stripped = result.stdout.strip()
+        return int(stripped) if stripped.isdigit() else 0
+
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
 
