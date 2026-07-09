@@ -75,7 +75,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave C — FR3: preflight-input probe assembly + wire real preflight
 
-### T-69-06 — RED: preflight returns the inert stub; probe builder absent `[-]`
+### T-69-06 — RED: preflight returns the inert stub; probe builder absent `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/features/lifecycle/test_preflight_input_builder.py` (new),
   `tests/integration/cli/test_preflight_real_wiring.py` (new)
@@ -86,7 +86,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `build_lifecycle_preflight_input` (import error / absent). CONFIRM RED.
 - **AC:** SPEC AC3(repro) RED half, AC3.1 (stub-never side).
 
-### T-69-07 — GREEN: build_lifecycle_preflight_input + wire, retire stub `[ ]`
+### T-69-07 — GREEN: build_lifecycle_preflight_input + wire, retire stub `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/container.py`,
   `dadaia_workspace/features/lifecycle/service.py`,
