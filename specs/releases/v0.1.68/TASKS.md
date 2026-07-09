@@ -91,7 +91,7 @@ THEN implementing the fix.
 
 ## Wave D — FR4 + FR5: full-pipeline E2E + validation
 
-### T-68-07 — Full-pipeline E2E on a throwaway context (the missing test) `[-]`
+### T-68-07 — Full-pipeline E2E on a throwaway context (the missing test) `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/e2e/features/test_pipeline_end_to_end_throwaway_context.py` (new — co-located with `test_lifecycle_journey_e2e.py`, architect F4)
 - **Preconditions:** T-68-02, T-68-04, T-68-06 `[x]`

@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+from dadaia_workspace.core.models.lifecycle import AgentRunRequest, AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
@@ -55,10 +55,10 @@ def _seed_tasks(workspace: Path, release: str) -> None:
     )
 
 
-def _capture_first_fake_request(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+def _capture_first_fake_request(monkeypatch: pytest.MonkeyPatch) -> list[AgentRunRequest]:
     """Swap FAKE-kind adapters for a request-recording FakeAgentRuntime."""
     real_build = container.build_agent_runtime
-    captured: list[object] = []
+    captured: list[AgentRunRequest] = []
 
     def fake_build(
         kind: AgentRuntimeKind, *, cwd: Path | None = None, model: object = None
