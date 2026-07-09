@@ -1,23 +1,24 @@
 ---
-release: v0.1.69
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.69 — Context Resolution, Session Observability & CLI Surface
+# Active release: none
 
-**Phase:** IMPLEMENTATION (SPEC/PLAN/TASKS Aprovado; architect REVISE F1a/F1b/F2/F3 folded).
+**v0.1.69 — Context Resolution, Session Observability & CLI Surface** shipped and
+closed 2026-07-09: merged `3388afde` (PR #132, all CI green incl. post-merge main);
+closure on `chore/v0.1.69-closure`. Fixed 4 CLI/context bugs (1 CRITICAL): FR1
+recognizes `CODEX_THREAD_ID` (+ lock.py identity + ENTRY_SIGNAL safety envelope), FR2
+`--context` on preflight/specs-doctor, FR3 built the preflight-input probe assembly &
+retired the inert stub, FR4 `context show` reads the incumbent pointer. QA PASS 5021/0
+with mutation-sanity 4/4. Specs archived to `specs/_archive/releases/v0.1.69/`.
 
-Second of three remediation releases dispositioning the 9 live lifecycle/CLI bugs
-reported against `dd-chain-capture v0.2.0` (remote HEAD == main). Release A
-(v0.1.68) fixed the engine; Release B fixes the layer an operator touches first:
-context resolution, session observability, and the diagnostic CLI surface — so a
-bound context is actually visible to every command.
+**Remediation arc (3 releases dispositioning 9 live dd-chain-capture bugs):**
+- ✅ **A — v0.1.68** lifecycle evidence/handoff engine (3 HIGH) — CLOSED
+- ✅ **B — v0.1.69** context resolution, session observability & CLI surface (1 CRIT + 3) — CLOSED
+- ⏭️ **C — v0.1.70** contract/hygiene drift —
+  `specs-doctor-rejects-current-memory-agent-tier-frontmatter` (HIGH),
+  `remote-bugs-gitignore-blocks-new-intake` (HIGH)
 
-**Picked bugs (4):**
-- `codex-thread-id-bind-resolution-breaks-cli` (**CRITICAL**)
-- `lifecycle-diagnostic-commands-missing-context-options` (HIGH)
-- `lifecycle-preflight-unusable-resolved-runtime-inputs` (MEDIUM)
-- `context-bind-success-not-reflected-in-context-show` (MEDIUM)
-
-**Release C (v0.1.70)** — contract/hygiene drift (agent_tier docs, gitignore
-intake) — follows. Memory consolidation + remote-bugs archival + post-mortem after C.
+Ledger: 3 open (2 for Release C + `stray-dadaia-tmp-inside-repo` MEDIUM side-bug,
+tracked). Memory consolidation + remote-bugs archival + full post-mortem after Release C.
