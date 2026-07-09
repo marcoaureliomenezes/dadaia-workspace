@@ -74,12 +74,23 @@ class WorkflowHandoffDoctor:
         *,
         now: dt.datetime | None = None,
         policy: SlopPolicy | None = None,
+        context: str | None = None,
+        release_id: str | None = None,
     ) -> None:
         self._workspace_root = workspace_root.resolve()
         self._steps_root = self._workspace_root / ".dadaia" / "runs" / "lifecycle"
         self._run_store = run_store
         self._now = (now or dt.datetime.now(tz=dt.UTC)).astimezone(dt.UTC)
         self._policy = policy or SlopPolicy()
+        # v0.1.71 FR2: optional REAL run filter (LifecycleRun carries context/release_id).
+        # ``None`` on both ⇒ whole-workspace scope (unchanged back-compat behaviour).
+        self._context = context
+        self._release_id = release_id
+
+    def _run_matches(self, run: Any) -> bool:
+        return (self._context is None or run.context == self._context) and (
+            self._release_id is None or run.release_id == self._release_id
+        )
 
     def run(self) -> WorkflowHandoffDoctorReport:
         findings: list[WorkflowHandoffFinding] = []
@@ -88,7 +99,14 @@ class WorkflowHandoffDoctor:
         consumed_ttl = self._policy.tmp_ttl_seconds
         cutoff = self._now - dt.timedelta(seconds=consumed_ttl)
 
-        for run in self._run_store.list_runs():
+        filtering = self._context is not None or self._release_id is not None
+        runs = [r for r in self._run_store.list_runs() if not filtering or self._run_matches(r)]
+        # When filtering, the disk scan must be scoped to the matched runs' step dirs —
+        # otherwise another context's on-disk payloads (absent from this scoped ledger)
+        # would be falsely flagged ``undeclared``.
+        scoped_run_ids = {r.run_id for r in runs} if filtering else None
+
+        for run in runs:
             run_terminal = run.status in terminal
             for record in run.workflow_steps:
                 ledger_refs.add(record.payload_ref)
@@ -123,9 +141,18 @@ class WorkflowHandoffDoctor:
                     )
                 # unconsumed-required: a terminal run whose declared-consumer payload was
                 # never fully consumed — a required edge silently went unfilled.
+                #
+                # v0.1.71 FR4: a PROMOTE_TO_EVIDENCE payload is durable evidence whose
+                # terminal disposition is PROMOTION, never consumption (symmetric with
+                # ``is_cleanup_eligible``, which already exempts it). Requiring such a
+                # payload to be consumed is contradictory — a terminal APPROVED review
+                # verdict is promoted, not consumed by a downstream step that can no
+                # longer run. Exempting it heals pre-existing terminal runs on disk with
+                # NO migration. ``delete_after_consumed`` required payloads still flag.
                 if (
                     run_terminal
                     and record.declared_consumers
+                    and record.retention_mode is not RetentionMode.PROMOTE_TO_EVIDENCE
                     and record.consumption_state() is not WorkflowStepConsumptionState.CONSUMED_ALL
                 ):
                     findings.append(
@@ -140,14 +167,26 @@ class WorkflowHandoffDoctor:
                         )
                     )
 
-        findings.extend(self._scan_disk(ledger_refs))
+        findings.extend(self._scan_disk(ledger_refs, scoped_run_ids))
         return WorkflowHandoffDoctorReport(ok=not findings, findings=tuple(findings))
 
-    def _scan_disk(self, ledger_refs: set[str]) -> list[WorkflowHandoffFinding]:
+    def _scan_disk(
+        self, ledger_refs: set[str], scoped_run_ids: set[str] | None = None
+    ) -> list[WorkflowHandoffFinding]:
         findings: list[WorkflowHandoffFinding] = []
         if not self._steps_root.is_dir():
             return findings
-        for payload in sorted(self._steps_root.rglob("*.step-payload.json")):
+        if scoped_run_ids is None:
+            payloads = self._steps_root.rglob("*.step-payload.json")
+        else:
+            # Scoped scan: only the matched runs' step dirs, so out-of-scope payloads are
+            # never mis-flagged ``undeclared`` against a deliberately narrowed ledger.
+            payloads = (
+                p
+                for run_id in scoped_run_ids
+                for p in (self._steps_root / run_id).rglob("*.step-payload.json")
+            )
+        for payload in sorted(payloads):
             if not payload.is_file():
                 continue
             rel = payload.resolve().relative_to(self._workspace_root).as_posix()

@@ -180,6 +180,33 @@ def list_all() -> None:
     console.print(table)
 
 
+def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
+    """Resolve the no-arg ``context show`` target (v0.1.71 FR3, bug
+    ``context-show-noarg-ignores-bound-session``).
+
+    Prefer the ALIVE context whose incumbent pointer references a LIVE (non-stale) bound
+    session — most recently seen first — so a bare ``context bind <ctx>`` is reflected by
+    ``context show`` with no arg. Fall back to the first ALIVE context when none has a
+    live bound session (unchanged prior behaviour).
+    """
+    alive = [c for c in svc.list_all() if c.state == ContextState.ALIVE]
+    if not alive:
+        return None
+    sessions_dir = _sessions_dir(workspace_root)
+    best: tuple[str, Any] | None = None  # (last_seen_at, ctx)
+    for ctx in alive:
+        session_id = session_identity.read_incumbent_ptr(workspace_root, ctx.name)
+        if not session_id:
+            continue
+        session_data = _load_session(sessions_dir, session_id)
+        if not session_data or _session_is_stale(session_data):
+            continue
+        last_seen = str(session_data.get("last_seen_at", ""))
+        if best is None or last_seen > best[0]:
+            best = (last_seen, ctx)
+    return best[1] if best is not None else alive[0]
+
+
 @app.command()
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
@@ -188,9 +215,9 @@ def show(
     """Show details of a context."""
     svc = _ctx_service()
     if name is None:
-        # Show first ALIVE context when no name given (v2: no global primary)
-        all_ctxs = svc.list_all()
-        ctx = next((c for c in all_ctxs if c.state == ContextState.ALIVE), None)
+        # No name: prefer the context with a live bound session, else first ALIVE (v2:
+        # no global primary). v0.1.71 FR3 — reflect a bare `context bind`.
+        ctx = _resolve_default_context(svc, resolve_workspace_root())
     else:
         try:
             ctx = svc.show(name)

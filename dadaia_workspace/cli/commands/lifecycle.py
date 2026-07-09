@@ -152,23 +152,68 @@ def _runtime_ref_payload(ref: RuntimeFileRef) -> dict[str, object]:
 
 @app.command()
 def status(
+    context: str | None = typer.Option(
+        None, "--context", help="Scope the run summary to one Spec Context."
+    ),
+    release_id: str | None = typer.Option(
+        None, "--release-id", help="Scope the run summary to one release."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Show lifecycle status."""
+    """Show lifecycle status.
+
+    Hygiene counters are workspace-global. v0.1.71 FR2: ``--context``/``--release-id`` add
+    a REAL run-scoped summary (``LifecycleRun`` carries both) — the count of lifecycle runs
+    matching the filter, grouped by status — so the diagnostic accepts the same explicit
+    context surface as the rest of the lifecycle CLI. Omitting both summarises every run.
+    """
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
     service = container.build_lifecycle_hygiene_service(workspace_root)
     counters = service.status()
+    runs_summary = _runs_summary(workspace_root, context=context, release_id=release_id)
     if json_output:
         _emit_json(
             {
                 "status": LifecycleCommandStatus.OK.value,
                 "counters": counters.to_dict(),
+                "runs": runs_summary,
             }
         )
         return
-    typer.echo(f"OK cleanup_candidates={counters.cleanup_candidate_count}")
+    typer.echo(
+        f"OK cleanup_candidates={counters.cleanup_candidate_count} "
+        f"runs_matched={runs_summary['matched']}"
+    )
+
+
+def _runs_summary(
+    workspace_root: Path, *, context: str | None, release_id: str | None
+) -> dict[str, Any]:
+    """Count lifecycle runs matching an optional (context, release_id) filter, by status.
+
+    A REAL filter over ``LifecycleRun.context``/``release_id`` — never accepted-but-ignored.
+    """
+    from dadaia_workspace import container
+
+    runs = container.build_lifecycle_run_store(workspace_root).list_runs()
+    matched = [
+        run
+        for run in runs
+        if (context is None or run.context == context)
+        and (release_id is None or run.release_id == release_id)
+    ]
+    by_status: dict[str, int] = {}
+    for run in matched:
+        key = run.status.value if hasattr(run.status, "value") else str(run.status)
+        by_status[key] = by_status.get(key, 0) + 1
+    return {
+        "context": context,
+        "release_id": release_id,
+        "matched": len(matched),
+        "by_status": by_status,
+    }
 
 
 @app.command()
@@ -1914,17 +1959,29 @@ def workflow_doctor(
 
 @handoffs_app.command("doctor")
 def handoffs_doctor(
+    context: str | None = typer.Option(
+        None, "--context", help="Narrow the report to one Spec Context's runs."
+    ),
+    release_id: str | None = typer.Option(
+        None, "--release-id", help="Narrow the report to one release's runs."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Reconcile the workflow-step handoff ledger against on-disk payloads (A26).
 
     Fails (exit 3) on any orphan / malformed / stale / undeclared / unconsumed-required
     workflow-step payload; exit 0 when the ledger and the data plane are coherent.
+
+    v0.1.71 FR2: ``--context``/``--release-id`` are REAL run filters (``LifecycleRun``
+    carries both) — the report and its on-disk scan narrow to the matched runs. Omitting
+    both preserves the whole-workspace scope.
     """
     from dadaia_workspace import container
 
     workspace_root = resolve_workspace_root()
-    report = container.build_workflow_handoff_doctor(workspace_root).run()
+    report = container.build_workflow_handoff_doctor(
+        workspace_root, context=context, release_id=release_id
+    ).run()
     if json_output:
         _emit_json({"status": "ok" if report.ok else "blocked", **report.to_dict()})
     else:

@@ -8,18 +8,29 @@ release's active (``[-]``) task and parses its declared ``Write set:`` globs so
 ``pipeline.py`` can union them into the implement step's ``allowed_paths`` automatically.
 ``--write-scope`` remains an additive escape hatch, never a requirement.
 
-Deterministic grammar (SPEC FR3.1 / architect F3):
+Deterministic grammar (SPEC FR3.1 / architect F3; v0.1.71 FR1 — real consumer grammar):
 
-- **Reserved task:** the task whose marker is ``[-]``. If NOT exactly one ``[-]`` task
-  exists across the whole file (zero, or multiple), return ``()`` — never guess.
-- **Write-set line:** the ``Write set:`` bullet within that task's block, up to the next
-  ``- **``/``###`` bullet or a blank line; a multi-line continuation is joined into one
-  logical line before extraction.
-- **Glob extraction:** backtick-delimited spans that are *path-shaped* (contain ``/`` or
-  a filename extension) AND appear before the first ``(`` on the (joined) line. A
-  trailing parenthetical annotation (e.g. ``(new, additive)``,
-  ``(`run_implement_review_loop` only)``) is stripped, and any backticks inside it are
-  never captured as paths.
+Two task grammars occur in real repos and BOTH are supported:
+
+- **Internal grammar** (this library's own releases): a ``### … `[-]``` H3 heading with
+  the marker inline, and a bold ``- **Write set:**`` key.
+- **Consumer grammar** (e.g. dd-chain-capture): a **bold** ``**T-3.1 — …**`` task heading
+  whose active marker lives in a **fenced block** ```` ```\n[-] T-3.1\n``` ```` elsewhere
+  in the file, and a **plain** ``- Write set:`` key.
+
+Common rules:
+
+- **Reserved task:** the single task whose marker is ``[-]`` (inline in an H3 heading OR a
+  standalone ``[-] T-x`` marker line). If NOT exactly one ``[-]`` exists across the whole
+  file (zero, or multiple), return ``()`` — never guess.
+- **Write-set line:** the ``Write set:`` bullet (bold or plain key) within that task's
+  block, up to the next bullet / heading / blank line; a multi-line continuation is joined
+  into one logical line before extraction.
+- **Glob extraction:** every backtick-delimited span that is *path-shaped* (contains ``/``
+  or a filename extension), AFTER masking out every parenthetical annotation — per path,
+  wherever it occurs (``(new)``, ``(reuse — no change)``, ``(`func` only)``). Annotations
+  are NOT terminators, so per-path parentheticals never truncate the remaining paths, and
+  a backtick token inside a parenthetical is never captured as a path.
 - ``none`` (case-insensitive, the whole Write-set value) ⇒ ``()``.
 - Absent ``TASKS.md`` / no ``releases/`` dir ⇒ ``()`` — never crashes the pipeline over a
   purely additive-optional derivation.
@@ -30,10 +41,28 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_TASK_MARKER_RE = re.compile(r"^###\s.*`\[(?P<marker>[ x-])\]`\s*$")
-_BULLET_RE = re.compile(r"^-\s+\*\*(?P<key>[^*]+):\*\*\s*(?P<rest>.*)$")
-_NEXT_BLOCK_RE = re.compile(r"^(-\s+\*\*|###)")
+# An H3 task heading (internal grammar). The inline marker, if present, is any single
+# ``[ x-]`` bracket in the heading (with or without surrounding backticks): both
+# ``### T-1 — … `[-]``` and ``### [-] T-1 — …`` are recognized.
+_H3_HEADING_RE = re.compile(r"^###\s+\S")
+# A bold task heading (consumer grammar): ``**T-3.1 — …**`` — the closing ``**`` need not
+# be at end-of-line (a trailing ``(HOP-…)`` annotation may follow outside the bold span).
+_BOLD_HEADING_RE = re.compile(r"^\*\*\s*(?P<id>T-[0-9][0-9A-Za-z.\-]*)\b.*?\*\*")
+# A standalone marker line (consumer grammar), e.g. inside a fenced block: ``[-] T-3.1``.
+_STANDALONE_MARKER_RE = re.compile(r"^\[(?P<marker>[ x-])\]\s+(?P<id>T-[0-9][0-9A-Za-z.\-]*)\s*$")
+# Any ``[ x-]`` marker bracket appearing inline in a heading (optional backticks).
+_INLINE_MARKER_RE = re.compile(r"`?\[(?P<marker>[ x-])\]`?")
+# Any markdown heading (``#``..``######``) — a block boundary regardless of task-ness.
+_ANY_HEADING_RE = re.compile(r"^#{1,6}\s")
+
+_BULLET_RE = re.compile(
+    r"^-\s+(?:\*\*(?P<bkey>[^*]+):\*\*|(?P<pkey>[A-Za-z][\w ]*?):)\s*(?P<rest>.*)$"
+)
+# The write-set continuation stops at the next bullet (``- ``), any heading (``#`` /
+# ``**T-x``), or a blank line.
+_NEXT_BLOCK_RE = re.compile(r"^(-\s|#{1,6}\s|\*\*\s*T-)")
 _BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
+_PARENTHETICAL_RE = re.compile(r"\([^()]*\)")
 
 _WRITE_SET_KEY = "write set"
 
@@ -62,24 +91,53 @@ def write_scope_from_tasks(specs_dir: Path, release_id: str) -> tuple[str, ...]:
 def _reserved_task_block(text: str) -> str | None:
     """Return the body lines of the single ``[-]`` task's block, or ``None``.
 
-    A "block" is every line from a ``### ... `[-]``` heading up to (but excluding) the
-    next ``### `` heading (or end of file). Returns ``None`` unless EXACTLY one task in
-    the whole file carries the ``[-]`` marker.
+    Handles both grammars (see module docstring). A "block" is every line from the
+    reserved task's heading up to (but excluding) the next markdown/bold-task heading (or
+    end of file). Returns ``None`` unless EXACTLY one task in the whole file carries the
+    ``[-]`` marker — whether inline in an H3 heading or in a standalone ``[-] T-x`` line.
     """
     lines = text.splitlines()
-    headings: list[tuple[int, str]] = []
-    for idx, line in enumerate(lines):
-        match = _TASK_MARKER_RE.match(line.rstrip())
-        if match is not None:
-            headings.append((idx, match.group("marker")))
 
-    reserved = [idx for idx, marker in headings if marker == "-"]
-    if len(reserved) != 1:
+    # All heading line indices (block boundaries) and, for bold headings, their task id.
+    heading_idxs: list[int] = []
+    bold_id_to_idx: dict[str, int] = {}
+    # Reserved tasks found via an inline H3 marker: their heading line index.
+    inline_reserved: list[int] = []
+
+    for idx, raw in enumerate(lines):
+        line = raw.rstrip()
+        if _H3_HEADING_RE.match(line):
+            heading_idxs.append(idx)
+            markers = _INLINE_MARKER_RE.findall(line)
+            # Exactly one marker bracket in the heading ⇒ that is the task's marker.
+            if len(markers) == 1 and markers[0] == "-":
+                inline_reserved.append(idx)
+        elif _ANY_HEADING_RE.match(line):
+            heading_idxs.append(idx)
+        else:
+            bold = _BOLD_HEADING_RE.match(line)
+            if bold is not None:
+                heading_idxs.append(idx)
+                bold_id_to_idx.setdefault(bold.group("id"), idx)
+
+    # Reserved tasks found via a standalone ``[-] T-x`` marker line (consumer grammar).
+    standalone_reserved_ids = [
+        m.group("id")
+        for m in (_STANDALONE_MARKER_RE.match(raw.strip()) for raw in lines)
+        if m is not None and m.group("marker") == "-"
+    ]
+
+    starts: list[int] = list(inline_reserved)
+    for task_id in standalone_reserved_ids:
+        heading_idx = bold_id_to_idx.get(task_id)
+        if heading_idx is not None:
+            starts.append(heading_idx)
+
+    if len(starts) != 1:
         return None
 
-    start = reserved[0]
-    heading_starts = sorted(idx for idx, _marker in headings)
-    later = [idx for idx in heading_starts if idx > start]
+    start = starts[0]
+    later = [idx for idx in sorted(heading_idxs) if idx > start]
     end = later[0] if later else len(lines)
     return "\n".join(lines[start + 1 : end])
 
@@ -95,7 +153,10 @@ def _write_set_line(block: str) -> str | None:
     first_rest = ""
     for idx, line in enumerate(lines):
         match = _BULLET_RE.match(line.strip())
-        if match is not None and match.group("key").strip().lower() == _WRITE_SET_KEY:
+        if match is None:
+            continue
+        key = match.group("bkey") or match.group("pkey") or ""
+        if key.strip().lower() == _WRITE_SET_KEY:
             start_idx = idx
             first_rest = match.group("rest")
             break
@@ -118,12 +179,14 @@ def _extract_globs(write_set_line: str) -> tuple[str, ...]:
     if write_set_line.strip().lower() == "none":
         return ()
 
-    # Only consider content before the first '(' — a trailing parenthetical annotation
-    # (and any backticks inside it) is never part of the glob list.
-    head = write_set_line.split("(", 1)[0]
+    # Mask EVERY parenthetical annotation (and any backticks inside it) — per path,
+    # wherever it occurs. A ``(new)`` / ``(reuse — no change)`` after path #1 must not
+    # truncate the remaining paths (the old ``split('(', 1)[0]`` bug), and a ``(`func`
+    # only)`` annotation must not surface ``func`` as a path.
+    masked = _PARENTHETICAL_RE.sub(" ", write_set_line)
 
     globs: list[str] = []
-    for span in _BACKTICK_SPAN_RE.findall(head):
+    for span in _BACKTICK_SPAN_RE.findall(masked):
         candidate = span.strip()
         if not candidate:
             continue

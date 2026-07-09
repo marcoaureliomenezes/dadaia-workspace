@@ -872,13 +872,17 @@ def build_workflow_handoff_doctor(
     workspace_root: Path,
     *,
     now: dt.datetime | None = None,
+    context: str | None = None,
+    release_id: str | None = None,
 ) -> "WorkflowHandoffDoctor":
     """Compose the workflow-step handoff doctor (v0.1.30 Item 5 / T-30-D-08 / A26).
 
     Read-only reconciliation of every run's ``workflow_steps`` ledger against the on-disk
     payloads under ``.dadaia/runs/lifecycle/<run>/steps/``; reports orphan / malformed /
     stale / undeclared / unconsumed-required incoherences. The clock is injectable for
-    hermetic tests.
+    hermetic tests. v0.1.71 FR2: optional ``context``/``release_id`` narrow the report to
+    the runs of one Spec Context release (``LifecycleRun`` carries both); ``None`` on both
+    preserves the whole-workspace scope.
     """
     from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import WorkflowHandoffDoctor
 
@@ -887,6 +891,8 @@ def build_workflow_handoff_doctor(
         workspace_root,
         build_lifecycle_run_store(workspace_root),
         now=now,
+        context=context,
+        release_id=release_id,
     )
 
 
