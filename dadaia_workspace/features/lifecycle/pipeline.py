@@ -171,7 +171,6 @@ class LifecyclePipeline:
         handoff_resolver: WorkflowHandoffResolver | None = None,
         max_review_retries: int = 2,
         specs_dir: Path | None = None,
-        handoff_lookup: Callable[[str, str], str | None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -180,13 +179,6 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
-        # FR8 (v0.1.66, DEC-A(iii)): additive-optional handoff-evidence lookup, threaded
-        # into every ``LifecycleAgentRunner`` this pipeline constructs. Mirrors the
-        # ``specs_dir``/``specs_dir_resolver`` pattern below — wired by
-        # ``build_lifecycle_pipeline`` (closing over ``workspace_root``); ``None`` for a
-        # fixture-constructed pipeline (no enrichment, never inert-by-omission in the real
-        # pipeline path).
-        self._handoff_lookup = handoff_lookup
         # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
         # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
         # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
@@ -270,7 +262,6 @@ class LifecyclePipeline:
             runner = LifecycleAgentRunner(
                 runtime=runtime,
                 state_machine=self._state_machine,
-                handoff_lookup=self._handoff_lookup,
             )
             decision = runner.run(
                 run,
@@ -501,7 +492,6 @@ class LifecyclePipeline:
         runner = LifecycleAgentRunner(
             runtime=runtime,
             state_machine=self._state_machine,
-            handoff_lookup=self._handoff_lookup,
         )
         return runner.evaluate_gate_with_result(
             run,

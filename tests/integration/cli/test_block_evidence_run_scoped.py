@@ -56,7 +56,9 @@ def _seed_stale_handoff(workspace: Path) -> Path:
     """
     handoff_dir = workspace / ".dadaia" / "handoff" / _CONTEXT
     handoff_dir.mkdir(parents=True, exist_ok=True)
-    stale_path = handoff_dir / "2099-01-01T000000Z-software-engineer-unrelated-old-task.handoff.json"
+    stale_path = (
+        handoff_dir / "2099-01-01T000000Z-software-engineer-unrelated-old-task.handoff.json"
+    )
     stale_doc = {
         "schema_version": "handoff-v1.1",
         "agent": "software-engineer",
@@ -136,6 +138,5 @@ def test_block_evidence_is_run_scoped(
     detail = payload["blocked"]["detail"]
     # The precise defect: current code enriches detail with the stale cross-run handoff.
     assert detail.get("validated_handoff_path") != stale_rel_path, (
-        "block detail must NOT surface a stale, unrelated handoff's path — "
-        f"got detail={detail!r}"
+        f"block detail must NOT surface a stale, unrelated handoff's path — got detail={detail!r}"
     )
