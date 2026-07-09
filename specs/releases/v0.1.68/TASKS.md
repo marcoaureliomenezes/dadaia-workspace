@@ -13,7 +13,7 @@ THEN implementing the fix.
 
 ## Wave A — FR1: run-scoped block evidence
 
-### T-68-01 — RED: block evidence must not surface a stale role handoff `[-]`
+### T-68-01 — RED: block evidence must not surface a stale role handoff `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_block_evidence_run_scoped.py` (new, additive — co-located with lifecycle siblings, architect F4)
 - **Task:** Executed-path test: seed `.dadaia/handoff/<ctx>/<old-UTC>-software-engineer-<slug>.handoff.json`
