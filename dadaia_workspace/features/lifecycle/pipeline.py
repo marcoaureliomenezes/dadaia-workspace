@@ -171,7 +171,6 @@ class LifecyclePipeline:
         handoff_resolver: WorkflowHandoffResolver | None = None,
         max_review_retries: int = 2,
         specs_dir: Path | None = None,
-        handoff_lookup: Callable[[str, str], str | None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -180,13 +179,6 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
-        # FR8 (v0.1.66, DEC-A(iii)): additive-optional handoff-evidence lookup, threaded
-        # into every ``LifecycleAgentRunner`` this pipeline constructs. Mirrors the
-        # ``specs_dir``/``specs_dir_resolver`` pattern below — wired by
-        # ``build_lifecycle_pipeline`` (closing over ``workspace_root``); ``None`` for a
-        # fixture-constructed pipeline (no enrichment, never inert-by-omission in the real
-        # pipeline path).
-        self._handoff_lookup = handoff_lookup
         # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
         # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
         # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
@@ -270,7 +262,6 @@ class LifecyclePipeline:
             runner = LifecycleAgentRunner(
                 runtime=runtime,
                 state_machine=self._state_machine,
-                handoff_lookup=self._handoff_lookup,
             )
             decision = runner.run(
                 run,
@@ -401,6 +392,15 @@ class LifecyclePipeline:
             if review_blocked is not None:
                 return self._finalize_structural_block(run, review_blocked, rounds, attempt)
             verdict = review_result.structured_output.get("verdict")
+            # FR2 (v0.1.68): the verdict is already known HERE, before produce() — a
+            # terminal APPROVED round must declare NO consumer, since no further
+            # implement attempt will ever run to consume it (the loop returns COMPLETED
+            # immediately below). Declaring `(implement_step.label,)` unconditionally on
+            # every round (the pre-fix behavior) left that consumer structurally
+            # unfulfillable on the terminal round, which the doctor's unconsumed-required
+            # gate correctly flags. A REJECTED round still declares the implement
+            # consumer: the next attempt's implement#N genuinely consumes this exact
+            # rejection digest (see resolver.resolve_required above, attempt > 0).
             run, _ = resolver.produce(
                 run,
                 producer_step=review_step.label,
@@ -410,7 +410,7 @@ class LifecyclePipeline:
                     "verdict": verdict if isinstance(verdict, str) else "REJECTED",
                     "verdict_reason": review_result.summary or "review",
                 },
-                declared_consumers=(implement_step.label,),
+                declared_consumers=() if verdict == "APPROVED" else (implement_step.label,),
                 retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
             )
             rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
@@ -501,7 +501,6 @@ class LifecyclePipeline:
         runner = LifecycleAgentRunner(
             runtime=runtime,
             state_machine=self._state_machine,
-            handoff_lookup=self._handoff_lookup,
         )
         return runner.evaluate_gate_with_result(
             run,

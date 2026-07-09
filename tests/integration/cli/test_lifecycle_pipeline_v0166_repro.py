@@ -299,14 +299,20 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
 ) -> None:
     """AC8(repro) — bug: (observability NFR, cross-cutting; DEC-A(iii)).
 
-    A faked pi worker result has empty ``artifact_refs`` (a genuine no-op, blocking
-    exactly as FR2's invariant requires) but a genuinely valid, independently
-    validating handoff file already exists on disk at the expected
-    ``.dadaia/handoff/<context>/`` path for the step's context/agent naming
-    convention. On current (buggy) code the block's ``detail`` dict is always
-    ``{}``. After the DEC-A(iii) fix, ``detail["validated_handoff_path"]`` must
-    equal that path — and the run must STILL be BLOCKED (this never converts a
-    block into a pass).
+    **INVERTED for v0.1.68 FR1 (SPEC FR1.5 / architect F2).** The v0.1.66 FR8
+    enrichment this test originally pinned — surfacing a role-keyed disk-glob match
+    as ``detail["validated_handoff_path"]`` — is exactly the
+    ``lifecycle-pipeline-selects-stale-unrelated-handoff`` defect: the glob is keyed
+    ONLY on ``(context, role)``, carries no run_id/step, and so returns an ARBITRARY
+    historical handoff by that role rather than anything produced by the current
+    run's current step. It can never be made run-scoped (handoff files carry no
+    run/step identity; the step-payload ledger is a different data plane), so v0.1.68
+    REMOVES the enrichment rather than repairing it. This test now asserts the
+    corrected invariant: even with a genuinely valid, independently-validating
+    handoff file pre-existing on disk at the exact path the OLD enrichment would have
+    matched, the block detail carries NO ``validated_handoff_path`` referencing it —
+    only the honest ``no_current_artifact`` marker. The run is still BLOCKED, exactly
+    as before (FR2's no-op invariant is untouched by this correction).
     """
     calls: list[object] = []
 
@@ -326,9 +332,9 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
     monkeypatch.chdir(workspace)
 
     # Pre-write a genuinely valid, independently-validating handoff file at the exact
-    # path the FR8 enrichment must find: <workspace>/.dadaia/handoff/<context>/ named
-    # per the emitter convention <UTC>-<agent>-<slug>.handoff.json, agent=software-engineer
-    # (the `implement` step's role, per implementation_ladder()).
+    # path the RETIRED FR8 enrichment used to match: <workspace>/.dadaia/handoff/<context>/
+    # named per the emitter convention <UTC>-<agent>-<slug>.handoff.json,
+    # agent=software-engineer (the `implement` step's role, per implementation_ladder()).
     handoff_dir = workspace / ".dadaia" / "handoff" / "dadaia-workspace"
     handoff_dir.mkdir(parents=True, exist_ok=True)
     handoff_path = handoff_dir / "2026-07-08T150000Z-software-engineer-pipe-fr8-repro.handoff.json"
@@ -361,9 +367,15 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
     assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
     assert result.exit_code == 3, result.output
     payload = json.loads(result.output)
-    # The run is STILL blocked — FR8 is detail enrichment only, never a pass conversion.
+    # The run is STILL blocked — the FR1 correction only removes the (mis)enrichment.
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
     assert payload["blocked"]["reason"] == "agent result missing artifact evidence"
-    expected_rel_path = ".dadaia/handoff/dadaia-workspace/2026-07-08T150000Z-software-engineer-pipe-fr8-repro.handoff.json"
-    assert payload["blocked"]["detail"]["validated_handoff_path"] == expected_rel_path
+    stale_rel_path = ".dadaia/handoff/dadaia-workspace/2026-07-08T150000Z-software-engineer-pipe-fr8-repro.handoff.json"
+    detail = payload["blocked"]["detail"]
+    assert "validated_handoff_path" not in detail, (
+        f"the retired FR8 disk-glob must never surface a handoff path again; got {detail!r}"
+    )
+    assert detail.get("no_current_artifact") == "pipe-fr8-repro:implement"
+    # Never any reference to the pre-existing stale file's path anywhere in detail.
+    assert stale_rel_path not in detail.values()

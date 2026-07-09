@@ -188,6 +188,45 @@ def test_implement_attempt_2_consumes_exact_qa_attempt_1(tmp_path: Path) -> None
     assert "verdict: REJECTED" in impl2.prompt
 
 
+# --- FR2 (v0.1.68) AC2.2: REJECTED rounds still declare the implement consumer; ------------
+# --- the terminal APPROVED round declares none. ---------------------------------------------
+
+
+def test_rejected_rounds_declare_implement_consumer_terminal_round_declares_none(
+    tmp_path: Path,
+) -> None:
+    """AC2.2 — a REJECTED→REJECTED→APPROVED sequence: qa#0 and qa#1 (both REJECTED)
+    each declare the ``implement`` consumer (the next attempt genuinely consumes that
+    exact rejection digest — proven by ``test_implement_attempt_2_consumes_exact_qa_attempt_1``
+    above); qa#2 (the terminal APPROVED round) declares NO consumer, since no further
+    implement attempt will ever run to consume it.
+    """
+    _workspace(tmp_path)
+    runtime = _ScriptedReviewRuntime(AgentRuntimeKind.FAKE, ["REJECTED", "REJECTED", "APPROVED"])
+    pipeline = _build(tmp_path, runtime, max_retries=2)
+
+    result = pipeline.run_implement_review_loop(
+        "loop-fr2-ac22", implement_step=_steps()[0], review_step=_steps()[1]
+    )
+    assert result.completed is True
+    assert result.attempts == 3
+
+    run = JsonLifecycleRunStore(tmp_path).load("loop-fr2-ac22")
+    assert run is not None
+
+    qa0 = run.workflow_steps.find("qa", 0)
+    qa1 = run.workflow_steps.find("qa", 1)
+    qa2 = run.workflow_steps.find("qa", 2)
+    assert qa0 is not None and qa1 is not None and qa2 is not None
+
+    # Both REJECTED rounds declared the implement consumer — the digest IS consumed next.
+    assert qa0.declared_consumers == ("implement",)
+    assert qa1.declared_consumers == ("implement",)
+
+    # The terminal APPROVED round declares NO consumer.
+    assert qa2.declared_consumers == ()
+
+
 # --- A24: bounded retry exceeded → BLOCK (retry EXHAUSTION, not a structural block) ---------
 
 

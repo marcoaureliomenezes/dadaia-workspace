@@ -1,24 +1,23 @@
 ---
-release: none
-phase: none
+release: v0.1.68
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.68 — Lifecycle Evidence/Handoff Engine Correctness
 
-**v0.1.67 — Test-Infra Executed-Path Integrity** shipped and closed 2026-07-08:
-merged `08703384` (PR #128, all CI green incl. post-merge main); closure on
-`chore/v0.1.67-closure`. Fixed the 2 test-integrity bugs found during v0.1.66 —
-adapters bound `subprocess.run` as a class-definition-time default, so
-executed-path tests silently invoked the real pi/codex binary; a loose assertion
-let the real-binary error pass as success. FR1 moved both adapters to call-time
-runner resolution; FR2 rewrote the false-positive tests with call-recorder
-assertions; FR3 added a suite-wide real-binary guard (4-flag opt-in union).
-Both bugs `resolved`; ledger 0 open.
+**Phase:** IMPLEMENTATION (SPEC/PLAN/TASKS Aprovado; architect REVISE F1-F4 folded).
 
-**Next-pick backlog (per release-governance):** `panel-tab-reorg-agentic-layers`
-(candidate), `dispatch-band-legacy-fallback-removal` (eligible 2026-08-01),
-`platform-seam-todo-retirement`, `specs-doctor-partial-archive-invariant`.
-Audit follow-ups (2026-07-08 scaffolding audit, not yet backlogged): product-engineer
-missing `dadaia-release-definition` skill; L2 ambient AGENTS.md inheritance; root
-residue (`bug-space-war/`, `.playwright-mcp/`). Operator-pending: optional PyPI
-deploy (v0.1.61–67 unpublished).
+First of three remediation releases dispositioning the 9 live lifecycle/CLI bugs
+reported against `dd-chain-capture v0.2.0` on a machine running current `main`
+(HEAD `54e9be0e`). Release A fixes the lifecycle **engine**: run-scoped evidence
+selection, terminal-payload consumption contract, and TASKS.md-derived implement
+write-scope — plus the marquee full-pipeline E2E that drives a real release
+through `dadaia lifecycle pipeline` end-to-end (the test that was missing).
+
+**Picked bugs (3):**
+- `lifecycle-pipeline-selects-stale-unrelated-handoff` (HIGH)
+- `implement-review-completed-run-leaves-unconsumed-required-payload` (HIGH)
+- `pipeline-does-not-derive-write-scope-from-tasks` (HIGH)
+
+**Releases B (v0.1.69, context/CLI surface) and C (v0.1.70, contract/hygiene
+drift)** follow, each a full cycle.
