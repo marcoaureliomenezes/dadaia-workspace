@@ -103,7 +103,7 @@ THEN implementing the fix.
   `-p no:cacheprovider`, no real binaries.
 - **AC:** SPEC AC4.1.
 
-### T-68-08 — QA validation + gate green `[-]`
+### T-68-08 — QA validation + gate green `[x]`
 - **Owner:** qa-engineer
 - **Write set:** none (ADDITIVE evidence handoff only)
 - **Preconditions:** T-68-07 `[x]`
