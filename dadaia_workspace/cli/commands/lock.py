@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import lease as _lease
 from dadaia_workspace.hooks.sdd_gate import _active_field
@@ -40,15 +41,19 @@ def _caller_session_id() -> str:
     subsequent gated writes (which the gate keys on the same env vars) RENEW the
     lease instead of seeing a foreign holder and blocking. Falls back to a random
     id only when nothing identifies the session.
+
+    v0.1.69 FR1.4 (bug ``codex-thread-id-bind-resolution-breaks-cli``): routed through
+    the single source :func:`harness_session_id` (which now includes ``CODEX_THREAD_ID``)
+    instead of a hardcoded local tuple, so lease-transfer keys to the live Codex thread
+    the same way every other resolver-driven consumer does. The ``DADAIA_SESSION_ID``
+    operator override leg is preserved ahead of the harness-native lookup.
     """
-    for var in (
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-    ):
-        val = os.environ.get(var)
-        if val:
-            return "".join(c for c in val if c.isalnum() or c in "_-")
+    override = os.environ.get("DADAIA_SESSION_ID")
+    if override:
+        return sanitize_session_id(override)
+    native = harness_session_id()
+    if native:
+        return native
     return f"sess_{uuid.uuid4().hex[:8]}"
 
 

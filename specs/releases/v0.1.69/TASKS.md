@@ -27,7 +27,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   CONFIRM RED (both None today).
 - **AC:** SPEC AC1(repro) RED half, AC1.1.
 
-### T-69-02 — GREEN: add CODEX_THREAD_ID at the single source + lock.py + envelope `[-]`
+### T-69-02 — GREEN: add CODEX_THREAD_ID at the single source + lock.py + envelope `[x]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/session_env.py`,
   `dadaia_workspace/cli/commands/lock.py`,
