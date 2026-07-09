@@ -75,7 +75,7 @@ THEN implementing the fix.
   `Write set: none` → `()`, (iv) not-exactly-one `[-]` → `()`. CONFIRM RED.
 - **AC:** SPEC AC3(repro) RED half, AC3.3.
 
-### T-68-06 — GREEN: TASKS write-scope resolver (grammar F3) + pipeline union `[-]`
+### T-68-06 — GREEN: TASKS write-scope resolver (grammar F3) + pipeline union `[x]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/tasks_write_scope.py` (new),
   `dadaia_workspace/features/lifecycle/pipeline.py` (`_scope`/step assembly),

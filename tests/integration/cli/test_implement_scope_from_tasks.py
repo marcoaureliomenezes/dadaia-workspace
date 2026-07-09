@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRuntimeKind
+from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime

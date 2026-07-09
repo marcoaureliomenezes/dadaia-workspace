@@ -1693,11 +1693,19 @@ def pipeline(
     # carries only the fake-vs-real selection (so `--harness fake` drives the fake adapter
     # while the snapshot still records the governed harness); there is no separate
     # post-resolve runtime_kind swap.
+    # FR3 (v0.1.68): derive the implement step's write scope from the reserved TASKS.md
+    # task's declared `Write set:` globs, unioned BEFORE any --write-scope extras (FR3.2).
+    # Additive-optional: an absent/ambiguous TASKS.md degrades to () with no crash (AC3.2),
+    # so a fixture/dry-run pipeline with no real TASKS.md behaves exactly as before.
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
+
+    specs_dir = container.resolve_context_specs_dir(workspace_root, context)
+    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
     # FR7 (T-66-08): --write-scope threads into extra_allowed_paths for non-review steps
     # ONLY (gated on step.is_review is False, not a label match — ARCHITECT MEDIUM-2);
     # review steps are never widened. Today the ladder has exactly one non-review step
     # (implement); this stays structurally correct if the ladder grows another create step.
-    extra_paths = tuple(write_scope or ())
+    extra_paths = tuple(tasks_paths) + tuple(write_scope or ())
     base = tuple(
         replace(
             step,

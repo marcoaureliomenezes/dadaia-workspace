@@ -938,6 +938,18 @@ def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     return specs_dir
 
 
+def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
+    """Public seam for :func:`_context_specs_dir` (FR3, v0.1.68).
+
+    Lets a CLI verb resolve the same context→``specs/`` mapping the pipeline container
+    already uses internally — e.g. so ``lifecycle pipeline`` can derive the implement
+    step's write scope from the release's ``TASKS.md`` (see
+    :func:`dadaia_workspace.features.lifecycle.tasks_write_scope.write_scope_from_tasks`)
+    without duplicating the resolution logic.
+    """
+    return _context_specs_dir(workspace_root, context)
+
+
 def _active_phase(specs_dir: Path) -> str | None:
     """Resolve the active ``ACTIVE.md`` lifecycle phase under *specs_dir* (v0.1.57 FR2).
 
