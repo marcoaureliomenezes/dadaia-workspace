@@ -1,11 +1,11 @@
 ---
 release: v0.1.70
-phase: IMPLEMENTATION
+phase: DEFINITION
 ---
 
 # Active release: v0.1.70 — Contract & Repo-Hygiene Drift
 
-**Phase:** IMPLEMENTATION (SPEC/PLAN/TASKS Aprovado; architect APPROVE, F1/F2 folded).
+**Phase:** DEFINITION (SPEC/PLAN/TASKS Aprovado; architect APPROVE F1/F2 folded). Kept in DEFINITION through implementation because FR1.2 corrects MEMORY-class atoms (specs/memory/*), gate-writable only in DEFINITION/CLOSURE.
 
 Third and final remediation release for the 9 live dd-chain-capture bugs. Releases
 A (engine) and B (context/CLI) are closed. Release C fixes two shipped
