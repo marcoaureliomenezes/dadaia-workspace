@@ -28,7 +28,7 @@ F2 (`central-bind-resolution-seam`) honestly descoped → timestamped HIGH backl
 | Deliberate contract updates | 4 store tests (hourly rotation) + 1 backup-location test + 4 bugs-CLI tests updated to the new operator contracts | diff |
 | ruff / mypy --strict / import-linter | PASS (9/9 contracts) | pre-push + CI |
 | Security | APPROVED keyed to pushed sha | handoff |
-| CI (full matrix) | GREEN — PR #<PR> merged `<SHA>` | GitHub Actions |
+| CI (full matrix) | GREEN — PR #141 merged `9b4eb78d` | GitHub Actions |
 
 ## Drifts
 
