@@ -1,26 +1,17 @@
 ---
-release: v0.1.73
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.73 — Governance hygiene: single bug ledger, timestamped backlog, blocking resolution gate
+# Active release: none
 
-Operator-mandated governance cleanup + all 4 open ledger bugs (open work outranks backlog):
+**v0.1.73 SHIPPED + CLOSED (PR #141 `9b4eb78d`).** Governance hygiene: the bug ledger is
+ONE append-only `specs/bugs/bugs.jsonl` (+ one `_archive/archive.jsonl`) — self-applied
+via the real `specs upgrade` v2→4; backlog entries carry `YYYYMMDD-` first-commit
+prefixes with `candidates.md` as the index; `resolved` events REQUIRE
+`--resolution-evidence` (the blocking resolution law — its redaction gap was caught by
+the security gate's REJECT before shipping and fixed RED-first); agent-tier ReDoS,
+out-of-worktree upgrade backups, REPO-DADAIA-1 doctor invariant.
 
-- FR1 (HIGH) `bugs-store-fragments-into-hourly-files` — ONE append-only `specs/bugs/bugs.jsonl`
-  (operator contract; per-hour rotation was implementation drift) + `specs upgrade` step
-  v3→4 consolidating hourly files chronologically and collapsing `specs/bugs/_archive/*.md`
-  into one `_archive/archive.jsonl` (content preserved per line).
-- FR2 backlog hygiene — `YYYYMMDD-` timestamp prefixes on kept entries (real first-commit
-  dates), archive the terminal-REJECTED `fast-tier-persona-validation`, rebuild `candidates.md`.
-- FR3 blocking resolution gate — `dadaia bugs append --event resolved` REQUIRES
-  `--resolution-evidence` (reporter-artifact repro + surfaces covered); CLI rejects without.
-- FR4 (MEDIUM) `migrate-agent-tier-frontmatter-redos-on-unterminated-block` — linear-time
-  frontmatter scan (no backtracking regex).
-- FR5 (MEDIUM) `specs-upgrade-backup-trips-preflight-dirty-gate` — upgrade backup lands
-  OUTSIDE the repo worktree (workspace `.dadaia/tmp/specs-upgrade-backups/…`).
-- FR6 (MEDIUM) `stray-dadaia-tmp-inside-repo` — doctor invariant flags an in-repo
-  `.dadaia/`; clean reclaims it.
-
-F2 central bind-resolution seam → timestamped backlog entry (next release; too large to
-bundle honestly here).
+**Bug ledger: 0 open.** Backlog: 8 timestamped entries; top pick for the next release:
+`20260709-central-bind-resolution-seam` (HIGH — recurrence family F2 class-level fix).
