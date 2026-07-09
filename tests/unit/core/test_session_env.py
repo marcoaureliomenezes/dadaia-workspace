@@ -21,7 +21,7 @@ import os
 
 import pytest
 
-from dadaia_workspace.core.session_env import entry_harness
+from dadaia_workspace.core.session_env import entry_harness, harness_session_id
 from tests.fixtures.harness_env import ENTRY_SIGNAL_ENV_VARS, scrub_entry_signal_env
 
 # AC-4 CI half: raw env captured at import/collection time — before the per-test autouse
@@ -83,6 +83,37 @@ def test_envelope_scrub_neutralizes_developer_codex_session(
     monkeypatch.setenv("CODEX_SESSION_ID", "developer-codex-tui-sess")
     scrub_entry_signal_env(monkeypatch)
     assert entry_harness() is None
+
+
+def test_codex_thread_id_resolves_harness_session_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    # T-69-01 (FR1, bug codex-thread-id-bind-resolution-breaks-cli): a modern Codex tool
+    # subprocess exposes CODEX_THREAD_ID instead of CODEX_SESSION_ID. Today
+    # HARNESS_SESSION_ID_ENV_VARS omits it, so harness_session_id() returns None for a
+    # live Codex session even though a thread id is present.
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
+    assert harness_session_id() == "thread-abc123"
+
+
+def test_codex_thread_id_resolves_entry_harness_codex(monkeypatch: pytest.MonkeyPatch) -> None:
+    # T-69-01 (FR1.2): entry_harness() today checks only CODEX_SESSION_ID, so a live
+    # Codex session identified solely by CODEX_THREAD_ID is invisible to entry
+    # detection.
+    monkeypatch.delenv("DADAIA_ENTRY_HARNESS", raising=False)
+    monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
+    assert entry_harness() == "codex"
+
+
+def test_codex_session_id_preferred_over_thread_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    # AC1.2: when both CODEX_SESSION_ID and CODEX_THREAD_ID are present,
+    # harness_session_id() must prefer CODEX_SESSION_ID (session-id preferred when both
+    # present) — CODEX_THREAD_ID must be ordered AFTER CODEX_SESSION_ID.
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
+    assert harness_session_id() == "codex-sess-1"
 
 
 @pytest.mark.skipif(
