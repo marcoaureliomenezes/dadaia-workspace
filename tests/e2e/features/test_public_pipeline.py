@@ -52,6 +52,7 @@ EXPECTED_SKILLS = {
     "ai-harness-claude-code",
     "ai-harness-codex",
     "architect-core-workflow",
+    "dadaia-cli",
     "dadaia-grill-me",
     "dadaia-handoff-emitter",
     "dadaia-release-closure",
