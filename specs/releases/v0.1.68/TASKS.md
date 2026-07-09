@@ -42,7 +42,7 @@ THEN implementing the fix.
 
 ## Wave B — FR2: terminal payload declares no phantom consumer
 
-### T-68-03 — RED: terminal implement-review leaves no unconsumed_required `[-]`
+### T-68-03 — RED: terminal implement-review leaves no unconsumed_required `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_implement_review_terminal_consumption.py` (new)
 - **Task:** Executed-path test: run `implement-review` to APPROVED on the fake
