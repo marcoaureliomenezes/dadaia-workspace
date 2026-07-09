@@ -112,7 +112,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `session` is `null` today. CONFIRM RED.
 - **AC:** SPEC AC4(repro) RED half.
 
-### T-69-09 — GREEN: show falls back to incumbent pointer `[-]`
+### T-69-09 — GREEN: show falls back to incumbent pointer `[x]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/context.py`
 - **Preconditions:** T-69-08 `[x]`
@@ -124,7 +124,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave E — FR5 + FR6: E2E + validation
 
-### T-69-10 — E2E: a bound context is visible to the CLI `[ ]`
+### T-69-10 — E2E: a bound context is visible to the CLI `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/e2e/features/test_bound_context_visible_to_cli.py` (new)
 - **Preconditions:** T-69-02, T-69-05, T-69-09 `[x]`
