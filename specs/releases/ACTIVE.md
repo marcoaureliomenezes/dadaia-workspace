@@ -1,23 +1,28 @@
 ---
-release: v0.1.68
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.68 — Lifecycle Evidence/Handoff Engine Correctness
+# Active release: none
 
-**Phase:** IMPLEMENTATION (SPEC/PLAN/TASKS Aprovado; architect REVISE F1-F4 folded).
+**v0.1.68 — Lifecycle Evidence/Handoff Engine Correctness** shipped and closed
+2026-07-09: merged `b1e469f8` (PR #130, all CI green incl. post-merge main);
+closure on `chore/v0.1.68-closure`. Fixed 3 HIGH lifecycle-engine bugs at root
+cause (FR1 removed the run-unscopable block-evidence disk-glob; FR2 terminal
+review declares no phantom consumer; FR3 derives implement write-scope from
+TASKS.md) + added the missing full-pipeline E2E. QA PASS 4996/0 with
+mutation-sanity; ledger 3 resolved. Specs archived to `specs/_archive/releases/v0.1.68/`.
 
-First of three remediation releases dispositioning the 9 live lifecycle/CLI bugs
-reported against `dd-chain-capture v0.2.0` on a machine running current `main`
-(HEAD `54e9be0e`). Release A fixes the lifecycle **engine**: run-scoped evidence
-selection, terminal-payload consumption contract, and TASKS.md-derived implement
-write-scope — plus the marquee full-pipeline E2E that drives a real release
-through `dadaia lifecycle pipeline` end-to-end (the test that was missing).
+**Remediation arc (3 releases dispositioning 9 live dd-chain-capture bugs):**
+- ✅ **A — v0.1.68** lifecycle evidence/handoff engine (3 HIGH) — CLOSED
+- ⏭️ **B — v0.1.69** context resolution, session observability & CLI surface —
+  `codex-thread-id-bind-resolution-breaks-cli` (CRITICAL),
+  `lifecycle-diagnostic-commands-missing-context-options` (HIGH),
+  `lifecycle-preflight-unusable-resolved-runtime-inputs` (MEDIUM),
+  `context-bind-success-not-reflected-in-context-show` (MEDIUM)
+- ⏭️ **C — v0.1.70** contract/hygiene drift —
+  `specs-doctor-rejects-current-memory-agent-tier-frontmatter` (HIGH),
+  `remote-bugs-gitignore-blocks-new-intake` (HIGH)
 
-**Picked bugs (3):**
-- `lifecycle-pipeline-selects-stale-unrelated-handoff` (HIGH)
-- `implement-review-completed-run-leaves-unconsumed-required-payload` (HIGH)
-- `pipeline-does-not-derive-write-scope-from-tasks` (HIGH)
-
-**Releases B (v0.1.69, context/CLI surface) and C (v0.1.70, contract/hygiene
-drift)** follow, each a full cycle.
+Ledger: 6 open. Memory consolidation + remote-bugs archival + full post-mortem
+happen once, after Release C.
