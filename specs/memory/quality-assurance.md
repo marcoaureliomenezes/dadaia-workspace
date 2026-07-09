@@ -348,6 +348,20 @@ on the fake harness against a throwaway `tmp_path` spec-context** (see
 `tests/e2e/features/test_pipeline_end_to_end_throwaway_context.py`,
 `test_bound_context_visible_to_cli.py`). Adapter-level green ≠ workflow green.
 
+**The fixture must be the REAL consumer artifact, and the acceptance gate is a replay on
+the operator's environment (v0.1.71).** The v0.1.68–70 arc marked four bugs resolved that
+were re-verified STILL OPEN on the operator's remote against the same shipped sha: the
+tmp_path E2Es exercised the real *command* but with *internal* fixtures, so
+`write_scope_from_tasks` passed our `### `[-]`` grammar while returning `()` for the real
+dd-chain-capture `**T-x**`/fenced-marker `TASKS.md`, and `handoffs doctor` was proven on
+freshly-produced runs while a pre-existing terminal `promote_to_evidence` run kept
+blocking on disk. Law: (1) when a parser/consumer reads an artifact a real project
+authors, commit that project's real artifact verbatim as the fixture — never a
+self-authored specimen of the grammar you assume; (2) for a bug reported from a live
+environment, the close gate is a **before/after replay of the reporter's exact commands
+on that environment** (see `tests/fixtures/tasks/ddcc-specs/…/TASKS.md`). Internal
+fixtures and fake harnesses are necessary, never sufficient.
+
 **"Resolved" means the operator's reported need is met, not that a narrower reading was
 patched.** v0.1.66 marked `lifecycle-implement-step-write-scope-too-narrow` resolved by
 shipping only the manual `--write-scope` flag; the operator's actual need —
