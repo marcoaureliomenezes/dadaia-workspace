@@ -28,8 +28,8 @@ No workflow step advanced and no new handoff was produced.
 After a pipeline is blocked at `implement`, run:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
-  /home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle resume pipeline
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
+  <workspace>/.dadaia/.venv/bin/dadaia lifecycle resume pipeline
 ```
 
 The command exits `0` and prints success, but the state file remains unchanged.

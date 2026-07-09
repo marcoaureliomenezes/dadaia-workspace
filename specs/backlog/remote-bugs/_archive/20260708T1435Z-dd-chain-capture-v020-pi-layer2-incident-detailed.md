@@ -78,8 +78,8 @@ Pi wrote this handoff:
 Validation command:
 
 ```bash
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia reports validate \
-  /home/ubuntu/workspace/.dadaia/handoff/dd-chain-capture/2026-07-08T00-software-engineer-t11.handoff.json
+<workspace>/.dadaia/.venv/bin/dadaia reports validate \
+  <workspace>/.dadaia/handoff/dd-chain-capture/2026-07-08T00-software-engineer-t11.handoff.json
 ```
 
 Validation result:
@@ -186,7 +186,7 @@ dadaia-workspace profile is not self-sufficient.
 After the pipeline blocked, this command was run:
 
 ```bash
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle resume pipeline
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle resume pipeline
 ```
 
 It printed:
@@ -217,8 +217,8 @@ retrying, or clearly explaining that no progress occurred.
 Policy resolution:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --harness pi \
@@ -233,8 +233,8 @@ PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
 Pipeline run:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --harness pi \
@@ -285,7 +285,7 @@ Attempting the mitigation with Codex workers exposed another dadaia-workspace ad
 issue. A fresh run was started with:
 
 ```bash
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --run-id pipeline-codex \
@@ -326,7 +326,7 @@ The run still blocked before implementation:
 
 Why this points at dadaia-workspace:
 
-- `~/.codex/config.toml` already marks `/home/ubuntu/workspace` as trusted.
+- `~/.codex/config.toml` already marks `<workspace>` as trusted.
 - `dadaia_workspace.infrastructure.codex_runtime.CodexExecAdapter._command` invokes
   `codex exec --ignore-user-config`.
 - Because user config is ignored, the worker does not see the trusted project entry.
@@ -387,8 +387,8 @@ dadaia lifecycle gate and this already trusted local workspace session for contr
 A third run was started:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tmp/codex/20260708/bin:$PATH \
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+PATH=<workspace>/.dadaia/tmp/codex/20260708/bin:$PATH \
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --run-id pipeline-codex-full \

@@ -37,8 +37,8 @@ Run the `v0.2.0` pipeline with Pi and the OpenRouter Kimi profile after Pi auth/
 aliasing is configured:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --harness pi \
@@ -54,7 +54,7 @@ Evidence:
 - Pipeline capture: `.dadaia/tmp/codex/20260708/v020-pipeline.jsonl`
 - State file: `.dadaia/states/lifecycle/pipeline.json`
 - Valid handoff: `.dadaia/handoff/dd-chain-capture/2026-07-08T00-software-engineer-t11.handoff.json`
-- Pi session: `/home/ubuntu/.pi/agent/sessions/--home-ubuntu-workspace--/2026-07-08T14-21-47-410Z_019f421b-3612-71b8-9f94-de03ff885e29.jsonl`
+- Pi session: `<home>/.pi/agent/sessions/--home-ubuntu-workspace--/2026-07-08T14-21-47-410Z_019f421b-3612-71b8-9f94-de03ff885e29.jsonl`
 
 ## Expected
 
