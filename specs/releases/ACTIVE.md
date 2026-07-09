@@ -1,17 +1,18 @@
 ---
-release: none
-phase: none
+release: v0.1.74
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.74 — Canonical zone docs are never hygiene waste
 
-**v0.1.73 SHIPPED + CLOSED (PR #141 `9b4eb78d`).** Governance hygiene: the bug ledger is
-ONE append-only `specs/bugs/bugs.jsonl` (+ one `_archive/archive.jsonl`) — self-applied
-via the real `specs upgrade` v2→4; backlog entries carry `YYYYMMDD-` first-commit
-prefixes with `candidates.md` as the index; `resolved` events REQUIRE
-`--resolution-evidence` (the blocking resolution law — its redaction gap was caught by
-the security gate's REJECT before shipping and fixed RED-first); agent-tier ReDoS,
-out-of-worktree upgrade backups, REPO-DADAIA-1 doctor invariant.
+Single-bug remediation (HIGH, reported against `45da12e5` from the operator's remote):
+`public install` restores the projected zone-doc `AGENTS.md` files with historical
+mtimes → 2 UNPROTECTED expired candidates → preflight re-blocked → `hygiene clean
+--apply` deletes them → `public doctor` drifts → install restores → loop.
 
-**Bug ledger: 0 open.** Backlog: 8 timestamped entries; top pick for the next release:
-`20260709-central-bind-resolution-seam` (HIGH — recurrence family F2 class-level fix).
+Root cause: the hygiene zone scan has no concept of canonical zone docs / lib
+projections — mtime freshening would only re-expire in 24h; classification is the fix.
+FR1: zone-root doc files (`AGENTS.md`, `README.md`, `.gitkeep` — the documented
+scoped-rules mechanism) get `HygieneProtectionKind.CANONICAL_ZONE_DOC` in ONE insertion
+point (`_protected_paths`), inherited by cleanup, the FR3 preflight arithmetic, and the
+retention sweep. Acceptance: remote replay of the reporter's exact commands.
