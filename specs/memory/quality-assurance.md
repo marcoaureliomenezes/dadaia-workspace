@@ -15,7 +15,7 @@ tags:
   - quality
   - test-architecture
 token_estimate: 4180
-last_updated: '2026-07-08'
+last_updated: '2026-07-09'
 release_origin: v0.1.67
 ---
 
@@ -334,6 +334,41 @@ durable guard that a decomposed god module stays decomposed — a raised ceiling
 same-commit justification; lowering is always welcome. It complements the import-linter
 `ignore_imports` cap (full enforcement status single-sourced in [[architecture]]
 §Enforcement).
+
+**Validate at the workflow boundary the operator actually runs, not one layer below it
+(v0.1.68–70 remediation arc).** The nine dd-chain-capture bugs that shipped live on
+`main` were all caught by the same blind spot: v0.1.66/67 validated the pi/codex
+**adapter** (does the binary get invoked, does a non-zero exit surface) with fake
+harnesses and adapter-level unit tests, and **never once drove `dadaia lifecycle
+pipeline` / `implement-review` end to end** — so the engine layer above the adapter
+(run-scoped evidence selection, terminal-payload consumption, TASKS write-scope
+derivation) was untested and three HIGH bugs lived there. **Law: every operator-facing
+workflow verb has at least one executed-path E2E that drives the REAL command end to end
+on the fake harness against a throwaway `tmp_path` spec-context** (see
+`tests/e2e/features/test_pipeline_end_to_end_throwaway_context.py`,
+`test_bound_context_visible_to_cli.py`). Adapter-level green ≠ workflow green.
+
+**"Resolved" means the operator's reported need is met, not that a narrower reading was
+patched.** v0.1.66 marked `lifecycle-implement-step-write-scope-too-narrow` resolved by
+shipping only the manual `--write-scope` flag; the operator's actual need —
+auto-derivation from `TASKS.md` — went undelivered and re-surfaced as a new bug. A
+disposition that patches a sub-case while leaving the reported workflow broken is not a
+fix. Re-read the reporter's *expected* behavior before closing.
+
+**A stub is not a diagnostic — a hardcoded BLOCKED/OK stub hides an unbuilt subsystem.**
+`lifecycle preflight` returned a hardcoded "requires resolved runtime inputs" for
+releases because its whole probe-assembly layer (`build_lifecycle_preflight_input`) was
+never built; "wire the stub" was a feature, not a wiring task. Treat a constant-return
+stub in a user-facing command as an unbuilt feature and scope it honestly.
+
+**Guard shipped contracts against self-contradiction with a consistency test.** Two bugs
+were the library contradicting itself: authoring docs claimed the memory schema
+"tolerates `agent_tier`" while the schema (`additionalProperties:false`) rejected it, and
+`.gitignore` ignored the `remote-bugs/` intake it documented as tracked truth. Neither
+had a test asserting doc↔schema / gitignore↔intake agreement. When a doc, scaffold, or
+config states a contract another artifact enforces, add an executed-path test asserting
+they agree (see `test_memory_agents_doc_schema_consistency.py`,
+`test_governance_intake_not_gitignored.py`).
 
 This atom is the design-of-record for implementers and qa-engineer. It is the
 canonical path per constitution §13 (`specs/memory/quality-assurance.md`) and the

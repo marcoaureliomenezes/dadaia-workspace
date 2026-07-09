@@ -21,8 +21,8 @@ instead of surfacing the real Pi setup failure.
 With `pi` installed but no provider API key configured:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
-  /home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle pipeline \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
+  <workspace>/.dadaia/.venv/bin/dadaia lifecycle pipeline \
   --context dd-chain-capture \
   --release-id v0.2.0 \
   --harness pi \
@@ -32,7 +32,7 @@ PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
 Direct Pi smoke command:
 
 ```bash
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
   pi --mode json --tools read --model gpt-5.3-codex -p 'Return exactly {"ok":true}'
 ```
 

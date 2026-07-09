@@ -16,9 +16,9 @@ recognize it as a valid model ID.
 ## Reproduction
 
 ```bash
-/home/ubuntu/workspace/.dadaia/.venv/bin/dadaia lifecycle workflow profiles list --json
+<workspace>/.dadaia/.venv/bin/dadaia lifecycle workflow profiles list --json
 
-PATH=/home/ubuntu/workspace/.dadaia/tools/pi/node_modules/.bin:$PATH \
+PATH=<workspace>/.dadaia/tools/pi/node_modules/.bin:$PATH \
 pi --provider openrouter --model kimi-2.7 --mode json --tools read -p smoke
 ```
 
