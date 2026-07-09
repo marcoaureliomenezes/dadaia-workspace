@@ -49,7 +49,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `specs/backlog/` as controls. CONFIRM RED for the `remote-bugs/` probe today.
 - **AC:** SPEC AC2(repro) RED half.
 
-### T-70-04 — GREEN: add remote-bugs negation to .gitignore `[-]`
+### T-70-04 — GREEN: add remote-bugs negation to .gitignore `[x]`
 - **Owner:** software-engineer
 - **Write set:** `.gitignore`
 - **Preconditions:** T-70-03 `[x]`

@@ -136,6 +136,15 @@ pip-wheel-metadata/
 !/specs/backlog/_archive/
 /specs/backlog/_archive/*
 !/specs/backlog/_archive/*.md
+# remote-bugs/ is the remote-bug-report intake subtree (excluded by
+# /specs/backlog/* above with no negation until now): opt in ONLY *.md,
+# live entries + _archive durable copies, mirroring the backlog/_archive idiom.
+!/specs/backlog/remote-bugs/
+/specs/backlog/remote-bugs/*
+!/specs/backlog/remote-bugs/*.md
+!/specs/backlog/remote-bugs/_archive/
+/specs/backlog/remote-bugs/_archive/*
+!/specs/backlog/remote-bugs/_archive/*.md
 !/specs/releases/
 !/specs/releases/ACTIVE.md
 !/specs/releases/*/
