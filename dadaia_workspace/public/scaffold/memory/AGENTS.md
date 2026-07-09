@@ -49,8 +49,8 @@ dadaia memory catalog generate
   All 9 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
   `tags`, `token_estimate`, `last_updated`, `release_origin` — and
   `additionalProperties: false` makes any stray field a hard error.
-  `agent_tier` is deprecated-optional since v0.1.53: the schema tolerates it,
-  nothing emits it, and atoms no longer carry it.
+  `agent_tier` was deprecated in v0.1.53 and schema-dropped in v0.1.61: the
+  schema now rejects it (`additionalProperties: false`) — do not include it.
 - Body uses curated headings only — the `lint-memory-atoms` allowlist governs
   which h2 sections are valid.
 - `[[slug]]` wikilinks resolve by slug at any depth; do not hardcode paths.
