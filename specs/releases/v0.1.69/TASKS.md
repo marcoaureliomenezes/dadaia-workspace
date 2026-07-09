@@ -54,7 +54,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave B — FR2: --context on preflight + specs doctor (load-bearing only)
 
-### T-69-04 — RED: preflight + specs doctor reject --context `[-]`
+### T-69-04 — RED: preflight + specs doctor reject --context `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_diagnostic_context_option.py` (new)
 - **Task:** CliRunner: `preflight --context <ctx> --release-id <rel>` and
@@ -63,7 +63,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `--context` (AC2.3), documenting the F2 decision.
 - **AC:** SPEC AC2(repro) RED half, AC2.3.
 
-### T-69-05 — GREEN: add --context/--release-id to preflight + specs doctor `[ ]`
+### T-69-05 — GREEN: add --context/--release-id to preflight + specs doctor `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/cli/commands/lifecycle.py`,
   `dadaia_workspace/cli/commands/specs.py`
