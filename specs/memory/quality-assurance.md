@@ -362,6 +362,24 @@ environment, the close gate is a **before/after replay of the reporter's exact c
 on that environment** (see `tests/fixtures/tasks/ddcc-specs/…/TASKS.md`). Internal
 fixtures and fake harnesses are necessary, never sufficient.
 
+**Gate coherence + resolution law (v0.1.72, from the 150-bug recurrence audit).** The
+ledger audit found ~40% of the v0.1.66–71 arc's resolutions left the reported need unmet
+(median re-report <11h), all sharing one signature: *validated against the artifact the
+fixer controls, declared resolved at that boundary*. Zero-recurrence fixes (v0.1.67
+call-time seams + loud guards) were structural. Laws:
+1. **A schema-drop MUST ship its migration** — a gate must never demand an action its
+   own tooling refuses (protected evidence) or forbids (phase-locked memory); every gate
+   ships its legal repair path.
+2. **The gate a diagnostic reports is the gate the verbs enforce** — advisory gates are
+   theater; overrides are explicit flags, never silent.
+3. **Probes are validated against a LIVED-IN workspace** (old atoms, real lease lineage,
+   accumulated evidence), never only clean fixtures.
+4. **Resolution requires**: (i) repro against the REPORTER's artifact/environment;
+   (ii) coverage of EVERY surface the bug names — scope-shrink means the bug stays open
+   (re-scope explicitly with the reporter, never silently); (iii) pre-existing on-disk
+   state healed, not only new runs; (iv) a second same-family report ⇒ mandatory
+   CLASS-level fix + invariant test, never a third instance patch.
+
 **"Resolved" means the operator's reported need is met, not that a narrower reading was
 patched.** v0.1.66 marked `lifecycle-implement-step-write-scope-too-narrow` resolved by
 shipping only the manual `--write-scope` flag; the operator's actual need —

@@ -33,7 +33,7 @@ byproduct re-trips the dirty-tree gate it repairs.
 | Remote full-chain replay (live dd-chain-capture v0.2.0) | PASS — upgrade v1→3 heals 8 atoms + doctor clean; adoption sandbox on-box (`adopted: True`, `live_foreign_holder: False`); pipeline WITHOUT skip REFUSES (honest reason, no run created); pipeline `--skip-preflight --harness fake` completes to closure; `context show` live branch `feature/v0.1.1` vs stored `main` | replay transcript |
 | ruff format+check / mypy --strict | PASS | pre-push + CI |
 | Security | APPROVED, keyed to pushed sha | security-reviewer handoff |
-| CI (full matrix) | GREEN — PR #<PR> merged `<SHA>`; post-merge main green | GitHub Actions |
+| CI (full matrix) | GREEN — PR #139 merged `6b517d79`; post-merge main green | GitHub Actions |
 
 ## Drifts
 
