@@ -23,7 +23,7 @@ THEN implementing the fix.
   seeded stale file. CONFIRM RED (current code surfaces the stale path).
 - **AC:** SPEC AC1(repro) RED half.
 
-### T-68-02 — GREEN: remove the run-unscopable disk-glob enrichment `[ ]`
+### T-68-02 — GREEN: remove the run-unscopable disk-glob enrichment `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/container.py`,
   `dadaia_workspace/features/lifecycle/agent_runner.py`,
