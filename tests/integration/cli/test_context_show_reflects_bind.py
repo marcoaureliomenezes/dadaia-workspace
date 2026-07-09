@@ -119,3 +119,81 @@ def test_show_without_any_bind_still_reports_null_session_ac42(
     assert show_result.exit_code == 0, show_result.output
     payload = json.loads(show_result.output)
     assert payload["session"] is None
+
+
+# --- v0.1.71 FR3: no-arg `context show` reflects the bound session -------------------
+
+
+def _make_two_context_workspace(root: Path) -> Path:
+    """First-ALIVE ``default-first`` (never bound) + ``bound-second`` (bound below)."""
+    ws = root / "ws2"
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": "default-first",
+                        "state": "alive",
+                        "repo_slug": "default-first",
+                        "repo_url": "https://example.invalid/default-first.git",
+                        "created_at": "2026-07-01T00:00:00+00:00",
+                        "alive_since": "2026-07-01T00:00:00+00:00",
+                        "dead_since": None,
+                    },
+                    {
+                        "name": "bound-second",
+                        "state": "alive",
+                        "repo_slug": "bound-second",
+                        "repo_url": "https://example.invalid/bound-second.git",
+                        "created_at": "2026-07-01T00:00:00+00:00",
+                        "alive_since": "2026-07-01T00:00:00+00:00",
+                        "dead_since": None,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return ws
+
+
+def test_noarg_show_resolves_to_bound_context_not_first_alive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR3: after a bare ``context bind bound-second``, ``context show --json`` (NO arg)
+    surfaces ``bound-second`` with its live session — not first-ALIVE ``default-first``
+    with ``session: null`` (the exact remote symptom against 574a84bd)."""
+    ws = _make_two_context_workspace(tmp_path)
+    monkeypatch.chdir(ws)
+
+    bind_result = _runner.invoke(
+        app,
+        ["context", "bind", "bound-second", "--mode", "implementation", "--release", "v0.2.0"],
+    )
+    assert bind_result.exit_code == 0, bind_result.output
+
+    show_result = _runner.invoke(app, ["context", "show", "--json"])
+    assert show_result.exit_code == 0, show_result.output
+    payload = json.loads(show_result.output)
+    assert payload["name"] == "bound-second", payload
+    assert payload["session"] is not None, payload
+    assert payload["session"]["context"] == "bound-second"
+    assert payload["session"]["release"] == "v0.2.0"
+
+
+def test_noarg_show_falls_back_to_first_alive_when_no_bound_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR3 fallback: with no live bound session anywhere, no-arg show returns first-ALIVE
+    (unchanged prior behaviour)."""
+    ws = _make_two_context_workspace(tmp_path)
+    monkeypatch.chdir(ws)
+
+    show_result = _runner.invoke(app, ["context", "show", "--json"])
+    assert show_result.exit_code == 0, show_result.output
+    payload = json.loads(show_result.output)
+    assert payload["name"] == "default-first", payload
+    assert payload["session"] is None

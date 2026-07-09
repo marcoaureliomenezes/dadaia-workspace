@@ -186,3 +186,112 @@ def test_doctor_flags_unconsumed_required_on_terminal_run(tmp_path: Path) -> Non
     report = _doctor(tmp_path).run()
     assert report.ok is False
     assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(report)
+
+
+# --- v0.1.71 FR4: promote_to_evidence exemption --------------------------------------
+# Reproduces bug ``handoffs-doctor-blocks-terminal-promote-to-evidence``: a terminal
+# APPROVED implement-review's review verdict payload has retention_mode=PROMOTE_TO_EVIDENCE
+# + declared_consumers=(implement) and is never consumed — because it is promoted to
+# evidence, not consumed. It must NOT be flagged unconsumed_required (heals pre-fix runs
+# on disk with no migration). RED before FR4: this asserts ``ok is True`` where the
+# pre-fix doctor reported UNCONSUMED_REQUIRED.
+
+
+def test_doctor_does_not_flag_terminal_promote_to_evidence_payload(tmp_path: Path) -> None:
+    _workspace(tmp_path)
+    resolver = _resolver(tmp_path)
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="review_qa",
+        attempt=0,
+        output_schema="qa-review-handoff-v1",
+        payload={"verdict": "APPROVED", "summary": "approved", "blocking": []},
+        declared_consumers=("implement",),
+        retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
+    )
+    terminal = dataclasses.replace(run, status=LifecycleRunStatus.COMPLETED)
+    JsonLifecycleRunStore(tmp_path).save(terminal)
+    report = _doctor(tmp_path).run()
+    assert report.ok is True, [f.to_dict() for f in report.findings]
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED not in _kinds(report)
+
+
+def test_doctor_still_flags_terminal_delete_after_consumed_unconsumed(tmp_path: Path) -> None:
+    """FR4.2 control: the exemption is scoped to PROMOTE_TO_EVIDENCE — a terminal
+    delete_after_consumed required payload that was never consumed still flags."""
+    _workspace(tmp_path)
+    resolver = _resolver(tmp_path)
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "scope"},
+        declared_consumers=("spec_create",),
+        retention_mode=RetentionMode.DELETE_AFTER_CONSUMED,
+    )
+    terminal = dataclasses.replace(run, status=LifecycleRunStatus.COMPLETED)
+    JsonLifecycleRunStore(tmp_path).save(terminal)
+    report = _doctor(tmp_path).run()
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(report)
+
+
+# --- v0.1.71 FR2: --context/--release-id are REAL run filters -------------------------
+
+
+def _run_in(run_id: str, context: str, release_id: str) -> LifecycleRun:
+    return LifecycleRun(
+        run_id=run_id,
+        context=context,
+        release_id=release_id,
+        command="release_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.COMPLETED,
+        current_step="release_scope",
+        idempotency_key=run_id,
+    )
+
+
+def test_doctor_context_filter_scopes_to_matched_runs_only(tmp_path: Path) -> None:
+    """A context/release filter narrows the report AND the on-disk scan to the matched
+    runs — an unconsumed_required defect in another context's run is excluded, and that
+    other run's on-disk payload is NOT mis-flagged ``undeclared`` against the narrowed
+    ledger."""
+    _workspace(tmp_path)
+    resolver = _resolver(tmp_path)
+    # Target run (dd-chain-capture/v0.2.0): coherent.
+    tgt, _ = resolver.produce(
+        _run_in("run-target", "dd-chain-capture", "v0.2.0"),
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "ok"},
+    )
+    JsonLifecycleRunStore(tmp_path).save(
+        dataclasses.replace(tgt, status=LifecycleRunStatus.COMPLETED)
+    )
+    # Foreign run (other context): has a genuine unconsumed_required defect.
+    other, _ = resolver.produce(
+        _run_in("run-other", "some-other-context", "v9.9.9"),
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "defect"},
+        declared_consumers=("spec_create",),
+    )
+    JsonLifecycleRunStore(tmp_path).save(
+        dataclasses.replace(other, status=LifecycleRunStatus.COMPLETED)
+    )
+
+    # Unfiltered: the foreign defect is visible.
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(_doctor(tmp_path).run())
+
+    # Filtered to the target: clean, and no ``undeclared`` from the foreign payload.
+    scoped = WorkflowHandoffDoctor(
+        tmp_path,
+        JsonLifecycleRunStore(tmp_path),
+        now=NOW,
+        context="dd-chain-capture",
+        release_id="v0.2.0",
+    ).run()
+    assert scoped.ok is True, [f.to_dict() for f in scoped.findings]

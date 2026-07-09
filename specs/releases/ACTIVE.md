@@ -1,21 +1,22 @@
 ---
-release: none
-phase: none
+release: v0.1.71
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.71 — Remediation: real-consumer TASKS grammar + diagnostic surface + evidence-doctor
 
-**REMEDIATION ARC COMPLETE (v0.1.68 -> v0.1.70).** All 9 live dd-chain-capture bugs
-(reported against remote HEAD == main 54e9be0e) fixed at root cause, RED-first, no
-workarounds, validated with mutation-sanity + full-pipeline/bound-context E2Es, shipped
-and closed:
-- v0.1.68 (PR #130/#131) — lifecycle evidence/handoff engine (3 HIGH)
-- v0.1.69 (PR #132/#133) — context resolution & CLI surface (1 CRITICAL + 3)
-- v0.1.70 (PR #134) — contract/hygiene drift (2 HIGH)
+Remediation of 4 bugs re-verified STILL OPEN on the operator's remote against installed
+source `574a84bd` (== main). The v0.1.68–70 arc marked these resolved but validated only
+against internal fixtures / fake harnesses — never against the real `dd-chain-capture`
+consumer artifacts. This release fixes each at root cause and its acceptance gate is
+**validation on the operator's remote against the real consumer**, not the local suite.
 
-Remote-bugs intake archived (redacted) to specs/backlog/remote-bugs/_archive/. Memory
-consolidated (quality-assurance.md: workflow-boundary validation law + 3 more).
-Post-mortem in specs/_archive/releases/v0.1.70/CLOSURE.md. Ledger: 1 open
-(stray-dadaia-tmp-inside-repo, a tracked AI-surface side-bug found during the arc).
-Backlog follow-ups: preflight-block-reasons-missing-operator-command,
-tasks-write-scope-traversal-hardening, implement-review-write-scope-from-tasks-parity.
+- FR1 (HIGH) `pipeline-write-scope-parser-wrong-grammar` — parser handles the real
+  consumer TASKS.md grammar (bold `**T-x —**` headings, fenced `[-] T-x.y` marker blocks,
+  plain `- Write set:` key, per-path parentheticals) as well as the internal grammar.
+- FR2 (HIGH) `lifecycle-status-handoffs-doctor-missing-context` — `lifecycle status` and
+  `lifecycle handoffs doctor` accept `--context`/`--release-id` as REAL run filters.
+- FR3 (MEDIUM) `context-show-noarg-ignores-bound-session` — no-arg `context show` resolves
+  to the context with a live bound session before first-ALIVE.
+- FR4 (HIGH) `handoffs-doctor-blocks-terminal-promote-to-evidence` — doctor exempts
+  `promote_to_evidence` payloads from `unconsumed_required`; heals existing runs, no migration.

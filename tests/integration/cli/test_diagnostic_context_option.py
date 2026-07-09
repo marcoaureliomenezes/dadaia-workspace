@@ -10,13 +10,16 @@ such option" usage error, exit code 2) is superseded here by the T-69-05 GREEN
 assertion — both options are now accepted (exit code != 2, i.e. no usage error) and
 ``specs doctor`` rejects passing ``--context`` and ``--specs-dir`` together (AC2.2).
 
-Positive control (AC2.3, documenting the architect F2 scoping decision): ``lifecycle
-status`` and ``lifecycle handoffs doctor`` are backed by workspace-global builders
-(``build_lifecycle_hygiene_service`` / ``build_workflow_handoff_doctor`` take no
-``specs_dir``) and must NEVER gain a ``--context`` option — accepted-but-ignored would
-be worse than absent. This assertion is a REGRESSION GUARD, not a repro: it passed
-before T-69-05 and keeps passing after (which touches only
-``preflight``/``specs doctor``).
+v0.1.71 FR2 CORRECTION (bug ``lifecycle-status-handoffs-doctor-missing-context``): the
+v0.1.69 "architect F2 scoping decision" — that ``status``/``handoffs doctor`` must NEVER
+accept ``--context`` because their builders were workspace-global — was WRONG for the
+operator's real release workflow, which runs every lifecycle verb with an explicit
+``--context dd-chain-capture --release-id v0.2.0``. ``LifecycleRun`` carries ``context``
+and ``release_id``, so the option is a REAL run filter, not accepted-but-ignored. The two
+former "must-reject" regression guards are inverted here to "accepts (parse contract)";
+the DEEP filtering behaviour is proven hermetically in
+``tests/unit/features/lifecycle/test_workflow_handoff_doctor.py`` (doctor) and
+``tests/unit/cli/test_lifecycle_status_runs_summary.py`` (status).
 """
 
 from __future__ import annotations
@@ -82,19 +85,34 @@ def test_specs_doctor_context_and_specs_dir_mutually_exclusive_ac22() -> None:
     assert "--specs-dir" in clean, result.output
 
 
-def test_status_stays_workspace_global_no_context_option() -> None:
-    """AC2.3 positive control: status's builder takes no specs_dir; --context must
-    never be accepted there (accepted-but-ignored is worse than absent)."""
-    result = _runner.invoke(app, ["lifecycle", "status", "--context", "dadaia-workspace"])
-    assert result.exit_code == 2, result.output
-    assert "No such option" in result.output
-
-
-def test_handoffs_doctor_stays_workspace_global_no_context_option() -> None:
-    """AC2.3 positive control: handoffs doctor's builder takes no specs_dir; --context
-    must never be accepted there."""
+def test_status_accepts_context_option_v0171() -> None:
+    """v0.1.71 FR2 (AC): ``lifecycle status`` ACCEPTS ``--context``/``--release-id`` — no
+    Typer "No such option" usage error (exit 2). Parse-contract only, hermetic: the deep
+    run-scoped summary is proven against a tmp_path workspace in the unit test (this must
+    NOT depend on an ambient initialized workspace — there is none on CI)."""
     result = _runner.invoke(
-        app, ["lifecycle", "handoffs", "doctor", "--context", "dadaia-workspace"]
+        app,
+        ["lifecycle", "status", "--context", "dd-chain-capture", "--release-id", "v0.2.0"],
     )
-    assert result.exit_code == 2, result.output
-    assert "No such option" in result.output
+    assert result.exit_code != 2, result.output
+    assert "No such option" not in result.output
+
+
+def test_handoffs_doctor_accepts_context_option_v0171() -> None:
+    """v0.1.71 FR2 (AC): ``lifecycle handoffs doctor`` ACCEPTS ``--context``/
+    ``--release-id`` — no Typer "No such option" usage error. Parse-contract only,
+    hermetic; the deep run filter is proven in the unit test."""
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "handoffs",
+            "doctor",
+            "--context",
+            "dd-chain-capture",
+            "--release-id",
+            "v0.2.0",
+        ],
+    )
+    assert result.exit_code != 2, result.output
+    assert "No such option" not in result.output
