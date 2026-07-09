@@ -61,7 +61,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave C — FR3: validation
 
-### T-70-05 — QA validation + gate green `[ ]`
+### T-70-05 — QA validation + gate green `[x]`
 - **Owner:** qa-engineer
 - **Write set:** none (ADDITIVE handoff only)
 - **Preconditions:** T-70-02, T-70-04 `[x]`
