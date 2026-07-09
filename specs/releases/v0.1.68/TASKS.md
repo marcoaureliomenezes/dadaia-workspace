@@ -63,7 +63,7 @@ THEN implementing the fix.
 
 ## Wave C — FR3: derive implement write-scope from TASKS.md
 
-### T-68-05 — RED: implement scope derived from TASKS write set `[ ]`
+### T-68-05 — RED: implement scope derived from TASKS write set `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/features/lifecycle/test_tasks_write_scope.py` (new — resolver grammar unit tests),
   `tests/integration/cli/test_implement_scope_from_tasks.py` (new — executed-path)
