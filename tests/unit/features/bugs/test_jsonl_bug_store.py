@@ -180,61 +180,42 @@ def test_redact_service_scrubs_symptom_repro_expected(tmp_path: Path) -> None:
 # --- store: append + filename shape -----------------------------------------------
 
 
-def test_append_writes_zero_padded_filename(tmp_path: Path) -> None:
+def test_append_writes_single_canonical_file(tmp_path: Path) -> None:
+    """v0.1.73 FR1 (bug ``bugs-store-fragments-into-hourly-files``): every append lands
+    in the ONE canonical ``bugs.jsonl`` — the operator contract; the v0.1.46 per-hour
+    rotation fragmented the ledger into dozens of files."""
     store = JsonlBugStore(tmp_path)
     path = store.append_event(_reported("first"))
-    assert path.name == f"{_HOUR_BUCKET}Z-00.jsonl"
-    # The written line is valid JSON matching the event.
+    assert path.name == "bugs.jsonl"
     line = path.read_text(encoding="utf-8").strip()
     assert json.loads(line)["bug_id"] == "first"
 
 
-def test_hour_bucket_derived_from_event_ts_not_wallclock(tmp_path: Path) -> None:
+def test_appends_across_hours_go_to_same_single_file(tmp_path: Path) -> None:
     store = JsonlBugStore(tmp_path)
-    path = store.append_event(_reported("x", ts="2025-01-02T09:30:00Z"))
-    assert path.name == "20250102T09Z-00.jsonl"
-
-
-def test_appends_same_hour_go_to_same_file(tmp_path: Path) -> None:
-    store = JsonlBugStore(tmp_path)
-    p1 = store.append_event(_reported("a"))
-    p2 = store.append_event(_reported("b"))
-    assert p1 == p2
+    p1 = store.append_event(_reported("a", ts="2025-01-02T09:30:00Z"))
+    p2 = store.append_event(_reported("b", ts="2026-07-01T15:00:00Z"))
+    assert p1 == p2 == tmp_path / "bugs.jsonl"
     assert len(store.files()) == 1
 
 
-# --- store: rotation boundary -----------------------------------------------------
-
-
-def test_rotation_rolls_to_next_counter_at_ceiling(tmp_path: Path) -> None:
-    """At exactly ROWS_PER_FILE rows the next append rolls to -01 (the boundary)."""
+def test_no_rotation_ever_on_canonical_file(tmp_path: Path) -> None:
+    """The single-file contract has NO rotation: past the legacy ceiling the append
+    still lands in ``bugs.jsonl``."""
     store = JsonlBugStore(tmp_path)
-    file0 = tmp_path / f"{_HOUR_BUCKET}Z-00.jsonl"
-    # Pre-seed file0 with exactly ROWS_PER_FILE valid lines.
-    with file0.open("w", encoding="utf-8") as handle:
-        for i in range(ROWS_PER_FILE):
-            handle.write(json.dumps(_reported(f"seed-{i}").to_dict()) + "\n")
-
-    rolled = store.append_event(_reported("overflow"))
-    assert rolled.name == f"{_HOUR_BUCKET}Z-01.jsonl"
-    # The pre-existing full file is untouched (still ROWS_PER_FILE lines).
-    assert sum(1 for line in file0.read_text().splitlines() if line.strip()) == ROWS_PER_FILE
-
-
-def test_no_rotation_below_ceiling(tmp_path: Path) -> None:
-    store = JsonlBugStore(tmp_path)
-    file0 = tmp_path / f"{_HOUR_BUCKET}Z-00.jsonl"
-    with file0.open("w", encoding="utf-8") as handle:
-        for i in range(ROWS_PER_FILE - 1):
+    canonical = tmp_path / "bugs.jsonl"
+    with canonical.open("w", encoding="utf-8") as handle:
+        for i in range(ROWS_PER_FILE + 5):
             handle.write(json.dumps(_reported(f"seed-{i}").to_dict()) + "\n")
     same = store.append_event(_reported("last"))
-    assert same.name == f"{_HOUR_BUCKET}Z-00.jsonl"
+    assert same == canonical
 
 
-def test_iter_events_orders_by_hour_and_counter(tmp_path: Path) -> None:
+def test_iter_events_orders_legacy_then_canonical(tmp_path: Path) -> None:
+    """Legacy hourly files stream chronologically FIRST, the canonical file LAST —
+    correct in both the pre- and post-consolidation regimes."""
     store = JsonlBugStore(tmp_path)
-    # Write out of order: later hour first, then a rotated file in an earlier hour.
-    store.append_event(_reported("late", ts="2026-07-01T15:00:00Z"))
+    store.append_event(_reported("canonical-tail", ts="2026-07-01T15:00:00Z"))
     (tmp_path / f"{_HOUR_BUCKET}Z-00.jsonl").write_text(
         json.dumps(_reported("early0").to_dict()) + "\n", encoding="utf-8"
     )
@@ -242,7 +223,7 @@ def test_iter_events_orders_by_hour_and_counter(tmp_path: Path) -> None:
         json.dumps(_reported("early1").to_dict()) + "\n", encoding="utf-8"
     )
     ids = [e.bug_id for e in store.iter_events()]
-    assert ids == ["early0", "early1", "late"]
+    assert ids == ["early0", "early1", "canonical-tail"]
 
 
 # --- store: malformed-line tolerance ----------------------------------------------
@@ -309,3 +290,21 @@ def test_stats_aggregates_by_status_and_severity(tmp_path: Path) -> None:
     assert stats.total == 3
     assert stats.by_status == {"open": 2, "resolved": 1}
     assert stats.by_severity == {"HIGH": 2, "LOW": 1}
+
+
+def test_redact_scrubs_evidence_field() -> None:
+    """v0.1.73 security REJECT (bug ``bug-evidence-field-bypasses-redaction``, CWE-532):
+    ``evidence`` is operator-authored free text ("reporter-artifact repro") — exactly the
+    content class that carries local paths/IPs — and must be scrubbed like notes/repro."""
+    event = BugEvent(
+        bug_id="ev",
+        event="resolved",
+        ts=_HOUR_TS,
+        reported_by="se",
+        release="v9.9.9",
+        evidence="replayed /home/ubuntu/workspace repro against 10.0.0.5",
+    )
+    red = event.redact()
+    assert red.evidence is not None
+    assert "ubuntu" not in red.evidence
+    assert "10.0.0.5" not in red.evidence

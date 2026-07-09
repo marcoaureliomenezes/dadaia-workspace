@@ -154,6 +154,7 @@ class SpecsDoctor:
         issues.extend(self._coherence.check_orchestration_registry())
         # TREE invariants (spec-context-tree-v2)
         issues.extend(self._structural.check_tree1_foundation())
+        issues.extend(self._structural.check_repo_dadaia1())
         issues.extend(self._structural.check_tree2_root_spec_md())
         issues.extend(self._structural.check_tree3_memory_md())
         issues.extend(self._structural.check_tree4_required_dirs())
@@ -214,6 +215,9 @@ class SpecsDoctor:
             try:
                 if issue.code == "TREE-4":
                     self._structural.fix_tree4(issue)
+                    fixed.append(issue)
+                elif issue.code == "REPO-DADAIA-1":
+                    self._structural.fix_repo_dadaia1(issue)
                     fixed.append(issue)
                 elif issue.code == "SPEC-DOC-034":
                     self._closure_audit.fix_archive_dir(issue)

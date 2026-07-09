@@ -366,11 +366,15 @@ class GovernanceValidator:
         terminated: set[str] = set()
 
         for jsonl_path in sorted(bugs_dir.glob("*.jsonl")):
-            if not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
+            # v0.1.73 FR1: the single canonical bugs.jsonl gets schema + coherence checks
+            # but NO rotation ceiling (the one-file contract has no rotation); legacy
+            # hourly files keep all three sub-checks.
+            is_canonical = jsonl_path.name == "bugs.jsonl"
+            if not is_canonical and not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
                 continue
             lines = jsonl_path.read_text(encoding="utf-8").splitlines()
             row_count = sum(1 for line in lines if line.strip())
-            if row_count > _BUGS_JSONL_ROW_CEILING:
+            if not is_canonical and row_count > _BUGS_JSONL_ROW_CEILING:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-033",

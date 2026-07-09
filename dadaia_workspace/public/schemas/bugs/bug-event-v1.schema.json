@@ -4,7 +4,12 @@
   "title": "Bug Event v1",
   "description": "One append-only event in the event-sourced JSONL bug telemetry (v0.1.46 AC-1). Each line of a specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl file is one object validating this schema. A bug_id's stream opens with a `reported` event and carries at most one terminal event {resolved, superseded, deferred, rejected}; `archived` is a NON-terminal annotation (defined-but-unemitted this release).",
   "type": "object",
-  "required": ["bug_id", "event", "ts", "reported_by"],
+  "required": [
+    "bug_id",
+    "event",
+    "ts",
+    "reported_by"
+  ],
   "additionalProperties": false,
   "properties": {
     "bug_id": {
@@ -14,7 +19,14 @@
     },
     "event": {
       "type": "string",
-      "enum": ["reported", "resolved", "superseded", "deferred", "rejected", "archived"],
+      "enum": [
+        "reported",
+        "resolved",
+        "superseded",
+        "deferred",
+        "rejected",
+        "archived"
+      ],
       "description": "Event kind. `reported` opens the stream; {resolved, superseded, deferred, rejected} are terminal (at most one per bug_id); `archived` is a non-terminal annotation."
     },
     "ts": {
@@ -33,7 +45,12 @@
     },
     "severity": {
       "type": "string",
-      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
       "description": "reported: severity level."
     },
     "surface": {
@@ -50,7 +67,9 @@
     },
     "tags": {
       "type": "array",
-      "items": {"type": "string"},
+      "items": {
+        "type": "string"
+      },
       "description": "reported: free-form classification tags."
     },
     "symptom": {
@@ -67,7 +86,7 @@
     },
     "notes": {
       "type": "string",
-      "description": "reported: environment / logs — MUST be redacted of any operator-local path, IP, hostname, private repo name, or secret."
+      "description": "reported: environment / logs \u2014 MUST be redacted of any operator-local path, IP, hostname, private repo name, or secret."
     },
     "release": {
       "type": "string",
@@ -80,11 +99,25 @@
     "reason": {
       "type": "string",
       "description": "deferred/rejected: the disposition rationale."
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 20,
+      "description": "resolved: the resolution law's evidence (v0.1.73 FR3) \u2014 reporter-artifact reproduction + every surface the bug names. REQUIRED at the CLI append path (blocking); optional in the schema so historical pre-law events remain valid."
     }
   },
   "allOf": [
     {
-      "if": {"properties": {"event": {"const": "reported"}}, "required": ["event"]},
+      "if": {
+        "properties": {
+          "event": {
+            "const": "reported"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
       "then": {
         "required": [
           "title",
@@ -101,20 +134,72 @@
       }
     },
     {
-      "if": {"properties": {"event": {"const": "resolved"}}, "required": ["event"]},
-      "then": {"required": ["release"]}
+      "if": {
+        "properties": {
+          "event": {
+            "const": "resolved"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "required": [
+          "release"
+        ]
+      }
     },
     {
-      "if": {"properties": {"event": {"const": "superseded"}}, "required": ["event"]},
-      "then": {"required": ["superseded_by"]}
+      "if": {
+        "properties": {
+          "event": {
+            "const": "superseded"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "required": [
+          "superseded_by"
+        ]
+      }
     },
     {
-      "if": {"properties": {"event": {"const": "deferred"}}, "required": ["event"]},
-      "then": {"required": ["reason"]}
+      "if": {
+        "properties": {
+          "event": {
+            "const": "deferred"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
     },
     {
-      "if": {"properties": {"event": {"const": "rejected"}}, "required": ["event"]},
-      "then": {"required": ["reason"]}
+      "if": {
+        "properties": {
+          "event": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
     }
   ]
 }

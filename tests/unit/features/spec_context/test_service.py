@@ -186,8 +186,11 @@ def test_alive_safe_preserves_preexisting_specs_to_backup(
 
     svc.alive("projbk")
 
-    # A backup snapshot of the pre-existing tree exists under specs_bkp/preserve-*.
-    backups = list((repo_dir / "specs_bkp").glob("preserve-*"))
+    # A backup snapshot of the pre-existing tree exists under the canonical backup
+    # root (v0.1.73 FR5: OUTSIDE the repo worktree when a workspace root is resolvable).
+    from dadaia_workspace.core import specs_backup as _sb
+
+    backups = list(_sb.backup_root(specs_dir).glob("preserve-*"))
     assert backups, "alive() must safe-preserve the pre-existing specs/ before merging"
     assert (backups[0] / "constitution.md").read_text(encoding="utf-8") == "# operator\n"
 

@@ -22,6 +22,7 @@ from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
     migrate_agent_tier_frontmatter,
 )
 from dadaia_workspace.features.migrate.bugs_jsonl import migrate_bugs_jsonl
+from dadaia_workspace.features.migrate.bugs_single_file import migrate_bugs_single_file
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
 
 
@@ -50,6 +51,15 @@ REGISTRY: tuple[MigrationStep, ...] = (
         to_version=3,
         key="agent-tier-frontmatter",
         apply=migrate_agent_tier_frontmatter,
+    ),
+    # v0.1.73 FR1: consolidate the drifted per-hour bug logs into the single canonical
+    # bugs.jsonl + collapse _archive/*.md into one archive.jsonl (operator contract,
+    # bug bugs-store-fragments-into-hourly-files).
+    MigrationStep(
+        from_version=3,
+        to_version=4,
+        key="bugs-single-file",
+        apply=migrate_bugs_single_file,
     ),
 )
 
