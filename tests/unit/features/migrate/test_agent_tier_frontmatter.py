@@ -127,4 +127,23 @@ def test_registered_in_chain_v2_to_v3() -> None:
     step = next((s for s in REGISTRY if s.key == "agent-tier-frontmatter"), None)
     assert step is not None, "agent-tier-frontmatter step not registered"
     assert (step.from_version, step.to_version) == (2, 3)
-    assert latest_version() == 3
+    assert latest_version() >= 3  # v0.1.73 added bugs-single-file (3→4)
+
+
+def test_unterminated_frontmatter_completes_linearly(tmp_path: Path) -> None:
+    """v0.1.73 FR4 (bug ``migrate-agent-tier-frontmatter-redos-on-unterminated-block``,
+    security review of v0.1.72): a malformed atom — opening ``---`` fence + a long
+    blank-line run + NO closing fence — must complete in linear time. The DOTALL
+    ``.*?`` frontmatter regex backtracked super-linearly (~34s at 50k newlines)."""
+    import time
+
+    malformed = "---\n" + "\n" * 50_000  # no closing fence
+    specs = _specs(tmp_path, ("malformed.md", malformed))
+
+    start = time.monotonic()
+    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 2.0, f"frontmatter scan took {elapsed:.1f}s — super-linear backtracking"
+    assert result.moved == []  # malformed file untouched
+    assert (specs / "memory" / "malformed.md").read_text(encoding="utf-8") == malformed

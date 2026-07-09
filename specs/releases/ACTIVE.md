@@ -1,19 +1,26 @@
 ---
-release: none
-phase: none
+release: v0.1.73
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.73 — Governance hygiene: single bug ledger, timestamped backlog, blocking resolution gate
 
-**v0.1.72 SHIPPED + CLOSED (PR #139 `6b517d79`).** Round-3 remediation: 6 remote bugs
-(1 CRITICAL) fixed at root cause — gate coherence: every gate ships its repair path
-(agent-tier migration v2→3, lease lineage adoption, protected-residual exemption, live
-branch) and the preflight the CLI reports is the preflight pipeline/implement-review
-enforce (--skip-preflight explicit override). Validated by full-chain replay on the
-operator's remote against live dd-chain-capture v0.2.0.
+Operator-mandated governance cleanup + all 4 open ledger bugs (open work outranks backlog):
 
-Recurrence audit (150 bugs): ~40% of the v0.1.66–71 arc's resolutions were need-unmet
-(median re-report <11h) — resolution law now in quality-assurance.md. Ledger: 4 open,
-all scoped to the NEXT release (governance-hygiene): bugs-store single append-only JSONL
-+ _archive consolidation (operator contract), backlog timestamp prefixes + cleanup,
-agent-tier ReDoS, specs_bkp-trips-dirty-gate, F2 central bind-resolution seam.
+- FR1 (HIGH) `bugs-store-fragments-into-hourly-files` — ONE append-only `specs/bugs/bugs.jsonl`
+  (operator contract; per-hour rotation was implementation drift) + `specs upgrade` step
+  v3→4 consolidating hourly files chronologically and collapsing `specs/bugs/_archive/*.md`
+  into one `_archive/archive.jsonl` (content preserved per line).
+- FR2 backlog hygiene — `YYYYMMDD-` timestamp prefixes on kept entries (real first-commit
+  dates), archive the terminal-REJECTED `fast-tier-persona-validation`, rebuild `candidates.md`.
+- FR3 blocking resolution gate — `dadaia bugs append --event resolved` REQUIRES
+  `--resolution-evidence` (reporter-artifact repro + surfaces covered); CLI rejects without.
+- FR4 (MEDIUM) `migrate-agent-tier-frontmatter-redos-on-unterminated-block` — linear-time
+  frontmatter scan (no backtracking regex).
+- FR5 (MEDIUM) `specs-upgrade-backup-trips-preflight-dirty-gate` — upgrade backup lands
+  OUTSIDE the repo worktree (workspace `.dadaia/tmp/specs-upgrade-backups/…`).
+- FR6 (MEDIUM) `stray-dadaia-tmp-inside-repo` — doctor invariant flags an in-repo
+  `.dadaia/`; clean reclaims it.
+
+F2 central bind-resolution seam → timestamped backlog entry (next release; too large to
+bundle honestly here).

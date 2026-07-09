@@ -1,3 +1,0 @@
-{"bug_id": "lifecycle-pipeline-selects-stale-unrelated-handoff", "event": "resolved", "release": "v0.1.68", "reported_by": "software-engineer", "ts": "2026-07-09T04:08:39Z"}
-{"bug_id": "implement-review-completed-run-leaves-unconsumed-required-payload", "event": "resolved", "release": "v0.1.68", "reported_by": "software-engineer", "ts": "2026-07-09T04:08:41Z"}
-{"bug_id": "pipeline-does-not-derive-write-scope-from-tasks", "event": "resolved", "release": "v0.1.68", "reported_by": "software-engineer", "ts": "2026-07-09T04:08:42Z"}

@@ -64,7 +64,8 @@ def test_append_writes_jsonl_under_bugs_dir(specs: Path) -> None:
     _append_reported(specs, "gate-bug")
     logs = list((specs / "bugs").glob("*.jsonl"))
     assert len(logs) == 1
-    assert logs[0].name.endswith("-00.jsonl")
+    # v0.1.73 FR1 (operator contract): the ONE canonical append-only ledger.
+    assert logs[0].name == "bugs.jsonl"
 
 
 def test_status_lists_open_bug_ids(specs: Path) -> None:
@@ -82,6 +83,8 @@ def test_status_lists_open_bug_ids(specs: Path) -> None:
             "open-beta",
             "--event",
             "resolved",
+            "--resolution-evidence",
+            "test: reporter-artifact repro replayed; all named surfaces covered.",
             "--release",
             "v0.1.46",
         ],
@@ -109,6 +112,8 @@ def test_status_all_includes_closed(specs: Path) -> None:
             "a",
             "--event",
             "resolved",
+            "--resolution-evidence",
+            "test: reporter-artifact repro replayed; all named surfaces covered.",
             "--release",
             "v0.1.46",
         ],
@@ -133,6 +138,8 @@ def test_stats_aggregates_by_status_and_severity(specs: Path) -> None:
             "c",
             "--event",
             "resolved",
+            "--resolution-evidence",
+            "test: reporter-artifact repro replayed; all named surfaces covered.",
             "--release",
             "v0.1.46",
         ],

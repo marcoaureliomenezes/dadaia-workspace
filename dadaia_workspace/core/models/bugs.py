@@ -61,6 +61,7 @@ _OPTIONAL_STR_FIELDS: tuple[str, ...] = (
     "release",
     "superseded_by",
     "reason",
+    "evidence",
 )
 
 # Redaction patterns for `notes` (privacy rules): operator-local home paths + IPs never
@@ -117,6 +118,7 @@ class BugEvent:
     release: str | None = None
     superseded_by: str | None = None
     reason: str | None = None
+    evidence: str | None = None
 
     @property
     def is_terminal(self) -> bool:
@@ -126,7 +128,7 @@ class BugEvent:
     def redact(self) -> BugEvent:
         """Return a copy with every free-text field scrubbed of operator-local paths/IPs.
 
-        ``title``, ``symptom``, ``repro``, ``expected`` and ``notes`` are all operator-authored
+        ``title``, ``symptom``, ``repro``, ``expected``, ``notes`` and ``evidence`` are all operator-authored
         free text that can carry a home path or IP (CWE-532). Each is passed through
         :func:`redact_text`; unset fields are left as ``None``. Structured/enumerated fields
         (severity, component, release, …) are not free text and are left untouched.
@@ -142,6 +144,7 @@ class BugEvent:
             repro=_scrub(self.repro),
             expected=_scrub(self.expected),
             notes=_scrub(self.notes),
+            evidence=_scrub(self.evidence),
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -189,4 +192,5 @@ class BugEvent:
             release=_opt_str(raw, "release"),
             superseded_by=_opt_str(raw, "superseded_by"),
             reason=_opt_str(raw, "reason"),
+            evidence=_opt_str(raw, "evidence"),
         )

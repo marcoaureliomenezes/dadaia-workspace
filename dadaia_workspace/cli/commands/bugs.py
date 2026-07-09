@@ -81,6 +81,12 @@ def bugs_append_cmd(
     expected: str | None = typer.Option(None, "--expected", help="reported: contract promise."),
     notes: str | None = typer.Option(None, "--notes", help="reported: notes (redacted)."),
     release: str | None = typer.Option(None, "--release", help="resolved: fixing release."),
+    resolution_evidence: str | None = typer.Option(
+        None,
+        "--resolution-evidence",
+        help="resolved (REQUIRED, v0.1.73 resolution law): reporter-artifact repro + "
+        "every surface the bug names (or the explicit re-scope). Min 20 chars.",
+    ),
     superseded_by: str | None = typer.Option(
         None, "--superseded-by", help="superseded: superseding slug."
     ),
@@ -97,6 +103,20 @@ def bugs_append_cmd(
     target = _resolve_specs_dir(specs_dir)
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        raise typer.Exit(code=1)
+
+    # v0.1.73 FR3 (resolution law, BLOCKING form): a resolved event without evidence is
+    # refused BEFORE anything is written — the recurrence audit showed ~40% of the
+    # v0.1.66-71 arc's resolutions were need-unmet; evidence = reporter-artifact repro
+    # + every surface the bug names (or the explicit re-scope).
+    if event is BugEventKind.RESOLVED and (
+        resolution_evidence is None or len(resolution_evidence.strip()) < 20
+    ):
+        typer.echo(
+            "[error] resolved requires --resolution-evidence (>=20 chars): "
+            "reporter-artifact repro + every surface the bug names (resolution law).",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     model = BugEvent(
@@ -117,6 +137,7 @@ def bugs_append_cmd(
         release=release,
         superseded_by=superseded_by,
         reason=reason,
+        evidence=resolution_evidence,
     ).redact()
 
     payload = model.to_dict()

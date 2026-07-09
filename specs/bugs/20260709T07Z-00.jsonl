@@ -1,4 +1,0 @@
-{"bug_id": "codex-thread-id-bind-resolution-breaks-cli", "event": "resolved", "release": "v0.1.69", "reported_by": "software-engineer", "ts": "2026-07-09T07:58:44Z"}
-{"bug_id": "lifecycle-diagnostic-commands-missing-context-options", "event": "resolved", "release": "v0.1.69", "reported_by": "software-engineer", "ts": "2026-07-09T07:58:45Z"}
-{"bug_id": "lifecycle-preflight-unusable-resolved-runtime-inputs", "event": "resolved", "release": "v0.1.69", "reported_by": "software-engineer", "ts": "2026-07-09T07:58:47Z"}
-{"bug_id": "context-bind-success-not-reflected-in-context-show", "event": "resolved", "release": "v0.1.69", "reported_by": "software-engineer", "ts": "2026-07-09T07:58:48Z"}

@@ -26,8 +26,8 @@ from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
 
 __all__ = ["migrate_agent_tier_frontmatter"]
 
-#: The leading frontmatter block: ``---\n ... \n---\n`` at the very start of the file.
-_FRONTMATTER_RE = re.compile(r"\A(---\s*\n)(?P<body>.*?)(\n---\s*\n)", re.DOTALL)
+#: Opening/closing frontmatter fence line (whole line, optional trailing whitespace).
+_FENCE_RE = re.compile(r"^---\s*$")
 
 #: A top-level (non-indented) ``agent_tier:`` key line inside the frontmatter body.
 _AGENT_TIER_LINE_RE = re.compile(r"^agent_tier\s*:")
@@ -69,21 +69,34 @@ def migrate_agent_tier_frontmatter(specs_dir: Path, *, dry_run: bool = False) ->
 
 def _strip_agent_tier(text: str) -> str | None:
     """Return *text* with the frontmatter ``agent_tier`` key removed, or ``None`` if the
-    file has no leading frontmatter block or no ``agent_tier`` key in it."""
-    match = _FRONTMATTER_RE.match(text)
-    if match is None:
-        return None
+    file has no leading frontmatter block or no ``agent_tier`` key in it.
 
-    fm_lines = match.group("body").splitlines()
+    v0.1.73 FR4 (bug ``migrate-agent-tier-frontmatter-redos-on-unterminated-block``):
+    LINEAR splitlines scan — the previous DOTALL ``.*?`` regex backtracked
+    super-linearly (~34s at 50k newlines) on a malformed atom with an opening fence and
+    no closing fence. Line-by-line fence detection is O(n) on every input.
+    """
+    lines = text.splitlines(keepends=True)
+    if not lines or not _FENCE_RE.match(lines[0].rstrip("\n")):
+        return None
+    close_idx: int | None = None
+    for idx in range(1, len(lines)):
+        if _FENCE_RE.match(lines[idx].rstrip("\n")):
+            close_idx = idx
+            break
+    if close_idx is None:
+        return None  # unterminated fence — not a frontmatter block; leave untouched
+
     kept: list[str] = []
     removed = False
     skipping_continuation = False
-    for line in fm_lines:
-        if _AGENT_TIER_LINE_RE.match(line):
+    for line in lines[1:close_idx]:
+        bare = line.rstrip("\n")
+        if _AGENT_TIER_LINE_RE.match(bare):
             removed = True
             skipping_continuation = True
             continue
-        if skipping_continuation and _CONTINUATION_RE.match(line):
+        if skipping_continuation and _CONTINUATION_RE.match(bare):
             # An indented continuation of the removed key (block list/scalar) — drop it.
             continue
         skipping_continuation = False
@@ -92,5 +105,4 @@ def _strip_agent_tier(text: str) -> str | None:
     if not removed:
         return None
 
-    new_frontmatter = match.group(1) + "\n".join(kept) + match.group(3)
-    return new_frontmatter + text[match.end() :]
+    return lines[0] + "".join(kept) + "".join(lines[close_idx:])
