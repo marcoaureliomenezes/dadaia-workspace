@@ -77,8 +77,7 @@ def test_remote_bugs_intake_probe_not_ignored(probe_paths: list[Path]) -> None:
     """
     relative = probe_paths[2].relative_to(_REPO_ROOT).as_posix()
     assert not _is_ignored(_REPO_ROOT, relative), (
-        f"{relative} is git-ignored — the remote-bugs/ intake subtree has no "
-        "negation in .gitignore"
+        f"{relative} is git-ignored — the remote-bugs/ intake subtree has no negation in .gitignore"
     )
 
 

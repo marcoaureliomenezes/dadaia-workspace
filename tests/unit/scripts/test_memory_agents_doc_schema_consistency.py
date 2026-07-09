@@ -40,9 +40,7 @@ def test_agents_md_copies_do_not_claim_schema_tolerates_agent_tier() -> None:
         text = path.read_text(encoding="utf-8")
         if _AGENTS_MD_LIE in text:
             offenders.append(str(path.relative_to(_REPO_ROOT)))
-    assert offenders == [], (
-        f"These files still falsely claim '{_AGENTS_MD_LIE}': {offenders}"
-    )
+    assert offenders == [], f"These files still falsely claim '{_AGENTS_MD_LIE}': {offenders}"
 
 
 def test_architecture_md_does_not_claim_schema_retains_agent_tier() -> None:
