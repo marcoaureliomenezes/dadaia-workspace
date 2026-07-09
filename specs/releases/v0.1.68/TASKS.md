@@ -50,7 +50,7 @@ THEN implementing the fix.
   `report.ok is True` (no `unconsumed_required`). CONFIRM RED.
 - **AC:** SPEC AC2(repro) RED half.
 
-### T-68-04 — GREEN: declare () consumers on APPROVED terminal round `[ ]`
+### T-68-04 — GREEN: declare () consumers on APPROVED terminal round `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/features/lifecycle/pipeline.py` (`run_implement_review_loop` only)
 - **Preconditions:** T-68-03 `[x]`
