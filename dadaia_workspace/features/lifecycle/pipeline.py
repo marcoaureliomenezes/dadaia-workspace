@@ -392,6 +392,15 @@ class LifecyclePipeline:
             if review_blocked is not None:
                 return self._finalize_structural_block(run, review_blocked, rounds, attempt)
             verdict = review_result.structured_output.get("verdict")
+            # FR2 (v0.1.68): the verdict is already known HERE, before produce() — a
+            # terminal APPROVED round must declare NO consumer, since no further
+            # implement attempt will ever run to consume it (the loop returns COMPLETED
+            # immediately below). Declaring `(implement_step.label,)` unconditionally on
+            # every round (the pre-fix behavior) left that consumer structurally
+            # unfulfillable on the terminal round, which the doctor's unconsumed-required
+            # gate correctly flags. A REJECTED round still declares the implement
+            # consumer: the next attempt's implement#N genuinely consumes this exact
+            # rejection digest (see resolver.resolve_required above, attempt > 0).
             run, _ = resolver.produce(
                 run,
                 producer_step=review_step.label,
@@ -401,7 +410,7 @@ class LifecyclePipeline:
                     "verdict": verdict if isinstance(verdict, str) else "REJECTED",
                     "verdict_reason": review_result.summary or "review",
                 },
-                declared_consumers=(implement_step.label,),
+                declared_consumers=() if verdict == "APPROVED" else (implement_step.label,),
                 retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
             )
             rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))

@@ -73,16 +73,17 @@ def test_terminal_implement_review_leaves_no_unconsumed_required(workspace: Path
     assert payload["completed"] is True
     assert payload["final_verdict"] == "APPROVED"
 
-    # Confirm the terminal review payload is EXACTLY the structurally-over-declared one:
-    # non-empty declared_consumers, state stuck at PRODUCED (never consumed — no next
-    # implement attempt runs after APPROVED).
+    # FR2 (AC2.1): the terminal APPROVED review payload declares NO consumer — the
+    # producer already knows the verdict at produce time, so it never over-declares an
+    # implement consumer that can structurally never run after the loop completes.
     run = container.build_lifecycle_run_store(workspace).load(run_id)
     assert run is not None
     review_record = run.workflow_steps.find("review_qa", 0)
     assert review_record is not None
-    assert review_record.declared_consumers == ("implement",), (
-        "precondition for the repro: the terminal round must have declared the "
-        "implement consumer (the over-declaration this task proves is a defect)"
+    assert review_record.declared_consumers == (), (
+        "a terminal APPROVED review round must declare zero consumers — the prior "
+        "unconditional (implement_step.label,) declaration is exactly the defect "
+        "this task fixes"
     )
     assert review_record.consumption_state() is WorkflowStepConsumptionState.PRODUCED
 
