@@ -28,14 +28,44 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The engine's evidence gate still blocks a NO-EVIDENCE worker result.
+
+    v0.1.72 FR5: the PLAIN default fake now carries the driving APPROVED+evidence
+    result (the smoke path completes), so this block-proof injects a SCRIPTED
+    no-evidence fake through the preserved ``container.build_agent_runtime`` seam —
+    the engine (not the fake) is what blocks at implement.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunResult,
+        AgentRunStatus,
+        AgentRuntimeKind,
+    )
+    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
+
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+
+    real_build = container.build_agent_runtime
+    no_evidence = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="worker produced no artifact evidence",
+        artifact_refs=(),
+    )
+
+    def scripted(kind: AgentRuntimeKind, **kwargs: object) -> object:
+        if kind is AgentRuntimeKind.FAKE:
+            return FakeAgentRuntime(result=no_evidence)
+        return real_build(kind, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(container, "build_agent_runtime", scripted)
 
     result = _runner.invoke(
         app,
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -52,7 +82,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
     payload = json.loads(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
-    # First step ran the engine on the fake harness and blocked on the missing verdict.
+    # First step ran the engine on the fake harness and blocked on the missing evidence.
     assert payload["steps"][0]["label"] == "implement"
     assert payload["steps"][0]["runtime"] == "fake"
     assert payload["steps"][0]["accepted"] is False
@@ -137,6 +167,7 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -181,6 +212,7 @@ def test_pipeline_defaults_fake_silently_with_no_entry_signal(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -189,8 +221,11 @@ def test_pipeline_defaults_fake_silently_with_no_entry_signal(
         ],
     )
 
-    assert result.exit_code == 3, result.output
+    # v0.1.72 FR5: the plain default fake carries the driving APPROVED+evidence result,
+    # so the auto-defaulted fake pipeline now COMPLETES (was: blocked at implement).
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
+    assert payload["status"] == "OK"
     assert payload["steps"][0]["runtime"] == "fake"
     assert "[harness] auto-default:" not in result.stderr
 
@@ -259,6 +294,7 @@ def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -361,6 +397,7 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -481,6 +518,7 @@ def test_codex_pipeline_untrusted_dir_no_longer_blocks_on_trust_error(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -559,6 +597,7 @@ def test_codex_pipeline_sandbox_override_avoids_container_bwrap_failure(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -616,6 +655,7 @@ def test_codex_pipeline_sandbox_default_stays_read_only_when_env_unset(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",

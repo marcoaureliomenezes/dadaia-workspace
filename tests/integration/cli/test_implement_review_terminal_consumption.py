@@ -59,6 +59,7 @@ def test_terminal_implement_review_leaves_no_unconsumed_required(workspace: Path
         [
             "lifecycle",
             "implement-review",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--run-id",

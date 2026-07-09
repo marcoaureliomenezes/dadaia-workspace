@@ -136,6 +136,7 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0166-fr1-repro",
             "--run-id",
@@ -211,6 +212,7 @@ def test_pi_pipeline_accepts_schema_version_and_singular_artifact_result(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro",
             "--run-id",
@@ -268,6 +270,7 @@ def test_pi_pipeline_still_blocks_on_genuine_noop_worker(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro-negative",
             "--run-id",
@@ -354,6 +357,7 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0166-fr8-repro",
             "--run-id",

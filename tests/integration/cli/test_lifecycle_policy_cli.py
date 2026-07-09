@@ -185,6 +185,7 @@ def test_pipeline_show_policy_json(tmp_path: Path, monkeypatch) -> None:  # type
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.28",
             "--harness",
@@ -212,6 +213,7 @@ def test_pipeline_harness_pi_show_policy_resolves_pi(tmp_path: Path, monkeypatch
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.29",
             "--harness",
@@ -238,6 +240,7 @@ def test_pipeline_harness_pi_with_codex_step_model_rejected(tmp_path: Path, monk
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.29",
             "--harness",
@@ -261,6 +264,7 @@ def test_pipeline_step_harness_pi_only_that_step(tmp_path: Path, monkeypatch) ->
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.29",
             "--step-harness",
@@ -283,6 +287,7 @@ def test_pipeline_step_model_rejects_raw_model_string(tmp_path: Path, monkeypatc
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.28",
             "--step-model",
@@ -304,6 +309,7 @@ def test_pipeline_step_model_rejects_unknown_profile(tmp_path: Path, monkeypatch
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.28",
             "--step-model",
@@ -324,6 +330,7 @@ def test_pipeline_step_model_rejects_harness_mismatch(tmp_path: Path, monkeypatc
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.28",
             "--step-model",

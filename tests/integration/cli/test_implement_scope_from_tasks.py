@@ -94,6 +94,7 @@ def test_implement_scope_derived_from_tasks(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--run-id",

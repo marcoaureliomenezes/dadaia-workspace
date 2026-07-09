@@ -75,7 +75,9 @@ PidProbe = Callable[[int], bool]
 __all__ = [
     "PidProbe",
     "acquire",
+    "adopt_if_own_lineage",
     "contexts_for_session",
+    "holder_in_lineage",
     "is_held",
     "read_record",
     "reclaim",
@@ -703,6 +705,90 @@ def renew_heartbeat(
                 return False
             rec["heartbeat"] = clock().isoformat()
             _write_record(record_path, rec)
+            return True
+        finally:
+            sentinel.unlink(missing_ok=True)
+    return False
+
+
+def holder_in_lineage(
+    record: dict[str, object] | None, ancestry_pids: frozenset[int] | None
+) -> bool:
+    """True iff the lease record's holder ``pid`` is in the CURRENT process lineage.
+
+    v0.1.72 FR2 (bug ``rebind-does-not-adopt-same-process-lease``): the lock's recorded
+    pid is the long-lived harness process; a session rotation inside that same process
+    (rebind, relaunch, hook-heartbeat identity vs bind ``sess_*`` identity) leaves the
+    record naming an old sid while the pid IS an ancestor of every CLI this harness
+    spawns. A process lineage can never be foreign to itself — mirrors acquire's rung-1
+    ``.ptr`` semantics and the bind-marker ancestry attribution (W1-7/W1-8).
+    """
+    if record is None or not ancestry_pids:
+        return False
+    rec_pid = record.get("pid")
+    return isinstance(rec_pid, int) and rec_pid in ancestry_pids
+
+
+def adopt_if_own_lineage(
+    workspace: Path,
+    ctx: str,
+    session_id: str,
+    *,
+    ancestry_pids: frozenset[int] | None,
+    clock: Callable[[], datetime] = _utcnow,
+    permission_setter: FilePermissionSetter | None = None,
+) -> bool:
+    """Adopt a same-lineage lease record for ``session_id`` (v0.1.72 FR2).
+
+    Called by ``dadaia context bind`` after it refreshes the incumbent pointer: when the
+    existing lock record's holder pid is in THIS process's ancestry chain (see
+    :func:`holder_in_lineage`) and the record names a different session id, rewrite the
+    record to the current session — the eager form of acquire's rung-1 normalization, so
+    diagnostics (preflight) see a coherent holder immediately instead of a false
+    "live foreign holder". Foreign records (pid outside our lineage) are NEVER touched.
+    Same O_EXCL sentinel CAS as acquire/renew. Returns True iff adopted.
+    """
+    _validate(ctx, field="context")
+    _validate(session_id, field="session_id")
+    rec = read_record(workspace, ctx)
+    if not holder_in_lineage(rec, ancestry_pids):
+        return False
+    assert rec is not None
+    old_sid = str(rec.get("session_id", ""))
+    if old_sid == session_id:
+        return False
+
+    record_path = _record_path(workspace, ctx, permission_setter)
+    sentinel = _sentinel_path(workspace, ctx, permission_setter)
+    backoff = _INITIAL_BACKOFF
+    for attempt in range(_MAX_RETRIES + 1):
+        _gc_orphan_sentinel(sentinel)
+        try:
+            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
+                pass
+        except FileExistsError:
+            if attempt >= _MAX_RETRIES:
+                return False  # contended — the next acquire will normalize (rung 1)
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+        try:
+            rec = read_record(workspace, ctx)
+            if not holder_in_lineage(rec, ancestry_pids):
+                return False
+            assert rec is not None
+            drifted_sid = str(rec.get("session_id", ""))
+            if drifted_sid == session_id:
+                return False
+            if drifted_sid:
+                with contextlib.suppress(OSError, ValueError):
+                    _index_remove(workspace, ctx, drifted_sid)
+            rec["session_id"] = session_id
+            rec["heartbeat"] = clock().isoformat()
+            _write_record(record_path, rec)
+            _index_add(workspace, ctx, session_id)
+            _write_ptr(workspace, ctx, session_id)
+            _audit(workspace, "adopt", ctx, session_id, clock=clock)
             return True
         finally:
             sentinel.unlink(missing_ok=True)

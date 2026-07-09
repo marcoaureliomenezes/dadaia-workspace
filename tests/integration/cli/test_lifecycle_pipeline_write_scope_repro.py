@@ -95,6 +95,7 @@ def test_implement_pipeline_write_scope_covers_reserved_task_production_path(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
@@ -138,6 +139,7 @@ def test_implement_pipeline_without_write_scope_still_blocks_out_of_scope(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",

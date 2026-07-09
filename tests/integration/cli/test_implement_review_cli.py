@@ -108,6 +108,7 @@ def test_implement_review_approved_round_completes_and_persists_snapshot(workspa
         [
             "lifecycle",
             "implement-review",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--run-id",
@@ -141,6 +142,7 @@ def test_implement_review_all_rejected_run_blocks_and_persists_snapshot(
         [
             "lifecycle",
             "implement-review",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--run-id",
@@ -175,6 +177,7 @@ def test_implement_review_rejects_raw_step_model(workspace: Path) -> None:
         [
             "lifecycle",
             "implement-review",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--harness",
@@ -195,6 +198,7 @@ def test_implement_review_model_flag_is_removed(workspace: Path) -> None:
         [
             "lifecycle",
             "implement-review",
+            "--skip-preflight",
             "--release-id",
             _RELEASE,
             "--harness",

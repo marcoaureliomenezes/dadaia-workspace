@@ -19,7 +19,8 @@ from pathlib import Path
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
-CANONICAL_SPECS_VERSION = 2
+#: v3 = agent-tier-frontmatter (v0.1.72 FR1 — the missing v0.1.61 schema-drop migration).
+CANONICAL_SPECS_VERSION = 3
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0

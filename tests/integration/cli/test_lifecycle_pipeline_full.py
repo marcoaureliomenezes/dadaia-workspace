@@ -130,6 +130,7 @@ def test_pipeline_runs_to_closure_on_fake(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
             "--run-id",
