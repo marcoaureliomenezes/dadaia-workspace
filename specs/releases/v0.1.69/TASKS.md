@@ -19,7 +19,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave A — FR1: recognize CODEX_THREAD_ID (CRITICAL)
 
-### T-69-01 — RED: CODEX_THREAD_ID not recognized `[-]`
+### T-69-01 — RED: CODEX_THREAD_ID not recognized `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/core/test_session_env.py` (additive cases)
 - **Task:** With `CODEX_SESSION_ID` unset + `CODEX_THREAD_ID` set: assert
@@ -27,7 +27,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   CONFIRM RED (both None today).
 - **AC:** SPEC AC1(repro) RED half, AC1.1.
 
-### T-69-02 — GREEN: add CODEX_THREAD_ID at the single source + lock.py + envelope `[ ]`
+### T-69-02 — GREEN: add CODEX_THREAD_ID at the single source + lock.py + envelope `[-]`
 - **Owner:** software-engineer
 - **Write set:** `dadaia_workspace/core/session_env.py`,
   `dadaia_workspace/cli/commands/lock.py`,
