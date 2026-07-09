@@ -133,7 +133,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   `preflight --context` targets it / resolves its specs (FR2). Hermetic.
 - **AC:** SPEC AC5.1.
 
-### T-69-11 — QA validation + gate green `[ ]`
+### T-69-11 — QA validation + gate green `[x]`
 - **Owner:** qa-engineer
 - **Write set:** none (ADDITIVE handoff only)
 - **Preconditions:** T-69-10 `[x]`
