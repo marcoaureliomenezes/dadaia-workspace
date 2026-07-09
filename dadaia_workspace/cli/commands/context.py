@@ -58,6 +58,20 @@ def _ctx_service() -> SpecContextService:
 
 
 def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
+    # v0.1.72 FR4 (bug `context-current-branch-stale-for-alive-repo`): the store's
+    # current_branch is a snapshot written only at alive()/dead() transitions — for an
+    # ALIVE repo on disk, report the ACTUAL checked-out branch (the stored snapshot is
+    # still exposed as `stored_branch`, the dead/alive restore metadata).
+    live_branch: str | None = None
+    if ctx.state == ContextState.ALIVE:
+        repo_path = resolve_workspace_root() / "repos" / ctx.repo_slug
+        if (repo_path / ".git").exists():
+            try:
+                from dadaia_workspace import container
+
+                live_branch = container.build_git_client().current_branch(repo_path) or None
+            except Exception:  # noqa: BLE001 — display fallback, never break `show`
+                live_branch = None
     return {
         "name": ctx.name,
         "state": ctx.state.value,
@@ -66,7 +80,8 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": ctx.current_branch,
+        "current_branch": live_branch or ctx.current_branch,
+        "stored_branch": ctx.current_branch,
     }
 
 
@@ -488,9 +503,31 @@ def bind(
                 name,
                 pids=container.build_ancestry_pid_chain(os.getppid()),
             )
+            # v0.1.72 FR2 (bug rebind-does-not-adopt-same-process-lease): a lease record
+            # whose holder pid is in THIS bind's process lineage is OUR lease under a
+            # rotated session id (dead prior session / hook-heartbeat identity) — adopt it
+            # for the new session eagerly (the eager form of acquire's rung-1 `.ptr`
+            # normalization) so preflight never reports our own harness as a live foreign
+            # holder. Foreign records (pid outside our lineage) are never touched.
+            # Best-effort: adoption failure must never break the bind.
+            adopted = False
+            with contextlib.suppress(Exception):
+                from dadaia_workspace.features.spec_context import lease as _lease
+
+                adopted = _lease.adopt_if_own_lineage(
+                    workspace_root,
+                    name,
+                    session_id,
+                    ancestry_pids=frozenset(container.build_ancestry_pid_chain(os.getpid())),
+                )
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+    if adopted:
+        console.print(
+            "[green]✓[/green] Adopted the context's existing same-process lease "
+            f"for session {session_id}"
+        )
 
     # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
     # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.

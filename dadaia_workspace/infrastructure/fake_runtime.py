@@ -40,6 +40,17 @@ class FakeAgentRuntime:
         self._on_run = on_run
         self.received_requests: list[AgentRunRequest] = []
 
+    @property
+    def is_plain_default(self) -> bool:
+        """True iff no scripted result AND no on_run hook was injected.
+
+        v0.1.72 FR5: the pipeline's runtime factory upgrades only a PLAIN default fake
+        to the driving (evidence-producing, APPROVED) result — a test-injected scripted
+        result or hook is always respected (the ``container.build_agent_runtime``
+        monkeypatch seam keeps working).
+        """
+        return self._result is None and self._on_run is None
+
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.FAKE
 

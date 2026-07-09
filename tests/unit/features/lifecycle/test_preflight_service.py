@@ -213,6 +213,13 @@ def test_preflight_accepts_persisted_bound_implementation_mode_tokens() -> None:
             "dadaia lifecycle hygiene clean --dry-run",
         ),
         (
+            # v0.1.72 FR3: 13 candidates but only 12 protected — the ONE unprotected
+            # candidate still blocks (the gate keeps its teeth for reclaimable waste).
+            {"hygiene": HygieneCounters(cleanup_candidate_count=13, protected_residual_count=12)},
+            "hygiene cleanup candidates present",
+            "dadaia lifecycle hygiene clean --dry-run",
+        ),
+        (
             {"hygiene": HygieneCounters(malformed_handoff_count=1)},
             "malformed handoffs present",
             "dadaia lifecycle hygiene status --json",
@@ -330,3 +337,16 @@ def test_resume_run_still_reports_ok_for_non_blocked_status_ac62(
 
     assert result.status is LifecycleCommandStatus.OK
     assert result.message == "resumed run-1"
+
+
+def test_preflight_passes_when_all_cleanup_candidates_are_protected() -> None:
+    """v0.1.72 FR3 (bug ``hygiene-preflight-blocks-protected-residuals``): candidates the
+    cleaner itself protects (``current_release_evidence``) are NOT reclaimable waste — a
+    gate must never require deleting evidence the deleter refuses to delete. The
+    reporter's exact remote state: 12 candidates, all 12 protected ⇒ preflight passes."""
+    result = LifecyclePreflightService().preflight(
+        _input(hygiene=HygieneCounters(cleanup_candidate_count=12, protected_residual_count=12))
+    )
+
+    assert result.ok is True, result.blocked
+    assert result.blocked is None

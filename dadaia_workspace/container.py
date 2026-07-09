@@ -1,6 +1,7 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import datetime as dt
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
         WorkflowModelPolicyOverlay,
         WorkflowPolicySnapshot,
     )
+    from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.core.protocols.plugin_store import PluginStore
     from dadaia_workspace.core.protocols.workflow_model_policy_store import (
         WorkflowModelPolicyStorePort,
@@ -262,6 +264,16 @@ def build_public_service() -> PublicAssetService:
 
 def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
+
+
+def build_git_client() -> "GitClient":
+    """Composition-root seam for the subprocess-backed ``GitClient`` (v0.1.72 FR4).
+
+    The CLI layer must not import infrastructure directly (import-linter contract);
+    commands that need a read-only git probe (e.g. ``context show``'s live
+    ``current_branch``) compose it here.
+    """
+    return GitSubprocessClient()
 
 
 def build_process_ancestry() -> ProcessAncestry:
@@ -836,7 +848,21 @@ def build_lifecycle_preflight_input(
         holder_session_id = str(lease_record.get("session_id") or "") or None
         # is_held() is the single canonical liveness verdict (core.lock_liveness.is_stale,
         # wrapped) — never a forked liveness check.
-        if _lease.is_held(workspace_root, context) and holder_session_id != incumbent_sid:
+        #
+        # v0.1.72 FR2 (bug `rebind-does-not-adopt-same-process-lease`): a record whose
+        # holder pid is in THIS process's ancestry chain is never a foreign holder — a
+        # session rotation inside the same harness process leaves the record naming an
+        # old sid while the pid IS our lineage (acquire's rung-1 `.ptr` semantics would
+        # RENEW it, so preflight must not call it foreign — the old forked identity
+        # check contradicted the canon and permanently blocked rebinds).
+        own_lineage = _lease.holder_in_lineage(
+            lease_record, frozenset(build_ancestry_pid_chain(os.getpid()))
+        )
+        if (
+            _lease.is_held(workspace_root, context)
+            and holder_session_id != incumbent_sid
+            and not own_lineage
+        ):
             live_foreign_holder = True
     lease_state = LeaseModeState(
         mode=str(incumbent_mode or ""),
@@ -1188,6 +1214,7 @@ def build_lifecycle_pipeline(
     cwd: Path | None = None,
     models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
     policy_snapshot: "WorkflowPolicySnapshot | None" = None,
+    runtime_factory: "Callable[[AgentRuntimeKind], AgentRuntimePort] | None" = None,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
@@ -1207,9 +1234,10 @@ def build_lifecycle_pipeline(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=lambda kind: build_agent_runtime(
-            kind, cwd=run_cwd, model=model_by_kind.get(kind)
-        ),
+        # v0.1.72 FR5: an injected factory (the CLI's driving-fake-aware seam) wins;
+        # the bare default remains for direct composition in tests.
+        runtime_factory=runtime_factory
+        or (lambda kind: build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))),
         prefix=prefix,
         policy_snapshot=policy_snapshot,
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step

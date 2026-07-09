@@ -373,7 +373,12 @@ class LifecyclePreflightService:
         return None
 
     def _check_hygiene(self, data: LifecyclePreflightInput) -> BlockedState | None:
-        if data.hygiene.cleanup_candidate_count > 0:
+        # v0.1.72 FR3 (bug `hygiene-preflight-blocks-protected-residuals`): candidates the
+        # cleaner itself protects (current_release_evidence) are NOT reclaimable waste —
+        # a gate must never demand deletion of evidence the deleter refuses to delete.
+        # Block only on the UNPROTECTED remainder.
+        unprotected = data.hygiene.cleanup_candidate_count - data.hygiene.protected_residual_count
+        if unprotected > 0:
             return self._blocked(
                 data,
                 "hygiene cleanup candidates present",

@@ -18,6 +18,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
+    migrate_agent_tier_frontmatter,
+)
 from dadaia_workspace.features.migrate.bugs_jsonl import migrate_bugs_jsonl
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
 
@@ -40,6 +43,14 @@ class MigrationStep:
 REGISTRY: tuple[MigrationStep, ...] = (
     MigrationStep(from_version=0, to_version=1, key="tree-v2", apply=migrate_tree_v2),
     MigrationStep(from_version=1, to_version=2, key="bugs-jsonl", apply=migrate_bugs_jsonl),
+    # v0.1.72 FR1: the missing migration for the v0.1.61 agent_tier schema-drop — a
+    # schema-drop MUST ship its migration (bug memory-agent-tier-migration-deadlock).
+    MigrationStep(
+        from_version=2,
+        to_version=3,
+        key="agent-tier-frontmatter",
+        apply=migrate_agent_tier_frontmatter,
+    ),
 )
 
 

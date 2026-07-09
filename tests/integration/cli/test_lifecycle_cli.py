@@ -235,6 +235,7 @@ def test_lifecycle_implement_rejects_claude_step_harness_in_pipeline(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0.1.24",
             "--step-harness",

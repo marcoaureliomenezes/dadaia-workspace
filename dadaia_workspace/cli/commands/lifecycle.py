@@ -1503,6 +1503,93 @@ def _implement_review_runtime_factory(
     return factory
 
 
+def _enforce_preflight_gate(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    skip: bool,
+    json_output: bool,
+) -> None:
+    """v0.1.72 FR6 (bug ``workflow-verbs-run-despite-blocked-preflight``): release-mutating
+    worker verbs enforce the SAME preflight gate the ``preflight`` command reports.
+
+    A blocked preflight refuses the verb BEFORE any lifecycle run is created — a gate
+    that reports "unsafe" while the verb proceeds is theater. ``--skip-preflight`` is the
+    explicit, visible operator override (wiring smoke tests on throwaway contexts that
+    have no full git topology; deliberate operator judgment) — never a silent default.
+    """
+    if skip:
+        if not json_output:
+            # Human runs get the visible notice; --json keeps the stream machine-pure.
+            typer.echo("[preflight] SKIPPED by --skip-preflight (operator override)", err=True)
+        return
+    from dadaia_workspace import container
+
+    data = container.build_lifecycle_preflight_input(
+        workspace_root, context=context, release_id=release_id
+    )
+    result = _preflight_service().preflight(data)
+    if result.ok:
+        return
+    assert result.blocked is not None
+    # _emit_command_result exits with LifecycleExitCode.BLOCKED for non-OK statuses.
+    _emit_command_result(
+        LifecycleCommandResult(
+            status=LifecycleCommandStatus.BLOCKED,
+            message=f"preflight blocked: {result.blocked.reason}",
+            blocked=result.blocked,
+        ),
+        json_output=json_output,
+    )
+
+
+def _pipeline_runtime_factory(
+    workspace_root: Path,
+    *,
+    context: str,
+) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
+    """Per-step runtime factory for the ``pipeline`` verb (v0.1.72 FR5, bug
+    ``fake-pipeline-blocks-missing-artifact-evidence``).
+
+    ``FAKE`` resolves to the same DRIVING fake the release-definition and
+    implement-review verbs already had — an APPROVED result carrying artifact evidence —
+    so ``pipeline --harness fake`` is a usable deterministic workflow-wiring smoke test
+    instead of always blocking at ``implement`` with ``agent result missing artifact
+    evidence``. Real harnesses (pi/codex) resolve to their live adapters; the
+    policy-resolved concrete model reaches each adapter through
+    ``request.resolved_model`` (threaded by ``apply_resolved_policy``).
+
+    Seam-preserving: FAKE still routes THROUGH ``container.build_agent_runtime`` — a
+    test-injected scripted fake (monkeypatched builder: custom result or on_run hook) is
+    respected verbatim; only the PLAIN default fake is upgraded to the driving result.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.infrastructure import fake_runtime
+
+    approving = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="fake pipeline worker: APPROVED",
+        artifact_refs=(f".dadaia/handoff/{context}/pipeline-step.handoff.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
+        runtime = container.build_agent_runtime(kind, cwd=workspace_root)
+        if (
+            kind is AgentRuntimeKind.FAKE
+            and isinstance(runtime, fake_runtime.FakeAgentRuntime)
+            and runtime.is_plain_default
+        ):
+            # Attribute access (not a from-import) so test seams patching the CLASS on
+            # the infrastructure module are honored here too.
+            return fake_runtime.FakeAgentRuntime(result=approving)
+        return runtime
+
+    return factory
+
+
 def _build_implement_review_pipeline(
     workspace_root: Path,
     *,
@@ -1587,6 +1674,12 @@ def implement_review(
         "--max-review-retries",
         help="Bounded retry count: after this many REJECTED rounds the loop BLOCKS.",
     ),
+    skip_preflight: bool = typer.Option(
+        False,
+        "--skip-preflight",
+        help="Explicit operator override: run WITHOUT the preflight gate (wiring smoke "
+        "tests / deliberate judgment). Never silently skipped.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the implement/review attempt loop (implement → review, bounded retry) on a harness.
@@ -1607,7 +1700,16 @@ def implement_review(
     )
 
     workspace_root = resolve_workspace_root()
+    # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
     default_kind = _resolve_harness(harness)
+    # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created.
+    _enforce_preflight_gate(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        skip=skip_preflight,
+        json_output=json_output,
+    )
 
     # FR3: resolve the ``implementation`` snapshot through the shared resolver; seed each base
     # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let
@@ -1680,13 +1782,20 @@ def pipeline(
         help="Extra write-scope path glob for the implement step ONLY (repeatable). "
         "FR7 (T-66-08): unions with the handoff-dir scope so an implement worker may "
         "legally edit the given production/test path(s); review steps are never "
-        "widened. A full TASKS.md write-set parser is out of scope — supply the paths "
-        "explicitly per invocation.",
+        "widened. Since v0.1.71 the reserved [-] task's TASKS.md 'Write set:' is "
+        "derived automatically — this flag is an additive escape hatch, not a "
+        "requirement.",
     ),
     show_policy: bool = typer.Option(
         False,
         "--show-policy",
         help="Print the resolved per-step model policy and exit without running.",
+    ),
+    skip_preflight: bool = typer.Option(
+        False,
+        "--skip-preflight",
+        help="Explicit operator override: run WITHOUT the preflight gate (wiring smoke "
+        "tests / deliberate judgment). Never silently skipped.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -1712,7 +1821,18 @@ def pipeline(
     )
 
     workspace_root = resolve_workspace_root()
+    # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
     default_kind = _resolve_harness(harness)
+    # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created
+    # (--show-policy is a read-only print — never gated).
+    if not show_policy:
+        _enforce_preflight_gate(
+            workspace_root,
+            context=context,
+            release_id=release_id,
+            skip=skip_preflight,
+            json_output=json_output,
+        )
 
     # Parse --step-harness into label→(kind, name). The kind drives the base ladder's
     # dry-run sentinel (fake vs real); the name is threaded into the governed resolver.
@@ -1794,6 +1914,9 @@ def pipeline(
         context=context,
         release_id=release_id,
         policy_snapshot=snapshot,
+        # v0.1.72 FR5: the driving-fake-aware factory — `--harness fake` completes the
+        # smoke path with artifact evidence (parity with implement-review).
+        runtime_factory=_pipeline_runtime_factory(workspace_root, context=context),
     )
     result = pipe.run(run_id, steps)
     status = (

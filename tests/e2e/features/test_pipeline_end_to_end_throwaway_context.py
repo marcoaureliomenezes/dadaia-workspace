@@ -37,9 +37,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
     AgentRunStatus,
-    AgentRuntimeKind,
 )
-from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -138,23 +136,75 @@ def test_pipeline_end_to_end_on_throwaway_context(
     stale_path = _seed_stale_handoff(workspace)
     monkeypatch.chdir(workspace)
 
-    # --- Drive 1: `pipeline` with a no-op implement worker — proves FR1 + FR3 ---------
+    # --- Drive 0: preflight ENFORCED (v0.1.72 FR6) ------------------------------------
+    #
+    # Bug `workflow-verbs-run-despite-blocked-preflight`: the throwaway context is not
+    # bound, so preflight is BLOCKED — the release-mutating verbs must REFUSE before
+    # creating any lifecycle run (no --skip-preflight given).
+    refused = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "pipeline",
+            "--context",
+            _CONTEXT,
+            "--release-id",
+            _RELEASE,
+            "--run-id",
+            "e2e-refused",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+    assert refused.exit_code == 3, refused.output
+    refused_payload = json.loads(refused.output)
+    assert refused_payload["status"] == "BLOCKED"
+    assert refused_payload["message"].startswith("preflight blocked:"), refused_payload
+    assert not (workspace / ".dadaia" / "runs" / "lifecycle" / "e2e-refused").exists(), (
+        "a refused verb must not create a lifecycle run"
+    )
+
+    refused_ir = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "implement-review",
+            "--context",
+            _CONTEXT,
+            "--release-id",
+            _RELEASE,
+            "--run-id",
+            "e2e-refused-ir",
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+    assert refused_ir.exit_code == 3, refused_ir.output
+    assert json.loads(refused_ir.output)["message"].startswith("preflight blocked:")
+    assert not (workspace / ".dadaia" / "runs" / "lifecycle" / "e2e-refused-ir").exists()
+
+    # --- Drive 1: `pipeline --harness fake` COMPLETES (v0.1.72 FR5) ------------------
+    #
+    # Bug `fake-pipeline-blocks-missing-artifact-evidence`: this drive previously
+    # ASSERTED exit 3 / BLOCKED — codifying the broken smoke path the operator hit
+    # (release-definition and implement-review had driving fakes; pipeline never got
+    # one). The deterministic fake pipeline is the operator's workflow-wiring smoke
+    # test: it must COMPLETE. Capture the implement request through the real wiring
+    # (subclass seam on the infrastructure FakeAgentRuntime, resolved at factory call
+    # time) to keep proving FR3 write-scope derivation on the executed path.
 
     captured_requests: list[AgentRunRequest] = []
-    real_build = container.build_agent_runtime
 
-    def fake_build_no_op(
-        kind: AgentRuntimeKind, *, cwd: Path | None = None, model: object = None
-    ) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
+    class _CapturingFake(FakeAgentRuntime):
+        def run(self, request: AgentRunRequest) -> object:  # type: ignore[override]
+            captured_requests.append(request)
+            return super().run(request)
 
-            def _capture(request: AgentRunRequest) -> None:
-                captured_requests.append(request)
+    import dadaia_workspace.infrastructure.fake_runtime as _fake_mod
 
-            return FakeAgentRuntime(result=_no_op_result(), on_run=_capture)
-        return real_build(kind, cwd=cwd)
-
-    monkeypatch.setattr(container, "build_agent_runtime", fake_build_no_op)
+    monkeypatch.setattr(_fake_mod, "FakeAgentRuntime", _CapturingFake)
 
     pipeline_result = _runner.invoke(
         app,
@@ -169,21 +219,19 @@ def test_pipeline_end_to_end_on_throwaway_context(
             "e2e-pipe",
             "--harness",
             "fake",
+            "--skip-preflight",
             "--json",
         ],
     )
-    assert pipeline_result.exit_code == 3, pipeline_result.output
+    assert pipeline_result.exit_code == 0, pipeline_result.output
     pipeline_payload = json.loads(pipeline_result.output)
-    assert pipeline_payload["status"] == "BLOCKED"
-    assert pipeline_payload["completed"] is False
+    assert pipeline_payload["status"] == "OK"
+    assert pipeline_payload["completed"] is True
 
-    # (a) FR1 — run-scoped evidence: the stale, unrelated handoff is NEVER surfaced.
-    detail = pipeline_payload["blocked"]["detail"]
-    stale_rel_path = str(stale_path.relative_to(workspace))
-    assert detail.get("validated_handoff_path") != stale_rel_path, (
-        f"a stale cross-run handoff must never be surfaced as evidence; detail={detail!r}"
-    )
-    assert "validated_handoff_path" not in detail
+    # (a) FR1 — run-scoped evidence: the stale, unrelated handoff was never consumed or
+    # mutated by the completing run.
+    stale_after = json.loads(stale_path.read_text(encoding="utf-8"))
+    assert stale_after["scope"] == "an unrelated prior task — NOT this run's evidence"
 
     # (c) FR3 — implement scope includes the TASKS.md write set, no --write-scope flag.
     assert captured_requests, "the fake implement worker must have been invoked"
@@ -194,7 +242,6 @@ def test_pipeline_end_to_end_on_throwaway_context(
 
     # --- Drive 2: `implement-review` to APPROVED (default driving fake) — proves FR2 ---
 
-    monkeypatch.setattr(container, "build_agent_runtime", real_build)
     review_result = _runner.invoke(
         app,
         [
@@ -206,6 +253,7 @@ def test_pipeline_end_to_end_on_throwaway_context(
             _RELEASE,
             "--run-id",
             "e2e-review",
+            "--skip-preflight",
             "--harness",
             "fake",
             "--json",

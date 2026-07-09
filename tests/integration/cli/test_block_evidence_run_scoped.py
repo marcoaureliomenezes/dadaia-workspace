@@ -118,6 +118,7 @@ def test_block_evidence_is_run_scoped(
         [
             "lifecycle",
             "pipeline",
+            "--skip-preflight",
             "--release-id",
             "v0168-fr1-repro",
             "--run-id",
