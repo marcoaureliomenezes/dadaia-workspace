@@ -43,7 +43,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
   suite green (incl. `test_ci_job_env_carries_no_entry_signal_vars`), 0 unrelated edits.
 - **AC:** SPEC AC1.1, AC1.2, FR1.4, FR1.5, AC1(repro) GREEN half.
 
-### T-69-03 — Integration: bind persists thread-keyed record, resolver attributes it `[-]`
+### T-69-03 — Integration: bind persists thread-keyed record, resolver attributes it `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_codex_thread_id_bind.py` (new)
 - **Preconditions:** T-69-02 `[x]`
