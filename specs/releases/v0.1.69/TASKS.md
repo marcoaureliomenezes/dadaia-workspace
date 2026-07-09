@@ -75,7 +75,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave C — FR3: preflight-input probe assembly + wire real preflight
 
-### T-69-06 — RED: preflight returns the inert stub; probe builder absent `[ ]`
+### T-69-06 — RED: preflight returns the inert stub; probe builder absent `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/features/lifecycle/test_preflight_input_builder.py` (new),
   `tests/integration/cli/test_preflight_real_wiring.py` (new)
