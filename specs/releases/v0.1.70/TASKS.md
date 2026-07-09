@@ -11,7 +11,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave A — FR1: agent_tier doc↔schema truth
 
-### T-70-01 — RED: doc-consistency test (docs lie about the schema) `[-]`
+### T-70-01 — RED: doc-consistency test (docs lie about the schema) `[x]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/scripts/test_memory_agents_doc_schema_consistency.py` (new)
 - **Task:** Executed-path test over the real files covering **all four surfaces**
