@@ -278,7 +278,7 @@ Verifies that the set of slugs in `catalog.json` matches the `*.md` files (exclu
 
 ## Structured-memory-source subsystem (memory-markdown-source-v1)
 
-Memory atoms are `.md` with YAML frontmatter (`memory-frontmatter-v1`, `additionalProperties: false`; required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `token_estimate`, `last_updated`, `release_origin`; the schema retains a deprecated optional `agent_tier` property with zero consumers, slated for removal) + a Markdown body with a `##` heading allowlist (`## Changelog`/`Histórico`/`History`/`Versions` are hard errors). HTML is ephemeral — the panel renders `.md` in-memory via `mistune~=3.0` (mermaid fence → `<pre class="mermaid">` displayed as source, no CDN; wikilink → anchor; XSS sanitiser), cached by mtime; no `.html` on disk. `lint-memory-atoms.py` validates frontmatter/headings/wikilinks/token-drift and is invoked by the LINT-1 check ([[specs-doctor]]).
+Memory atoms are `.md` with YAML frontmatter (`memory-frontmatter-v1`, `additionalProperties: false`; required: `slug`, `title`, `category`, `tldr`, `summary`, `tags`, `token_estimate`, `last_updated`, `release_origin`; `agent_tier` was deprecated in v0.1.53 and schema-dropped in v0.1.61 — the schema now rejects it) + a Markdown body with a `##` heading allowlist (`## Changelog`/`Histórico`/`History`/`Versions` are hard errors). HTML is ephemeral — the panel renders `.md` in-memory via `mistune~=3.0` (mermaid fence → `<pre class="mermaid">` displayed as source, no CDN; wikilink → anchor; XSS sanitiser), cached by mtime; no `.html` on disk. `lint-memory-atoms.py` validates frontmatter/headings/wikilinks/token-drift and is invoked by the LINT-1 check ([[specs-doctor]]).
 
 ## Backlog-consistency subsystem (`features/backlog/`)
 
