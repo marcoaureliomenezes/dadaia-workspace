@@ -19,7 +19,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave A — FR1: recognize CODEX_THREAD_ID (CRITICAL)
 
-### T-69-01 — RED: CODEX_THREAD_ID not recognized `[ ]`
+### T-69-01 — RED: CODEX_THREAD_ID not recognized `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/unit/core/test_session_env.py` (additive cases)
 - **Task:** With `CODEX_SESSION_ID` unset + `CODEX_THREAD_ID` set: assert
