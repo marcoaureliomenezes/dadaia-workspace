@@ -54,7 +54,7 @@ failing proof, confirm it fails on current code, THEN implement the fix.
 
 ## Wave B — FR2: --context on preflight + specs doctor (load-bearing only)
 
-### T-69-04 — RED: preflight + specs doctor reject --context `[ ]`
+### T-69-04 — RED: preflight + specs doctor reject --context `[-]`
 - **Owner:** software-engineer
 - **Write set:** `tests/integration/cli/test_diagnostic_context_option.py` (new)
 - **Task:** CliRunner: `preflight --context <ctx> --release-id <rel>` and
