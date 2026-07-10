@@ -30,11 +30,11 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.infrastructure import (
     claude_sdk_runtime,
     codex_runtime,
-    headless_adapter_base,
     pi_runtime,
 )
 from dadaia_workspace.infrastructure.headless_adapter_base import (
     _SECRET_NAME_PARTS,
+    ChangedPathsMixin,
     RedactionMixin,
     ResultMatch,
     SubprocessAdapterMixin,
@@ -85,42 +85,29 @@ def _request(runtime: AgentRuntimeKind) -> AgentRunRequest:
 # --------------------------------------------------------------------------- #
 
 
-def test_redaction_is_single_sourced_across_real_adapters() -> None:
-    """All three real adapters bind ``_redact`` to the shared ``RedactionMixin``.
+def test_shared_symbols_are_single_sourced_across_real_adapters() -> None:
+    """All three real adapters bind their security-relevant mixins to the SAME
+    shared base objects — a divergent re-defined copy on any adapter fails here.
 
-    Each adapter resolves ``_redact`` through its MRO. A divergent re-defined
-    ``_redact`` on any adapter would no longer be ``RedactionMixin._redact`` and
-    this assertion would fail.
+    Covers: ``_redact`` (all three), ``_with_changed_paths`` (CLI pair), the
+    ``_SECRET_NAME_PARTS`` constant (never locally redefined), and the env-filter
+    / prompt-envelope surface (CLI pair).
     """
     assert pi_runtime.PiHeadlessAdapter._redact is RedactionMixin._redact
     assert codex_runtime.CodexExecAdapter._redact is RedactionMixin._redact
     assert claude_sdk_runtime.ClaudeSdkAdapter._redact is RedactionMixin._redact
-
-
-def test_changed_paths_override_is_single_sourced_for_cli_adapters() -> None:
-    """The CLI adapters share one ``_with_changed_paths`` (the git Ring-2 override)."""
-    from dadaia_workspace.infrastructure.headless_adapter_base import ChangedPathsMixin
 
     assert pi_runtime.PiHeadlessAdapter._with_changed_paths is ChangedPathsMixin._with_changed_paths
     assert (
         codex_runtime.CodexExecAdapter._with_changed_paths is ChangedPathsMixin._with_changed_paths
     )
 
-
-def test_secret_name_parts_not_redefined_in_adapter_modules() -> None:
-    """No real adapter module redefines its own ``_SECRET_NAME_PARTS`` constant.
-
-    A local copy is exactly the divergence risk this de-duplication removes.
-    """
     assert not hasattr(pi_runtime, "_SECRET_NAME_PARTS")
     assert not hasattr(codex_runtime, "_SECRET_NAME_PARTS")
     assert not hasattr(claude_sdk_runtime, "_SECRET_NAME_PARTS")
     # The single source still carries every secret token fragment.
     assert _SECRET_NAME_PARTS == ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
 
-
-def test_env_filter_and_prompt_envelope_are_single_sourced() -> None:
-    """The CLI adapters share the env-filter and prompt-envelope surface."""
     assert pi_runtime.PiHeadlessAdapter._env is SubprocessAdapterMixin._env
     assert codex_runtime.CodexExecAdapter._env is SubprocessAdapterMixin._env
     assert pi_runtime.PiHeadlessAdapter._prompt is SubprocessAdapterMixin._prompt
@@ -180,7 +167,9 @@ def test_redaction_parity_across_all_three_adapters(make_adapter: AdapterFactory
     ids=["pi", "codex", "claude_sdk"],
 )
 def test_no_secret_named_env_value_is_left_unredacted(make_adapter: AdapterFactory) -> None:
-    """Parity for every secret-name fragment family (TOKEN/KEY/SECRET/...)."""
+    """Parity for every secret-name fragment family (TOKEN/KEY/SECRET/...); an
+    empty-valued secret-named key is also skipped, never redacted as a literal
+    empty match."""
     adapter = make_adapter()
     adapter._environ = {
         "MY_TOKEN": "t-val",
@@ -189,6 +178,7 @@ def test_no_secret_named_env_value_is_left_unredacted(make_adapter: AdapterFacto
         "USER_PASSWORD": "p-val",
         "AWS_CREDENTIAL": "c-val",
         "PUBLIC_VALUE": "ok",
+        "EMPTY_SECRET": "",
     }
     out = adapter._redact("t-val k-val s-val p-val c-val ok")
     assert out == "[REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] ok"
@@ -207,7 +197,9 @@ def test_no_secret_named_env_value_is_left_unredacted(make_adapter: AdapterFacto
 def test_changed_paths_override_parity_for_cli_adapters(
     make_adapter: CliAdapterFactory,
 ) -> None:
-    """The git diff UNCONDITIONALLY overwrites a self-reported ``changed_paths``."""
+    """The git diff UNCONDITIONALLY overwrites a self-reported ``changed_paths``,
+    and with no git client injected the result passes through untouched (parity
+    for both branches, across both CLI adapters)."""
     adapter = make_adapter()
     adapter._git = _FakeGit(("a.py", "b.py"))
     lying = AgentRunResult(
@@ -218,15 +210,6 @@ def test_changed_paths_override_parity_for_cli_adapters(
     out = adapter._with_changed_paths(lying)
     assert out.structured_output["changed_paths"] == "a.py,b.py"
 
-
-@pytest.mark.parametrize(
-    "make_adapter",
-    [_make_pi, _make_codex],
-    ids=["pi", "codex"],
-)
-def test_changed_paths_noop_without_git(make_adapter: CliAdapterFactory) -> None:
-    """With no git client injected, the result is returned untouched (parity)."""
-    adapter = make_adapter()
     adapter._git = None
     result = AgentRunResult(status=AgentRunStatus.SUCCEEDED, summary="ok")
     assert adapter._with_changed_paths(result) is result
@@ -237,17 +220,12 @@ def test_changed_paths_noop_without_git(make_adapter: CliAdapterFactory) -> None
 # --------------------------------------------------------------------------- #
 
 
-def test_filter_env_keeps_only_present_allowlisted_keys() -> None:
+def test_filter_env_and_build_prompt_envelope() -> None:
     env = {"PATH": "/bin", "HOME": "/h", "DADAIA_PRIVATE": "leak"}
     out = filter_env(env, ("PATH", "HOME", "ANTHROPIC_API_KEY"))
     assert out == {"PATH": "/bin", "HOME": "/h"}
-
-
-def test_filter_env_returns_empty_when_no_allowlisted_key_present() -> None:
     assert filter_env({"DADAIA_PRIVATE": "leak"}, ("PATH", "HOME")) == {}
 
-
-def test_build_prompt_envelope_is_deterministic_and_carries_all_fields() -> None:
     import json
 
     request = _request(AgentRuntimeKind.PI_HEADLESS)
@@ -269,79 +247,76 @@ def test_build_prompt_envelope_is_deterministic_and_carries_all_fields() -> None
     assert build_prompt_envelope(request) == build_prompt_envelope(request)
 
 
-def test_redaction_mixin_skips_empty_values() -> None:
-    class _Host(RedactionMixin):
-        def __init__(self) -> None:
-            self._environ = {"API_KEY": "", "DB_PASSWORD": "pw"}
-
-    out = _Host()._redact("pw stays? no")
-    assert out == "[REDACTED] stays? no"
-
-
-def test_module_lives_in_infrastructure_layer() -> None:
-    assert headless_adapter_base.__name__.startswith("dadaia_workspace.infrastructure")
-
-
 # ---------------------------------------------------------------------------
-# normalize_artifact_refs — accept BOTH real-worker shapes (v0.1.32 Wave C)
-# ---------------------------------------------------------------------------
-
-
-def test_normalize_artifact_refs_accepts_plain_string_list() -> None:
-    """The string-list shape a real worker emitted for release_scope."""
-    payload = {"artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"]}
-    assert normalize_artifact_refs(payload) == (".dadaia/handoff/dadaia-workspace/a.handoff.json",)
-
-
-def test_normalize_artifact_refs_accepts_object_list_with_path() -> None:
-    """The richer object shape a real worker emitted for spec_create — was silently dropped.
-
-    Before this, only ``str`` items were kept, so the object form yielded empty refs and a
-    real review/create step BLOCKed on "missing artifact evidence" (live e2e, v0.1.32).
-    """
-    payload = {
-        "artifact_refs": [
-            {
-                "type": "handoff",
-                "path": ".dadaia/handoff/dadaia-workspace/spec.handoff.json",
-                "content_hash": "f95...",
-            }
-        ]
-    }
-    assert normalize_artifact_refs(payload) == (
-        ".dadaia/handoff/dadaia-workspace/spec.handoff.json",
-    )
-
-
-def test_normalize_artifact_refs_mixed_and_ignores_garbage() -> None:
-    payload = {
-        "artifact_refs": [
-            "string/ref.json",
-            {"path": "object/ref.json"},
-            {"no_path": "x"},  # dict without a path → ignored
-            123,  # non-str/dict → ignored
-            "",  # empty string → ignored
-        ]
-    }
-    assert normalize_artifact_refs(payload) == ("string/ref.json", "object/ref.json")
-
-
-def test_normalize_artifact_refs_non_list_or_absent_is_empty() -> None:
-    assert normalize_artifact_refs({"artifact_refs": "not-a-list"}) == ()
-    assert normalize_artifact_refs({}) == ()
-
-
-# ---------------------------------------------------------------------------
-# FR2 (T-66-05, bug: lifecycle-agent-run-result-extraction-too-strict)
+# normalize_artifact_refs / classify_result_payload — one shape-table param.
 #
-# Widen classify_result_payload/normalize_artifact_refs tolerance WITHOUT ever
-# loosening the no-op-worker invariant: a genuine no-op worker (no payload at
-# all) must still yield empty artifact_refs and BLOCK. See
-# test_pi_noop_worker_yields_empty_artifact_refs and
-# test_pi_adapter_bare_json_without_result_shape_is_rejected
-# (tests/unit/infrastructure/test_pi_runtime.py:717,471) — both stay
-# byte-identical, unedited by this release.
+# Covers (v0.1.32 Wave C + FR2 T-66-05): plain string-list, richer object-list
+# (was silently dropped pre-fix), mixed list with garbage ignored, absent/non-list
+# → empty, singular artifact.path fallback (+ populated-list precedence, +
+# missing-path stays empty), and schema_version as an equivalent STRICT label.
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_refs"),
+    [
+        pytest.param(
+            {"artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"]},
+            (".dadaia/handoff/dadaia-workspace/a.handoff.json",),
+            id="plain-string-list",
+        ),
+        pytest.param(
+            {
+                "artifact_refs": [
+                    {
+                        "type": "handoff",
+                        "path": ".dadaia/handoff/dadaia-workspace/spec.handoff.json",
+                        "content_hash": "f95...",
+                    }
+                ]
+            },
+            (".dadaia/handoff/dadaia-workspace/spec.handoff.json",),
+            id="object-list-with-path",
+        ),
+        pytest.param(
+            {
+                "artifact_refs": [
+                    "string/ref.json",
+                    {"path": "object/ref.json"},
+                    {"no_path": "x"},  # dict without a path → ignored
+                    123,  # non-str/dict → ignored
+                    "",  # empty string → ignored
+                ]
+            },
+            ("string/ref.json", "object/ref.json"),
+            id="mixed-list-ignores-garbage",
+        ),
+        pytest.param({"artifact_refs": "not-a-list"}, (), id="non-list-is-empty"),
+        pytest.param({}, (), id="absent-is-empty"),
+        pytest.param(
+            {"artifact": {"type": "other", "path": "repos/x/f.py"}},
+            ("repos/x/f.py",),
+            id="singular-artifact-path-fallback",
+        ),
+        pytest.param(
+            {
+                "artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"],
+                "artifact": {"type": "other", "path": "repos/x/should-not-be-used.py"},
+            },
+            (".dadaia/handoff/dadaia-workspace/a.handoff.json",),
+            id="populated-list-wins-over-singular-fallback",
+        ),
+        pytest.param(
+            {"artifact": {"type": "other"}},
+            (),
+            id="singular-artifact-missing-path-stays-empty",
+        ),
+    ],
+)
+def test_normalize_artifact_refs_shape_table(
+    payload: dict[str, object], expected_refs: tuple[str, ...]
+) -> None:
+    assert normalize_artifact_refs(payload) == expected_refs
 
 
 def test_classify_result_payload_accepts_schema_version_as_strict_label() -> None:
@@ -351,6 +326,8 @@ def test_classify_result_payload_accepts_schema_version_as_strict_label() -> Non
     of ``schema`` genuinely IS the result object; it must classify STRICT, not
     fall through to the (narrower) structural check or NONE.
     """
+    assert normalize_artifact_refs({"artifact": "not-a-dict"}) == ()
+
     payload: dict[str, object] = {
         "schema_version": "agent-run-result-v1",
         "status": "succeeded",
@@ -358,25 +335,3 @@ def test_classify_result_payload_accepts_schema_version_as_strict_label() -> Non
         "artifact_refs": [],
     }
     assert classify_result_payload(payload, "agent-run-result-v1") is ResultMatch.STRICT
-
-
-def test_normalize_artifact_refs_harvests_singular_artifact_path_as_fallback() -> None:
-    """AC2.2 — a singular ``artifact.path`` is a one-element fallback when the
-    list-based ``artifact_refs`` extraction yields nothing (key absent entirely)."""
-    payload = {"artifact": {"type": "other", "path": "repos/x/f.py"}}
-    assert normalize_artifact_refs(payload) == ("repos/x/f.py",)
-
-
-def test_normalize_artifact_refs_singular_artifact_never_overrides_populated_list() -> None:
-    """AC2.3 — a populated ``artifact_refs`` list always wins over the singular fallback."""
-    payload = {
-        "artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"],
-        "artifact": {"type": "other", "path": "repos/x/should-not-be-used.py"},
-    }
-    assert normalize_artifact_refs(payload) == (".dadaia/handoff/dadaia-workspace/a.handoff.json",)
-
-
-def test_normalize_artifact_refs_singular_artifact_missing_path_stays_empty() -> None:
-    """Invariant guard: a dict ``artifact`` with no string ``path`` yields no fallback ref."""
-    assert normalize_artifact_refs({"artifact": {"type": "other"}}) == ()
-    assert normalize_artifact_refs({"artifact": "not-a-dict"}) == ()

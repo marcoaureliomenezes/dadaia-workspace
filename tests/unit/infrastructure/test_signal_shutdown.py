@@ -5,15 +5,6 @@ Tests pass on all platforms.
 
 Signal-install tests must not be run from a non-main thread — pytest typically
 runs tests on the main thread, so this constraint is satisfied.
-
-Scenarios:
-  1. PosixSignalShutdownHandler installs both SIGINT and SIGTERM handlers.
-  2. WindowsSignalShutdownHandler installs SIGINT handler only (no SIGTERM).
-  3. WindowsSignalShutdownHandler emits an INFO log about SIGTERM being skipped.
-  4. WindowsSignalShutdownHandler NEVER calls signal.signal with SIGTERM.
-  5. Both adapters call server.shutdown() from a daemon thread when handler fires.
-  6. container.build_shutdown_handler() returns POSIX handler on linux/darwin.
-  7. container.build_shutdown_handler() returns Windows handler on win32.
 """
 
 from __future__ import annotations
@@ -28,10 +19,6 @@ import pytest
 from dadaia_workspace.infrastructure.signal_shutdown_posix import PosixSignalShutdownHandler
 from dadaia_workspace.infrastructure.signal_shutdown_windows import WindowsSignalShutdownHandler
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _mock_server() -> MagicMock:
     """Return a MagicMock with a .shutdown() method."""
@@ -40,114 +27,9 @@ def _mock_server() -> MagicMock:
     return srv
 
 
-# ---------------------------------------------------------------------------
-# 1. PosixSignalShutdownHandler registers SIGINT + SIGTERM
-# ---------------------------------------------------------------------------
-
-
-def test_posix_handler_installs_sigint_and_sigterm() -> None:
-    """PosixSignalShutdownHandler must register handlers for both SIGINT and SIGTERM."""
-    installed: list[int] = []
-
-    def _fake_signal(sig: int, handler: Any) -> Any:
-        installed.append(sig)
-        return signal.SIG_DFL
-
-    with patch("signal.signal", side_effect=_fake_signal):
-        PosixSignalShutdownHandler().install(_mock_server())
-
-    assert signal.SIGINT in installed, "SIGINT must be registered"
-    assert signal.SIGTERM in installed, "SIGTERM must be registered"
-
-
-# ---------------------------------------------------------------------------
-# 2. WindowsSignalShutdownHandler registers SIGINT only (no SIGTERM)
-# ---------------------------------------------------------------------------
-
-
-def test_windows_handler_installs_sigint_only() -> None:
-    """WindowsSignalShutdownHandler must NOT register SIGTERM."""
-    installed: list[int] = []
-
-    def _fake_signal(sig: int, handler: Any) -> Any:
-        installed.append(sig)
-        return signal.SIG_DFL
-
-    with patch("signal.signal", side_effect=_fake_signal):
-        WindowsSignalShutdownHandler().install(_mock_server())
-
-    assert signal.SIGINT in installed, "SIGINT must be registered on Windows adapter"
-    assert signal.SIGTERM not in installed, (
-        "SIGTERM must NOT be registered — signal.signal(SIGTERM,...) raises OSError on Windows"
-    )
-
-
-# ---------------------------------------------------------------------------
-# 3. WindowsSignalShutdownHandler emits INFO log about SIGTERM being skipped
-# ---------------------------------------------------------------------------
-
-
-def test_windows_handler_logs_sigterm_skipped(caplog: pytest.LogCaptureFixture) -> None:
-    """An INFO message must be logged when SIGTERM is skipped."""
-    import logging
-
-    def _fake_signal(sig: int, handler: Any) -> Any:
-        return signal.SIG_DFL
-
-    with patch("signal.signal", side_effect=_fake_signal), caplog.at_level(logging.INFO):
-        WindowsSignalShutdownHandler().install(_mock_server())
-
-    assert any(
-        "SIGTERM" in rec.message and "skipped" in rec.message.lower() for rec in caplog.records
-    ), "Expected INFO log mentioning SIGTERM and skipped"
-
-
-# ---------------------------------------------------------------------------
-# 4. WindowsSignalShutdownHandler never calls signal.signal with SIGTERM
-# ---------------------------------------------------------------------------
-
-
-def test_windows_handler_never_calls_signal_with_sigterm() -> None:
-    """Explicit assertion that signal.signal is never called with SIGTERM arg."""
-    calls: list[tuple[int, Any]] = []
-
-    def _spy(sig: int, handler: Any) -> Any:
-        calls.append((sig, handler))
-        return signal.SIG_DFL
-
-    with patch("signal.signal", side_effect=_spy):
-        WindowsSignalShutdownHandler().install(_mock_server())
-
-    for sig, _ in calls:
-        assert sig != signal.SIGTERM, (
-            f"signal.signal was called with SIGTERM={signal.SIGTERM}, "
-            "which raises OSError on Windows"
-        )
-
-
-# ---------------------------------------------------------------------------
-# 5. Handler fires → server.shutdown() called from a daemon thread
-# ---------------------------------------------------------------------------
-
-
-def _extract_handler(sig_target: int) -> Any:
-    """Install a real-ish handler and capture it via a spy."""
-    captured: dict[int, Any] = {}
-
-    def _spy(sig: int, handler: Any) -> Any:
-        captured[sig] = handler
-        return signal.SIG_DFL
-
-    with patch("signal.signal", side_effect=_spy):
-        PosixSignalShutdownHandler().install(_mock_server())
-
-    return captured.get(sig_target)
-
-
 def test_posix_handler_calls_shutdown_in_thread_on_sigint() -> None:
     """When the SIGINT handler fires, server.shutdown() must be called from a
-    daemon thread (not from the signal frame itself).
-    """
+    daemon thread (not from the signal frame itself)."""
     server = _mock_server()
     captured: dict[int, Any] = {}
 
@@ -163,9 +45,7 @@ def test_posix_handler_calls_shutdown_in_thread_on_sigint() -> None:
     assert handler is not None, "SIGINT handler must be captured"
     handler(signal.SIGINT, None)
 
-    # Give the daemon thread a moment to call server.shutdown().
-    server.shutdown._mock_wait_called = True  # type: ignore[attr-defined]
-    # Poll for up to 1 s.
+    # Poll for up to 1 s for the daemon thread to call server.shutdown().
     for _ in range(20):
         if server.shutdown.called:
             break
@@ -176,81 +56,72 @@ def test_posix_handler_calls_shutdown_in_thread_on_sigint() -> None:
     assert server.shutdown.called, "server.shutdown() must be called after SIGINT"
 
 
-# ---------------------------------------------------------------------------
-# 6 & 7. container.build_shutdown_handler() selects the right adapter
-# ---------------------------------------------------------------------------
+def test_posix_install_and_windows_signal_matrix() -> None:
+    """PosixSignalShutdownHandler installs BOTH SIGINT and SIGTERM; the Windows
+    adapter installs SIGINT only, NEVER calls signal.signal(SIGTERM, ...) (which
+    raises OSError on Windows), and logs an INFO message explaining the skip."""
+    import logging
+
+    posix_installed: list[int] = []
+
+    def _fake_signal_posix(sig: int, handler: Any) -> Any:
+        posix_installed.append(sig)
+        return signal.SIG_DFL
+
+    with patch("signal.signal", side_effect=_fake_signal_posix):
+        PosixSignalShutdownHandler().install(_mock_server())
+    assert signal.SIGINT in posix_installed
+    assert signal.SIGTERM in posix_installed
+
+    windows_calls: list[tuple[int, Any]] = []
+    caplog_records: list[logging.LogRecord] = []
+
+    class _CollectingHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            caplog_records.append(record)
+
+    def _spy_windows(sig: int, handler: Any) -> Any:
+        windows_calls.append((sig, handler))
+        return signal.SIG_DFL
+
+    logger = logging.getLogger("dadaia_workspace.infrastructure.signal_shutdown_windows")
+    handler_obj = _CollectingHandler()
+    logger.addHandler(handler_obj)
+    logger.setLevel(logging.INFO)
+    try:
+        with patch("signal.signal", side_effect=_spy_windows):
+            WindowsSignalShutdownHandler().install(_mock_server())
+    finally:
+        logger.removeHandler(handler_obj)
+
+    windows_installed = [sig for sig, _ in windows_calls]
+    assert signal.SIGINT in windows_installed
+    assert signal.SIGTERM not in windows_installed, (
+        "signal.signal must NEVER be called with SIGTERM on the Windows adapter — "
+        "it raises OSError on real Windows"
+    )
+    assert any(
+        "SIGTERM" in rec.message and "skipped" in rec.message.lower() for rec in caplog_records
+    ), "Expected INFO log mentioning SIGTERM and skipped"
 
 
-def test_container_returns_posix_handler_on_linux() -> None:
-    """build_shutdown_handler() must return PosixSignalShutdownHandler on linux."""
+@pytest.mark.parametrize(
+    ("platform_str", "expected"),
+    [
+        ("linux", PosixSignalShutdownHandler),
+        ("darwin", PosixSignalShutdownHandler),
+        ("win32", WindowsSignalShutdownHandler),
+    ],
+)
+def test_container_selects_shutdown_handler_by_platform(platform_str: str, expected: type) -> None:
+    """build_shutdown_handler() selects PosixSignalShutdownHandler on linux/darwin
+    and WindowsSignalShutdownHandler on win32."""
     from dadaia_workspace.core.platform import Capabilities
 
-    linux_caps = Capabilities.detect("linux")
-    with patch("dadaia_workspace.core.platform.PLATFORM", linux_caps):
+    caps = Capabilities.detect(platform_str)
+    with patch("dadaia_workspace.core.platform.PLATFORM", caps):
         import dadaia_workspace.container as _c
 
         handler = _c.build_shutdown_handler()
 
-    assert isinstance(handler, PosixSignalShutdownHandler), (
-        f"Expected PosixSignalShutdownHandler on linux, got {type(handler)}"
-    )
-
-
-def test_container_returns_posix_handler_on_darwin() -> None:
-    """build_shutdown_handler() must return PosixSignalShutdownHandler on darwin."""
-    from dadaia_workspace.core.platform import Capabilities
-
-    darwin_caps = Capabilities.detect("darwin")
-    with patch("dadaia_workspace.core.platform.PLATFORM", darwin_caps):
-        import dadaia_workspace.container as _c
-
-        handler = _c.build_shutdown_handler()
-
-    assert isinstance(handler, PosixSignalShutdownHandler), (
-        f"Expected PosixSignalShutdownHandler on darwin, got {type(handler)}"
-    )
-
-
-def test_container_returns_windows_handler_on_win32() -> None:
-    """build_shutdown_handler() must return WindowsSignalShutdownHandler on win32."""
-    from dadaia_workspace.core.platform import Capabilities
-
-    win32_caps = Capabilities.detect("win32")
-    with patch("dadaia_workspace.core.platform.PLATFORM", win32_caps):
-        import dadaia_workspace.container as _c
-
-        handler = _c.build_shutdown_handler()
-
-    assert isinstance(handler, WindowsSignalShutdownHandler), (
-        f"Expected WindowsSignalShutdownHandler on win32, got {type(handler)}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Extra: panel/server.py contains only build_panel_http_server
-# ---------------------------------------------------------------------------
-
-
-def test_server_module_has_no_install_shutdown_handlers() -> None:
-    """panel/server.py must not contain install_shutdown_handlers after T-018-11."""
-    import ast
-    from pathlib import Path
-
-    src = (
-        Path(__file__).parents[3] / "dadaia_workspace" / "features" / "panel" / "server.py"
-    ).read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    func_names = [
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    ]
-    assert "install_shutdown_handlers" not in func_names, (
-        "install_shutdown_handlers must be deleted from panel/server.py in T-018-11"
-    )
-    assert "serve_blocking" not in func_names, (
-        "serve_blocking must be deleted from panel/server.py in T-018-11"
-    )
-    assert "build_panel_http_server" in func_names, (
-        "build_panel_http_server must remain in panel/server.py"
-    )
+    assert isinstance(handler, expected)

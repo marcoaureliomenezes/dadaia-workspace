@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import subprocess
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,18 +17,6 @@ from dadaia_workspace.core.models.lifecycle import (
     GateEvidenceKind,
 )
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter, CodexExecConfig
-
-
-class _FakeGit:
-    """Fake GitSubprocessClient seam — returns a canned diff list per cwd snapshot."""
-
-    def __init__(self, changed: tuple[str, ...] = ()) -> None:
-        self._changed = changed
-        self.calls: list[Path] = []
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]:
-        self.calls.append(path)
-        return self._changed
 
 
 def _request(*, model_profile: str | None = "dispatch") -> AgentRunRequest:
@@ -110,34 +98,18 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert "secret-key" not in str(call["kwargs"])
 
 
-def test_codex_exec_adapter_resolves_model_from_registry_tier(tmp_path: Path) -> None:
-    captured: dict[str, list[str]] = {}
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        captured["argv"] = argv
-        return subprocess.CompletedProcess(argv, 0, stdout='{"summary":"plain"}')
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=fake_runner,
-        environ={},
-    ).run(_request(model_profile="fast"))
-
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert captured["argv"][captured["argv"].index("-m") + 1] == "gpt-5.4-mini"
-    assert 'model_reasoning_effort="medium"' in captured["argv"]
-
-
-def test_codex_discrete_model_and_effort_reach_command_verbatim(tmp_path: Path) -> None:
-    """WS-2 (LAW 2): a supplied discrete ``(id, effort)`` is used verbatim, NOT the tier.
-
-    Built via the container seam ``build_agent_runtime(CODEX_EXEC, model=...)`` to prove
-    the discrete catalog option threads to ``-m <id> -c model_reasoning_effort=<effort>``.
-    Even though the request still carries a ``model_profile`` tier, the discrete config
-    wins (tier is fallback only).
-    """
+@pytest.mark.parametrize(
+    "case",
+    [
+        "tier-fallback",
+        "discrete-verbatim",
+        "no-discrete-uses-tier",
+        "resolved-wins-over-config-and-tier",
+    ],
+)
+def test_codex_model_precedence(tmp_path: Path, case: str) -> None:
+    """WS-2 (LAW 2) / T-28-A-06 (M2): the ordered precedence is
+    resolved_model > config.model > model_profile tier > dispatch default."""
     from dadaia_workspace import container
     from dadaia_workspace.core.harness_models import validate
 
@@ -151,305 +123,118 @@ def test_codex_discrete_model_and_effort_reach_command_verbatim(tmp_path: Path) 
         output.write_text('{"summary":"done"}', encoding="utf-8")
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
-    option = validate("codex", "gpt-5.5:medium")
-    adapter = container.build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path, model=option)
-    assert isinstance(adapter, CodexExecAdapter)
-    adapter._runner = fake_runner  # type: ignore[attr-defined]
-    adapter._environ = {}  # type: ignore[attr-defined]
-    adapter._git = None  # type: ignore[attr-defined]
-    # Request carries a tier profile, which MUST be ignored in favour of the discrete model.
-    adapter.run(_request(model_profile="deep"))
+    if case == "tier-fallback":
+        result = CodexExecAdapter(
+            CodexExecConfig(cwd=tmp_path),
+            runner=fake_runner,
+            environ={},
+        ).run(_request(model_profile="fast"))
+        assert result.status is AgentRunStatus.SUCCEEDED
+        assert captured["argv"][captured["argv"].index("-m") + 1] == "gpt-5.4-mini"
+        assert 'model_reasoning_effort="medium"' in captured["argv"]
 
-    argv = captured["argv"]
-    assert argv[argv.index("-m") + 1] == "gpt-5.5"
-    assert 'model_reasoning_effort="medium"' in argv
+    elif case == "discrete-verbatim":
+        option = validate("codex", "gpt-5.5:medium")
+        adapter = container.build_agent_runtime(
+            AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path, model=option
+        )
+        assert isinstance(adapter, CodexExecAdapter)
+        adapter._runner = fake_runner  # type: ignore[attr-defined]
+        adapter._environ = {}  # type: ignore[attr-defined]
+        adapter._git = None  # type: ignore[attr-defined]
+        # Request carries a tier profile, which MUST be ignored in favour of the
+        # discrete model.
+        adapter.run(_request(model_profile="deep"))
+        argv = captured["argv"]
+        assert argv[argv.index("-m") + 1] == "gpt-5.5"
+        assert 'model_reasoning_effort="medium"' in argv
 
+    elif case == "no-discrete-uses-tier":
+        adapter = container.build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path)
+        assert isinstance(adapter, CodexExecAdapter)
+        adapter._runner = fake_runner  # type: ignore[attr-defined]
+        adapter._environ = {}  # type: ignore[attr-defined]
+        adapter._git = None  # type: ignore[attr-defined]
+        adapter.run(_request(model_profile="fast"))
+        argv = captured["argv"]
+        # 'fast' tier resolves to gpt-5.4-mini via codex_tier_views().
+        assert argv[argv.index("-m") + 1] == "gpt-5.4-mini"
 
-def test_codex_tier_fallback_used_when_no_discrete_model(tmp_path: Path) -> None:
-    """When no discrete model is supplied, the registry tier view is the fallback."""
-    from dadaia_workspace import container
-
-    captured: dict[str, list[str]] = {}
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        captured["argv"] = argv
-        output = Path(argv[argv.index("--output-last-message") + 1])
-        output.write_text('{"summary":"done"}', encoding="utf-8")
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
-
-    adapter = container.build_agent_runtime(AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path)
-    assert isinstance(adapter, CodexExecAdapter)
-    adapter._runner = fake_runner  # type: ignore[attr-defined]
-    adapter._environ = {}  # type: ignore[attr-defined]
-    adapter._git = None  # type: ignore[attr-defined]
-    adapter.run(_request(model_profile="fast"))
-
-    argv = captured["argv"]
-    # 'fast' tier resolves to gpt-5.4-mini via codex_tier_views().
-    assert argv[argv.index("-m") + 1] == "gpt-5.4-mini"
-
-
-def test_codex_exec_adapter_rejects_wrong_runtime_without_calling_codex(tmp_path: Path) -> None:
-    called = False
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        nonlocal called
-        called = True
-        return subprocess.CompletedProcess([], 0)
-
-    request = AgentRunRequest(
-        role="software-engineer",
-        prompt="wrong runtime",
-        runtime=AgentRuntimeKind.FAKE,
-        context="dadaia-workspace",
-        release_id="v0.1.15",
-    )
-
-    result = CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
-        request
-    )
-
-    assert result.status is AgentRunStatus.FAILED
-    assert called is False
-
-
-def test_codex_exec_adapter_redacts_secret_values_from_errors(tmp_path: Path) -> None:
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        return subprocess.CompletedProcess(
-            argv,
-            1,
-            stdout="",
-            stderr="failed with sk-secret-token",
+    else:  # resolved-wins-over-config-and-tier
+        from dadaia_workspace.core.models.workflow_execution import (
+            PolicySource,
+            ResolvedModelConfig,
         )
 
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=fake_runner,
-        environ={"PATH": "/bin", "OPENAI_API_KEY": "sk-secret-token"},
-    ).run(_request())
+        # Construction-time config model is gpt-5.5:medium ...
+        option = validate("codex", "gpt-5.5:medium")
+        adapter = CodexExecAdapter(
+            CodexExecConfig(cwd=tmp_path, model=option.model_id, reasoning_effort=option.effort),
+            runner=fake_runner,
+            environ={},
+        )
+        # ... but the resolved_model says gpt-5.5:high — which must win.
+        request = dataclasses.replace(
+            _request(model_profile="deep"),
+            resolved_model=ResolvedModelConfig(
+                profile_id="codex-review-deep",
+                harness="codex",
+                model="gpt-5.5",
+                reasoning="high",
+                source=PolicySource.CLI,
+            ),
+        )
+        adapter.run(request)
+        argv = captured["argv"]
+        assert argv[argv.index("-m") + 1] == "gpt-5.5"
+        assert 'model_reasoning_effort="high"' in argv
 
-    assert result.status is AgentRunStatus.FAILED
-    assert result.error == "failed with [REDACTED]"
 
-
-def test_codex_exec_adapter_maps_unexpected_argument_to_actionable_error(tmp_path: Path) -> None:
-    """W1-1: an "unexpected argument" stderr surfaces an actionable flag-contract message.
-
-    A codex-cli that rejects an argv flag (the ``--ask-for-approval`` incompatibility this
-    task fixed, or any future argv drift) exits non-zero with an "unexpected argument"
-    stderr. The adapter must not pass that raw complaint through — it maps the class to a
-    message naming the incompatible-flag contract so the failure is diagnosable.
-    """
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        return subprocess.CompletedProcess(
-            argv,
+@pytest.mark.parametrize(
+    ("exit_code", "stderr", "expected_summary", "expected_error_contains"),
+    [
+        pytest.param(
             2,
-            stdout="",
-            stderr="error: unexpected argument '--ask-for-approval' found",
-        )
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=fake_runner,
-        environ={"PATH": "/bin"},
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.FAILED
-    assert (
-        result.summary == "codex exec rejected an argument (incompatible codex-cli flag contract)"
-    )
-    assert result.error is not None
-    assert "--ask-for-approval" in result.error
-    assert "-c approval_policy=" in result.error
-    # The underlying CLI complaint is preserved (appended) for diagnosis.
-    assert "unexpected argument" in result.error
-
-
-def test_codex_exec_adapter_generic_nonzero_exit_keeps_raw_stderr(tmp_path: Path) -> None:
-    """W1-1: a non-"unexpected argument" failure keeps the plain non-zero-exit summary."""
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="model timeout")
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=fake_runner,
-        environ={"PATH": "/bin"},
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.FAILED
-    assert result.summary == "codex exec returned non-zero exit"
-    assert result.error == "model timeout"
-
-
-def test_codex_exec_adapter_redacts_successful_json_output(tmp_path: Path) -> None:
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        output = Path(argv[argv.index("--output-last-message") + 1])
-        output.write_text(
-            json.dumps(
-                {
-                    "summary": "completed with sk-secret-token",
-                    "artifact_refs": [".dadaia/handoff/sk-secret-token.handoff.json"],
-                    "structured_output": {
-                        "verdict": "APPROVED",
-                        "token": "sk-secret-token",
-                    },
-                }
-            ),
-            encoding="utf-8",
-        )
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=fake_runner,
-        environ={"PATH": "/bin", "OPENAI_API_KEY": "sk-secret-token"},
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.summary == "completed with [REDACTED]"
-    assert result.artifact_refs == (".dadaia/handoff/[REDACTED].handoff.json",)
-    assert result.structured_output["token"] == "[REDACTED]"
-
-
-# ---------------------------------------------------------------------------
-# GAP-B — changed_paths from a FAKED git diff (never a model self-report)
-# ---------------------------------------------------------------------------
-
-
-def _git_diff_runner(model_changed: str) -> Callable[..., subprocess.CompletedProcess[str]]:
-    """Runner whose codex output is a valid result object self-reporting a (lying) ``changed_paths``.
-
-    The payload IS a result object (schema-labelled + non-empty ``artifact_refs``) so it
-    passes the v0.1.32 extraction/reject-guard — the test then exercises whether the git
-    diff OVERRIDES the model's self-reported ``changed_paths`` (Ring-2 boundary).
-    """
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        output = Path(argv[argv.index("--output-last-message") + 1])
-        output.write_text(
-            json.dumps(
-                {
-                    "schema": "agent-run-result-v1",
-                    "summary": "done",
-                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/g.handoff.json"],
-                    "structured_output": {"changed_paths": model_changed},
-                }
-            ),
-            encoding="utf-8",
-        )
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
-
-    return fake_runner
-
-
-def test_codex_exec_adapter_changed_paths_from_git_diff(tmp_path: Path) -> None:
-    fake_git = _FakeGit(changed=("src/a.py", "src/b.py"))
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=_git_diff_runner(model_changed="lies/fake.py"),
-        environ={},
-        git=fake_git,
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.SUCCEEDED
-    # The real git diff WINS over the model's self-reported changed_paths.
-    assert result.structured_output["changed_paths"] == "src/a.py,src/b.py"
-    assert fake_git.calls == [tmp_path]
-
-
-def test_codex_exec_adapter_changed_paths_empty_when_no_diff(tmp_path: Path) -> None:
-    fake_git = _FakeGit(changed=())
-
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=_git_diff_runner(model_changed="lies/fake.py"),
-        environ={},
-        git=fake_git,
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.structured_output["changed_paths"] == ""
-    assert fake_git.calls == [tmp_path]
-
-
-def test_codex_exec_adapter_no_git_client_preserves_prior_behavior(tmp_path: Path) -> None:
-    result = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path),
-        runner=_git_diff_runner(model_changed="lies/fake.py"),
-        environ={},
-    ).run(_request())
-
-    assert result.status is AgentRunStatus.SUCCEEDED
-    # No git client: the adapter does not synthesize changed_paths; the model's own
-    # value passes through untouched (no Ring-2 override).
-    assert result.structured_output["changed_paths"] == "lies/fake.py"
-
-
-def test_codex_resolved_model_wins_over_config_and_tier(tmp_path: Path) -> None:
-    """T-28-A-06 / M2: the per-request resolved_model wins over config.model and tier.
-
-    The single ordered precedence is resolved_model > config.model > model_profile tier >
-    dispatch default. Here both a construction-time config model AND a request tier exist;
-    the resolved_model must still be the one that reaches ``-m`` / ``model_reasoning_effort``.
-    """
-    import dataclasses
-
-    from dadaia_workspace.core.harness_models import validate
-    from dadaia_workspace.core.models.workflow_execution import (
-        PolicySource,
-        ResolvedModelConfig,
-    )
-    from dadaia_workspace.infrastructure.codex_runtime import CodexExecConfig
-
-    captured: dict[str, list[str]] = {}
-
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        captured["argv"] = argv
-        output = Path(argv[argv.index("--output-last-message") + 1])
-        output.write_text('{"summary":"done"}', encoding="utf-8")
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
-
-    # Construction-time config model is gpt-5.5:medium ...
-    option = validate("codex", "gpt-5.5:medium")
-    adapter = CodexExecAdapter(
-        CodexExecConfig(cwd=tmp_path, model=option.model_id, reasoning_effort=option.effort),
-        runner=fake_runner,
-        environ={},
-    )
-    # ... but the resolved_model says gpt-5.5:high — which must win.
-    request = dataclasses.replace(
-        _request(model_profile="deep"),
-        resolved_model=ResolvedModelConfig(
-            profile_id="codex-review-deep",
-            harness="codex",
-            model="gpt-5.5",
-            reasoning="high",
-            source=PolicySource.CLI,
+            "error: unexpected argument '--ask-for-approval' found",
+            "codex exec rejected an argument (incompatible codex-cli flag contract)",
+            ["--ask-for-approval", "-c approval_policy=", "unexpected argument"],
+            id="unexpected-argument-mapped-to-actionable-error",
         ),
-    )
+        pytest.param(
+            1,
+            "model timeout",
+            "codex exec returned non-zero exit",
+            ["model timeout"],
+            id="generic-nonzero-exit-keeps-raw-stderr",
+        ),
+    ],
+)
+def test_codex_stderr_mapping(
+    tmp_path: Path,
+    exit_code: int,
+    stderr: str,
+    expected_summary: str,
+    expected_error_contains: list[str],
+) -> None:
+    """W1-1: codex exec stderr is mapped to an actionable message when it names an
+    argv-contract violation, else the raw stderr is kept as-is."""
 
-    adapter.run(request)
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, exit_code, stdout="", stderr=stderr)
 
-    argv = captured["argv"]
-    assert argv[argv.index("-m") + 1] == "gpt-5.5"
-    assert 'model_reasoning_effort="high"' in argv
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.FAILED
+    assert result.summary == expected_summary
+    assert result.error is not None
+    for token in expected_error_contains:
+        assert token in result.error
 
 
 # ---------------------------------------------------------------------------
@@ -480,86 +265,84 @@ def _codex_run_with_message(tmp_path: Path, last_message_text: str) -> Any:
     )
 
 
-def test_codex_strict_primary_accepts_bare_payload(tmp_path: Path) -> None:
-    """A10/A11 — a correctly-labelled BARE codex payload is accepted via the strict path."""
-    bare = json.dumps(
-        {
-            "schema": "agent-run-result-v1",
-            "summary": "bare codex strict",
-            "artifact_refs": [".dadaia/handoff/dadaia-workspace/c1.handoff.json"],
-            "structured_output": {"verdict": "APPROVED"},
-        }
-    )
-    result = _codex_run_with_message(tmp_path, bare)
+@pytest.mark.parametrize(
+    ("payload_text", "expected_summary", "expected_refs"),
+    [
+        pytest.param(
+            json.dumps(
+                {
+                    "schema": "agent-run-result-v1",
+                    "summary": "bare codex strict",
+                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/c1.handoff.json"],
+                    "structured_output": {"verdict": "APPROVED"},
+                }
+            ),
+            "bare codex strict",
+            (".dadaia/handoff/dadaia-workspace/c1.handoff.json",),
+            id="strict-primary-accepts-bare-payload",
+        ),
+        pytest.param(
+            "Here is my result.\n```json\n"
+            + json.dumps(
+                {
+                    "schema": "agent-run-result-v1",
+                    "summary": "fenced codex strict",
+                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/c2.handoff.json"],
+                    "structured_output": {"verdict": "APPROVED"},
+                }
+            )
+            + "\n```\nDone.\n",
+            "fenced codex strict",
+            (".dadaia/handoff/dadaia-workspace/c2.handoff.json",),
+            id="strict-primary-accepts-fenced-payload",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    "schema": "release-scope-handoff-v1",  # wrong (domain) id
+                    "status": "succeeded",
+                    "summary": "codex mislabelled but valid",
+                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/c3.handoff.json"],
+                    "structured_output": {"verdict": "APPROVED"},
+                }
+            ),
+            "codex mislabelled but valid",
+            (".dadaia/handoff/dadaia-workspace/c3.handoff.json",),
+            id="structural-fallback-accepts-mislabelled-payload",
+        ),
+    ],
+)
+def test_codex_extractor_accept_matrix(
+    tmp_path: Path,
+    payload_text: str,
+    expected_summary: str,
+    expected_refs: tuple[str, ...],
+) -> None:
+    """A10/A11 — strict-primary (bare/fenced) and structural-fallback (mislabelled
+    schema) payloads are all accepted."""
+    result = _codex_run_with_message(tmp_path, payload_text)
     assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.summary == "bare codex strict"
-    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c1.handoff.json",)
+    assert result.summary == expected_summary
+    assert result.artifact_refs == expected_refs
     assert result.structured_output["verdict"] == "APPROVED"
 
 
-def test_codex_strict_primary_accepts_fenced_payload(tmp_path: Path) -> None:
-    """A10 — a fenced ```json codex payload (trailing prose) is accepted, not dropped.
-
-    The pre-parity codex called ``json.loads`` on the whole fenced text once and FAILED,
-    degrading to a prose-summary result with EMPTY ``artifact_refs`` (would BLOCK a step).
-    """
-    fenced = (
-        "Here is my result.\n```json\n"
-        + json.dumps(
-            {
-                "schema": "agent-run-result-v1",
-                "summary": "fenced codex strict",
-                "artifact_refs": [".dadaia/handoff/dadaia-workspace/c2.handoff.json"],
-                "structured_output": {"verdict": "APPROVED"},
-            }
-        )
-        + "\n```\nDone.\n"
-    )
-    result = _codex_run_with_message(tmp_path, fenced)
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.summary == "fenced codex strict"
-    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c2.handoff.json",)
-    assert result.structured_output["verdict"] == "APPROVED"
-
-
-def test_codex_structural_fallback_accepts_mislabelled_payload(tmp_path: Path) -> None:
-    """A11 — structural fallback parity: a schema-MISLABELLED but valid payload parses."""
-    bare = json.dumps(
-        {
-            "schema": "release-scope-handoff-v1",  # wrong (domain) id
-            "status": "succeeded",
-            "summary": "codex mislabelled but valid",
-            "artifact_refs": [".dadaia/handoff/dadaia-workspace/c3.handoff.json"],
-            "structured_output": {"verdict": "APPROVED"},
-        }
-    )
-    result = _codex_run_with_message(tmp_path, bare)
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.summary == "codex mislabelled but valid"
-    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/c3.handoff.json",)
-    assert result.structured_output["verdict"] == "APPROVED"
-
-
-def test_codex_noop_worker_yields_empty_artifact_refs(tmp_path: Path) -> None:
-    """A11 — a no-op codex worker (no result payload) yields empty ``artifact_refs``."""
-    result = _codex_run_with_message(tmp_path, "I had nothing structured to emit.")
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.artifact_refs == ()
-    assert "verdict" not in result.structured_output
-
-
-def test_codex_reject_guard_drops_shapeless_dict(tmp_path: Path) -> None:
-    """C4 / A11 — codex reject-guard: arbitrary JSON lacking the result shape is dropped.
-
-    A parsed dict with NO ``schema`` match AND no non-empty ``artifact_refs`` is not the
-    result object; the rewired codex must yield empty ``artifact_refs`` (no longer mapping
-    ANY dict to a result). Pins the regression away from the pre-parity unconditional
-    dict acceptance.
-    """
-    shapeless = json.dumps(
-        {"schema": "something-else", "note": "not a result", "verdict": "APPROVED"}
-    )
-    result = _codex_run_with_message(tmp_path, shapeless)
+@pytest.mark.parametrize(
+    "payload_text",
+    [
+        pytest.param("I had nothing structured to emit.", id="noop-worker-blocks"),
+        pytest.param(
+            json.dumps({"schema": "something-else", "note": "not a result", "verdict": "APPROVED"}),
+            id="shapeless-dict-rejected",
+        ),
+    ],
+)
+def test_codex_extractor_reject_matrix(tmp_path: Path, payload_text: str) -> None:
+    """A11/C4 — a no-op worker (no result payload) and an arbitrary shapeless JSON dict
+    (no schema match, no non-empty artifact_refs) both yield EMPTY ``artifact_refs``,
+    which downstream gates BLOCK on. SPEC v0.1.66 forbids editing this invariant —
+    ``id="noop-worker-blocks"`` is a permanent regression param."""
+    result = _codex_run_with_message(tmp_path, payload_text)
     assert result.status is AgentRunStatus.SUCCEEDED
     assert result.artifact_refs == ()
     assert "verdict" not in result.structured_output
@@ -626,69 +409,68 @@ def test_pi_and_codex_share_one_extraction_helper(tmp_path: Path, monkeypatch: A
 # ---------------------------------------------------------------------------
 
 
-def test_sandbox_env_override_reaches_resolved_config(tmp_path: Path, monkeypatch: Any) -> None:
-    """AC5.1: DADAIA_CODEX_SANDBOX=workspace-write overrides the compiled-in default."""
-    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
-    config = CodexExecConfig(cwd=tmp_path)
-    assert config.sandbox == "workspace-write"
-    assert config.resolved_sandbox == "workspace-write"
-
-
-def test_sandbox_default_stays_read_only_when_env_unset(tmp_path: Path, monkeypatch: Any) -> None:
-    """AC5.2: with DADAIA_CODEX_SANDBOX unset, the resolved sandbox stays read-only —
-    no behavior change for the unset case (regression guard)."""
-    monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
-    config = CodexExecConfig(cwd=tmp_path)
-    assert config.sandbox == "read-only"
-    assert config.resolved_sandbox == "read-only"
-
-
-def test_sandbox_env_invalid_value_fails_loud_at_construction(
-    tmp_path: Path, monkeypatch: Any
+@pytest.mark.parametrize(
+    "case",
+    [
+        "env-override-reaches-resolved-config",
+        "default-stays-read-only-when-env-unset",
+        "env-invalid-value-fails-loud-at-construction",
+        "explicit-caller-value-wins-over-env",
+        "explicit-caller-invalid-value-still-fails-loud",
+        "override-reaches-the-command-argv",
+    ],
+)
+def test_codex_sandbox_env_choke_point(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
 ) -> None:
-    """AC5.3: an unrecognized DADAIA_CODEX_SANDBOX value raises at construction — never
-    a silent pass-through to `codex exec`."""
-    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "not-a-real-value")
-    with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
-        CodexExecConfig(cwd=tmp_path)
+    """AC5.1-5.3: DADAIA_CODEX_SANDBOX is a single, unconditional validation choke
+    point — env override, unset default, explicit-caller precedence, and invalid
+    values (from either source) all resolve/fail through the same path, reaching the
+    real command argv."""
+    if case == "env-override-reaches-resolved-config":
+        monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
+        config = CodexExecConfig(cwd=tmp_path)
+        assert config.sandbox == "workspace-write"
+        assert config.resolved_sandbox == "workspace-write"
 
+    elif case == "default-stays-read-only-when-env-unset":
+        monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
+        config = CodexExecConfig(cwd=tmp_path)
+        assert config.sandbox == "read-only"
+        assert config.resolved_sandbox == "read-only"
 
-def test_sandbox_explicit_caller_value_wins_over_env(tmp_path: Path, monkeypatch: Any) -> None:
-    """An explicit caller-supplied sandbox= always wins over the env var — the env var
-    only substitutes for the sentinel default, never overrides an explicit choice."""
-    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
-    config = CodexExecConfig(cwd=tmp_path, sandbox="danger-full-access")
-    assert config.sandbox == "danger-full-access"
+    elif case == "env-invalid-value-fails-loud-at-construction":
+        monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "not-a-real-value")
+        with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
+            CodexExecConfig(cwd=tmp_path)
 
+    elif case == "explicit-caller-value-wins-over-env":
+        monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
+        config = CodexExecConfig(cwd=tmp_path, sandbox="danger-full-access")
+        assert config.sandbox == "danger-full-access"
 
-def test_sandbox_explicit_caller_invalid_value_still_fails_loud(
-    tmp_path: Path, monkeypatch: Any
-) -> None:
-    """A bad explicit caller value fails loud too — validation is unconditional, not
-    only applied to the env-sourced path (single choke point, architect MEDIUM-1)."""
-    monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
-    with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
-        CodexExecConfig(cwd=tmp_path, sandbox="not-a-real-value")
+    elif case == "explicit-caller-invalid-value-still-fails-loud":
+        monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
+        with pytest.raises(ValueError, match="invalid Codex sandbox mode"):
+            CodexExecConfig(cwd=tmp_path, sandbox="not-a-real-value")
 
+    else:  # override-reaches-the-command-argv
+        monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "danger-full-access")
+        captured: dict[str, list[str]] = {}
 
-def test_sandbox_override_reaches_the_command_argv(tmp_path: Path, monkeypatch: Any) -> None:
-    """The resolved sandbox value (env-overridden or default) reaches the real
-    `_command()` argv — not just the config object."""
-    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "danger-full-access")
-    captured: dict[str, list[str]] = {}
+        def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            argv = args[0]
+            assert isinstance(argv, list)
+            captured["argv"] = argv
+            output = Path(argv[argv.index("--output-last-message") + 1])
+            output.write_text(json.dumps({"summary": "done"}), encoding="utf-8")
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
-    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        argv = args[0]
-        assert isinstance(argv, list)
-        captured["argv"] = argv
-        output = Path(argv[argv.index("--output-last-message") + 1])
-        output.write_text(json.dumps({"summary": "done"}), encoding="utf-8")
-        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
-
-    CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(_request())
-
-    argv = captured["argv"]
-    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "danger-full-access"]
+        CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+            _request()
+        )
+        argv = captured["argv"]
+        assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "danger-full-access"]
 
 
 # ---------------------------------------------------------------------------

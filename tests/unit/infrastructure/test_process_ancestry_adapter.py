@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from dadaia_workspace.core.protocols.process_ancestry import (
     UNKNOWN,
     Ancestry,
+    ProcessAncestry,
 )
 from dadaia_workspace.core.protocols.process_runner import ProcessResult
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
@@ -28,7 +30,7 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 )
 
 # --------------------------------------------------------------------------- #
-# Fakes
+# Fakes                                                                        #
 # --------------------------------------------------------------------------- #
 
 
@@ -61,100 +63,72 @@ class _PsRunnerFake:
         return ProcessResult(returncode=0, stdout=f"  {self._ppids[pid]}\n", stderr="")
 
 
+def _linux_probe(ppids: dict[int, int], tmp_path: Path) -> LinuxProcAncestry:
+    return LinuxProcAncestry(proc_root=_make_proc_tree(tmp_path, ppids))
+
+
+def _ps_probe(ppids: dict[int, int], *, fail: bool = False) -> PsProcessAncestry:
+    return PsProcessAncestry(_PsRunnerFake(ppids, fail=fail))
+
+
+def _windows_probe(ppids: dict[int, int]) -> WindowsToolhelpAncestry:
+    return WindowsToolhelpAncestry(snapshot=ppids)
+
+
 # --------------------------------------------------------------------------- #
-# Linux adapter
+# Cross-adapter matrix: ancestor / grandparent / unrelated / self / missing /
+# failure — identical semantics across the 3 real adapter implementations.
 # --------------------------------------------------------------------------- #
 
 
-def test_linux_direct_parent_is_ancestor(tmp_path: Path) -> None:
-    proc = _make_proc_tree(tmp_path, {100: 50, 50: 1})
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(50, 100) is Ancestry.ANCESTOR
+@pytest.mark.parametrize(
+    ("adapter_kind", "case"),
+    [
+        (kind, case)
+        for kind in ("linux", "ps", "windows")
+        for case in ("direct-parent", "grandparent", "unrelated", "missing-link")
+    ]
+    + [("linux", "self")],
+)
+def test_ancestry_matrix_across_adapters(tmp_path: Path, adapter_kind: str, case: str) -> None:
+    if case == "direct-parent":
+        ppids, child, ancestor, expected = {100: 50, 50: 1}, 100, 50, Ancestry.ANCESTOR
+    elif case == "grandparent":
+        ppids, child, ancestor, expected = (
+            {200: 100, 100: 50, 50: 1},
+            200,
+            50,
+            Ancestry.ANCESTOR,
+        )
+    elif case == "unrelated":
+        ppids, child, ancestor, expected = {200: 100, 100: 1}, 200, 999, Ancestry.NOT_ANCESTOR
+    elif case == "self":
+        ppids, child, ancestor, expected = {200: 1}, 200, 200, Ancestry.ANCESTOR
+    else:  # missing-link
+        ppids, child, ancestor, expected = {}, 100, 50, UNKNOWN
+
+    if adapter_kind == "linux":
+        probe: ProcessAncestry = _linux_probe(ppids, tmp_path)
+    elif adapter_kind == "ps":
+        probe = _ps_probe(ppids)
+    else:
+        probe = _windows_probe(ppids)
+
+    assert probe.is_ancestor(ancestor, child) is expected
 
 
-def test_linux_grandparent_is_ancestor(tmp_path: Path) -> None:
-    proc = _make_proc_tree(tmp_path, {200: 100, 100: 50, 50: 1})
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(50, 200) is Ancestry.ANCESTOR
+def test_ps_failure_and_linux_comm_with_parens_parse(tmp_path: Path) -> None:
+    ps_probe = _ps_probe({300: 200}, fail=True)
+    assert ps_probe.is_ancestor(200, 300) is UNKNOWN
 
-
-def test_linux_unrelated_is_not_ancestor(tmp_path: Path) -> None:
-    proc = _make_proc_tree(tmp_path, {200: 100, 100: 1})
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(999, 200) is Ancestry.NOT_ANCESTOR
-
-
-def test_linux_self_is_ancestor(tmp_path: Path) -> None:
-    proc = _make_proc_tree(tmp_path, {200: 1})
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(200, 200) is Ancestry.ANCESTOR
-
-
-def test_linux_missing_pid_is_unknown(tmp_path: Path) -> None:
-    proc = _make_proc_tree(tmp_path, {})  # empty tree
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(50, 100) is UNKNOWN
-
-
-def test_linux_comm_with_parens_parses(tmp_path: Path) -> None:
     proc = tmp_path / "proc"
     (proc / "100").mkdir(parents=True)
     # comm containing spaces AND a close-paren — the robust rfind(")") parse must win.
     (proc / "100" / "stat").write_text("100 (weird ) name) S 50 0\n", encoding="utf-8")
     (proc / "50").mkdir(parents=True)
     (proc / "50" / "stat").write_text("50 (init) S 1 0\n", encoding="utf-8")
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(50, 100) is Ancestry.ANCESTOR
-
-
-# --------------------------------------------------------------------------- #
-# macOS / ps adapter
-# --------------------------------------------------------------------------- #
-
-
-def test_ps_grandparent_is_ancestor() -> None:
-    runner = _PsRunnerFake({300: 200, 200: 100, 100: 1})
-    probe = PsProcessAncestry(runner)
-    assert probe.is_ancestor(100, 300) is Ancestry.ANCESTOR
-
-
-def test_ps_unrelated_is_not_ancestor() -> None:
-    runner = _PsRunnerFake({300: 200, 200: 1})
-    probe = PsProcessAncestry(runner)
-    assert probe.is_ancestor(999, 300) is Ancestry.NOT_ANCESTOR
-
-
-def test_ps_runner_failure_is_unknown() -> None:
-    runner = _PsRunnerFake({300: 200}, fail=True)
-    probe = PsProcessAncestry(runner)
-    assert probe.is_ancestor(200, 300) is UNKNOWN
-
-
-def test_ps_uses_injected_runner_not_subprocess() -> None:
-    runner = _PsRunnerFake({300: 1})
-    probe = PsProcessAncestry(runner)
-    probe.is_ancestor(1, 300)
-    assert runner.calls and runner.calls[0][:3] == ["ps", "-o", "ppid="]
-
-
-# --------------------------------------------------------------------------- #
-# Windows adapter (mocked Toolhelp32 snapshot)
-# --------------------------------------------------------------------------- #
-
-
-def test_windows_grandparent_is_ancestor() -> None:
-    probe = WindowsToolhelpAncestry(snapshot={400: 300, 300: 200, 200: 0})
-    assert probe.is_ancestor(200, 400) is Ancestry.ANCESTOR
-
-
-def test_windows_unrelated_is_not_ancestor() -> None:
-    probe = WindowsToolhelpAncestry(snapshot={400: 300, 300: 0})
-    assert probe.is_ancestor(999, 400) is Ancestry.NOT_ANCESTOR
-
-
-def test_windows_missing_link_is_unknown() -> None:
-    probe = WindowsToolhelpAncestry(snapshot={400: 300})  # 300 has no ppid entry
-    assert probe.is_ancestor(200, 400) is UNKNOWN
+    linux_probe = LinuxProcAncestry(proc_root=proc)
+    assert linux_probe.is_ancestor(50, 100) is Ancestry.ANCESTOR
 
 
 # --------------------------------------------------------------------------- #
@@ -170,10 +144,10 @@ def test_windows_missing_link_is_unknown() -> None:
         WindowsToolhelpAncestry(snapshot={}),
     ],
 )
-def test_never_calls_os_kill(probe, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_never_calls_os_kill(probe: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import os
 
-    def _boom(*_a, **_k):  # noqa: ANN002, ANN003
+    def _boom(*_a: object, **_k: object) -> None:
         raise AssertionError("ProcessAncestry must never call os.kill")
 
     monkeypatch.setattr(os, "kill", _boom)
@@ -181,12 +155,11 @@ def test_never_calls_os_kill(probe, monkeypatch: pytest.MonkeyPatch) -> None:
     result = probe.is_ancestor(1, 12345)
     assert isinstance(result, Ancestry)
 
-
-def test_cyclic_chain_terminates_unknown(tmp_path: Path) -> None:
-    # A corrupt ppid cycle must not loop forever — hop budget → UNKNOWN.
-    proc = _make_proc_tree(tmp_path, {10: 11, 11: 10})
-    probe = LinuxProcAncestry(proc_root=proc)
-    assert probe.is_ancestor(999, 10) is UNKNOWN
+    if isinstance(probe, LinuxProcAncestry):
+        # A corrupt ppid cycle must not loop forever — hop budget → UNKNOWN.
+        cyclic_proc = _make_proc_tree(tmp_path, {10: 11, 11: 10})
+        cyclic_probe = LinuxProcAncestry(proc_root=cyclic_proc)
+        assert cyclic_probe.is_ancestor(999, 10) is UNKNOWN
 
 
 # --------------------------------------------------------------------------- #

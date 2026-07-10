@@ -7,10 +7,10 @@
 
 - [x] **T-1** Panel cluster per `plan-panel.md` (496→81).
   Write set: `tests/unit/features/panel/**`, `tests/e2e/panel/**` (goldens only)
-- [-] **T-2** Infrastructure cluster per `plan-infrastructure.md` (622→~150; split
+- [x] **T-2** Infrastructure cluster per `plan-infrastructure.md` (622→~150; split
   `test_public_assets.py` by concern).
   Write set: `tests/unit/infrastructure/**`
-- [ ] **T-3** Contract+e2e cluster per `plan-contract-e2e.md` (294→~120).
+- [-] **T-3** Contract+e2e cluster per `plan-contract-e2e.md` (294→~120).
   Write set: `tests/contract/**`, `tests/e2e/**` (python only), `tests/performance/**`
 - [ ] **T-4** Core+hooks+cli + unit-root adjacency per `plan-core-hooks-cli.md`
   (~854→~324).

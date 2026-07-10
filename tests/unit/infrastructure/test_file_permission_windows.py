@@ -24,10 +24,6 @@ import pytest
 from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.infrastructure.file_permission_windows import WindowsFilePermissionSetter
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_ok_result() -> MagicMock:
     r = MagicMock(spec=subprocess.CompletedProcess)
@@ -43,153 +39,81 @@ def _make_fail_result(code: int = 1) -> MagicMock:
     return r
 
 
-# ---------------------------------------------------------------------------
-# shell=False assertions
-# ---------------------------------------------------------------------------
-
-
-def test_restrict_dir_uses_shell_false(tmp_path: Path) -> None:
-    """icacls must be invoked with shell=False to prevent command injection."""
+@pytest.mark.parametrize("target_kind", ["dir", "file"])
+def test_restrict_uses_shell_false_and_getpass_not_env(tmp_path: Path, target_kind: str) -> None:
+    """icacls must be invoked with shell=False (CWE-78) for both dir and file
+    restriction, and the username must come from getpass.getuser(), not
+    os.environ['USERNAME']."""
     setter = WindowsFilePermissionSetter()
+    target: Path
+    if target_kind == "dir":
+        target = tmp_path
+    else:
+        target = tmp_path / "token"
+        target.write_text("t", encoding="utf-8")
+
     with (
-        patch("getpass.getuser", return_value="testuser"),
+        patch("getpass.getuser", return_value="getpass_user") as mock_getpass,
         patch("subprocess.run", return_value=_make_ok_result()) as mock_run,
     ):
-        setter.restrict_dir_to_owner(tmp_path)
-
-    call_kwargs = mock_run.call_args
-    assert call_kwargs.kwargs.get("shell") is False or call_kwargs.args[1:] == (), (
-        "subprocess.run must be called with shell=False"
-    )
-    # Confirm the positional call also has shell=False
-    all_kwargs = {**call_kwargs.kwargs}
-    # shell may be a positional arg (unlikely but guard for it)
-    assert all_kwargs.get("shell") is False, (
-        "subprocess.run MUST be called with shell=False (CWE-78)"
-    )
-
-
-def test_restrict_to_owner_uses_shell_false(tmp_path: Path) -> None:
-    """icacls must be invoked with shell=False for file restriction too."""
-    f = tmp_path / "token"
-    f.write_text("t", encoding="utf-8")
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="testuser"),
-        patch("subprocess.run", return_value=_make_ok_result()) as mock_run,
-    ):
-        setter.restrict_to_owner(f)
+        if target_kind == "dir":
+            setter.restrict_dir_to_owner(target)
+        else:
+            setter.restrict_to_owner(target)
 
     call_kwargs = mock_run.call_args
     assert call_kwargs.kwargs.get("shell") is False, (
         "subprocess.run MUST be called with shell=False (CWE-78)"
     )
 
-
-# ---------------------------------------------------------------------------
-# Username source: getpass.getuser() — NOT os.environ['USERNAME']
-# ---------------------------------------------------------------------------
-
-
-def test_restrict_dir_uses_getpass_not_env(tmp_path: Path) -> None:
-    """Username must come from getpass.getuser(), not os.environ['USERNAME']."""
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="getpass_user") as mock_getpass,
-        patch("subprocess.run", return_value=_make_ok_result()) as mock_run,
-    ):
-        setter.restrict_dir_to_owner(tmp_path)
-
     mock_getpass.assert_called_once()
-    cmd = mock_run.call_args.args[0]
-    # The command must contain the getpass username, not a hard-coded env lookup
+    cmd = call_kwargs.args[0]
     assert any("getpass_user" in str(arg) for arg in cmd), (
         f"Command did not contain the getpass username 'getpass_user': {cmd}"
     )
 
 
-# ---------------------------------------------------------------------------
-# Non-zero icacls exit → PlatformSecurityError
-# ---------------------------------------------------------------------------
-
-
-def test_restrict_dir_raises_on_nonzero_exit(tmp_path: Path) -> None:
-    """Non-zero icacls return code must raise PlatformSecurityError."""
+@pytest.mark.parametrize(
+    ("target_kind", "getuser_kwargs", "run_result"),
+    [
+        pytest.param(
+            "dir", {"return_value": "testuser"}, _make_fail_result(1), id="dir-nonzero-exit"
+        ),
+        pytest.param(
+            "file", {"return_value": "testuser"}, _make_fail_result(2), id="file-nonzero-exit"
+        ),
+        pytest.param("dir", {"side_effect": OSError("no tty")}, None, id="getuser-raises"),
+        pytest.param("dir", {"return_value": ""}, None, id="empty-username"),
+    ],
+)
+def test_restrict_raises_platform_security_error(
+    tmp_path: Path,
+    target_kind: str,
+    getuser_kwargs: dict[str, object],
+    run_result: MagicMock | None,
+) -> None:
+    """Non-zero icacls exit, a raising getpass.getuser(), and an empty username all
+    raise PlatformSecurityError — never a silent failure."""
     setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="testuser"),
-        patch("subprocess.run", return_value=_make_fail_result(1)),
-        pytest.raises(PlatformSecurityError),
-    ):
-        setter.restrict_dir_to_owner(tmp_path)
+    target: Path
+    if target_kind == "file":
+        target = tmp_path / "token"
+        target.write_text("t", encoding="utf-8")
+    else:
+        target = tmp_path
 
+    patches = [patch("getpass.getuser", **getuser_kwargs)]
+    if run_result is not None:
+        patches.append(patch("subprocess.run", return_value=run_result))
 
-def test_restrict_to_owner_raises_on_nonzero_exit(tmp_path: Path) -> None:
-    """Non-zero icacls return code for file restriction raises PlatformSecurityError."""
-    f = tmp_path / "token"
-    f.write_text("t", encoding="utf-8")
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="testuser"),
-        patch("subprocess.run", return_value=_make_fail_result(2)),
-        pytest.raises(PlatformSecurityError),
-    ):
-        setter.restrict_to_owner(f)
-
-
-# ---------------------------------------------------------------------------
-# Missing username → PlatformSecurityError
-# ---------------------------------------------------------------------------
-
-
-def test_restrict_dir_raises_on_getuser_exception(tmp_path: Path) -> None:
-    """If getpass.getuser() raises, PlatformSecurityError is raised (not silenced)."""
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", side_effect=OSError("no tty")),
-        pytest.raises(PlatformSecurityError),
-    ):
-        setter.restrict_dir_to_owner(tmp_path)
-
-
-def test_restrict_dir_raises_on_empty_username(tmp_path: Path) -> None:
-    """If getpass.getuser() returns an empty string, PlatformSecurityError is raised."""
-    setter = WindowsFilePermissionSetter()
-    with patch("getpass.getuser", return_value=""), pytest.raises(PlatformSecurityError):
-        setter.restrict_dir_to_owner(tmp_path)
-
-
-# ---------------------------------------------------------------------------
-# Mode parameter is accepted but ignored on Windows
-# ---------------------------------------------------------------------------
-
-
-def test_restrict_to_owner_accepts_mode_param(tmp_path: Path) -> None:
-    """mode parameter must be accepted without error (ignored on Windows)."""
-    f = tmp_path / "token"
-    f.write_text("t", encoding="utf-8")
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="testuser"),
-        patch("subprocess.run", return_value=_make_ok_result()),
-    ):
-        # Should not raise
-        setter.restrict_to_owner(f, mode=0o600)
-
-
-def test_restrict_dir_to_owner_accepts_mode_param(tmp_path: Path) -> None:
-    """mode parameter must be accepted without error (ignored on Windows)."""
-    setter = WindowsFilePermissionSetter()
-    with (
-        patch("getpass.getuser", return_value="testuser"),
-        patch("subprocess.run", return_value=_make_ok_result()),
-    ):
-        setter.restrict_dir_to_owner(tmp_path, mode=0o700)
-
-
-# ---------------------------------------------------------------------------
-# Real icacls test — Windows runner only
-# ---------------------------------------------------------------------------
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        with pytest.raises(PlatformSecurityError):
+            if target_kind == "dir":
+                setter.restrict_dir_to_owner(target)
+            else:
+                setter.restrict_to_owner(target)
 
 
 @pytest.mark.skipif(

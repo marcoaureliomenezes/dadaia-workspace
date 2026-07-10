@@ -112,7 +112,8 @@ def _sha(p: Path) -> str:
 def test_hostile_slug_rejected_at_derivation(
     tmp_path: Path, slug: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Each hostile slug is skipped with a non-silent [reject] stderr line."""
+    """Each hostile slug is skipped with a non-silent [reject] stderr line. A valid
+    slug alongside them still survives (folded in as the second assert block)."""
     ws = _make_workspace(tmp_path)
     _write_registry(ws, [slug])
     # Plant a directory where the naive join would resolve, so only the lexical
@@ -126,25 +127,29 @@ def test_hostile_slug_rejected_at_derivation(
     assert "[reject]" in err
     assert "unsafe path component" in err
 
+    if slug == _HOSTILE_SLUGS[0]:
+        # A valid slug alongside hostile ones still survives (piggy-backed on the
+        # first param to avoid a separate fixture setup).
+        ws2 = _make_workspace(tmp_path / "valid-alongside")
+        good = ws2 / "repos" / "game"
+        good.mkdir(parents=True)
+        _write_registry(ws2, ["../evil", "a/b", "game"])
+        assert _consumer_repos_for_root(ws2) == [good]
+        err2 = capsys.readouterr().err
+        assert err2.count("[reject]") == 2
+        assert "'../evil'" in err2
+        assert "'a/b'" in err2
 
-def test_valid_slug_survives_alongside_hostile_ones(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+
+def test_traversal_slug_writes_nothing_outside_repos_and_write_site_containment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    ws = _make_workspace(tmp_path)
-    good = ws / "repos" / "game"
-    good.mkdir(parents=True)
-    _write_registry(ws, ["../evil", "a/b", "game"])
-    assert _consumer_repos_for_root(ws) == [good]
-    err = capsys.readouterr().err
-    assert err.count("[reject]") == 2
-    assert "'../evil'" in err
-    assert "'a/b'" in err
-
-
-def test_traversal_slug_writes_nothing_outside_repos(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """AC-7 end-to-end (RED-first): pre-fix, '../evil' landed the pair OUTSIDE repos/."""
+    """AC-7 end-to-end (RED-first): pre-fix, '../evil' landed the pair OUTSIDE
+    repos/. ADR-6 belt-and-braces: even if derivation returned a hostile path
+    directly (bypassing the derivation-level reject), the write-site containment
+    assert skips it too (never writes, never raises) — two independent layers."""
     ws = _make_workspace(tmp_path)
     evil_dir = ws / "evil"  # where repos/../evil lexically lands
     evil_dir.mkdir(parents=True)
@@ -158,25 +163,17 @@ def test_traversal_slug_writes_nothing_outside_repos(
     # Workspace-root pair is unaffected (fail-open overall).
     assert (ws / "AGENTS.md").exists()
 
-
-def test_write_site_containment_assert_is_independent(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """ADR-6 belt-and-braces: even if derivation returned a hostile path, the
-    write-site containment assert skips it (never writes, never raises)."""
     from dadaia_workspace.infrastructure import workspace_guardrail as wg
 
-    ws = _make_workspace(tmp_path)
-    evil_dir = ws / "evil"
-    evil_dir.mkdir(parents=True)
-    hostile = ws / "repos" / "../evil"
+    ws2 = _make_workspace(tmp_path / "ws2")
+    evil_dir2 = ws2 / "evil"
+    evil_dir2.mkdir(parents=True)
+    hostile = ws2 / "repos" / "../evil"
     monkeypatch.setattr(wg, "_consumer_repos_for_root", lambda _root: [hostile])
-    src = _source(tmp_path)
-    installed: list[str] = []
-    wg._install_guardrail_pair(src, ws, force=True, installed=installed, targets={"repos"})
-    assert not (evil_dir / "AGENTS.md").exists()
+    src2 = _source(tmp_path / "ws2")
+    installed2: list[str] = []
+    wg._install_guardrail_pair(src2, ws2, force=True, installed=installed2, targets={"repos"})
+    assert not (evil_dir2 / "AGENTS.md").exists()
     assert "[reject]" in capsys.readouterr().err
 
 
@@ -192,124 +189,125 @@ def _consumer(ws: Path, slug: str = "game") -> Path:
     return repo
 
 
-def test_symlinked_agents_target_survives_byte_identical(tmp_path: Path) -> None:
-    """AC-8(a) (RED-first): pre-fix, copy2 wrote THROUGH the link and clobbered the
-    out-of-repo target. Post-fix: [foreign] ... (symlink), target byte-identical,
-    and no CLAUDE.md orphan dropped (sibling-fate ladder)."""
+@pytest.mark.parametrize(
+    "case",
+    [
+        "symlinked-agents-target-survives-byte-identical",
+        "symlinked-banner-bearing-target-survives",
+        "dangling-symlink-refused-never-created-through",
+        "symlinked-claude-md-refused",
+    ],
+)
+def test_symlink_write_through_refusal(tmp_path: Path, case: str) -> None:
+    """AC-8(a)/(b): a destination-FILE symlink (real target, banner-bearing target,
+    dangling target, or the CLAUDE.md sibling) is NEVER written through — the pair
+    follows the FR9 sibling-fate ladder and the target bytes are untouched."""
     _require_symlinks(tmp_path)
     ws = _make_workspace(tmp_path)
     repo = _consumer(ws)
-    target = tmp_path / "outside" / "precious.md"
-    target.parent.mkdir(parents=True)
-    target.write_text("# precious out-of-repo file\n", encoding="utf-8")
-    before = _sha(target)
-    (repo / "AGENTS.md").symlink_to(target)
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
-    assert _sha(target) == before
-    assert (repo / "AGENTS.md").is_symlink()
-    assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
-    assert not (repo / "CLAUDE.md").exists()
+
+    if case == "symlinked-agents-target-survives-byte-identical":
+        target = tmp_path / "outside" / "precious.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("# precious out-of-repo file\n", encoding="utf-8")
+        before = _sha(target)
+        (repo / "AGENTS.md").symlink_to(target)
+        installed: list[str] = []
+        _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
+        assert _sha(target) == before
+        assert (repo / "AGENTS.md").is_symlink()
+        assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
+        assert not (repo / "CLAUDE.md").exists()
+
+    elif case == "symlinked-banner-bearing-target-survives":
+        target = tmp_path / "outside2" / "stale.md"
+        target.parent.mkdir(parents=True)
+        target.write_text(_CANONICAL_AGENTS_BANNER + "\nSTALE BODY\n", encoding="utf-8")
+        before = _sha(target)
+        (repo / "AGENTS.md").symlink_to(target)
+        installed = []
+        _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
+        assert _sha(target) == before
+        assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
+
+    elif case == "dangling-symlink-refused-never-created-through":
+        missing_target = tmp_path / "nowhere" / "gone.md"
+        (repo / "AGENTS.md").symlink_to(missing_target)
+        installed = []
+        _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
+        assert not missing_target.exists()
+        assert (repo / "AGENTS.md").is_symlink()
+        assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
+        assert not (repo / "CLAUDE.md").exists()
+
+    else:  # symlinked-claude-md-refused
+        target = tmp_path / "outside3" / "claude-target.md"
+        target.parent.mkdir(parents=True)
+        target.write_text("not the stub\n", encoding="utf-8")
+        before = _sha(target)
+        (repo / "CLAUDE.md").symlink_to(target)
+        installed = []
+        _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
+        assert _sha(target) == before
+        assert (repo / "CLAUDE.md").is_symlink()
+        assert any(
+            "[foreign]" in ln and "(symlink)" in ln and "CLAUDE.md" in ln for ln in installed
+        )
 
 
-def test_symlinked_banner_bearing_target_survives(tmp_path: Path) -> None:
-    """AC-8(a) banner-bearing-target case: even a banner-carrying target behind a
-    link is never restored through the link."""
-    _require_symlinks(tmp_path)
-    ws = _make_workspace(tmp_path)
-    repo = _consumer(ws)
-    target = tmp_path / "outside2" / "stale.md"
-    target.parent.mkdir(parents=True)
-    target.write_text(_CANONICAL_AGENTS_BANNER + "\nSTALE BODY\n", encoding="utf-8")
-    before = _sha(target)
-    (repo / "AGENTS.md").symlink_to(target)
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
-    assert _sha(target) == before
-    assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
+@pytest.mark.parametrize(
+    "case",
+    [
+        "doctor-classifies-symlinked-pair-foreign",
+        "symlinked-consumer-dir-stays-ok",
+        "regular-file-provenance-ladder-unchanged",
+    ],
+)
+def test_symlink_classification_and_regular_ladder(tmp_path: Path, case: str) -> None:
+    """AC-8(c)/(d): doctor classifies symlinked pair FILES [foreign] (never
+    ok/drift/missing); a symlinked consumer DIRECTORY (the CI ln -sfn pattern) stays
+    fully [ok]; and the FR9 regular-file provenance ladder is unchanged (no false
+    (symlink) suffix on a hand-authored file)."""
+    if case == "doctor-classifies-symlinked-pair-foreign":
+        _require_symlinks(tmp_path)
+        ws = _make_workspace(tmp_path)
+        repo = _consumer(ws)
+        target = tmp_path / "t.md"
+        target.write_text(_SOURCE, encoding="utf-8")  # byte-identical to source through link
+        (repo / "AGENTS.md").symlink_to(target)
+        (repo / "CLAUDE.md").symlink_to(tmp_path / "dangling.md")
+        lines = _doctor_consumer_pair_lines(_source(tmp_path), ws, emit_stderr=False)
+        assert lines == [
+            "[foreign] repos/game:AGENTS.md",
+            "[foreign] repos/game:CLAUDE.md",
+        ]
 
+    elif case == "symlinked-consumer-dir-stays-ok":
+        _require_symlinks(tmp_path)
+        ws = _make_workspace(tmp_path)
+        real = tmp_path / "real_game"
+        real.mkdir()
+        src = _source(tmp_path)
+        (real / "AGENTS.md").write_text(_SOURCE, encoding="utf-8")
+        (real / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
+        (ws / "repos" / "game").symlink_to(real, target_is_directory=True)
+        _write_registry(ws, ["game"])
+        assert _consumer_repos_for_root(ws) == [ws / "repos" / "game"]
+        lines = _doctor_consumer_pair_lines(src, ws, emit_stderr=False)
+        assert lines == [
+            "[ok] repos/game:AGENTS.md",
+            "[ok] repos/game:CLAUDE.md",
+        ]
+        installed: list[str] = []
+        _install_workspace_guardrail_pair(src, ws, force=True, installed=installed)
+        assert any("[ok]" in ln and "AGENTS.md" in ln and "game" in ln for ln in installed)
+        assert (real / "AGENTS.md").read_text(encoding="utf-8") == _SOURCE
 
-def test_dangling_symlink_refused_never_created_through(tmp_path: Path) -> None:
-    """AC-8(b): a dangling AGENTS.md symlink is refused — never 'absent → create'."""
-    _require_symlinks(tmp_path)
-    ws = _make_workspace(tmp_path)
-    repo = _consumer(ws)
-    missing_target = tmp_path / "nowhere" / "gone.md"
-    (repo / "AGENTS.md").symlink_to(missing_target)
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
-    assert not missing_target.exists()
-    assert (repo / "AGENTS.md").is_symlink()
-    assert any("[foreign]" in ln and "(symlink)" in ln for ln in installed)
-    assert not (repo / "CLAUDE.md").exists()
-
-
-def test_symlinked_claude_md_refused(tmp_path: Path) -> None:
-    """AC-8: a symlinked CLAUDE.md is also never written through, even when the
-    sibling AGENTS.md is created."""
-    _require_symlinks(tmp_path)
-    ws = _make_workspace(tmp_path)
-    repo = _consumer(ws)
-    target = tmp_path / "outside3" / "claude-target.md"
-    target.parent.mkdir(parents=True)
-    target.write_text("not the stub\n", encoding="utf-8")
-    before = _sha(target)
-    (repo / "CLAUDE.md").symlink_to(target)
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
-    assert _sha(target) == before
-    assert (repo / "CLAUDE.md").is_symlink()
-    assert any("[foreign]" in ln and "(symlink)" in ln and "CLAUDE.md" in ln for ln in installed)
-
-
-def test_doctor_classifies_symlinked_pair_files_foreign(tmp_path: Path) -> None:
-    """AC-8(c): doctor reports symlinked pair files [foreign] — never
-    [ok]/[drift]/[missing] — so public doctor exits 0."""
-    _require_symlinks(tmp_path)
-    ws = _make_workspace(tmp_path)
-    repo = _consumer(ws)
-    target = tmp_path / "t.md"
-    target.write_text(_SOURCE, encoding="utf-8")  # byte-identical to source through link
-    (repo / "AGENTS.md").symlink_to(target)
-    (repo / "CLAUDE.md").symlink_to(tmp_path / "dangling.md")
-    lines = _doctor_consumer_pair_lines(_source(tmp_path), ws, emit_stderr=False)
-    assert lines == [
-        "[foreign] repos/game:AGENTS.md",
-        "[foreign] repos/game:CLAUDE.md",
-    ]
-
-
-def test_symlinked_consumer_dir_stays_ok(tmp_path: Path) -> None:
-    """AC-8(d): a symlinked consumer DIRECTORY (the CI ln -sfn pattern) with regular
-    canonical files inside keeps today's [ok] behavior — no false-block."""
-    _require_symlinks(tmp_path)
-    ws = _make_workspace(tmp_path)
-    real = tmp_path / "real_game"
-    real.mkdir()
-    src = _source(tmp_path)
-    (real / "AGENTS.md").write_text(_SOURCE, encoding="utf-8")
-    (real / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8")
-    (ws / "repos" / "game").symlink_to(real, target_is_directory=True)
-    _write_registry(ws, ["game"])
-    assert _consumer_repos_for_root(ws) == [ws / "repos" / "game"]
-    lines = _doctor_consumer_pair_lines(src, ws, emit_stderr=False)
-    assert lines == [
-        "[ok] repos/game:AGENTS.md",
-        "[ok] repos/game:CLAUDE.md",
-    ]
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(src, ws, force=True, installed=installed)
-    assert any("[ok]" in ln and "AGENTS.md" in ln and "game" in ln for ln in installed)
-    assert (real / "AGENTS.md").read_text(encoding="utf-8") == _SOURCE
-
-
-def test_regular_file_provenance_ladder_unchanged(tmp_path: Path) -> None:
-    """FR6 tail: the FR9 ladder for regular files is byte-identical — a hand-authored
-    (no-banner) regular AGENTS.md is still [foreign] without the (symlink) suffix."""
-    ws = _make_workspace(tmp_path)
-    repo = _consumer(ws)
-    (repo / "AGENTS.md").write_text("# hand-authored\n", encoding="utf-8")
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
-    foreign = [ln for ln in installed if "[foreign]" in ln and "AGENTS.md" in ln]
-    assert foreign and all("(symlink)" not in ln for ln in foreign)
+    else:  # regular-file-provenance-ladder-unchanged
+        ws = _make_workspace(tmp_path)
+        repo = _consumer(ws)
+        (repo / "AGENTS.md").write_text("# hand-authored\n", encoding="utf-8")
+        installed = []
+        _install_workspace_guardrail_pair(_source(tmp_path), ws, force=True, installed=installed)
+        foreign = [ln for ln in installed if "[foreign]" in ln and "AGENTS.md" in ln]
+        assert foreign and all("(symlink)" not in ln for ln in foreign)

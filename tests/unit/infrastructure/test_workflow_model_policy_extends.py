@@ -26,7 +26,7 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
 
 
 def _workspace(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia").mkdir()
+    (tmp_path / ".dadaia").mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
@@ -34,10 +34,13 @@ def _store(tmp_path: Path) -> JsonWorkflowModelPolicyStore:
     return JsonWorkflowModelPolicyStore(_workspace(tmp_path))
 
 
-def test_extends_chain_resolves_nearest_level_wins(tmp_path: Path) -> None:
-    # default defines `implement`; child overrides `review_qa`; grandchild overrides
-    # `implement`. The grandchild resolves its own `implement`, the child's `review_qa`,
-    # and inherits nothing else.
+def test_extends_chain_resolution_nearest_wins_and_harness_inheritance(
+    tmp_path: Path,
+) -> None:
+    """default defines `implement`; child overrides `review_qa`; grandchild overrides
+    `implement`. The grandchild resolves its own `implement`, the child's
+    `review_qa`, and inherits nothing else. A separate harness-only chain proves
+    default_harness/step_harness inherit through `extends` the same way."""
     overlay = {
         "schema_version": "workflow-model-policy-v1",
         "policy_id": "default",
@@ -65,9 +68,7 @@ def test_extends_chain_resolves_nearest_level_wins(tmp_path: Path) -> None:
     # nothing defines review_security anywhere in the chain
     assert parsed.step_profile("grandchild", "implementation", "review_security") is None
 
-
-def test_extends_chain_harness_inheritance(tmp_path: Path) -> None:
-    overlay = {
+    harness_overlay = {
         "schema_version": "workflow-model-policy-v1",
         "policy_id": "default",
         "contexts": {
@@ -86,69 +87,80 @@ def test_extends_chain_harness_inheritance(tmp_path: Path) -> None:
             },
         },
     }
-    parsed = _store(tmp_path).parse(overlay)
+    parsed_harness = _store(tmp_path / "harness").parse(harness_overlay)
     # pi-shop overrides the default harness, inherits the per-step harness from default.
-    assert parsed.workflow_default_harness("pi-shop", "implementation") == "pi"
-    assert parsed.step_harness("pi-shop", "implementation", "implement") == "codex"
+    assert parsed_harness.workflow_default_harness("pi-shop", "implementation") == "pi"
+    assert parsed_harness.step_harness("pi-shop", "implementation", "implement") == "codex"
 
 
-def test_missing_extends_parent_is_hard_error(tmp_path: Path) -> None:
-    overlay = {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {
-            "child": {
-                "extends": "nonexistent-parent",
-                "workflows": {"implementation": {"steps": {}}},
-            }
-        },
-    }
+@pytest.mark.parametrize(
+    ("overlay", "expected_message_fragments"),
+    [
+        pytest.param(
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "child": {
+                        "extends": "nonexistent-parent",
+                        "workflows": {"implementation": {"steps": {}}},
+                    }
+                },
+            },
+            ["nonexistent-parent", "unknown parent"],
+            id="missing-extends-parent-is-hard-error",
+        ),
+        pytest.param(
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "a": {"extends": "b", "workflows": {}},
+                    "b": {"extends": "a", "workflows": {}},
+                },
+            },
+            ["cycle"],
+            id="extends-cycle-is-rejected",
+        ),
+        pytest.param(
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {"a": {"extends": "a", "workflows": {}}},
+            },
+            [],  # either "extend itself" or "cycle" — checked separately below
+            id="self-extends-is-rejected",
+        ),
+        pytest.param(
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "parent": {"workflows": {}},
+                    "default": {"extends": "parent", "workflows": {}},
+                },
+            },
+            ["root"],
+            id="default-may-not-declare-extends",
+        ),
+    ],
+)
+def test_extends_validation_matrix(
+    tmp_path: Path, overlay: dict[str, object], expected_message_fragments: list[str]
+) -> None:
     with pytest.raises(WorkflowModelPolicyStoreError) as exc:
         _store(tmp_path).parse(overlay)
-    assert "nonexistent-parent" in str(exc.value)
-    assert "unknown parent" in str(exc.value).lower()
+    message = str(exc.value).lower()
+    if expected_message_fragments:
+        for fragment in expected_message_fragments:
+            assert fragment.lower() in message
+    else:
+        assert "extend itself" in message or "cycle" in message
 
 
-def test_extends_cycle_is_rejected(tmp_path: Path) -> None:
-    overlay = {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {
-            "a": {"extends": "b", "workflows": {}},
-            "b": {"extends": "a", "workflows": {}},
-        },
-    }
-    with pytest.raises(WorkflowModelPolicyStoreError) as exc:
-        _store(tmp_path).parse(overlay)
-    assert "cycle" in str(exc.value).lower()
-
-
-def test_self_extends_is_rejected(tmp_path: Path) -> None:
-    overlay = {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {"a": {"extends": "a", "workflows": {}}},
-    }
-    with pytest.raises(WorkflowModelPolicyStoreError) as exc:
-        _store(tmp_path).parse(overlay)
-    assert "extend itself" in str(exc.value).lower() or "cycle" in str(exc.value).lower()
-
-
-def test_default_may_not_declare_extends(tmp_path: Path) -> None:
-    overlay = {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {
-            "parent": {"workflows": {}},
-            "default": {"extends": "parent", "workflows": {}},
-        },
-    }
-    with pytest.raises(WorkflowModelPolicyStoreError) as exc:
-        _store(tmp_path).parse(overlay)
-    assert "root" in str(exc.value).lower()
-
-
-def test_extends_default_root_is_valid(tmp_path: Path) -> None:
+def test_extends_default_root_is_valid_and_round_trips_through_save_load(
+    tmp_path: Path,
+) -> None:
     # A context may extend the 'default' root even when 'default' carries no overrides.
     overlay = {
         "schema_version": "workflow-model-policy-v1",
@@ -162,6 +174,25 @@ def test_extends_default_root_is_valid(tmp_path: Path) -> None:
     }
     parsed = _store(tmp_path).parse(overlay)
     assert parsed.step_profile("child", "implementation", "implement") == "pi-reasoning-low"
+
+    round_trip_overlay = {
+        "schema_version": "workflow-model-policy-v1",
+        "policy_id": "default",
+        "contexts": {
+            "default": {"workflows": {}},
+            "child": {
+                "extends": "default",
+                "workflows": {"implementation": {"steps": {"implement": "pi-reasoning-high"}}},
+            },
+        },
+    }
+    store = _store(tmp_path / "round-trip")
+    parsed_rt = store.parse(round_trip_overlay)
+    store.save(parsed_rt)
+    loaded = store.load()
+    assert loaded is not None
+    assert loaded.extends == {"child": "default"}
+    assert loaded.step_profile("child", "implementation", "implement") == "pi-reasoning-high"
 
 
 def test_no_extends_back_compat_round_trip(tmp_path: Path) -> None:
@@ -192,24 +223,3 @@ def test_no_extends_back_compat_round_trip(tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.extends == {}
     assert loaded.to_dict() == payload
-
-
-def test_extends_round_trips_through_save_load(tmp_path: Path) -> None:
-    overlay = {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {
-            "default": {"workflows": {}},
-            "child": {
-                "extends": "default",
-                "workflows": {"implementation": {"steps": {"implement": "pi-reasoning-high"}}},
-            },
-        },
-    }
-    store = _store(tmp_path)
-    parsed = store.parse(overlay)
-    store.save(parsed)
-    loaded = store.load()
-    assert loaded is not None
-    assert loaded.extends == {"child": "default"}
-    assert loaded.step_profile("child", "implementation", "implement") == "pi-reasoning-high"

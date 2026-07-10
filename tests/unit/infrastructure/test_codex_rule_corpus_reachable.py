@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import pathlib
 
+import pytest
+
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_codex_rule_corpus_reachable,
     codex_trust_boundary_info,
@@ -34,9 +36,18 @@ def _make_rule(workspace: pathlib.Path, name: str) -> None:
     (rules / f"{name}.md").write_text(f"# {name}\n", encoding="utf-8")
 
 
-class TestRuleCorpusReachable:
-    def test_all_citations_reachable_reports_ok(self, tmp_path: pathlib.Path) -> None:
-        """Every by-name rule resolving to .claude/rules/<name>.md → single [ok] line."""
+@pytest.mark.parametrize(
+    "case",
+    [
+        "all-reachable-ok",
+        "unreachable-reports-error",
+        "no-citations-silent",
+        "no-codex-dir-silent",
+        "unreachable-name-deduped",
+    ],
+)
+def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
+    if case == "all-reachable-ok":
         _make_codex_agent(
             tmp_path,
             "software-engineer",
@@ -46,11 +57,9 @@ class TestRuleCorpusReachable:
         _make_rule(tmp_path, "release-governance")
 
         out = check_codex_rule_corpus_reachable(tmp_path)
-
         assert out == ["[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)"]
 
-    def test_unreachable_citation_reports_error(self, tmp_path: pathlib.Path) -> None:
-        """A cited rule with no on-disk surface produces an [error] line."""
+    elif case == "unreachable-reports-error":
         _make_codex_agent(
             tmp_path,
             "software-engineer",
@@ -60,43 +69,34 @@ class TestRuleCorpusReachable:
         # nonexistent-rule.md deliberately absent.
 
         out = check_codex_rule_corpus_reachable(tmp_path)
-
         assert len(out) == 1
         assert "nonexistent-rule" in out[0]
         assert out[0].startswith("[error] codex:rule-corpus")
         assert "WS-CDX-PROTOCOL" in out[0]
 
-    def test_no_citations_is_silent(self, tmp_path: pathlib.Path) -> None:
-        """A Codex agent that cites no by-name rule yields no output."""
+    elif case == "no-citations-silent":
         _make_codex_agent(tmp_path, "lonely", "No rules referenced here.")
-
-        out = check_codex_rule_corpus_reachable(tmp_path)
-
-        assert out == []
-
-    def test_no_codex_dir_is_silent(self, tmp_path: pathlib.Path) -> None:
-        """Absent .codex/agents/ → empty (not an error)."""
         assert check_codex_rule_corpus_reachable(tmp_path) == []
 
-    def test_each_unreachable_name_reported_once(self, tmp_path: pathlib.Path) -> None:
-        """A name cited by multiple agents but unreachable is reported once."""
+    elif case == "no-codex-dir-silent":
+        assert check_codex_rule_corpus_reachable(tmp_path) == []
+
+    else:  # unreachable-name-deduped
         _make_codex_agent(tmp_path, "a", "Use the `missing-rule` rule.")
         _make_codex_agent(tmp_path, "b", "Also the `missing-rule` rule.")
 
         out = check_codex_rule_corpus_reachable(tmp_path)
-
         assert len(out) == 1
         assert "missing-rule" in out[0]
 
 
-class TestTrustBoundaryInfo:
-    def test_info_line_states_boundary(self) -> None:
-        """A7: INFO line names interactive-fire and headless-no-fire honestly."""
-        out = codex_trust_boundary_info()
+def test_trust_boundary_info_line_states_boundary() -> None:
+    """A7: INFO line names interactive-fire and headless-no-fire honestly."""
+    out = codex_trust_boundary_info()
 
-        assert len(out) == 1
-        line = out[0]
-        assert line.startswith("[info] codex:trust-boundary")
-        assert "interactive hooks fire and block" in line
-        assert "`codex exec` headless does not" in line
-        assert "WS-CDX-HYGIENE" in line
+    assert len(out) == 1
+    line = out[0]
+    assert line.startswith("[info] codex:trust-boundary")
+    assert "interactive hooks fire and block" in line
+    assert "`codex exec` headless does not" in line
+    assert "WS-CDX-HYGIENE" in line

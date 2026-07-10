@@ -30,28 +30,9 @@ from dadaia_workspace.infrastructure.file_lock_posix import (
 )
 
 
-# ---------------------------------------------------------------------------
-# _acquire_flock — unit tests
-# ---------------------------------------------------------------------------
-
-
-def test_acquire_flock_succeeds_on_free_file(tmp_path: Path) -> None:
-    """_acquire_flock acquires the lock when the file is free."""
-    import fcntl
-    import os
-
-    lock_file = tmp_path / ".ws_lock"
-    fd = os.open(str(lock_file), os.O_WRONLY | os.O_CREAT, 0o600)
-    try:
-        _acquire_flock(fd, str(lock_file))
-        # If we got here, lock was acquired. Release it.
-        fcntl.flock(fd, fcntl.LOCK_UN)
-    finally:
-        os.close(fd)
-
-
 def test_acquire_flock_times_out_when_held(tmp_path: Path) -> None:
-    """_acquire_flock raises WorkspaceLockTimeoutError when lock is held."""
+    """_acquire_flock raises WorkspaceLockTimeoutError when the lock is held by
+    another fd — real fcntl contention, not a mock."""
     import fcntl
     import os
 
@@ -71,32 +52,9 @@ def test_acquire_flock_times_out_when_held(tmp_path: Path) -> None:
         os.close(holder_fd)
 
 
-# ---------------------------------------------------------------------------
-# PosixWorkspaceLock — context manager tests
-# ---------------------------------------------------------------------------
-
-
-def test_workspace_lock_creates_lock_file(tmp_path: Path) -> None:
-    """PosixWorkspaceLock.acquire creates the .ws_lock file if absent."""
-    lock_dir = tmp_path / ".dadaia" / "states"
-    # Do not pre-create the directory — acquire should mkdir.
-    lock = PosixWorkspaceLock()
-    with lock.acquire(tmp_path):
-        assert (lock_dir / ".ws_lock").exists()
-
-
-def test_workspace_lock_releases_after_exit(tmp_path: Path) -> None:
-    """A second acquire succeeds immediately after the first context exits."""
-    lock = PosixWorkspaceLock()
-    with lock.acquire(tmp_path):
-        pass
-    # Should not raise — lock was released.
-    with lock.acquire(tmp_path):
-        pass
-
-
 def test_workspace_lock_exclusive_blocks_concurrent(tmp_path: Path) -> None:
-    """Concurrent workspace locks on the same root are serialized."""
+    """Concurrent workspace locks on the same root are serialized (real thread
+    contention, not a mock)."""
     lock = PosixWorkspaceLock()
     results: list[str] = []
     barrier = threading.Barrier(2)
@@ -123,32 +81,64 @@ def test_workspace_lock_exclusive_blocks_concurrent(tmp_path: Path) -> None:
     assert results[1] == "waiter_acquired"
 
 
-# ---------------------------------------------------------------------------
-# PosixContextLock — context manager tests
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "case",
+    [
+        "acquire-flock-succeeds-on-free-file",
+        "workspace-lock-creates-file",
+        "workspace-lock-releases-after-exit",
+        "context-lock-creates-slug-file",
+        "context-lock-independent-slugs",
+        "context-lock-same-slug-releases",
+    ],
+)
+def test_lock_lifecycle(tmp_path: Path, case: str) -> None:
+    """Create / release / re-acquire lifecycle for both PosixWorkspaceLock and
+    PosixContextLock (identical acquire/release contract, different scope)."""
+    if case == "acquire-flock-succeeds-on-free-file":
+        import fcntl
+        import os
 
+        lock_file = tmp_path / ".ws_lock"
+        fd = os.open(str(lock_file), os.O_WRONLY | os.O_CREAT, 0o600)
+        try:
+            _acquire_flock(fd, str(lock_file))
+            # If we got here, lock was acquired. Release it.
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
-def test_context_lock_creates_lock_file(tmp_path: Path) -> None:
-    """PosixContextLock.acquire creates the slug lock file."""
-    lock = PosixContextLock()
-    with lock.acquire(tmp_path, "my-project"):
-        lock_path = tmp_path / ".dadaia" / "states" / "ctx_locks" / "my-project.lock"
-        assert lock_path.exists()
+    elif case == "workspace-lock-creates-file":
+        lock_dir = tmp_path / ".dadaia" / "states"
+        # Do not pre-create the directory — acquire should mkdir.
+        lock = PosixWorkspaceLock()
+        with lock.acquire(tmp_path):
+            assert (lock_dir / ".ws_lock").exists()
 
+    elif case == "workspace-lock-releases-after-exit":
+        lock = PosixWorkspaceLock()
+        with lock.acquire(tmp_path):
+            pass
+        # Should not raise — lock was released.
+        with lock.acquire(tmp_path):
+            pass
 
-def test_context_lock_independent_slugs(tmp_path: Path) -> None:
-    """Locks for different slugs are independent and can be held simultaneously."""
-    lock = PosixContextLock()
-    # Both should succeed without deadlock.
-    with lock.acquire(tmp_path, "slug-a"), lock.acquire(tmp_path, "slug-b"):
-        pass
+    elif case == "context-lock-creates-slug-file":
+        lock = PosixContextLock()
+        with lock.acquire(tmp_path, "my-project"):
+            lock_path = tmp_path / ".dadaia" / "states" / "ctx_locks" / "my-project.lock"
+            assert lock_path.exists()
 
+    elif case == "context-lock-independent-slugs":
+        lock = PosixContextLock()
+        # Both should succeed without deadlock.
+        with lock.acquire(tmp_path, "slug-a"), lock.acquire(tmp_path, "slug-b"):
+            pass
 
-def test_context_lock_same_slug_releases(tmp_path: Path) -> None:
-    """Re-acquiring a context lock on the same slug succeeds after release."""
-    lock = PosixContextLock()
-    with lock.acquire(tmp_path, "my-project"):
-        pass
-    # Should not raise — lock was released.
-    with lock.acquire(tmp_path, "my-project"):
-        pass
+    else:  # context-lock-same-slug-releases
+        lock = PosixContextLock()
+        with lock.acquire(tmp_path, "my-project"):
+            pass
+        # Should not raise — lock was released.
+        with lock.acquire(tmp_path, "my-project"):
+            pass

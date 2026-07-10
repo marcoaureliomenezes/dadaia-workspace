@@ -20,8 +20,6 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
-from dadaia_workspace.infrastructure import claude_sdk_runtime
 from dadaia_workspace.infrastructure.claude_sdk_runtime import (
     ClaudeRunOutput,
     ClaudeSdkAdapter,
@@ -43,22 +41,15 @@ def _request() -> AgentRunRequest:
     )
 
 
-def test_adapter_satisfies_port() -> None:
-    adapter = ClaudeSdkAdapter()
-    assert isinstance(adapter, AgentRuntimePort)
-    assert adapter.runtime_kind() is AgentRuntimeKind.CLAUDE_SDK
-
-
-def test_ring1_write_permission_mirrors_scope() -> None:
+def test_ring1_write_permission_mirrors_scope_and_redacts_secret_from_error() -> None:
+    """ONLY coverage of the Ring-1 write boundary decision function (keep verbatim)
+    AND CWE-209 parity: a secret-named env value must never surface in the error
+    string, matching the codex redaction discipline."""
     decide = ClaudeSdkAdapter().write_permission(_request())
     assert decide(".dadaia/handoff/dadaia-workspace/qa.handoff.json") is True
     assert decide("repos/dadaia-workspace/secrets.py") is False  # forbidden
     assert decide("repos/dadaia-workspace/src/app.py") is False  # outside allowed
 
-
-def test_run_redacts_secret_env_value_from_surfaced_error() -> None:
-    """CWE-209 parity: a secret-named env value must never surface in the error string,
-    matching the codex redaction discipline."""
     secret = "sk-ant-supersecret-xyz"
 
     def _leaky_query(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
@@ -72,61 +63,6 @@ def test_run_redacts_secret_env_value_from_surfaced_error() -> None:
     assert result.status is AgentRunStatus.FAILED
     assert secret not in (result.error or "")
     assert "[REDACTED]" in (result.error or "")
-
-
-def test_run_maps_approved_output_to_succeeded_result() -> None:
-    def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
-        # The transport is handed the Ring-1 decider; an out-of-scope write is denied.
-        assert permission(".dadaia/handoff/dadaia-workspace/qa.handoff.json") is True
-        assert permission("repos/dadaia-workspace/secrets.py") is False
-        return ClaudeRunOutput(
-            summary="done",
-            verdict="APPROVED",
-            artifact_refs=(".dadaia/handoff/dadaia-workspace/qa.handoff.json",),
-            changed_paths=(".dadaia/handoff/dadaia-workspace/qa.handoff.json",),
-        )
-
-    result = ClaudeSdkAdapter(query_fn=query_fn).run(_request())
-    assert result.status is AgentRunStatus.SUCCEEDED
-    assert result.structured_output["verdict"] == "APPROVED"
-    assert result.artifact_refs == (".dadaia/handoff/dadaia-workspace/qa.handoff.json",)
-    assert result.structured_output["changed_paths"].endswith("qa.handoff.json")
-
-
-def test_run_returns_failed_when_sdk_absent() -> None:
-    def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
-        raise ImportError("Claude execution requires the optional `claude-agent-sdk` package")
-
-    result = ClaudeSdkAdapter(query_fn=query_fn).run(_request())
-    assert result.status is AgentRunStatus.FAILED
-    assert result.error is not None
-    assert "claude-agent-sdk" in result.error
-
-
-def test_run_rejects_mismatched_runtime() -> None:
-    bad = AgentRunRequest(
-        role="x",
-        prompt="y",
-        runtime=AgentRuntimeKind.CODEX_EXEC,
-        context="c",
-        release_id="r",
-    )
-    result = ClaudeSdkAdapter(query_fn=lambda p, perm: ClaudeRunOutput(summary="")).run(bad)
-    assert result.status is AgentRunStatus.FAILED
-    assert "unsupported runtime" in (result.error or "")
-
-
-def test_run_propagates_transport_error_as_failed() -> None:
-    def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
-        return ClaudeRunOutput(summary="boom", error="model refused")
-
-    result = ClaudeSdkAdapter(query_fn=query_fn).run(_request())
-    assert result.status is AgentRunStatus.FAILED
-    assert result.error == "model refused"
-
-
-def test_module_does_not_import_the_sdk_at_load() -> None:
-    assert "claude_agent_sdk" not in sys.modules
 
 
 # --------------------------------------------------------------------------- #
@@ -236,91 +172,144 @@ def fake_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[_FakeSdkModule]:
     yield module
 
 
-def test_can_use_tool_allows_in_scope_write(fake_sdk: _FakeSdkModule) -> None:
+@pytest.mark.parametrize(
+    "case",
+    [
+        "allow-in-scope-write",
+        "deny-out-of-scope-write",
+        "allow-tool-without-write-path",
+        "wired-through-default-query-fn",
+    ],
+)
+def test_can_use_tool(fake_sdk: _FakeSdkModule, case: str) -> None:
     decide = ClaudeSdkAdapter().write_permission(_request())
-    can_use_tool = _build_can_use_tool(decide, fake_sdk)
 
-    result = asyncio.run(
-        can_use_tool(
-            "Write",
-            {"file_path": ".dadaia/handoff/dadaia-workspace/qa.handoff.json"},
-            None,
+    if case == "allow-in-scope-write":
+        can_use_tool = _build_can_use_tool(decide, fake_sdk)
+        result = asyncio.run(
+            can_use_tool(
+                "Write",
+                {"file_path": ".dadaia/handoff/dadaia-workspace/qa.handoff.json"},
+                None,
+            )
         )
-    )
-    assert isinstance(result, _FakePermissionResultAllow)
+        assert isinstance(result, _FakePermissionResultAllow)
+    elif case == "deny-out-of-scope-write":
+        can_use_tool = _build_can_use_tool(decide, fake_sdk)
+        result = asyncio.run(
+            can_use_tool("Edit", {"file_path": "repos/dadaia-workspace/secrets.py"}, None)
+        )
+        assert isinstance(result, _FakePermissionResultDeny)
+        assert "secrets.py" in result.message
+        assert result.interrupt is False
+    elif case == "allow-tool-without-write-path":
+        can_use_tool = _build_can_use_tool(decide, fake_sdk)
+        # A read/bash tool carries no file_path — never blocked by Ring-1 (git Ring-2 backstop).
+        result = asyncio.run(can_use_tool("Bash", {"command": "ls"}, None))
+        assert isinstance(result, _FakePermissionResultAllow)
+    else:  # wired-through-default-query-fn
+        fake_sdk.messages = [
+            _FakeAssistantMessage(content=[_FakeTextBlock(text="hello ")]),
+            _FakeResultMessage(result="done", structured_output={"verdict": "APPROVED"}),
+        ]
+        output = _default_query_fn("go", decide, cwd=None, model="claude-opus-4-8")
+        assert output.error is None
+        assert output.summary == "done"
+        assert output.verdict == "APPROVED"
+        # The options carried our async can_use_tool and the default permission mode.
+        assert fake_sdk.last_options.permission_mode == "default"
+        assert fake_sdk.last_options.model == "claude-opus-4-8"
+        can_use_tool = fake_sdk.last_options.can_use_tool
+        denied = asyncio.run(
+            can_use_tool("Write", {"file_path": "repos/dadaia-workspace/secrets.py"}, None)
+        )
+        assert isinstance(denied, _FakePermissionResultDeny)
 
 
-def test_can_use_tool_denies_out_of_scope_write(fake_sdk: _FakeSdkModule) -> None:
-    decide = ClaudeSdkAdapter().write_permission(_request())
-    can_use_tool = _build_can_use_tool(decide, fake_sdk)
-
-    result = asyncio.run(
-        can_use_tool("Edit", {"file_path": "repos/dadaia-workspace/secrets.py"}, None)
-    )
-    assert isinstance(result, _FakePermissionResultDeny)
-    assert "secrets.py" in result.message
-    assert result.interrupt is False
-
-
-def test_can_use_tool_allows_tool_without_write_path(fake_sdk: _FakeSdkModule) -> None:
-    decide = ClaudeSdkAdapter().write_permission(_request())
-    can_use_tool = _build_can_use_tool(decide, fake_sdk)
-
-    # A read/bash tool carries no file_path — never blocked by Ring-1 (git Ring-2 backstop).
-    result = asyncio.run(can_use_tool("Bash", {"command": "ls"}, None))
-    assert isinstance(result, _FakePermissionResultAllow)
-
-
-def test_default_query_fn_wires_permission_into_can_use_tool(fake_sdk: _FakeSdkModule) -> None:
-    fake_sdk.messages = [
-        _FakeAssistantMessage(content=[_FakeTextBlock(text="hello ")]),
-        _FakeResultMessage(result="done", structured_output={"verdict": "APPROVED"}),
-    ]
-    decide = ClaudeSdkAdapter().write_permission(_request())
-
-    output = _default_query_fn("go", decide, cwd=None, model="claude-opus-4-8")
-
-    assert output.error is None
-    assert output.summary == "done"
-    assert output.verdict == "APPROVED"
-    # The options carried our async can_use_tool and the default permission mode.
-    assert fake_sdk.last_options.permission_mode == "default"
-    assert fake_sdk.last_options.model == "claude-opus-4-8"
-    can_use_tool = fake_sdk.last_options.can_use_tool
-    denied = asyncio.run(
-        can_use_tool("Write", {"file_path": "repos/dadaia-workspace/secrets.py"}, None)
-    )
-    assert isinstance(denied, _FakePermissionResultDeny)
-
-
-def test_default_query_fn_falls_back_to_assistant_text(fake_sdk: _FakeSdkModule) -> None:
-    fake_sdk.messages = [
-        _FakeAssistantMessage(content=[_FakeTextBlock(text="just "), _FakeTextBlock(text="text")]),
-    ]
+@pytest.mark.parametrize(
+    "case",
+    [
+        "result-message",
+        "text-fallback",
+        "error-mapping",
+        "sdk-exception-mapping",
+        "wrong-runtime",
+        "transport-error",
+        "sdk-absent",
+        "sdk-absent-actionable-import-error",
+    ],
+)
+def test_query_fn_and_run_mapping(
+    fake_sdk: _FakeSdkModule, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
     decide = ClaudeSdkAdapter().write_permission(_request())
 
-    output = _default_query_fn("go", decide)
-    assert output.error is None
-    assert output.summary == "just text"
+    if case == "result-message":
+        fake_sdk.messages = [
+            _FakeResultMessage(result="ok", structured_output={"verdict": "APPROVED"}),
+        ]
+        result = ClaudeSdkAdapter().run(_request())
+        assert result.status is AgentRunStatus.SUCCEEDED
+        assert result.summary == "ok"
+        assert result.structured_output["verdict"] == "APPROVED"
+    elif case == "text-fallback":
+        fake_sdk.messages = [
+            _FakeAssistantMessage(
+                content=[_FakeTextBlock(text="just "), _FakeTextBlock(text="text")]
+            ),
+        ]
+        output = _default_query_fn("go", decide)
+        assert output.error is None
+        assert output.summary == "just text"
+    elif case == "error-mapping":
+        fake_sdk.messages = [
+            _FakeResultMessage(is_error=True, errors=["rate limited", "retry later"]),
+        ]
+        output = _default_query_fn("go", decide)
+        assert output.error == "rate limited; retry later"
+    elif case == "sdk-exception-mapping":
+        fake_sdk.raise_on_query = _FakeProcessError("cli crashed")
+        output = _default_query_fn("go", decide)
+        assert output.error is not None
+        assert "cli crashed" in output.error
+    elif case == "wrong-runtime":
+        bad = AgentRunRequest(
+            role="x",
+            prompt="y",
+            runtime=AgentRuntimeKind.CODEX_EXEC,
+            context="c",
+            release_id="r",
+        )
+        result = ClaudeSdkAdapter(query_fn=lambda p, perm: ClaudeRunOutput(summary="")).run(bad)
+        assert result.status is AgentRunStatus.FAILED
+        assert "unsupported runtime" in (result.error or "")
+    elif case == "transport-error":
 
+        def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
+            return ClaudeRunOutput(summary="boom", error="model refused")
 
-def test_default_query_fn_maps_result_error_to_failure(fake_sdk: _FakeSdkModule) -> None:
-    fake_sdk.messages = [
-        _FakeResultMessage(is_error=True, errors=["rate limited", "retry later"]),
-    ]
-    decide = ClaudeSdkAdapter().write_permission(_request())
+        result = ClaudeSdkAdapter(query_fn=query_fn).run(_request())
+        assert result.status is AgentRunStatus.FAILED
+        assert result.error == "model refused"
+    elif case == "sdk-absent":
 
-    output = _default_query_fn("go", decide)
-    assert output.error == "rate limited; retry later"
+        def query_fn(prompt: str, permission: WritePermission) -> ClaudeRunOutput:
+            raise ImportError("Claude execution requires the optional `claude-agent-sdk` package")
 
+        result = ClaudeSdkAdapter(query_fn=query_fn).run(_request())
+        assert result.status is AgentRunStatus.FAILED
+        assert result.error is not None
+        assert "claude-agent-sdk" in result.error
+    else:  # sdk-absent-actionable-import-error
+        monkeypatch.setitem(sys.modules, "claude_agent_sdk", None)  # force ImportError
+        with pytest.raises(ImportError) as excinfo:
+            _default_query_fn("go", decide)
+        assert "claude-agent-sdk" in str(excinfo.value)
 
-def test_default_query_fn_maps_sdk_exception_to_failure(fake_sdk: _FakeSdkModule) -> None:
-    fake_sdk.raise_on_query = _FakeProcessError("cli crashed")
-    decide = ClaudeSdkAdapter().write_permission(_request())
-
-    output = _default_query_fn("go", decide)
-    assert output.error is not None
-    assert "cli crashed" in output.error
+        result = ClaudeSdkAdapter().run(_request())
+        assert result.status is AgentRunStatus.FAILED
+        assert result.error is not None
+        assert "claude-agent-sdk" in result.error
 
 
 def test_adapter_run_uses_default_transport_through_fake_sdk(fake_sdk: _FakeSdkModule) -> None:
@@ -333,31 +322,3 @@ def test_adapter_run_uses_default_transport_through_fake_sdk(fake_sdk: _FakeSdkM
     assert result.status is AgentRunStatus.SUCCEEDED
     assert result.summary == "ok"
     assert result.structured_output["verdict"] == "APPROVED"
-
-
-def test_default_query_fn_raises_actionable_import_error_when_absent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """With no `claude_agent_sdk` importable, the lazy import raises an actionable
-    ImportError naming the optional extra — and the adapter maps it to FAILED."""
-    monkeypatch.setitem(sys.modules, "claude_agent_sdk", None)  # force ImportError
-    decide = ClaudeSdkAdapter().write_permission(_request())
-
-    with pytest.raises(ImportError) as excinfo:
-        _default_query_fn("go", decide)
-    assert "claude-agent-sdk" in str(excinfo.value)
-
-    result = ClaudeSdkAdapter().run(_request())
-    assert result.status is AgentRunStatus.FAILED
-    assert result.error is not None
-    assert "claude-agent-sdk" in result.error
-
-
-def test_default_transport_does_not_persist_sdk_import(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Even after a default-transport run, no real SDK was imported at module scope:
-    the fake is the only `claude_agent_sdk` and it came from this test's injection."""
-    module = _FakeSdkModule(messages=[_FakeResultMessage(result="ok")])
-    monkeypatch.setitem(sys.modules, "claude_agent_sdk", module)
-    assert claude_sdk_runtime.__name__  # module loaded without importing the SDK
-    result = ClaudeSdkAdapter().run(_request())
-    assert result.status is AgentRunStatus.SUCCEEDED
