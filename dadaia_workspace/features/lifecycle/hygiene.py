@@ -22,6 +22,11 @@ if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 
 
+#: Zone doc filenames that are canonical (scoped-rules / zone documentation), never
+#: reclaimable (v0.1.74).
+_CANONICAL_ZONE_DOC_NAMES = frozenset({"AGENTS.md", "README.md", ".gitkeep"})
+
+
 @dataclass(frozen=True)
 class WorkflowStepPayloadCounts:
     """Workflow-step payload state counters (v0.1.30 Item 5 / T-30-D-07).
@@ -231,6 +236,26 @@ class LifecycleHygieneService:
         protected: dict[str, HygieneProtectionKind] = {}
         for path in self._important_paths():
             protected[path] = HygieneProtectionKind.IMPORTANT_REPORT
+
+        # v0.1.74 (bug public-install-restores-expired-zone-agents-reblocks-preflight):
+        # zone doc files (AGENTS.md scoped rules, README.md, .gitkeep) are CANONICAL —
+        # the documented zone-documentation mechanism, lib-projected with historical
+        # mtimes. Classifying them by TTL made every `public install` re-block preflight
+        # and created an install→clean→doctor-drift loop. One insertion point: cleanup,
+        # the FR3 preflight arithmetic, and the retention sweep (protected_refs) all
+        # inherit this protection.
+        for zone in self._policy.safe_zones:
+            zone_dir = self._dadaia_root / zone.value
+            if not zone_dir.is_dir():
+                continue
+            zone_root = zone_dir.resolve()
+            for doc in sorted(zone_dir.rglob("*")):
+                if (
+                    doc.is_file()
+                    and doc.name in _CANONICAL_ZONE_DOC_NAMES
+                    and self._is_under_resolved(doc, zone_root)
+                ):
+                    protected[self._workspace_ref(doc)] = HygieneProtectionKind.CANONICAL_ZONE_DOC
 
         handoff_dir = self._dadaia_root / HygieneZone.HANDOFF.value
         if not handoff_dir.is_dir():

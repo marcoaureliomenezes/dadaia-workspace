@@ -138,3 +138,42 @@ def test_lifecycle_hygiene_accepts_explicit_policy(tmp_path: Path) -> None:
 
     assert counters.expired_totals[HygieneZone.REPORTS] == 1
     assert old_report.exists()
+
+
+def test_zone_doc_agents_md_is_canonical_never_unprotected(tmp_path: Path) -> None:
+    """v0.1.74 (bug ``public-install-restores-expired-zone-agents-reblocks-preflight``):
+    zone-root ``AGENTS.md`` files are the documented scoped-rules mechanism — canonical
+    lib projections, NOT ephemeral artifacts. ``public install`` restores them with old
+    mtimes, so an unprotected classification re-blocked preflight forever (and
+    ``clean --apply`` deleting them made ``public doctor`` drift: an install/clean loop).
+    They must be PROTECTED (``canonical_zone_doc``); a genuinely stale sibling stays
+    unprotected. README.md / .gitkeep zone docs get the same class treatment."""
+    agents_handoff = _write(
+        tmp_path / ".dadaia" / "handoff" / "AGENTS.md", age=dt.timedelta(days=30)
+    )
+    agents_tmp = _write(tmp_path / ".dadaia" / "tmp" / "AGENTS.md", age=dt.timedelta(days=30))
+    _write(tmp_path / ".dadaia" / "reports" / "README.md", age=dt.timedelta(days=30))
+    stale_sibling = _write(
+        tmp_path / ".dadaia" / "handoff" / "ctx" / "stale.handoff.json",
+        age=dt.timedelta(days=30),
+    )
+
+    service = LifecycleHygieneService(tmp_path, now=NOW)
+    result = service.cleanup(dry_run=True)
+
+    by_path = {c.path: c for c in result.candidates}
+    for doc in (".dadaia/handoff/AGENTS.md", ".dadaia/tmp/AGENTS.md"):
+        assert by_path[doc].protected is True, by_path[doc]
+        assert by_path[doc].protection_kind is not None
+        assert by_path[doc].protection_kind.value == "canonical_zone_doc"
+    assert by_path[".dadaia/handoff/ctx/stale.handoff.json"].protected is False
+
+    # The FR3 preflight arithmetic: only the stale sibling counts as unprotected.
+    counters = service.status()
+    assert counters.cleanup_candidate_count - counters.protected_residual_count == 1
+
+    # clean --apply never deletes the canonical docs.
+    service.cleanup(dry_run=False)
+    assert agents_handoff.exists()
+    assert agents_tmp.exists()
+    assert not stale_sibling.exists()
