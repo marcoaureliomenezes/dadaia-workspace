@@ -1,6 +1,7 @@
 ---
 name: specs-doctor-partial-archive-invariant
-status: candidate
+status: superseded
+superseded_by: deprecation-strips-and-doctor-cleanup (consolidation 2026-07-10)
 opened: 2026-07-07
 owner: project-manager (curates)
 source: v0.1.61 closure backlog return (audit G-23 doctor-coverage-gap INFO — deferred per ADR-5, small new invariant out of an already-wide release)

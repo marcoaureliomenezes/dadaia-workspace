@@ -1,6 +1,7 @@
 ---
 name: dispatch-band-legacy-fallback-removal
-status: candidate
+status: superseded
+superseded_by: deprecation-strips-and-doctor-cleanup (consolidation 2026-07-10)
 opened: 2026-07-07
 owner: project-manager (curates)
 source: v0.1.64 closure backlog return (FR5/ADR-4 tolerate-then-strip window — deprecation-expiry law)

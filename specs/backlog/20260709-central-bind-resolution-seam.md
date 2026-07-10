@@ -3,6 +3,7 @@ name: central-bind-resolution-seam
 status: candidate
 opened: 2026-07-09
 owner: project-manager (curates)
+priority: P0
 source: "2026-07-09 150-bug recurrence audit — family F2: 8 reports, 5 partial per-command fixes v0.1.47→v0.1.71, still recurring; the resolution law mandates a class-level fix"
 intents:
   - subject: { kind: code, ref: "dadaia_workspace/core/specs_resolver.py#resolve_specs_dir" }
@@ -18,3 +19,11 @@ July arc).
 **Acceptance.** After a bare `context bind <ctx>`: every resolver-driven verb targets
 `<ctx>` (parametrized executed-path test over the full verb list); removing the seam from
 any one verb fails the contract test.
+
+**Relation to the P0 lock kernel (consolidation 2026-07-10).** Kept as a SEPARATE P0
+entry by operator decision: this seam governs *which context a CLI verb resolves* (the
+specs-dir contract); `lock-lease-session-identity-kernel` governs *who holds the
+mutating lease* (the identity contract). Same neighborhood (bind), distinct contracts
+and test surfaces. Sequencing hint: the lock-kernel's canonical SessionIdentity should
+land first or together — this seam's session-record resolution rung reads the identity
+that entry redefines.

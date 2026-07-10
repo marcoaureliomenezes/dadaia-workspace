@@ -1,6 +1,7 @@
 ---
 name: preflight-block-reasons-missing-operator-command
-status: candidate
+status: superseded
+superseded_by: lifecycle-pipeline-correctness-and-diagnosability (consolidation 2026-07-10)
 opened: 2026-07-09
 owner: project-manager (curates)
 source: "v0.1.69 code-review MEDIUM — pre-existing preflight _check_* block reasons carry operator_command:null; FR3 made them reachable in production for the first time"

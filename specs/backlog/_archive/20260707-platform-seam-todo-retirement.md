@@ -1,6 +1,7 @@
 ---
 name: platform-seam-todo-retirement
-status: candidate
+status: superseded
+superseded_by: lock-lease-session-identity-kernel (consolidation 2026-07-10)
 opened: 2026-07-07
 owner: project-manager (curates)
 source: "v0.1.61 closure backlog return (audit A-3 deferral — grill correction: the audit's cited anchor `features-import-infrastructure-direct-debt` was consumed at R6/v0.1.54, so this NEW tracked return replaces it)"

@@ -1,6 +1,7 @@
 ---
 name: implement-review-write-scope-from-tasks-parity
-status: candidate
+status: superseded
+superseded_by: lifecycle-pipeline-correctness-and-diagnosability (consolidation 2026-07-10)
 opened: 2026-07-09
 owner: project-manager (curates)
 source: "v0.1.68 closure return — code-reviewer LOW: FR3 write-scope derivation wired into the `pipeline` verb only; the `implement-review` verb has no equivalent"

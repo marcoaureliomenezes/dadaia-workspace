@@ -1,6 +1,7 @@
 ---
 name: test-suite-remediation-waves
-status: candidate
+status: consumed
+consumed_by: v0.1.75 (shipped 2026-07-10, PR #145)
 opened: 2026-07-09
 owner: project-manager (curates)
 source: "2026-06-03 test-suite audit (report + memory project_test_suite_audit); 2026-07-09 re-measure on feature/v0.1.74 — the audit's 3-wave remediation was never converted to a backlog item, so it was never scheduled or executed"

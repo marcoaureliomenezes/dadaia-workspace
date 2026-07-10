@@ -1,6 +1,7 @@
 ---
 name: tasks-write-scope-traversal-hardening
-status: candidate
+status: superseded
+superseded_by: lifecycle-pipeline-correctness-and-diagnosability (consolidation 2026-07-10)
 opened: 2026-07-09
 owner: project-manager (curates)
 source: "v0.1.68 closure return — code-reviewer MEDIUM + security-reviewer INFO on the FR3 write-scope parser (both non-blocking for v0.1.68; routed here per reviewer recommendation)"
