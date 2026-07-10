@@ -1,11 +1,14 @@
 ---
-release: none
-phase: none
+release: v0.1.76
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.76 — Lock liberation (advisory presence)
 
-v0.1.75 shipped (PR #145, `81e60ef7`) and closed — archived to `specs/_archive/v0.1.75/`.
+Branch `feature/v0.1.76`. SPEC/PLAN/TASKS Aprovado in `specs/releases/v0.1.76/`.
+Disposes the CRITICAL bug + the P0 lock audit under the NO-LOCKS DOCTRINE.
+
+Previous: v0.1.75 shipped (PR #145, `81e60ef7`) and closed — archived to `specs/_archive/v0.1.75/`.
 Suite: 4,450 → 1,327 authored test fns, full run 2:52, coverage 84.30%.
 
 Bug ledger: **5 open** (2026-07-10 remote intake: 1 CRITICAL lease-identity self-block,
