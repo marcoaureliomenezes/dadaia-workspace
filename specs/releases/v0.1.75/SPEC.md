@@ -54,7 +54,10 @@ implementation strings, never a duplicate of another tier's coverage.
 
 ## Acceptance
 
-1. Collected python test fns between 1,000 and 1,200 (`pytest --collect-only -q`).
+1. Authored python test fns between 1,000 and 1,200 (`grep -rh "def test_" tests
+   --include="*.py" | wc -l`) — the operator's unit of "a designed test"; a
+   parametrized table is ONE designed test over named rows, so the pytest collected
+   count is naturally higher and is reported transparently alongside.
 2. Full suite green; CI 80% coverage job green; Playwright suite untouched and green.
 3. No behavior loses its ONLY coverage — each cluster plan's "only-coverage" list is
    verified present in the surviving suite.

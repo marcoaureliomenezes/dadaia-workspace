@@ -1,15 +1,14 @@
 """T-26-07 — ``dadaia lifecycle backlog define`` drives the REAL workflow.
 
-Acceptance §3.7.6:
-- ``--harness fake`` drives :class:`BacklogDefinitionWorkflow` (not the ``_deferred`` stub);
-- ``--harness claude`` is rejected (LAW 1);
-- a bad ``--model`` is rejected (LAW 2).
+Acceptance §3.7.6: ``--harness fake`` drives :class:`BacklogDefinitionWorkflow` (not the
+``_deferred`` stub). The LAW1/D-3/--model rejection dupes are deleted — owned by the
+policy matrix (``test_lifecycle_policy_cli.py``) and the AC-9 matrix
+(``test_model_flag_removed_ac9.py``).
 """
 
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -21,23 +20,6 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _runner = CliRunner()
-
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_BOX_CHARS = "│╭╮╰╯─"
-
-
-def _clean(output: str) -> str:
-    """Normalize Typer/Rich error output for substring checks.
-
-    Typer renders ``BadParameter`` messages in a Rich error box: ANSI colour codes,
-    box-drawing borders, and line-wrapping at the (environment-dependent) terminal
-    width. A human message like ``takes no --model`` can therefore be split across a
-    wrap + box border in CI while staying on one line locally. Strip ANSI + box glyphs
-    and collapse whitespace so the assertion is width-independent.
-    """
-    text = _ANSI_RE.sub("", output)
-    text = "".join(" " if ch in _BOX_CHARS else ch for ch in text)
-    return re.sub(r"\s+", " ", text)
 
 
 @pytest.fixture
@@ -86,64 +68,3 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
     # The conditional grill is skipped on a clean demand.
     grill = next(s for s in payload["steps"] if s["label"] == "conflict_resolution_grill")
     assert grill["skipped"] is True
-
-
-def test_claude_harness_rejected_law1(workspace: Path) -> None:
-    result = _runner.invoke(
-        app,
-        ["lifecycle", "backlog", "define", "--release-id", "v0.1.26", "--harness", "claude"],
-    )
-    assert result.exit_code != 0
-    cleaned = _clean(result.output)
-    assert "Layer-2 workflow harness" in cleaned or "LAW 1" in cleaned
-
-
-def test_raw_step_model_rejected_d3(workspace: Path) -> None:
-    """v0.1.56 FR1 (rewritten from the inverted LAW-2 raw-model rejection):
-
-    a raw ``--step-model label=<id>:<effort>`` is rejected as a D-3 profile-id violation —
-    profile ids only, resolved through the shared resolver.
-    """
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "backlog",
-            "define",
-            "--release-id",
-            "v0.1.26",
-            "--harness",
-            "fake",
-            "--step-model",
-            "intake_grill=gpt-5.5:high",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "profile id" in _clean(result.output)
-
-
-def test_model_flag_is_removed(workspace: Path) -> None:
-    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
-    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
-
-    The profile-ids-only D-3 rejection stays covered by ``test_raw_step_model_rejected_d3``.
-    """
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "backlog",
-            "define",
-            "--release-id",
-            "v0.1.26",
-            "--harness",
-            "fake",
-            "--model",
-            "anything:high",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 2
-    assert "No such option: --model" in _clean(result.stderr)
-    # Q4: the UsageError is on stderr — the --json stdout stays empty.
-    assert result.stdout == ""

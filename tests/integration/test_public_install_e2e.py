@@ -88,33 +88,24 @@ def _add_marker_consumer(workspace_root: Path, slug: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — services/ pair untouched; root + consumer pairs written
+# Merged: nested operator services/ pair untouched (with and without consumers) +
+# all projected root/consumer pairs byte-identical to source (single SHA-256, Option C).
 # ---------------------------------------------------------------------------
 
 
-def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
-    """services/AGENTS.md and services/CLAUDE.md are not overwritten by install.
-
-    FR10 end-to-end: the installer writes ONLY to workspace-root and marker-bearing
-    consumer-repo roots.  Operator-authored files in subdirectories (e.g. `services/`)
-    must remain byte-identical to their pre-install content.
-
-    Setup:
-      - `services/AGENTS.md` and `services/CLAUDE.md` present with operator content.
-      - `data/AGENTS.md` source has different content.
-      - One marker-bearing consumer repo under `repos/`.
-
-    After `_install_workspace_guardrail_pair` (force=True):
-      - services/{AGENTS,CLAUDE}.md unchanged.
-      - workspace-root/{AGENTS,CLAUDE}.md byte-identical to source.
-      - consumer/{AGENTS,CLAUDE}.md byte-identical to source (single SHA-256).
-    """
+def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
+    tmp_path: Path,
+) -> None:
+    """FR10 end-to-end: the installer writes ONLY to workspace-root and marker-bearing
+    consumer-repo roots — operator-authored files in ``services/`` remain byte-identical
+    to their pre-install content, both with and without consumer repos present. Option C
+    (ADR): a single source file fans out to N projections, and all N destinations share
+    exactly one SHA-256 per file kind (AGENTS.md vs the T-41 CLAUDE.md stub)."""
     source = _make_source(tmp_path)
-
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
-    # --- Operator-authored files in services/ (must NOT be touched) ---
+    # Operator-authored files in services/ (must NOT be touched).
     services_dir = workspace_root / "services"
     services_dir.mkdir()
     services_agents = services_dir / "AGENTS.md"
@@ -122,122 +113,7 @@ def test_nested_services_pair_untouched_after_install(tmp_path: Path) -> None:
     services_agents.write_bytes(_OPERATOR_AGENTS_CONTENT)
     services_claude.write_bytes(_OPERATOR_CLAUDE_CONTENT)
 
-    # --- Marker-bearing consumer repo ---
-    slug = "sample-consumer"
-    consumer = _add_marker_consumer(workspace_root, slug)
-
-    # --- Run install ---
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(source, workspace_root, force=True, installed=installed)
-
-    # --- Assert: services/ files unchanged ---
-    assert services_agents.read_bytes() == _OPERATOR_AGENTS_CONTENT, (
-        "services/AGENTS.md was overwritten by install — it must remain untouched (FR10)."
-    )
-    assert services_claude.read_bytes() == _OPERATOR_CLAUDE_CONTENT, (
-        "services/CLAUDE.md was overwritten by install — it must remain untouched (FR10)."
-    )
-
-    # --- Assert: workspace-root AGENTS.md byte-identical to source ---
-    source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
-
-    root_agents = workspace_root / "AGENTS.md"
-    root_claude = workspace_root / "CLAUDE.md"
-    assert root_agents.exists(), "workspace-root/AGENTS.md must be written by install."
-    assert root_claude.exists(), "workspace-root/CLAUDE.md must be written by install."
-    assert _sha256(root_agents) == source_sha, (
-        f"workspace-root/AGENTS.md is not byte-identical to source.\n"
-        f"  source sha256: {source_sha}\n"
-        f"  dest   sha256: {_sha256(root_agents)}"
-    )
-    # T-41: CLAUDE.md is always the 1-line stub (delegates to AGENTS.md), not a copy of source.
-    assert _sha256(root_claude) == stub_sha, (
-        f"workspace-root/CLAUDE.md must be the T-41 stub, not a source copy.\n"
-        f"  stub sha256: {stub_sha}\n"
-        f"  dest sha256: {_sha256(root_claude)}"
-    )
-
-    # --- Assert: consumer AGENTS.md byte-identical to source; CLAUDE.md is stub ---
-    consumer_agents = consumer / "AGENTS.md"
-    consumer_claude = consumer / "CLAUDE.md"
-    assert consumer_agents.exists(), f"repos/{slug}/AGENTS.md must be written by install."
-    assert consumer_claude.exists(), f"repos/{slug}/CLAUDE.md must be written by install."
-    assert _sha256(consumer_agents) == source_sha, (
-        f"repos/{slug}/AGENTS.md is not byte-identical to source.\n"
-        f"  source sha256: {source_sha}\n"
-        f"  dest   sha256: {_sha256(consumer_agents)}"
-    )
-    assert _sha256(consumer_claude) == stub_sha, (
-        f"repos/{slug}/CLAUDE.md must be the T-41 stub, not a source copy.\n"
-        f"  stub sha256: {stub_sha}\n"
-        f"  dest sha256: {_sha256(consumer_claude)}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Test 2 — services/ pair untouched even without consumer repos
-# ---------------------------------------------------------------------------
-
-
-def test_nested_services_pair_untouched_no_consumers(tmp_path: Path) -> None:
-    """services/ files untouched even when there are no consumer repos.
-
-    This is the minimal variant: workspace-root only, no repos/ directory.
-    Confirms the FR10 invariant is upheld regardless of whether consumers exist.
-    """
-    source = _make_source(tmp_path)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
-    # Operator-authored files — services/ (no marker-bearing repos in this test)
-    services_dir = workspace_root / "services"
-    services_dir.mkdir()
-    services_agents = services_dir / "AGENTS.md"
-    services_claude = services_dir / "CLAUDE.md"
-    services_agents.write_bytes(_OPERATOR_AGENTS_CONTENT)
-    services_claude.write_bytes(_OPERATOR_CLAUDE_CONTENT)
-
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    assert services_agents.read_bytes() == _OPERATOR_AGENTS_CONTENT, (
-        "services/AGENTS.md was overwritten by install (no consumers) — FR10 violated."
-    )
-    assert services_claude.read_bytes() == _OPERATOR_CLAUDE_CONTENT, (
-        "services/CLAUDE.md was overwritten by install (no consumers) — FR10 violated."
-    )
-
-    source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
-    assert _sha256(workspace_root / "AGENTS.md") == source_sha, (
-        "workspace-root/AGENTS.md must be byte-identical to source after install."
-    )
-    # T-41: CLAUDE.md is always the 1-line stub, not a copy of source.
-    assert _sha256(workspace_root / "CLAUDE.md") == stub_sha, (
-        "workspace-root/CLAUDE.md must be the T-41 stub after install."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Test 3 — all projected pairs share a single SHA-256 (Option C invariant)
-# ---------------------------------------------------------------------------
-
-
-def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
-    """All projected {AGENTS,CLAUDE}.md files share exactly one unique SHA-256.
-
-    Option C (ADR): a single source file fans out to N projections.  All N
-    destinations must be byte-identical to each other (verified by SHA-256 set
-    cardinality = 1).
-
-    Fixture: 2 marker-bearing consumer repos.
-    """
-    source = _make_source(tmp_path)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
+    # Two marker-bearing consumer repos.
     slug_a = "sample-consumer"
     slug_b = "workflow-tools"
     consumer_a = _add_marker_consumer(workspace_root, slug_a)
@@ -245,6 +121,17 @@ def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
 
     installed: list[str] = []
     _install_workspace_guardrail_pair(source, workspace_root, force=True, installed=installed)
+
+    # services/ files unchanged.
+    assert services_agents.read_bytes() == _OPERATOR_AGENTS_CONTENT, (
+        "services/AGENTS.md was overwritten by install — it must remain untouched (FR10)."
+    )
+    assert services_claude.read_bytes() == _OPERATOR_CLAUDE_CONTENT, (
+        "services/CLAUDE.md was overwritten by install — it must remain untouched (FR10)."
+    )
+
+    source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
+    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
 
     agents_files = [
         workspace_root / "AGENTS.md",
@@ -256,21 +143,15 @@ def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
         consumer_a / "CLAUDE.md",
         consumer_b / "CLAUDE.md",
     ]
-
     for path in agents_files + claude_files:
         assert path.exists(), f"Expected projected file missing: {path}"
 
-    # AGENTS.md: all copies byte-identical to source (Option C invariant).
-    source_sha = hashlib.sha256(_SOURCE_GUARDRAIL_CONTENT).hexdigest()
     agents_sha_set = {_sha256(p) for p in agents_files}
     assert agents_sha_set == {source_sha}, (
         f"All AGENTS.md projections must share a single SHA-256 (Option C invariant).\n"
         f"  Expected: {{{source_sha!r}}}\n"
         f"  Got: {agents_sha_set}"
     )
-
-    # T-41: CLAUDE.md is always the 1-line stub across all targets.
-    stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
     claude_sha_set = {_sha256(p) for p in claude_files}
     assert claude_sha_set == {stub_sha}, (
         f"All CLAUDE.md projections must be the T-41 stub (single SHA-256).\n"
@@ -278,9 +159,36 @@ def test_all_projected_pairs_share_single_sha256(tmp_path: Path) -> None:
         f"  Got: {claude_sha_set}"
     )
 
-    # Also confirm the installed list records all 6 as [ok]
     ok_entries = [e for e in installed if e.startswith("[ok]")]
     assert len(ok_entries) == 6, (
         f"Expected 6 '[ok]' entries in installed list (2 root + 4 consumer), "
         f"got {len(ok_entries)}.\n  installed: {installed}"
+    )
+
+    # Minimal variant: workspace-root only, no repos/ directory — services/ still untouched.
+    no_consumer_root = tmp_path / "no-consumer-case"
+    no_consumer_root.mkdir()
+    no_consumer_source = _make_source(no_consumer_root)
+    no_consumer_ws = no_consumer_root / "workspace"
+    no_consumer_ws.mkdir()
+    nc_services_dir = no_consumer_ws / "services"
+    nc_services_dir.mkdir()
+    nc_services_agents = nc_services_dir / "AGENTS.md"
+    nc_services_claude = nc_services_dir / "CLAUDE.md"
+    nc_services_agents.write_bytes(_OPERATOR_AGENTS_CONTENT)
+    nc_services_claude.write_bytes(_OPERATOR_CLAUDE_CONTENT)
+
+    _install_workspace_guardrail_pair(no_consumer_source, no_consumer_ws, force=True)
+
+    assert nc_services_agents.read_bytes() == _OPERATOR_AGENTS_CONTENT, (
+        "services/AGENTS.md was overwritten by install (no consumers) — FR10 violated."
+    )
+    assert nc_services_claude.read_bytes() == _OPERATOR_CLAUDE_CONTENT, (
+        "services/CLAUDE.md was overwritten by install (no consumers) — FR10 violated."
+    )
+    assert _sha256(no_consumer_ws / "AGENTS.md") == source_sha, (
+        "workspace-root/AGENTS.md must be byte-identical to source after install."
+    )
+    assert _sha256(no_consumer_ws / "CLAUDE.md") == stub_sha, (
+        "workspace-root/CLAUDE.md must be the T-41 stub after install."
     )

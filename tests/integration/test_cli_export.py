@@ -23,9 +23,11 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_export_list_only_does_not_create_archive(workspace: Path) -> None:
-    result = _runner.invoke(app, ["export", "--list", "--exclude-mnt"])
-    assert result.exit_code == 0, result.output
+def test_export_list_then_create_archive_excluding_mnt(workspace: Path, tmp_path: Path) -> None:
+    """--list alone creates no archive; a real export creates exactly one tar.gz; and
+    --exclude-mnt skips the mnt/ subtree inside it."""
+    list_result = _runner.invoke(app, ["export", "--list", "--exclude-mnt"])
+    assert list_result.exit_code == 0, list_result.output
     archives = (
         list((workspace / ".dadaia" / "dist").glob("*.tar.gz"))
         if (workspace / ".dadaia" / "dist").exists()
@@ -33,17 +35,6 @@ def test_export_list_only_does_not_create_archive(workspace: Path) -> None:
     )
     assert archives == []
 
-
-def test_export_creates_archive(workspace: Path, tmp_path: Path) -> None:
-    out = tmp_path / "out"
-    out.mkdir()
-    result = _runner.invoke(app, ["export", "--output", str(out), "--exclude-mnt"])
-    assert result.exit_code == 0, result.output
-    archives = list(out.glob("workspace-*.tar.gz"))
-    assert len(archives) == 1
-
-
-def test_export_exclude_mnt_skips_mnt_dir(workspace: Path, tmp_path: Path) -> None:
     (workspace / "mnt" / "my-tool").mkdir(parents=True)
     (workspace / "mnt" / "my-tool" / "marker.txt").write_text("hi")
 
@@ -51,10 +42,11 @@ def test_export_exclude_mnt_skips_mnt_dir(workspace: Path, tmp_path: Path) -> No
     out.mkdir()
     result = _runner.invoke(app, ["export", "--output", str(out), "--exclude-mnt"])
     assert result.exit_code == 0, result.output
+    created = list(out.glob("workspace-*.tar.gz"))
+    assert len(created) == 1
 
     import tarfile
 
-    archive = next(out.glob("workspace-*.tar.gz"))
-    with tarfile.open(archive, "r:gz") as tar:
+    with tarfile.open(created[0], "r:gz") as tar:
         names = tar.getnames()
     assert not any("mnt/" in n for n in names)

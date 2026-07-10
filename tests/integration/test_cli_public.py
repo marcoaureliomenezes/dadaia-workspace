@@ -1,4 +1,9 @@
-"""dadaia public CLI — stage / install / doctor commands."""
+"""dadaia public CLI — stage / install / doctor commands.
+
+Merged per plan-integration.md (4 -> 2): (1) stage + install --target all + --force
+smoke; (2) doctor exit-code routing (mocked service, both cases — the non-zero-on-drift
+exit contract).
+"""
 
 from pathlib import Path
 
@@ -20,42 +25,34 @@ def _init_ws(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_public_stage_reports_result(tmp_path: Path, monkeypatch) -> None:
+def test_public_stage_install_all_and_force_smoke(tmp_path: Path, monkeypatch) -> None:
     _init_ws(tmp_path)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["public", "stage"])
-    assert result.exit_code == 0, result.output
-    assert "staged" in result.output.lower() or "No assets" in result.output
+
+    stage_result = _runner.invoke(app, ["public", "stage"])
+    assert stage_result.exit_code == 0, stage_result.output
+    assert "staged" in stage_result.output.lower() or "No assets" in stage_result.output
+
+    install_result = _runner.invoke(app, ["public", "install", "--target", "all"])
+    assert install_result.exit_code == 0, install_result.output
+
+    force_result = _runner.invoke(app, ["public", "install", "--force"])
+    assert force_result.exit_code == 0, force_result.output
 
 
-def test_public_install_with_target_all(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["public", "install", "--target", "all"])
-    assert result.exit_code == 0, result.output
-
-
-def test_public_install_force_flag(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["public", "install", "--force"])
-    assert result.exit_code == 0, result.output
-
-
-def test_public_doctor_outputs_status(tmp_path: Path, monkeypatch) -> None:
+def test_public_doctor_exit_code_routing_clean_and_drift(tmp_path: Path, monkeypatch) -> None:
     """T-PROP-02 integration: doctor CLI exits 0 on clean workspace, non-zero on drift.
 
-    The two sub-cases are tested using patched service responses so the test
-    is deterministic regardless of the real workspace state.  The CLI layer
-    (command/exit-code routing) is exercised in full; only the service return
-    value is stubbed.
+    The two sub-cases are tested using patched service responses so the test is
+    deterministic regardless of the real workspace state. The CLI layer
+    (command/exit-code routing) is exercised in full; only the service return value
+    is stubbed.
     """
     from unittest.mock import MagicMock, patch
 
     _init_ws(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    # --- Case 1: clean workspace → exit 0, only [ok]/[not-applicable] lines ---
     ok_lines = ["[ok] stage:agents/qa-engineer.md", "[not-applicable] codex:config.toml"]
     with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
         mock_svc = MagicMock()
@@ -65,14 +62,14 @@ def test_public_doctor_outputs_status(tmp_path: Path, monkeypatch) -> None:
             "dadaia_workspace.cli.commands.public.resolve_workspace_root",
             return_value=tmp_path,
         ):
-            result = _runner.invoke(app, ["public", "doctor"])
+            clean_result = _runner.invoke(app, ["public", "doctor"])
 
-    assert result.exit_code == 0, (
-        f"Expected exit 0 for clean workspace, got {result.exit_code}. Output:\n{result.output}"
+    assert clean_result.exit_code == 0, (
+        f"Expected exit 0 for clean workspace, got {clean_result.exit_code}. "
+        f"Output:\n{clean_result.output}"
     )
-    assert "[ok]" in result.output
+    assert "[ok]" in clean_result.output
 
-    # --- Case 2: drift detected → non-zero exit, [drift] in output ---
     drift_lines = ["[ok] stage:agents/qa-engineer.md", "[drift] claude:rules/some-rule.md"]
     with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
         mock_svc = MagicMock()
@@ -82,9 +79,12 @@ def test_public_doctor_outputs_status(tmp_path: Path, monkeypatch) -> None:
             "dadaia_workspace.cli.commands.public.resolve_workspace_root",
             return_value=tmp_path,
         ):
-            result = _runner.invoke(app, ["public", "doctor"])
+            drift_result = _runner.invoke(app, ["public", "doctor"])
 
-    assert result.exit_code != 0, (
-        f"Expected non-zero exit for drift, got {result.exit_code}. Output:\n{result.output}"
+    assert drift_result.exit_code != 0, (
+        f"Expected non-zero exit for drift, got {drift_result.exit_code}. "
+        f"Output:\n{drift_result.output}"
     )
-    assert "[drift]" in result.output, f"Expected '[drift]' in output, got:\n{result.output}"
+    assert "[drift]" in drift_result.output, (
+        f"Expected '[drift]' in output, got:\n{drift_result.output}"
+    )

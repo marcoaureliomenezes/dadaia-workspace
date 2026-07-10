@@ -23,11 +23,11 @@
   (1,035→250) + **FR2 frozen-suite re-baseline** (successor baseline named; QA
   adjudication recorded in the task commit + CLOSURE).
   Write set: `tests/unit/features/**` (excluding `panel/`, `lifecycle/`)
-- [-] **T-7** Integration cluster per `plan-integration.md` (574→~145; shared
+- [x] **T-7** Integration cluster per `plan-integration.md` (574→~145; shared
   session-scoped workspace template + panel-server factory; relocations to unit; dead
   live files deleted).
   Write set: `tests/integration/**`, `tests/unit/**` (relocation targets only)
-- [ ] **T-8** Speed wiring + reconciliation: pre-push hook → `ci preflight --quick`;
+- [-] **T-8** Speed wiring + reconciliation: pre-push hook → `ci preflight --quick`;
   pytest-xdist dep + `-n auto` on unit tiers (preflight + CI unit jobs; 3 consecutive
   randomized green runs); `tests/tmp/` gitignored; `pytest --collect-only -q` count in
   [1,000, 1,200] (apply secondary-squeeze lists if over); full suite green.

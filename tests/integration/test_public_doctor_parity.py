@@ -89,29 +89,23 @@ def _add_consumer(
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — root labels always present (no consumers)
+# Fn 1 — root+consumer label parity + `_runtime_expectations` labels.
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_root_labels_present_without_consumers(tmp_path: Path) -> None:
-    """Root parity labels are emitted even when no consumer repos exist.
-
-    Verifies the minimum invariant: ``root:AGENTS.md`` and ``root:CLAUDE.md``
-    always appear in doctor output regardless of ``repos/`` contents.
-    """
+def test_doctor_root_consumer_labels_and_runtime_expectations(tmp_path: Path) -> None:
+    """Root labels always present (no consumers); exactly 4 labels with one registry-listed
+    consumer (root x2 + consumer x2, bannerless-source consumer classifies [foreign]);
+    drift detected for a modified destination; and ``_runtime_expectations`` yields the
+    root labels in the manager's doctor output after a stage+install cycle."""
+    # Root labels present even without consumers.
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
     source.write_bytes(_SOURCE_CONTENT)
-
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
-
-    # Install the pair at workspace root.
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    # Doctor must surface both root labels as [ok].
     lines = _doctor_guardrail_pair(source, workspace_root)
-
     labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
     assert "root:AGENTS.md" in labels, (
         f"Expected 'root:AGENTS.md' in doctor output labels. Got: {labels}"
@@ -123,38 +117,22 @@ def test_doctor_root_labels_present_without_consumers(tmp_path: Path) -> None:
         f"All root labels should be [ok] after install. Lines: {lines}"
     )
 
-
-# ---------------------------------------------------------------------------
-# Test 2 — 4 labels per consumer (root × 2 + consumer × 2)
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
-    """Exactly 4 parity labels are emitted when one registry-listed consumer exists.
-
-    v0.1.58 FR4 INVERT: the consumer is detected via ``spec_contexts.json``
-    (registry-based), not the dead in-repo marker (Ruling G).
-
-    v0.1.60 FR9 amendment: ``_SOURCE_CONTENT`` is BANNERLESS, so the consumer pair
-    classifies ``[foreign]`` (doctor-``[ok]``-parity flip) — including the PAIRED
-    ``repos/<slug>:CLAUDE.md`` line (Ruling 16) — while the lib-owned root pair keeps
-    ``[ok]``. All 4 labels are still present.
-    """
-    source = tmp_path / "data" / "AGENTS.md"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(_SOURCE_CONTENT)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
+    # Exactly 4 parity labels with one registry-listed consumer (v0.1.58 FR4:
+    # registry-based, not the dead in-repo marker). v0.1.60 FR9: bannerless source
+    # classifies the consumer pair [foreign] (doctor-[ok]-parity flip) while the
+    # lib-owned root pair keeps [ok].
+    consumer_root = tmp_path / "consumer-case"
+    consumer_root.mkdir()
+    consumer_source = consumer_root / "data" / "AGENTS.md"
+    consumer_source.parent.mkdir(parents=True)
+    consumer_source.write_bytes(_SOURCE_CONTENT)
+    consumer_ws = consumer_root / "workspace"
+    consumer_ws.mkdir()
     slug = "sample-consumer"
-    _add_consumer(workspace_root, slug)
-
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    lines = _doctor_guardrail_pair(source, workspace_root)
-    status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
-
+    _add_consumer(consumer_ws, slug)
+    _install_workspace_guardrail_pair(consumer_source, consumer_ws, force=True)
+    lines2 = _doctor_guardrail_pair(consumer_source, consumer_ws)
+    status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines2 if " " in ln}
     expected = {
         "root:AGENTS.md",
         "root:CLAUDE.md",
@@ -164,73 +142,42 @@ def test_doctor_emits_four_labels_with_one_consumer(tmp_path: Path) -> None:
     assert set(status) == expected, (
         f"Doctor labels mismatch.\n  Expected: {expected}\n  Got: {set(status)}"
     )
-    assert len(lines) == 4, f"Expected exactly 4 parity lines, got {len(lines)}.\n  Lines: {lines}"
-    # Root pair (lib-owned) [ok]; consumer pair (bannerless source) [foreign] — INCLUDING the
-    # paired CLAUDE.md line, so `public doctor` exits 0 for a hand-authored consumer repo.
-    assert status["root:AGENTS.md"] == "[ok]", lines
-    assert status["root:CLAUDE.md"] == "[ok]", lines
-    assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines
-    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines
+    assert len(lines2) == 4, (
+        f"Expected exactly 4 parity lines, got {len(lines2)}.\n  Lines: {lines2}"
+    )
+    assert status["root:AGENTS.md"] == "[ok]", lines2
+    assert status["root:CLAUDE.md"] == "[ok]", lines2
+    assert status[f"repos/{slug}:AGENTS.md"] == "[foreign]", lines2
+    assert status[f"repos/{slug}:CLAUDE.md"] == "[foreign]", lines2
 
-
-# ---------------------------------------------------------------------------
-# Test 3 — drift detected for modified destination
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_detects_drift_on_modified_destination(tmp_path: Path) -> None:
-    """Doctor reports [drift] when a projected file diverges from the source."""
-    source = tmp_path / "data" / "AGENTS.md"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(_SOURCE_CONTENT)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    # Tamper with the workspace-root CLAUDE.md.
-    (workspace_root / "CLAUDE.md").write_bytes(b"# Tampered CLAUDE\n")
-
-    lines = _doctor_guardrail_pair(source, workspace_root)
-    label_map = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines if " " in ln}
-
+    # Drift detected on a tampered destination.
+    drift_root = tmp_path / "drift-case"
+    drift_root.mkdir()
+    drift_source = drift_root / "data" / "AGENTS.md"
+    drift_source.parent.mkdir(parents=True)
+    drift_source.write_bytes(_SOURCE_CONTENT)
+    drift_ws = drift_root / "workspace"
+    drift_ws.mkdir()
+    _install_workspace_guardrail_pair(drift_source, drift_ws, force=True)
+    (drift_ws / "CLAUDE.md").write_bytes(b"# Tampered CLAUDE\n")
+    lines3 = _doctor_guardrail_pair(drift_source, drift_ws)
+    label_map = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines3 if " " in ln}
     assert label_map.get("root:CLAUDE.md") == "[drift]", (
-        f"Expected '[drift] root:CLAUDE.md'. Lines: {lines}"
+        f"Expected '[drift] root:CLAUDE.md'. Lines: {lines3}"
     )
     assert label_map.get("root:AGENTS.md") == "[ok]", (
-        f"Expected '[ok] root:AGENTS.md'. Lines: {lines}"
+        f"Expected '[ok] root:AGENTS.md'. Lines: {lines3}"
     )
 
-
-# ---------------------------------------------------------------------------
-# Test 4 — _runtime_expectations yields 4 tuples for data/AGENTS.md source
-# (full stage + install cycle via FileSystemPublicAssetManager)
-# ---------------------------------------------------------------------------
-
-
-def test_runtime_expectations_yields_guardrail_labels(tmp_path: Path) -> None:
-    """``_runtime_expectations`` yields ``root:AGENTS.md`` and ``root:CLAUDE.md``.
-
-    This is a smoke test verifying the labels are present in the manager's
-    doctor output after a stage + install cycle.
-
-    If no marker-bearing consumer repos exist in the workspace, only the
-    2 root labels are verified (minimum acceptable state per task acceptance).
-    """
+    # _runtime_expectations smoke test via a full stage+install cycle.
     public_dir = _make_minimal_public(tmp_path)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
+    smoke_ws = tmp_path / "smoke-workspace"
+    smoke_ws.mkdir()
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001
-
-    manager.stage(workspace_root)
-    manager.install(workspace_root, target="all", force=True)
-
-    doctor_lines = manager.doctor(workspace_root)
-
+    manager.stage(smoke_ws)
+    manager.install(smoke_ws, target="all", force=True)
+    doctor_lines = manager.doctor(smoke_ws)
     label_set = set(doctor_lines)
     assert any("root:AGENTS.md" in ln for ln in label_set), (
         f"Expected 'root:AGENTS.md' in doctor output.\n  Lines: {sorted(label_set)}"
@@ -241,21 +188,16 @@ def test_runtime_expectations_yields_guardrail_labels(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR9 wiring — the REAL manager.doctor() consumer fan-out is provenance-aware
-# (bug public-doctor-flags-hand-authored-consumer-agents-md; Ruling 16). PRIMARY proof that
-# the gate is on the executed `dadaia public doctor` path (not the dead `_doctor_guardrail_pair`).
+# Fn 2 — drift-detected + foreign-pair hand-authored + unregistered-consumer-excluded.
 # ---------------------------------------------------------------------------
 
 
-def test_manager_doctor_foreign_pair_for_hand_authored_consumer(tmp_path: Path) -> None:
+def test_doctor_foreign_pair_and_unregistered_consumer_excluded(tmp_path: Path) -> None:
     """The REAL ``manager.doctor()`` emits ``[foreign]`` on BOTH paired consumer lines for a
-    hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]`` — so
-    ``public doctor`` does not perpetually flag a repo-owned file.
-
-    RED-first (pre-fix): the consumer lines came from ``runtime_expectations`` (a raw
-    sha-compare + stub-check), so ``manager.doctor()`` emitted ``[drift] repos/game:AGENTS.md``
-    + ``[missing] repos/game:CLAUDE.md`` and ``public doctor`` EXITED 1.
-    """
+    hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]`` (Ruling
+    16; bug public-doctor-flags-hand-authored-consumer-agents-md); and a consumer repo NOT
+    registered in ``spec_contexts.json`` is absent from doctor labels entirely (registry-
+    based detection, v0.1.58 FR4, Ruling G)."""
     public_dir = _make_minimal_public(tmp_path)
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
@@ -283,34 +225,22 @@ def test_manager_doctor_foreign_pair_for_hand_authored_consumer(tmp_path: Path) 
         f"the consumer pair must be [foreign] only — no legacy [drift]/[missing].\n  {consumer_lines}"
     )
 
-
-# ---------------------------------------------------------------------------
-# Test 5 — consumer repos without marker are skipped silently
-# ---------------------------------------------------------------------------
-
-
-def test_unregistered_consumer_does_not_appear_in_doctor_labels(tmp_path: Path) -> None:
-    """A repo NOT registered in ``spec_contexts.json`` is absent from doctor
-    labels — registry-based detection (v0.1.58 FR4, Ruling G).
-    """
-    source = tmp_path / "data" / "AGENTS.md"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(_SOURCE_CONTENT)
-
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-
-    # Unregistered consumer: on disk but not in the registry.
-    no_marker = workspace_root / "repos" / "no-marker-repo"
+    # A repo NOT registered in spec_contexts.json is invisible to doctor.
+    unregistered_root = tmp_path / "unregistered-case"
+    unregistered_root.mkdir()
+    unregistered_source = unregistered_root / "data" / "AGENTS.md"
+    unregistered_source.parent.mkdir(parents=True)
+    unregistered_source.write_bytes(_SOURCE_CONTENT)
+    unregistered_ws = unregistered_root / "workspace"
+    unregistered_ws.mkdir()
+    no_marker = unregistered_ws / "repos" / "no-marker-repo"
     no_marker.mkdir(parents=True)
-
-    _install_workspace_guardrail_pair(source, workspace_root, force=True)
-
-    lines = _doctor_guardrail_pair(source, workspace_root)
-    labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
-
-    # Only root labels should be present; the no-marker repo is invisible.
-    assert "repos/no-marker-repo:AGENTS.md" not in labels, (
-        f"Marker-less consumer must not appear in doctor labels. Labels: {labels}"
+    _install_workspace_guardrail_pair(unregistered_source, unregistered_ws, force=True)
+    unreg_lines = _doctor_guardrail_pair(unregistered_source, unregistered_ws)
+    unreg_labels = {ln.split(" ", 1)[1] for ln in unreg_lines if " " in ln}
+    assert "repos/no-marker-repo:AGENTS.md" not in unreg_labels, (
+        f"Marker-less consumer must not appear in doctor labels. Labels: {unreg_labels}"
     )
-    assert len(lines) == 2, f"Expected exactly 2 lines (root pair only). Got {len(lines)}: {lines}"
+    assert len(unreg_lines) == 2, (
+        f"Expected exactly 2 lines (root pair only). Got {len(unreg_lines)}: {unreg_lines}"
+    )

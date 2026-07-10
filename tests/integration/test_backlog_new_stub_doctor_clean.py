@@ -43,9 +43,11 @@ def _schema_findings(findings: list) -> list:
     return [f for f in findings if f.code is BacklogDoctorCode.BL_SCHEMA]
 
 
-def test_fresh_backlog_new_stub_is_doctor_clean(tmp_path: Path) -> None:
+def test_fresh_stub_clean_then_flipped_to_candidate_fires_bl_schema(tmp_path: Path) -> None:
     """A fresh ``dadaia backlog new`` stub (status: idea, no intents, no catalog.json) is
-    ``backlog doctor``-clean: zero BL-SCHEMA errors."""
+    ``backlog doctor``-clean: zero BL-SCHEMA errors. AC-7(e): the SAME stub flipped to
+    ``status: candidate`` FIRES BL-SCHEMA (a candidate carrying no intents is not exempt)
+    — proving the gate is status-gated, not a blanket exemption."""
     specs = tmp_path / "specs"
     specs.mkdir()
     src = tmp_path / "src"
@@ -58,20 +60,9 @@ def test_fresh_backlog_new_stub_is_doctor_clean(tmp_path: Path) -> None:
     schema = _schema_findings(findings)
     assert schema == [], [f.to_dict() for f in schema]
 
-
-def test_fresh_stub_flipped_to_candidate_fires_bl_schema(tmp_path: Path) -> None:
-    """AC-7(e): the SAME fresh stub flipped to ``status: candidate`` FIRES BL-SCHEMA (a
-    candidate carrying no intents is not exempt) — proving the gate is status-gated, not a
-    blanket exemption."""
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    src = tmp_path / "src"
-    src.mkdir()
-
-    result = backlog_new(specs, "my-fresh-idea")
     text = result.path.read_text(encoding="utf-8")
     assert "status: idea" in text
     result.path.write_text(text.replace("status: idea", "status: candidate"), encoding="utf-8")
 
-    schema = _schema_findings(_run_doctor(specs, src))
-    assert schema, "a candidate with no intents[] must fire BL-SCHEMA (status-gate is not blanket)"
+    schema2 = _schema_findings(_run_doctor(specs, src))
+    assert schema2, "a candidate with no intents[] must fire BL-SCHEMA (status-gate is not blanket)"

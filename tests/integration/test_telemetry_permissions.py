@@ -1,22 +1,20 @@
-"""Integration tests for TelemetryService filesystem permission hardening (T-AM-20).
+"""Integration test for TelemetryService filesystem permission hardening (T-AM-20).
 
-Verifies that:
-  1. The state directory is created with mode 0o700 (owner rwx only).
-  2. The SQLite database file is created with mode 0o600 (owner rw only).
+Merged per plan-integration.md into one fn (posix-only): dir 0700 + db 0600 +
+idempotent-on-re-refresh (state_dir corrected from a permissive 0o755, and the SQLite
+file corrected back to 0o600 after external drift).
 
-Uses tmp_path to avoid touching the real ~/.dadaia/state/telemetry/ directory.
-All readers and the aggregator are replaced with in-process stubs so no real
-operator data is read and no network calls are made.
-
-Mode-bit assertions (T-018-08 / SE MINOR-1): mode-bit checks use
-``skipif sys.platform == 'win32'`` because ``os.chmod`` is a no-op on Windows.
+Uses tmp_path to avoid touching the real ~/.dadaia/state/telemetry/ directory. All
+readers and the aggregator are replaced with in-process stubs so no real operator data
+is read and no network calls are made. Mode-bit assertions are POSIX-only
+(``os.chmod`` is a no-op on Windows).
 """
 
 from __future__ import annotations
 
+import os
 import sys
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
 
 pytest.importorskip("fcntl")
@@ -28,10 +26,6 @@ from typing import Any  # noqa: E402
 
 from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Stubs — same pattern as tests/unit/features/telemetry/test_service.py
-# ---------------------------------------------------------------------------
 
 
 class _StubPricing:
@@ -48,12 +42,12 @@ class _StubPricing:
 
 class _StubClaudeReader:
     def read_session_file(self, path: Any, dao: Any, now_iso: str) -> None:
-        pass  # no-op
+        pass
 
 
 class _StubCodexReader:
     def read_sessions(self, path: Any, dao: Any, now_iso: str) -> None:
-        pass  # no-op
+        pass
 
 
 class _StubAggregator:
@@ -72,15 +66,8 @@ class _StubSCS:
         return []
 
 
-# ---------------------------------------------------------------------------
-# Helper to build a TelemetryService backed by a real on-disk SQLite DB
-# under tmp_path (so chmod effects are visible).
-# ---------------------------------------------------------------------------
-
-
 def _make_service_on_disk(
-    state_dir: pathlib.Path,
-    workspace_root: pathlib.Path,
+    state_dir: pathlib.Path, workspace_root: pathlib.Path
 ) -> TelemetryService:
     """Build a TelemetryService that writes its DB to ``state_dir``."""
     db_path = state_dir / "telemetry.sqlite"
@@ -98,84 +85,43 @@ def _make_service_on_disk(
         workspace_root=workspace_root,
         state_dir=state_dir,
         spec_context_service=_StubSCS(),
-        # Ensure we never block on uid=0 check in CI environments.
         _getuid_fn=lambda: 1000,
     )
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+@pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
+def test_state_dir_0700_db_0600_and_idempotent_on_drift(tmp_path: pathlib.Path) -> None:
+    """state_dir 0o700 (created + corrected from 0o755) + db 0o600 (idempotent on drift)."""
+    state_dir = tmp_path / "telemetry"
+    assert not state_dir.exists()
 
+    _make_service_on_disk(state_dir, tmp_path)
+    assert state_dir.exists(), "state_dir was not created"
+    mode = state_dir.stat().st_mode & 0o777
+    assert mode == 0o700, f"state_dir has mode 0o{mode:o} — expected 0o700."
 
-class TestTelemetryDirectoryPermissions:
-    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
-    def test_state_dir_created_with_0o700(self, tmp_path: pathlib.Path) -> None:
-        """After construction, state_dir mode must be 0o700 (owner rwx only)."""
-        state_dir = tmp_path / "telemetry"
-        assert not state_dir.exists()
+    # Pre-existing dir with permissive mode is corrected to 0o700 by the constructor.
+    other_state_dir = tmp_path / "telemetry-existing"
+    other_state_dir.mkdir(parents=True)
+    os.chmod(other_state_dir, 0o755)
+    _make_service_on_disk(other_state_dir, tmp_path)
+    mode = other_state_dir.stat().st_mode & 0o777
+    assert mode == 0o700, f"state_dir mode was not corrected — got 0o{mode:o}, expected 0o700."
 
-        _make_service_on_disk(state_dir, tmp_path)
+    # SQLite file created with 0o600 after refresh().
+    svc = _make_service_on_disk(state_dir, tmp_path)
+    svc.refresh()
+    db_path = state_dir / "telemetry.sqlite"
+    assert db_path.exists(), "telemetry.sqlite was not created after refresh()"
+    mode = db_path.stat().st_mode & 0o777
+    assert mode == 0o600, f"telemetry.sqlite has mode 0o{mode:o} — expected 0o600."
 
-        assert state_dir.exists(), "state_dir was not created"
-        mode = state_dir.stat().st_mode & 0o777
-        assert mode == 0o700, (
-            f"state_dir has mode 0o{mode:o} — expected 0o700. "
-            "Directory must be restricted to owning user only."
-        )
-
-    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
-    def test_state_dir_mode_after_existing_dir(self, tmp_path: pathlib.Path) -> None:
-        """If state_dir already exists with wrong perms, constructor fixes them to 0o700."""
-        state_dir = tmp_path / "telemetry"
-        # Pre-create with permissive mode.
-        state_dir.mkdir(parents=True)
-        import os
-
-        os.chmod(state_dir, 0o755)
-
-        _make_service_on_disk(state_dir, tmp_path)
-
-        mode = state_dir.stat().st_mode & 0o777
-        assert mode == 0o700, f"state_dir mode was not corrected — got 0o{mode:o}, expected 0o700."
-
-
-class TestTelemetrySQLitePermissions:
-    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
-    def test_sqlite_file_created_with_0o600(self, tmp_path: pathlib.Path) -> None:
-        """After refresh(), the SQLite DB file must have mode 0o600 (owner rw only)."""
-        state_dir = tmp_path / "telemetry"
-        svc = _make_service_on_disk(state_dir, tmp_path)
-
-        svc.refresh()
-
-        db_path = state_dir / "telemetry.sqlite"
-        assert db_path.exists(), "telemetry.sqlite was not created after refresh()"
-        mode = db_path.stat().st_mode & 0o777
-        assert mode == 0o600, (
-            f"telemetry.sqlite has mode 0o{mode:o} — expected 0o600. "
-            "Database file must be restricted to owning user only."
-        )
-
-    @pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
-    def test_sqlite_mode_idempotent_on_second_refresh(self, tmp_path: pathlib.Path) -> None:
-        """Calling refresh() twice keeps the SQLite file at 0o600."""
-        import os
-
-        state_dir = tmp_path / "telemetry"
-        svc = _make_service_on_disk(state_dir, tmp_path)
-
-        svc.refresh()
-        db_path = state_dir / "telemetry.sqlite"
-        # Simulate drift: another process relaxed the mode.
-        os.chmod(db_path, 0o644)
-
-        # Force another refresh cycle by resetting last_refresh.
-        svc._last_refresh = 0.0
-        svc.refresh()
-
-        mode = db_path.stat().st_mode & 0o777
-        assert mode == 0o600, (
-            f"telemetry.sqlite mode reverted to 0o{mode:o} — expected 0o600 "
-            "after second refresh corrected drift."
-        )
+    # Idempotent: external drift is corrected back to 0o600 on the next refresh.
+    os.chmod(db_path, 0o644)
+    svc._last_refresh = 0.0
+    svc.refresh()
+    mode = db_path.stat().st_mode & 0o777
+    assert mode == 0o600, (
+        f"telemetry.sqlite mode reverted to 0o{mode:o} — expected 0o600 "
+        "after second refresh corrected drift."
+    )

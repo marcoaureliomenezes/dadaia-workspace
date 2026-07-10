@@ -1,7 +1,27 @@
-"""Integration tests for public asset staging and runtime projections."""
+"""Integration tests for public asset staging and runtime projections.
+
+Merged per plan-integration.md (39 -> ~8):
+  - Keep: install-refuses-dadaia-workspace-source-root (safety), public-privacy gate
+    (flags identifiers + ignores bytecode, merged -> 1), CLI pi install+doctor-clean.
+  - Merge: stage (manifest + codex adapters) -> 1; install-all + pi projection block
+    (ring-1, tree, idempotent, system-note markers, doctor pi-ok) -> 1;
+    overwrite-stale/skip-canonical/force -> 1; codex projection (config omits/emits +
+    workflows dir + legacy overwrite + native-rules-only) -> 1; model-governance
+    overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
+    doctor rerender-drift/invalid-vs-missing) -> 2.
+  - Delete -> unit (already covered by tests/unit/infrastructure/test_public_assets_*.py,
+    T-2's per-concern split): ``_render_agent_toml_block`` quoting/escaping,
+    ``_parse_agent_frontmatter`` param cases, ``_render_codex_agent_toml`` field/tier
+    cases, command-policy prefix rules, ``_classify_workflows`` quadrants, and the
+    skill-frontmatter static-lint fn (moved to unit/features/public).
+
+Privacy gate is CRITICAL (public-boundary). Renderer fns keep coverage as unit tests —
+no fs/subprocess needed there.
+"""
+
+from __future__ import annotations
 
 import json
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -12,10 +32,6 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _PRIVACY_DENYLIST_ENV,
     FileSystemPublicAssetManager,
-    _parse_agent_frontmatter,
-    _render_agent_toml_block,
-    _render_codex_agent_toml,
-    _render_codex_command_policy_rules,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -23,7 +39,12 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 _runner = CliRunner()
 
 
-def test_stage_creates_agentic_manifest(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# stage() — manifest + codex runtime adapters
+# ---------------------------------------------------------------------------
+
+
+def test_stage_creates_manifest_and_copies_codex_runtime_adapters(tmp_path: Path) -> None:
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
 
@@ -35,23 +56,19 @@ def test_stage_creates_agentic_manifest(tmp_path: Path) -> None:
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
 
-
-def test_stage_copies_codex_runtime_adapters(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-
-    manager.stage(workspace)
-
     assert (
         workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "design-ctx" / "SKILL.md"
     ).exists()
-    manifest = json.loads(
-        (workspace / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
-    )
     assert any(asset["path"] == "runtime/codex/design-ctx/SKILL.md" for asset in manifest["assets"])
 
 
-def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# install(target="all") + pi projection block (Ring-1, tree, idempotent, system-note,
+# doctor pi-ok)
+# ---------------------------------------------------------------------------
+
+
+def test_install_all_and_pi_projection_block(tmp_path: Path) -> None:
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
 
@@ -74,78 +91,63 @@ def test_install_all_projects_runtime_assets(tmp_path: Path) -> None:
     assert (workspace / ".pi" / "SYSTEM.md").exists()
     assert (workspace / ".pi" / "settings.json").exists()
 
+    # T-PIO-04: doctor emits [ok] pi: lines after a clean install.
+    reports = manager.doctor(workspace)
+    pi_lines = [r for r in reports if "pi:" in r]
+    assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
+    assert any("[ok] pi:settings.json" in r for r in reports), reports
+    assert all(r.startswith("[ok]") for r in pi_lines), pi_lines
 
-def test_install_target_pi_projects_ring1_sdd_gate_extension(tmp_path: Path) -> None:
-    """WS-PI-4: `--target pi` projects the Layer-1 Ring-1 SDD-gate extension, settings.json
-    lists it, and the extension body carries its invariants (tool_call → pre_gate; the
-    write→Write/edit→Edit mapping; fail-open; venv resolution; the block-envelope check) —
-    AND, as a post-trust executable asset, carries NO operator-local path or secret."""
-    workspace = tmp_path / "ws"
-    FileSystemPublicAssetManager().install(workspace, target="pi")
+    # WS-PI-4: --target pi (isolated) projects the Layer-1 Ring-1 SDD-gate extension;
+    # settings.json lists it, the body carries its invariants, and — as a post-trust
+    # executable asset — carries NO operator-local path or secret.
+    pi_ws = tmp_path / "pi-only"
+    FileSystemPublicAssetManager().install(pi_ws, target="pi")
 
-    ext = workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts"
+    ext = pi_ws / ".pi" / "extensions" / "dadaia-sdd-gate.ts"
     assert ext.exists()
     body = ext.read_text(encoding="utf-8")
-    # Delegates to the single Python gate — never re-derives policy in TS.
     assert "dadaia_workspace.hooks.pre_gate" in body
     assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
-    # Maps PI's lowercase tool names to the gate's canonical WRITE_TOOLS vocabulary.
     assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
-    # Blocks only on the explicit decision envelope; fail-open otherwise.
     assert '"decision":"block"' in body or "decision" in body
     assert "block: true" in body
-    # venv resolution (no bash dependency).
     assert ".venv" in body and "python" in body
-    # Post-trust executable surface: no operator-local path / no secret leakage.
     assert "/home/" not in body and "/Users/" not in body
     for secret_token in ("ANTHROPIC_API_KEY", "TOKEN=", "SECRET", "password"):
         assert secret_token not in body
 
-    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    settings = json.loads((pi_ws / ".pi" / "settings.json").read_text(encoding="utf-8"))
     assert any("dadaia-sdd-gate" in entry for entry in settings.get("extensions", [])), settings
 
-
-def test_install_target_pi_projects_pi_tree(tmp_path: Path) -> None:
-    """T-PIO-03: `dadaia public install --target pi` projects `public/pi/` -> `.pi/`."""
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-
-    manager.install(workspace, target="pi")
-
-    assert (workspace / ".pi" / "SYSTEM.md").exists()
-    assert (workspace / ".pi" / "settings.json").exists()
-    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
-    assert (workspace / ".pi" / "extensions" / "dadaia-sdd-gate.ts").exists()
-    # settings.json is valid JSON, generic-only.
-    settings = json.loads((workspace / ".pi" / "settings.json").read_text(encoding="utf-8"))
+    # T-PIO-03: public/pi/ -> .pi/ tree.
+    assert (pi_ws / ".pi" / "prompts" / "dadaia-context.md").exists()
     assert isinstance(settings, dict)
 
-
-def test_install_target_pi_is_idempotent(tmp_path: Path) -> None:
-    """T-PIO-03/T-PIO-07: re-install of `--target pi` skips already-canonical files.
-
-    Live `--target pi` projection smoke in an ISOLATED temp workspace (never the repo
-    root / live workspace): produce `.pi/`, re-install (idempotent, no drift), and prove
-    `public doctor` reports `[ok] pi:` lines with no pi drift/missing. (The global
-    `public-privacy` check scans the source `public/` tree, not a bare temp workspace, so
-    it is asserted by the source-repo `dadaia public doctor` gate, not here.)
-    """
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-
-    manager.install(workspace, target="pi")
-    second = manager.install(workspace, target="pi")
-
-    # The .pi files must report [skip] on the second pass (hash-compare no-op).
-    pi_results = [line for line in second if str(workspace / ".pi") in line]
+    # T-PIO-03/07: re-install is idempotent (hash-compare skip); doctor stays clean.
+    second = FileSystemPublicAssetManager().install(pi_ws, target="pi")
+    pi_results = [line for line in second if str(pi_ws / ".pi") in line]
     assert pi_results, "expected .pi/ projection lines on re-install"
     assert all("[skip]" in line for line in pi_results), pi_results
 
-    reports = manager.doctor(workspace)
-    pi_lines = [r for r in reports if "pi:" in r]
-    assert pi_lines and all(r.startswith("[ok]") for r in pi_lines), pi_lines
-    drift = [r for r in reports if r.startswith(("[drift]", "[missing]")) and "pi" in r]
+    reports2 = FileSystemPublicAssetManager().doctor(pi_ws)
+    pi_lines2 = [r for r in reports2 if "pi:" in r]
+    assert pi_lines2 and all(r.startswith("[ok]") for r in pi_lines2), pi_lines2
+    drift = [r for r in reports2 if r.startswith(("[drift]", "[missing]")) and "pi" in r]
     assert not drift, drift
+
+    # Layer-1 governance content in the projected .pi/SYSTEM.md + context prompt.
+    system_note = (pi_ws / ".pi" / "SYSTEM.md").read_text(encoding="utf-8")
+    context_prompt = (pi_ws / ".pi" / "prompts" / "dadaia-context.md").read_text(encoding="utf-8")
+    assert "AGENTS.md" in system_note
+    assert "dadaia" in system_note
+    assert "SDD" in system_note
+    assert "Layer-1" in system_note
+    assert "post-trust" in system_note
+    assert "this note carries none" in system_note
+    assert "/home/" not in system_note
+    assert "/home/" not in context_prompt
+    assert "dadaia" in context_prompt
 
 
 def test_cli_install_target_pi_projects_and_doctor_clean(
@@ -160,8 +162,6 @@ def test_cli_install_target_pi_projects_and_doctor_clean(
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
     workspace = tmp_path / "ws"
-    # Initialize a real workspace root the CLI resolver can find (conftest backstops
-    # real venv creation). This is the state `dadaia init` leaves behind.
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
@@ -180,47 +180,9 @@ def test_cli_install_target_pi_projects_and_doctor_clean(
     assert "pi:" in doctor.output
 
 
-def test_install_target_pi_system_note_carries_governance_markers(tmp_path: Path) -> None:
-    """Layer-1 governance content: the projected `.pi/SYSTEM.md` must bind PI to the
-    workspace law (AGENTS.md), name the `dadaia` CLI operational surface and SDD
-    discipline, and declare the post-trust executable boundary — AND honestly carry NO
-    restated law and no operator-local absolute paths (the honesty property the audit
-    requires)."""
-    workspace = tmp_path / "ws"
-    FileSystemPublicAssetManager().install(workspace, target="pi")
-
-    system_note = (workspace / ".pi" / "SYSTEM.md").read_text(encoding="utf-8")
-    context_prompt = (workspace / ".pi" / "prompts" / "dadaia-context.md").read_text(
-        encoding="utf-8"
-    )
-
-    # Binds to the law and the operational surface.
-    assert "AGENTS.md" in system_note
-    assert "dadaia" in system_note
-    assert "SDD" in system_note
-    assert "Layer-1" in system_note
-    # Declares the post-trust executable trust boundary.
-    assert "post-trust" in system_note
-    # Honesty: the note must NOT restate the law (it defers to AGENTS.md).
-    assert "this note carries none" in system_note
-    # No operator-local absolute paths leaked into the post-trust executable surface.
-    assert "/home/" not in system_note
-    assert "/home/" not in context_prompt
-    assert "dadaia" in context_prompt
-
-
-def test_doctor_emits_pi_ok_lines(tmp_path: Path) -> None:
-    """T-PIO-04: `dadaia public doctor` emits `[ok] pi:` lines after a clean install."""
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(workspace, target="all", force=True)
-
-    reports = manager.doctor(workspace)
-
-    pi_lines = [r for r in reports if "pi:" in r]
-    assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
-    assert any("[ok] pi:settings.json" in r for r in reports), reports
-    assert all(r.startswith("[ok]") for r in pi_lines), pi_lines
+# ---------------------------------------------------------------------------
+# Safety — never touch the dadaia-workspace source root itself.
+# ---------------------------------------------------------------------------
 
 
 def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
@@ -241,100 +203,62 @@ def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
     assert not (workspace / ".codex").exists()
 
 
-def test_problematic_skill_files_have_frontmatter() -> None:
-    """Skill files that require YAML frontmatter must start with --- and define name+description.
-
-    The set of checked skills is scoped to files that actually exist in the current
-    public/ surface (agent-surface-reduction removed frontend/design skills).
-    """
-    public_dir = FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
-    # Only skills that survived the agent-surface-reduction (v0.2.0) are checked.
-    # frontend/design skills (ux-ui-review, design-report-quality-gate, etc.) were
-    # removed from the core install; codex runtime adapters (design-ctx, frontend-ctx)
-    # remain but are checked via test_stage_copies_codex_runtime_adapters.
-    candidate_paths = [
-        public_dir / "runtime" / "codex" / "design-ctx" / "SKILL.md",
-        public_dir / "runtime" / "codex" / "frontend-ctx" / "SKILL.md",
-    ]
-    skill_paths = [p for p in candidate_paths if p.exists()]
-
-    for skill_path in skill_paths:
-        text = skill_path.read_text(encoding="utf-8")
-        assert text.startswith("---\n"), f"{skill_path} must start with YAML frontmatter"
-        assert "\n---\n" in text[4:], f"{skill_path} must close YAML frontmatter"
-        frontmatter = text.split("\n---\n", 1)[0]
-        assert "\nname: " in frontmatter
-        assert "\ndescription: " in frontmatter
+# ---------------------------------------------------------------------------
+# overwrite-stale/skip-canonical/force
+# ---------------------------------------------------------------------------
 
 
-def test_install_overwrites_stale_file_without_force(tmp_path: Path) -> None:
-    """T-PROP-01: install without --force overwrites stale projected files (hash-compare).
-
-    The OLD behavior preserved any existing file when force=False. The NEW behavior
-    compares SHA256: if staged != projected, the file is overwritten even without --force.
-    A 'custom\\n' placeholder has a different hash from the canonical staged AGENTS.md,
-    so it must be overwritten with the canonical content.
-    """
+def test_install_overwrite_skip_force_and_doctor_drift_tracking(tmp_path: Path) -> None:
+    """T-PROP-01: hash-compare governs overwrite-without-force / skip-when-canonical /
+    force; doctor tracks the dadaia-scoped AGENTS.md files for drift."""
     workspace = tmp_path / "ws"
     agents_md = workspace / "AGENTS.md"
     agents_md.parent.mkdir(parents=True, exist_ok=True)
     agents_md.write_text("custom\n", encoding="utf-8")
 
-    FileSystemPublicAssetManager().install(workspace, target="all")
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="all")
 
     content = agents_md.read_text(encoding="utf-8")
-    # Hash mismatch → overwritten with canonical AGENTS.md content.
     assert content != "custom\n", "Expected stale AGENTS.md to be overwritten"
     assert "AI agent" in content or "dadaia" in content.lower()
-
-
-def test_install_skips_file_when_already_canonical(tmp_path: Path) -> None:
-    """T-PROP-01: install without --force is a no-op when projected hash == staged hash."""
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    # First install: writes canonical content.
-    manager.install(workspace, target="all")
-    agents_md = workspace / "AGENTS.md"
-    canonical_content = agents_md.read_text(encoding="utf-8")
+    canonical_content = content
     mtime_before = agents_md.stat().st_mtime
 
-    # Second install: same hash → skip.
+    # Second install: same hash -> skip (no-op).
     manager.install(workspace, target="all")
-
     assert agents_md.read_text(encoding="utf-8") == canonical_content
     assert agents_md.stat().st_mtime == mtime_before
 
+    # force=True overwrites even when a stale placeholder is reintroduced.
+    force_ws = tmp_path / "force-ws"
+    force_agents = force_ws / "AGENTS.md"
+    force_agents.parent.mkdir(parents=True, exist_ok=True)
+    force_agents.write_text("custom\n", encoding="utf-8")
+    FileSystemPublicAssetManager().install(force_ws, target="all", force=True)
+    force_content = force_agents.read_text(encoding="utf-8")
+    assert force_content != "custom\n"
+    assert "# dadaia-workspace" in force_content
 
-def test_install_overwrites_existing_files_with_force(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    agents_md = workspace / "AGENTS.md"
-    agents_md.parent.mkdir(parents=True, exist_ok=True)
-    agents_md.write_text("custom\n", encoding="utf-8")
+    # doctor tracks .dadaia-scoped AGENTS.md files for drift.
+    drift_ws = tmp_path / "drift-ws"
+    drift_manager = FileSystemPublicAssetManager()
+    drift_manager.stage(drift_ws)
+    drift_manager.install(drift_ws, target="all", force=True)
 
-    FileSystemPublicAssetManager().install(workspace, target="all", force=True)
-
-    content = agents_md.read_text(encoding="utf-8")
-    assert content != "custom\n"  # force overwrote the placeholder
-    assert "# dadaia-workspace" in content  # canonical content is present
-
-
-def test_doctor_tracks_dadaia_scoped_agents_files(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-
-    manager.stage(workspace)
-    manager.install(workspace, target="all", force=True)
-
-    clean_report = manager.doctor(workspace)
+    clean_report = drift_manager.doctor(drift_ws)
     assert "[ok] dadaia:AGENTS.md" in clean_report
     assert "[ok] dadaia:tmp/AGENTS.md" in clean_report
     assert "[ok] dadaia:states/AGENTS.md" in clean_report
 
-    (workspace / ".dadaia" / "states" / "AGENTS.md").write_text("drift\n", encoding="utf-8")
-    drift_report = manager.doctor(workspace)
-
+    (drift_ws / ".dadaia" / "states" / "AGENTS.md").write_text("drift\n", encoding="utf-8")
+    drift_report = drift_manager.doctor(drift_ws)
     assert "[drift] dadaia:states/AGENTS.md" in drift_report
 
+
+# ---------------------------------------------------------------------------
+# Public-privacy gate (CRITICAL — public-boundary)
+# ---------------------------------------------------------------------------
 
 _PRIVACY_TEST_TERM = "10.99.99.99"
 
@@ -346,7 +270,7 @@ def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
 
 
-def test_public_privacy_gate_flags_private_identifiers(
+def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _seed_denylist_env(monkeypatch, tmp_path)
@@ -366,294 +290,24 @@ def test_public_privacy_gate_flags_private_identifiers(
     assert any(line.startswith("[error] public-privacy:") for line in report)
     assert any(_PRIVACY_TEST_TERM in line.lower() for line in report)
 
-
-def test_public_privacy_gate_ignores_bytecode_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _seed_denylist_env(monkeypatch, tmp_path)
-    repo_root = tmp_path / "repo"
-    public_dir = repo_root / "dadaia_workspace" / "public"
-    cache_dir = public_dir / "skills" / "sample" / "__pycache__"
+    # A denylisted term inside a __pycache__/*.pyc is ignored (bytecode is not scanned).
+    clean_repo_root = tmp_path / "repo-clean"
+    clean_public_dir = clean_repo_root / "dadaia_workspace" / "public"
+    cache_dir = clean_public_dir / "skills" / "sample" / "__pycache__"
     cache_dir.mkdir(parents=True)
     (cache_dir / "leak.pyc").write_bytes(_PRIVACY_TEST_TERM.encode())
-    (public_dir / "data").mkdir()
-    (public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
+    (clean_public_dir / "data").mkdir()
+    (clean_public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
 
-    manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
-
-    assert manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
-
-
-_CLASSIFY_WORKFLOWS_CASES = [
-    {
-        "id": "codex_linear",
-        "content": "# linear workflow\nstep: do_something\n",
-        "expected_in": [
-            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)",
-            "[ok] claude:workflows/sample.workflow.md",
-        ],
-        "expected_not_in": ["[partial] claude:workflows/sample.workflow.md"],
-    },
-    {
-        "id": "codex_parallel",
-        "content": "# parallel workflow\nparallel_group: batch_a\nstep: do_something\n",
-        "expected_in": [
-            "[reference-only] codex:workflows/sample.workflow.md (installed, no workflow executor)",
-            "[ok] claude:workflows/sample.workflow.md",
-        ],
-        "expected_not_in": ["[partial] claude:workflows/sample.workflow.md"],
-    },
-]
-
-
-@pytest.mark.parametrize(
-    "case", _CLASSIFY_WORKFLOWS_CASES, ids=[str(c["id"]) for c in _CLASSIFY_WORKFLOWS_CASES]
-)
-def test_classify_workflows_quadrants(tmp_path: Path, case: dict) -> None:  # type: ignore[type-arg]
-    agentic_dir = tmp_path / "agentic"
-    workflows_dir = agentic_dir / "workflows"
-    workflows_dir.mkdir(parents=True)
-    (workflows_dir / "sample.workflow.md").write_text(case["content"], encoding="utf-8")
-
-    result = FileSystemPublicAssetManager()._classify_workflows(agentic_dir)  # noqa: SLF001
-
-    for expected in case["expected_in"]:
-        assert expected in result, f"Expected {expected!r} in result; got {result}"
-    for not_expected in case["expected_not_in"]:
-        assert not_expected not in result, (
-            f"Did not expect {not_expected!r} in result; got {result}"
-        )
+    clean_manager = FileSystemPublicAssetManager()
+    clean_manager._public_dir = clean_public_dir  # noqa: SLF001
+    assert clean_manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
-# T-MPP-2.9 — T-PB-1 happy-path unit tests (#1..#6)
+# Codex projection: config omits inert keys / still emits agent blocks; workflows dir
+# projection + legacy overwrite; native .rules only (no markdown protocol copy).
 # ---------------------------------------------------------------------------
-
-_PARSE_FM_SIMPLE_CASES = [
-    {
-        "id": "name_and_model",
-        "text": "---\nname: my-agent\nmodel: claude-3\n---\n# body\n",
-        "expected": {"name": "my-agent", "model": "claude-3"},
-    },
-    {
-        "id": "description_scalar",
-        "text": "---\nname: helper\ndescription: Does stuff\n---\n",
-        "expected": {"name": "helper", "description": "Does stuff"},
-    },
-]
-
-
-@pytest.mark.parametrize(
-    "case", _PARSE_FM_SIMPLE_CASES, ids=[c["id"] for c in _PARSE_FM_SIMPLE_CASES]
-)
-def test_parse_agent_frontmatter_extracts_whitelisted_fields(case: dict) -> None:  # type: ignore[type-arg]
-    """T-PB-1 #1 — basic key:value parsing."""
-    result = _parse_agent_frontmatter(case["text"])
-    for key, val in case["expected"].items():
-        assert result[key] == val, f"Key {key!r}: expected {val!r}, got {result.get(key)!r}"
-
-
-def test_render_agent_toml_block_quotes_hyphenated_name() -> None:
-    """T-PB-1 #2 — hyphenated name is double-quoted in TOML header."""
-    fm: dict[str, object] = {"name": "software-engineer", "model": "claude-sonnet-4-6"}
-    result = _render_agent_toml_block("software-engineer", fm)
-    assert result.startswith('[agents."software-engineer"]\n'), (
-        f"Expected quoted header, got: {result!r}"
-    )
-
-
-def test_render_agent_toml_block_emits_triple_quoted_description() -> None:
-    """T-PB-1 #3 — multi-line description (folded YAML >) → TOML triple-quoted string."""
-    description = "Implements tasks for Python services\nand Node.js tooling."
-    fm: dict[str, object] = {"name": "dev", "description": description}
-    result = _render_agent_toml_block("dev", fm)
-    # Multi-line value must be wrapped in triple-quotes
-    assert '"""' in result, f"Expected triple-quoted description in: {result!r}"
-    assert description.split("\n")[0] in result
-
-
-def test_render_agent_toml_block_drops_unknown_fields() -> None:
-    """T-PB-1 #4 — fields outside _TOML_SAFE_AGENT_FIELDS are dropped."""
-    fm: dict[str, object] = {
-        "name": "dev",
-        "model": "claude-3",
-        "skills": ["dadaia-handoff-emitter"],  # unknown field — must be dropped
-        "color": "yellow",  # unknown field — must be dropped
-    }
-    result = _render_agent_toml_block("dev", fm)
-    assert "skills" not in result
-    assert "color" not in result
-    assert "claude-3" in result  # whitelisted field present
-
-
-def test_render_agent_toml_block_drops_missing_name() -> None:
-    """T-PB-1 #5 — _parse_agent_frontmatter returns {} when name is absent."""
-    text = "---\nmodel: claude-3\ndescription: No name here\n---\n"
-    result = _parse_agent_frontmatter(text)
-    assert result == {}, f"Expected empty dict when name missing, got: {result!r}"
-
-
-def test_render_agent_toml_block_emits_tools_array_literal() -> None:
-    """T-PB-1 #6 — tools list → TOML array of quoted strings."""
-    fm: dict[str, object] = {"name": "dev", "tools": ["Read", "Edit", "Bash"]}
-    result = _render_agent_toml_block("dev", fm)
-    assert 'tools = ["Read", "Edit", "Bash"]' in result, f"Expected tools array in: {result!r}"
-
-
-def test_render_codex_agent_toml_emits_description() -> None:
-    # T-013-12: model_reasoning_effort is now derived from the agent's registry
-    # tier via its claude_model (ai-engineer -> claude-fable-5 -> deep -> high),
-    # not from a per-agent name list.
-    result = _render_codex_agent_toml(
-        "ai-engineer",
-        "gpt-5.5",
-        "Follow the Codex persona.",
-        description="AI entity authoring agent.",
-        claude_model="claude-fable-5",
-    )
-
-    parsed = tomllib.loads(result)
-    assert parsed["name"] == "ai-engineer"
-    assert parsed["description"] == "AI entity authoring agent."
-    assert parsed["model"] == "gpt-5.5"
-    assert parsed["sandbox_mode"] == "workspace-write"
-    assert parsed["model_reasoning_effort"] == "high"
-    assert parsed["developer_instructions"].strip() == "Follow the Codex persona."
-
-
-def test_render_codex_agent_toml_emits_read_only_boundary_for_reviewers() -> None:
-    for name in ("qa-engineer", "code-reviewer", "security-reviewer", "project-auditor"):
-        result = _render_codex_agent_toml(
-            name,
-            "gpt-5.3-codex",
-            "Review without production edits.",
-        )
-
-        parsed = tomllib.loads(result)
-        assert parsed["sandbox_mode"] == "read-only"
-        assert parsed["model_reasoning_effort"] == "medium"
-        assert "provider" not in parsed
-        assert "api_key" not in parsed
-        assert "telemetry" not in parsed
-
-
-def test_render_codex_command_policy_uses_documented_prefix_rules() -> None:
-    result = _render_codex_command_policy_rules()
-
-    assert "prefix_rule(" in result
-    assert "command_allowed(" not in result
-    assert 'decision = "prompt"' in result
-    assert 'pattern = ["git", "push"]' in result
-
-
-# ---------------------------------------------------------------------------
-# T-MPP-2.10 — T-PB-1 adversarial unit tests (#7, #8)
-# ---------------------------------------------------------------------------
-
-
-def test_render_agent_toml_block_escapes_quote_in_name() -> None:
-    """T-PB-1 #7 — adversarial: names with double-quote escape correctly; ] raises.
-
-    Defensive coding floor: even though agent names are lib-controlled (Q1), the
-    escape path must round-trip correctly for names containing special characters.
-    """
-    # Part A: name containing double-quote — must escape and round-trip
-    name_with_quote = 'my"agent'
-    fm: dict[str, object] = {"name": name_with_quote, "description": "x"}
-    rendered = _render_agent_toml_block(name_with_quote, fm)
-    parsed = tomllib.loads(rendered)
-    extracted_name = next(iter(parsed["agents"]))
-    assert extracted_name == name_with_quote, (
-        f"Round-trip name mismatch: expected {name_with_quote!r}, got {extracted_name!r}"
-    )
-
-    # Part B: name containing ] must raise ValueError
-    with pytest.raises(ValueError, match=r"\]"):
-        _render_agent_toml_block("bad]name", {"name": "bad]name"})
-
-    # Part C: name containing newline must raise ValueError
-    with pytest.raises(ValueError, match="newline"):
-        _render_agent_toml_block("bad\nname", {"name": "bad\nname"})
-
-
-def test_render_agent_toml_block_escapes_triple_quote_in_description() -> None:
-    """T-PB-1 #8 — adversarial: triple-quote in description must round-trip.
-
-    _toml_escape() uses triple-quoted TOML strings for multi-line values.
-    An embedded triple-quote must be escaped so the round-trip preserves
-    the original description bytes.
-    """
-    description_with_triple_quote = 'first line\nsecond with """embedded""" quotes\nthird'
-    fm: dict[str, object] = {"name": "agent-x", "description": description_with_triple_quote}
-    rendered = _render_agent_toml_block("agent-x", fm)
-    parsed = tomllib.loads(rendered)
-    extracted_description = parsed["agents"]["agent-x"]["description"]
-    assert extracted_description == description_with_triple_quote, (
-        f"Round-trip description mismatch:\n"
-        f"  expected: {description_with_triple_quote!r}\n"
-        f"  got:      {extracted_description!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# W1-2 — the inert `approved_commands` array and `[skills] paths` table are no longer
-# emitted (both live-verified invalid/inert in codex-cli). The generated config carries
-# only the header plus one [agents."<name>"] config_file block per canonical agent.
-# ---------------------------------------------------------------------------
-
-# A non-existent path so _render_agents_config_file_blocks returns "" (no agent blocks) —
-# the header-only config must still be valid and carry neither inert key.
-_NONEXISTENT_AGENTIC_DIR = Path("/nonexistent/agentic")
-
-# The real public/ dir so that [agents.*] blocks ARE present.
-# FileSystemPublicAssetManager._public_dir points to dadaia_workspace/public/.
-_REAL_AGENTIC_DIR = FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
-
-
-@pytest.mark.parametrize(
-    "agentic_dir",
-    [_NONEXISTENT_AGENTIC_DIR, _REAL_AGENTIC_DIR],
-    ids=["no_agents", "with_agents"],
-)
-def test_codex_config_omits_inert_skills_and_approved_commands(agentic_dir: Path) -> None:
-    """W1-2 — _codex_config() emits neither the `[skills]` table nor `approved_commands`."""
-    manager = FileSystemPublicAssetManager()
-    output = manager._codex_config(agentic_dir)  # noqa: SLF001
-    assert "[skills]" not in output, f"Expected no '[skills]' section; got:\n{output}"
-    assert "approved_commands" not in output, (
-        f"Expected no 'approved_commands' array; got:\n{output}"
-    )
-
-
-def test_codex_config_still_emits_agent_blocks() -> None:
-    """W1-2 — the [agents.*] config_file blocks are still rendered from the real public dir."""
-    manager = FileSystemPublicAssetManager()
-    output = manager._codex_config(_REAL_AGENTIC_DIR)  # noqa: SLF001
-    assert "[agents." in output, "Expected at least one [agents.*] block in output"
-    assert output.startswith('# Generated by "dadaia public install --target codex".')
-
-
-# ---------------------------------------------------------------------------
-# T-MPP-3.4 — T-PB-2 base unit tests (#1, #2)
-# ---------------------------------------------------------------------------
-
-
-def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
-    """Return a manager pointed at a minimal public dir and a workspace root.
-
-    The public/ dir has only what _install_codex() strictly requires: a rules/
-    subdir and an agents/ subdir (both may be empty).
-    """
-    public_dir = tmp_path / "public"
-    (public_dir / "rules").mkdir(parents=True)
-    (public_dir / "agents").mkdir(parents=True)
-    workspace_root = tmp_path / "ws"
-    workspace_root.mkdir()
-    manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
-    return manager, workspace_root
-
 
 _MINIMAL_WORKFLOW_CROSS_CUTTING = """\
 ---
@@ -686,77 +340,86 @@ stages:
 """
 
 
-def test_install_codex_projects_workflows_dir(tmp_path: Path) -> None:
-    """T-16 — _install_codex() projects canonical workflows to .codex/workflows/.
+def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
+    """Return a manager pointed at a minimal public dir and a workspace root.
 
-    FR9/ADR-4: the old behavior of removing .codex/workflows/ is replaced by
-    projecting the canonical workflows from the agentic directory.
+    The public/ dir has only what _install_codex() strictly requires: a rules/
+    subdir and an agents/ subdir (both may be empty).
     """
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "rules").mkdir(parents=True)
+    (public_dir / "agents").mkdir(parents=True)
+    workspace_root = tmp_path / "ws"
+    workspace_root.mkdir()
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir  # noqa: SLF001
+    return manager, workspace_root
 
-    # Add a canonical workflow to the public/workflows dir (must be schema-valid)
+
+def test_codex_projection_config_workflows_and_native_rules(tmp_path: Path) -> None:
+    # W1-2 — _codex_config() emits neither the [skills] table nor approved_commands,
+    # for both a no-agents and a real-agents source dir; the real dir still emits
+    # [agents.*] blocks.
+    manager_probe = FileSystemPublicAssetManager()
+    real_agentic_dir = manager_probe._public_dir  # noqa: SLF001
+    for agentic_dir in (Path("/nonexistent/agentic"), real_agentic_dir):
+        output = manager_probe._codex_config(agentic_dir)  # noqa: SLF001
+        assert "[skills]" not in output, f"Expected no '[skills]' section; got:\n{output}"
+        assert "approved_commands" not in output, (
+            f"Expected no 'approved_commands' array; got:\n{output}"
+        )
+
+    real_output = manager_probe._codex_config(real_agentic_dir)  # noqa: SLF001
+    assert "[agents." in real_output, "Expected at least one [agents.*] block in output"
+    assert real_output.startswith('# Generated by "dadaia public install --target codex".')
+
+    # T-16 (FR9/ADR-4): canonical workflows are projected to .codex/workflows/.
+    manager, workspace_root = _make_codex_install_manager(tmp_path)
     public_dir = manager._public_dir  # noqa: SLF001
     workflows_src = public_dir / "workflows"
     workflows_src.mkdir(parents=True)
     (workflows_src / "cross-cutting-feature.workflow.md").write_text(
         _MINIMAL_WORKFLOW_CROSS_CUTTING, encoding="utf-8"
     )
-
     manager.install(workspace_root, target="codex", force=True)
-
     workflows_dir = workspace_root / ".codex" / "workflows"
     assert workflows_dir.exists(), ".codex/workflows/ should exist after install"
     assert (workflows_dir / "cross-cutting-feature.workflow.md").exists(), (
         "Canonical workflow should be projected to .codex/workflows/"
     )
 
-
-def test_install_codex_overwrites_legacy_workflow_file(tmp_path: Path) -> None:
-    """T-16 addendum — a pre-existing workflow file is overwritten by the canonical source."""
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
-
-    # Pre-create a legacy workflows dir with stale content
-    workflows_dir = workspace_root / ".codex" / "workflows"
-    workflows_dir.mkdir(parents=True)
-    (workflows_dir / "hotfix-release.workflow.md").write_text("stale content\n", encoding="utf-8")
-
-    # Add the canonical workflow (must be schema-valid)
-    public_dir = manager._public_dir  # noqa: SLF001
-    workflows_src = public_dir / "workflows"
-    workflows_src.mkdir(parents=True)
-    (workflows_src / "hotfix-release.workflow.md").write_text(
+    # T-16 addendum — a pre-existing (legacy) workflow file is overwritten by the
+    # canonical source.
+    legacy_manager, legacy_ws = _make_codex_install_manager(tmp_path / "legacy-case")
+    legacy_workflows_dir = legacy_ws / ".codex" / "workflows"
+    legacy_workflows_dir.mkdir(parents=True)
+    (legacy_workflows_dir / "hotfix-release.workflow.md").write_text(
+        "stale content\n", encoding="utf-8"
+    )
+    legacy_public_dir = legacy_manager._public_dir  # noqa: SLF001
+    legacy_workflows_src = legacy_public_dir / "workflows"
+    legacy_workflows_src.mkdir(parents=True)
+    (legacy_workflows_src / "hotfix-release.workflow.md").write_text(
         _MINIMAL_WORKFLOW_HOTFIX, encoding="utf-8"
     )
-
-    manager.install(workspace_root, target="codex", force=True)
-
-    # The canonical workflow content was projected (force=True overwrites)
-    assert (workflows_dir / "hotfix-release.workflow.md").read_text(
+    legacy_manager.install(legacy_ws, target="codex", force=True)
+    assert (legacy_workflows_dir / "hotfix-release.workflow.md").read_text(
         encoding="utf-8"
     ) == _MINIMAL_WORKFLOW_HOTFIX
 
-
-# ---------------------------------------------------------------------------
-# Codex command policy is projected as native .rules
-# ---------------------------------------------------------------------------
-
-
-def test_install_codex_generates_native_rules_only(tmp_path: Path) -> None:
-    """Markdown behavioral protocols are not projected as Codex Rules."""
-    manager, workspace_root = _make_codex_install_manager(tmp_path)
-
-    public_dir = manager._public_dir  # noqa: SLF001
-    rules_src = public_dir / "rules"
+    # Markdown behavioral protocols are not projected as Codex Rules — only the
+    # native .rules command policy is.
+    rules_manager, rules_ws = _make_codex_install_manager(tmp_path / "rules-case")
+    rules_public_dir = rules_manager._public_dir  # noqa: SLF001
+    rules_src = rules_public_dir / "rules"
     (rules_src / "game-agents-coordination.md").write_text(
         "# game-agents-coordination\nProse rule\n", encoding="utf-8"
     )
     (rules_src / "workspace-protocol.md").write_text(
         "---\nname: workspace-protocol\n---\n# body\n", encoding="utf-8"
     )
-
-    manager.install(workspace_root, target="codex", force=True)
-
-    rules_dst = workspace_root / ".codex" / "rules"
+    rules_manager.install(rules_ws, target="codex", force=True)
+    rules_dst = rules_ws / ".codex" / "rules"
     assert not (rules_dst / "game-agents-coordination.md").exists(), (
         "Behavioral rule should NOT be projected to .codex/rules/"
     )
@@ -765,7 +428,8 @@ def test_install_codex_generates_native_rules_only(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# v0.1.65 FR5 (T-65-08) — render-at-install, both harnesses, ONE resolved config
+# Model-governance overlay (v0.1.65 FR5/FR7) — lockstep rendering, invalid-overlay
+# fail-loud, and the render-at-install doctor.
 # ---------------------------------------------------------------------------
 
 
@@ -792,17 +456,19 @@ def _codex_toml_fields(ws: Path, agent: str) -> dict[str, str]:
     return out
 
 
-def test_install_with_no_overlay_renders_balanced_roster_in_lockstep(
+def test_model_policy_overlay_lockstep_rendering_and_invalid_fails_loud(
     tmp_path: Path,
 ) -> None:
-    """AC-2 + F-1: with no overlay, BOTH projections render the exact ``balanced``
-    roster from the SAME resolved config — this lockstep test IS the codex-correctness
-    assurance (no codex doctor byte-compare exists)."""
+    """AC-2/AC-3 + F-1: no-overlay renders the balanced roster; an overlay change moves
+    BOTH .claude md and .codex toml together at install (byte-stable repeats); an
+    invalid overlay fails loud before any write."""
     ws = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
     manager.install(ws, target="all")
 
-    # balanced (FR2): project-manager fable-5/high; software-engineer sonnet-5/xhigh.
+    # AC-2: with no overlay, BOTH projections render the exact `balanced` roster from
+    # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
+    # codex doctor byte-compare exists).
     pm = _claude_frontmatter(ws, "project-manager")
     assert (pm["model"], pm["effort"]) == ("claude-fable-5", "high")
     se = _claude_frontmatter(ws, "software-engineer")
@@ -810,7 +476,6 @@ def test_install_with_no_overlay_renders_balanced_roster_in_lockstep(
     sec = _claude_frontmatter(ws, "security-reviewer")
     assert sec["model"] == "claude-opus-4-8", "never Fable on security-reviewer (G-1)"
 
-    # Codex projection derives from the SAME resolved config (G-3, D-3 clamp).
     pm_toml = _codex_toml_fields(ws, "project-manager")
     assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
     se_toml = _codex_toml_fields(ws, "software-engineer")
@@ -819,16 +484,7 @@ def test_install_with_no_overlay_renders_balanced_roster_in_lockstep(
         "high",  # xhigh clamps to high (D-3)
     )
 
-
-def test_overlay_change_moves_claude_md_and_codex_toml_in_lockstep(
-    tmp_path: Path,
-) -> None:
-    """AC-3 + F-1 lockstep: an overlay change moves the .claude md AND the .codex toml
-    together at install; repeated install is byte-stable ([skip])."""
-    ws = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(ws, target="all")
-
+    # AC-3: an overlay change moves the .claude md AND .codex toml together at install.
     states = ws / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
     (states / "agent_model_policy.json").write_text(
@@ -843,18 +499,15 @@ def test_overlay_change_moves_claude_md_and_codex_toml_in_lockstep(
     )
     manager.install(ws, target="all")
 
-    # AC-3: SE model from override, effort from the subscription-saver template.
-    se = _claude_frontmatter(ws, "software-engineer")
-    assert (se["model"], se["effort"]) == ("claude-opus-4-8", "xhigh")
-    # Others move per subscription-saver (PM: opus-4-8/high).
-    pm = _claude_frontmatter(ws, "project-manager")
-    assert (pm["model"], pm["effort"]) == ("claude-opus-4-8", "high")
+    se2 = _claude_frontmatter(ws, "software-engineer")
+    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "xhigh")
+    pm2 = _claude_frontmatter(ws, "project-manager")
+    assert (pm2["model"], pm2["effort"]) == ("claude-opus-4-8", "high")
 
-    # Codex moved in lockstep from the SAME resolved config.
-    se_toml = _codex_toml_fields(ws, "software-engineer")
-    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
-    pm_toml = _codex_toml_fields(ws, "project-manager")
-    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    se2_toml = _codex_toml_fields(ws, "software-engineer")
+    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    pm2_toml = _codex_toml_fields(ws, "project-manager")
+    assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
 
     # Byte-stable repeated install: every agent projection line is a [skip].
     third = manager.install(ws, target="all")
@@ -868,21 +521,19 @@ def test_overlay_change_moves_claude_md_and_codex_toml_in_lockstep(
     not_skipped = [line for line in agent_lines if not line.startswith("[skip]")]
     assert not_skipped == [], f"repeated install must be byte-stable: {not_skipped}"
 
-
-def test_invalid_overlay_fails_install_loud_before_any_write(tmp_path: Path) -> None:
-    """NFR-4: invalid overlay ⇒ loud typed error, never a silent fallback; the
-    projection tree is not touched."""
+    # NFR-4: invalid overlay -> loud typed error, never a silent fallback; the
+    # projection tree is not touched.
     from dadaia_workspace.core.models.agent_model_policy import (
         AgentModelPolicyStoreError,
     )
 
-    ws = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(ws, target="all")
-    before = (ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+    invalid_ws = tmp_path / "invalid-ws"
+    invalid_manager = FileSystemPublicAssetManager()
+    invalid_manager.install(invalid_ws, target="all")
+    before = (invalid_ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
 
-    states = ws / ".dadaia" / "states"
-    (states / "agent_model_policy.json").write_text(
+    invalid_states = invalid_ws / ".dadaia" / "states"
+    (invalid_states / "agent_model_policy.json").write_text(
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
@@ -892,30 +543,32 @@ def test_invalid_overlay_fails_install_loud_before_any_write(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with pytest.raises(AgentModelPolicyStoreError):
-        manager.install(ws, target="all")
-    after = (ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
+        invalid_manager.install(invalid_ws, target="all")
+    after = (invalid_ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
     assert after == before
 
 
-# ---------------------------------------------------------------------------
-# v0.1.65 FR7 (T-65-09) — policy-aware doctor (claude-md-only render-compare)
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
+def test_doctor_policy_rerender_ok_hand_edit_drift_and_invalid_overlay_error(
     tmp_path: Path,
 ) -> None:
-    """AC-5, all three directions + F-2 pin.
+    """FR7 — AC-5, all three directions + F-2 pin, plus the invalid-vs-missing overlay
+    doctor distinction:
 
     1. Immediately after a policy re-render, doctor reports [ok] on every
        ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
     2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
     3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
        render seam (F-2 — never a global ``_compare`` patch).
+    4. A missing overlay is not a doctor ERROR; an invalid overlay is.
     """
     ws = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
     manager.install(ws, target="all")
+
+    clean = manager.doctor(ws)
+    assert not any("agent-model-policy ERROR" in r for r in clean), (
+        "missing overlay must not emit an agent-model-policy ERROR line"
+    )
 
     states = ws / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
@@ -936,7 +589,6 @@ def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
     bad = [r for r in agent_lines if not r.startswith("[ok]")]
     assert bad == [], f"policy re-render must be doctor-[ok]: {bad}"
 
-    # F-2: the generic↔generic stage compare and non-agent labels stay raw [ok].
     stage_agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("stage:agents/")]
     assert stage_agent_lines and all(r.startswith("[ok]") for r in stage_agent_lines), (
         stage_agent_lines
@@ -944,7 +596,6 @@ def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
     rule_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:rules/")]
     assert rule_lines and all(r.startswith("[ok]") for r in rule_lines), rule_lines[:5]
 
-    # Direction 2: a hand-edited claude agent projection is [drift].
     target = ws / ".claude" / "agents" / "software-engineer.md"
     target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
     reports2 = manager.doctor(ws)
@@ -953,21 +604,8 @@ def test_doctor_ok_after_policy_rerender_drift_on_hand_edit_nonagent_untouched(
         for r in reports2
     ), [r for r in reports2 if "software-engineer" in r]
 
-
-def test_doctor_errors_on_invalid_overlay_ok_on_missing(tmp_path: Path) -> None:
-    """FR7: an invalid overlay is a doctor ERROR line; a missing overlay is not."""
-    ws = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(ws, target="all")
-
-    clean = manager.doctor(ws)
-    assert not any("agent-model-policy ERROR" in r for r in clean), (
-        "missing overlay must not emit an agent-model-policy ERROR line"
-    )
-
-    states = ws / ".dadaia" / "states"
     (states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
-    reports = manager.doctor(ws)
-    assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports), [
-        r for r in reports if "policy" in r
+    reports3 = manager.doctor(ws)
+    assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports3), [
+        r for r in reports3 if "policy" in r
     ]

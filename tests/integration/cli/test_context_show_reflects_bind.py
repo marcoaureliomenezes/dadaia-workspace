@@ -72,55 +72,6 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
-def test_bind_success_reflected_in_show_json_ac41(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = _make_workspace(tmp_path)
-    monkeypatch.chdir(ws)
-
-    bind_result = _runner.invoke(
-        app,
-        [
-            "context",
-            "bind",
-            _CTX,
-            "--mode",
-            "implementation",
-            "--release",
-            "v0.1.69",
-        ],
-    )
-    assert bind_result.exit_code == 0, bind_result.output
-
-    show_result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
-    assert show_result.exit_code == 0, show_result.output
-    payload = json.loads(show_result.output)
-
-    # AC4.1: session.session_id == the bound sid, with populated mode/release/context —
-    # not null, despite DADAIA_SESSION_ID never being set in this shell.
-    assert payload["session"] is not None, (
-        "context show --json must reflect the just-completed bind via the incumbent "
-        f"pointer fallback (FR4); got session=None. Full payload: {payload}"
-    )
-    session = payload["session"]
-    assert session["context"] == _CTX
-    assert session["mode"].upper() == "BOUND_IMPLEMENTATION"
-    assert session["release"] == "v0.1.69"
-
-
-def test_show_without_any_bind_still_reports_null_session_ac42(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC4.2 regression guard: no bind at all ⇒ session stays null (unchanged)."""
-    ws = _make_workspace(tmp_path)
-    monkeypatch.chdir(ws)
-
-    show_result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
-    assert show_result.exit_code == 0, show_result.output
-    payload = json.loads(show_result.output)
-    assert payload["session"] is None
-
-
 # --- v0.1.71 FR3: no-arg `context show` reflects the bound session -------------------
 
 
@@ -160,40 +111,69 @@ def _make_two_context_workspace(root: Path) -> Path:
     return ws
 
 
-def test_noarg_show_resolves_to_bound_context_not_first_alive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """FR3: after a bare ``context bind bound-second``, ``context show --json`` (NO arg)
-    surfaces ``bound-second`` with its live session — not first-ALIVE ``default-first``
-    with ``session: null`` (the exact remote symptom against 574a84bd)."""
-    ws = _make_two_context_workspace(tmp_path)
-    monkeypatch.chdir(ws)
+def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CRITICAL (minimal merge only, v0.1.76 rewrites the bind-resolution cluster).
+
+    AC4.1: bind -> named `show --json` reflects the session (sid/mode/release/context)
+    via the incumbent-pointer fallback, despite DADAIA_SESSION_ID never being set.
+    AC4.2: no bind at all -> named show still reports session: null (unchanged).
+    FR3: after a bare bind, no-arg `show --json` resolves to the BOUND context (not
+    first-ALIVE); with no bound session anywhere, no-arg show falls back to first-ALIVE
+    (unchanged prior behaviour) — the exact remote symptom against 574a84bd.
+    """
+    # AC4.1 — named show reflects a just-completed bind.
+    named_ws = _make_workspace(tmp_path)
+    monkeypatch.chdir(named_ws)
 
     bind_result = _runner.invoke(
         app,
-        ["context", "bind", "bound-second", "--mode", "implementation", "--release", "v0.2.0"],
+        ["context", "bind", _CTX, "--mode", "implementation", "--release", "v0.1.69"],
     )
     assert bind_result.exit_code == 0, bind_result.output
 
-    show_result = _runner.invoke(app, ["context", "show", "--json"])
-    assert show_result.exit_code == 0, show_result.output
-    payload = json.loads(show_result.output)
-    assert payload["name"] == "bound-second", payload
-    assert payload["session"] is not None, payload
-    assert payload["session"]["context"] == "bound-second"
-    assert payload["session"]["release"] == "v0.2.0"
+    named_show_result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
+    assert named_show_result.exit_code == 0, named_show_result.output
+    named_payload = json.loads(named_show_result.output)
+    assert named_payload["session"] is not None, (
+        "context show --json must reflect the just-completed bind via the incumbent "
+        f"pointer fallback (FR4); got session=None. Full payload: {named_payload}"
+    )
+    named_session = named_payload["session"]
+    assert named_session["context"] == _CTX
+    assert named_session["mode"].upper() == "BOUND_IMPLEMENTATION"
+    assert named_session["release"] == "v0.1.69"
 
+    # AC4.2 — no bind at all -> named show still reports session: null.
+    no_bind_ws = _make_workspace(tmp_path / "no-bind-root")
+    monkeypatch.chdir(no_bind_ws)
+    no_bind_show_result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
+    assert no_bind_show_result.exit_code == 0, no_bind_show_result.output
+    no_bind_payload = json.loads(no_bind_show_result.output)
+    assert no_bind_payload["session"] is None
 
-def test_noarg_show_falls_back_to_first_alive_when_no_bound_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """FR3 fallback: with no live bound session anywhere, no-arg show returns first-ALIVE
-    (unchanged prior behaviour)."""
-    ws = _make_two_context_workspace(tmp_path)
-    monkeypatch.chdir(ws)
+    # FR3 — no-arg show resolves to the bound context, not first-ALIVE.
+    two_ctx_ws = _make_two_context_workspace(tmp_path)
+    monkeypatch.chdir(two_ctx_ws)
 
-    show_result = _runner.invoke(app, ["context", "show", "--json"])
-    assert show_result.exit_code == 0, show_result.output
-    payload = json.loads(show_result.output)
-    assert payload["name"] == "default-first", payload
-    assert payload["session"] is None
+    bind_second_result = _runner.invoke(
+        app,
+        ["context", "bind", "bound-second", "--mode", "implementation", "--release", "v0.2.0"],
+    )
+    assert bind_second_result.exit_code == 0, bind_second_result.output
+
+    noarg_show_result = _runner.invoke(app, ["context", "show", "--json"])
+    assert noarg_show_result.exit_code == 0, noarg_show_result.output
+    noarg_payload = json.loads(noarg_show_result.output)
+    assert noarg_payload["name"] == "bound-second", noarg_payload
+    assert noarg_payload["session"] is not None, noarg_payload
+    assert noarg_payload["session"]["context"] == "bound-second"
+    assert noarg_payload["session"]["release"] == "v0.2.0"
+
+    # FR3 fallback — with no live bound session anywhere, no-arg show returns first-ALIVE.
+    fallback_ws = _make_two_context_workspace(tmp_path / "fallback-root")
+    monkeypatch.chdir(fallback_ws)
+    fallback_show_result = _runner.invoke(app, ["context", "show", "--json"])
+    assert fallback_show_result.exit_code == 0, fallback_show_result.output
+    fallback_payload = json.loads(fallback_show_result.output)
+    assert fallback_payload["name"] == "default-first", fallback_payload
+    assert fallback_payload["session"] is None

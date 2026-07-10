@@ -41,7 +41,6 @@ from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     BacklogStep,
     BacklogStepKind,
     ProposedIntent,
-    _parse_downgrade_verdict,
 )
 
 _CONTEXT = "dadaia-workspace"
@@ -144,18 +143,24 @@ def _divergent_demand() -> BacklogDemand:
 
 # ---------------------------------------------------------------------------
 # AC-5 — compatible-merge verdict folds; divergent/garbage stays DIVERGENT_CONFLICT
+# Also folds in: conflict_scan is cited by existing_backlog_review (no longer orphan).
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("verdict_value", "expected"),
+    ("verdict_value", "expected_fold"),
     [
         ("overlap", Verdict.OVERLAP),
         ("supersedes", Verdict.SUPERSEDES),
+        ("divergent_conflict", Verdict.DIVERGENT_CONFLICT),
+        ("unrelated", Verdict.DIVERGENT_CONFLICT),
+        ("duplicate", Verdict.DIVERGENT_CONFLICT),
+        ("kaboom", Verdict.DIVERGENT_CONFLICT),
+        ("", Verdict.DIVERGENT_CONFLICT),
     ],
 )
-def test_compatible_merge_verdict_folds_divergent_pair(
-    tmp_path: Path, verdict_value: str, expected: Verdict
+def test_consult_verdict_matrix_folds_or_stays_divergent(
+    tmp_path: Path, verdict_value: str, expected_fold: Verdict
 ) -> None:
     store = _MemoryRunStore()
     wf = _workflow(
@@ -165,36 +170,24 @@ def test_compatible_merge_verdict_folds_divergent_pair(
         kind=AgentRuntimeKind.CLAUDE_SDK,
         consult_verdict=verdict_value,
     )
-    result = wf.run(f"bd-fold-{verdict_value}", _divergent_demand())
-    # The consult downgraded the fail-closed DIVERGENT_CONFLICT to the compatible-merge class.
+    result = wf.run(f"bd-matrix-{verdict_value or 'empty'}", _divergent_demand())
+    # A compatible-merge verdict folds the fail-closed default; a divergent/garbage/
+    # unparseable verdict can never mask the conflict — never upgraded, never masked.
     assert len(result.overlap) == 1
-    assert result.overlap[0].verdict is expected
+    assert result.overlap[0].verdict is expected_fold
 
-
-@pytest.mark.parametrize(
-    "verdict_value", ["divergent_conflict", "unrelated", "duplicate", "kaboom", ""]
-)
-def test_divergent_or_garbage_verdict_stays_divergent(tmp_path: Path, verdict_value: str) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(
-        tmp_path,
-        store,
-        _registry(tmp_path),
-        kind=AgentRuntimeKind.CLAUDE_SDK,
-        consult_verdict=verdict_value,
-    )
-    result = wf.run(f"bd-stay-{verdict_value or 'empty'}", _divergent_demand())
-    # A divergent/garbage/unparseable verdict can never mask the conflict.
-    assert len(result.overlap) == 1
-    assert result.overlap[0].verdict is Verdict.DIVERGENT_CONFLICT
+    # conflict_scan is cited by the existing_backlog_review step (orphan check passes).
+    step = next(s for s in _SEQUENCE if s.kind is BacklogStepKind.EXISTING_REVIEW)
+    assert step.fragment_id == "backlog_definition.conflict_scan"
 
 
 # ---------------------------------------------------------------------------
-# Default FAKE path = no_downgrade (existing behavior unchanged)
+# Default FAKE path = no_downgrade (existing behavior unchanged); injected-downgrade
+# precedence always wins over the model consult.
 # ---------------------------------------------------------------------------
 
 
-def test_fake_runtime_keeps_no_downgrade(tmp_path: Path) -> None:
+def test_fake_offline_no_consult_and_injected_downgrade_precedence(tmp_path: Path) -> None:
     store = _MemoryRunStore()
     # FAKE default kind: the consult must NOT run; the pair stays DIVERGENT_CONFLICT offline.
     wf = _workflow(
@@ -207,18 +200,17 @@ def test_fake_runtime_keeps_no_downgrade(tmp_path: Path) -> None:
     result = wf.run("bd-fake", _divergent_demand())
     assert result.overlap[0].verdict is Verdict.DIVERGENT_CONFLICT
 
-
-def test_resolve_downgrade_precedence(tmp_path: Path) -> None:
-    """An explicitly injected downgrade always wins over the model consult."""
-    store = _MemoryRunStore()
-    specs = tmp_path / "specs"
+    # An explicitly injected downgrade always wins over the model consult.
+    injected_root = tmp_path / "injected-precedence"
+    injected_root.mkdir()
+    specs = injected_root / "specs"
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
     selector = ContextSelector(
-        SpecContext(specs_dir=specs, release_id=_RELEASE, handoff_dir=tmp_path / "handoff")
+        SpecContext(specs_dir=specs, release_id=_RELEASE, handoff_dir=injected_root / "handoff")
     )
-    registry = _registry(tmp_path)
+    registry = _registry(injected_root)
     injected = lambda _n, _e: Verdict.DEPENDS_ON  # noqa: E731 — terse test stub
-    wf = BacklogDefinitionWorkflow(
+    wf_injected = BacklogDefinitionWorkflow(
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=store,
@@ -229,7 +221,7 @@ def test_resolve_downgrade_precedence(tmp_path: Path) -> None:
         downgrade=injected,
     )
     step = next(s for s in _SEQUENCE if s.kind is BacklogStepKind.EXISTING_REVIEW)
-    assert wf._resolve_downgrade(step, "rid") is injected
+    assert wf_injected._resolve_downgrade(step, "rid") is injected
 
     # No fragment_id on a step => no_downgrade regardless of kind.
     bare = BacklogStep(label="x", role="python", kind=BacklogStepKind.EXISTING_REVIEW)
@@ -243,33 +235,3 @@ def test_resolve_downgrade_precedence(tmp_path: Path) -> None:
         default_runtime_kind=AgentRuntimeKind.CLAUDE_SDK,
     )
     assert wf_default._resolve_downgrade(bare, "rid") is no_downgrade
-
-
-# ---------------------------------------------------------------------------
-# WS-3 wrapper unit — maps ONLY overlap/supersedes
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("raw", "expected"),
-    [
-        ("overlap", Verdict.OVERLAP),
-        ("OVERLAP", Verdict.OVERLAP),
-        (" supersedes ", Verdict.SUPERSEDES),
-        ("depends_on", None),  # wrapper is stricter than the clamp on purpose
-        ("divergent_conflict", None),
-        ("unrelated", None),
-        ("duplicate", None),
-        ("garbage", None),
-        ("", None),
-        (None, None),
-    ],
-)
-def test_parse_downgrade_verdict(raw: str | None, expected: Verdict | None) -> None:
-    assert _parse_downgrade_verdict(raw) is expected
-
-
-def test_conflict_scan_is_no_longer_orphan() -> None:
-    """The existing_backlog_review step cites conflict_scan (orphan check passes)."""
-    step = next(s for s in _SEQUENCE if s.kind is BacklogStepKind.EXISTING_REVIEW)
-    assert step.fragment_id == "backlog_definition.conflict_scan"

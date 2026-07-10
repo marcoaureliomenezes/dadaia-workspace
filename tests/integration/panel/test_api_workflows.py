@@ -1,12 +1,12 @@
 """Integration tests for GET /api/workflows and GET /api/workflows/<name>.
 
-Coverage areas:
-  - Bearer token enforcement (auth)
-  - Cache invalidation when underlying file mtime changes
-  - Response shape against SPEC §5.3 / §5.4
-  - Path traversal / invalid workflow name rejection
+Coverage (merged per plan-integration.md, 14 -> 2 + 1 kept):
+  1. list shape + source_hint + lean-item (no stages[]/diagram_svg)
+  2. detail shape + stages + 404/400/traversal table
+  3. cache-invalidation-on-mtime (kept: unique own tmp workspace)
 
-Uses real workflow files from .dadaia/agentic/workflows/ — no mocks.
+Uses real workflow files from .dadaia/agentic/workflows/ — no mocks. Bearer
+fns deleted (no-auth contract pinned in tests/unit/features/panel/test_no_auth_contract.py).
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ import shutil
 import tempfile
 import threading
 import time
-import urllib.error
-import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -33,20 +31,7 @@ from dadaia_workspace.features.panel.views.api_workflows import (
 )
 from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-
-# ---------------------------------------------------------------------------
-# Hermetic workspace_root
-#
-# These tests must NOT depend on a pre-existing on-disk .dadaia/agentic/workflows/
-# staging dir (gitignored — absent on a clean checkout / CI). The `staged_root`
-# fixture stages the canonical, tracked public/ assets into a tmp workspace_root.
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Stubs
-# ---------------------------------------------------------------------------
+from tests.integration.panel.conftest import BASE_STUB_VIEWS, get
 
 
 class _StubRegistry:
@@ -63,154 +48,36 @@ class _StubTelemetry:
     is_degraded: bool = False
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:
-    req = urllib.request.Request(url)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            headers = {k.lower(): v for k, v in resp.headers.items()}
-            return resp.status, headers, resp.read()
-    except urllib.error.HTTPError as exc:
-        headers = {k.lower(): v for k, v in exc.headers.items()}
-        return exc.code, headers, exc.read()
-
-
-def _build_server(
-    token: str,
-    workspace_root: Path,
-) -> ThreadingHTTPServer:
-    workflows_service = WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
+@pytest.fixture(scope="module")
+def workflows_server(panel_server_factory, staged_root: Path) -> str:
+    workflows_service = WorkflowsService(staged_root, store_factory=MarkdownWorkflowStore)
     panel_service = PanelService(
         registry=_StubRegistry(),  # type: ignore[arg-type]
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
-        workspace_root=workspace_root,
+        workspace_root=staged_root,
         telemetry=_StubTelemetry(),
         workflows_service=workflows_service,
     )
-
-    def _stub_html(**kw: Any) -> tuple[int, str, bytes]:
-        return (200, "text/html; charset=utf-8", b"<html>ok</html>")
-
-    def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
-        return (200, "application/json; charset=utf-8", b"{}")
-
-    views: dict[str, Any] = {
-        "index": _stub_html,
-        "api_servers": _stub_json,
-        "api_contexts": _stub_json,
-        "api_agents": _stub_json,
-        "api_agent_prompt": _stub_json,
-        "api_workflows": render_api_workflows_list(panel_service),
-        "api_workflow_detail": render_api_workflow_detail(workflows_service),
-        "memory": _stub_html,
-        "memory_view": _stub_html,
-        "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
-    }
-    HandlerClass = make_handler_class(views, token=token, telemetry=_StubTelemetry())
-    return ThreadingHTTPServer(("127.0.0.1", 0), HandlerClass)
-
-
-_TOKEN = "workflows-integ-token-pr3-20"
-
-
-@pytest.fixture(scope="module")
-def staged_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Stage canonical (tracked) public/ assets into a hermetic tmp workspace_root.
-
-    Independent of any pre-existing on-disk .dadaia/agentic/ staging (gitignored,
-    absent on a clean checkout). The stager materialises workflows/ from the
-    package's own public/ dir.
-    """
-    root = tmp_path_factory.mktemp("panel-workflows-ws")
-    FileSystemPublicAssetManager().stage(root)
-    return root
-
-
-@pytest.fixture(scope="module")
-def workflows_server(staged_root: Path):
-    """Server backed by real workflow files; yields (base_url, token)."""
-    server = _build_server(_TOKEN, staged_root)
-    port = server.server_address[1]
-    base_url = f"http://127.0.0.1:{port}"
-    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
-    thread.start()
-    yield base_url, _TOKEN
-    server.shutdown()
-
-
-# ---------------------------------------------------------------------------
-# Tests: Bearer enforcement on /api/workflows
-# ---------------------------------------------------------------------------
-
-
-class TestWorkflowsBearerEnforcement:
-    """Renamed semantics: routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
-
-    def test_workflows_list_200_without_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows without Authorization → 200."""
-        base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows")
-        assert status == 200
-
-    def test_workflows_list_200_with_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows with Bearer → 200."""
-        base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows", token=token)
-        assert status == 200
-
-    def test_workflow_detail_200_without_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows/<name> without Authorization → 200."""
-        base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows/audit-fanout")
-        assert status == 200
-
-    def test_workflow_detail_200_with_token(self, workflows_server: Any) -> None:
-        """GET /api/workflows/audit-fanout with Bearer → 200."""
-        base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows/audit-fanout", token=token)
-        assert status == 200
-
-
-# ---------------------------------------------------------------------------
-# Tests: Workflow list response shape (SPEC §5.3)
-# ---------------------------------------------------------------------------
+    return panel_server_factory(
+        {
+            "api_workflows": render_api_workflows_list(panel_service),
+            "api_workflow_detail": render_api_workflow_detail(workflows_service),
+        }
+    )
 
 
 class TestWorkflowsListShape:
-    def test_top_level_keys_present(self, workflows_server: Any) -> None:
-        """Response has generated_at, source_hint, workflows keys."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows", token=token)
+    def test_top_level_keys_source_hint_and_lean_items(self, workflows_server: str) -> None:
+        status, _, body = get(f"{workflows_server}/api/workflows")
+        assert status == 200
         data = json.loads(body)
         for key in ("generated_at", "source_hint", "workflows"):
             assert key in data, f"missing key: {key}"
-
-    def test_source_hint_value(self, workflows_server: Any) -> None:
-        """source_hint is the canonical path '.dadaia/agentic/workflows/'."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows", token=token)
-        data = json.loads(body)
         assert data["source_hint"] == ".dadaia/agentic/workflows/"
 
-    def test_workflows_list_contains_real_workflow(self, workflows_server: Any) -> None:
-        """Response lists at least the 'audit-fanout' workflow from disk."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows", token=token)
-        data = json.loads(body)
         names = {w["name"] for w in data["workflows"]}
         assert "audit-fanout" in names
 
-    def test_workflow_item_shape(self, workflows_server: Any) -> None:
-        """Each workflow item has required SPEC §5.3 fields; no stages[] or diagram_svg."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows", token=token)
-        data = json.loads(body)
         item = next(w for w in data["workflows"] if w["name"] == "audit-fanout")
         for key in (
             "name",
@@ -225,71 +92,38 @@ class TestWorkflowsListShape:
             "source_path",
         ):
             assert key in item, f"missing workflow item key: {key}"
-        # LIST is lean (D1 synthesis decision) — no stages[] or diagram_svg
         assert "stages" not in item
         assert "diagram_svg" not in item
 
 
-# ---------------------------------------------------------------------------
-# Tests: Workflow detail response shape (SPEC §5.4)
-# ---------------------------------------------------------------------------
-
-
-class TestWorkflowDetailShape:
-    def test_detail_top_level_keys(self, workflows_server: Any) -> None:
-        """GET /api/workflows/audit-fanout → has name, stages, diagram_svg."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows/audit-fanout", token=token)
+class TestWorkflowDetailShapeAndErrors:
+    def test_detail_shape_stages_and_error_table(self, workflows_server: str) -> None:
+        status, _, body = get(f"{workflows_server}/api/workflows/audit-fanout")
+        assert status == 200
         data = json.loads(body)
         for key in ("name", "stages", "diagram_svg", "inputs", "agent_ids"):
             assert key in data, f"missing detail key: {key}"
-
-    def test_detail_stages_shape(self, workflows_server: Any) -> None:
-        """Each stage item has id, agent, needs, gate, on_failure keys."""
-        base, token = workflows_server
-        _, _, body = _get(f"{base}/api/workflows/audit-fanout", token=token)
-        data = json.loads(body)
         for stage in data["stages"]:
             for key in ("id", "agent", "needs", "gate", "on_failure"):
                 assert key in stage, f"stage missing key: {key}"
 
-    def test_detail_not_found_returns_404(self, workflows_server: Any) -> None:
-        """GET /api/workflows/nonexistent-workflow → 404."""
-        base, token = workflows_server
-        status, _, _ = _get(f"{base}/api/workflows/nonexistent-workflow", token=token)
+        status, _, _ = get(f"{workflows_server}/api/workflows/nonexistent-workflow")
         assert status == 404
 
-    def test_detail_invalid_name_returns_400(self, workflows_server: Any) -> None:
-        """GET /api/workflows/bad..name → 400 (dots violate regex)."""
-        base, token = workflows_server
-        status, _, body = _get(f"{base}/api/workflows/bad..name", token=token)
+        status, _, body = get(f"{workflows_server}/api/workflows/bad..name")
         assert status == 400
         data = json.loads(body)
         assert data.get("error") == "invalid_workflow_name"
 
-    def test_detail_traversal_path_rejected(self, workflows_server: Any) -> None:
-        """GET /api/workflows/../etc/passwd → 400 or 404 (regex blocks dots/slashes)."""
-        base, token = workflows_server
-        # The route pattern ^/api/workflows/(?P<workflow_name>[^/]+)$ prevents slashes.
-        # A name with dots is caught by _WORKFLOW_NAME_RE before any I/O.
-        status, _, _ = _get(f"{base}/api/workflows/..%2Fetc%2Fpasswd", token=token)
+        status, _, _ = get(f"{workflows_server}/api/workflows/..%2Fetc%2Fpasswd")
         assert status in (400, 404)
-
-
-# ---------------------------------------------------------------------------
-# Tests: Cache invalidation when file mtime changes
-# ---------------------------------------------------------------------------
 
 
 class TestWorkflowCacheInvalidation:
     """Verify that editing a workflow file and touching its mtime produces updated data.
 
-    Strategy:
-      1. Create a temp workspace with one minimal workflow file.
-      2. Spin up a fresh server pointing at the temp workspace.
-      3. Fetch the workflow detail — check initial description.
-      4. Overwrite the file with a new description, update mtime.
-      5. Fetch again — the new description must appear (cache invalidated).
+    Own tmp workspace + own server (unique fixture) — kept per plan (not folded into
+    the package factory, since it needs to mutate the underlying workflow file).
     """
 
     _WORKFLOW_TEMPLATE = """\
@@ -318,11 +152,27 @@ stages:
         )
         return tmp
 
+    def _build_server(self, token: str, workspace_root: Path) -> ThreadingHTTPServer:
+        workflows_service = WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
+        panel_service = PanelService(
+            registry=_StubRegistry(),  # type: ignore[arg-type]
+            spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
+            workspace_root=workspace_root,
+            telemetry=_StubTelemetry(),
+            workflows_service=workflows_service,
+        )
+        views: dict[str, Any] = {
+            **BASE_STUB_VIEWS,
+            "api_workflows": render_api_workflows_list(panel_service),
+            "api_workflow_detail": render_api_workflow_detail(workflows_service),
+        }
+        handler_cls = make_handler_class(views, token=token, telemetry=_StubTelemetry())
+        return ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+
     def test_cache_invalidated_on_mtime_change(self) -> None:
-        """After overwriting workflow file, new description is returned (cache busted)."""
         tmp = self._setup_temp_workspace()
         try:
-            server = _build_server("cache-token", tmp)
+            server = self._build_server("cache-token", tmp)
             port = server.server_address[1]
             base = f"http://127.0.0.1:{port}"
             thread = threading.Thread(
@@ -331,15 +181,11 @@ stages:
             thread.start()
 
             try:
-                # First fetch — must see "version-one"
-                status, _, body = _get(
-                    f"{base}/api/workflows/cache-test-workflow", token="cache-token"
-                )
+                status, _, body = get(f"{base}/api/workflows/cache-test-workflow")
                 assert status == 200
                 data = json.loads(body)
                 assert "version-one" in data["description"]
 
-                # Overwrite with new description and advance mtime
                 wf_file = (
                     tmp / ".dadaia" / "agentic" / "workflows" / "cache-test-workflow.workflow.md"
                 )
@@ -347,14 +193,10 @@ stages:
                     self._WORKFLOW_TEMPLATE.format(description="version-two"),
                     encoding="utf-8",
                 )
-                # Advance mtime by ≥1 second to guarantee cache key differs
                 future_mtime = time.time() + 2
                 os.utime(wf_file, (future_mtime, future_mtime))
 
-                # Second fetch — must see "version-two" (cache busted by mtime change)
-                status2, _, body2 = _get(
-                    f"{base}/api/workflows/cache-test-workflow", token="cache-token"
-                )
+                status2, _, body2 = get(f"{base}/api/workflows/cache-test-workflow")
                 assert status2 == 200
                 data2 = json.loads(body2)
                 assert "version-two" in data2["description"], (

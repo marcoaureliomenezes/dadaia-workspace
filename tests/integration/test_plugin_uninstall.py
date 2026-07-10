@@ -166,8 +166,9 @@ def test_ac2_install_uninstall_cycle_equals_never_installed(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_ac3_double_uninstall_is_a_noop(tmp_path: Path) -> None:
-    """A second uninstall changes nothing — ledger + projected files byte-stable."""
+def test_ac3_double_uninstall_noop_and_multi_pack_isolation(tmp_path: Path) -> None:
+    """A second uninstall changes nothing — ledger + projected files byte-stable. With
+    both packs installed, uninstalling devops leaves frontend-design fully intact."""
     ws, mgr = _fresh_ws(tmp_path, "ws")
     mgr.install_plugin(ws, _PACK)
     mgr.uninstall_plugin(ws, _PACK)
@@ -182,6 +183,23 @@ def test_ac3_double_uninstall_is_a_noop(tmp_path: Path) -> None:
     assert (ws / ".claude" / "agents" / "frontend-engineer.md").read_bytes() == stub_before
     # No mutation lines: everything is a [skip]-class no-op.
     assert all(not ln.startswith(("[ok]", "[rm]", "[drift", "[ledger]")) for ln in lines), lines
+
+    # Multi-pack isolation: uninstalling devops leaves frontend-design fully intact.
+    ws2, mgr2 = _fresh_ws(tmp_path, "multi-pack-ws")
+    mgr2.install_plugin(ws2, _PACK)
+    mgr2.install_plugin(ws2, "devops")
+    fe_body = (ws2 / ".claude" / "agents" / "frontend-engineer.md").read_bytes()
+    assert b"[PLUGIN REQUIRED]" not in fe_body
+
+    mgr2.uninstall_plugin(ws2, "devops")
+
+    devops = (ws2 / ".claude" / "agents" / "devops-engineer.md").read_text(encoding="utf-8")
+    assert "[PLUGIN REQUIRED]" in devops
+    assert (ws2 / ".claude" / "agents" / "frontend-engineer.md").read_bytes() == fe_body
+    assert _pack_skill_files(ws2), "frontend-design skill projection was collaterally removed"
+    assert _ledger_plugins(ws2) == (_PACK,)
+    assert any(f"plugin:{_PACK}:" in ln for ln in mgr2.doctor_plugins(ws2))
+    assert not any("plugin:devops:" in ln for ln in mgr2.doctor_plugins(ws2))
 
 
 class _FailingWriteStore:
@@ -217,28 +235,6 @@ def test_ac3_files_before_ledger_interrupted_uninstall_keeps_ledger_entry(
     assert mgr.doctor_plugins(ws), "plugin doctor went silent on the interrupted half-state"
 
 
-def test_ac3_multi_pack_isolation_uninstall_devops_keeps_frontend_design(
-    tmp_path: Path,
-) -> None:
-    """With both packs installed, uninstalling devops leaves frontend-design fully intact."""
-    ws, mgr = _fresh_ws(tmp_path, "ws")
-    mgr.install_plugin(ws, _PACK)
-    mgr.install_plugin(ws, "devops")
-    fe_body = (ws / ".claude" / "agents" / "frontend-engineer.md").read_bytes()
-    assert b"[PLUGIN REQUIRED]" not in fe_body
-
-    mgr.uninstall_plugin(ws, "devops")
-
-    # devops-engineer restored to stub; frontend-design projections byte-intact.
-    devops = (ws / ".claude" / "agents" / "devops-engineer.md").read_text(encoding="utf-8")
-    assert "[PLUGIN REQUIRED]" in devops
-    assert (ws / ".claude" / "agents" / "frontend-engineer.md").read_bytes() == fe_body
-    assert _pack_skill_files(ws), "frontend-design skill projection was collaterally removed"
-    assert _ledger_plugins(ws) == (_PACK,)
-    assert any(f"plugin:{_PACK}:" in ln for ln in mgr.doctor_plugins(ws))
-    assert not any("plugin:devops:" in ln for ln in mgr.doctor_plugins(ws))
-
-
 # ---------------------------------------------------------------------------
 # AC-4 — profile-scoped uninstall (ADR-U3, Ruling 13 symmetry)
 # ---------------------------------------------------------------------------
@@ -263,11 +259,12 @@ def test_ac4_claude_only_profile_uninstall_never_touches_codex(tmp_path: Path) -
 # ---------------------------------------------------------------------------
 
 
-def test_ac5_hand_edited_projections_emit_drift_lines_and_repos_untouched(
+def test_ac5_drift_restored_removed_repos_untouched_and_unstaged_pack(
     tmp_path: Path,
 ) -> None:
     """A hand-edited pack agent md is [drift-restored]; a hand-edited pack skill is
-    [drift-removed]; nothing under repos/ is ever touched by uninstall."""
+    [drift-removed]; nothing under repos/ is ever touched by uninstall. An unstaged
+    pack -> ledger-only removal with a non-silent [skip]-class line (FR2)."""
     ws, mgr = _fresh_ws(tmp_path, "ws")
     consumer = ws / "repos" / "game" / "AGENTS.md"
     consumer.parent.mkdir(parents=True)
@@ -292,15 +289,13 @@ def test_ac5_hand_edited_projections_emit_drift_lines_and_repos_untouched(
     # repos/** untouched.
     assert consumer.read_text(encoding="utf-8") == consumer_body
 
+    # An unstaged pack -> ledger-only removal, non-silent.
+    unstaged_ws = tmp_path / "unstaged-ws"
+    (unstaged_ws / ".dadaia" / "states").mkdir(parents=True)
+    JsonPluginStore().write(unstaged_ws / ".dadaia" / "states", InstalledPlugins.of((_PACK,)))
+    unstaged_mgr = FileSystemPublicAssetManager()
 
-def test_unstaged_pack_uninstall_is_ledger_only_and_non_silent(tmp_path: Path) -> None:
-    """An unstaged pack ⇒ ledger-only removal with a non-silent [skip]-class line (FR2)."""
-    ws = tmp_path / "ws"
-    (ws / ".dadaia" / "states").mkdir(parents=True)
-    JsonPluginStore().write(ws / ".dadaia" / "states", InstalledPlugins.of((_PACK,)))
-    mgr = FileSystemPublicAssetManager()
+    unstaged_lines = unstaged_mgr.uninstall_plugin(unstaged_ws, _PACK)
 
-    lines = mgr.uninstall_plugin(ws, _PACK)
-
-    assert _ledger_plugins(ws) == ()
-    assert any("not staged" in ln for ln in lines), lines
+    assert _ledger_plugins(unstaged_ws) == ()
+    assert any("not staged" in ln for ln in unstaged_lines), unstaged_lines

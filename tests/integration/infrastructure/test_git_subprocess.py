@@ -1,18 +1,23 @@
-"""Integration and mocked regression tests for GitSubprocessClient.
+"""Real-git integration tests for GitSubprocessClient.
 
 Bugs covered:
   Bug 1 — commit_all: git add -A engulfs embedded git repos.
-  Bug 2 — GitSyncError with empty stderr on submodule no-op.
-  Bug 4 — git push fails without upstream tracking.
+  Bug 4 — git push fails without upstream tracking / mismatched upstream branch name.
+
+The MagicMock-patched `subprocess.run` unit-in-disguise fns (empty-stdout/stderr noop,
+error-message detail, refspec argv, skip-when-nothing) are dropped here — they are
+already covered by ``tests/unit/infrastructure/test_git_subprocess_unit.py`` via the
+cleaner ``git_subprocess._run`` seam (``test_error_and_noop_mapping`` and
+``test_push_argv_contract_upstream_vs_explicit_refspec``), which asserts the exact same
+behaviors without a subprocess. Real-git fixtures collapse to the two that need an
+actual repo/bare-remote: embedded-repo exclusion and first-push/mismatched-upstream.
 """
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -88,77 +93,18 @@ def test_commit_all_skips_embedded_git_repo(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Bug 2 — silent no-op when returncode != 0 but stdout and stderr are empty
+# Bug 4 — push sets upstream tracking when missing; explicit refspec on mismatch
 # ---------------------------------------------------------------------------
 
 
-def test_commit_all_treats_empty_stdout_stderr_as_noop() -> None:
-    """If git commit exits non-zero with both stdout and stderr empty,
-    commit_all must NOT raise GitSyncError (submodule edge case).
+def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refspec(
+    tmp_path: Path,
+) -> None:
+    """First push (no upstream) uses `git push -u origin <branch>`; a later push from a
+    differently-named local branch tracking a mismatched remote branch name succeeds via
+    the explicit refspec (v0.1.50 FR3 — plain `git push` fails under push.default=simple
+    whenever the upstream branch name differs from the local branch name).
     """
-    fake_result = MagicMock()
-    fake_result.returncode = 1
-    fake_result.stdout = ""
-    fake_result.stderr = ""
-
-    with patch(
-        "dadaia_workspace.infrastructure.git_subprocess.subprocess.run",
-        return_value=fake_result,
-    ):
-        client = GitSubprocessClient()
-        # Must not raise
-        client.commit_all(Path("/fake/repo"), "test commit")
-
-
-def test_commit_all_raises_with_meaningful_message_on_real_failure() -> None:
-    """If git commit exits non-zero with actual output, GitSyncError must include
-    both stdout and stderr in its message.
-
-    _stage_files_safe makes 2 calls before git commit:
-      1. git add -u
-      2. git ls-files --others --exclude-standard  (returns empty → no extra adds)
-    Then git commit is the 3rd call.
-    """
-    ok_result = MagicMock()
-    ok_result.returncode = 0
-    ok_result.stdout = ""
-    ok_result.stderr = ""
-
-    ls_result = MagicMock()
-    ls_result.returncode = 0
-    ls_result.stdout = ""  # no untracked files
-    ls_result.stderr = ""
-
-    commit_result = MagicMock()
-    commit_result.returncode = 1
-    commit_result.stdout = "error: some stdout detail"
-    commit_result.stderr = "fatal: some stderr detail"
-
-    with patch(
-        "dadaia_workspace.infrastructure.git_subprocess.subprocess.run",
-        side_effect=[ok_result, ls_result, commit_result],
-    ):
-        client = GitSubprocessClient()
-        with pytest.raises(GitSyncError) as exc_info:
-            client.commit_all(Path("/fake/repo"), "test commit")
-
-    msg = str(exc_info.value)
-    assert "some stdout detail" in msg
-    assert "some stderr detail" in msg
-
-
-# ---------------------------------------------------------------------------
-# Bug 4 — push sets upstream tracking when missing
-# ---------------------------------------------------------------------------
-
-
-def test_push_uses_set_upstream_when_no_tracking_configured(tmp_path: Path) -> None:
-    """On first push (no upstream), push() must call git push -u origin <branch>.
-
-    We simulate the no-upstream case by making `git rev-parse --abbrev-ref @{u}`
-    return non-zero (no tracking), then verifying the push call uses -u.
-    """
-    # We use a real repo + a bare remote so git push can actually succeed
     bare = tmp_path / "bare.git"
     bare.mkdir()
     subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
@@ -172,7 +118,7 @@ def test_push_uses_set_upstream_when_no_tracking_configured(tmp_path: Path) -> N
         check=True,
     )
 
-    # At this point no upstream tracking branch is set
+    # At this point no upstream tracking branch is set.
     tracking_check = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "@{u}"],
         cwd=local,
@@ -182,9 +128,8 @@ def test_push_uses_set_upstream_when_no_tracking_configured(tmp_path: Path) -> N
     assert tracking_check.returncode != 0, "pre-condition: no upstream should be set"
 
     client = GitSubprocessClient()
-    client.push(local)  # must NOT raise
+    client.push(local)  # must NOT raise; establishes upstream via -u
 
-    # After push, the upstream should now be set
     tracking_after = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "@{u}"],
         cwd=local,
@@ -193,103 +138,15 @@ def test_push_uses_set_upstream_when_no_tracking_configured(tmp_path: Path) -> N
     )
     assert tracking_after.returncode == 0, "upstream tracking must be set after push -u"
 
-
-def test_push_uses_explicit_refspec_when_tracking_already_set(tmp_path: Path) -> None:
-    """v0.1.50 FR3: with an upstream configured, push() uses the EXPLICIT refspec
-    ``git push <remote> HEAD:<upstream-branch>`` — plain `git push` fails under
-    push.default=simple whenever the upstream branch name differs — and it first
-    checks `rev-list --count @{u}..HEAD` to skip empty pushes.
-    """
-    tracking_result = MagicMock()
-    tracking_result.returncode = 0
-    tracking_result.stdout = "origin/main"
-    tracking_result.stderr = ""
-
-    ahead_result = MagicMock()
-    ahead_result.returncode = 0
-    ahead_result.stdout = "2"
-    ahead_result.stderr = ""
-
-    push_result = MagicMock()
-    push_result.returncode = 0
-    push_result.stdout = ""
-    push_result.stderr = ""
-
-    calls_made: list[list[str]] = []
-
-    def fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        calls_made.append(args)
-        if "--abbrev-ref" in args:
-            return tracking_result
-        if "rev-list" in args:
-            return ahead_result
-        return push_result
-
-    with patch(
-        "dadaia_workspace.infrastructure.git_subprocess.subprocess.run",
-        side_effect=fake_run,
-    ):
-        client = GitSubprocessClient()
-        client.push(Path("/fake/repo"))
-
-    push_calls = [c for c in calls_made if "push" in c]
-    assert push_calls == [["git", "push", "origin", "HEAD:main"]]
-
-
-def test_push_skips_when_nothing_to_push(tmp_path: Path) -> None:
-    """v0.1.50 FR3: `rev-list --count @{u}..HEAD` == 0 ⇒ no push subprocess at all."""
-    tracking_result = MagicMock()
-    tracking_result.returncode = 0
-    tracking_result.stdout = "origin/main"
-    tracking_result.stderr = ""
-
-    ahead_result = MagicMock()
-    ahead_result.returncode = 0
-    ahead_result.stdout = "0\n"
-    ahead_result.stderr = ""
-
-    calls_made: list[list[str]] = []
-
-    def fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        calls_made.append(args)
-        if "--abbrev-ref" in args:
-            return tracking_result
-        if "rev-list" in args:
-            return ahead_result
-        raise AssertionError(f"unexpected git call: {args}")
-
-    with patch(
-        "dadaia_workspace.infrastructure.git_subprocess.subprocess.run",
-        side_effect=fake_run,
-    ):
-        client = GitSubprocessClient()
-        client.push(Path("/fake/repo"))  # must not raise, must not push
-
-    assert not [c for c in calls_made if "push" in c]
-
-
-def test_push_succeeds_with_mismatched_upstream_branch_name(tmp_path: Path) -> None:
-    """v0.1.50 FR3 end-to-end: local branch `work` tracking `origin/main` pushes
-    via the explicit refspec (plain `git push` fails here under push.default=simple)."""
-    bare = tmp_path / "bare.git"
-    bare.mkdir()
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
-
-    local = tmp_path / "local"
-    _init_git_repo(local)
+    # Force-establish a remote `main` branch (the local default branch name is whatever
+    # `git init` picked, e.g. `master`) so the mismatch scenario below is genuine.
     subprocess.run(
-        ["git", "remote", "add", "origin", str(bare)], cwd=local, capture_output=True, check=True
-    )
-    # First push establishes origin/main from the default branch.
-    default = subprocess.run(
-        ["git", "branch", "--show-current"], cwd=local, capture_output=True, text=True
-    ).stdout.strip()
-    subprocess.run(
-        ["git", "push", "-u", "origin", "HEAD:refs/heads/main"],
+        ["git", "push", "origin", "HEAD:refs/heads/main"],
         cwd=local,
         capture_output=True,
         check=True,
     )
+
     # A differently-named local branch tracking origin/main + a new commit + simple mode.
     subprocess.run(["git", "checkout", "-b", "work"], cwd=local, capture_output=True, check=True)
     subprocess.run(
@@ -305,7 +162,6 @@ def test_push_succeeds_with_mismatched_upstream_branch_name(tmp_path: Path) -> N
     subprocess.run(["git", "add", "-A"], cwd=local, capture_output=True, check=True)
     subprocess.run(["git", "commit", "-m", "next"], cwd=local, capture_output=True, check=True)
 
-    client = GitSubprocessClient()
     client.push(local)  # old plain-push behavior raises GitSyncError here
 
     remote_tip = subprocess.run(
@@ -315,4 +171,3 @@ def test_push_succeeds_with_mismatched_upstream_branch_name(tmp_path: Path) -> N
         ["git", "rev-parse", "HEAD"], cwd=local, capture_output=True, text=True
     ).stdout.strip()
     assert remote_tip == local_tip
-    assert default  # silence unused (documents the original default branch)

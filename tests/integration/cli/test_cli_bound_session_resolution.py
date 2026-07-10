@@ -67,11 +67,15 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
-def test_bugs_append_resolves_bound_context_via_ancestry_chain(
+def test_bound_session_resolution_ancestry_rootlaw_and_plain_repo_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A bind marker anchored at a DEEP ancestor (beyond getppid) must attribute:
-    the CLI seam threads the full ancestry chain (degraded getppid-only misses it)."""
+    """CRITICAL (minimal merge only, v0.1.76 rewrites): (1) a bind marker anchored at
+    a DEEP ancestor (beyond getppid) must attribute — the CLI seam threads the full
+    ancestry chain (degraded getppid-only misses it); (2) the cwd fallback must refuse
+    a root-law-violating workspace-root specs/; (3) outside any workspace, cwd/specs
+    stays a legitimate fallback (plain repo layout)."""
+    # (1) deep-ancestry bind attribution.
     ws = tmp_path / "ws"
     _make_workspace(ws)
     ctx_bugs = ws / "repos" / "projx" / "specs" / "bugs"
@@ -91,33 +95,25 @@ def test_bugs_append_resolves_bound_context_via_ancestry_chain(
     assert result.exit_code == 0, result.output
     assert list(ctx_bugs.glob("*.jsonl")), "event must land in the BOUND context's specs/bugs/"
 
+    # (2) cwd fallback refuses root-law-violating workspace-root specs/.
+    rootlaw_ws = tmp_path / "rootlaw-ws"
+    _make_workspace(rootlaw_ws)
+    (rootlaw_ws / "specs" / "bugs").mkdir(parents=True)  # illegal top-level entry
 
-def test_cwd_fallback_refuses_workspace_root_specs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The cwd fallback must refuse a root-law-violating workspace-root specs/."""
-    ws = tmp_path / "ws"
-    _make_workspace(ws)
-    (ws / "specs" / "bugs").mkdir(parents=True)  # illegal top-level entry
+    monkeypatch.chdir(rootlaw_ws)
+    rootlaw_result = _runner.invoke(app, _APPEND_ARGS)
 
-    monkeypatch.chdir(ws)
-    result = _runner.invoke(app, _APPEND_ARGS)
-
-    assert result.exit_code != 0
-    assert "specs" in result.output
+    assert rootlaw_result.exit_code != 0
+    assert "specs" in rootlaw_result.output
     # Redaction-safe: no absolute operator-local path echoed.
-    assert str(ws) not in result.output
+    assert str(rootlaw_ws) not in rootlaw_result.output
 
-
-def test_cwd_fallback_still_serves_plain_repo_dirs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Outside any workspace, cwd/specs stays a legitimate fallback (repo layout)."""
+    # (3) plain-repo fallback still works outside any workspace.
     repo = tmp_path / "repo"
     (repo / "specs" / "bugs").mkdir(parents=True)
 
     monkeypatch.chdir(repo)
-    result = _runner.invoke(app, _APPEND_ARGS)
+    repo_result = _runner.invoke(app, _APPEND_ARGS)
 
-    assert result.exit_code == 0, result.output
+    assert repo_result.exit_code == 0, repo_result.output
     assert list((repo / "specs" / "bugs").glob("*.jsonl"))

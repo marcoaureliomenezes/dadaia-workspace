@@ -28,12 +28,6 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.commands.lifecycle import app as lifecycle_app
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
-from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-    _BUG_WRITE_STEP,
-)
-from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-    _SEQUENCE as _BUG_REPORT_SEQUENCE,
-)
 from dadaia_workspace.features.workflows.dadaia_catalog import (
     AVAILABILITY_AVAILABLE,
     governed_workflow_catalog,
@@ -42,10 +36,6 @@ from dadaia_workspace.features.workflows.dadaia_catalog import (
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.golden_platform import norm_stderr
-
-# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
-
 
 _runner = CliRunner()
 _RELEASE = "v0.1.56"
@@ -101,7 +91,21 @@ def test_wire_verb_completes_and_persists_resolver_snapshot(
     workflow_id: str,
     step_label: str,
 ) -> None:
-    """AC-3: the verb runs to COMPLETED under fake and leaves a resolver-derived snapshot."""
+    """AC-3: the verb runs to COMPLETED under fake and leaves a resolver-derived snapshot.
+    Also folds in the governed-catalog invocability check: the three wired bodies are
+    AVAILABLE, the governed catalog carries all 7 workflow ids, and every one of the 7
+    workflows is invocable via its registered CLI verb."""
+    availability = {wf.name: wf.availability for wf in list_dadaia_workflows()}
+    for wired in ("audit", "research", "bug_report"):
+        assert availability[wired] == AVAILABILITY_AVAILABLE
+
+    governed_ids = {wf.workflow_id for wf in governed_workflow_catalog().workflows}
+    assert governed_ids == set(_WORKFLOW_TO_VERB)
+
+    registered_verbs = set(typer.main.get_command(lifecycle_app).commands)
+    for wf_id, verb_path in _WORKFLOW_TO_VERB.items():
+        assert verb_path[0] in registered_verbs, f"{wf_id} verb {verb_path[0]!r} not registered"
+
     result = _runner.invoke(
         app,
         [
@@ -146,102 +150,3 @@ def test_wire_verb_completes_and_persists_resolver_snapshot(
 
     # AC-2(a/v) parity: runtime_kind stayed FAKE — the fake adapter ran, never codex/pi.
     assert _model_step_runtimes(payload) == {AgentRuntimeKind.FAKE.value}
-
-
-@pytest.mark.parametrize(
-    ("verb", "step_label"), [(row[1], row[4]) for row in _WIRE_VERBS], ids=_IDS
-)
-def test_wire_verb_rejects_raw_step_model(workspace: Path, verb: str, step_label: str) -> None:
-    """AC-2(iii): a raw ``--step-model label=<id>:<effort>`` is a D-3 profile-id rejection."""
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            verb,
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--step-model",
-            f"{step_label}=gpt-5.5:high",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "profile id" in result.output
-
-
-@pytest.mark.parametrize("verb", [row[1] for row in _WIRE_VERBS], ids=_IDS)
-def test_wire_verb_model_flag_is_removed(workspace: Path, verb: str) -> None:
-    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
-    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
-
-    The D-3 profile-id rejection stays asserted by ``test_wire_verb_rejects_raw_step_model``.
-    """
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            verb,
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--model",
-            "anything:high",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 2
-    assert "No such option: --model" in norm_stderr(result.stderr)
-    # Q4: the UsageError is on stderr — stdout stays empty.
-    assert result.stdout == ""
-
-
-def test_governed_catalog_reports_wired_workflows_available_and_invocable() -> None:
-    """AC-3: the three wired bodies are AVAILABLE and all 7 governed workflows are invocable."""
-    availability = {wf.name: wf.availability for wf in list_dadaia_workflows()}
-    # The three Wave-E bodies wired this release are AVAILABLE (unchanged — always were).
-    for wired in ("audit", "research", "bug_report"):
-        assert availability[wired] == AVAILABILITY_AVAILABLE
-
-    # The governed resolver catalog carries all 7 workflow ids (the single governed source).
-    governed_ids = {wf.workflow_id for wf in governed_workflow_catalog().workflows}
-    assert governed_ids == set(_WORKFLOW_TO_VERB)
-
-    # Every one of the 7 workflows is now invocable — its surfacing CLI verb is registered
-    # (the three new verbs close the last invocability gap: 7 defined / 7 invocable).
-    registered = set(typer.main.get_command(lifecycle_app).commands)
-    for workflow_id, verb_path in _WORKFLOW_TO_VERB.items():
-        assert verb_path[0] in registered, f"{workflow_id} verb {verb_path[0]!r} not registered"
-
-
-def test_bug_report_verb_routes_through_additive_no_lease_path_structurally(
-    workspace: Path,
-) -> None:
-    """AC-3 (structural): the bug_report verb's real ``bug_write`` target is ADDITIVE.
-
-    The verb routes through NO MUTATING/lease-acquiring path by construction: the only
-    file-writing step, ``bug_write``, scopes writes exclusively to the ADDITIVE
-    ``specs/bugs/`` path class (the gate's path classifier never leases ADDITIVE writes).
-    Every other step writes only to the handoff dir. This is a construction property of the
-    verb — asserted on the workflow the container builder produces, NOT a fake-run lease
-    observation (under ``--harness fake`` "no lease" is vacuous — the fake writes nothing).
-    """
-    wf = container.build_bug_report_workflow(workspace, context=_CONTEXT, release_id=_RELEASE)
-    bug_write_step = next(s for s in _BUG_REPORT_SEQUENCE if s.label == _BUG_WRITE_STEP)
-    bug_write_scope = wf._scope(bug_write_step, "struct", "suffix")  # noqa: SLF001
-    # ADDITIVE-only: exactly the specs/bugs channel — no .dadaia/, no MUTATING repo path.
-    assert bug_write_scope.allowed_paths == (
-        f"repos/{_CONTEXT}/specs/bugs/**",
-        "specs/bugs/**",
-    )
-    assert all("specs/bugs" in p for p in bug_write_scope.allowed_paths)
-
-    # Every OTHER (non-writing) step emits only to the handoff dir — never specs/bugs, never a
-    # MUTATING target that would take a lease.
-    for step in _BUG_REPORT_SEQUENCE:
-        if step.fragment_id is None or step.label == _BUG_WRITE_STEP:
-            continue
-        other_scope = wf._scope(step, "struct", "suffix")  # noqa: SLF001
-        assert all("specs/bugs" not in p for p in other_scope.allowed_paths)
-        assert all(p.startswith(".dadaia/handoff/") for p in other_scope.allowed_paths)

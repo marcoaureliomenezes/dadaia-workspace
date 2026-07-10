@@ -74,7 +74,11 @@ def _overlay_dict(profile: str) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def test_pipeline_e2e_persists_snapshot_and_threads_per_step_model(tmp_path: Path) -> None:
+def test_pipeline_e2e_persists_snapshot_threads_model_and_invalid_overlay_blocks(
+    tmp_path: Path,
+) -> None:
+    """E2e snapshot + per-step model persistence, plus invalid-overlay-blocks-before-
+    model-call with the last-good backup left intact — merged per plan-integration.md."""
     workspace = _init_workspace(tmp_path)
     resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
     snapshot = resolver.resolve("implementation", context="default")
@@ -105,6 +109,28 @@ def test_pipeline_e2e_persists_snapshot_and_threads_per_step_model(tmp_path: Pat
     assert impl_entry.model == "gpt-5.5"
     assert impl_entry.reasoning == "medium"
     assert "implementation.implement_tdd" in impl_entry.fragments
+
+    # Invalid overlay blocks BEFORE any model call; last-good backup byte-unchanged.
+    invalid_ws = _init_workspace(tmp_path / "invalid-overlay-case")
+    policy_store = container.build_workflow_model_policy_store(invalid_ws)
+    # Seed a valid overlay + its last-good backup by saving twice.
+    policy_store.save(policy_store.parse(_overlay_dict("codex-implementation-standard")))
+    policy_store.save(policy_store.parse(_overlay_dict("codex-review-deep")))
+    last_good_before = policy_store.last_good_path.read_bytes()
+
+    # Now corrupt the overlay file on disk.
+    policy_store.path.write_text("{ this is not valid json", encoding="utf-8")
+
+    invalid_recorder = FakeAgentRuntime(result=_approving())
+
+    # Building the resolver loads+validates the overlay → must raise BEFORE any model call.
+    with pytest.raises(WorkflowModelPolicyStoreError):
+        container.build_workflow_policy_resolver(invalid_ws)
+
+    # Zero model calls were made.
+    assert invalid_recorder.received_requests == []
+    # last-good backup is byte-unchanged.
+    assert policy_store.last_good_path.read_bytes() == last_good_before
 
 
 # ---------------------------------------------------------------------------
@@ -159,46 +185,3 @@ def test_pipeline_ac6_in_flight_ignores_later_overlay_edit(tmp_path: Path) -> No
     )
     fresh_impl = fresh.step("implement")
     assert fresh_impl is not None and fresh_impl.model_profile == "codex-review-deep"
-
-
-# ---------------------------------------------------------------------------
-# invalid vs missing overlay
-# ---------------------------------------------------------------------------
-
-
-def test_invalid_overlay_blocks_before_any_model_call_and_last_good_intact(
-    tmp_path: Path,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    policy_store = container.build_workflow_model_policy_store(workspace)
-    # Seed a valid overlay + its last-good backup by saving twice.
-    policy_store.save(policy_store.parse(_overlay_dict("codex-implementation-standard")))
-    policy_store.save(policy_store.parse(_overlay_dict("codex-review-deep")))
-    last_good_before = policy_store.last_good_path.read_bytes()
-
-    # Now corrupt the overlay file on disk.
-    policy_store.path.write_text("{ this is not valid json", encoding="utf-8")
-
-    recorder = FakeAgentRuntime(result=_approving())
-
-    # Building the resolver loads+validates the overlay → must raise BEFORE any model call.
-    with pytest.raises(WorkflowModelPolicyStoreError):
-        container.build_workflow_policy_resolver(workspace)
-
-    # Zero model calls were made.
-    assert recorder.received_requests == []
-    # last-good backup is byte-unchanged.
-    assert policy_store.last_good_path.read_bytes() == last_good_before
-
-
-def test_missing_overlay_resolves_to_library_defaults(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    # No overlay file written at all.
-    resolver = container.build_workflow_policy_resolver(workspace)
-    snapshot = resolver.resolve("implementation", context="default")
-    from dadaia_workspace.core.models.workflow_execution import PolicySource
-
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.source is PolicySource.LIBRARY_DEFAULT
-    assert impl.model_profile == "codex-implementation-standard"

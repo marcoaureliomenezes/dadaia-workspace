@@ -38,12 +38,15 @@ def _plant_stray_dir_tree(workspace: Path) -> None:
             os.utime(path, (old, old))
 
 
-def test_lifecycle_slop_json_returns_valid_report(
+def test_lifecycle_slop_json_report_and_read_only_guarantee(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """JSON report (dir-entry aggregation, 512 bytes) + read-only guarantee (the metric
+    never deletes anything)."""
     workspace = _init_workspace(tmp_path)
     _plant_stray_dir_tree(workspace)
+    planted = workspace / ".dadaia" / "tmp" / "agent" / "20260101" / "stray_venv" / "pyvenv.cfg"
     monkeypatch.chdir(workspace)
 
     result = _runner.invoke(app, ["lifecycle", "slop", "--json"])
@@ -64,19 +67,4 @@ def test_lifecycle_slop_json_returns_valid_report(
     assert len(venv_entries) == 1
     assert venv_entries[0]["is_dir"] is True
     assert venv_entries[0]["size_bytes"] == 512
-
-
-def test_lifecycle_slop_text_output_is_read_only(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    _plant_stray_dir_tree(workspace)
-    planted = workspace / ".dadaia" / "tmp" / "agent" / "20260101" / "stray_venv" / "pyvenv.cfg"
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "slop"])
-
-    assert result.exit_code == 0, result.output
-    assert result.output.startswith("OK entries=")
     assert planted.exists(), "the metric must never delete anything"

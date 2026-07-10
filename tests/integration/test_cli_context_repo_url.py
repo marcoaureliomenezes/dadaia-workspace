@@ -79,7 +79,12 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 # --------------------------------------------------------------------- (a) create --url
 
 
-def test_create_url_persists_and_overrides_catalog(workspace: Path) -> None:
+def test_create_update_url_persistence_and_ctx_url_1_doctor_flag(
+    workspace: Path, tmp_path: Path
+) -> None:
+    """(a) create --url persists (overrides catalog); (c) update --url repairs an empty
+    record; update on an unknown context exits 1; (d) doctor flags CTX-URL-1 for an ALIVE
+    context with an empty repo_url."""
     result = _runner.invoke(
         app, ["context", "create", "foo", "--repo", "foo", "--url", "https://x.test/foo.git"]
     )
@@ -87,45 +92,38 @@ def test_create_url_persists_and_overrides_catalog(workspace: Path) -> None:
     rec = _record(workspace, "foo")
     assert rec["repo_url"] == "https://x.test/foo.git"
 
+    _runner.invoke(app, ["context", "create", "bar", "--repo", "bar"])
+    rec_bar = _record(workspace, "bar")
+    assert rec_bar["repo_url"] == ""  # no catalog hit, no --url
 
-# --------------------------------------------------------------------- (c) update --url
+    update_result = _runner.invoke(
+        app, ["context", "update", "bar", "--url", "https://x.test/bar.git"]
+    )
+    assert update_result.exit_code == 0, update_result.output
+    rec_bar = _record(workspace, "bar")
+    assert rec_bar["repo_url"] == "https://x.test/bar.git"
 
+    unknown_result = _runner.invoke(
+        app, ["context", "update", "nope", "--url", "https://x.test/x.git"]
+    )
+    assert unknown_result.exit_code == 1
+    assert "not found" in unknown_result.output.lower()
 
-def test_update_url_repairs_empty_record(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "foo", "--repo", "foo"])
-    rec = _record(workspace, "foo")
-    assert rec["repo_url"] == ""  # no catalog hit, no --url
+    if not _HAS_GIT:
+        return
 
-    result = _runner.invoke(app, ["context", "update", "foo", "--url", "https://x.test/foo.git"])
-    assert result.exit_code == 0, result.output
-    rec = _record(workspace, "foo")
-    assert rec["repo_url"] == "https://x.test/foo.git"
-
-
-def test_update_url_unknown_context_exits_1(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "update", "nope", "--url", "https://x.test/x.git"])
-    assert result.exit_code == 1
-    assert "not found" in result.output.lower()
-
-
-# --------------------------------------------------------------------- (d) doctor CTX-URL-1
-
-
-@pytest.mark.skipif(not _HAS_GIT, reason="git not available")
-def test_doctor_flags_alive_empty_repo_url(workspace: Path, tmp_path: Path) -> None:
-    # Repo on disk with origin, but make the context ALIVE with an empty url first.
-    repo_path = workspace / "repos" / "foo"
+    # (d) CTX-URL-1: repo on disk with no origin, ALIVE with an empty url.
+    repo_path = workspace / "repos" / "baz"
     repo_path.mkdir(parents=True)
     _git(["init"], cwd=repo_path)
 
-    _runner.invoke(app, ["context", "create", "foo", "--repo", "foo"])
-    # Make ALIVE — no origin remote on this repo, so no back-fill: url stays empty.
-    alive = _runner.invoke(app, ["context", "alive", "foo"])
+    _runner.invoke(app, ["context", "create", "baz", "--repo", "baz"])
+    alive = _runner.invoke(app, ["context", "alive", "baz"])
     assert alive.exit_code == 0, alive.output
-    assert _record(workspace, "foo")["repo_url"] == ""
+    assert _record(workspace, "baz")["repo_url"] == ""
 
-    result = _runner.invoke(app, ["doctor"])
-    assert "CTX-URL-1" in result.output
+    doctor_result = _runner.invoke(app, ["doctor"])
+    assert "CTX-URL-1" in doctor_result.output
 
 
 # --------------------------------------------------------------------- (b) back-fill + bug repro

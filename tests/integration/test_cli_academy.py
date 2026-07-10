@@ -1,4 +1,9 @@
-"""dadaia academy CLI — happy path + error paths."""
+"""dadaia academy CLI — one journey fn: modules -> create -> list shows -> delete.
+
+Merged per plan-integration.md (8 -> 1). Deleted (unit-ownable exit-nonzero greps):
+create-invalid-module, delete-nonexistent, update-nonexistent, and the empty-list
+wording assert.
+"""
 
 from pathlib import Path
 
@@ -21,59 +26,18 @@ def _init_ws(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_academy_list_empty_workspace(tmp_path: Path, monkeypatch) -> None:
+def test_academy_journey_modules_create_list_delete(tmp_path: Path, monkeypatch) -> None:
     _init_ws(tmp_path, monkeypatch)
-    result = _runner.invoke(app, ["academy", "list"])
-    assert result.exit_code == 0, result.output
-    assert "No courses" in result.output
 
-
-def test_academy_modules_lists_available_modules(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    result = _runner.invoke(app, ["academy", "modules"])
-    assert result.exit_code == 0, result.output
-
-
-def test_academy_create_valid_module(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    # First find a valid module number
     mods_result = _runner.invoke(app, ["academy", "modules"])
-    assert mods_result.exit_code == 0
-    # Module 1 should always exist
-    result = _runner.invoke(app, ["academy", "create", "my-course", "--module", "1"])
-    assert result.exit_code == 0, result.output
-    assert "my-course" in result.output or "created" in result.output.lower()
+    assert mods_result.exit_code == 0, mods_result.output
 
+    create_result = _runner.invoke(app, ["academy", "create", "course-a", "--module", "1"])
+    assert create_result.exit_code == 0, create_result.output
 
-def test_academy_create_invalid_module_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    result = _runner.invoke(app, ["academy", "create", "bad", "--module", "9999"])
-    assert result.exit_code != 0
+    list_result = _runner.invoke(app, ["academy", "list"])
+    assert list_result.exit_code == 0, list_result.output
+    assert "course-a" in list_result.output
 
-
-def test_academy_create_then_list_shows_course(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    _runner.invoke(app, ["academy", "create", "course-a", "--module", "1"])
-    result = _runner.invoke(app, ["academy", "list"])
-    assert result.exit_code == 0, result.output
-    assert "course-a" in result.output
-
-
-def test_academy_delete_existing_course(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    _runner.invoke(app, ["academy", "create", "to-delete", "--module", "1"])
-    result = _runner.invoke(app, ["academy", "delete", "to-delete"])
-    assert result.exit_code == 0, result.output
-    assert "deleted" in result.output.lower() or "to-delete" in result.output
-
-
-def test_academy_delete_nonexistent_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    result = _runner.invoke(app, ["academy", "delete", "ghost-course"])
-    assert result.exit_code != 0
-
-
-def test_academy_update_nonexistent_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    _init_ws(tmp_path, monkeypatch)
-    result = _runner.invoke(app, ["academy", "update", "ghost-course", "--module", "1"])
-    assert result.exit_code != 0
+    delete_result = _runner.invoke(app, ["academy", "delete", "course-a"])
+    assert delete_result.exit_code == 0, delete_result.output

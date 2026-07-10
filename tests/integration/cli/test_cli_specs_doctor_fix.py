@@ -54,50 +54,41 @@ def _make_minimal_specs(root: Path) -> Path:
     return specs
 
 
-def test_doctor_fix_creates_missing_dirs(tmp_path: Path) -> None:
-    """--fix creates missing backlog/ and bugs/ directories with README.md + .gitkeep."""
+def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_never_mutates(
+    tmp_path: Path,
+) -> None:
+    """A fully clean scaffolded tree exits 0 without --fix; removing backlog/ and
+    running --fix recreates it (README.md + .gitkeep); and without --fix, behaviour
+    is unchanged — the doctor never auto-creates/mutates anything (removing the core
+    architecture.md atom stays removed)."""
     specs = _make_minimal_specs(tmp_path)
+
+    clean_result = _runner.invoke(
+        app,
+        ["specs", "doctor", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    assert clean_result.exit_code == 0, (
+        f"Expected exit 0; got {clean_result.exit_code}:\n{clean_result.output}"
+    )
+
     import shutil
 
     backlog = specs / "backlog"
     if backlog.exists():
         shutil.rmtree(backlog)
 
-    result = _runner.invoke(
+    fix_result = _runner.invoke(
         app,
         ["specs", "doctor", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    assert backlog.exists(), f"backlog/ must be created; output:\n{result.output}"
+    assert backlog.exists(), f"backlog/ must be created; output:\n{fix_result.output}"
     assert (backlog / "README.md").exists(), "backlog/README.md must be created"
     assert (backlog / ".gitkeep").exists(), "backlog/.gitkeep must be created"
-    assert result.exit_code == 0, f"Expected exit 0; got {result.exit_code}:\n{result.output}"
+    assert fix_result.exit_code == 0, (
+        f"Expected exit 0; got {fix_result.exit_code}:\n{fix_result.output}"
+    )
 
-
-def test_doctor_no_fix_flag_unchanged_behaviour(tmp_path: Path) -> None:
-    """Without --fix flag, behaviour is unchanged (check + report, no mutations).
-
-    memory-markdown-source-v1: memory atoms are now `.md`. Removing the core
-    architecture.md atom makes the tree non-clean, but without --fix the doctor
-    must NOT auto-create/mutate anything.
-    """
-    specs = _make_minimal_specs(tmp_path)
     arch = specs / "memory" / "architecture.md"
     arch.unlink()
-
-    _runner.invoke(
-        app,
-        ["specs", "doctor", "--specs-dir", str(specs)],
-    )
-    # File must NOT have been created/restored (no --fix was passed).
+    _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
-
-
-def test_doctor_exit_0_on_fully_clean_tree(tmp_path: Path) -> None:
-    """A fully clean scaffolded tree produces exit 0 without --fix."""
-    specs = _make_minimal_specs(tmp_path)
-
-    result = _runner.invoke(
-        app,
-        ["specs", "doctor", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
-    )
-    assert result.exit_code == 0, f"Expected exit 0; got {result.exit_code}:\n{result.output}"

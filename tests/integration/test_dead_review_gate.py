@@ -186,60 +186,66 @@ def test_dead_with_commit_planted_secret_blocks_real_git(
     assert "auto-sync before dead" not in log.stdout
 
 
-def test_dead_ignores_gitignored_file_real_git(tmp_path: Path, workspace_root: Path) -> None:
-    """A gitignored file is NOT untracked-for-review; the gate stays silent."""
-    remote = _bare_remote(tmp_path)
-    repo = workspace_root / "repos" / "proj-repo"
-    _clone_with_initial_commit(remote, repo)
-    (repo / ".gitignore").write_text("ignored.txt\n")
-    _run(["git", "add", ".gitignore"], cwd=repo)
-    _run(["git", "commit", "-m", "add gitignore"], cwd=repo)
-    (repo / "ignored.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
-
-    service, store = _make_service(workspace_root)
-    _alive_ctx(store, "proj-repo")
-
-    # No --commit, yet the only candidate file is gitignored ⇒ no refusal.
-    _make_tree_writable(repo)
-    ctx = service.dead("proj")
-    assert ctx.state == ContextState.DEAD
-    assert not repo.exists()
-
-
-def test_dead_clean_tree_unchanged_real_git(tmp_path: Path, workspace_root: Path) -> None:
-    """Clean tree (only tracked content) ⇒ dead() proceeds without --commit."""
-    remote = _bare_remote(tmp_path)
-    repo = workspace_root / "repos" / "proj-repo"
-    _clone_with_initial_commit(remote, repo)
-
-    service, store = _make_service(workspace_root)
-    _alive_ctx(store, "proj-repo")
-
-    _make_tree_writable(repo)
-    ctx = service.dead("proj")
-    assert ctx.state == ContextState.DEAD
-    assert not repo.exists()
-
-
-def test_dead_succeeds_with_readonly_git_objects_real_git(
-    workspace_root: Path, tmp_path: Path
+def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
+    tmp_path: Path, workspace_root: Path
 ) -> None:
-    """v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-git-objects):
-    0444 loose objects are git-normal — dead() now rmtree-chmod-retries with the
-    PLAIN GitSubprocessClient (no _WritableObjectsGitClient workaround needed)."""
+    """Three "dead() proceeds" scenarios, each with its own repo/remote fixture:
+    (1) a gitignored file is NOT untracked-for-review, so the gate stays silent even
+    without --commit; (2) a clean tree (only tracked content) proceeds without
+    --commit; (3) v0.1.50 FR3 (bug
+    context-dead-nonwritable-guard-rejects-standard-git-objects): 0444 loose objects
+    are git-normal — dead() rmtree-chmod-retries with the PLAIN GitSubprocessClient
+    (no _WritableObjectsGitClient workaround needed)."""
+    # (1) gitignored file — gate stays silent.
+    (tmp_path / "remote1").mkdir()
+    remote1 = _bare_remote(tmp_path / "remote1")
+    repo1 = workspace_root / "repos" / "proj-repo-gitignored"
+    _clone_with_initial_commit(remote1, repo1)
+    (repo1 / ".gitignore").write_text("ignored.txt\n")
+    _run(["git", "add", ".gitignore"], cwd=repo1)
+    _run(["git", "commit", "-m", "add gitignore"], cwd=repo1)
+    (repo1 / "ignored.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    service1, store1 = _make_service(workspace_root)
+    _alive_ctx(store1, "proj-repo-gitignored")
+    _make_tree_writable(repo1)
+    ctx1 = service1.dead("proj")
+    assert ctx1.state == ContextState.DEAD
+    assert not repo1.exists()
+
+    # (2) clean tree — proceeds without --commit.
+    (tmp_path / "remote2").mkdir()
+    remote2 = _bare_remote(tmp_path / "remote2")
+    repo2 = workspace_root / "repos" / "proj-repo-clean"
+    _clone_with_initial_commit(remote2, repo2)
+
+    store2 = FakeContextStore()
+    service2 = SpecContextService(
+        context_store=store2,
+        git_client=_WritableObjectsGitClient(),
+        workspace_root=workspace_root,
+    )
+    _alive_ctx(store2, "proj-repo-clean")
+    _make_tree_writable(repo2)
+    ctx2 = service2.dead("proj")
+    assert ctx2.state == ContextState.DEAD
+    assert not repo2.exists()
+
+    # (3) read-only git loose objects — rmtree-chmod-retry succeeds with the plain client.
     import os
 
-    remote = _bare_remote(tmp_path)
-    dest = workspace_root / "repos" / "proj"
-    _clone_with_initial_commit(remote, dest)
+    (tmp_path / "remote3").mkdir()
+    remote3 = _bare_remote(tmp_path / "remote3")
+    dest = workspace_root / "repos" / "proj-readonly"
+    _clone_with_initial_commit(remote3, dest)
 
-    store = FakeContextStore()
-    service = SpecContextService(
-        context_store=store,
+    store3 = FakeContextStore()
+    service3 = SpecContextService(
+        context_store=store3,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
-    _alive_ctx(store, "proj")
+    _alive_ctx(store3, "proj-readonly")
 
     readonly = [
         p
@@ -248,6 +254,6 @@ def test_dead_succeeds_with_readonly_git_objects_real_git(
     ]
     assert readonly, "precondition: git wrote read-only loose objects"
 
-    result = service.dead("proj", commit=False)
+    result = service3.dead("proj", commit=False)
     assert result.state is ContextState.DEAD
     assert not dest.exists()

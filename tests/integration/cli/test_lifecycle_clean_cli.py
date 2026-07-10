@@ -43,7 +43,7 @@ def _plant_stale_dir_tree(workspace: Path) -> Path:
     return tree
 
 
-def test_lifecycle_clean_default_is_dry_run(
+def test_lifecycle_clean_dry_run_keeps_tree_then_apply_reclaims(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -51,46 +51,23 @@ def test_lifecycle_clean_default_is_dry_run(
     tree = _plant_stale_dir_tree(workspace)
     monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(app, ["lifecycle", "clean", "--json"])
+    dry_run_result = _runner.invoke(app, ["lifecycle", "clean", "--json"])
 
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["status"] == "OK"
-    assert payload["applied"] is False
+    assert dry_run_result.exit_code == 0, dry_run_result.output
+    dry_run_payload = json.loads(dry_run_result.output)
+    assert dry_run_payload["status"] == "OK"
+    assert dry_run_payload["applied"] is False
     assert tree.exists(), "default invocation must NOT delete"
-    assert payload["reclaimed_bytes"] >= 512
-    assert any(str(p).endswith("/stray_venv") for p in payload["reclaimed_paths"])
+    assert dry_run_payload["reclaimed_bytes"] >= 512
+    assert any(str(p).endswith("/stray_venv") for p in dry_run_payload["reclaimed_paths"])
 
+    apply_result = _runner.invoke(app, ["lifecycle", "clean", "--apply", "--json"])
 
-def test_lifecycle_clean_apply_reclaims_dir_tree(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    tree = _plant_stale_dir_tree(workspace)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "clean", "--apply", "--json"])
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["applied"] is True
+    assert apply_result.exit_code == 0, apply_result.output
+    apply_payload = json.loads(apply_result.output)
+    assert apply_payload["applied"] is True
     assert not tree.exists(), "--apply must reclaim the stale directory tree"
-    assert payload["reclaimed_bytes"] >= 512
-    assert any(str(p).endswith("/stray_venv") for p in payload["reclaimed_paths"]), payload[
-        "reclaimed_paths"
-    ]
-
-
-def test_lifecycle_clean_text_output(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    _plant_stale_dir_tree(workspace)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "clean"])
-
-    assert result.exit_code == 0, result.output
-    assert result.output.startswith("OK dry-run reclaimed=")
+    assert apply_payload["reclaimed_bytes"] >= 512
+    assert any(str(p).endswith("/stray_venv") for p in apply_payload["reclaimed_paths"]), (
+        apply_payload["reclaimed_paths"]
+    )

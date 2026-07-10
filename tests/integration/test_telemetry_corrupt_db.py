@@ -1,16 +1,13 @@
 """Integration tests for corrupt-SQLite graceful degradation (T-AM-21).
 
-Verifies that when the telemetry database file is corrupt (invalid SQLite header):
-  1. TelemetryService detects the corruption via PRAGMA integrity_check.
-  2. The corrupt file is renamed to telemetry.sqlite.corrupt.<utc_ts>.
-  3. service.is_degraded is True after refresh().
-  4. /api/agents with a valid Bearer token returns 503 with JSON body containing
-     "telemetry_degraded".
-  5. /api/agents WITHOUT a Bearer token returns 401 (auth check precedes
-     degraded check — ordering invariant).
+Merged per plan-integration.md (11 -> 2):
+  1. corruption: integrity-check -> quarantine rename (+wal/shm siblings) -> is_degraded;
+     healthy negative.
+  2. degraded HTTP: agents/sessions 503 + body message, workflows 200 unaffected,
+     non-telemetry route unaffected (table).
 
-Uses tmp_path to avoid touching real state. The stub readers and aggregator
-ensure no real operator data is read.
+Uses tmp_path to avoid touching real state. The stub readers and aggregator ensure no
+real operator data is read.
 """
 
 from __future__ import annotations
@@ -32,10 +29,6 @@ pytest.importorskip("fcntl")
 
 from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-
-# ---------------------------------------------------------------------------
-# Stubs
-# ---------------------------------------------------------------------------
 
 
 class _StubPricing:
@@ -76,11 +69,6 @@ class _StubSCS:
         return []
 
 
-# ---------------------------------------------------------------------------
-# Service factory
-# ---------------------------------------------------------------------------
-
-
 def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> TelemetryService:
     """Build a TelemetryService using a real on-disk SQLite path under state_dir."""
     db_path = state_dir / "telemetry.sqlite"
@@ -100,11 +88,6 @@ def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> Tele
         spec_context_service=_StubSCS(),
         _getuid_fn=lambda: 1000,
     )
-
-
-# ---------------------------------------------------------------------------
-# HTTP helper
-# ---------------------------------------------------------------------------
 
 
 def _build_panel_server(token: str, svc: TelemetryService) -> ThreadingHTTPServer:
@@ -140,119 +123,59 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
         return exc.code, exc.read()
 
 
-# ---------------------------------------------------------------------------
-# Tests: degraded service (corrupt file fixture)
-# ---------------------------------------------------------------------------
+def test_corrupt_db_detection_quarantine_siblings_and_healthy_negative(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Corruption: integrity-check -> quarantine rename (+wal/shm) -> is_degraded; healthy negative."""
+    state_dir = tmp_path / "telemetry"
+    state_dir.mkdir(parents=True)
+    db_path = state_dir / "telemetry.sqlite"
+    wal_path = state_dir / "telemetry.sqlite-wal"
+    shm_path = state_dir / "telemetry.sqlite-shm"
 
+    # Corrupt main DB + real-looking WAL/SHM siblings (invalid SQLite header).
+    db_path.write_bytes(b"\x00" * 16)
+    wal_path.write_bytes(b"WAL-FRAME-BYTES")
+    shm_path.write_bytes(b"SHM-INDEX-BYTES")
 
-class TestCorruptDatabaseDegradation:
-    """Service detects a corrupt DB, quarantines it, and enters degraded mode."""
+    svc = _make_service(state_dir, tmp_path)
+    assert not svc.is_degraded  # clean before refresh
 
-    def test_corrupt_file_triggers_is_degraded(self, tmp_path: pathlib.Path) -> None:
-        """After refresh() with a corrupt DB, service.is_degraded is True."""
-        state_dir = tmp_path / "telemetry"
-        state_dir.mkdir(parents=True)
-        db_path = state_dir / "telemetry.sqlite"
-        # Write 16 bytes of garbage (not a valid SQLite header: must start with
-        # "SQLite format 3\x00").
-        db_path.write_bytes(b"\x00" * 16)
+    svc.refresh()
 
-        svc = _make_service(state_dir, tmp_path)
-        assert not svc.is_degraded  # clean before refresh
+    assert svc.is_degraded, "service.is_degraded must be True after refresh() with a corrupt DB."
+    assert not db_path.exists(), "telemetry.sqlite must be quarantined"
+    assert not wal_path.exists(), "telemetry.sqlite-wal sibling must be quarantined too"
+    assert not shm_path.exists(), "telemetry.sqlite-shm sibling must be quarantined too"
 
-        svc.refresh()
-
-        assert svc.is_degraded, (
-            "service.is_degraded must be True after refresh() with a corrupt DB."
+    main_q = [
+        p
+        for p in state_dir.glob("telemetry.sqlite.corrupt.*")
+        if not p.name.endswith(("-wal", "-shm"))
+    ]
+    wal_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-wal"))
+    shm_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-shm"))
+    assert main_q, "no quarantined main DB file found"
+    assert wal_q, "no quarantined -wal sibling found"
+    assert shm_q, "no quarantined -shm sibling found"
+    for qf in main_q + wal_q + shm_q:
+        assert fnmatch.fnmatch(qf.name, "telemetry.sqlite.corrupt.*"), (
+            f"Unexpected quarantine filename pattern: {qf.name}"
         )
 
-    def test_corrupt_file_renamed_to_quarantine(self, tmp_path: pathlib.Path) -> None:
-        """The corrupt file is renamed to telemetry.sqlite.corrupt.<utc_ts>."""
-        state_dir = tmp_path / "telemetry"
-        state_dir.mkdir(parents=True)
-        db_path = state_dir / "telemetry.sqlite"
-        db_path.write_bytes(b"NOT_A_VALID_SQLITE_FILE_HEADER_HERE!")
-
-        svc = _make_service(state_dir, tmp_path)
-        svc.refresh()
-
-        # Original file must be gone.
-        assert not db_path.exists(), (
-            "telemetry.sqlite must be renamed away after corruption is detected."
-        )
-
-        # A quarantine file matching the expected pattern must exist.
-        quarantine_files = list(state_dir.glob("telemetry.sqlite.corrupt.*"))
-        assert quarantine_files, (
-            "No quarantine file found — corrupt DB must be renamed to "
-            "telemetry.sqlite.corrupt.<utc_ts>."
-        )
-        # File name must match telemetry.sqlite.corrupt.<ts> where ts is like 20260517T123456Z.
-        for qf in quarantine_files:
-            assert fnmatch.fnmatch(qf.name, "telemetry.sqlite.corrupt.*"), (
-                f"Unexpected quarantine filename pattern: {qf.name}"
-            )
-            # The timestamp suffix must be a valid UTC ISO datetime with 'Z'.
-            suffix = qf.name.split("telemetry.sqlite.corrupt.", 1)[1]
-            assert suffix.endswith("Z"), f"Timestamp suffix must end with 'Z': {suffix!r}"
-
-    def test_degraded_not_triggered_for_healthy_db(self, tmp_path: pathlib.Path) -> None:
-        """Normal (healthy) DB does not set is_degraded = True."""
-        state_dir = tmp_path / "telemetry"
-        svc = _make_service(state_dir, tmp_path)
-        svc.refresh()
-        assert not svc.is_degraded
-
-    def test_quarantine_moves_wal_and_shm_siblings(self, tmp_path: pathlib.Path) -> None:
-        """Quarantine moves the -wal/-shm siblings with the corrupt DB (v0.1.52 FR3).
-
-        A WAL-mode store is three files: telemetry.sqlite, telemetry.sqlite-wal,
-        telemetry.sqlite-shm.  Stranding the -wal/-shm siblings after quarantining
-        only the main file leaves partial state that a fresh writer can pick up as
-        phantom WAL frames.  Quarantine must move ALL THREE.
-        """
-        state_dir = tmp_path / "telemetry"
-        state_dir.mkdir(parents=True)
-        db_path = state_dir / "telemetry.sqlite"
-        wal_path = state_dir / "telemetry.sqlite-wal"
-        shm_path = state_dir / "telemetry.sqlite-shm"
-
-        # Corrupt main DB + real-looking WAL/SHM siblings.
-        db_path.write_bytes(b"\x00" * 16)  # invalid SQLite header
-        wal_path.write_bytes(b"WAL-FRAME-BYTES")
-        shm_path.write_bytes(b"SHM-INDEX-BYTES")
-
-        svc = _make_service(state_dir, tmp_path)
-        svc.refresh()
-
-        assert svc.is_degraded, "corrupt DB must trigger degraded mode"
-        # All three originals must be gone (moved into quarantine).
-        assert not db_path.exists(), "telemetry.sqlite must be quarantined"
-        assert not wal_path.exists(), "telemetry.sqlite-wal sibling must be quarantined too"
-        assert not shm_path.exists(), "telemetry.sqlite-shm sibling must be quarantined too"
-
-        # A quarantined counterpart must exist for each of the three files.
-        main_q = list(state_dir.glob("telemetry.sqlite.corrupt.*"))
-        main_q = [p for p in main_q if not p.name.endswith(("-wal", "-shm"))]
-        wal_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-wal"))
-        shm_q = list(state_dir.glob("telemetry.sqlite.corrupt.*-shm"))
-        assert main_q, "no quarantined main DB file found"
-        assert wal_q, "no quarantined -wal sibling found"
-        assert shm_q, "no quarantined -shm sibling found"
-
-
-# ---------------------------------------------------------------------------
-# Tests: handler returns correct HTTP status codes
-# ---------------------------------------------------------------------------
+    # Healthy negative: a normal (non-corrupt) DB does not set is_degraded.
+    healthy_state_dir = tmp_path / "telemetry-healthy"
+    healthy_svc = _make_service(healthy_state_dir, tmp_path)
+    healthy_svc.refresh()
+    assert not healthy_svc.is_degraded
 
 
 class TestHandlerDegradedResponses:
-    """Panel handler returns 503 when service is degraded, 401 when unauthenticated."""
+    """Panel handler returns 503 when service is degraded; non-telemetry routes unaffected."""
 
     @pytest.fixture(scope="class")
     @staticmethod
     def degraded_panel(tmp_path_factory: pytest.TempPathFactory):  # type: ignore[misc]
-        """Start a panel server backed by a degraded TelemetryService."""
         tmp_path = tmp_path_factory.mktemp("corrupt_test")
         state_dir = tmp_path / "telemetry"
         state_dir.mkdir(parents=True)
@@ -277,63 +200,42 @@ class TestHandlerDegradedResponses:
 
         server.shutdown()
 
-    def test_api_agents_with_token_returns_503(self, degraded_panel: Any) -> None:
-        """GET /api/agents with valid Bearer → 503 when service is degraded."""
+    @pytest.mark.parametrize(
+        ("path", "with_token", "expected_status"),
+        [
+            ("/api/agents", True, 503),
+            ("/api/agents", False, 503),  # no-auth: degraded check gates, not auth
+            ("/api/workflows", True, 200),  # canonical WorkflowsService, unaffected
+            ("/api/agents/some-agent/sessions", True, 503),
+            ("/api/agents/some-agent/sessions", False, 503),
+            ("/", False, 200),  # non-telemetry route stays up
+        ],
+    )
+    def test_degraded_http_status_table(
+        self,
+        degraded_panel: Any,
+        path: str,
+        with_token: bool,
+        expected_status: int,
+    ) -> None:
+        base, token = degraded_panel
+        status, body = _get(f"{base}{path}", token=token if with_token else None)
+        assert status == expected_status, (
+            f"Expected {expected_status} for {path} (with_token={with_token}), got {status}. "
+            f"Body: {body!r}"
+        )
+
+    def test_503_body_contains_degraded_message_and_quarantine_hint(
+        self, degraded_panel: Any
+    ) -> None:
         base, token = degraded_panel
         status, body = _get(f"{base}/api/agents", token=token)
-        assert status == 503, f"Expected 503 for degraded service but got {status}. Body: {body!r}"
+        assert status == 503
         data = json.loads(body)
-        assert data.get("error") == "telemetry_degraded", (
-            f"Response body must have error='telemetry_degraded', got: {data}"
-        )
-
-    def test_api_agents_without_token_returns_503_degraded(self, degraded_panel: Any) -> None:
-        """GET /api/agents credential-less → 503 degraded (no-auth contract,
-        operator decision 2026-06-11: there is no auth step; the degraded-mode
-        telemetry check is what gates the route)."""
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/agents")
-        assert status == 503, (
-            f"Expected degraded-mode 503 for credential-less /api/agents, got {status}."
-        )
-
-    def test_api_workflows_with_token_returns_200(self, degraded_panel: Any) -> None:
-        """GET /api/workflows with valid Bearer → 200 even when telemetry is degraded.
-
-        api_workflows is a bearer-only route backed by the canonical
-        WorkflowsService — it does NOT go through the telemetry service, so
-        corrupt-DB degradation does not affect it.
-        """
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/workflows", token=token)
-        assert status == 200
-
-    def test_api_sessions_with_token_returns_503(self, degraded_panel: Any) -> None:
-        """GET /api/agents/{id}/sessions with valid Bearer → 503 when degraded."""
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/agents/some-agent/sessions", token=token)
-        assert status == 503
-
-    def test_api_sessions_without_token_returns_503_degraded(self, degraded_panel: Any) -> None:
-        """GET /api/agents/{id}/sessions credential-less → 503 degraded (no-auth contract)."""
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/agents/some-agent/sessions")
-        assert status == 503
-
-    def test_503_body_contains_message(self, degraded_panel: Any) -> None:
-        """503 response body must mention 'telemetry_degraded' and quarantine path."""
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/agents", token=token)
-        assert status == 503
+        assert data.get("error") == "telemetry_degraded"
         body_text = body.decode("utf-8", errors="replace")
         assert "telemetry_degraded" in body_text
         assert "corrupt" in body_text.lower(), (
             "503 message should mention the quarantine location so the operator "
             "can find the corrupt file."
         )
-
-    def test_non_telemetry_endpoint_unaffected(self, degraded_panel: Any) -> None:
-        """GET / still returns 200 even when telemetry is degraded (panel stays up)."""
-        base, token = degraded_panel
-        status, body = _get(f"{base}/")
-        assert status == 200, f"GET / should return 200 even in degraded mode, got {status}."

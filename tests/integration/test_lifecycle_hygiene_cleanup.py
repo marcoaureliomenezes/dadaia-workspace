@@ -25,21 +25,24 @@ def _old(path: Path, content: str = "content") -> Path:
     return _write(path, age=dt.timedelta(hours=72), content=content)
 
 
-def test_cleanup_defaults_to_dry_run_and_does_not_delete(tmp_path: Path) -> None:
+def test_cleanup_dry_run_default_then_apply_deletes_only_safe_zone_expired_files(
+    tmp_path: Path,
+) -> None:
+    """Default is dry-run (no deletion, candidates reported); --apply-equivalent
+    (dry_run=False) deletes only expired files under the safe zones (reports/handoff/
+    tmp) — states/locks/repos/runs are untouched even when stale, and a fresh tmp file
+    survives."""
     stale = _old(tmp_path / ".dadaia" / "tmp" / "agent" / "old.txt")
 
-    result = LifecycleHygieneService(tmp_path, now=NOW).cleanup()
+    dry_result = LifecycleHygieneService(tmp_path, now=NOW).cleanup()
 
-    assert result.dry_run is True
-    assert result.deleted_paths == ()
+    assert dry_result.dry_run is True
+    assert dry_result.deleted_paths == ()
     assert stale.exists()
-    assert {candidate.path for candidate in result.candidates} == {".dadaia/tmp/agent/old.txt"}
+    assert {c.path for c in dry_result.candidates} == {".dadaia/tmp/agent/old.txt"}
 
-
-def test_cleanup_apply_deletes_only_expired_files_under_safe_zones(tmp_path: Path) -> None:
     stale_report = _old(tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html")
     stale_handoff = _old(tmp_path / ".dadaia" / "handoff" / "ctx" / "old.handoff.json")
-    stale_tmp = _old(tmp_path / ".dadaia" / "tmp" / "agent" / "old.txt")
     fresh_tmp = _write(
         tmp_path / ".dadaia" / "tmp" / "agent" / "fresh.txt",
         age=dt.timedelta(minutes=5),
@@ -59,7 +62,7 @@ def test_cleanup_apply_deletes_only_expired_files_under_safe_zones(tmp_path: Pat
     }
     assert not stale_report.exists()
     assert not stale_handoff.exists()
-    assert not stale_tmp.exists()
+    assert not stale.exists()
     assert fresh_tmp.exists()
     assert state_file.exists()
     assert lock_file.exists()
@@ -67,9 +70,14 @@ def test_cleanup_apply_deletes_only_expired_files_under_safe_zones(tmp_path: Pat
     assert run_file.exists()
 
 
-def test_cleanup_preserves_important_records_and_operator_protected_paths(
+def test_cleanup_protection_classes_important_operator_referenced_and_malformed(
     tmp_path: Path,
 ) -> None:
+    """Every protection class survives cleanup: important-report (report_retention.json),
+    operator root_exceptions (*.png), referenced review evidence (report path in an
+    APPROVED handoff's artifact), and malformed review/audit handoffs (kept even
+    unparseable — never silently deleted, always investigable)."""
+    # Important-report + operator-protected.
     important = _old(tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "keep.html")
     screenshot = _old(tmp_path / ".dadaia" / "tmp" / "agent" / "operator.png")
     state_dir = tmp_path / ".dadaia" / "states"
@@ -82,25 +90,25 @@ def test_cleanup_preserves_important_records_and_operator_protected_paths(
     )
     (state_dir / "root_exceptions.txt").write_text("*.png\n", encoding="utf-8")
 
-    result = LifecycleHygieneService(tmp_path, now=NOW).cleanup(dry_run=False)
+    result1 = LifecycleHygieneService(tmp_path, now=NOW).cleanup(dry_run=False)
 
     assert important.exists()
     assert screenshot.exists()
-    assert result.deleted_paths == ()
-    protected = {candidate.path: candidate.protection_kind for candidate in result.candidates}
-    assert protected[".dadaia/reports/ctx/agent/keep.html"] is (
+    assert result1.deleted_paths == ()
+    protected1 = {c.path: c.protection_kind for c in result1.candidates}
+    assert protected1[".dadaia/reports/ctx/agent/keep.html"] is (
         HygieneProtectionKind.IMPORTANT_REPORT
     )
-    assert protected[".dadaia/tmp/agent/operator.png"] is (HygieneProtectionKind.OPERATOR_PROTECTED)
+    assert protected1[".dadaia/tmp/agent/operator.png"] is (
+        HygieneProtectionKind.OPERATOR_PROTECTED
+    )
 
-
-def test_cleanup_preserves_valid_referenced_artifacts_and_review_evidence(
-    tmp_path: Path,
-) -> None:
-    report = _old(tmp_path / ".dadaia" / "reports" / "ctx" / "review" / "old.html")
+    # Valid referenced artifact + review evidence — own workspace to avoid state overlap.
+    referenced_ws = tmp_path / "referenced-case"
+    report = _old(referenced_ws / ".dadaia" / "reports" / "ctx" / "review" / "old.html")
     referenced_report = ".dadaia/reports/ctx/review/old.html"
     handoff = _old(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "review.handoff.json",
+        referenced_ws / ".dadaia" / "handoff" / "ctx" / "review.handoff.json",
         content=json.dumps(
             {
                 "release_id": "v0.1.15",
@@ -111,39 +119,43 @@ def test_cleanup_preserves_valid_referenced_artifacts_and_review_evidence(
         ),
     )
 
-    result = LifecycleHygieneService(
-        tmp_path,
+    result2 = LifecycleHygieneService(
+        referenced_ws,
         now=NOW,
         active_release_id="v0.1.15",
     ).cleanup(dry_run=False)
 
     assert report.exists()
     assert handoff.exists()
-    assert result.deleted_paths == ()
-    protected = {candidate.path for candidate in result.candidates if candidate.protected}
-    assert protected == {
+    assert result2.deleted_paths == ()
+    protected2 = {c.path for c in result2.candidates if c.protected}
+    assert protected2 == {
         ".dadaia/reports/ctx/review/old.html",
         ".dadaia/handoff/ctx/review.handoff.json",
     }
 
-
-def test_cleanup_preserves_malformed_review_and_audit_handoffs(tmp_path: Path) -> None:
+    # Malformed review/audit handoffs — own workspace.
+    malformed_ws = tmp_path / "malformed-case"
     review = _old(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-01T000000Z-qa-review.handoff.json",
+        malformed_ws / ".dadaia" / "handoff" / "ctx" / "2026-06-01T000000Z-qa-review.handoff.json",
         content="{not json",
     )
     audit = _old(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-01T000000Z-security-audit.handoff.json",
+        malformed_ws
+        / ".dadaia"
+        / "handoff"
+        / "ctx"
+        / "2026-06-01T000000Z-security-audit.handoff.json",
         content="{not json",
     )
 
-    result = LifecycleHygieneService(tmp_path, now=NOW).cleanup(dry_run=False)
+    result3 = LifecycleHygieneService(malformed_ws, now=NOW).cleanup(dry_run=False)
 
     assert review.exists()
     assert audit.exists()
-    assert result.deleted_paths == ()
-    protected = {candidate.path for candidate in result.candidates if candidate.protected}
-    assert protected == {
+    assert result3.deleted_paths == ()
+    protected3 = {c.path for c in result3.candidates if c.protected}
+    assert protected3 == {
         ".dadaia/handoff/ctx/2026-06-01T000000Z-qa-review.handoff.json",
         ".dadaia/handoff/ctx/2026-06-01T000000Z-security-audit.handoff.json",
     }

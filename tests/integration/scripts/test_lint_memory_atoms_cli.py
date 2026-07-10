@@ -53,34 +53,33 @@ def _make_atom(
     return md_path
 
 
-def test_subprocess_clean_exits_zero(tmp_path: Path) -> None:
-    _make_atom(tmp_path)
-
+def test_subprocess_clean_exits_zero_bad_atom_exits_one(tmp_path: Path) -> None:
+    """Two subprocess runs: clean atom -> exit 0; a Changelog-section atom -> exit 1."""
+    clean_dir = tmp_path / "clean"
+    clean_dir.mkdir()
+    _make_atom(clean_dir)
     result = subprocess.run(
-        [sys.executable, str(_SCRIPT), "--memory-dir", str(tmp_path)],
+        [sys.executable, str(_SCRIPT), "--memory-dir", str(clean_dir)],
         capture_output=True,
         text=True,
         check=False,
     )
-
     assert result.returncode == 0, (
         f"Expected exit 0.\nstdout: {result.stdout!r}\nstderr: {result.stderr!r}"
     )
 
-
-def test_subprocess_bad_atom_exits_one(tmp_path: Path) -> None:
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
     _make_atom(
-        tmp_path,
+        bad_dir,
         body="## Propósito\n\nOK.\n\n## Changelog\n\nHistory.\n",
     )
-
-    result = subprocess.run(
-        [sys.executable, str(_SCRIPT), "--memory-dir", str(tmp_path)],
+    result2 = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--memory-dir", str(bad_dir)],
         capture_output=True,
         text=True,
         check=False,
     )
-
-    assert result.returncode == 1, (
-        f"Expected exit 1.\nstdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    assert result2.returncode == 1, (
+        f"Expected exit 1.\nstdout: {result2.stdout!r}\nstderr: {result2.stderr!r}"
     )

@@ -33,10 +33,6 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.golden_platform import norm_stderr
-
-# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
-
 
 _runner = CliRunner()
 _RELEASE = "v0.1.56"
@@ -114,8 +110,33 @@ def test_verb_persists_resolver_derived_snapshot(
     run_id: str,
     workflow_id: str,
     step_label: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-1 + AC-2(a/b/v): the run-store snapshot is resolver-derived; runtime stayed FAKE."""
+    """AC-1 + AC-2(a/b/v): the run-store snapshot is resolver-derived; runtime stayed FAKE.
+    The release-define row additionally carries a recording-fake extra case (folded from
+    the standalone resolved-model-in-request test): the built request's
+    ``resolved_model.profile_id`` equals the resolver's derived profile."""
+    recording: FakeAgentRuntime | None = None
+    if subcmd == ["release", "define"]:
+        # AC-2(c) extra case: capture every request via a recording FAKE adapter (the
+        # release-definition factory seam) so we can assert resolved_model afterward.
+        recording = FakeAgentRuntime(
+            result=AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="recording fake: APPROVED",
+                artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+                structured_output={"verdict": "APPROVED"},
+            )
+        )
+
+        def factory_builder(*, context: str, run_cwd: Path) -> object:  # noqa: ARG001
+            def factory(kind: AgentRuntimeKind) -> FakeAgentRuntime:
+                return recording  # type: ignore[return-value]
+
+            return factory
+
+        monkeypatch.setattr(container, "_release_definition_runtime_factory", factory_builder)
+
     result = _runner.invoke(
         app,
         [
@@ -157,110 +178,11 @@ def test_verb_persists_resolver_derived_snapshot(
     payload = json.loads(result.output)
     assert _run_json_runtimes(payload) == {AgentRuntimeKind.FAKE.value}
 
-
-@pytest.mark.parametrize(
-    ("subcmd", "step_model_label"), [(row[1], row[5]) for row in _VERBS], ids=_IDS
-)
-def test_verb_rejects_raw_step_model(
-    workspace: Path, subcmd: list[str], step_model_label: str
-) -> None:
-    """AC-2(iii): a raw ``--step-model label=<id>:<effort>`` is a D-3 profile-id rejection."""
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            *subcmd,
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--step-model",
-            f"{step_model_label}=gpt-5.5:high",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "profile id" in result.output
-
-
-@pytest.mark.parametrize("subcmd", [row[1] for row in _VERBS], ids=_IDS)
-def test_verb_model_flag_is_removed(workspace: Path, subcmd: list[str]) -> None:
-    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
-    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4).
-
-    ``--step-model <profile-id>`` (D-3) is the sole model-selection surface; the profile-id
-    resolution + raw-rejection are covered by ``test_verb_persists_resolver_derived_snapshot``
-    and ``test_verb_rejects_raw_step_model``. ``CliRunner`` takes NO ``mix_stderr`` kwarg
-    (removed in Click 8.2; the installed 8.4.1 ``TypeError``s on it).
-    """
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            *subcmd,
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--model",
-            "anything:high",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 2
-    assert "No such option: --model" in norm_stderr(result.stderr)
-    # Q4: the UsageError is on stderr — stdout stays empty (no partial JSON leaks).
-    assert result.stdout == ""
-
-
-def test_release_define_threads_resolved_model_into_request(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC-2(c): the built request carries the resolver-derived ``resolved_model``.
-
-    A recording FAKE adapter (via the release-definition factory seam) captures every
-    request; the ``release_scope`` request's ``resolved_model.profile_id`` equals the
-    resolver's derived profile. Also AC-2(v): the FAKE adapter (not codex/pi) executed.
-    """
-    recording = FakeAgentRuntime(
-        result=AgentRunResult(
-            status=AgentRunStatus.SUCCEEDED,
-            summary="recording fake: APPROVED",
-            artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
-            structured_output={"verdict": "APPROVED"},
-        )
-    )
-
-    def factory_builder(*, context: str, run_cwd: Path) -> object:  # noqa: ARG001
-        def factory(kind: AgentRuntimeKind) -> FakeAgentRuntime:
-            return recording
-
-        return factory
-
-    monkeypatch.setattr(container, "_release_definition_runtime_factory", factory_builder)
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "release",
-            "define",
-            "--release-id",
-            _RELEASE,
-            "--run-id",
-            "gov-cap",
-            "--harness",
-            "fake",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-
-    assert recording.runtime_kind() is AgentRuntimeKind.FAKE
-    assert recording.received_requests, "recording fake never ran"
-    first = recording.received_requests[0]
-    assert first.resolved_model is not None
-    resolver = container.build_workflow_policy_resolver(workspace, context=_CONTEXT)
-    expected = resolver.resolve("release_definition", context="default").step("release_scope")
-    assert expected is not None
-    # NOT ``FAKE == codex``: the request records the governed profile, the adapter stays fake.
-    assert first.resolved_model.profile_id == expected.model_profile
+    if recording is not None:
+        # AC-2(c): the built request carries the resolver-derived resolved_model; AC-2(v):
+        # the FAKE adapter (not codex/pi) executed.
+        assert recording.runtime_kind() is AgentRuntimeKind.FAKE
+        assert recording.received_requests, "recording fake never ran"
+        first = recording.received_requests[0]
+        assert first.resolved_model is not None
+        assert first.resolved_model.profile_id == expected.model_profile

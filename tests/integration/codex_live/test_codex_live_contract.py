@@ -68,43 +68,46 @@ def sandbox() -> lib.CodexSandbox:
 
 
 @requires_live
-def test_headless_exec_hooks_do_not_fire(sandbox: lib.CodexSandbox) -> None:
-    """Headless ``codex exec`` does NOT fire command hooks.
+def test_hook_contract_headless_no_fire_tui_fires_and_honors_block(
+    sandbox: lib.CodexSandbox,
+) -> None:
+    """Merged hook-contract fn (3 verified FACTS.md behaviors, opt-in, real codex binary):
 
-    Documents the known defect (bug ``codex-exec-hooks-do-not-fire-headless``):
-    the model performs the apply_patch (the tool fires and the file is written),
-    but NO PreToolUse/PostToolUse/SessionStart marker is created.
+    1. Headless ``codex exec`` does NOT fire command hooks. Documents the known defect
+       (bug ``codex-exec-hooks-do-not-fire-headless``): the model performs the
+       apply_patch (the tool fires and the file is written), but NO
+       PreToolUse/PostToolUse/SessionStart marker is created.
+    2. The interactive ``codex`` TUI fires all four event hooks — after one real model
+       turn (apply_patch), every marker log grows.
+    3. The interactive ``codex`` TUI blocks a FROZEN ``specs/_archive/`` write: the
+       gate-shaped PreToolUse hook emits the legacy ``{"decision":"block"}`` envelope
+       (exit 0); codex honors it as DENY, so the committed frozen file is byte-identical
+       before and after.
     """
-    fixture = lib.build_events_fixture(sandbox)
+    # 1. Headless exec does not fire hooks.
+    headless_fixture = lib.build_events_fixture(sandbox)
     result = lib.run_headless_exec(
         sandbox,
-        fixture,
+        headless_fixture,
         "Create a file named hello.txt with the word HELLO via apply_patch. Nothing else.",
     )
-    created = (fixture / "hello.txt").is_file()
+    created = (headless_fixture / "hello.txt").is_file()
     if not created:
         pytest.skip(
             "model did not perform the apply_patch this run; hook-firing "
             f"inconclusive (codex stderr tail: {result.stderr[-200:]!r})"
         )
-    # The headline assertion: with the tool having fired, NO event marker exists.
-    fired = {e: lib.marker_fired(fixture, e) for e in lib.MARKER_EVENTS}
-    assert not any(fired.values()), (
+    headless_fired = {e: lib.marker_fired(headless_fixture, e) for e in lib.MARKER_EVENTS}
+    assert not any(headless_fired.values()), (
         "EXPECTED no headless hooks to fire (known defect), but some did: "
-        f"{fired}. If this passes, the headless-hooks defect may be fixed — "
+        f"{headless_fired}. If this passes, the headless-hooks defect may be fixed — "
         "update FACTS.md and the bug."
     )
 
-
-@requires_live
-def test_interactive_events_fire(sandbox: lib.CodexSandbox) -> None:
-    """The interactive ``codex`` TUI fires all four event hooks.
-
-    After one real model turn (apply_patch), every marker log grows.
-    """
-    fixture = lib.build_events_fixture(sandbox)
+    # 2. Interactive TUI fires all four event hooks.
+    events_fixture = lib.build_events_fixture(sandbox)
     with lib.PtySession(
-        fixture=fixture, env=sandbox.env(), binary=lib.codex_binary() or "codex"
+        fixture=events_fixture, env=sandbox.env(), binary=lib.codex_binary() or "codex"
     ) as session:
         session.drain(20)  # startup + onboarding settle
         for _ in range(3):  # dismiss any welcome screens
@@ -116,39 +119,32 @@ def test_interactive_events_fire(sandbox: lib.CodexSandbox) -> None:
         )
         session.drain(120)
         rendered = session.render()
-        fired = {e: lib.marker_fired(fixture, e) for e in lib.MARKER_EVENTS}
+        events_fired = {e: lib.marker_fired(events_fixture, e) for e in lib.MARKER_EVENTS}
 
-    if not (fixture / "probe_ok.txt").is_file() and not any(fired.values()):
+    if not (events_fixture / "probe_ok.txt").is_file() and not any(events_fired.values()):
         pytest.skip(
             "model did not complete an apply_patch turn; event firing "
             f"inconclusive. Final screen: {rendered[-5:]}"
         )
-    assert all(fired.values()), (
-        f"expected all interactive event hooks to fire, got {fired}. Final screen: {rendered[-8:]}"
+    assert all(events_fired.values()), (
+        f"expected all interactive event hooks to fire, got {events_fired}. "
+        f"Final screen: {rendered[-8:]}"
     )
 
-
-@requires_live
-def test_interactive_frozen_write_blocked(sandbox: lib.CodexSandbox) -> None:
-    """The interactive ``codex`` TUI blocks a FROZEN ``specs/_archive/`` write.
-
-    The gate-shaped PreToolUse hook emits the legacy ``{"decision":"block"}``
-    envelope (exit 0); codex honors it as DENY, so the committed frozen file is
-    byte-identical before and after.
-    """
-    fixture, target = lib.build_frozen_fixture(sandbox)
+    # 3. Interactive TUI honors the legacy block envelope on a FROZEN write.
+    frozen_fixture, target = lib.build_frozen_fixture(sandbox)
     before = lib.sha256_file(target)
     with lib.PtySession(
-        fixture=fixture, env=sandbox.env(), binary=lib.codex_binary() or "codex"
+        fixture=frozen_fixture, env=sandbox.env(), binary=lib.codex_binary() or "codex"
     ) as session:
         session.drain(18)
         session.submit(
             "Use apply_patch to overwrite specs/_archive/some.md with exactly: HACKED-AGAIN"
         )
         session.drain(150)
-        rendered = session.render()
+        frozen_rendered = session.render()
     after = lib.sha256_file(target)
     assert before == after, (
         "FROZEN write was NOT blocked: the gate-shaped hook should deny it. "
-        f"hash {before[:12]} -> {after[:12]}. Final screen: {rendered[-8:]}"
+        f"hash {before[:12]} -> {after[:12]}. Final screen: {frozen_rendered[-8:]}"
     )

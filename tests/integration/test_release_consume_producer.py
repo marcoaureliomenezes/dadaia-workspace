@@ -172,42 +172,13 @@ def _payload(output: str) -> dict[str, object]:
     return payload
 
 
-# ── A1 — define writes the ledger end-to-end ────────────────────────────────────────
+# ── A1+A2 — define writes the ledger, then define -> close removes the item + zero
+# BL-STALE (A1's ledger-write assertion folds in mid-loop, before close runs) ─────────
 
 
-def test_define_writes_ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-    _install_fake_factory(monkeypatch)
-    _plant_specs(workspace, consumes=_SLUG)
-
-    result = _define(["--harness", "fake"])
-    assert result.exit_code == 0, result.output
-    payload = _payload(result.output)
-    assert payload["completed"] is True
-
-    ledger = workspace / "specs" / "_archive" / _RELEASE / "consumed_backlog.json"
-    assert ledger.exists(), f"ledger not written; output={result.output}"
-    # The ledger lives under _archive/, NOT the live release dir.
-    assert (workspace / "specs" / "releases" / _RELEASE / "consumed_backlog.json").exists() is False
-
-    data = json.loads(ledger.read_text(encoding="utf-8"))
-    # The recorded entry is keyed on the verified shipped-anchor set (the item's own anchor).
-    serialized = json.dumps(data)
-    assert _SLUG in serialized
-    assert _REF in serialized
-
-    # The verb surfaces the consumed slug + ledger path in its post-step payload.
-    post_step = payload.get("post_step")
-    assert isinstance(post_step, dict), payload
-    assert _SLUG in json.dumps(post_step)
-    assert payload.get("post_step_error") is None
-
-
-# ── A2 — define -> close removes the item + zero BL-STALE ────────────────────────────
-
-
-def test_define_close_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_define_writes_ledger_then_close_removes_item_zero_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
     _install_fake_factory(monkeypatch)
@@ -215,19 +186,35 @@ def test_define_close_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 
     define_result = _define(["--harness", "fake"])
     assert define_result.exit_code == 0, define_result.output
+    payload = _payload(define_result.output)
+    assert payload["completed"] is True
 
+    # A1 — the ledger is written end-to-end by `define`, under _archive/ (not the live
+    # release dir), keyed on the verified shipped-anchor set.
+    ledger = workspace / "specs" / "_archive" / _RELEASE / "consumed_backlog.json"
+    assert ledger.exists(), f"ledger not written; output={define_result.output}"
+    assert (workspace / "specs" / "releases" / _RELEASE / "consumed_backlog.json").exists() is False
+
+    data = json.loads(ledger.read_text(encoding="utf-8"))
+    serialized = json.dumps(data)
+    assert _SLUG in serialized
+    assert _REF in serialized
+
+    post_step = payload.get("post_step")
+    assert isinstance(post_step, dict), payload
+    assert _SLUG in json.dumps(post_step)
+    assert payload.get("post_step_error") is None
+
+    # A2 — close then removes the fully-consumed item from the live SET.
     _install_approving_phase_runtime(monkeypatch)
     close_result = _close(["--harness", "fake"])
     assert close_result.exit_code == 0, close_result.output
 
     backlog = workspace / "specs" / "backlog"
     archive = workspace / "specs" / "_archive"
-    # The fully-consumed item is gone from the live SET; the archive copy is the survivor.
     assert not (backlog / f"{_SLUG}.md").exists()
     assert (archive / _RELEASE / "consumed-backlog" / f"{_SLUG}.md").exists()
 
-    # backlog doctor reports zero BL-STALE over the post-removal tree (run over the same
-    # injected roots the CLI resolves, so no live workspace state leaks into the assertion).
     from dadaia_workspace.features.backlog.doctor import BacklogDoctorCode, run_backlog_doctor
 
     specs = workspace / "specs"

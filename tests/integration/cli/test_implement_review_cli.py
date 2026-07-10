@@ -16,12 +16,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-import typer
 from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import lifecycle as lifecycle_cli
-from dadaia_workspace.cli.commands.lifecycle import app as lifecycle_app
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -32,10 +30,6 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.golden_platform import norm_stderr
-
-# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
-
 
 _runner = CliRunner()
 _RELEASE = "v0.1.56"
@@ -101,9 +95,13 @@ def _assert_resolver_derived_snapshot(workspace_root: Path, run_id: str) -> None
         assert entry.harness in {"codex", "pi"}
 
 
-def test_implement_review_approved_round_completes_and_persists_snapshot(workspace: Path) -> None:
-    """AC-4(c): an APPROVED round → COMPLETED, leaving a resolver-derived run-store snapshot."""
-    result = _runner.invoke(
+def test_implement_review_approved_and_all_rejected_persist_resolver_snapshot(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-4(c): two invocations on one workspace — an APPROVED round completes and
+    persists a resolver-derived snapshot; an injected all-REJECTED run blocks
+    (bounded retry exhaustion) and still persists a snapshot."""
+    approved_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -118,18 +116,13 @@ def test_implement_review_approved_round_completes_and_persists_snapshot(workspa
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["completed"] is True
-    assert payload["final_verdict"] == "APPROVED"
-    assert payload["attempts"] == 1
+    assert approved_result.exit_code == 0, approved_result.output
+    approved_payload = json.loads(approved_result.stdout)
+    assert approved_payload["completed"] is True
+    assert approved_payload["final_verdict"] == "APPROVED"
+    assert approved_payload["attempts"] == 1
     _assert_resolver_derived_snapshot(workspace, "fr3-approved")
 
-
-def test_implement_review_all_rejected_run_blocks_and_persists_snapshot(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC-4(c): an all-REJECTED run → BLOCK (retry exhaustion), still leaving a snapshot."""
     rejecting = _RejectingRuntime(AgentRuntimeKind.FAKE)
 
     def _factory(workspace_root: Path, *, context: str) -> object:
@@ -137,7 +130,7 @@ def test_implement_review_all_rejected_run_blocks_and_persists_snapshot(
 
     monkeypatch.setattr(lifecycle_cli, "_implement_review_runtime_factory", _factory)
 
-    result = _runner.invoke(
+    rejected_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -154,60 +147,13 @@ def test_implement_review_all_rejected_run_blocks_and_persists_snapshot(
             "--json",
         ],
     )
-    assert result.exit_code == 3, result.output
-    payload = json.loads(result.stdout)
-    assert payload["completed"] is False
-    assert payload["blocked"] is not None
-    assert "bounded retry" in payload["blocked"]["reason"]
-    assert payload["rounds"] and all(r["review_verdict"] == "REJECTED" for r in payload["rounds"])
+    assert rejected_result.exit_code == 3, rejected_result.output
+    rejected_payload = json.loads(rejected_result.stdout)
+    assert rejected_payload["completed"] is False
+    assert rejected_payload["blocked"] is not None
+    assert "bounded retry" in rejected_payload["blocked"]["reason"]
+    assert rejected_payload["rounds"] and all(
+        r["review_verdict"] == "REJECTED" for r in rejected_payload["rounds"]
+    )
     # The snapshot-freezing wiring ran (only the runtime factory was injected) → snapshot persists.
     _assert_resolver_derived_snapshot(workspace, "fr3-rejected")
-
-
-def test_implement_review_is_a_registered_verb() -> None:
-    """AC-4(c): the verb is registered on the lifecycle app."""
-    registered = set(typer.main.get_command(lifecycle_app).commands)
-    assert "implement-review" in registered
-
-
-def test_implement_review_rejects_raw_step_model(workspace: Path) -> None:
-    """AC-2(iii) parity: a raw ``--step-model label=<id>:<effort>`` is a D-3 rejection."""
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "implement-review",
-            "--skip-preflight",
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--step-model",
-            "implement=gpt-5.5:high",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "profile id" in result.output
-
-
-def test_implement_review_model_flag_is_removed(workspace: Path) -> None:
-    """v0.1.57 FR6 (inverted from the v0.1.56 non-fatal-deprecation case): ``--model`` is now
-    an UNKNOWN option — exit 2 + ``No such option: --model`` on stderr + empty stdout (Q4)."""
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "implement-review",
-            "--skip-preflight",
-            "--release-id",
-            _RELEASE,
-            "--harness",
-            "fake",
-            "--model",
-            "anything:high",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 2
-    assert "No such option: --model" in norm_stderr(result.stderr)
-    assert result.stdout == ""

@@ -62,7 +62,9 @@ def _plant_bl_schema_violation(repo: Path) -> Path:
 
 
 def test_unrelated_commit_passes_despite_preexisting_backlog_debt(tmp_path: Path) -> None:
-    """(a) staged non-backlog paths + broken backlog on disk ⇒ gate skips, does NOT block."""
+    """(a) staged non-backlog paths + broken backlog on disk ⇒ gate skips, does NOT block.
+    Also folds in: a repo with no specs/backlog/ (not an SDD spec context) is a silent
+    no-op (must not attempt the git-diff scoping at all)."""
     repo = _init_repo(tmp_path)
     # Pre-existing backlog debt sits in the working tree but is NOT part of this commit.
     _plant_bl_schema_violation(repo)
@@ -72,6 +74,13 @@ def test_unrelated_commit_passes_despite_preexisting_backlog_debt(tmp_path: Path
 
     # Must NOT raise — the staged changeset does not intersect specs/backlog/**.
     _run_backlog_doctor_gate(repo)
+
+    no_backlog_repo = tmp_path / "plain"
+    (no_backlog_repo / "specs").mkdir(parents=True)
+    _git(no_backlog_repo, "init", "-q")
+    _git(no_backlog_repo, "config", "user.email", "t@e.st")
+    _git(no_backlog_repo, "config", "user.name", "Test")
+    _run_backlog_doctor_gate(no_backlog_repo)
 
 
 def test_staged_backlog_violation_still_blocks(tmp_path: Path) -> None:
@@ -83,14 +92,3 @@ def test_staged_backlog_violation_still_blocks(tmp_path: Path) -> None:
     with pytest.raises(typer.Exit) as exc:
         _run_backlog_doctor_gate(repo)
     assert exc.value.exit_code == 1
-
-
-def test_no_backlog_dir_is_noop(tmp_path: Path) -> None:
-    """A repo with no specs/backlog/ (not an SDD spec context) is a silent no-op."""
-    repo = tmp_path / "plain"
-    (repo / "specs").mkdir(parents=True)
-    _git(repo, "init", "-q")
-    _git(repo, "config", "user.email", "t@e.st")
-    _git(repo, "config", "user.name", "Test")
-    # Must NOT raise (and must not attempt the git-diff scoping — no backlog dir at all).
-    _run_backlog_doctor_gate(repo)

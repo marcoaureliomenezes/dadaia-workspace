@@ -144,7 +144,9 @@ def _new_demand(**over: object) -> BacklogDemand:
 # ---------------------------------------------------------------------------
 
 
-def test_full_sequence_completes_and_advances(tmp_path: Path) -> None:
+def test_full_sequence_completes_fragment_prompt_and_sequence_labels(tmp_path: Path) -> None:
+    """Happy path (full sequence completes+advances) + emitted prompt carries the
+    fragment (not generic) + the shipped _SEQUENCE matches the §4 seven-step order."""
     store = _MemoryRunStore()
     wf = _workflow(tmp_path, store, _registry(tmp_path))
 
@@ -159,11 +161,6 @@ def test_full_sequence_completes_and_advances(tmp_path: Path) -> None:
     grill = next(s for s in result.steps if s.label == "conflict_resolution_grill")
     assert grill.skipped is True
 
-
-def test_emitted_prompt_carries_fragment_not_generic(tmp_path: Path) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(tmp_path, store, _registry(tmp_path))
-    result = wf.run("bd-2", _new_demand())
     intake = next(s for s in result.steps if s.label == "intake_grill")
     assert intake.prompt_text is not None
     assert "backlog_definition.intake_grill" in intake.prompt_text
@@ -174,6 +171,17 @@ def test_emitted_prompt_carries_fragment_not_generic(tmp_path: Path) -> None:
     required = intake.prompt_text[intake.prompt_text.index("## Required output") :]
     assert "agent-run-result-v1" in required
     assert "backlog-demand-v1" not in required
+
+    expected_sequence = [
+        "intake_grill",
+        "subject_bind",
+        "existing_backlog_review",
+        "reconcile_decision",
+        "conflict_resolution_grill",
+        "backlog_author",
+        "backlog_review_gate",
+    ]
+    assert [s.label for s in _SEQUENCE] == expected_sequence
 
 
 # ---------------------------------------------------------------------------
@@ -270,17 +278,3 @@ def test_python_gate_matrix(tmp_path: Path, case: _Case) -> None:
 
     if case.grill_runs and grill is not None:
         assert grill.skipped is False, f"{case.name} should RUN the conflict grill"
-
-
-def test_sequence_labels_match_module_sequence(tmp_path: Path) -> None:
-    """The shipped _SEQUENCE carries the §4 seven-step order with the conditional grill."""
-    expected = [
-        "intake_grill",
-        "subject_bind",
-        "existing_backlog_review",
-        "reconcile_decision",
-        "conflict_resolution_grill",
-        "backlog_author",
-        "backlog_review_gate",
-    ]
-    assert [s.label for s in _SEQUENCE] == expected

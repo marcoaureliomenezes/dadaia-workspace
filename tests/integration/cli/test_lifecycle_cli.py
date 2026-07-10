@@ -1,4 +1,14 @@
-"""Integration tests for the lifecycle CLI command group."""
+"""Integration tests for the lifecycle CLI command group.
+
+Merged per plan-integration.md (18 -> 3): keep resume-still-blocked (real reason
+surfaced, exit != 0); merge exit-code matrix (preflight 3 / status 0 / usage 2 /
+resume-missing 1 / resume-ok 0 — absorbs the skeletons file's resume-ok test) -> 1;
+merge auto-default (no-signal->fake-silent + entry-pin->pi_headless+loud echo +
+explicit-wins + hermetic scrub, injected pi stream shared) -> 1. Deleted: 3 --help
+greps, LAW1 claude dupes (owned by the policy matrix), claude-adapter-importable +
+_HARNESS_KINDS (unit-ownable), --model dupe (owned by the AC-9 matrix), help-text
+auto-default grep. Entry-harness auto-default echo (AC-9 sabotage anchor) kept.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +21,6 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.golden_platform import norm_stderr
-
-# _norm_stderr: consolidated into tests/helpers/golden_platform.norm_stderr (v0.1.64 FR1).
-
 
 _runner = CliRunner()
 
@@ -25,86 +31,6 @@ def _init_workspace(path: Path) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(path)
     return path
-
-
-def test_lifecycle_help_exposes_required_command_group() -> None:
-    result = _runner.invoke(app, ["lifecycle", "--help"])
-
-    assert result.exit_code == 0, result.output
-    for command in (
-        "status",
-        "preflight",
-        "hygiene",
-        "report",
-        "resume",
-        "backlog",
-        "release",
-        "implement",
-        "review",
-        "close",
-    ):
-        assert command in result.output
-
-
-def test_lifecycle_hygiene_help_exposes_status_and_clean() -> None:
-    result = _runner.invoke(app, ["lifecycle", "hygiene", "--help"])
-
-    assert result.exit_code == 0, result.output
-    assert "status" in result.output
-    assert "clean" in result.output
-
-
-def test_lifecycle_review_help_exposes_review_gates() -> None:
-    result = _runner.invoke(app, ["lifecycle", "review", "--help"])
-
-    assert result.exit_code == 0, result.output
-    assert "qa" in result.output
-    assert "security" in result.output
-    assert "code" in result.output
-
-
-def test_lifecycle_preflight_uses_blocked_exit_code(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "preflight"])
-
-    assert result.exit_code == 3
-    assert "BLOCKED" in result.output
-
-
-def test_lifecycle_status_uses_ok_exit_code(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "status"])
-
-    assert result.exit_code == 0, result.output
-    assert "OK" in result.output
-
-
-def test_lifecycle_usage_error_uses_typer_exit_code() -> None:
-    result = _runner.invoke(app, ["lifecycle", "resume"])
-
-    assert result.exit_code == 2
-
-
-def test_lifecycle_resume_missing_uses_internal_error_exit_code(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "resume", "missing"])
-
-    assert result.exit_code == 1
-    assert "INTERNAL_ERROR" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -154,115 +80,55 @@ def test_lifecycle_resume_cli_exits_nonzero_on_still_blocked_run(
 
 
 # ---------------------------------------------------------------------------
-# WS-2 (T-24-06) — LAW 1 harness restriction + LAW 2 discrete model validation
+# Exit-code matrix: preflight 3 / status 0 / usage 2 / resume-missing 1 /
+# resume-ok 0 (absorbs the command-skeletons file's resume-ok test).
 # ---------------------------------------------------------------------------
 
 
-def test_lifecycle_implement_rejects_claude_harness_with_layer1_pointer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """LAW 1: ``--harness claude`` is rejected, pointing to Layer-1 use."""
+def test_lifecycle_exit_code_matrix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(
-        app,
-        ["lifecycle", "implement", "--release-id", "v0.1.24", "--harness", "claude"],
+    preflight_result = _runner.invoke(app, ["lifecycle", "preflight"])
+    assert preflight_result.exit_code == 3
+    assert "BLOCKED" in preflight_result.output
+
+    status_result = _runner.invoke(app, ["lifecycle", "status"])
+    assert status_result.exit_code == 0, status_result.output
+    assert "OK" in status_result.output
+
+    usage_result = _runner.invoke(app, ["lifecycle", "resume"])
+    assert usage_result.exit_code == 2
+
+    resume_missing_result = _runner.invoke(app, ["lifecycle", "resume", "missing"])
+    assert resume_missing_result.exit_code == 1
+    assert "INTERNAL_ERROR" in resume_missing_result.output
+
+    from dadaia_workspace.core.models.lifecycle import (
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+    from dadaia_workspace.infrastructure.json_lifecycle_run_store import (
+        JsonLifecycleRunStore,
     )
 
-    assert result.exit_code != 0
-    assert "Layer-1" in result.output
-    assert "pi or codex" in result.output
-
-
-def test_lifecycle_implement_rejects_raw_step_model_and_unknown_model(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """v0.1.57 FR6 (the (b) clause inverted from the v0.1.56 non-fatal-deprecation case):
-
-    (a) ``--step-model implement=<id>:<effort>`` (a raw model string) is STILL rejected as a
-        D-3 profile-id violation (KEPT); (b) ``--model`` is now an UNKNOWN option — exit 2 +
-        ``No such option: --model`` on stderr + empty stdout (Q4), not a deprecation warning.
-    """
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    # (a) raw --step-model is a D-3 rejection (profile ids only) — UNCHANGED.
-    raw = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "implement",
-            "--release-id",
-            "v0.1.24",
-            "--harness",
-            "codex",
-            "--step-model",
-            "implement=gpt-5.5:high",
-        ],
+    JsonLifecycleRunStore(workspace).save(
+        LifecycleRun(
+            run_id="run-ok",
+            context="dadaia-workspace",
+            release_id="v0.1.15",
+            command="implement",
+            phase=LifecyclePhase.IMPLEMENTATION,
+            status=LifecycleRunStatus.BLOCKED,
+            current_step="preflight",
+            expected_artifacts=(),
+            idempotency_key="idem-run-ok",
+        )
     )
-    assert raw.exit_code != 0
-    assert "profile id" in raw.output
-
-    # (b) --model is hard-removed — an unknown-option UsageError on stderr, exit 2, empty stdout.
-    dep = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "implement",
-            "--release-id",
-            "v0.1.24",
-            "--harness",
-            "fake",
-            "--model",
-            "anything:high",
-        ],
-    )
-    assert dep.exit_code == 2
-    assert "No such option: --model" in norm_stderr(dep.stderr)
-    assert dep.stdout == ""
-
-
-def test_lifecycle_implement_rejects_claude_step_harness_in_pipeline(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """LAW 1: ``--step-harness label=claude`` is rejected in the pipeline too."""
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.24",
-            "--step-harness",
-            "implement=claude",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "Layer-1" in result.output
-
-
-def test_claude_sdk_adapter_remains_importable_and_enum_value_kept() -> None:
-    """LAW 1 keeps the CLAUDE_SDK adapter + enum value in code (Layer-1 unaffected)."""
-    from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
-    from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
-
-    assert AgentRuntimeKind.CLAUDE_SDK.value == "claude_sdk"
-    adapter = ClaudeSdkAdapter(cwd=Path("/tmp"))
-    assert adapter.runtime_kind() is AgentRuntimeKind.CLAUDE_SDK
-
-
-def test_claude_not_a_workflow_harness_choice() -> None:
-    """LAW 1: ``claude`` is not in the Layer-2 workflow harness set."""
-    from dadaia_workspace.cli.commands.lifecycle import _HARNESS_KINDS
-
-    assert "claude" not in _HARNESS_KINDS
-    assert set(_HARNESS_KINDS) == {"fake", "codex", "pi"}
+    resume_ok_result = _runner.invoke(app, ["lifecycle", "resume", "run-ok"])
+    assert resume_ok_result.exit_code == 0, resume_ok_result.output
+    assert resume_ok_result.output.strip() == "OK resumed run-ok"
 
 
 # ---------------------------------------------------------------------------
@@ -329,67 +195,48 @@ def _inject_pi_stream(monkeypatch: pytest.MonkeyPatch) -> list[object]:
     return calls
 
 
-def test_implement_defaults_fake_silently_with_no_entry_signal(
+def test_implement_entry_harness_auto_default_matrix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-3: no --harness + no entry signal ⇒ fake, NO echo (behavior unchanged)."""
+    """AC-3/AC-4: no-signal defaults fake silently; DADAIA_ENTRY_HARNESS=pi auto-defaults
+    to pi with the loud echo (injected pi stream proves it reached the real adapter
+    path); an explicit --harness always wins over the entry pin, no echo; and a
+    simulated developer CODEX_SESSION_ID is scrubbed hermetically back to fake."""
     import json as _json
 
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
+    # (a) no --harness + no entry signal => fake, no echo.
+    no_signal_ws = _init_workspace(tmp_path / "no-signal")
+    monkeypatch.chdir(no_signal_ws)
+    no_signal_result = _runner.invoke(
         app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
     )
+    assert no_signal_result.exit_code == 3, no_signal_result.output
+    no_signal_payload = _json.loads(no_signal_result.output)
+    assert no_signal_payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in no_signal_result.stderr
 
-    assert result.exit_code == 3, result.output
-    payload = _json.loads(result.output)
-    assert payload["runtime"] == "fake"
-    assert "[harness] auto-default:" not in result.stderr
-
-
-def test_implement_auto_defaults_pi_from_entry_pin_with_loud_echo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC-3: DADAIA_ENTRY_HARNESS=pi + no --harness ⇒ pi worker + the loud echo.
-
-    Only the pi subprocess stream is injected (no real binary, no credits); the engine
-    records the step runtime as ``pi_headless`` — proof the auto-default reached the
-    real adapter path, not just the resolver.
-    """
-    import json as _json
-
+    # (b) DADAIA_ENTRY_HARNESS=pi + no --harness => pi worker + the loud echo.
+    entry_pin_ws = _init_workspace(tmp_path / "entry-pin")
     calls = _inject_pi_stream(monkeypatch)
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    monkeypatch.chdir(entry_pin_ws)
     monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
-
-    result = _runner.invoke(
+    entry_pin_result = _runner.invoke(
         app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
     )
-
-    assert result.exit_code == 3, result.output
-    payload = _json.loads(result.stdout)
+    assert entry_pin_result.exit_code == 3, entry_pin_result.output
+    entry_pin_payload = _json.loads(entry_pin_result.stdout)
     assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
-    assert payload["runtime"] == "pi_headless"
+    assert entry_pin_payload["runtime"] == "pi_headless"
     # AC-9 sabotage (d): dropping the loud echo fails exactly here.
-    assert _AUTO_ECHO_PI in result.stderr
+    assert _AUTO_ECHO_PI in entry_pin_result.stderr
     # --json stdout stays pure JSON — the echo rides stderr.
-    # result.output is the COMBINED stream (Click 8.2+); stdout stays pure JSON.
-    assert "[harness]" not in result.stdout
+    assert "[harness]" not in entry_pin_result.stdout
 
-
-def test_implement_explicit_fake_wins_over_entry_pin_no_echo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC-3: explicit --harness fake always wins — no auto-default, no echo."""
-    import json as _json
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    # (c) explicit --harness fake always wins over the entry pin — no auto-default, no echo.
+    explicit_ws = _init_workspace(tmp_path / "explicit-wins")
+    monkeypatch.chdir(explicit_ws)
     monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
-
-    result = _runner.invoke(
+    explicit_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -401,42 +248,23 @@ def test_implement_explicit_fake_wins_over_entry_pin_no_echo(
             "--json",
         ],
     )
+    assert explicit_result.exit_code == 3, explicit_result.output
+    explicit_payload = _json.loads(explicit_result.stdout)
+    assert explicit_payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in explicit_result.stderr
 
-    assert result.exit_code == 3, result.output
-    payload = _json.loads(result.stdout)
-    assert payload["runtime"] == "fake"
-    assert "[harness] auto-default:" not in result.stderr
-
-
-def test_implement_envelope_hermetic_against_developer_codex_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC-4: a simulated developer CODEX_SESSION_ID + the shared envelope scrub still
-    resolves ``fake`` — a defaulted test can never spawn a real worker."""
-    import json as _json
-
+    # (d) AC-4: a simulated developer CODEX_SESSION_ID + the shared envelope scrub still
+    # resolves fake — a defaulted test can never spawn a real worker.
     from tests.fixtures.harness_env import scrub_entry_signal_env
 
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    hermetic_ws = _init_workspace(tmp_path / "hermetic-scrub")
+    monkeypatch.chdir(hermetic_ws)
     monkeypatch.setenv("CODEX_SESSION_ID", "developer-codex-tui-sess")
     scrub_entry_signal_env(monkeypatch)
-
-    result = _runner.invoke(
+    hermetic_result = _runner.invoke(
         app, ["lifecycle", "implement", "--release-id", "multiharness-engine-v0116", "--json"]
     )
-
-    assert result.exit_code == 3, result.output
-    payload = _json.loads(result.output)
-    assert payload["runtime"] == "fake"
-    assert "[harness] auto-default:" not in result.stderr
-
-
-def test_implement_help_text_names_auto_default() -> None:
-    """FR3: the --harness help names the auto sentinel + the Layer-1 claude exclusion."""
-    result = _runner.invoke(app, ["lifecycle", "implement", "--help"])
-
-    assert result.exit_code == 0, result.output
-    # Strip Rich box glyphs + collapse whitespace so the assert survives help wrapping.
-    normalized = " ".join("".join(" " if ch in "│╭╮╰╯─" else ch for ch in result.output).split())
-    assert "auto (entry session)" in normalized
+    assert hermetic_result.exit_code == 3, hermetic_result.output
+    hermetic_payload = _json.loads(hermetic_result.output)
+    assert hermetic_payload["runtime"] == "fake"
+    assert "[harness] auto-default:" not in hermetic_result.stderr
