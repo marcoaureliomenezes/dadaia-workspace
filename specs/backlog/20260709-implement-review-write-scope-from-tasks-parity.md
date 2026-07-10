@@ -6,7 +6,7 @@ owner: project-manager (curates)
 source: "v0.1.68 closure return — code-reviewer LOW: FR3 write-scope derivation wired into the `pipeline` verb only; the `implement-review` verb has no equivalent"
 intents:
   - subject: { kind: code, ref: "dadaia_workspace/cli/commands/lifecycle.py#implement_review" }
-    change: "extend the FR3 (v0.1.68) TASKS.md write-scope derivation to the `implement-review` CLI verb, matching what the `pipeline` verb gained. Today `implement-review` (lifecycle.py:1497-1577) has neither the write_scope_from_tasks union nor a --write-scope flag, so a release driven through implement-review under-scopes its implement worker exactly as the pipeline verb did pre-v0.1.68. Wire write_scope_from_tasks(specs_dir, release_id) into the implement step of run_implement_review_loop the same way the pipeline verb does, and add a --write-scope escape hatch for parity. Requires threading specs_dir/release into the implement-review pipeline builder."
+    change: "extend the FR3 (v0.1.68) TASKS.md write-scope derivation to the `implement-review` CLI verb, matching what the `pipeline` verb gained. Today `implement-review` (lifecycle.py:1656-1753 at HEAD 7b08beef) has neither the write_scope_from_tasks union nor a --write-scope flag, so a release driven through implement-review under-scopes its implement worker exactly as the pipeline verb did pre-v0.1.68. Wire write_scope_from_tasks(specs_dir, release_id) into the implement step of run_implement_review_loop the same way the pipeline verb does, and add a --write-scope escape hatch for parity. Requires threading specs_dir/release into the implement-review pipeline builder."
 ---
 
 # BACKLOG — Give `implement-review` the same TASKS.md write-scope derivation as `pipeline`
