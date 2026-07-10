@@ -4,6 +4,9 @@
 (or UNRESOLVED/AMBIGUOUS + an alias suggestion). ``list_anchors(kind?)`` lists the live
 anchor set. The surface NEVER writes a backlog file or the alias map. Fixtures use a fixed
 ``tmp_path`` tree (SPEC §3.7.8); all roots injected.
+
+The unresolved-carries-alias-suggestion row is the actionable-error contract — kept
+standalone.
 """
 
 from __future__ import annotations
@@ -45,40 +48,37 @@ def _registry(tmp_path: Path) -> object:
     )
 
 
-def test_resolve_one_resolved(tmp_path: Path) -> None:
-    reg = _registry(tmp_path)
-    result = resolve_one(reg, "pkg/m.py#Widget", SubjectKind.CODE)
-    assert isinstance(result, PreviewResult)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor_id == "pkg/m.py#Widget"
-
-
 def test_resolve_one_unresolved_carries_alias_suggestion(tmp_path: Path) -> None:
+    """The actionable-error contract: an UNRESOLVED ref must carry a usable alias
+    suggestion — kept standalone."""
     reg = _registry(tmp_path)
     result = resolve_one(reg, "pkg/m.py#Ghost", SubjectKind.CODE)
     assert result.status is BindStatus.UNRESOLVED
     assert "Ghost" in result.message
-    # The preview surfaces an actionable alias-map suggestion for the gap.
     assert result.alias_suggestion is not None
     assert "->" in result.alias_suggestion
 
 
-def test_resolve_one_panel_alias(tmp_path: Path) -> None:
+def test_resolve_one_resolved_and_panel_alias(tmp_path: Path) -> None:
     reg = _registry(tmp_path)
-    result = resolve_one(reg, "the panel api", SubjectKind.PANEL)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor_id == "panel:/api/widgets"
+
+    code_result = resolve_one(reg, "pkg/m.py#Widget", SubjectKind.CODE)
+    assert isinstance(code_result, PreviewResult)
+    assert code_result.status is BindStatus.RESOLVED
+    assert code_result.anchor_id == "pkg/m.py#Widget"
+
+    panel_result = resolve_one(reg, "the panel api", SubjectKind.PANEL)
+    assert panel_result.status is BindStatus.RESOLVED
+    assert panel_result.anchor_id == "panel:/api/widgets"
 
 
-def test_list_anchors_filtered(tmp_path: Path) -> None:
+def test_list_anchors_filtered_and_all(tmp_path: Path) -> None:
     reg = _registry(tmp_path)
+
     code = list_anchors(reg, SubjectKind.CODE)
     ids = {a.id for a in code}
     assert "pkg/m.py#Widget" in ids
     assert all(a.kind is SubjectKind.CODE for a in code)
 
-
-def test_list_anchors_all(tmp_path: Path) -> None:
-    reg = _registry(tmp_path)
     everything = list_anchors(reg, None)
     assert any(a.kind is SubjectKind.CATALOG for a in everything)

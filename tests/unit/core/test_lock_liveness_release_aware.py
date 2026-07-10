@@ -9,6 +9,10 @@ ACTIVE release keeps the pid-veto (no false steal).
 
 These tests cover both the pure predicate and the ``lease.steal`` reclaim path, and preserve
 the legacy (``active_release is None``) behavior.
+
+CRIT: lease pid-veto vs release-aware reclaim. Both tables below keep every row — this is
+the no-steal/no-deadlock boundary. The two ``lease.steal`` execution-path tests are kept
+standalone (the executed reclaim path, not just the pure predicate).
 """
 
 from __future__ import annotations
@@ -31,14 +35,16 @@ def _stale_clock() -> datetime:
     return _HB + timedelta(seconds=_TTL + 30)
 
 
-def _rec(release: str, *, pid: int = 4321) -> dict[str, object]:
-    return {
+def _rec(release: str | None, *, pid: int = 4321) -> dict[str, object]:
+    base: dict[str, object] = {
         "heartbeat": _HB.isoformat(),
         "ttl": _TTL,
         "pid": pid,
         "session_id": "holder-sess",
-        "release": release,
     }
+    if release is not None:
+        base["release"] = release
+    return base
 
 
 def _alive(_pid: int) -> bool:
@@ -50,87 +56,74 @@ def _dead(_pid: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# AC-8 (a) — archived/non-ACTIVE-release lease with a LIVE pid is reclaimable
+# AC-8 (a) — a lease is reclaimable when pinned to a non-active release (any
+# active_release value), the pid is dead, or there is no pid probe at all.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("active", ["v0.1.43", "none", ""])
-def test_archived_release_lease_reclaimable_despite_live_pid(active: str) -> None:
-    rec = _rec("v0.1.41")  # pinned to a closed/archived release
-    assert (
-        lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_alive, active_release=active)
-        is True
-    )
+@pytest.mark.parametrize(
+    ("name", "release", "pid_probe", "active_release"),
+    [
+        ("archived_v0143_active", "v0.1.41", _alive, "v0.1.43"),
+        ("archived_none_active", "v0.1.41", _alive, "none"),
+        ("archived_empty_active", "v0.1.41", _alive, ""),
+        # A dead holder is reclaimable on the plain TTL verdict regardless of release.
+        ("dead_pid_archived_release", "v0.1.41", _dead, "v0.1.43"),
+        # pid_probe=None ⇒ TTL-only verdict (reclaimable); release bypass is moot but
+        # consistent.
+        ("no_probe_archived_release", "v0.1.41", None, "v0.1.43"),
+    ],
+)
+def test_reclaim_table(name: str, release: str, pid_probe: object, active_release: str) -> None:
+    rec = _rec(release)
+    kwargs: dict[str, object] = {"clock": _stale_clock, "active_release": active_release}
+    if pid_probe is not None:
+        kwargs["pid_probe"] = pid_probe
+    assert lock_liveness.is_stale(rec, **kwargs) is True  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# AC-8 (b) — live-ACTIVE-release lease with a LIVE pid is STILL pid-vetoed
+# AC-8 (b) + backward-compat — every case where the pid-veto STILL HOLDS (no false
+# steal): live-ACTIVE-release, legacy None active_release, TTL-fresh record, no
+# release field, empty release field.
 # ---------------------------------------------------------------------------
 
 
-def test_active_release_lease_still_pid_vetoed() -> None:
-    rec = _rec("v0.1.43")  # pinned to the live ACTIVE release
-    assert (
-        lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_alive, active_release="v0.1.43")
-        is False
-    )
+@pytest.mark.parametrize(
+    ("name", "rec_fn", "clock_fn", "active_release"),
+    [
+        # A lease pinned to the live ACTIVE release is STILL pid-vetoed.
+        ("active_release_lease", lambda: _rec("v0.1.43"), _stale_clock, "v0.1.43"),
+        # active_release=None ⇒ release-agnostic pid-veto, exactly as before.
+        ("legacy_none_active_release", lambda: _rec("v0.1.41"), _stale_clock, None),
+        # A TTL-fresh record stays live even when its release differs from the active
+        # one.
+        ("fresh_record_never_stale", lambda: _rec("v0.1.41"), lambda: _HB, "v0.1.43"),
+        # A legacy record carrying no release field still gets the pid-veto (nothing to
+        # compare).
+        (
+            "no_release_field",
+            lambda: {"heartbeat": _HB.isoformat(), "ttl": _TTL, "pid": 4321, "session_id": "x"},
+            _stale_clock,
+            "v0.1.43",
+        ),
+        # An empty-string release is not a release pin → pid-veto applies (no bypass).
+        ("empty_release_field", lambda: _rec(""), _stale_clock, "v0.1.43"),
+    ],
+)
+def test_veto_holds_table(
+    name: str, rec_fn: object, clock_fn: object, active_release: str | None
+) -> None:
+    rec = rec_fn()  # type: ignore[operator]
+    kwargs: dict[str, object] = {"clock": clock_fn, "pid_probe": _alive}
+    if active_release is not None:
+        kwargs["active_release"] = active_release
+    assert lock_liveness.is_stale(rec, **kwargs) is False  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# Backward-compat + edge cases (preserve existing is_stale semantics)
-# ---------------------------------------------------------------------------
-
-
-def test_legacy_none_active_release_keeps_pid_veto() -> None:
-    """active_release=None ⇒ release-agnostic pid-veto, exactly as before."""
-    rec = _rec("v0.1.41")
-    assert lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_alive) is False
-
-
-def test_release_bypass_never_makes_fresh_record_stale() -> None:
-    """A TTL-fresh record stays live even when its release differs from the active one."""
-    rec = _rec("v0.1.41")
-    assert (
-        lock_liveness.is_stale(rec, clock=lambda: _HB, pid_probe=_alive, active_release="v0.1.43")
-        is False
-    )
-
-
-def test_dead_pid_archived_release_reclaimable() -> None:
-    """A dead holder is reclaimable on the plain TTL verdict regardless of release."""
-    rec = _rec("v0.1.41")
-    assert (
-        lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_dead, active_release="v0.1.43")
-        is True
-    )
-
-
-def test_record_without_release_field_keeps_pid_veto() -> None:
-    """A legacy record carrying no release field still gets the pid-veto (nothing to compare)."""
-    rec = {"heartbeat": _HB.isoformat(), "ttl": _TTL, "pid": 4321, "session_id": "x"}
-    assert (
-        lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_alive, active_release="v0.1.43")
-        is False
-    )
-
-
-def test_empty_release_field_keeps_pid_veto() -> None:
-    """An empty-string release is not a release pin → pid-veto applies (no bypass)."""
-    rec = _rec("")
-    assert (
-        lock_liveness.is_stale(rec, clock=_stale_clock, pid_probe=_alive, active_release="v0.1.43")
-        is False
-    )
-
-
-def test_no_probe_archived_release_reclaimable() -> None:
-    """pid_probe=None ⇒ TTL-only verdict (reclaimable); release bypass is moot but consistent."""
-    rec = _rec("v0.1.41")
-    assert lock_liveness.is_stale(rec, clock=_stale_clock, active_release="v0.1.43") is True
-
-
-# ---------------------------------------------------------------------------
-# AC-8 — lease.steal reclaim path is release-aware
+# AC-8 — lease.steal reclaim path is release-aware (the executed reclaim path, not
+# just the pure predicate).
 # ---------------------------------------------------------------------------
 
 

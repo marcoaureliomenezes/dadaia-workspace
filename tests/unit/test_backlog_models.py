@@ -3,6 +3,9 @@
 Pure typed ``Subject``/``Intent`` dataclasses with per-kind ref validation. ``code`` refs
 are module-relative ``path#symbol`` — absolute / operator-local paths and private repo names
 are rejected (SPEC §3.8 finding #7). No resolution/binding lives here (that is T-25-02).
+
+Operator-local-path rejection = privacy law — rows survive below in the reject table, plus
+the absolute-path case kept standalone.
 """
 
 from __future__ import annotations
@@ -20,10 +23,7 @@ from dadaia_workspace.core.models.backlog import (
 pytestmark = pytest.mark.unit
 
 
-# ── SubjectKind ───────────────────────────────────────────────────────────────
-
-
-def test_subject_kind_members() -> None:
+def test_subject_kind_members_and_valid_construction() -> None:
     assert {k.value for k in SubjectKind} == {
         "code",
         "api",
@@ -33,14 +33,7 @@ def test_subject_kind_members() -> None:
         "invariant",
         "catalog",
     }
-
-
-# ── valid subjects per kind ─────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    ("kind", "ref"),
-    [
+    valid = [
         (SubjectKind.CODE, "dadaia_workspace/core/models/lifecycle.py#AgentRuntimeKind"),
         (SubjectKind.CLI, "backlog doctor"),
         (SubjectKind.CATALOG, "panel"),
@@ -48,12 +41,11 @@ def test_subject_kind_members() -> None:
         (SubjectKind.INVARIANT, "INV-no-claude-at-L2"),
         (SubjectKind.PANEL, "panel:/api/dadaia-workflows"),
         (SubjectKind.API, "api:/api/kanban"),
-    ],
-)
-def test_valid_subject_constructs(kind: SubjectKind, ref: str) -> None:
-    subject = Subject(kind=kind, ref=ref)
-    assert subject.kind is kind
-    assert subject.ref == ref
+    ]
+    for kind, ref in valid:
+        subject = Subject(kind=kind, ref=ref)
+        assert subject.kind is kind
+        assert subject.ref == ref
 
 
 def test_intent_is_frozen() -> None:
@@ -62,49 +54,67 @@ def test_intent_is_frozen() -> None:
         intent.change = "y"  # type: ignore[misc]
 
 
-# ── code ref validation (the privacy-critical one) ──────────────────────────────
-
-
-def test_code_ref_requires_hash_symbol() -> None:
-    with pytest.raises(ValueError, match="path#symbol"):
-        Subject(SubjectKind.CODE, "dadaia_workspace/core/models/lifecycle.py")
+# ── code ref validation privacy law — the absolute-path rejection is the CRIT row ──
 
 
 def test_code_ref_rejects_absolute_path() -> None:
+    """PRIVACY: an absolute operator-local path must never bind as a code ref."""
     with pytest.raises(ValueError, match="module-relative|absolute"):
         Subject(SubjectKind.CODE, "/home/marco/workspace/foo.py#Bar")
 
 
-def test_code_ref_rejects_home_traversal() -> None:
-    with pytest.raises(ValueError, match="module-relative|operator-local"):
-        Subject(SubjectKind.CODE, "~/secret/foo.py#Bar")
+@pytest.mark.parametrize(
+    ("name", "kind", "ref", "match"),
+    [
+        (
+            "requires_hash_symbol",
+            SubjectKind.CODE,
+            "dadaia_workspace/core/models/lifecycle.py",
+            "path#symbol",
+        ),
+        (
+            # PRIVACY: `~` home-relative refs must never bind.
+            "rejects_home_traversal",
+            SubjectKind.CODE,
+            "~/secret/foo.py#Bar",
+            "module-relative|operator-local",
+        ),
+        (
+            # PRIVACY: `../` parent traversal must never escape the source root.
+            "rejects_parent_traversal",
+            SubjectKind.CODE,
+            "../other-repo/foo.py#Bar",
+            "module-relative|traversal",
+        ),
+        (
+            "rejects_empty_symbol",
+            SubjectKind.CODE,
+            "dadaia_workspace/core/foo.py#",
+            None,
+        ),
+    ],
+)
+def test_code_ref_reject_table(name: str, kind: SubjectKind, ref: str, match: str | None) -> None:
+    if match is not None:
+        with pytest.raises(ValueError, match=match):
+            Subject(kind, ref)
+    else:
+        with pytest.raises(ValueError):
+            Subject(kind, ref)
 
 
-def test_code_ref_rejects_parent_traversal() -> None:
-    with pytest.raises(ValueError, match="module-relative|traversal"):
-        Subject(SubjectKind.CODE, "../other-repo/foo.py#Bar")
-
-
-def test_code_ref_rejects_empty_symbol() -> None:
-    with pytest.raises(ValueError):
-        Subject(SubjectKind.CODE, "dadaia_workspace/core/foo.py#")
-
-
-def test_empty_ref_rejected_for_all_kinds() -> None:
+def test_empty_ref_rejected_for_all_kinds_and_blank_change_rejected() -> None:
     for kind in SubjectKind:
         with pytest.raises(ValueError):
             Subject(kind, "")
-
-
-def test_blank_change_rejected() -> None:
     with pytest.raises(ValueError, match="change"):
         Intent(subject=Subject(SubjectKind.INVARIANT, "INV-1"), change="   ")
 
 
-# ── (de)serialization round-trip ────────────────────────────────────────────────
+# ── (de)serialization round-trip + rejection table ──────────────────────────────
 
 
-def test_parse_intents_round_trip() -> None:
+def test_parse_intents_round_trip_and_none_is_empty() -> None:
     raw = [
         {
             "subject": {
@@ -124,26 +134,22 @@ def test_parse_intents_round_trip() -> None:
     assert intents[0].change == "remove OPENCODE_RUN"
     assert serialize_intents(intents) == raw
 
-
-def test_parse_intents_none_is_empty() -> None:
     assert parse_intents(None) == []
 
 
-def test_parse_intents_rejects_non_list() -> None:
-    with pytest.raises(ValueError, match="list"):
-        parse_intents({"subject": {}})  # type: ignore[arg-type]
-
-
-def test_parse_intents_rejects_unknown_kind() -> None:
-    with pytest.raises(ValueError, match="kind"):
-        parse_intents([{"subject": {"kind": "bogus", "ref": "x"}, "change": "c"}])
-
-
-def test_parse_intents_rejects_missing_change() -> None:
-    with pytest.raises(ValueError, match="change"):
-        parse_intents([{"subject": {"kind": "invariant", "ref": "INV-1"}}])
-
-
-def test_parse_intents_rejects_missing_subject() -> None:
-    with pytest.raises(ValueError, match="subject"):
-        parse_intents([{"change": "c"}])
+@pytest.mark.parametrize(
+    ("name", "payload", "match"),
+    [
+        ("non_list", {"subject": {}}, "list"),
+        ("unknown_kind", [{"subject": {"kind": "bogus", "ref": "x"}, "change": "c"}], "kind"),
+        (
+            "missing_change",
+            [{"subject": {"kind": "invariant", "ref": "INV-1"}}],
+            "change",
+        ),
+        ("missing_subject", [{"change": "c"}], "subject"),
+    ],
+)
+def test_parse_intents_reject_table(name: str, payload: object, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        parse_intents(payload)  # type: ignore[arg-type]

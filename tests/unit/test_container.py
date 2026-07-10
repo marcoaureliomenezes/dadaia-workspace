@@ -1,4 +1,8 @@
-"""Unit tests for container.py builder functions."""
+"""Unit tests for container.py builder functions.
+
+CRIT: the two container pid-probe tests are the only production-wiring proof of
+FR-W1-02 no-steal for LOCK-GC — kept verbatim, never merged away.
+"""
 
 import json
 import os
@@ -10,9 +14,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace import container
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.workspace.service import WorkspaceService
 
 
 def _init_states(tmp_path: Path) -> Path:
@@ -22,96 +25,78 @@ def _init_states(tmp_path: Path) -> Path:
     return states
 
 
-def test_build_workspace_service_returns_service(tmp_path: Path) -> None:
-    svc = container.build_workspace_service(tmp_path)
-    assert isinstance(svc, WorkspaceService)
+def _init_states_v2(tmp_path: Path) -> Path:
+    """Initialize a v2 spec_contexts.json (the LOCK-GC path actually loads the store)."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text(json.dumps({"schema_version": "2", "contexts": []}))
+    return states
 
 
-def test_build_public_service_returns_service() -> None:
-    svc = container.build_public_service()
-    assert isinstance(svc, PublicAssetService)
+# ---------------------------------------------------------------------------
+# build_*_service — WorkspaceNotInitializedError guards
+# ---------------------------------------------------------------------------
 
 
-def test_guard_initialized_raises_when_not_initialized(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "builder",
+    [
+        container.build_spec_context_service,
+        container.build_doctor_service,
+        container.build_academy_service,
+        container.build_export_service,
+        container.build_orchestration_catalog_service,
+        container.build_panel_service,
+    ],
+)
+def test_build_service_raises_when_not_initialized(tmp_path: Path, builder: object) -> None:
     with pytest.raises(WorkspaceNotInitializedError):
-        container.build_spec_context_service(tmp_path)
+        builder(tmp_path)  # type: ignore[operator]
 
 
-def test_build_spec_context_service_succeeds_when_initialized(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# build_*_service — succeeds when initialized (+ repos/public, which need no init)
+# ---------------------------------------------------------------------------
+
+
+def test_build_service_succeeds_table(tmp_path: Path) -> None:
+    from dadaia_workspace.features.export.service import ExportService
+    from dadaia_workspace.features.public.service import PublicAssetService
+    from dadaia_workspace.features.repos.service import ReposService
+    from dadaia_workspace.features.spec_context.doctor import DoctorService
+    from dadaia_workspace.features.workflows.service import WorkflowsService
+    from dadaia_workspace.features.workspace.service import WorkspaceService
+
+    # No initialization required.
+    assert isinstance(container.build_workspace_service(tmp_path), WorkspaceService)
+    assert isinstance(container.build_public_service(), PublicAssetService)
+    assert isinstance(container.build_repos_service(), ReposService)
+
     _init_states(tmp_path)
-    svc = container.build_spec_context_service(tmp_path)
-    assert svc is not None
+    assert container.build_spec_context_service(tmp_path) is not None
+    assert container.build_academy_service(tmp_path) is not None
+    assert isinstance(container.build_orchestration_catalog_service(tmp_path), WorkflowsService)
+    assert isinstance(container.build_export_service(tmp_path), ExportService)
+    assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
+
+    from dadaia_workspace.features.panel.service import PanelService
+
+    assert isinstance(container.build_panel_service(tmp_path), PanelService)
 
 
-def test_build_doctor_service_raises_when_not_initialized(tmp_path: Path) -> None:
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_doctor_service(tmp_path)
+# ---------------------------------------------------------------------------
+# _agent_catalog
+# ---------------------------------------------------------------------------
 
 
-def test_build_academy_service_raises_when_not_initialized(tmp_path: Path) -> None:
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_academy_service(tmp_path)
+def test_agent_catalog_empty_and_sorted(tmp_path: Path) -> None:
+    assert container._agent_catalog(tmp_path) == ()
 
-
-def test_build_academy_service_succeeds_when_initialized(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    svc = container.build_academy_service(tmp_path)
-    assert svc is not None
-
-
-def test_build_export_service_raises_when_not_initialized(tmp_path: Path) -> None:
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_export_service(tmp_path)
-
-
-def test_agent_catalog_returns_empty_when_no_agents_dir(tmp_path: Path) -> None:
-    result = container._agent_catalog(tmp_path)
-    assert result == ()
-
-
-def test_agent_catalog_returns_sorted_agent_names(tmp_path: Path) -> None:
     agents_dir = tmp_path / ".dadaia" / "agentic" / "agents"
     agents_dir.mkdir(parents=True)
     (agents_dir / "product-engineer.md").write_text("# Product Engineer")
     (agents_dir / "software-architect.md").write_text("# Software Architect")
-    result = container._agent_catalog(tmp_path)
-    assert result == ("product-engineer", "software-architect")
-
-
-def test_build_orchestration_catalog_service_raises_when_not_initialized(tmp_path: Path) -> None:
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_orchestration_catalog_service(tmp_path)
-
-
-def test_build_orchestration_catalog_service_succeeds_when_initialized(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    from dadaia_workspace.features.workflows.service import WorkflowsService
-
-    svc = container.build_orchestration_catalog_service(tmp_path)
-    assert isinstance(svc, WorkflowsService)
-
-
-def test_build_export_service_succeeds_when_initialized(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    from dadaia_workspace.features.export.service import ExportService
-
-    svc = container.build_export_service(tmp_path)
-    assert isinstance(svc, ExportService)
-
-
-def test_build_doctor_service_succeeds_when_initialized(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    from dadaia_workspace.features.spec_context.doctor import DoctorService
-
-    svc = container.build_doctor_service(tmp_path)
-    assert isinstance(svc, DoctorService)
-
-
-def test_build_repos_service_returns_service() -> None:
-    from dadaia_workspace.features.repos.service import ReposService
-
-    svc = container.build_repos_service()
-    assert isinstance(svc, ReposService)
+    assert container._agent_catalog(tmp_path) == ("product-engineer", "software-architect")
 
 
 # ---------------------------------------------------------------------------
@@ -126,17 +111,7 @@ def test_build_repos_service_returns_service() -> None:
 # --fix. The fix wires build_pid_probe() into the DoctorService.
 # ---------------------------------------------------------------------------
 
-from dadaia_workspace.core import kernel_tunables  # noqa: E402
-
 _GC_CTX = "containergcctx"
-
-
-def _init_states_v2(tmp_path: Path) -> Path:
-    """Initialize a v2 spec_contexts.json (the LOCK-GC path actually loads the store)."""
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(json.dumps({"schema_version": "2", "contexts": []}))
-    return states
 
 
 def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
@@ -215,19 +190,6 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
     actions = doctor.fix()
     assert not path.exists(), "TTL-expired dead-holder lease should be reclaimed by --fix"
     assert any("LOCK-GC" in a for a in actions)
-
-
-def test_build_panel_service_raises_when_not_initialized(tmp_path: Path) -> None:
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_panel_service(tmp_path)
-
-
-def test_build_panel_service_succeeds_when_initialized(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    from dadaia_workspace.features.panel.service import PanelService
-
-    svc = container.build_panel_service(tmp_path)
-    assert isinstance(svc, PanelService)
 
 
 # ---------------------------------------------------------------------------
@@ -327,31 +289,26 @@ def test_build_workflow_model_profile_registry_returns_catalog() -> None:
     ]
 
 
-def test_build_workflow_model_policy_store_guards_init(tmp_path: Path) -> None:
+def test_build_workflow_model_policy_store_guard_and_canonical_path(tmp_path: Path) -> None:
     with pytest.raises(WorkspaceNotInitializedError):
         container.build_workflow_model_policy_store(tmp_path)
 
-
-def test_build_workflow_model_policy_store_path_is_canonical(tmp_path: Path) -> None:
     _init_states(tmp_path)
     store = container.build_workflow_model_policy_store(tmp_path)
     assert store.path == tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
 
 
-def test_build_workflow_policy_resolver_missing_overlay_uses_defaults(tmp_path: Path) -> None:
+def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> None:
+    from dadaia_workspace.core.models.workflow_execution import PolicySource
+
     _init_states(tmp_path)
     resolver = container.build_workflow_policy_resolver(tmp_path)
     snapshot = resolver.resolve("implementation", context="default")
-    from dadaia_workspace.core.models.workflow_execution import PolicySource
-
     impl = snapshot.step("implement")
     assert impl is not None
     assert impl.source is PolicySource.LIBRARY_DEFAULT
     assert impl.model_profile == "codex-implementation-standard"
 
-
-def test_build_workflow_policy_resolver_honors_overlay(tmp_path: Path) -> None:
-    _init_states(tmp_path)
     store = container.build_workflow_model_policy_store(tmp_path)
     overlay = store.parse(
         {
@@ -366,10 +323,10 @@ def test_build_workflow_policy_resolver_honors_overlay(tmp_path: Path) -> None:
     )
     store.save(overlay)
 
-    resolver = container.build_workflow_policy_resolver(tmp_path)
-    impl = resolver.resolve("implementation", context="default").step("implement")
-    assert impl is not None
-    assert impl.model_profile == "codex-review-deep"
+    overlay_resolver = container.build_workflow_policy_resolver(tmp_path)
+    overlay_impl = overlay_resolver.resolve("implementation", context="default").step("implement")
+    assert overlay_impl is not None
+    assert overlay_impl.model_profile == "codex-review-deep"
 
 
 def test_build_workflow_policy_resolver_invalid_overlay_raises(tmp_path: Path) -> None:

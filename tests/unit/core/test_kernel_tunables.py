@@ -19,6 +19,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core import kernel_tunables
 
 
@@ -71,7 +73,7 @@ def _imports_name_from_kernel_tunables(source: str, name: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 
-def test_tunables_are_pure_constants() -> None:
+def test_tunables_are_pure_constants_with_no_io_imports() -> None:
     assert isinstance(kernel_tunables.LEASE_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS, float)
     assert isinstance(kernel_tunables.SENTINEL_GC_TTL_SECONDS, int)
@@ -80,9 +82,7 @@ def test_tunables_are_pure_constants() -> None:
     assert isinstance(kernel_tunables.CAS_INITIAL_BACKOFF_SECONDS, float)
     assert isinstance(kernel_tunables.RECONCILER_THROTTLE_TTL_SECONDS, int)
 
-
-def test_kernel_tunables_has_no_io_imports() -> None:
-    """The module must be a zero-I/O constant home (no os/subprocess/pathlib/open)."""
+    # The module must be a zero-I/O constant home (no os/subprocess/pathlib/open).
     source = _module_source("dadaia_workspace.core.kernel_tunables")
     tree = ast.parse(source)
     banned = {"os", "subprocess", "pathlib", "sys", "json", "time", "socket"}
@@ -99,24 +99,18 @@ def test_kernel_tunables_has_no_io_imports() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_lease_imports_ttl_from_kernel_tunables() -> None:
-    src = _module_source("dadaia_workspace.features.spec_context.lease")
-    assert _imports_name_from_kernel_tunables(src, "LEASE_TTL_SECONDS")
-
-
-def test_lease_imports_cas_retries_from_kernel_tunables() -> None:
-    src = _module_source("dadaia_workspace.features.spec_context.lease")
-    assert _imports_name_from_kernel_tunables(src, "CAS_MAX_RETRIES")
-
-
-def test_ctx_inject_imports_sentinel_gc_ttl_from_kernel_tunables() -> None:
-    src = _module_source("dadaia_workspace.hooks.ctx_inject")
-    assert _imports_name_from_kernel_tunables(src, "SENTINEL_GC_TTL_SECONDS")
-
-
-def test_doctor_imports_sentinel_orphan_age_from_kernel_tunables() -> None:
-    src = _module_source("dadaia_workspace.features.spec_context.doctor")
-    assert _imports_name_from_kernel_tunables(src, "SENTINEL_ORPHAN_AGE_SECONDS")
+@pytest.mark.parametrize(
+    ("module", "name"),
+    [
+        ("dadaia_workspace.features.spec_context.lease", "LEASE_TTL_SECONDS"),
+        ("dadaia_workspace.features.spec_context.lease", "CAS_MAX_RETRIES"),
+        ("dadaia_workspace.hooks.ctx_inject", "SENTINEL_GC_TTL_SECONDS"),
+        ("dadaia_workspace.features.spec_context.doctor", "SENTINEL_ORPHAN_AGE_SECONDS"),
+    ],
+)
+def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) -> None:
+    src = _module_source(module)
+    assert _imports_name_from_kernel_tunables(src, name)
 
 
 # --------------------------------------------------------------------------- #
@@ -124,7 +118,7 @@ def test_doctor_imports_sentinel_orphan_age_from_kernel_tunables() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_lease_renew_default_ttl_observes_kernel_constant(monkeypatch) -> None:
+def test_lease_renew_default_ttl_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
     """The lease liveness path observes the centralized ``kernel_tunables`` TTL constant.
 
     Re-stamp ``kernel_tunables.LEASE_TTL_SECONDS`` to a sentinel and assert the

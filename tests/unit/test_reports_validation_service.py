@@ -1,4 +1,8 @@
-"""Unit tests for ReportsValidationService — 8 tests using FakeHandoffValidator."""
+"""Unit tests for ReportsValidationService.
+
+Content-hash integrity feeds the pre-push security-verdict chokepoint — the
+artifact-path-outside-workspace rejection is CRIT and kept standalone.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +15,6 @@ from dadaia_workspace.features.reports.validation import (
     ReportsValidationService,
 )
 from tests.fakes import FakeHandoffValidator
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _write_valid_handoff(path: Path, artifact_path_rel: str = "report.html") -> dict[str, object]:
@@ -38,75 +38,104 @@ def _write_valid_handoff(path: Path, artifact_path_rel: str = "report.html") -> 
     return doc
 
 
-# ---------------------------------------------------------------------------
-# Test 1: happy path — valid handoff returns ValidationResult(valid=True)
-# ---------------------------------------------------------------------------
+def _doc_with_artifact(
+    *,
+    artifact_path: str | None,
+    content_hash: str,
+    agent: str = "software-engineer",
+    context: str = "dadaia-workspace",
+) -> dict[str, object]:
+    artifact: dict[str, object] = {"type": "report", "content_hash": content_hash}
+    if artifact_path is not None:
+        artifact["path"] = artifact_path
+    return {
+        "schema_version": "handoff-v1",
+        "agent": agent,
+        "context": context,
+        "produced_at": "2026-05-16T23:29:05Z",
+        "artifact": artifact,
+    }
 
 
-def test_validate_file_happy_path(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-    handoff_path = tmp_path / "my-report.handoff.json"
-    _write_valid_handoff(handoff_path)
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is True
-    assert result.errors == ()
-    assert result.hash_status == "match"
-    assert len(fake.calls) == 1
+# --- validate_file() — happy path / malformed JSON / schema violation ------------
 
 
-# ---------------------------------------------------------------------------
-# Test 2: malformed JSON → valid=False with malformed-JSON error
-# ---------------------------------------------------------------------------
+def test_validate_file_table(tmp_path: Path) -> None:
+    happy_fake = FakeHandoffValidator(canned_errors=[])
+    happy_service = ReportsValidationService(validator=happy_fake, reports_root=tmp_path)
+    happy_path = tmp_path / "my-report.handoff.json"
+    _write_valid_handoff(happy_path)
+    happy_result = happy_service.validate_file(happy_path)
+    assert happy_result.valid is True
+    assert happy_result.errors == ()
+    assert happy_result.hash_status == "match"
+    assert len(happy_fake.calls) == 1
 
+    malformed_dir = tmp_path / "malformed"
+    malformed_dir.mkdir()
+    malformed_fake = FakeHandoffValidator(canned_errors=[])
+    malformed_service = ReportsValidationService(
+        validator=malformed_fake, reports_root=malformed_dir
+    )
+    malformed_path = malformed_dir / "bad.handoff.json"
+    malformed_path.write_text("{not valid json", encoding="utf-8")
+    malformed_result = malformed_service.validate_file(malformed_path)
+    assert malformed_result.valid is False
+    assert len(malformed_result.errors) >= 1
+    assert "$root" in malformed_result.errors[0].field_path
+    assert "malformed" in malformed_result.errors[0].message.lower()
+    assert len(malformed_fake.calls) == 0  # not called with malformed content
 
-def test_validate_file_malformed_json(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-    handoff_path = tmp_path / "bad.handoff.json"
-    handoff_path.write_text("{not valid json", encoding="utf-8")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is False
-    assert len(result.errors) >= 1
-    assert "$root" in result.errors[0].field_path
-    assert "malformed" in result.errors[0].message.lower()
-    # Validator should NOT have been called with malformed content
-    assert len(fake.calls) == 0
-
-
-# ---------------------------------------------------------------------------
-# Test 3: schema violation propagated from FakeHandoffValidator → valid=False
-# ---------------------------------------------------------------------------
-
-
-def test_validate_file_schema_violation_propagated(tmp_path: Path):
+    violation_dir = tmp_path / "violated"
+    violation_dir.mkdir()
     violation = HandoffValidationError("agent", "required field missing")
-    fake = FakeHandoffValidator(canned_errors=[violation])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-    handoff_path = tmp_path / "violated.handoff.json"
-    _write_valid_handoff(handoff_path)
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is False
-    assert len(result.errors) == 1
-    assert result.errors[0].field_path == "agent"
-
-
-# ---------------------------------------------------------------------------
-# Test 4: validate_all discovers *.handoff.json recursively under root
-# ---------------------------------------------------------------------------
+    violation_fake = FakeHandoffValidator(canned_errors=[violation])
+    violation_service = ReportsValidationService(
+        validator=violation_fake, reports_root=violation_dir
+    )
+    violation_path = violation_dir / "violated.handoff.json"
+    _write_valid_handoff(violation_path)
+    violation_result = violation_service.validate_file(violation_path)
+    assert violation_result.valid is False
+    assert len(violation_result.errors) == 1
+    assert violation_result.errors[0].field_path == "agent"
 
 
-def test_validate_all_discovers_recursively(tmp_path: Path):
+def test_validate_file_hash_mismatch_and_missing_artifact_path(tmp_path: Path) -> None:
     fake = FakeHandoffValidator(canned_errors=[])
     service = ReportsValidationService(validator=fake, reports_root=tmp_path)
 
-    # Create handoff files at different depths
+    mismatch_dir = tmp_path / "mismatch"
+    mismatch_dir.mkdir()
+    (mismatch_dir / "report.html").write_bytes(b"<html>changed</html>")
+    mismatch_handoff = mismatch_dir / "report.handoff.json"
+    mismatch_handoff.write_text(
+        json.dumps(_doc_with_artifact(artifact_path="report.html", content_hash="b" * 64)),
+        encoding="utf-8",
+    )
+    mismatch_result = service.validate_file(mismatch_handoff)
+    assert mismatch_result.valid is False
+    assert mismatch_result.hash_status == "mismatch"
+    assert any("artifact hash check failed" in error.message for error in mismatch_result.errors)
+
+    no_path_dir = tmp_path / "no-path"
+    no_path_dir.mkdir()
+    no_path_handoff = no_path_dir / "handoff.handoff.json"
+    no_path_handoff.write_text(
+        json.dumps(_doc_with_artifact(artifact_path=None, content_hash="b" * 64)), encoding="utf-8"
+    )
+    no_path_result = service.validate_file(no_path_handoff)
+    assert no_path_result.valid is True
+    assert no_path_result.hash_status is None
+
+
+# --- validate_all() — recursive discovery + context filter -----------------------
+
+
+def test_validate_all_recursive_and_context_filter(tmp_path: Path) -> None:
+    fake = FakeHandoffValidator(canned_errors=[])
+    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
+
     (tmp_path / "ctx-a").mkdir()
     (tmp_path / "ctx-a" / "agent1").mkdir()
     _write_valid_handoff(tmp_path / "ctx-a" / "agent1" / "r1.handoff.json")
@@ -115,125 +144,56 @@ def test_validate_all_discovers_recursively(tmp_path: Path):
     (tmp_path / "ctx-b" / "agent2").mkdir()
     _write_valid_handoff(tmp_path / "ctx-b" / "agent2" / "r3.handoff.json")
 
-    results = service.validate_all()
+    all_results = service.validate_all()
+    assert len(all_results) == 3
 
-    assert len(results) == 3
-
-
-# ---------------------------------------------------------------------------
-# Test 5: validate_all with context= filter only returns matching subdir
-# ---------------------------------------------------------------------------
+    filtered_results = service.validate_all(context="ctx-a")
+    assert len(filtered_results) == 2
+    assert all("ctx-a" in str(r.path) for r in filtered_results)
 
 
-def test_validate_all_context_filter(tmp_path: Path):
+# --- check_hash() — match / mismatch / missing-artifact / workspace-relative -----
+
+
+def test_check_hash_table(tmp_path: Path) -> None:
     fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
 
-    (tmp_path / "ctx-a").mkdir()
-    (tmp_path / "ctx-a" / "se").mkdir()
-    _write_valid_handoff(tmp_path / "ctx-a" / "se" / "r1.handoff.json")
-
-    (tmp_path / "ctx-b").mkdir()
-    (tmp_path / "ctx-b" / "pe").mkdir()
-    _write_valid_handoff(tmp_path / "ctx-b" / "pe" / "r2.handoff.json")
-
-    results = service.validate_all(context="ctx-a")
-
-    assert len(results) == 1
-    assert "ctx-a" in str(results[0].path)
-
-
-# ---------------------------------------------------------------------------
-# Test 6: check_hash returns "match" when artifact sha256 matches handoff's content_hash
-# ---------------------------------------------------------------------------
-
-
-def test_check_hash_returns_match(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-
-    # Create artifact and compute its hash
-    artifact = tmp_path / "report.html"
+    match_dir = tmp_path / "match"
+    match_dir.mkdir()
+    match_service = ReportsValidationService(validator=fake, reports_root=match_dir)
+    artifact = match_dir / "report.html"
     artifact.write_bytes(b"<html>content</html>")
     actual_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    match_handoff = match_dir / "report.handoff.json"
+    match_handoff.write_text(
+        json.dumps(_doc_with_artifact(artifact_path="report.html", content_hash=actual_hash)),
+        encoding="utf-8",
+    )
+    assert match_service.check_hash(match_handoff) == "match"
 
-    # Write handoff JSON referring to the artifact with the correct hash
-    handoff_path = tmp_path / "report.handoff.json"
-    doc: dict[str, object] = {
-        "schema_version": "handoff-v1",
-        "agent": "software-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-16T23:29:05Z",
-        "artifact": {
-            "type": "report",
-            "path": "report.html",
-            "content_hash": actual_hash,
-        },
-    }
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    mismatch_dir = tmp_path / "mismatch2"
+    mismatch_dir.mkdir()
+    mismatch_service = ReportsValidationService(validator=fake, reports_root=mismatch_dir)
+    (mismatch_dir / "report.html").write_bytes(b"<html>original</html>")
+    mismatch_handoff = mismatch_dir / "report.handoff.json"
+    mismatch_handoff.write_text(
+        json.dumps(_doc_with_artifact(artifact_path="report.html", content_hash="b" * 64)),
+        encoding="utf-8",
+    )
+    assert mismatch_service.check_hash(mismatch_handoff) == "mismatch"
 
-    status = service.check_hash(handoff_path)
-    assert status == "match"
-
-
-# ---------------------------------------------------------------------------
-# Test 7: check_hash returns "mismatch" when sha256 differs
-# ---------------------------------------------------------------------------
-
-
-def test_check_hash_returns_mismatch(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-
-    artifact = tmp_path / "report.html"
-    artifact.write_bytes(b"<html>original</html>")
-
-    handoff_path = tmp_path / "report.handoff.json"
-    doc: dict[str, object] = {
-        "schema_version": "handoff-v1",
-        "agent": "software-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-16T23:29:05Z",
-        "artifact": {
-            "type": "report",
-            "path": "report.html",
-            "content_hash": "b" * 64,  # deliberately wrong hash
-        },
-    }
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
-
-    status = service.check_hash(handoff_path)
-    assert status == "mismatch"
+    missing_dir = tmp_path / "missing"
+    missing_dir.mkdir()
+    missing_service = ReportsValidationService(validator=fake, reports_root=missing_dir)
+    missing_handoff = missing_dir / "report.handoff.json"
+    missing_handoff.write_text(
+        json.dumps(_doc_with_artifact(artifact_path="nonexistent.html", content_hash="a" * 64)),
+        encoding="utf-8",
+    )
+    assert missing_service.check_hash(missing_handoff) == "missing_artifact"
 
 
-# ---------------------------------------------------------------------------
-# Test 8: check_hash returns "missing_artifact" when sibling artifact does not exist
-# ---------------------------------------------------------------------------
-
-
-def test_check_hash_returns_missing_artifact(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-
-    handoff_path = tmp_path / "report.handoff.json"
-    doc: dict[str, object] = {
-        "schema_version": "handoff-v1",
-        "agent": "software-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-16T23:29:05Z",
-        "artifact": {
-            "type": "report",
-            "path": "nonexistent.html",  # no file here
-            "content_hash": "a" * 64,
-        },
-    }
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
-
-    status = service.check_hash(handoff_path)
-    assert status == "missing_artifact"
-
-
-def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path):
+def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path) -> None:
     fake = FakeHandoffValidator(canned_errors=[])
     handoff_root = tmp_path / ".dadaia" / "handoff"
     handoff_root.mkdir(parents=True)
@@ -262,7 +222,9 @@ def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path):
     assert service.check_hash(handoff_path) == "match"
 
 
-def test_check_hash_rejects_artifact_path_outside_workspace(tmp_path: Path):
+def test_check_hash_rejects_artifact_path_outside_workspace(tmp_path: Path) -> None:
+    """CRIT traversal guard: an artifact path outside the workspace root must never
+    resolve — it is treated as a missing artifact, never followed."""
     fake = FakeHandoffValidator(canned_errors=[])
     handoff_root = tmp_path / ".dadaia" / "handoff"
     handoff_root.mkdir(parents=True)
@@ -289,51 +251,3 @@ def test_check_hash_rejects_artifact_path_outside_workspace(tmp_path: Path):
         assert service.check_hash(handoff_path) == "missing_artifact"
     finally:
         outside.unlink(missing_ok=True)
-
-
-def test_validate_file_marks_hash_mismatch_invalid(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-    artifact = tmp_path / "report.html"
-    artifact.write_bytes(b"<html>changed</html>")
-    handoff_path = tmp_path / "report.handoff.json"
-    doc: dict[str, object] = {
-        "schema_version": "handoff-v1",
-        "agent": "software-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-16T23:29:05Z",
-        "artifact": {
-            "type": "report",
-            "path": "report.html",
-            "content_hash": "b" * 64,
-        },
-    }
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is False
-    assert result.hash_status == "mismatch"
-    assert any("artifact hash check failed" in error.message for error in result.errors)
-
-
-def test_validate_file_without_artifact_path_does_not_crash(tmp_path: Path):
-    fake = FakeHandoffValidator(canned_errors=[])
-    service = ReportsValidationService(validator=fake, reports_root=tmp_path)
-    handoff_path = tmp_path / "handoff.handoff.json"
-    doc: dict[str, object] = {
-        "schema_version": "handoff-v1",
-        "agent": "software-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-16T23:29:05Z",
-        "artifact": {
-            "type": "report",
-            "content_hash": "b" * 64,
-        },
-    }
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is True
-    assert result.hash_status is None

@@ -7,6 +7,8 @@ NOT in the shipped set:
 * residual == 0 -> copy to specs/_archive/<release>/consumed-backlog/<slug>.md THEN unlink;
   the archive copy MUST exist before the removal (the only surviving copy — backlog is
   gitignored).
+
+Copy-before-unlink ordering spy is the ADR-C safety proof — kept standalone.
 """
 
 from __future__ import annotations
@@ -91,7 +93,7 @@ def test_residual_item_rewritten_and_kept(tmp_path: Path) -> None:
     assert action.action is RemovalAction.REWRITTEN
 
 
-def test_fully_shipped_item_archived_then_removed(tmp_path: Path) -> None:
+def test_fully_shipped_archived_removed_and_unrelated_untouched(tmp_path: Path) -> None:
     backlog, archive_root, registry = _build(tmp_path)
 
     result = apply_removal(
@@ -109,6 +111,22 @@ def test_fully_shipped_item_archived_then_removed(tmp_path: Path) -> None:
     assert "all of it shipped" in archive_copy.read_text(encoding="utf-8")
     action = next(a for a in result.actions if a.slug == "done-item")
     assert action.action is RemovalAction.ARCHIVED_AND_REMOVED
+
+    # Nothing shipped that matches partial's residual-only anchor → partial fully
+    # survives untouched.
+    unrelated_backlog, unrelated_archive, unrelated_registry = _build(
+        tmp_path.parent / "unrelated-case"
+    )
+    unrelated_result = apply_removal(
+        backlog_dir=unrelated_backlog,
+        archive_root=unrelated_archive,
+        release_id="v0.1.26",
+        shipped_anchors={"pkg/other.py#nope"},
+        registry=unrelated_registry,
+    )
+    assert (unrelated_backlog / "partial-item.md").is_file()
+    assert (unrelated_backlog / "done-item.md").is_file()
+    assert all(a.action is RemovalAction.UNCHANGED for a in unrelated_result.actions)
 
 
 def test_archive_copy_exists_before_removal(tmp_path: Path) -> None:
@@ -142,19 +160,3 @@ def test_archive_copy_exists_before_removal(tmp_path: Path) -> None:
         removal_mod.Path.unlink = orig  # type: ignore[method-assign]
 
     assert seen.get("copy_present_at_unlink") is True
-
-
-def test_unrelated_item_untouched(tmp_path: Path) -> None:
-    backlog, archive_root, registry = _build(tmp_path)
-    # Nothing shipped that matches partial's residual-only anchor → partial fully survives,
-    # done-item shares no shipped anchor → untouched too.
-    result = apply_removal(
-        backlog_dir=backlog,
-        archive_root=archive_root,
-        release_id="v0.1.26",
-        shipped_anchors={"pkg/other.py#nope"},
-        registry=registry,
-    )
-    assert (backlog / "partial-item.md").is_file()
-    assert (backlog / "done-item.md").is_file()
-    assert all(a.action is RemovalAction.UNCHANGED for a in result.actions)

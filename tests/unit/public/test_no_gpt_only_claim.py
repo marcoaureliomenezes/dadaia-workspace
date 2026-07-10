@@ -56,14 +56,13 @@ def _violations() -> list[str]:
 
 
 def test_no_surviving_gpt_only_claim() -> None:
+    # Sanity folded in: the scan set is non-empty (a silent empty glob would pass
+    # vacuously).
+    assert _scanned_files(), "doc-lint scan found no files under dadaia_workspace/"
+
     violations = _violations()
     assert violations == [], (
         "live source / public docs still assert Layer-2 is 'GPT-only', contradicting the "
         "v0.1.44 allowlist-validated law (use 'allowlist-validated (no claude-*)'):\n"
         + "\n".join(violations)
     )
-
-
-def test_guardrail_actually_scans_files() -> None:
-    """Sanity: the scan set is non-empty (a silent empty glob would pass vacuously)."""
-    assert _scanned_files(), "doc-lint scan found no files under dadaia_workspace/"

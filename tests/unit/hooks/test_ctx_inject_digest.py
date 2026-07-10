@@ -16,7 +16,9 @@ harness-env contract):
    inside ``ctx_inject`` itself (NOT ``spec_context/doctor.py`` — avoids the doctor
    write-set overlap; the conditional in the task write set resolves to the inject-time
    leg). An aged sentinel (mtime older than the GC TTL) is removed when the hook fires; a
-   fresh sentinel from a different session is left untouched.
+   fresh sentinel from a different session is left untouched. GC must keep the
+   fresh-foreign-sentinel-preserved row — deleting another live session's sentinel would
+   re-inject its context.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ import json
 import os
 import time
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.hooks import ctx_inject
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
@@ -110,8 +114,13 @@ def _injected_catalog_block(out: str) -> str:
     return out[start:end]
 
 
-def test_injected_catalog_is_tldr_digest_drops_summary(tmp_path: Path) -> None:
-    _ws_with_catalog(tmp_path)
+def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
+    ws = _ws_with_catalog(tmp_path)
+    raw_catalog = (
+        ws / "repos" / "ctx" / "specs" / "memory" / "product" / "catalog.json"
+    ).read_text(encoding="utf-8")
+    before = len(raw_catalog.encode("utf-8"))
+
     out = _run(tmp_path, "dig1")
     # The digest must be present and parseable.
     block = _injected_catalog_block(out)
@@ -129,20 +138,9 @@ def test_injected_catalog_is_tldr_digest_drops_summary(tmp_path: Path) -> None:
     assert first["slug"] == "agent-comms"
     assert first["path"] == "specs/memory/product/agents/agent-comms.md"
 
-
-def test_digest_is_smaller_than_raw_catalog_before_after_bytes(tmp_path: Path) -> None:
-    """AC-W4-03 before/after byte assertion (numbers recorded for CLOSURE)."""
-    ws = _ws_with_catalog(tmp_path)
-    raw_catalog = (
-        ws / "repos" / "ctx" / "specs" / "memory" / "product" / "catalog.json"
-    ).read_text(encoding="utf-8")
-    before = len(raw_catalog.encode("utf-8"))
-
-    out = _run(tmp_path, "dig2")
-    digest_block = _injected_catalog_block(out)
-    after = len(digest_block.encode("utf-8"))
-
-    # The digest must be a strict, substantial reduction — summary is the bulk of the bytes.
+    # AC-W4-03 before/after byte assertion (numbers recorded for CLOSURE): a strict,
+    # substantial reduction — summary is the bulk of the bytes.
+    after = len(block.encode("utf-8"))
     assert after < before
     assert after < before * 0.5, (
         f"expected >50% reduction; before={before}B after={after}B ratio={after / before:.3f}"
@@ -181,48 +179,58 @@ def test_index_md_fallback_emitted_verbatim_when_no_catalog(tmp_path: Path) -> N
 # --- Sentinel GC (pinned to inject time) -------------------------------------------------
 
 
-def test_aged_sentinel_swept_at_inject_time(tmp_path: Path) -> None:
-    """PIN: the GC home is the inject-time sweep inside ctx_inject, not doctor.
-
-    An aged sentinel (mtime older than the GC TTL) is removed when the hook fires.
-    """
+@pytest.mark.parametrize(
+    ("name", "sentinel_name", "seed_fn", "should_survive"),
+    [
+        (
+            # PIN: the GC home is the inject-time sweep inside ctx_inject, not doctor. An
+            # aged sentinel (mtime older than the GC TTL) is removed when the hook fires.
+            "aged_sentinel_swept",
+            "ctx-inject-fired-deadsession",
+            lambda p: os.utime(
+                p,
+                (
+                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
+                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
+                ),
+            ),
+            False,
+        ),
+        (
+            # A fresh sentinel from another live session must NOT be swept (mtime = now,
+            # well within TTL). Deleting a live foreign session's sentinel would
+            # re-inject its context.
+            "fresh_foreign_sentinel_preserved",
+            "ctx-inject-fired-otherlive",
+            None,
+            True,
+        ),
+        (
+            # The sweep must only target ctx-inject sentinels, never other tmp files.
+            "gc_ignores_non_sentinel_tmp_files",
+            "some-other-artifact.json",
+            lambda p: os.utime(
+                p,
+                (
+                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
+                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
+                ),
+            ),
+            True,
+        ),
+    ],
+)
+def test_sentinel_gc_table(
+    tmp_path: Path, name: str, sentinel_name: str, seed_fn: object, should_survive: bool
+) -> None:
     _ws_with_catalog(tmp_path)
     tmp_dir = tmp_path / ".dadaia" / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    aged = tmp_dir / "ctx-inject-fired-deadsession"
-    aged.touch()
-    # Backdate well beyond the GC TTL.
-    old = time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600)
-    os.utime(aged, (old, old))
+    target = tmp_dir / sentinel_name
+    target.touch()
+    if seed_fn is not None:
+        seed_fn(target)  # type: ignore[operator]
 
-    _run(tmp_path, "live1")
+    _run(tmp_path, f"live-{name}")
 
-    assert not aged.exists(), "aged sentinel must be GC'd at inject time"
-
-
-def test_fresh_foreign_sentinel_preserved(tmp_path: Path) -> None:
-    """A fresh sentinel from another live session must NOT be swept."""
-    _ws_with_catalog(tmp_path)
-    tmp_dir = tmp_path / ".dadaia" / "tmp"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    fresh = tmp_dir / "ctx-inject-fired-otherlive"
-    fresh.touch()  # mtime = now, well within TTL
-
-    _run(tmp_path, "live2")
-
-    assert fresh.exists(), "a fresh foreign sentinel must be preserved"
-
-
-def test_gc_ignores_non_sentinel_tmp_files(tmp_path: Path) -> None:
-    """The sweep must only target ctx-inject sentinels, never other tmp files."""
-    _ws_with_catalog(tmp_path)
-    tmp_dir = tmp_path / ".dadaia" / "tmp"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    bystander = tmp_dir / "some-other-artifact.json"
-    bystander.write_text("{}", encoding="utf-8")
-    old = time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600)
-    os.utime(bystander, (old, old))
-
-    _run(tmp_path, "live3")
-
-    assert bystander.exists(), "GC must not touch non-sentinel tmp files"
+    assert target.exists() == should_survive

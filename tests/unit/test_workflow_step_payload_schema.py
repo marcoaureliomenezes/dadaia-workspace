@@ -66,19 +66,11 @@ def _valid_ledger_record() -> dict[str, object]:
     }
 
 
-# --- schemas are well-formed ------------------------------------------------------
-
-
-def test_envelope_schema_is_well_formed() -> None:
+def test_schemas_well_formed_and_do_not_touch_generic_handoff_schema() -> None:
+    """A21/anti-slop: the new schemas are separate and well-formed; handoff-v1.1 is
+    never mutated ($id separation)."""
     Draft202012Validator.check_schema(_envelope_schema())
-
-
-def test_ledger_schema_is_well_formed() -> None:
     Draft202012Validator.check_schema(_ledger_schema())
-
-
-def test_schemas_do_not_touch_generic_handoff_schema() -> None:
-    """A21/anti-slop: the new schemas are separate; handoff-v1.1 is never mutated."""
     assert _envelope_schema()["$id"] == "workflow-step-payload-v1"
     assert _ledger_schema()["$id"] == "lifecycle-run-workflow-steps-v1"
 
@@ -90,44 +82,20 @@ def test_valid_envelope_validates() -> None:
     Draft202012Validator(_envelope_schema()).validate(_valid_envelope())
 
 
-def test_envelope_rejects_wrong_schema_version() -> None:
+@pytest.mark.parametrize(
+    ("name", "mutate_fn"),
+    [
+        ("wrong_schema_version", lambda d: d.__setitem__("schema_version", "handoff-v1.1")),
+        ("missing_payload", lambda d: d.__delitem__("payload")),
+        ("negative_attempt", lambda d: d.__setitem__("attempt", -1)),
+        ("unknown_retention_mode", lambda d: d.__setitem__("retention_mode", "keep_forever")),
+        ("additional_properties", lambda d: d.__setitem__("surprise", 1)),
+        ("non_z_timestamp", lambda d: d.__setitem__("produced_at", "2026-06-27 12:00:00")),
+    ],
+)
+def test_envelope_rejection_table(name: str, mutate_fn: object) -> None:
     bad = _valid_envelope()
-    bad["schema_version"] = "handoff-v1.1"
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_envelope_schema()).validate(bad)
-
-
-def test_envelope_rejects_missing_payload() -> None:
-    bad = _valid_envelope()
-    del bad["payload"]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_envelope_schema()).validate(bad)
-
-
-def test_envelope_rejects_negative_attempt() -> None:
-    bad = _valid_envelope()
-    bad["attempt"] = -1
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_envelope_schema()).validate(bad)
-
-
-def test_envelope_rejects_unknown_retention_mode() -> None:
-    bad = _valid_envelope()
-    bad["retention_mode"] = "keep_forever"
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_envelope_schema()).validate(bad)
-
-
-def test_envelope_rejects_additional_properties() -> None:
-    bad = _valid_envelope()
-    bad["surprise"] = 1
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_envelope_schema()).validate(bad)
-
-
-def test_envelope_rejects_non_z_timestamp() -> None:
-    bad = _valid_envelope()
-    bad["produced_at"] = "2026-06-27 12:00:00"
+    mutate_fn(bad)  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Draft202012Validator(_envelope_schema()).validate(bad)
 
@@ -135,31 +103,25 @@ def test_envelope_rejects_non_z_timestamp() -> None:
 # --- ledger validation ------------------------------------------------------------
 
 
-def test_empty_ledger_validates() -> None:
-    """A27: an old record's empty ledger is a valid (empty) array."""
+def test_empty_and_valid_ledger_validate() -> None:
+    # A27: an old record's empty ledger is a valid (empty) array.
     Draft202012Validator(_ledger_schema()).validate([])
-
-
-def test_valid_ledger_validates() -> None:
     Draft202012Validator(_ledger_schema()).validate([_valid_ledger_record()])
 
 
-def test_ledger_rejects_bad_payload_ref() -> None:
+@pytest.mark.parametrize(
+    ("name", "mutate_fn"),
+    [
+        (
+            "bad_payload_ref",
+            lambda d: d.__setitem__("payload_ref", ".dadaia/handoff/ctx/x.handoff.json"),
+        ),
+        ("bad_content_hash", lambda d: d.__setitem__("content_hash", "not-a-hash")),
+        ("missing_consumptions_field", lambda d: d.__delitem__("consumptions")),
+    ],
+)
+def test_ledger_rejection_table(name: str, mutate_fn: object) -> None:
     bad = _valid_ledger_record()
-    bad["payload_ref"] = ".dadaia/handoff/ctx/x.handoff.json"
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_ledger_schema()).validate([bad])
-
-
-def test_ledger_rejects_bad_content_hash() -> None:
-    bad = _valid_ledger_record()
-    bad["content_hash"] = "not-a-hash"
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_ledger_schema()).validate([bad])
-
-
-def test_ledger_rejects_missing_consumptions_field() -> None:
-    bad = _valid_ledger_record()
-    del bad["consumptions"]
+    mutate_fn(bad)  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Draft202012Validator(_ledger_schema()).validate([bad])

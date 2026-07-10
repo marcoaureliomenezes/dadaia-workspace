@@ -13,6 +13,9 @@ harness env, these tests prove the heartbeat actually fires under real condition
 
 No direct hook-module import here — the hook-import contract (test_harness_env_contract)
 requires behavior tests in ``tests/**/hooks|gate/**`` to use the subprocess runner.
+
+CRIT: lease heartbeat under a real harness env (audit-finding-2 corrective) — no
+cross-session renewal is the no-steal invariant's heartbeat half. Kept standalone below.
 """
 
 from __future__ import annotations
@@ -21,6 +24,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -59,8 +64,10 @@ def _heartbeat(workspace: Path, ctx: str) -> str:
     return str(rec["heartbeat"])
 
 
-def test_bash_post_tool_use_renews_held_lease(tmp_path: Path) -> None:
-    """A Bash PostToolUse under claude_hook_env ⇒ the holder's lease heartbeat is fresher."""
+def test_bash_post_tool_use_renews_held_lease_and_logs_event(tmp_path: Path) -> None:
+    """A Bash PostToolUse under claude_hook_env renews the holder's lease heartbeat AND
+    the HEARTBEAT audit event records how many leases were renewed.
+    """
     session_id = "claude-holder"
     old = _seed_lease(tmp_path, "myctx", session_id, age_seconds=60)
 
@@ -70,6 +77,12 @@ def test_bash_post_tool_use_renews_held_lease(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert _heartbeat(tmp_path, "myctx") != old  # FRESHER after the heartbeat
+
+    events = (tmp_path / ".dadaia" / "logs" / "lock-events.jsonl").read_text(encoding="utf-8")
+    record = json.loads(events.strip().splitlines()[-1])
+    assert record["event"] == "HEARTBEAT"
+    assert record["session_id"] == session_id
+    assert record["leases_renewed"] == 1
 
 
 def test_foreign_session_does_not_renew_foreign_lease(tmp_path: Path) -> None:
@@ -84,40 +97,24 @@ def test_foreign_session_does_not_renew_foreign_lease(tmp_path: Path) -> None:
     assert _heartbeat(tmp_path, "myctx") == old  # untouched
 
 
-def test_no_lease_exits_zero(tmp_path: Path) -> None:
-    """A session holding no lease ⇒ exit 0, no crash (fail-open)."""
+@pytest.mark.parametrize(
+    ("name", "session_id", "pop_native_env"),
+    [
+        # A session holding no lease ⇒ exit 0, no crash (fail-open).
+        ("no_lease_held", "no-lease", False),
+        # No session id anywhere (empty payload, scrubbed env) ⇒ exit 0 no-op.
+        ("no_session_id_in_payload", None, True),
+    ],
+)
+def test_noop_exits_zero(
+    tmp_path: Path, name: str, session_id: str | None, pop_native_env: bool
+) -> None:
     (tmp_path / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
-
-    env = claude_hook_env(tmp_path, session_id="no-lease")
-    payload = {**_BASH_POST_TOOL_PAYLOAD, "session_id": "no-lease"}
-    result = run_hook_subprocess("sdd_post_gate", payload, env)
-
-    assert result.returncode == 0, result.stderr
-
-
-def test_no_session_id_in_payload_exits_zero(tmp_path: Path) -> None:
-    """No session id anywhere (empty payload, scrubbed env) ⇒ exit 0 no-op."""
-    env = claude_hook_env(tmp_path)
-    # Strip the native session-id var so the hook resolves no id at all.
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    payload = {"hook_event_name": "PostToolUse", "tool_name": "Bash"}
-    result = run_hook_subprocess("sdd_post_gate", payload, env)
-
-    assert result.returncode == 0, result.stderr
-
-
-def test_heartbeat_event_logged_with_lease_count(tmp_path: Path) -> None:
-    """The HEARTBEAT audit event records how many leases were renewed."""
-    session_id = "claude-audit"
-    _seed_lease(tmp_path, "myctx", session_id, age_seconds=60)
-
-    env = claude_hook_env(tmp_path, session_id=session_id)
-    payload = {**_BASH_POST_TOOL_PAYLOAD, "session_id": session_id}
+    env = claude_hook_env(tmp_path, session_id=session_id or "unused")
+    if pop_native_env:
+        env.pop("CLAUDE_CODE_SESSION_ID", None)
+    payload: dict[str, Any] = {"hook_event_name": "PostToolUse", "tool_name": "Bash"}
+    if session_id is not None:
+        payload = {**_BASH_POST_TOOL_PAYLOAD, "session_id": session_id}
     result = run_hook_subprocess("sdd_post_gate", payload, env)
     assert result.returncode == 0, result.stderr
-
-    events = (tmp_path / ".dadaia" / "logs" / "lock-events.jsonl").read_text(encoding="utf-8")
-    record = json.loads(events.strip().splitlines()[-1])
-    assert record["event"] == "HEARTBEAT"
-    assert record["session_id"] == session_id
-    assert record["leases_renewed"] == 1

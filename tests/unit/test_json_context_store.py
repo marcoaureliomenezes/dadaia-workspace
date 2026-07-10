@@ -1,4 +1,7 @@
-"""Unit tests for JsonContextStore (v2 schema: ALIVE/DEAD)."""
+"""Unit tests for JsonContextStore (v2 schema: ALIVE/DEAD).
+
+Migration-refusal rows (SchemaVersionError + 'dadaia migrate' hint) preserved.
+"""
 
 import json
 from pathlib import Path
@@ -26,164 +29,125 @@ def _make_ctx(
     )
 
 
-def test_list_all_empty_when_no_file(tmp_path: Path) -> None:
+def test_crud_round_trips(tmp_path: Path) -> None:
     store = JsonContextStore(tmp_path)
+
     assert store.list_all() == []
-
-
-def test_get_returns_none_when_not_found(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
     assert store.get("ghost") is None
 
-
-def test_save_and_get_roundtrip(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
     ctx = _make_ctx("alpha")
     store.save(ctx)
     assert store.get("alpha") == ctx
 
-
-def test_save_multiple_and_list_all(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
-    a = _make_ctx("a")
     b = _make_ctx("b")
-    store.save(a)
     store.save(b)
     result = store.list_all()
     assert len(result) == 2
-    assert {c.name for c in result} == {"a", "b"}
+    assert {c.name for c in result} == {"alpha", "b"}
 
-
-def test_update_replaces_existing(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
-    ctx = _make_ctx("myctx", state=ContextState.DEAD)
-    store.save(ctx)
     updated = SpecContextProject(
-        name="myctx",
+        name="alpha",
         state=ContextState.ALIVE,
-        repo_slug="myctx",
-        repo_url="https://github.com/org/myctx",
+        repo_slug="alpha",
+        repo_url="https://github.com/org/alpha",
         created_at="2026-01-01T00:00:00",
         alive_since="2026-06-01T00:00:00",
         dead_since=None,
         current_branch="main",
     )
     store.update(updated)
-    fetched = store.get("myctx")
+    fetched = store.get("alpha")
     assert fetched is not None
     assert fetched.state == ContextState.ALIVE
     assert fetched.alive_since == "2026-06-01T00:00:00"
     assert fetched.current_branch == "main"
 
+    store.delete("alpha")
+    assert store.get("alpha") is None
+    remaining = store.list_all()
+    assert {c.name for c in remaining} == {"b"}
 
-def test_delete_removes_context(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
-    ctx = _make_ctx("todel")
-    store.save(ctx)
-    store.delete("todel")
-    assert store.get("todel") is None
-    assert store.list_all() == []
+    store.delete("ghost")  # must not raise (delete of nonexistent is a no-op)
 
-
-def test_delete_nonexistent_is_noop(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
-    store.delete("ghost")  # must not raise
-
-
-def test_save_persists_to_disk(tmp_path: Path) -> None:
-    store = JsonContextStore(tmp_path)
+    # Persistence survives a fresh store instance over the same tmp_path.
     store.save(_make_ctx("persist"))
     store2 = JsonContextStore(tmp_path)
     assert store2.get("persist") is not None
 
 
 # ---------------------------------------------------------------------------
-# AC-T10a-5: Loading a schema_version="1" file raises SchemaVersionError
+# AC-T10a-5/6: legacy schema/state rejection — migration-refusal rows.
 # ---------------------------------------------------------------------------
 
 
-def test_load_v1_schema_version_raises_schema_version_error(tmp_path: Path) -> None:
-    """AC-T10a-5: schema_version "1" must raise SchemaVersionError with 'dadaia migrate'."""
-    ctx_file = tmp_path / "spec_contexts.json"
-    v1_data = {
-        "schema_version": "1",
-        "contexts": [
+@pytest.mark.parametrize(
+    ("name", "payload"),
+    [
+        (
+            # AC-T10a-5: schema_version "1" must raise SchemaVersionError with
+            # 'dadaia migrate'.
+            "v1_schema_version",
             {
-                "name": "old-ctx",
-                "state": "ativo",
-                "repo_slug": "old-ctx",
-                "repo_url": "https://github.com/org/old-ctx",
-                "is_primary": False,
-                "created_at": "2026-01-01T00:00:00Z",
-                "activated_at": "2026-05-01T00:00:00Z",
-            }
-        ],
-    }
-    ctx_file.write_text(json.dumps(v1_data), encoding="utf-8")
-    store = JsonContextStore(tmp_path)
-    with pytest.raises(SchemaVersionError) as exc_info:
-        store.list_all()
-    assert "dadaia migrate" in str(exc_info.value)
-
-
-def test_load_v1_version_key_raises_schema_version_error(tmp_path: Path) -> None:
-    """AC-T10a-5 (variant): v1 'version' key also raises SchemaVersionError."""
-    ctx_file = tmp_path / "spec_contexts.json"
-    v1_data = {
-        "version": "1",
-        "contexts": [],
-    }
-    ctx_file.write_text(json.dumps(v1_data), encoding="utf-8")
-    store = JsonContextStore(tmp_path)
-    with pytest.raises(SchemaVersionError) as exc_info:
-        store.list_all()
-    assert "dadaia migrate" in str(exc_info.value)
-
-
-# ---------------------------------------------------------------------------
-# AC-T10a-6: Loading a file with state "ativo" raises SchemaVersionError
-# ---------------------------------------------------------------------------
-
-
-def test_load_ativo_state_raises_schema_version_error(tmp_path: Path) -> None:
-    """AC-T10a-6: state 'ativo' in any context row must raise SchemaVersionError."""
-    ctx_file = tmp_path / "spec_contexts.json"
-    legacy_data = {
-        "schema_version": "2",  # claims v2 but has legacy state values
-        "contexts": [
+                "schema_version": "1",
+                "contexts": [
+                    {
+                        "name": "old-ctx",
+                        "state": "ativo",
+                        "repo_slug": "old-ctx",
+                        "repo_url": "https://github.com/org/old-ctx",
+                        "is_primary": False,
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "activated_at": "2026-05-01T00:00:00Z",
+                    }
+                ],
+            },
+        ),
+        (
+            # AC-T10a-5 (variant): v1 'version' key also raises SchemaVersionError.
+            "v1_version_key",
+            {"version": "1", "contexts": []},
+        ),
+        (
+            # AC-T10a-6: state 'ativo' in any context row must raise
+            # SchemaVersionError.
+            "ativo_state",
             {
-                "name": "bad-ctx",
-                "state": "ativo",
-                "repo_slug": "bad-ctx",
-                "repo_url": "",
-                "created_at": "2026-01-01T00:00:00Z",
-                "alive_since": None,
-                "dead_since": None,
-            }
-        ],
-    }
-    ctx_file.write_text(json.dumps(legacy_data), encoding="utf-8")
-    store = JsonContextStore(tmp_path)
-    with pytest.raises(SchemaVersionError) as exc_info:
-        store.list_all()
-    assert "dadaia migrate" in str(exc_info.value)
-
-
-def test_load_inativo_state_raises_schema_version_error(tmp_path: Path) -> None:
-    """AC-T10a-6 (variant): state 'inativo' also raises SchemaVersionError."""
-    ctx_file = tmp_path / "spec_contexts.json"
-    legacy_data = {
-        "contexts": [
+                "schema_version": "2",  # claims v2 but has legacy state values
+                "contexts": [
+                    {
+                        "name": "bad-ctx",
+                        "state": "ativo",
+                        "repo_slug": "bad-ctx",
+                        "repo_url": "",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "alive_since": None,
+                        "dead_since": None,
+                    }
+                ],
+            },
+        ),
+        (
+            # AC-T10a-6 (variant): state 'inativo' also raises SchemaVersionError.
+            "inativo_state",
             {
-                "name": "bad-ctx",
-                "state": "inativo",
-                "repo_slug": "bad-ctx",
-                "repo_url": "",
-                "created_at": "2026-01-01T00:00:00Z",
-            }
-        ],
-    }
-    ctx_file.write_text(json.dumps(legacy_data), encoding="utf-8")
+                "contexts": [
+                    {
+                        "name": "bad-ctx",
+                        "state": "inativo",
+                        "repo_slug": "bad-ctx",
+                        "repo_url": "",
+                        "created_at": "2026-01-01T00:00:00Z",
+                    }
+                ]
+            },
+        ),
+    ],
+)
+def test_legacy_schema_or_state_raises_schema_version_error(
+    tmp_path: Path, name: str, payload: dict[str, object]
+) -> None:
+    ctx_file = tmp_path / "spec_contexts.json"
+    ctx_file.write_text(json.dumps(payload), encoding="utf-8")
     store = JsonContextStore(tmp_path)
     with pytest.raises(SchemaVersionError) as exc_info:
         store.list_all()
@@ -195,8 +159,9 @@ def test_load_inativo_state_raises_schema_version_error(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_written_json_has_no_is_primary_or_activated_at(tmp_path: Path) -> None:
-    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields."""
+def test_written_json_has_no_legacy_fields(tmp_path: Path) -> None:
+    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields
+    (the v2 shape)."""
     store = JsonContextStore(tmp_path)
     ctx = SpecContextProject(
         name="myctx",

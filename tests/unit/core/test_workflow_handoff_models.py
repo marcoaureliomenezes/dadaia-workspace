@@ -8,6 +8,8 @@ that writes ledger entries, per the operator-approved Wave-D order.
 
 from __future__ import annotations
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     LifecyclePhase,
     LifecycleRun,
@@ -78,8 +80,10 @@ def test_old_lifecycle_run_without_workflow_steps_loads_as_empty_ledger() -> Non
     assert run.workflow_steps.to_list() == []
 
 
-def test_new_lifecycle_run_round_trips_its_workflow_step_ledger() -> None:
-    """A27: a new record with a populated ledger round-trips through to_dict/from_dict."""
+def test_new_run_round_trips_ledger_and_default_ledger_is_empty() -> None:
+    """A27: a new record with a populated ledger round-trips through to_dict/from_dict,
+    and a LifecycleRun constructed without a ledger defaults to an empty one (additive).
+    """
     consumed = WorkflowStepConsumerRecord(
         consumer_step="spec_create", consumer_attempt=0, consumed_at="2026-06-27T12:05:00Z"
     )
@@ -107,10 +111,7 @@ def test_new_lifecycle_run_round_trips_its_workflow_step_ledger() -> None:
     # The serialised form carries the additive key.
     assert "workflow_steps" in run.to_dict()
 
-
-def test_lifecycle_run_default_workflow_steps_is_empty_ledger() -> None:
-    """A LifecycleRun constructed without a ledger defaults to an empty one (additive)."""
-    run = LifecycleRun(
+    default_run = LifecycleRun(
         run_id="r",
         context="c",
         release_id="v",
@@ -119,48 +120,72 @@ def test_lifecycle_run_default_workflow_steps_is_empty_ledger() -> None:
         status=LifecycleRunStatus.RUNNING,
         current_step="s",
     )
-    assert len(run.workflow_steps) == 0
+    assert len(default_run.workflow_steps) == 0
 
 
 # --- consumption state derivation (A22) -------------------------------------------
 
 
-def test_consumption_state_is_produced_when_no_consumer_acked() -> None:
-    record = _record(declared_consumers=("spec_create", "plan_create"))
-    assert record.consumption_state() is WorkflowStepConsumptionState.PRODUCED
-    assert not record.is_cleanup_eligible()
-
-
-def test_consumption_state_is_partial_when_some_consumers_acked() -> None:
-    acked = WorkflowStepConsumerRecord(
-        consumer_step="spec_create", consumer_attempt=0, consumed_at="2026-06-27T12:05:00Z"
-    )
-    record = _record(declared_consumers=("spec_create", "plan_create"), consumptions=(acked,))
-    assert record.consumption_state() is WorkflowStepConsumptionState.CONSUMED_PARTIAL
-    assert not record.is_cleanup_eligible()
-
-
-def test_consumption_state_is_all_when_every_declared_consumer_acked() -> None:
-    acks = (
-        WorkflowStepConsumerRecord(
-            consumer_step="spec_create", consumer_attempt=0, consumed_at="t1"
+@pytest.mark.parametrize(
+    ("name", "declared_consumers", "consumptions", "expected_state", "expected_cleanup_eligible"),
+    [
+        (
+            "produced_when_no_consumer_acked",
+            ("spec_create", "plan_create"),
+            (),
+            WorkflowStepConsumptionState.PRODUCED,
+            False,
         ),
-        WorkflowStepConsumerRecord(
-            consumer_step="plan_create", consumer_attempt=0, consumed_at="t2"
+        (
+            "partial_when_some_consumers_acked",
+            ("spec_create", "plan_create"),
+            (
+                WorkflowStepConsumerRecord(
+                    consumer_step="spec_create",
+                    consumer_attempt=0,
+                    consumed_at="2026-06-27T12:05:00Z",
+                ),
+            ),
+            WorkflowStepConsumptionState.CONSUMED_PARTIAL,
+            False,
         ),
-    )
-    record = _record(declared_consumers=("spec_create", "plan_create"), consumptions=acks)
-    assert record.consumption_state() is WorkflowStepConsumptionState.CONSUMED_ALL
-    assert record.is_cleanup_eligible()
-
-
-def test_payload_with_no_declared_consumers_is_never_auto_consumed_all() -> None:
-    record = _record(declared_consumers=())
-    assert record.consumption_state() is WorkflowStepConsumptionState.PRODUCED
-    assert not record.is_cleanup_eligible()
+        (
+            "all_when_every_declared_consumer_acked",
+            ("spec_create", "plan_create"),
+            (
+                WorkflowStepConsumerRecord(
+                    consumer_step="spec_create", consumer_attempt=0, consumed_at="t1"
+                ),
+                WorkflowStepConsumerRecord(
+                    consumer_step="plan_create", consumer_attempt=0, consumed_at="t2"
+                ),
+            ),
+            WorkflowStepConsumptionState.CONSUMED_ALL,
+            True,
+        ),
+        (
+            "no_declared_consumers_never_auto_consumed_all",
+            (),
+            (),
+            WorkflowStepConsumptionState.PRODUCED,
+            False,
+        ),
+    ],
+)
+def test_consumption_state_table(
+    name: str,
+    declared_consumers: tuple[str, ...],
+    consumptions: tuple[WorkflowStepConsumerRecord, ...],
+    expected_state: WorkflowStepConsumptionState,
+    expected_cleanup_eligible: bool,
+) -> None:
+    record = _record(declared_consumers=declared_consumers, consumptions=consumptions)
+    assert record.consumption_state() is expected_state
+    assert record.is_cleanup_eligible() is expected_cleanup_eligible
 
 
 def test_promote_to_evidence_is_never_cleanup_eligible_even_when_consumed_all() -> None:
+    """A data-loss guard, kept standalone: promoted evidence must survive cleanup sweeps."""
     acked = WorkflowStepConsumerRecord(
         consumer_step="spec_create", consumer_attempt=0, consumed_at="t"
     )
@@ -173,10 +198,10 @@ def test_promote_to_evidence_is_never_cleanup_eligible_even_when_consumed_all() 
     assert not record.is_cleanup_eligible(), "promoted evidence is durable, never reclaimed"
 
 
-# --- with_consumption idempotency -------------------------------------------------
+# --- with_consumption idempotency + ledger lookups (A19/A24) ----------------------
 
 
-def test_with_consumption_appends_and_is_idempotent_per_step_attempt() -> None:
+def test_with_consumption_idempotent_and_ledger_lookups() -> None:
     record = _record(declared_consumers=("spec_create",))
     ack = WorkflowStepConsumerRecord(
         consumer_step="spec_create", consumer_attempt=0, consumed_at="t"
@@ -186,61 +211,49 @@ def test_with_consumption_appends_and_is_idempotent_per_step_attempt() -> None:
     assert len(once.consumptions) == 1
     assert twice is once, "re-recording the same (step, attempt) is a no-op"
 
-
-def test_with_consumption_distinguishes_attempts() -> None:
-    """Different attempts of the same consumer step are distinct consumptions (A24)."""
-    record = _record(declared_consumers=("implement",))
+    # Different attempts of the same consumer step are distinct consumptions (A24).
+    impl_record = _record(declared_consumers=("implement",))
     a0 = WorkflowStepConsumerRecord(consumer_step="implement", consumer_attempt=0, consumed_at="t0")
     a1 = WorkflowStepConsumerRecord(consumer_step="implement", consumer_attempt=1, consumed_at="t1")
-    updated = record.with_consumption(a0).with_consumption(a1)
+    updated = impl_record.with_consumption(a0).with_consumption(a1)
     assert len(updated.consumptions) == 2
 
-
-# --- ledger lookups (A19 exact-by-attempt) ----------------------------------------
-
-
-def test_ledger_find_resolves_exact_step_and_attempt() -> None:
+    # Ledger find resolves exact step and attempt (A19).
     ledger = WorkflowStepLedger(
-        records=(
-            _record(producer_step="qa", attempt=0),
-            _record(producer_step="qa", attempt=1),
-        )
+        records=(_record(producer_step="qa", attempt=0), _record(producer_step="qa", attempt=1))
     )
     found = ledger.find("qa", 1)
     assert found is not None
     assert found.key == ("run-1", "qa", 1)
     assert ledger.find("qa", 2) is None
 
-
-def test_ledger_latest_attempt_returns_highest_attempt() -> None:
-    ledger = WorkflowStepLedger(
+    # Ledger latest_attempt returns the highest attempt.
+    multi_ledger = WorkflowStepLedger(
         records=(
             _record(producer_step="qa", attempt=0),
             _record(producer_step="qa", attempt=2),
             _record(producer_step="qa", attempt=1),
         )
     )
-    latest = ledger.latest_attempt("qa")
+    latest = multi_ledger.latest_attempt("qa")
     assert latest is not None
     assert latest.attempt == 2
-    assert ledger.latest_attempt("missing") is None
+    assert multi_ledger.latest_attempt("missing") is None
 
-
-def test_ledger_upsert_replaces_by_key_and_preserves_order() -> None:
-    ledger = WorkflowStepLedger(records=(_record(producer_step="qa", attempt=0),))
+    # Ledger upsert replaces by key and preserves order; a new key appends.
+    upsert_ledger = WorkflowStepLedger(records=(_record(producer_step="qa", attempt=0),))
     replacement = _record(producer_step="qa", attempt=0, declared_consumers=("implement",))
-    updated = ledger.upsert(replacement)
-    assert len(updated) == 1
-    found = updated.find("qa", 0)
-    assert found is not None
-    assert found.declared_consumers == ("implement",)
-    # upsert of a new key appends
-    appended = updated.upsert(_record(producer_step="spec", attempt=0))
+    upserted = upsert_ledger.upsert(replacement)
+    assert len(upserted) == 1
+    replaced = upserted.find("qa", 0)
+    assert replaced is not None
+    assert replaced.declared_consumers == ("implement",)
+    appended = upserted.upsert(_record(producer_step="spec", attempt=0))
     assert len(appended) == 2
 
-
-def test_ledger_round_trips_through_list_form() -> None:
-    ledger = WorkflowStepLedger(
+    # Ledger round-trips through list form.
+    round_trip_ledger = WorkflowStepLedger(
         records=(_record(producer_step="qa", attempt=0), _record(producer_step="spec", attempt=0))
     )
-    assert WorkflowStepLedger.from_list(ledger.to_list()).to_list() == ledger.to_list()
+    listed: list[object] = list(round_trip_ledger.to_list())
+    assert WorkflowStepLedger.from_list(listed).to_list() == round_trip_ledger.to_list()

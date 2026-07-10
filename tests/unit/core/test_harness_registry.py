@@ -38,41 +38,8 @@ _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 
 # ---------------------------------------------------------------------------
-# Rosters + vocabularies
+# LAW 1 standalone: claude is never a Layer-2 worker.
 # ---------------------------------------------------------------------------
-
-
-def test_l1_entry_roster_is_canonical() -> None:
-    assert L1_ENTRY_HARNESSES == ("claude", "codex", "pi")
-
-
-def test_l2_worker_roster_is_canonical() -> None:
-    assert L2_WORKER_HARNESSES == ("codex", "pi")
-
-
-def test_projection_targets_are_agents_plus_l1() -> None:
-    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "pi")
-    assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
-
-
-def test_install_targets_are_projection_plus_all() -> None:
-    assert frozenset({"all", "agents", "claude", "codex", "pi"}) == INSTALL_TARGETS
-    assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
-
-
-# ---------------------------------------------------------------------------
-# Capability predicates
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("harness", ["claude", "codex", "pi"])
-def test_is_l1_true_for_entry_harnesses(harness: str) -> None:
-    assert is_l1(harness) is True
-
-
-@pytest.mark.parametrize("harness", ["bogus", "fake", "opencode", ""])
-def test_is_l1_false_for_non_entry(harness: str) -> None:
-    assert is_l1(harness) is False
 
 
 def test_claude_is_never_layer2() -> None:
@@ -80,60 +47,8 @@ def test_claude_is_never_layer2() -> None:
     assert can_be_workflow_worker("claude") is False
 
 
-@pytest.mark.parametrize("harness", ["codex", "pi"])
-def test_l2_workers(harness: str) -> None:
-    assert is_l2(harness) is True
-    assert can_be_workflow_worker(harness) is True
-
-
 # ---------------------------------------------------------------------------
-# parse_harness_set
-# ---------------------------------------------------------------------------
-
-
-def test_parse_harness_set_all() -> None:
-    assert parse_harness_set("all") == ("claude", "codex", "pi")
-
-
-def test_parse_harness_set_subset_canonical_order() -> None:
-    assert parse_harness_set("codex,pi") == ("codex", "pi")
-    # input order does not leak — result is always canonical L1 order.
-    assert parse_harness_set("pi,codex") == ("codex", "pi")
-
-
-def test_parse_harness_set_single() -> None:
-    assert parse_harness_set("claude") == ("claude",)
-
-
-def test_parse_harness_set_dedup_and_whitespace_and_case() -> None:
-    assert parse_harness_set(" PI , pi ") == ("pi",)
-    assert parse_harness_set("CLAUDE,Codex") == ("claude", "codex")
-
-
-def test_parse_harness_set_bogus_raises_with_listing() -> None:
-    with pytest.raises(ValueError) as exc:
-        parse_harness_set("bogus")
-    msg = str(exc.value)
-    assert "bogus" in msg
-    # the message lists every valid harness (a listing error).
-    assert "claude" in msg and "codex" in msg and "pi" in msg
-
-
-def test_parse_harness_set_partial_unknown_raises() -> None:
-    with pytest.raises(ValueError) as exc:
-        parse_harness_set("claude,zzz")
-    assert "zzz" in str(exc.value)
-
-
-def test_parse_harness_set_empty_raises() -> None:
-    with pytest.raises(ValueError):
-        parse_harness_set("")
-    with pytest.raises(ValueError):
-        parse_harness_set("  ,  ")
-
-
-# ---------------------------------------------------------------------------
-# R1 contract — L2 roster ⇔ model catalog (order-independent)
+# R1 contract — L2 roster ⇔ model catalog (order-independent) standalone.
 # ---------------------------------------------------------------------------
 
 
@@ -147,7 +62,91 @@ def test_l2_roster_matches_model_catalog_as_set() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Grep — the roster literals are GONE from all 7 repointed sites
+# Rosters + vocabularies golden.
+# ---------------------------------------------------------------------------
+
+
+def test_roster_vocabulary_golden() -> None:
+    assert L1_ENTRY_HARNESSES == ("claude", "codex", "pi")
+    assert L2_WORKER_HARNESSES == ("codex", "pi")
+    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "pi")
+    assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
+    assert frozenset({"all", "agents", "claude", "codex", "pi"}) == INSTALL_TARGETS
+    assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
+
+
+# ---------------------------------------------------------------------------
+# Capability predicates.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("harness", "expect_l1", "expect_l2", "expect_worker"),
+    [
+        ("claude", True, False, False),
+        ("codex", True, True, True),
+        ("pi", True, True, True),
+        ("bogus", False, False, False),
+        ("fake", False, False, False),
+        ("opencode", False, False, False),
+        ("", False, False, False),
+    ],
+)
+def test_capability_predicates_table(
+    harness: str, expect_l1: bool, expect_l2: bool, expect_worker: bool
+) -> None:
+    assert is_l1(harness) is expect_l1
+    if harness != "claude":  # claude's L2/worker case is covered standalone above
+        assert is_l2(harness) is expect_l2
+        assert can_be_workflow_worker(harness) is expect_worker
+
+
+# ---------------------------------------------------------------------------
+# parse_harness_set ACCEPT paths.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("all", ("claude", "codex", "pi")),
+        ("codex,pi", ("codex", "pi")),
+        # input order does not leak — result is always canonical L1 order.
+        ("pi,codex", ("codex", "pi")),
+        ("claude", ("claude",)),
+        (" PI , pi ", ("pi",)),
+        ("CLAUDE,Codex", ("claude", "codex")),
+    ],
+)
+def test_parse_harness_set_accept_table(raw: str, expected: tuple[str, ...]) -> None:
+    assert parse_harness_set(raw) == expected
+
+
+# ---------------------------------------------------------------------------
+# parse_harness_set REJECT paths.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expect_in_message"),
+    [
+        ("bogus", ["bogus", "claude", "codex", "pi"]),
+        ("claude,zzz", ["zzz"]),
+        ("", []),
+        ("  ,  ", []),
+    ],
+)
+def test_parse_harness_set_reject_table(raw: str, expect_in_message: list[str]) -> None:
+    with pytest.raises(ValueError) as exc:
+        parse_harness_set(raw)
+    msg = str(exc.value)
+    for fragment in expect_in_message:
+        assert fragment in msg
+
+
+# ---------------------------------------------------------------------------
+# Grep — the roster literals are GONE from all 7 repointed sites, and the derived
+# model_profiles site still derives (not a bare literal).
 # ---------------------------------------------------------------------------
 
 # Each site maps to (spaceless forbidden roster literal, required registry reference).
@@ -173,26 +172,23 @@ _L2_SITES: dict[str, tuple[str, str]] = {
 }
 
 
-@pytest.mark.parametrize("rel", [*_L1_SITES, *_L2_SITES])
-def test_roster_literal_absent_and_registry_consumed(rel: str) -> None:
+def test_roster_literal_absent_registry_consumed_and_model_profiles_derives() -> None:
     """AC-2 / AC-9(a,a′): each repointed site has NO bare roster literal, and DOES consume
-    the registry. Reverting a site to a hard-coded roster tuple/set fails this test."""
-    forbidden, required = ({**_L1_SITES, **_L2_SITES})[rel]
-    source = (_PKG / rel).read_text(encoding="utf-8")
-    spaceless = source.replace(" ", "")
-    assert forbidden not in spaceless, (
-        f"{rel} still carries the bare roster literal {forbidden!r} — it must resolve "
-        "through core/harness_registry (v0.1.58 FR1)."
-    )
-    assert required in source, f"{rel} does not consume the registry (missing {required!r})."
+    the registry. Reverting a site to a hard-coded roster tuple/set fails this test. The
+    4th ``_LAYER2_HARNESSES`` site (``model_profiles.py``) is DERIVED from the model
+    catalog constants (reconciled by the R1 contract test above), NOT repointed and NOT a
+    bare literal."""
+    for rel, (forbidden, required) in {**_L1_SITES, **_L2_SITES}.items():
+        source = (_PKG / rel).read_text(encoding="utf-8")
+        spaceless = source.replace(" ", "")
+        assert forbidden not in spaceless, (
+            f"{rel} still carries the bare roster literal {forbidden!r} — it must resolve "
+            "through core/harness_registry (v0.1.58 FR1)."
+        )
+        assert required in source, f"{rel} does not consume the registry (missing {required!r})."
 
-
-def test_model_profiles_derived_site_is_reconciled_not_repointed() -> None:
-    """The 4th ``_LAYER2_HARNESSES`` site (``model_profiles.py``) is DERIVED from the model
-    catalog constants (reconciled by the R1 contract test), NOT repointed and NOT a bare
-    literal."""
-    source = (_PKG / "features/lifecycle/model_profiles.py").read_text(encoding="utf-8")
-    spaceless = source.replace(" ", "")
-    assert 'frozenset({"codex","pi"})' not in spaceless
-    assert "harness_models.CODEX_HARNESS" in source
-    assert "harness_models.PI_HARNESS" in source
+    profiles_source = (_PKG / "features/lifecycle/model_profiles.py").read_text(encoding="utf-8")
+    spaceless_profiles = profiles_source.replace(" ", "")
+    assert 'frozenset({"codex","pi"})' not in spaceless_profiles
+    assert "harness_models.CODEX_HARNESS" in profiles_source
+    assert "harness_models.PI_HARNESS" in profiles_source

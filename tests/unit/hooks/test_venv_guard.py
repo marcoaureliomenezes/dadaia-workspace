@@ -7,6 +7,9 @@ invocations NOT rooted in `.dadaia/.venv/bin/` (or the workspace-absolute equiva
 ruff, and mypy are explicitly NOT matched. The false-block law (ADR-G1) requires that
 quoted strings, in-repo paths like ``repos/x/pip.py``, and another venv's explicit bin
 path are never blocked — covered by the negative matrix below.
+
+CRIT: the corrected-command message content is preserved as a parametrized column (was 3
+separate fns) — never dropped. False-block law rows are untouched — never weakened.
 """
 
 from __future__ import annotations
@@ -21,45 +24,32 @@ def _bash(command: str) -> dict[str, object]:
 
 
 # ----------------------------------------------------------------------------
-# BLOCK matrix — bare workspace tools not rooted in the venv bin.
+# BLOCK matrix — bare workspace tools not rooted in the venv bin, with the
+# expected corrected-command fragment carried as a param column.
 # ----------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "command",
+    ("command", "expected_correction"),
     [
-        "dadaia doctor",
-        "dadaia context show --json",
-        "pip install foo",
-        "pip3 install foo",
-        "python -m dadaia_workspace",
-        "python3 -m dadaia_workspace",
-        "python -m dadaia_workspace.cli.main doctor",
+        ("dadaia doctor", ".dadaia/.venv/bin/dadaia doctor"),
+        ("dadaia context show --json", ".dadaia/.venv/bin/dadaia context show --json"),
+        ("pip install foo", ".dadaia/.venv/bin/pip install foo"),
+        ("pip3 install foo", ".dadaia/.venv/bin/pip3 install foo"),
+        ("python -m dadaia_workspace", ".dadaia/.venv/bin/python -m dadaia_workspace"),
+        ("python3 -m dadaia_workspace", ".dadaia/.venv/bin/python -m dadaia_workspace"),
+        (
+            "python -m dadaia_workspace.cli.main doctor",
+            ".dadaia/.venv/bin/python -m dadaia_workspace.cli.main doctor",
+        ),
     ],
 )
-def test_blocks_bare_workspace_invocation(command: str) -> None:
+def test_blocks_bare_workspace_invocation(command: str, expected_correction: str) -> None:
     reason = venv_guard.evaluate_payload(_bash(command))
     assert reason is not None, f"expected block for {command!r}"
     # Block message must contain the corrected, venv-rooted invocation.
     assert ".dadaia/.venv/bin/" in reason
-
-
-def test_block_message_contains_corrected_command() -> None:
-    reason = venv_guard.evaluate_payload(_bash("pip install foo"))
-    assert reason is not None
-    assert ".dadaia/.venv/bin/pip install foo" in reason
-
-
-def test_block_message_for_dadaia_corrects_to_venv_dadaia() -> None:
-    reason = venv_guard.evaluate_payload(_bash("dadaia doctor"))
-    assert reason is not None
-    assert ".dadaia/.venv/bin/dadaia doctor" in reason
-
-
-def test_block_message_for_python_module_corrects_to_venv_python() -> None:
-    reason = venv_guard.evaluate_payload(_bash("python -m dadaia_workspace"))
-    assert reason is not None
-    assert ".dadaia/.venv/bin/python -m dadaia_workspace" in reason
+    assert expected_correction in reason
 
 
 # ----------------------------------------------------------------------------
@@ -136,26 +126,25 @@ def test_no_false_block(command: str) -> None:
 
 
 # ----------------------------------------------------------------------------
-# Non-Bash and malformed payloads fail open (ALLOW).
+# Non-Bash and malformed payloads fail open (ALLOW); Codex shell shape blocks
+# same as Claude's Bash shape.
 # ----------------------------------------------------------------------------
 
 
-def test_non_bash_tool_is_ignored() -> None:
-    payload = {"tool_name": "Edit", "tool_input": {"command": "pip install foo"}}
-    assert venv_guard.evaluate_payload(payload) is None
-
-
-def test_empty_command_allows() -> None:
-    assert venv_guard.evaluate_payload(_bash("")) is None
-    assert venv_guard.evaluate_payload(_bash("   ")) is None
-
-
-def test_missing_command_field_allows() -> None:
-    assert venv_guard.evaluate_payload({"tool_name": "Bash", "tool_input": {}}) is None
-
-
-def test_codex_shell_command_is_inspected() -> None:
-    # Codex shell event carries the same tool_input.command shape.
-    payload = {"tool_name": "Bash", "tool_input": {"command": "pip install foo"}}
+@pytest.mark.parametrize(
+    ("payload", "expect_block"),
+    [
+        ({"tool_name": "Edit", "tool_input": {"command": "pip install foo"}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": ""}}, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "   "}}, False),
+        ({"tool_name": "Bash", "tool_input": {}}, False),
+        # Codex shell event carries the same tool_input.command shape.
+        ({"tool_name": "Bash", "tool_input": {"command": "pip install foo"}}, True),
+    ],
+)
+def test_fail_open_and_codex_shape(payload: dict[str, object], expect_block: bool) -> None:
     reason = venv_guard.evaluate_payload(payload)
-    assert reason is not None
+    if expect_block:
+        assert reason is not None
+    else:
+        assert reason is None

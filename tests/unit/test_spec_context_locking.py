@@ -12,6 +12,8 @@ Acceptance criteria covered here:
     - workspace lock times out correctly (WorkspaceLockTimeoutError).
     - audit log appends records with required schema.
     - dead contexts cannot be bound — context service guard.
+
+Real-concurrency race tests are unique failure detectors — kept verbatim below.
 """
 
 from __future__ import annotations
@@ -53,54 +55,6 @@ from dadaia_workspace.infrastructure.file_lock_posix import _acquire_flock  # no
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def ws(tmp_path: Path) -> Path:
-    """Minimal workspace root with .dadaia/states/ and repos/."""
-    root = tmp_path / "ws"
-    root.mkdir()
-    (root / "repos").mkdir()
-    (root / ".dadaia" / "states").mkdir(parents=True)
-    return root
-
-
-@pytest.fixture()
-def store() -> FakeContextStore:
-    return FakeContextStore()
-
-
-@pytest.fixture()
-def git() -> FakeGitClient:
-    return FakeGitClient()
-
-
-@pytest.fixture()
-def svc(
-    store: FakeContextStore,
-    git: FakeGitClient,
-    ws: Path,
-) -> SpecContextService:
-    return SpecContextService(
-        context_store=store,
-        git_client=git,
-        workspace_root=ws,
-    )
-
-
-def _make_alive_ctx(name: str, slug: str) -> SpecContextProject:
-    return SpecContextProject(
-        name=name,
-        state=ContextState.ALIVE,
-        repo_slug=slug,
-        repo_url=f"https://example.com/{slug}",
-        created_at="2026-01-01T00:00:00Z",
-        alive_since="2026-01-01T00:00:00Z",
-    )
-
 
 def _make_dead_ctx(name: str, slug: str) -> SpecContextProject:
     return SpecContextProject(
@@ -111,35 +65,6 @@ def _make_dead_ctx(name: str, slug: str) -> SpecContextProject:
         created_at="2026-01-01T00:00:00Z",
         dead_since="2026-01-01T00:00:00Z",
     )
-
-
-# ---------------------------------------------------------------------------
-# AC-T11-5: bind on DEAD context raises ContextNotAliveError (service-level guard)
-# ---------------------------------------------------------------------------
-
-
-def test_ac_t11_5_bind_on_dead_context_raises(ws: Path, store: FakeContextStore) -> None:
-    """AC-T11-5: the CLI bind guard raises if the context is DEAD.
-
-    Unit scope tests the guard logic directly. CLI command behavior belongs in
-    contract tests.
-    """
-    from dadaia_workspace.core.exceptions import ContextNotAliveError
-
-    dead_ctx = _make_dead_ctx("proj", "my-repo")
-    store.save(dead_ctx)
-
-    ctx = store.get("proj")
-    assert ctx is not None
-    assert ctx.state == ContextState.DEAD
-
-    # The CLI checks ctx.state != ALIVE before creating the lock.
-    with pytest.raises(ContextNotAliveError):
-        if ctx.state != ContextState.ALIVE:
-            raise ContextNotAliveError(
-                f"Context 'proj' is not ALIVE (state={ctx.state.value}). "
-                "Run 'dadaia context alive <name>' first."
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -373,12 +298,18 @@ def test_workspace_lock_timeout(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Audit log — required schema
+# Audit log — required schema; dead-bind guard.
 # ---------------------------------------------------------------------------
 
 
-def test_audit_log_appends_required_event_schema(ws: Path) -> None:
-    """Audit helpers append valid JSONL records for acquired, released, and blocked events."""
+def test_audit_log_schema_and_dead_bind_guard(tmp_path: Path) -> None:
+    """Audit helpers append valid JSONL records for acquired, released, and blocked
+    events, and the CLI dead-bind guard raises when a context is DEAD."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "repos").mkdir()
+    (ws / ".dadaia" / "states").mkdir(parents=True)
+
     audit_acquired(
         ws,
         context="proj",
@@ -427,3 +358,22 @@ def test_audit_log_appends_required_event_schema(ws: Path) -> None:
     assert records[0]["pid"] == 12345
     assert records[2]["session_id"] == "sess_blocked"
     assert records[2]["reason"] == "lock already held"
+
+    # AC-T11-5: the CLI bind guard raises if the context is DEAD.
+    from dadaia_workspace.core.exceptions import ContextNotAliveError
+
+    store = FakeContextStore()
+    dead_ctx = _make_dead_ctx("proj2", "my-repo2")
+    store.save(dead_ctx)
+
+    ctx = store.get("proj2")
+    assert ctx is not None
+    assert ctx.state == ContextState.DEAD
+
+    # The CLI checks ctx.state != ALIVE before creating the lock.
+    with pytest.raises(ContextNotAliveError):
+        if ctx.state != ContextState.ALIVE:
+            raise ContextNotAliveError(
+                f"Context 'proj2' is not ALIVE (state={ctx.state.value}). "
+                "Run 'dadaia context alive <name>' first."
+            )
