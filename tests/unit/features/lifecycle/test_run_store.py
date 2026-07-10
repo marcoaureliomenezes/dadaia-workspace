@@ -1,7 +1,12 @@
-"""Unit tests for lifecycle run-state stores."""
+"""Unit tests for lifecycle run-state stores.
+
+Repo-root refusal prevents ``.dadaia/`` inside repos — workspace-boundary law, kept as the
+full fixture set as params.
+"""
 
 from __future__ import annotations
 
+import json as _json
 from pathlib import Path
 
 import pytest
@@ -17,7 +22,7 @@ from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecyc
 
 
 def _workspace(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia").mkdir()
+    (tmp_path / ".dadaia").mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
@@ -41,7 +46,9 @@ def _run(
     )
 
 
-def test_json_store_persists_under_canonical_states_lifecycle(tmp_path: Path) -> None:
+def test_json_store_persists_under_canonical_states_lifecycle_and_load_round_trips(
+    tmp_path: Path,
+) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace)
     run = _run()
@@ -52,16 +59,25 @@ def test_json_store_persists_under_canonical_states_lifecycle(tmp_path: Path) ->
     assert (store.root / "run-1.json").is_file()
     assert store.load("run-1") == run
 
+    # Positive contrast for the repo-root refusal matrix below: a genuine self-hosting
+    # workspace root (carrying its OWN .git AND .dadaia AND repos/) is allowed.
+    self_hosting = tmp_path / "self-hosting-workspace"
+    self_hosting.mkdir()
+    (self_hosting / ".git").mkdir()
+    (self_hosting / ".dadaia" / "states").mkdir(parents=True)
+    (self_hosting / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    (self_hosting / "repos").mkdir()
+    self_hosting_store = JsonLifecycleRunStore(self_hosting)
+    assert self_hosting_store.root == self_hosting / ".dadaia" / "states" / "lifecycle"
 
-def test_json_store_loads_old_format_record_without_workflow_policy(tmp_path: Path) -> None:
-    # M1 (T-28-A-05): a literal old-format record — current 'lifecycle-run-v1' schema,
-    # NO 'workflow_policy' key — must still load. The schema version literal is unchanged.
-    import json as _json
 
-    workspace = _workspace(tmp_path)
-    store = JsonLifecycleRunStore(workspace)
-    store.root.mkdir(parents=True, exist_ok=True)
-    legacy_payload = {
+# ---------------------------------------------------------------------------
+# ① legacy back-compat param: no-workflow_policy / no-workflow_steps keys still load
+# ---------------------------------------------------------------------------
+
+
+def _legacy_no_workflow_policy() -> dict[str, object]:
+    return {
         "schema_version": "lifecycle-run-v1",
         "run": {
             "run_id": "legacy-1",
@@ -77,25 +93,10 @@ def test_json_store_loads_old_format_record_without_workflow_policy(tmp_path: Pa
             "injected_context": [],
         },
     }
-    (store.root / "legacy-1.json").write_text(
-        _json.dumps(legacy_payload, indent=2, sort_keys=True), encoding="utf-8"
-    )
-
-    loaded = store.load("legacy-1")
-    assert loaded is not None
-    assert loaded.run_id == "legacy-1"
-    assert loaded.workflow_policy is None
 
 
-def test_json_store_loads_old_format_record_without_workflow_steps(tmp_path: Path) -> None:
-    # A27 (T-30-D-04): an old-format record with NO 'workflow_steps' key still loads,
-    # yielding an empty ledger. The 'lifecycle-run-v1' schema literal is unchanged.
-    import json as _json
-
-    workspace = _workspace(tmp_path)
-    store = JsonLifecycleRunStore(workspace)
-    store.root.mkdir(parents=True, exist_ok=True)
-    legacy_payload = {
+def _legacy_no_workflow_steps() -> dict[str, object]:
+    return {
         "schema_version": "lifecycle-run-v1",
         "run": {
             "run_id": "legacy-2",
@@ -113,16 +114,38 @@ def test_json_store_loads_old_format_record_without_workflow_steps(tmp_path: Pat
             # deliberately NO 'workflow_steps' key.
         },
     }
-    (store.root / "legacy-2.json").write_text(
-        _json.dumps(legacy_payload, indent=2, sort_keys=True), encoding="utf-8"
+
+
+def test_legacy_back_compat_matrix(tmp_path: Path) -> None:
+    """M1 (T-28-A-05): a literal old-format record with NO 'workflow_policy' key still
+    loads; A27 (T-30-D-04): NO 'workflow_steps' key still loads, yielding an empty ledger.
+    The 'lifecycle-run-v1' schema literal is unchanged in both cases."""
+    workspace = _workspace(tmp_path)
+    store = JsonLifecycleRunStore(workspace)
+    store.root.mkdir(parents=True, exist_ok=True)
+
+    (store.root / "legacy-1.json").write_text(
+        _json.dumps(_legacy_no_workflow_policy(), indent=2, sort_keys=True), encoding="utf-8"
     )
+    loaded1 = store.load("legacy-1")
+    assert loaded1 is not None
+    assert loaded1.run_id == "legacy-1"
+    assert loaded1.workflow_policy is None
 
-    loaded = store.load("legacy-2")
-    assert loaded is not None
-    assert len(loaded.workflow_steps) == 0
+    (store.root / "legacy-2.json").write_text(
+        _json.dumps(_legacy_no_workflow_steps(), indent=2, sort_keys=True), encoding="utf-8"
+    )
+    loaded2 = store.load("legacy-2")
+    assert loaded2 is not None
+    assert len(loaded2.workflow_steps) == 0
 
 
-def test_json_store_persists_workflow_steps_ledger(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# ② ledger persists atomically + runs-location root
+# ---------------------------------------------------------------------------
+
+
+def test_ledger_persists_atomically_and_runs_location_root(tmp_path: Path) -> None:
     # A18 (T-30-D-04): the workflow-step ledger is persisted atomically as part of the run
     # record (LifecycleRun.to_dict serialises it; the store's temp+rename is atomic).
     from dadaia_workspace.core.models.workflow_handoff import (
@@ -160,19 +183,22 @@ def test_json_store_persists_workflow_steps_ledger(tmp_path: Path) -> None:
     assert loaded == run
     assert loaded.workflow_steps.find("release_scope", 0) is not None
 
-
-def test_json_store_can_persist_under_runs_lifecycle(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    store = JsonLifecycleRunStore(workspace, location="runs")
-    run = _run("run-2")
-
-    store.save(run)
-
-    assert store.root == workspace / ".dadaia" / "runs" / "lifecycle"
-    assert store.load("run-2") == run
+    # The alternate 'runs' location root also persists correctly.
+    runs_store = JsonLifecycleRunStore(_workspace(tmp_path / "runs-variant"), location="runs")
+    runs_store.save(_run("run-2"))
+    assert runs_store.root == (tmp_path / "runs-variant") / ".dadaia" / "runs" / "lifecycle"
+    assert runs_store.load("run-2") == _run("run-2")
 
 
-def test_resume_is_idempotent_and_does_not_rewrite_state(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# ③ error param: resume idempotent / save-replaces / missing-resume / corrupt / traversal /
+#    list_runs-skips-corrupt
+# ---------------------------------------------------------------------------
+
+
+def test_resume_idempotent_save_replaces_list_skips_corrupt_and_error_matrix(
+    tmp_path: Path,
+) -> None:
     workspace = _workspace(tmp_path)
     store = JsonLifecycleRunStore(workspace)
     blocked = BlockedState(
@@ -193,142 +219,95 @@ def test_resume_is_idempotent_and_does_not_rewrite_state(tmp_path: Path) -> None
     assert second == run
     assert state_path.read_text(encoding="utf-8") == before
 
-
-def test_save_replaces_existing_run_state(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    store = JsonLifecycleRunStore(workspace)
-    store.save(_run(status=LifecycleRunStatus.RUNNING))
     replacement = _run(status=LifecycleRunStatus.COMPLETED)
-
     store.save(replacement)
-
     assert store.load("run-1") == replacement
 
+    empty_store = JsonLifecycleRunStore(_workspace(tmp_path / "empty"))
+    assert empty_store.list_runs() == []
 
-def test_list_runs_returns_empty_when_no_runs(tmp_path: Path) -> None:
-    store = JsonLifecycleRunStore(_workspace(tmp_path))
-    assert store.list_runs() == []
+    multi_store = JsonLifecycleRunStore(_workspace(tmp_path / "multi"))
+    multi_store.save(_run("run-a"))
+    multi_store.save(_run("run-b"))
+    assert {r.run_id for r in multi_store.list_runs()} == {"run-a", "run-b"}
 
-
-def test_list_runs_returns_every_persisted_run(tmp_path: Path) -> None:
-    store = JsonLifecycleRunStore(_workspace(tmp_path))
-    store.save(_run("run-a"))
-    store.save(_run("run-b"))
-
-    runs = store.list_runs()
-
-    assert {r.run_id for r in runs} == {"run-a", "run-b"}
-
-
-def test_list_runs_skips_corrupt_files_without_raising(tmp_path: Path) -> None:
     # A corrupt run JSON must not break the panel run-history listing — it is skipped.
-    store = JsonLifecycleRunStore(_workspace(tmp_path))
-    store.save(_run("run-ok"))
-    store.root.mkdir(parents=True, exist_ok=True)
-    (store.root / "run-bad.json").write_text("{not json", encoding="utf-8")
+    corrupt_store = JsonLifecycleRunStore(_workspace(tmp_path / "corrupt"))
+    corrupt_store.save(_run("run-ok"))
+    corrupt_store.root.mkdir(parents=True, exist_ok=True)
+    (corrupt_store.root / "run-bad.json").write_text("{not json", encoding="utf-8")
+    assert [r.run_id for r in corrupt_store.list_runs()] == ["run-ok"]
 
-    runs = store.list_runs()
+    # error param: missing resume / corrupt state / path traversal.
+    missing_workspace = _workspace(tmp_path / "missing")
+    with pytest.raises(LifecycleRunStoreError, match="not found") as missing_exc:
+        JsonLifecycleRunStore(missing_workspace).resume("missing")
+    assert "missing.json" in str(missing_exc.value)
 
-    assert [r.run_id for r in runs] == ["run-ok"]
-
-
-def test_missing_resume_raises_actionable_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    store = JsonLifecycleRunStore(workspace)
-
-    with pytest.raises(LifecycleRunStoreError, match="not found") as exc:
-        store.resume("missing")
-
-    assert "missing.json" in str(exc.value)
-
-
-def test_corrupt_run_state_raises_actionable_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    state = workspace / ".dadaia" / "states" / "lifecycle" / "run-1.json"
+    corrupt_workspace = _workspace(tmp_path / "corrupt-state")
+    state = corrupt_workspace / ".dadaia" / "states" / "lifecycle" / "run-1.json"
     state.parent.mkdir(parents=True)
     state.write_text("{not json", encoding="utf-8")
+    with pytest.raises(LifecycleRunStoreError, match="corrupt lifecycle run state") as corrupt_exc:
+        JsonLifecycleRunStore(corrupt_workspace).load("run-1")
+    assert str(state) in str(corrupt_exc.value)
 
-    with pytest.raises(LifecycleRunStoreError, match="corrupt lifecycle run state") as exc:
-        JsonLifecycleRunStore(workspace).load("run-1")
-
-    assert str(state) in str(exc.value)
-
-
-def test_invalid_run_id_rejects_path_traversal(tmp_path: Path) -> None:
-    store = JsonLifecycleRunStore(_workspace(tmp_path))
-
+    traversal_workspace = _workspace(tmp_path / "traversal")
     with pytest.raises(LifecycleRunStoreError, match="invalid lifecycle run id"):
-        store.load("../escape")
+        JsonLifecycleRunStore(traversal_workspace).load("../escape")
 
 
-def test_refuses_to_create_dadaia_inside_repo_root(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# ④ repo-root refusal param (6 tree shapes) + self-hosting-workspace allowed
+# ---------------------------------------------------------------------------
+
+
+def _plain_repo_root(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     (repo_root / ".git").mkdir()
-
-    with pytest.raises(LifecycleRunStoreError, match="repository tree"):
-        JsonLifecycleRunStore(repo_root)
+    return repo_root
 
 
-def test_refuses_repo_root_even_when_dadaia_already_exists(tmp_path: Path) -> None:
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    (repo_root / ".git").mkdir()
+def _repo_root_with_dadaia(tmp_path: Path) -> Path:
+    repo_root = _plain_repo_root(tmp_path)
     (repo_root / ".dadaia").mkdir()
-
-    with pytest.raises(LifecycleRunStoreError, match="repository tree"):
-        JsonLifecycleRunStore(repo_root)
+    return repo_root
 
 
-def test_refuses_repo_root_with_dadaia_and_repos_but_no_workspace_sentinel(
-    tmp_path: Path,
-) -> None:
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    (repo_root / ".git").mkdir()
-    (repo_root / ".dadaia").mkdir()
+def _repo_root_with_dadaia_and_repos(tmp_path: Path) -> Path:
+    repo_root = _repo_root_with_dadaia(tmp_path)
     (repo_root / "repos").mkdir()
-
-    with pytest.raises(LifecycleRunStoreError, match="repository tree"):
-        JsonLifecycleRunStore(repo_root)
+    return repo_root
 
 
-def test_refuses_subdirectory_inside_repo_tree(tmp_path: Path) -> None:
+def _nested_subdirectory(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     nested = repo_root / "src" / "pkg"
     nested.mkdir(parents=True)
     (repo_root / ".git").mkdir()
-
-    with pytest.raises(LifecycleRunStoreError, match="repository tree"):
-        JsonLifecycleRunStore(nested)
+    return nested
 
 
-def test_refuses_subdirectory_inside_repo_tree_even_with_nested_dadaia(
-    tmp_path: Path,
-) -> None:
-    repo_root = tmp_path / "repo"
-    nested = repo_root / "src" / "pkg"
-    nested.mkdir(parents=True)
-    (repo_root / ".git").mkdir()
+def _nested_subdirectory_with_dadaia(tmp_path: Path) -> Path:
+    nested = _nested_subdirectory(tmp_path)
     (nested / ".dadaia").mkdir()
+    return nested
 
+
+_REFUSAL_CASES = (
+    ("plain-repo-root", _plain_repo_root),
+    ("repo-root-with-dadaia", _repo_root_with_dadaia),
+    ("repo-root-with-dadaia-and-repos-no-sentinel", _repo_root_with_dadaia_and_repos),
+    ("nested-subdirectory", _nested_subdirectory),
+    ("nested-subdirectory-with-dadaia", _nested_subdirectory_with_dadaia),
+)
+
+
+@pytest.mark.parametrize(
+    "build_root", [c[1] for c in _REFUSAL_CASES], ids=[c[0] for c in _REFUSAL_CASES]
+)
+def test_repo_root_refusal_matrix(tmp_path: Path, build_root) -> None:
+    target = build_root(tmp_path)
     with pytest.raises(LifecycleRunStoreError, match="repository tree"):
-        JsonLifecycleRunStore(nested)
-
-
-def test_allows_self_hosting_workspace_root_with_git_and_dadaia(
-    tmp_path: Path,
-) -> None:
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    (workspace / ".git").mkdir()
-    (workspace / ".dadaia" / "states").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        "{}",
-        encoding="utf-8",
-    )
-    (workspace / "repos").mkdir()
-
-    store = JsonLifecycleRunStore(workspace)
-
-    assert store.root == workspace / ".dadaia" / "states" / "lifecycle"
+        JsonLifecycleRunStore(target)

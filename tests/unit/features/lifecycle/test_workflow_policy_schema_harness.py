@@ -5,6 +5,8 @@ optional per-workflow `default_harness` and a per-step `harnesses` object, both
 constrained to the Layer-2 enum codex|pi, while keeping `additionalProperties:false`.
 A v0.1.28 overlay (no harness fields) must still validate; a non-codex/pi harness must
 be rejected.
+
+Layer-2 residue enforcement, schema layer.
 """
 
 from __future__ import annotations
@@ -39,28 +41,34 @@ def _overlay(workflow: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_v0128_overlay_without_harness_validates() -> None:
-    _validator().validate(_overlay({"steps": {"implement": "codex-implementation-standard"}}))
+# --- ① validates param: v0.1.28 shape / default_harness pi / per-step harnesses --------
 
 
-def test_default_harness_pi_validates() -> None:
-    _validator().validate(_overlay({"steps": {}, "default_harness": "pi"}))
+@pytest.mark.parametrize(
+    "workflow",
+    [
+        {"steps": {"implement": "codex-implementation-standard"}},
+        {"steps": {}, "default_harness": "pi"},
+        {"steps": {}, "harnesses": {"implement": "pi"}},
+    ],
+    ids=["v0128-shape-no-harness", "default-harness-pi", "per-step-harnesses"],
+)
+def test_validates_matrix(workflow: dict[str, object]) -> None:
+    _validator().validate(_overlay(workflow))
 
 
-def test_per_step_harnesses_validate() -> None:
-    _validator().validate(_overlay({"steps": {}, "harnesses": {"implement": "pi"}}))
+# --- ② rejects param: claude default / opencode step / unknown field -------------------
 
 
-def test_non_layer2_default_harness_rejected() -> None:
+@pytest.mark.parametrize(
+    "workflow",
+    [
+        {"steps": {}, "default_harness": "claude"},
+        {"steps": {}, "harnesses": {"implement": "opencode"}},
+        {"steps": {}, "bogus": "x"},
+    ],
+    ids=["non-layer2-default-harness", "non-layer2-step-harness", "unknown-workflow-field"],
+)
+def test_rejects_matrix(workflow: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
-        _validator().validate(_overlay({"steps": {}, "default_harness": "claude"}))
-
-
-def test_non_layer2_step_harness_rejected() -> None:
-    with pytest.raises(ValidationError):
-        _validator().validate(_overlay({"steps": {}, "harnesses": {"implement": "opencode"}}))
-
-
-def test_unknown_workflow_field_rejected() -> None:
-    with pytest.raises(ValidationError):
-        _validator().validate(_overlay({"steps": {}, "bogus": "x"}))
+        _validator().validate(_overlay(workflow))

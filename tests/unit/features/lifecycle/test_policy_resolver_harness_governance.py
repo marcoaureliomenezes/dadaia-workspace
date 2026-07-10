@@ -4,7 +4,11 @@ Covers the effective-harness precedence (D-1), auto-profile-on-harness-override 
 validation against the *effective* harness (the ``policy_resolver.py:288`` fix), and the
 default-first byte-identical back-compat (AC-10), all against the shared resolver. These
 sit alongside the v0.1.28 ``test_policy_resolver.py`` suite, which still pins the
-no-override default path.
+no-override default path — the AC-10 default-first pair is byte-identical to that suite's
+library-default fn and is not repeated here.
+
+CRITICAL: Layer-2 residue rejection + precedence order (CLI > overlay-step >
+overlay-default > catalog).
 """
 
 from __future__ import annotations
@@ -12,7 +16,6 @@ from __future__ import annotations
 import pytest
 
 from dadaia_workspace.core.models.workflow_execution import (
-    PolicySource,
     WorkflowModelPolicyOverlay,
 )
 from dadaia_workspace.features.lifecycle.policy_resolver import (
@@ -31,151 +34,130 @@ def _resolver(overlay: WorkflowModelPolicyOverlay | None = None) -> WorkflowExec
 
 
 # ---------------------------------------------------------------------------
-# T-29-A-01 — CatalogStep carries per-harness default profiles
+# ① T-29-A-01/A-02 — CatalogStep per-harness default profiles + effective-harness
+# precedence matrix (AC-1)
 # ---------------------------------------------------------------------------
 
 
-def test_catalog_step_carries_default_profiles() -> None:
+def test_effective_harness_precedence_matrix() -> None:
+    """T-29-A-01: CatalogStep carries a governed default profile per supported Layer-2
+    harness. T-29-A-02: default->all-pi / step-only / CLI-step-beats-CLI-default /
+    overlay-step / CLI-beats-overlay-step / overlay-step-beats-overlay-default /
+    overlay-default-all — every layer of the precedence chain (CLI > overlay-step > overlay-default > catalog)
+    as one param table."""
     catalog = library_workflow_catalog()
     workflow = catalog.workflow(_WORKFLOW)
     assert workflow is not None
-    implement = workflow.step("implement")
-    assert implement is not None
+    implement_step = workflow.step("implement")
+    assert implement_step is not None
     # Every supported Layer-2 harness has a governed default profile for the step.
-    assert implement.default_profiles["codex"] == "codex-implementation-standard"
-    assert implement.default_profiles["pi"] == "pi-implementation-standard"
-    review = workflow.step("review_qa")
-    assert review is not None
-    assert review.default_profiles["codex"] == "codex-review-deep"
-    assert review.default_profiles["pi"] == "pi-reasoning-high"
+    assert implement_step.default_profiles["codex"] == "codex-implementation-standard"
+    assert implement_step.default_profiles["pi"] == "pi-implementation-standard"
+    review_step = workflow.step("review_qa")
+    assert review_step is not None
+    assert review_step.default_profiles["codex"] == "codex-review-deep"
+    assert review_step.default_profiles["pi"] == "pi-reasoning-high"
 
-
-# ---------------------------------------------------------------------------
-# T-29-A-02 — effective-harness precedence (AC-1)
-# ---------------------------------------------------------------------------
-
-
-def test_default_harness_override_moves_every_step_to_pi() -> None:
-    snapshot = _resolver().resolve(_WORKFLOW, context="default", default_harness="pi")
-    for entry in snapshot.steps:
+    default_snapshot = _resolver().resolve(_WORKFLOW, context="default", default_harness="pi")
+    for entry in default_snapshot.steps:
         assert entry.harness == "pi"
 
-
-def test_step_harness_override_moves_only_that_step() -> None:
-    snapshot = _resolver().resolve(
+    step_only_snapshot = _resolver().resolve(
         _WORKFLOW,
         context="default",
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="pi"),),
     )
-    assert snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    assert step_only_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
+    assert step_only_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
 
-
-def test_cli_step_harness_beats_cli_default_harness() -> None:
-    snapshot = _resolver().resolve(
+    cli_beats_cli_default = _resolver().resolve(
         _WORKFLOW,
         context="default",
         default_harness="pi",
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="codex"),),
     )
-    assert snapshot.step("implement").harness == "codex"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").harness == "pi"  # type: ignore[union-attr]
+    assert cli_beats_cli_default.step("implement").harness == "codex"  # type: ignore[union-attr]
+    assert cli_beats_cli_default.step("review_qa").harness == "pi"  # type: ignore[union-attr]
 
-
-def test_overlay_step_harness_resolves_pi() -> None:
-    overlay = WorkflowModelPolicyOverlay(
+    overlay_step_only = WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={"default": {_WORKFLOW: {}}},
         default_harness_overlay={"default": {}},
         step_harness_overlay={"default": {_WORKFLOW: {"implement": "pi"}}},
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="default")
-    assert snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    overlay_step_snapshot = _resolver(overlay_step_only).resolve(_WORKFLOW, context="default")
+    assert overlay_step_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
+    assert overlay_step_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
 
-
-def test_cli_step_harness_beats_overlay_step_harness() -> None:
-    overlay = WorkflowModelPolicyOverlay(
-        policy_id="default",
-        contexts={"default": {_WORKFLOW: {}}},
-        default_harness_overlay={"default": {}},
-        step_harness_overlay={"default": {_WORKFLOW: {"implement": "pi"}}},
-    )
-    snapshot = _resolver(overlay).resolve(
+    cli_beats_overlay_step = _resolver(overlay_step_only).resolve(
         _WORKFLOW,
         context="default",
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="codex"),),
     )
-    assert snapshot.step("implement").harness == "codex"  # type: ignore[union-attr]
+    assert cli_beats_overlay_step.step("implement").harness == "codex"  # type: ignore[union-attr]
 
-
-def test_overlay_step_harness_beats_overlay_default_harness() -> None:
-    overlay = WorkflowModelPolicyOverlay(
+    overlay_step_beats_overlay_default = WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={"default": {_WORKFLOW: {}}},
         default_harness_overlay={"default": {_WORKFLOW: "codex"}},
         step_harness_overlay={"default": {_WORKFLOW: {"implement": "pi"}}},
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="default")
-    assert snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    overlay_layered_snapshot = _resolver(overlay_step_beats_overlay_default).resolve(
+        _WORKFLOW, context="default"
+    )
+    assert overlay_layered_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
+    assert overlay_layered_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
 
-
-def test_overlay_default_harness_resolves_every_step_to_pi() -> None:
-    overlay = WorkflowModelPolicyOverlay(
+    overlay_default_all = WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={"default": {_WORKFLOW: {}}},
         default_harness_overlay={"default": {_WORKFLOW: "pi"}},
         step_harness_overlay={"default": {_WORKFLOW: {}}},
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="default")
-    for entry in snapshot.steps:
+    overlay_default_snapshot = _resolver(overlay_default_all).resolve(_WORKFLOW, context="default")
+    for entry in overlay_default_snapshot.steps:
         assert entry.harness == "pi"
 
 
 # ---------------------------------------------------------------------------
-# T-29-A-03 — auto-profile-on-harness-override + match effective harness
+# ② T-29-A-03 — auto-profile-on-harness-override + explicit-not-overridden + pi-accepted
 # ---------------------------------------------------------------------------
 
 
-def test_harness_override_auto_selects_pi_default_profile() -> None:
-    snapshot = _resolver().resolve(_WORKFLOW, context="default", default_harness="pi")
-    impl = snapshot.step("implement")
+def test_auto_profile_on_harness_override_and_explicit_profile_not_overridden() -> None:
+    auto = _resolver().resolve(_WORKFLOW, context="default", default_harness="pi")
+    impl = auto.step("implement")
     assert impl is not None
     assert impl.harness == "pi"
     assert impl.model_profile == "pi-implementation-standard"
-    review = snapshot.step("review_qa")
+    review = auto.step("review_qa")
     assert review is not None
     assert review.model_profile == "pi-reasoning-high"
 
-
-def test_explicit_profile_not_overridden_by_auto_selection() -> None:
     # An explicit --step-model on a pi-resolved step keeps the explicit profile.
-    snapshot = _resolver().resolve(
+    explicit = _resolver().resolve(
         _WORKFLOW,
         context="default",
         default_harness="pi",
         cli_overrides=(StepOverride(step="implement", profile_id="pi-reasoning-low"),),
     )
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.model_profile == "pi-reasoning-low"
-    assert impl.harness == "pi"
+    explicit_impl = explicit.step("implement")
+    assert explicit_impl is not None
+    assert explicit_impl.model_profile == "pi-reasoning-low"
+    assert explicit_impl.harness == "pi"
 
-
-def test_pi_profile_accepted_on_pi_resolved_step() -> None:
     # The pre-fix policy_resolver.py:288 rejected a pi profile against a codex default
     # step; with the step resolved to pi, the pi profile is now valid.
-    snapshot = _resolver().resolve(
+    pi_on_pi = _resolver().resolve(
         _WORKFLOW,
         context="default",
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="pi"),),
         cli_overrides=(StepOverride(step="implement", profile_id="pi-reasoning-high"),),
     )
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.harness == "pi"
-    assert impl.model_profile == "pi-reasoning-high"
+    pi_on_pi_impl = pi_on_pi.step("implement")
+    assert pi_on_pi_impl is not None
+    assert pi_on_pi_impl.harness == "pi"
+    assert pi_on_pi_impl.model_profile == "pi-reasoning-high"
 
 
 def test_explicit_profile_conflicts_with_effective_harness_rejected() -> None:
@@ -201,32 +183,3 @@ def test_layer2_residue_harness_rejected() -> None:
             _resolver().resolve(_WORKFLOW, context="default", default_harness=bad)
         msg = str(exc.value).lower()
         assert "codex" in msg or "pi" in msg
-
-
-# ---------------------------------------------------------------------------
-# AC-10 — default-first / back-compat (byte-identical to v0.1.28)
-# ---------------------------------------------------------------------------
-
-
-def test_default_first_unchanged_no_flags_no_overlay() -> None:
-    snapshot = _resolver().resolve(_WORKFLOW, context="default")
-    for entry in snapshot.steps:
-        assert entry.harness == "codex"
-        assert entry.source is PolicySource.LIBRARY_DEFAULT
-    assert snapshot.step("implement").model_profile == "codex-implementation-standard"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").model_profile == "codex-review-deep"  # type: ignore[union-attr]
-
-
-def test_back_compat_overlay_without_harness_resolves_catalog_default() -> None:
-    # An overlay carrying only a profile override (v0.1.28 shape) resolves unchanged.
-    overlay = WorkflowModelPolicyOverlay(
-        policy_id="default",
-        contexts={"default": {_WORKFLOW: {"implement": "codex-review-deep"}}},
-        default_harness_overlay={"default": {}},
-        step_harness_overlay={"default": {_WORKFLOW: {}}},
-    )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="default")
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.harness == "codex"
-    assert impl.model_profile == "codex-review-deep"

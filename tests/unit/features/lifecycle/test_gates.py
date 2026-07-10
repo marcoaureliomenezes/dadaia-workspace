@@ -1,4 +1,8 @@
-"""Unit tests for lifecycle handoff gate validators."""
+"""Unit tests for lifecycle handoff gate validators.
+
+CRITICAL: the handoff gate validator — commit_sha exact-match (the push chokepoint keys on
+it), severity threshold, and anti-substring matching.
+"""
 
 from __future__ import annotations
 
@@ -156,24 +160,23 @@ def test_rejects_wrong_semantic_fields_without_substring_matching(
     assert reason in result.reasons
 
 
-def test_rejects_stale_handoff() -> None:
-    result = _validate(_handoff(), age_seconds=601)
+@pytest.mark.parametrize(
+    ("handoff_overrides", "kwargs", "reason"),
+    [
+        ({}, {"age_seconds": 601}, "stale handoff"),
+        ({}, {"artifact_hash": "b" * 64}, "artifact hash mismatch"),
+        (
+            {"findings": [{"severity": "HIGH", "message": "blocking issue"}]},
+            {},
+            "unresolved severity exceeds threshold",
+        ),
+    ],
+    ids=["stale", "hash-mismatch", "severity-threshold"],
+)
+def test_rejects_staleness_hash_mismatch_and_severity_threshold(
+    handoff_overrides: dict[str, object], kwargs: dict[str, object], reason: str
+) -> None:
+    result = _validate(_handoff(**handoff_overrides), **kwargs)  # type: ignore[arg-type]
 
     assert result.accepted is False
-    assert "stale handoff" in result.reasons
-
-
-def test_rejects_artifact_hash_mismatch() -> None:
-    result = _validate(_handoff(), artifact_hash="b" * 64)
-
-    assert result.accepted is False
-    assert "artifact hash mismatch" in result.reasons
-
-
-def test_rejects_unresolved_severity_above_threshold() -> None:
-    result = _validate(
-        _handoff(findings=[{"severity": "HIGH", "message": "blocking issue"}]),
-    )
-
-    assert result.accepted is False
-    assert "unresolved severity exceeds threshold" in result.reasons
+    assert reason in result.reasons

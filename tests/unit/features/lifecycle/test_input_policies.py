@@ -70,48 +70,42 @@ def _selector(tmp_path: Path) -> ContextSelector:
 
 
 # ---------------------------------------------------------------------------
-# loader
+# ① loader param: parses / absent-defaults-empty / non-mapping rejected / non-string rejected
 # ---------------------------------------------------------------------------
 
 
-def test_loader_parses_input_policies(tmp_path: Path) -> None:
-    loader = _write_fragment(
-        tmp_path / "frags",
+def test_loader_input_policies_matrix(tmp_path: Path) -> None:
+    parses = _write_fragment(
+        tmp_path / "frags-parses",
         input_policies_block="input_policies:\n  spec_draft: exact-files-only\n",
     )
-    fragment = loader.load_fragment("fixture.per_input")
+    fragment = parses.load_fragment("fixture.per_input")
     assert fragment.input_policies == {"spec_draft": "exact-files-only"}
     assert fragment.max_context_policy == "summary"  # the fragment-global default is intact
 
+    absent = _write_fragment(tmp_path / "frags-absent", input_policies_block="")
+    assert absent.load_fragment("fixture.per_input").input_policies == {}
 
-def test_loader_absent_input_policies_defaults_empty(tmp_path: Path) -> None:
-    loader = _write_fragment(tmp_path / "frags", input_policies_block="")
-    fragment = loader.load_fragment("fixture.per_input")
-    assert fragment.input_policies == {}
-
-
-def test_loader_rejects_non_mapping_input_policies(tmp_path: Path) -> None:
-    loader = _write_fragment(
-        tmp_path / "frags", input_policies_block="input_policies: not-a-mapping\n"
+    non_mapping = _write_fragment(
+        tmp_path / "frags-non-mapping", input_policies_block="input_policies: not-a-mapping\n"
     )
     with pytest.raises(FragmentValidationError, match="input_policies.*must be a mapping"):
-        loader.load_fragment("fixture.per_input")
+        non_mapping.load_fragment("fixture.per_input")
 
-
-def test_loader_rejects_non_string_policy_value(tmp_path: Path) -> None:
-    loader = _write_fragment(
-        tmp_path / "frags", input_policies_block="input_policies:\n  spec_draft: 3\n"
+    non_string = _write_fragment(
+        tmp_path / "frags-non-string",
+        input_policies_block="input_policies:\n  spec_draft: 3\n",
     )
     with pytest.raises(FragmentValidationError, match="must map strings to strings"):
-        loader.load_fragment("fixture.per_input")
+        non_string.load_fragment("fixture.per_input")
 
 
 # ---------------------------------------------------------------------------
-# AC-6 — mixed per-input policy resolution in one select_all
+# ② AC-6 mixed per-input resolution + byte-stable when absent
 # ---------------------------------------------------------------------------
 
 
-def test_ac6_mixed_per_input_policies_in_one_select_all(tmp_path: Path) -> None:
+def test_ac6_mixed_per_input_policies_and_byte_stable_when_absent(tmp_path: Path) -> None:
     loader = _write_fragment(
         tmp_path / "frags",
         input_policies_block="input_policies:\n  spec_draft: exact-files-only\n",
@@ -133,18 +127,10 @@ def test_ac6_mixed_per_input_policies_in_one_select_all(tmp_path: Path) -> None:
     assert by_name["approved_spec"].policy is MaxContextPolicy.SUMMARY
     assert _MARKER not in by_name["approved_spec"].content
 
-
-# ---------------------------------------------------------------------------
-# byte-stable — absent input_policies == today's behaviour
-# ---------------------------------------------------------------------------
-
-
-def test_select_all_byte_stable_when_input_policies_absent(tmp_path: Path) -> None:
-    selector = _selector(tmp_path)
+    # byte-stable — absent input_policies == today's behaviour.
     names = ("spec_draft", "approved_spec")
     without = selector.select_all("s", names, MaxContextPolicy.SUMMARY)
     with_empty = selector.select_all("s", names, MaxContextPolicy.SUMMARY, input_policies={})
     with_none = selector.select_all("s", names, MaxContextPolicy.SUMMARY, input_policies=None)
     assert without == with_empty == with_none
-    # every input resolved at the single fragment-global policy.
     assert all(result.policy is MaxContextPolicy.SUMMARY for result in without.results)

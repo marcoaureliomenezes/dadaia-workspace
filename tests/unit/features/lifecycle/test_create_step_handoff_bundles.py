@@ -6,17 +6,13 @@ contract. The producing-step set is **derived programmatically from each workflo
 ``_SEQUENCE``** (not a hard-coded list) so the coverage claim cannot drift from the real
 library: every non-review create step that produces a payload must carry the contract.
 
-There is exactly ONE output-handoff fragment family — no parallel ``create_handoff``
-fragment (D-2).
-
-RED today: ``release_scope`` bundles only ``shared.grill_questionnaire`` and
-``plan_create`` / ``tasks_create`` / ``backlog_author`` bundle no output contract.
-``spec_create`` already carries it.
+The single-output-handoff-family (no parallel ``create_handoff``) invariant is asserted
+directly on the fragment source in ``test_output_handoff_fragment_canonical.py`` (library-wide
+grep) — not repeated here.
 """
 
 from __future__ import annotations
 
-from dadaia_workspace.features.lifecycle.fragments.loader import list_fragments
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     _SEQUENCE as BACKLOG_SEQUENCE,
 )
@@ -58,35 +54,22 @@ def _backlog_authoring_step() -> object:
     )
 
 
-def test_release_producing_create_steps_cover_the_expected_labels() -> None:
+def test_every_producing_create_step_across_workflows_bundles_output_handoff() -> None:
     # The programmatic derivation must surface exactly the four release-definition
-    # producing create steps named in the SPEC.
+    # producing create steps named in the SPEC, and every one — plus backlog's authoring
+    # step — must bundle the single output-handoff contract. release_scope keeps its
+    # grill_questionnaire alongside it (not replaced by it).
     labels = {s.label for s in _release_producing_create_steps()}  # type: ignore[attr-defined]
     assert labels == {"release_scope", "spec_create", "plan_create", "tasks_create"}
 
-
-def test_every_release_producing_create_step_bundles_output_handoff() -> None:
     for step in _release_producing_create_steps():
         assert _OUTPUT_HANDOFF in step.shared_fragment_ids, (  # type: ignore[attr-defined]
             f"{step.label} must bundle {_OUTPUT_HANDOFF}"  # type: ignore[attr-defined]
         )
 
-
-def test_release_scope_keeps_its_grill_questionnaire_alongside_output_handoff() -> None:
     release_scope = next(s for s in RELEASE_SEQUENCE if s.label == "release_scope")
     assert "shared.grill_questionnaire" in release_scope.shared_fragment_ids
     assert _OUTPUT_HANDOFF in release_scope.shared_fragment_ids
 
-
-def test_backlog_author_bundles_output_handoff() -> None:
-    step = _backlog_authoring_step()
-    assert _OUTPUT_HANDOFF in step.shared_fragment_ids  # type: ignore[attr-defined]
-
-
-def test_single_output_handoff_fragment_family_no_create_handoff() -> None:
-    # D-2 / A10: there is exactly ONE output-handoff fragment family and NO parallel
-    # ``create_handoff`` fragment.
-    fragment_ids = {f.id for f in list_fragments()}
-    assert _OUTPUT_HANDOFF in fragment_ids
-    create_handoff = {fid for fid in fragment_ids if "create_handoff" in fid}
-    assert create_handoff == set(), f"unexpected create_handoff fragment(s): {create_handoff}"
+    backlog_step = _backlog_authoring_step()
+    assert _OUTPUT_HANDOFF in backlog_step.shared_fragment_ids  # type: ignore[attr-defined]

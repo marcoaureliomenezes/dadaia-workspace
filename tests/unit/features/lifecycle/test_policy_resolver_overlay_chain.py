@@ -38,10 +38,13 @@ def _parse(document: dict[str, object], tmp_path) -> WorkflowModelPolicyOverlay:
     return JsonWorkflowModelPolicyStore(tmp_path).parse(document)
 
 
-def test_chain_resolves_inherited_profile(tmp_path) -> None:  # type: ignore[no-untyped-def]
+# --- ① extends-chain: inherit + child-wins ----------------------------------------------
+
+
+def test_extends_chain_inherits_and_child_override_wins(tmp_path) -> None:  # type: ignore[no-untyped-def]
     # default overrides implement -> codex-review-deep (a valid codex profile for that step);
     # child inherits it via extends.
-    overlay = _parse(
+    inherit_overlay = _parse(
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -54,15 +57,13 @@ def test_chain_resolves_inherited_profile(tmp_path) -> None:  # type: ignore[no-
         },
         tmp_path,
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="child")
-    impl = snapshot.step("implement")
+    inherited = _resolver(inherit_overlay).resolve(_WORKFLOW, context="child")
+    impl = inherited.step("implement")
     assert impl is not None
     assert impl.model_profile == "codex-review-deep"
     assert impl.source is PolicySource.DEFAULT_OVERLAY
 
-
-def test_child_override_wins_over_inherited(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    overlay = _parse(
+    child_wins_overlay = _parse(
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -83,16 +84,18 @@ def test_child_override_wins_over_inherited(tmp_path) -> None:  # type: ignore[n
         },
         tmp_path,
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="pi-shop")
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.model_profile == "pi-reasoning-high"
-    assert impl.harness == "pi"
+    child = _resolver(child_wins_overlay).resolve(_WORKFLOW, context="pi-shop")
+    child_impl = child.step("implement")
+    assert child_impl is not None
+    assert child_impl.model_profile == "pi-reasoning-high"
+    assert child_impl.harness == "pi"
 
 
-def test_unresolvable_overlay_ref_fails_closed(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    # A context override naming an unknown profile is a hard failure (fail-closed).
-    overlay = _parse(
+# --- ② fail-closed param: unknown profile / stale step id in chain / harness mismatch ---
+
+_FAIL_CLOSED_CASES = (
+    (
+        "unknown-profile",
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -103,14 +106,11 @@ def test_unresolvable_overlay_ref_fails_closed(tmp_path) -> None:  # type: ignor
                 }
             },
         },
-        tmp_path,
-    )
-    with pytest.raises(PolicyResolutionError):
-        _resolver(overlay).resolve(_WORKFLOW, context="child")
-
-
-def test_stale_overlay_step_in_chain_fails_closed(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    overlay = _parse(
+        "child",
+        None,
+    ),
+    (
+        "stale-step-id-in-chain",
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -121,16 +121,11 @@ def test_stale_overlay_step_in_chain_fails_closed(tmp_path) -> None:  # type: ig
                 "child": {"extends": "default", "workflows": {}},
             },
         },
-        tmp_path,
-    )
-    with pytest.raises(PolicyResolutionError) as exc:
-        _resolver(overlay).resolve(_WORKFLOW, context="child")
-    assert "ghost-step" in str(exc.value)
-
-
-def test_harness_profile_mismatch_in_overlay_fails_closed(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    # A pi profile on a step that resolves to codex (no harness override) is a mismatch.
-    overlay = _parse(
+        "child",
+        "ghost-step",
+    ),
+    (
+        "harness-profile-mismatch",
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -141,7 +136,22 @@ def test_harness_profile_mismatch_in_overlay_fails_closed(tmp_path) -> None:  # 
                 }
             },
         },
-        tmp_path,
-    )
-    with pytest.raises(PolicyResolutionError):
-        _resolver(overlay).resolve(_WORKFLOW, context="child")
+        "child",
+        None,
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    "document,context,expected_substring",
+    [c[1:] for c in _FAIL_CLOSED_CASES],
+    ids=[c[0] for c in _FAIL_CLOSED_CASES],
+)
+def test_fail_closed_matrix(
+    tmp_path, document: dict[str, object], context: str, expected_substring: str | None
+) -> None:  # type: ignore[no-untyped-def]
+    overlay = _parse(document, tmp_path)
+    with pytest.raises(PolicyResolutionError) as exc:
+        _resolver(overlay).resolve(_WORKFLOW, context=context)
+    if expected_substring is not None:
+        assert expected_substring in str(exc.value)

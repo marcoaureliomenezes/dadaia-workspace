@@ -30,16 +30,16 @@ def test_prefix_is_deterministic_and_order_independent() -> None:
     assert len(a.content_hash) == 64  # sha256 hex
 
 
-def test_build_without_prefix_is_unchanged() -> None:
-    built = LifecyclePromptBuilder().build(_scope(), runtime=AgentRuntimeKind.FAKE)
-    assert built.prefix_hash is None
-    assert built.request.prompt == "do the qa step"
+def test_build_without_prefix_unchanged_with_prefix_prepended_verbatim() -> None:
+    without = LifecyclePromptBuilder().build(_scope(), runtime=AgentRuntimeKind.FAKE)
+    assert without.prefix_hash is None
+    assert without.request.prompt == "do the qa step"
 
-
-def test_build_with_prefix_prepends_verbatim_and_records_hash() -> None:
     prefix = PromptPrefix.from_sections({"constitution": "law", "spec": "the spec"})
-    built = LifecyclePromptBuilder().build(_scope(), runtime=AgentRuntimeKind.FAKE, prefix=prefix)
-    assert built.prefix_hash == prefix.content_hash
-    assert built.request.prompt.startswith(prefix.text)
-    assert built.request.prompt.endswith("do the qa step")
-    assert built.prompt_text.startswith(prefix.text)
+    with_prefix = LifecyclePromptBuilder().build(
+        _scope(), runtime=AgentRuntimeKind.FAKE, prefix=prefix
+    )
+    assert with_prefix.prefix_hash == prefix.content_hash
+    assert with_prefix.request.prompt.startswith(prefix.text)
+    assert with_prefix.request.prompt.endswith("do the qa step")
+    assert with_prefix.prompt_text.startswith(prefix.text)

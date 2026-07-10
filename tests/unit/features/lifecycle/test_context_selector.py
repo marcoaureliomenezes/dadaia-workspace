@@ -2,7 +2,8 @@
 
 Each implemented selector is exercised against a real-but-minimal fixture specs tree,
 each max-context policy is asserted to bound what is returned, and the run-record audit
-seam is verified to list the injected refs.
+seam is verified to list the injected refs. Summary-excludes-body / catalog-only bounding is
+the token-cost contract — kept as named cases.
 """
 
 from __future__ import annotations
@@ -192,31 +193,25 @@ def context(tmp_path: Path) -> SpecContext:
 
 
 # ---------------------------------------------------------------------------
-# Policy parsing
+# ① registered-inputs guard + unknown-input/unknown-policy error param
 # ---------------------------------------------------------------------------
 
 
-def test_policy_parse_known() -> None:
+def test_policy_registry_and_error_matrix(context: SpecContext) -> None:
     assert MaxContextPolicy.parse("exact-files-only") is MaxContextPolicy.EXACT_FILES_ONLY
     assert MaxContextPolicy.parse("summary") is MaxContextPolicy.SUMMARY
     assert MaxContextPolicy.parse("catalog-only") is MaxContextPolicy.CATALOG_ONLY
     assert MaxContextPolicy.parse("diff-only") is MaxContextPolicy.DIFF_ONLY
     assert MaxContextPolicy.parse("previous-handoff-only") is MaxContextPolicy.PREVIOUS_HANDOFF_ONLY
 
-
-def test_policy_parse_unknown_raises() -> None:
     with pytest.raises(UnknownPolicyError):
         MaxContextPolicy.parse("everything")
 
-
-def test_unknown_dynamic_input_raises(context: SpecContext) -> None:
     selector = ContextSelector(context)
     with pytest.raises(UnknownDynamicInputError):
         selector.select("not_a_real_input", MaxContextPolicy.SUMMARY)
 
-
-def test_release_definition_inputs_all_registered() -> None:
-    """Every dynamic input the release_definition fragments declare must resolve."""
+    # Every dynamic input the release_definition fragments declare must resolve.
     declared = {
         "plan_draft",
         "approved_spec",
@@ -246,106 +241,71 @@ def test_release_definition_inputs_all_registered() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Max-context policies bound what is returned
+# ② max-context-policy bounding param
 # ---------------------------------------------------------------------------
 
 
-def test_exact_files_only_returns_full_body(context: SpecContext) -> None:
+def test_max_context_policy_bounding(context: SpecContext) -> None:
     selector = ContextSelector(context)
-    result = selector.select("relevant_product_atoms", MaxContextPolicy.EXACT_FILES_ONLY)
-    assert "Body paragraph that is NOT in the frontmatter" in result.content
 
-
-def test_summary_excludes_body(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("relevant_product_atoms", MaxContextPolicy.SUMMARY)
-    assert "the brand identity summary body" in result.content
-    assert "Body paragraph that is NOT in the frontmatter" not in result.content
-
-
-def test_catalog_only_is_short(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     full = selector.select("relevant_product_atoms", MaxContextPolicy.EXACT_FILES_ONLY)
+    assert "Body paragraph that is NOT in the frontmatter" in full.content
+
+    summary = selector.select("relevant_product_atoms", MaxContextPolicy.SUMMARY)
+    assert "the brand identity summary body" in summary.content
+    assert "Body paragraph that is NOT in the frontmatter" not in summary.content
+
     cat = selector.select("relevant_product_atoms", MaxContextPolicy.CATALOG_ONLY)
     assert len(cat.content) < len(full.content)
     assert "Body paragraph" not in cat.content
 
-
-def test_diff_only_policy_on_git_diff_selector(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("git_diff", MaxContextPolicy.EXACT_FILES_ONLY)
+    diff = selector.select("git_diff", MaxContextPolicy.EXACT_FILES_ONLY)
     # git_diff always returns a diff-only payload regardless of requested policy.
-    assert result.policy is MaxContextPolicy.DIFF_ONLY
+    assert diff.policy is MaxContextPolicy.DIFF_ONLY
 
-
-def test_previous_handoff_only_returns_single_latest(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    full = selector.select("spec_review_handoffs", MaxContextPolicy.EXACT_FILES_ONLY)
-    last = selector.select("spec_review_handoffs", MaxContextPolicy.PREVIOUS_HANDOFF_ONLY)
-    assert len(full.refs) == 2
-    assert len(last.refs) == 1
-    assert last.refs[0].endswith("qa-engineer-spec.handoff.json")
+    full_handoffs = selector.select("spec_review_handoffs", MaxContextPolicy.EXACT_FILES_ONLY)
+    last_handoff = selector.select("spec_review_handoffs", MaxContextPolicy.PREVIOUS_HANDOFF_ONLY)
+    assert len(full_handoffs.refs) == 2
+    assert len(last_handoff.refs) == 1
+    assert last_handoff.refs[0].endswith("qa-engineer-spec.handoff.json")
 
 
 # ---------------------------------------------------------------------------
-# Per-selector behavior
+# ③ per-selector inclusion/exclusion expectation table
 # ---------------------------------------------------------------------------
 
 
-def test_memory_atoms_selector(context: SpecContext) -> None:
+def test_per_selector_expectations(context: SpecContext) -> None:
     selector = ContextSelector(context)
+
     result = selector.select("memory_atoms", MaxContextPolicy.EXACT_FILES_ONLY)
     assert any("brand-identity.md" in ref for ref in result.refs)
 
+    catalog = selector.select("product_catalog", MaxContextPolicy.CATALOG_ONLY)
+    assert "brand-identity" in catalog.content
+    assert catalog.refs and catalog.refs[0].endswith("catalog.json")
 
-def test_product_catalog_selector(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("product_catalog", MaxContextPolicy.CATALOG_ONLY)
-    assert "brand-identity" in result.content
-    assert result.refs and result.refs[0].endswith("catalog.json")
+    open_bugs = selector.select("open_bugs", MaxContextPolicy.SUMMARY)
+    assert any("open-bug-one.md" in ref for ref in open_bugs.refs)
+    assert all("closed-bug-one.md" not in ref for ref in open_bugs.refs)
 
+    selected_bugs = selector.select("selected_bugs", MaxContextPolicy.SUMMARY)
+    assert len(selected_bugs.refs) == 2
 
-def test_open_bugs_excludes_closed(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("open_bugs", MaxContextPolicy.SUMMARY)
-    assert any("open-bug-one.md" in ref for ref in result.refs)
-    assert all("closed-bug-one.md" not in ref for ref in result.refs)
+    candidate = selector.select("candidate_backlog", MaxContextPolicy.SUMMARY)
+    assert any("candidate.md" in ref for ref in candidate.refs)
+    assert all("deferred.md" not in ref for ref in candidate.refs)
 
+    selected_backlog = selector.select("selected_backlog_items", MaxContextPolicy.SUMMARY)
+    assert len(selected_backlog.refs) == 2
 
-def test_selected_bugs_includes_all(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("selected_bugs", MaxContextPolicy.SUMMARY)
-    assert len(result.refs) == 2
+    open_audits = selector.select("open_audits", MaxContextPolicy.EXACT_FILES_ONLY)
+    assert any("index.md" in ref for ref in open_audits.refs)
+    assert "Finding A1" in open_audits.content
 
+    audit_findings = selector.select("selected_audit_findings", MaxContextPolicy.EXACT_FILES_ONLY)
+    assert "Finding A1" in audit_findings.content
 
-def test_candidate_backlog_excludes_deferred(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("candidate_backlog", MaxContextPolicy.SUMMARY)
-    assert any("candidate.md" in ref for ref in result.refs)
-    assert all("deferred.md" not in ref for ref in result.refs)
-
-
-def test_selected_backlog_includes_all(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("selected_backlog_items", MaxContextPolicy.SUMMARY)
-    assert len(result.refs) == 2
-
-
-def test_open_audits_selector(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("open_audits", MaxContextPolicy.EXACT_FILES_ONLY)
-    assert any("index.md" in ref for ref in result.refs)
-    assert "Finding A1" in result.content
-
-
-def test_selected_audit_findings_selector(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("selected_audit_findings", MaxContextPolicy.EXACT_FILES_ONLY)
-    assert "Finding A1" in result.content
-
-
-def test_release_artifact_selectors(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     spec = selector.select("approved_spec", MaxContextPolicy.EXACT_FILES_ONLY)
     plan = selector.select("approved_plan", MaxContextPolicy.EXACT_FILES_ONLY)
     tasks = selector.select("tasks_draft", MaxContextPolicy.EXACT_FILES_ONLY)
@@ -354,55 +314,28 @@ def test_release_artifact_selectors(context: SpecContext) -> None:
     assert "The plan body." in plan.content
     assert "T-1 do the thing." in tasks.content
 
-
-def test_release_artifact_missing_returns_empty(tmp_path: Path) -> None:
-    specs = tmp_path / "ctx" / "specs"
-    (specs / "releases" / "v1.0.0").mkdir(parents=True)
-    selector = ContextSelector(SpecContext(specs_dir=specs, release_id="v1.0.0"))
-    result = selector.select("approved_spec", MaxContextPolicy.EXACT_FILES_ONLY)
-    assert result.content == ""
-    assert result.refs == ()
-
-
-def test_constitution_and_architecture_selectors(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     const = selector.select("constitution.md", MaxContextPolicy.EXACT_FILES_ONLY)
     arch = selector.select("memory/architecture.md", MaxContextPolicy.SUMMARY)
     assert "The law." in const.content
     assert arch.refs[0].endswith("architecture.md")
 
+    scope_handoff = selector.select("release_scope_handoff", MaxContextPolicy.PREVIOUS_HANDOFF_ONLY)
+    assert len(scope_handoff.refs) == 1
+    assert "project-manager" in scope_handoff.refs[0]
 
-def test_release_scope_handoff_filters_to_pm(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("release_scope_handoff", MaxContextPolicy.PREVIOUS_HANDOFF_ONLY)
-    assert len(result.refs) == 1
-    assert "project-manager" in result.refs[0]
-
-
-def test_summary_map_selectors(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     code = selector.select("code_map_summary", MaxContextPolicy.SUMMARY)
     src = selector.select("source_map_summary", MaxContextPolicy.SUMMARY)
-    tests = selector.select("test_catalog_summary", MaxContextPolicy.SUMMARY)
+    test_catalog = selector.select("test_catalog_summary", MaxContextPolicy.SUMMARY)
     assert "module_a.py" in code.content
     assert "module_a.py" in src.content
-    assert "test_a.py" in tests.content
+    assert "test_a.py" in test_catalog.content
 
+    arch_summary = selector.select("architecture_summary", MaxContextPolicy.SUMMARY)
+    assert arch_summary.refs[0].endswith("architecture.md")
 
-def test_architecture_summary_input(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("architecture_summary", MaxContextPolicy.SUMMARY)
-    assert result.refs[0].endswith("architecture.md")
+    product_summary = selector.select("product_catalog_summary", MaxContextPolicy.CATALOG_ONLY)
+    assert "brand-identity" in product_summary.content
 
-
-def test_product_catalog_summary_input(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    result = selector.select("product_catalog_summary", MaxContextPolicy.CATALOG_ONLY)
-    assert "brand-identity" in result.content
-
-
-def test_quality_assurance_and_test_output_selectors(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     qa = selector.select("quality_assurance_atom", MaxContextPolicy.EXACT_FILES_ONLY)
     test_out = selector.select("test_output", MaxContextPolicy.SUMMARY)
     src_sum = selector.select("source_summary", MaxContextPolicy.SUMMARY)
@@ -410,48 +343,23 @@ def test_quality_assurance_and_test_output_selectors(context: SpecContext) -> No
     assert "module_a.py" in src_sum.content
     assert test_out.name == "test_output"
 
-
-def test_repo_ownership_and_write_set_selectors(context: SpecContext) -> None:
-    selector = ContextSelector(context)
     ownership = selector.select("repo_ownership_map", MaxContextPolicy.SUMMARY)
     write_set = selector.select("write_set_guidance", MaxContextPolicy.SUMMARY)
     assert ownership.refs[0].endswith("architecture.md")
     assert write_set.refs[0].endswith("constitution.md")
 
-
-# ---------------------------------------------------------------------------
-# Batch select + audit
-# ---------------------------------------------------------------------------
-
-
-def test_select_all_collects_refs_and_fragment_ids(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    audit = selector.select_all(
-        step="spec_create",
-        names=("approved_spec", "memory/architecture.md", "relevant_product_atoms"),
-        policy="exact-files-only",
-        fragment_ids=("release_definition.spec_create",),
-    )
-    assert audit.step == "spec_create"
-    assert audit.fragment_ids == ("release_definition.spec_create",)
-    assert any(ref.endswith("SPEC.md") for ref in audit.refs)
-    assert any(ref.endswith("architecture.md") for ref in audit.refs)
-    assert any("brand-identity.md" in ref for ref in audit.refs)
-
-
-def test_select_all_dedupes_refs(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    audit = selector.select_all(
-        step="dup",
-        names=("approved_spec", "spec_draft"),  # both resolve SPEC.md
-        policy="exact-files-only",
-    )
-    spec_refs = [ref for ref in audit.refs if ref.endswith("SPEC.md")]
-    assert len(spec_refs) == 1
+    # Negative counterpart: a release artifact selector against a tree missing the
+    # artifact file returns empty content/refs (no crash).
+    empty_specs = context.specs_dir.parent.parent / "ctx-missing" / "specs"
+    (empty_specs / "releases" / "v1.0.0").mkdir(parents=True)
+    empty_selector = ContextSelector(SpecContext(specs_dir=empty_specs, release_id="v1.0.0"))
+    empty_result = empty_selector.select("approved_spec", MaxContextPolicy.EXACT_FILES_ONLY)
+    assert empty_result.content == ""
+    assert empty_result.refs == ()
 
 
 # ---------------------------------------------------------------------------
-# Run-record audit seam
+# ④ select_all refs+dedupe + run-record seam
 # ---------------------------------------------------------------------------
 
 
@@ -467,8 +375,33 @@ def _run() -> LifecycleRun:
     )
 
 
-def test_run_record_lists_injected_refs(context: SpecContext) -> None:
+def test_select_all_and_run_record_seam_records_round_trips_and_accumulates(
+    context: SpecContext,
+) -> None:
     selector = ContextSelector(context)
+
+    # select_all: collects refs across multiple names + dedupes when two names resolve
+    # the same underlying file.
+    wide_audit = selector.select_all(
+        step="spec_create",
+        names=("approved_spec", "memory/architecture.md", "relevant_product_atoms"),
+        policy="exact-files-only",
+        fragment_ids=("release_definition.spec_create",),
+    )
+    assert wide_audit.step == "spec_create"
+    assert wide_audit.fragment_ids == ("release_definition.spec_create",)
+    assert any(ref.endswith("SPEC.md") for ref in wide_audit.refs)
+    assert any(ref.endswith("architecture.md") for ref in wide_audit.refs)
+    assert any("brand-identity.md" in ref for ref in wide_audit.refs)
+
+    dedupe_audit = selector.select_all(
+        step="dup",
+        names=("approved_spec", "spec_draft"),  # both resolve SPEC.md
+        policy="exact-files-only",
+    )
+    spec_refs = [ref for ref in dedupe_audit.refs if ref.endswith("SPEC.md")]
+    assert len(spec_refs) == 1
+
     audit = selector.select_all(
         step="spec_create",
         names=("approved_spec", "memory/architecture.md"),
@@ -485,27 +418,16 @@ def test_run_record_lists_injected_refs(context: SpecContext) -> None:
     assert any(ref.endswith("architecture.md") for ref in entry.refs)
     assert "exact-files-only" in entry.policies
 
-
-def test_run_record_audit_round_trips(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    audit = selector.select_all(
-        step="release_scope",
-        names=("open_bugs", "candidate_backlog"),
-        policy="summary",
-        fragment_ids=("release_definition.release_scope",),
-    )
-    run = record_injected_context(_run(), audit)
+    # round-trips through to_dict/from_dict
     restored = LifecycleRun.from_dict(run.to_dict())
     assert restored.injected_context == run.injected_context
 
-
-def test_run_record_accumulates_multiple_steps(context: SpecContext) -> None:
-    selector = ContextSelector(context)
-    run = _run()
-    run = record_injected_context(
-        run, selector.select_all("step_a", ("approved_spec",), "exact-files-only")
+    # accumulates across multiple steps, in order
+    accumulated = _run()
+    accumulated = record_injected_context(
+        accumulated, selector.select_all("step_a", ("approved_spec",), "exact-files-only")
     )
-    run = record_injected_context(
-        run, selector.select_all("step_b", ("approved_plan",), "exact-files-only")
+    accumulated = record_injected_context(
+        accumulated, selector.select_all("step_b", ("approved_plan",), "exact-files-only")
     )
-    assert [entry.step for entry in run.injected_context] == ["step_a", "step_b"]
+    assert [e.step for e in accumulated.injected_context] == ["step_a", "step_b"]

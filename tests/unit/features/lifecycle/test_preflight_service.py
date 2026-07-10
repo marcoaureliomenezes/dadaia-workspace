@@ -84,7 +84,7 @@ def _input(**overrides: object) -> LifecyclePreflightInput:
     return LifecyclePreflightInput(**kwargs)  # type: ignore[arg-type]
 
 
-def test_preflight_passes_and_returns_required_handoff_evidence() -> None:
+def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens() -> None:
     required = RequiredHandoff(
         source=".dadaia/handoff/dadaia-workspace/qa.handoff.json",
         document=_handoff(),
@@ -103,9 +103,7 @@ def test_preflight_passes_and_returns_required_handoff_evidence() -> None:
     assert len(result.evidence) == 1
     assert result.evidence[0].agent == "qa-engineer"
 
-
-def test_preflight_accepts_persisted_bound_implementation_mode_tokens() -> None:
-    result = LifecyclePreflightService().preflight(
+    bound_result = LifecyclePreflightService().preflight(
         _input(
             binding=BoundContext(
                 context="dadaia-workspace",
@@ -117,8 +115,8 @@ def test_preflight_accepts_persisted_bound_implementation_mode_tokens() -> None:
         ),
     )
 
-    assert result.ok is True
-    assert result.blocked is None
+    assert bound_result.ok is True
+    assert bound_result.blocked is None
 
 
 @pytest.mark.parametrize(

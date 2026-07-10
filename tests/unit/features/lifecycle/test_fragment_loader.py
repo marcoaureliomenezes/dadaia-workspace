@@ -1,4 +1,7 @@
-"""Unit tests for the lifecycle fragment loader (WS-3 / T-24-07)."""
+"""Unit tests for the lifecycle fragment loader (WS-3 / T-24-07).
+
+Token lint (harness-universality) must survive — it is the cross-harness portability gate.
+"""
 
 from __future__ import annotations
 
@@ -57,12 +60,7 @@ _SHARED_IDS = {
     "shared.write_scope",
 }
 # Workflow dirs that still ship only a `_README.md` stub (no authored step fragments).
-# ``implementation`` left this set in v0.1.24 (T-24-11): it now ships three authored step
-# fragments (implement_tdd, self_verify, qa_review). ``backlog_definition`` left this set in
-# v0.1.26 R2 (T-26-02): it now ships four authored step fragments. ``audit``/``research``/
-# ``bug_report`` left this set in v0.1.30 Wave E (T-30-E-01..03): each now ships real
-# fragment+gate step fragments. ``closure`` stays a README-only stub (its close worker is
-# generic, no fragment).
+# ``closure`` stays a README-only stub (its close worker is generic, no fragment).
 _DEFERRED_WORKFLOW_DIRS = {
     "closure",
 }
@@ -90,43 +88,50 @@ max_context_policy: summary
 """
 
 
+def _write_fragment(tmp_path: Path, name: str, text: str) -> FragmentLoader:
+    root = tmp_path / "lifecycle_fragments"
+    (root / "shared").mkdir(parents=True, exist_ok=True)
+    (root / "shared" / name).write_text(text, encoding="utf-8")
+    return FragmentLoader(root=root)
+
+
 # ---------------------------------------------------------------------------
-# Shipped fragment library — load + validate the real packaged tree.
+# ① shipped-library existence derived from _SEQUENCE / ladder
 # ---------------------------------------------------------------------------
 
 
-def test_validate_all_loads_every_shipped_fragment() -> None:
+def test_shipped_library_existence_derived_from_sequence_and_ladder() -> None:
     fragments = validate_all()
     assert fragments, "expected the packaged fragment library to be non-empty"
     assert all(isinstance(f, Fragment) for f in fragments)
+    loadable = {f.id for f in fragments}
 
-
-def test_release_definition_step_fragments_exist_and_load() -> None:
     rd = {f.id for f in list_fragments(workflow="release_definition")}
     missing = _RELEASE_DEFINITION_STEP_IDS - rd
     assert not missing, f"release_definition workflow references missing fragments: {missing}"
-    # The derived set is non-empty — guards against a refactor silently emptying _SEQUENCE.
-    assert _RELEASE_DEFINITION_STEP_IDS
+    assert _RELEASE_DEFINITION_STEP_IDS  # guards against a refactor silently emptying _SEQUENCE
 
-
-def test_shared_fragments_cited_by_release_definition_exist() -> None:
     shared = {f.id for f in list_fragments(workflow="shared")}
     assert shared >= _SHARED_IDS
-    # Every shared id the workflow actually cites is a real, loadable shared fragment.
     assert _shared_ids_cited_by_release_definition() <= shared
 
-
-def test_implementation_ladder_fragments_exist_and_load() -> None:
-    # Fix #2: the implementation pipeline ladder's fragment ids must all resolve to real
-    # shipped fragments; the set is derived from the ladder, not hand-copied.
     ladder_ids = _implementation_ladder_fragment_ids()
     assert ladder_ids, "implementation ladder declared no fragment ids"
-    loadable = {f.id for f in validate_all()}
-    missing = ladder_ids - loadable
-    assert not missing, f"implementation ladder references missing fragments: {missing}"
+    ladder_missing = ladder_ids - loadable
+    assert not ladder_missing, (
+        f"implementation ladder references missing fragments: {ladder_missing}"
+    )
+
+    # No fragment id should ever resolve to a _README stub.
+    assert all(not fid.endswith("_README") for fid in loadable)
 
 
-def test_load_fragment_by_id_round_trips() -> None:
+# ---------------------------------------------------------------------------
+# ② load-by-id/path round trip + unknown-id raises
+# ---------------------------------------------------------------------------
+
+
+def test_load_by_id_and_path_round_trip_unknown_id_raises() -> None:
     fragment = load_fragment("release_definition.spec_review_architecture")
     assert fragment.id == "release_definition.spec_review_architecture"
     assert fragment.workflow == "release_definition"
@@ -135,34 +140,27 @@ def test_load_fragment_by_id_round_trips() -> None:
     assert "specs/memory/architecture.md" in fragment.static_inputs
     assert fragment.body.startswith("# SPEC architecture review")
 
-
-def test_load_fragment_by_path_round_trips() -> None:
     loader = FragmentLoader()
-    fragment = loader.load_fragment(Path("shared") / "anti-slop.md")
-    assert fragment.id == "shared.anti_slop"
+    by_path = loader.load_fragment(Path("shared") / "anti-slop.md")
+    assert by_path.id == "shared.anti_slop"
 
-
-def test_load_fragment_unknown_id_raises() -> None:
     with pytest.raises(FragmentNotFoundError):
         load_fragment("release_definition.does_not_exist")
 
 
 # ---------------------------------------------------------------------------
-# Counts (5 shared, 8 release_definition; backlog_definition now ships 4 authored fragments).
+# ③ workflow-dir shape param: authored / deferred README-only / README-never-a-fragment /
+#    implementation ships its 5
 # ---------------------------------------------------------------------------
 
 
-def test_fragment_counts() -> None:
+def test_workflow_dir_shape_matrix() -> None:
+    """authored dirs ship fragments / deferred README-only / README-never-a-fragment /
+    implementation ships its 5 — one loader, one param-shaped assertion table."""
     loader = FragmentLoader()
-    assert len(loader.list_fragments(workflow="shared")) == 5
-    assert len(loader.list_fragments(workflow="release_definition")) == 8
 
-
-def test_implementation_dir_ships_its_authored_fragments() -> None:
-    # The implementation workflow ships five authored step fragments backing the
-    # pipeline's implement + QA / security / code review steps. v0.1.43 added the
-    # security-review and code-review gate fragments. No README-only deferred stub.
-    loader = FragmentLoader()
+    # v0.1.43 added the security-review and code-review gate fragments. No README-only
+    # deferred stub.
     ids = {f.id for f in loader.list_fragments(workflow="implementation")}
     assert ids == {
         "implementation.implement_tdd",
@@ -171,13 +169,11 @@ def test_implementation_dir_ships_its_authored_fragments() -> None:
         "implementation.security_review",
         "implementation.code_review",
     }
+    assert len(loader.list_fragments(workflow="shared")) == 5
+    assert len(loader.list_fragments(workflow="release_definition")) == 8
 
-
-def test_deferred_workflow_dirs_present_with_readme_stub_only() -> None:
-    loader = FragmentLoader()
     dirs = set(loader.list_workflow_dirs())
     assert dirs >= _DEFERRED_WORKFLOW_DIRS
-    # Deferred dirs ship only a `_README.md` stub: no fragments are discovered there.
     for workflow in _DEFERRED_WORKFLOW_DIRS:
         assert loader.list_fragments(workflow=workflow) == [], (
             f"deferred workflow '{workflow}' must carry no step fragments yet"
@@ -185,11 +181,8 @@ def test_deferred_workflow_dirs_present_with_readme_stub_only() -> None:
         readme = loader.root / workflow / "_README.md"
         assert readme.exists(), f"deferred workflow '{workflow}' must ship a _README.md stub"
 
-
-def test_authored_workflow_dirs_ship_step_fragments() -> None:
     # T-30-E-01..03: audit / research / bug_report are no longer README-only deferred
     # stubs — each ships real fragment+gate step fragments backing its workflow body.
-    loader = FragmentLoader()
     for workflow in _AUTHORED_WORKFLOW_DIRS:
         fragments = loader.list_fragments(workflow=workflow)
         assert fragments, f"authored workflow '{workflow}' must ship step fragments"
@@ -197,22 +190,54 @@ def test_authored_workflow_dirs_ship_step_fragments() -> None:
             assert fragment.workflow == workflow
 
 
-def test_readme_stubs_are_not_treated_as_fragments() -> None:
-    # No fragment id should ever resolve to a _README stub.
-    ids = {f.id for f in validate_all()}
-    assert all(not fid.endswith("_README") for fid in ids)
-
-
 # ---------------------------------------------------------------------------
-# Malformed metadata is rejected.
+# ④ malformed-frontmatter rejection param
 # ---------------------------------------------------------------------------
 
+_MALFORMED_CASES = (
+    (
+        "missing-required-key",
+        lambda t: t.replace("output_schema: handoff-v1.1\n", ""),
+        "output_schema",
+    ),
+    (
+        "wrong-type-for-list-key",
+        lambda t: t.replace("dynamic_inputs: [available_evidence]", "dynamic_inputs: not-a-list"),
+        "dynamic_inputs",
+    ),
+    (
+        "empty-string-key",
+        lambda t: t.replace("output_schema: handoff-v1.1", 'output_schema: ""'),
+        "output_schema",
+    ),
+    (
+        "non-string-list-item",
+        lambda t: t.replace("dynamic_inputs: [available_evidence]", "dynamic_inputs: [3]"),
+        "dynamic_inputs",
+    ),
+    (
+        "no-frontmatter-delimiter",
+        lambda t: "# no frontmatter here\n",
+        "frontmatter",
+    ),
+    (
+        "unclosed-frontmatter",
+        lambda t: "---\nid: shared.fixture\nrole: shared\n# never closed\n",
+        "not closed",
+    ),
+)
 
-def _write_fragment(tmp_path: Path, name: str, text: str) -> FragmentLoader:
-    root = tmp_path / "lifecycle_fragments"
-    (root / "shared").mkdir(parents=True, exist_ok=True)
-    (root / "shared" / name).write_text(text, encoding="utf-8")
-    return FragmentLoader(root=root)
+
+@pytest.mark.parametrize(
+    "mutate,match",
+    [c[1:] for c in _MALFORMED_CASES],
+    ids=[c[0] for c in _MALFORMED_CASES],
+)
+def test_malformed_frontmatter_rejected(tmp_path: Path, mutate, match: str) -> None:
+    text = mutate(_VALID_FRONTMATTER)
+    loader = _write_fragment(tmp_path, "fixture.md", text)
+    with pytest.raises(FragmentValidationError, match=match):
+        loader.load_fragment(Path("shared") / "fixture.md")
 
 
 def test_valid_fixture_loads(tmp_path: Path) -> None:
@@ -222,51 +247,8 @@ def test_valid_fixture_loads(tmp_path: Path) -> None:
     assert fragment.dynamic_inputs == ("available_evidence",)
 
 
-def test_missing_required_key_rejected(tmp_path: Path) -> None:
-    text = _VALID_FRONTMATTER.replace("output_schema: handoff-v1.1\n", "")
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match="output_schema"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_wrong_type_for_list_key_rejected(tmp_path: Path) -> None:
-    text = _VALID_FRONTMATTER.replace(
-        "dynamic_inputs: [available_evidence]", "dynamic_inputs: not-a-list"
-    )
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match="dynamic_inputs"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_empty_string_key_rejected(tmp_path: Path) -> None:
-    text = _VALID_FRONTMATTER.replace("output_schema: handoff-v1.1", 'output_schema: ""')
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match="output_schema"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_non_string_list_item_rejected(tmp_path: Path) -> None:
-    text = _VALID_FRONTMATTER.replace("dynamic_inputs: [available_evidence]", "dynamic_inputs: [3]")
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match="dynamic_inputs"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_missing_frontmatter_delimiter_rejected(tmp_path: Path) -> None:
-    loader = _write_fragment(tmp_path, "fixture.md", "# no frontmatter here\n")
-    with pytest.raises(FragmentValidationError, match="frontmatter"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_unclosed_frontmatter_rejected(tmp_path: Path) -> None:
-    text = "---\nid: shared.fixture\nrole: shared\n# never closed\n"
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match="not closed"):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
 # ---------------------------------------------------------------------------
-# Harness-specific token lint (SECONDARY guarantee).
+# ⑤ token lint: forbidden-token param + case-insensitive + every-shipped-passes
 # ---------------------------------------------------------------------------
 
 
@@ -282,21 +264,18 @@ def test_forbidden_harness_token_rejected(tmp_path: Path, token: str) -> None:
         loader.load_fragment(Path("shared") / "fixture.md")
 
 
-def test_forbidden_token_match_is_case_insensitive(tmp_path: Path) -> None:
+def test_forbidden_token_lint_case_insensitive_and_shipped_library_passes(
+    tmp_path: Path,
+) -> None:
     text = _VALID_FRONTMATTER.rsplit("\n# ", 1)[0] + "\n# Use CODEX EXEC for this step.\n"
     loader = _write_fragment(tmp_path, "fixture.md", text)
     with pytest.raises(FragmentValidationError, match="codex exec"):
         loader.load_fragment(Path("shared") / "fixture.md")
 
-
-def test_forbidden_token_in_helper() -> None:
+    assert forbidden_token_in("call the READ TOOL now") == "READ TOOL"
     assert forbidden_token_in("call the read tool") == "read tool"
     assert forbidden_token_in("a clean universal sentence") is None
 
-
-def test_every_shipped_fragment_passes_the_token_lint() -> None:
-    # The packaged fragments are loaded through validate_all, which runs the lint;
-    # this assertion is the explicit statement that no shipped body trips it.
     for fragment in validate_all():
         assert forbidden_token_in(fragment.body) is None, (
             f"shipped fragment {fragment.id} contains a harness-specific token"

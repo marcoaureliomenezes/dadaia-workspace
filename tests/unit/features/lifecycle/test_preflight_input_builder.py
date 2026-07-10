@@ -5,11 +5,14 @@
 ``build_lifecycle_preflight_input`` does not exist yet, so every test here fails with
 ``AttributeError`` (no such attribute on ``container``) / ``ImportError``.
 
-Each test below drives ONE producer's real behavior against a hand-assembled ``tmp_path``
+Each test below drives real producers' behavior against a hand-assembled ``tmp_path``
 workspace (no fakes-of-the-thing-under-test): active-release from a real ACTIVE.md, git
 state from a real git repo, specs-doctor from a real specs tree, lease/mode from real
 session-identity + lease records, hygiene from the real ``LifecycleHygieneService``, and
 the composed ``expected_phase``/``required_mode`` policy from ACTIVE.md's phase.
+
+CRITICAL: preflight inputs come from REAL producers (v0.1.69 zero-producers bug) — do not
+fake these back out. Grouped by producer, keeping the real-git/real-session substance.
 """
 
 from __future__ import annotations
@@ -84,9 +87,10 @@ def _mk_workspace(tmp_path: Path, *, ctx: str = "proj") -> Path:
     return ws
 
 
-def test_build_lifecycle_preflight_input_exists_and_returns_typed_input(
-    tmp_path: Path,
-) -> None:
+# --- ① builder exists/typed + active-release from real ACTIVE.md -----------------------
+
+
+def test_builder_exists_typed_and_active_release_from_real_active_md(tmp_path: Path) -> None:
     from dadaia_workspace import container
 
     ws = _mk_workspace(tmp_path)
@@ -94,20 +98,15 @@ def test_build_lifecycle_preflight_input_exists_and_returns_typed_input(
 
     assert data.context == "proj"
     assert data.release_id == "v0.1.99"
-
-
-def test_active_release_producer_reads_real_active_md(tmp_path: Path) -> None:
-    from dadaia_workspace import container
-
-    ws = _mk_workspace(tmp_path)
-    data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
-
     assert data.active_release.release_id == "v0.1.99"
     assert data.active_release.phase is not None
     assert data.active_release.phase.strip().upper() == "IMPLEMENTATION"
 
 
-def test_git_producer_reads_real_dirty_state(tmp_path: Path) -> None:
+# --- ② git producer real clean/dirty -----------------------------------------------------
+
+
+def test_git_producer_reads_real_clean_and_dirty_state(tmp_path: Path) -> None:
     from dadaia_workspace import container
 
     ws = _mk_workspace(tmp_path)
@@ -122,17 +121,12 @@ def test_git_producer_reads_real_dirty_state(tmp_path: Path) -> None:
     assert dirty_data.git.dirty_paths != ()
 
 
-def test_specs_doctor_producer_runs_real_doctor(tmp_path: Path) -> None:
+# --- ③ lease unbound default + bound incumbent binding -----------------------------------
+
+
+def test_lease_unbound_default_and_bound_incumbent_binding(tmp_path: Path) -> None:
     from dadaia_workspace import container
-
-    ws = _mk_workspace(tmp_path)
-    data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
-
-    assert isinstance(data.specs_doctor.ok, bool)
-
-
-def test_lease_mode_producer_reads_real_session_identity(tmp_path: Path) -> None:
-    from dadaia_workspace import container
+    from dadaia_workspace.features.spec_context import session_identity
 
     ws = _mk_workspace(tmp_path)
     data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
@@ -140,21 +134,6 @@ def test_lease_mode_producer_reads_real_session_identity(tmp_path: Path) -> None
     # No bind yet ⇒ no live foreign holder, mode resolves to the unbound default.
     assert data.lease.live_foreign_holder is False
 
-
-def test_hygiene_producer_reads_real_lifecycle_hygiene_service(tmp_path: Path) -> None:
-    from dadaia_workspace import container
-
-    ws = _mk_workspace(tmp_path)
-    data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
-
-    assert data.hygiene.cleanup_candidate_count == 0
-
-
-def test_binding_producer_reads_incumbent_pointer_when_bound(tmp_path: Path) -> None:
-    from dadaia_workspace import container
-    from dadaia_workspace.features.spec_context import session_identity
-
-    ws = _mk_workspace(tmp_path)
     session_identity.write_session(
         ws,
         "sess-bound-1",
@@ -167,22 +146,25 @@ def test_binding_producer_reads_incumbent_pointer_when_bound(tmp_path: Path) -> 
     )
     session_identity.set_incumbent(ws, "proj", "sess-bound-1")
 
-    data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
+    bound_data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
 
-    assert data.binding is not None
-    assert data.binding.context == "proj"
-    assert data.binding.release_id == "v0.1.99"
-    assert data.binding.mode.upper() == "BOUND_IMPLEMENTATION"
+    assert bound_data.binding is not None
+    assert bound_data.binding.context == "proj"
+    assert bound_data.binding.release_id == "v0.1.99"
+    assert bound_data.binding.mode.upper() == "BOUND_IMPLEMENTATION"
 
 
-def test_expected_phase_and_required_mode_policy_derived_from_active_md(
-    tmp_path: Path,
-) -> None:
+# --- ④ specs-doctor + hygiene + expected_phase/required_mode policy --------------------
+
+
+def test_specs_doctor_hygiene_and_expected_phase_required_mode_policy(tmp_path: Path) -> None:
     from dadaia_workspace import container
     from dadaia_workspace.core.models.lifecycle import LifecyclePhase
 
     ws = _mk_workspace(tmp_path)
     data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
 
+    assert isinstance(data.specs_doctor.ok, bool)
+    assert data.hygiene.cleanup_candidate_count == 0
     assert data.expected_phase == LifecyclePhase.IMPLEMENTATION
     assert data.required_mode.strip().lower() == "implementation"

@@ -1,6 +1,6 @@
 """W1-3 (T-47-12) — persona injection on ALL verbs, not just the pipeline.
 
-Before this fix, role→persona resolution existed only in ``LifecyclePipeline._scope``. The
+Before this fix, role->persona resolution existed only in ``LifecyclePipeline._scope``. The
 five fragment workflow bodies (release_definition / audit / research / bug_report /
 backlog_definition) and the CLI single-step path (``_run_phase_step``) built their
 ``PromptScope`` WITHOUT a persona, so every model step reached the worker with no operative
@@ -70,7 +70,7 @@ def _envelope_persona(request: AgentRunRequest) -> str:
     return str(payload["persona"])
 
 
-# --- the five fragment workflow bodies ---------------------------------------------
+# --- the five fragment workflow bodies, parametrized over (workflow_cls, extra kwargs) ---
 
 
 def _first_persona_step(sequence: object) -> object:
@@ -83,20 +83,67 @@ def _first_persona_step(sequence: object) -> object:
     raise AssertionError("no persona-bearing model step in sequence")
 
 
-def test_release_definition_scope_carries_persona(tmp_path: Path) -> None:
+def _release_definition_case(tmp_path: Path):
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         _SEQUENCE,
         ReleaseDefinitionWorkflow,
     )
 
-    wf = ReleaseDefinitionWorkflow(
+    return ReleaseDefinitionWorkflow, {}, _SEQUENCE
+
+
+def _audit_case(tmp_path: Path):
+    from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE, AuditWorkflow
+
+    return AuditWorkflow, {}, _SEQUENCE
+
+
+def _research_case(tmp_path: Path):
+    from dadaia_workspace.features.lifecycle.workflows.research import _SEQUENCE, ResearchWorkflow
+
+    return ResearchWorkflow, {}, _SEQUENCE
+
+
+def _bug_report_case(tmp_path: Path):
+    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
+        _SEQUENCE,
+        BugReportWorkflow,
+    )
+
+    return BugReportWorkflow, {}, _SEQUENCE
+
+
+def _backlog_definition_case(tmp_path: Path):
+    from dadaia_workspace.features.backlog.subject_registry import Registry
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        _SEQUENCE,
+        BacklogDefinitionWorkflow,
+    )
+
+    return BacklogDefinitionWorkflow, {"registry": Registry(anchors={}, aliases={})}, _SEQUENCE
+
+
+_CASE_BUILDERS = {
+    "release_definition": _release_definition_case,
+    "audit": _audit_case,
+    "research": _research_case,
+    "bug_report": _bug_report_case,
+    "backlog_definition": _backlog_definition_case,
+}
+
+
+@pytest.mark.parametrize("case_id", sorted(_CASE_BUILDERS))
+def test_workflow_body_scope_carries_persona(tmp_path: Path, case_id: str) -> None:
+    workflow_cls, extra_kwargs, sequence = _CASE_BUILDERS[case_id](tmp_path)
+    wf = workflow_cls(
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=_MemoryRunStore(),  # type: ignore[arg-type]
         runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
         context_selector=_selector(tmp_path),
+        **extra_kwargs,
     )
-    step = _first_persona_step(_SEQUENCE)
+    step = _first_persona_step(sequence)
     scope = wf._scope(step, "run1", "suffix body")  # type: ignore[arg-type]
     expected = resolve_persona_for_role(step.role)  # type: ignore[attr-defined]
     assert expected is not None
@@ -106,94 +153,6 @@ def test_release_definition_scope_carries_persona(tmp_path: Path) -> None:
     persona_field = _envelope_persona(built.request)
     assert "OPERATIVE DIRECTIVE" in persona_field
     assert expected in persona_field
-
-
-def test_audit_scope_carries_persona(tmp_path: Path) -> None:
-    from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE, AuditWorkflow
-
-    wf = AuditWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
-        runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(tmp_path),
-    )
-    step = _first_persona_step(_SEQUENCE)
-    scope = wf._scope(step, "run1", "suffix body")  # type: ignore[arg-type]
-    expected = resolve_persona_for_role(step.role)  # type: ignore[attr-defined]
-    assert expected is not None
-    assert scope.persona == expected
-    assert expected in _envelope_persona(
-        LifecyclePromptBuilder().build(scope, runtime=AgentRuntimeKind.FAKE).request
-    )
-
-
-def test_research_scope_carries_persona(tmp_path: Path) -> None:
-    from dadaia_workspace.features.lifecycle.workflows.research import _SEQUENCE, ResearchWorkflow
-
-    wf = ResearchWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
-        runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(tmp_path),
-    )
-    step = _first_persona_step(_SEQUENCE)
-    scope = wf._scope(step, "run1", "suffix body")  # type: ignore[arg-type]
-    expected = resolve_persona_for_role(step.role)  # type: ignore[attr-defined]
-    assert expected is not None
-    assert scope.persona == expected
-    assert expected in _envelope_persona(
-        LifecyclePromptBuilder().build(scope, runtime=AgentRuntimeKind.FAKE).request
-    )
-
-
-def test_bug_report_scope_carries_persona(tmp_path: Path) -> None:
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-        _SEQUENCE,
-        BugReportWorkflow,
-    )
-
-    wf = BugReportWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
-        runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(tmp_path),
-    )
-    step = _first_persona_step(_SEQUENCE)
-    scope = wf._scope(step, "run1", "suffix body")  # type: ignore[arg-type]
-    expected = resolve_persona_for_role(step.role)  # type: ignore[attr-defined]
-    assert expected is not None
-    assert scope.persona == expected
-    assert expected in _envelope_persona(
-        LifecyclePromptBuilder().build(scope, runtime=AgentRuntimeKind.FAKE).request
-    )
-
-
-def test_backlog_definition_scope_carries_persona(tmp_path: Path) -> None:
-    from dadaia_workspace.features.backlog.subject_registry import Registry
-    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
-        _SEQUENCE,
-        BacklogDefinitionWorkflow,
-    )
-
-    wf = BacklogDefinitionWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
-        runtime_factory=lambda kind: None,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(tmp_path),
-        registry=Registry(anchors={}, aliases={}),
-    )
-    step = _first_persona_step(_SEQUENCE)
-    scope = wf._scope(step, "run1", "suffix body")  # type: ignore[arg-type]
-    expected = resolve_persona_for_role(step.role)  # type: ignore[attr-defined]
-    assert expected is not None
-    assert scope.persona == expected
-    assert expected in _envelope_persona(
-        LifecyclePromptBuilder().build(scope, runtime=AgentRuntimeKind.FAKE).request
-    )
 
 
 # --- the CLI single-step path (_run_phase_step) ------------------------------------

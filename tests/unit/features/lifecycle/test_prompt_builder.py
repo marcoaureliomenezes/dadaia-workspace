@@ -1,4 +1,7 @@
-"""Unit tests for lifecycle prompt builder."""
+"""Unit tests for lifecycle prompt builder.
+
+Repo-wide/escape scope rejection is a safety boundary — keep the full path list as params.
+"""
 
 from __future__ import annotations
 
@@ -53,58 +56,50 @@ def test_builds_runtime_request_and_matching_json_prompt() -> None:
     assert payload["required_evidence"] == ["handoff", "dirty_diff"]
 
 
-def test_rejects_missing_allowed_paths() -> None:
-    scope = PromptScope(
-        role="software-engineer",
-        context="dadaia-workspace",
-        release_id="v0.1.15",
-        task_id="T-015-18",
-        prompt="unsafe",
-        allowed_paths=(),
-    )
+# --- ① scope rejection param: missing allowed_paths + escaping paths + repo-wide globs ---
 
-    with pytest.raises(PromptScopeError, match="allowed_paths"):
-        LifecyclePromptBuilder().build(scope)
-
-
-@pytest.mark.parametrize("path", ("", ".", "**", "*/**", "/", "/tmp/file", "../escape"))
-def test_rejects_whole_workspace_or_escaping_paths(path: str) -> None:
-    scope = PromptScope(
-        role="software-engineer",
-        context="dadaia-workspace",
-        release_id="v0.1.15",
-        task_id="T-015-18",
-        prompt="unsafe",
-        allowed_paths=(path,),
-    )
-
-    with pytest.raises(PromptScopeError):
-        LifecyclePromptBuilder().build(scope)
+_REJECTION_CASES = (
+    ("empty-allowed-paths", (), "allowed_paths"),
+    ("empty-string", ("",), None),
+    ("dot", (".",), None),
+    ("double-star", ("**",), None),
+    ("star-slash-double-star", ("*/**",), None),
+    ("root-slash", ("/",), None),
+    ("absolute-tmp-escape", ("/tmp/file",), None),
+    ("relative-escape", ("../escape",), None),
+    ("repo-wide-bare", ("repos/dadaia-workspace",), "repo-wide"),
+    ("repo-wide-star", ("repos/dadaia-workspace/*",), "repo-wide"),
+    ("repo-wide-double-star", ("repos/dadaia-workspace/**",), "repo-wide"),
+)
 
 
 @pytest.mark.parametrize(
-    "path",
-    (
-        "repos/dadaia-workspace",
-        "repos/dadaia-workspace/*",
-        "repos/dadaia-workspace/**",
-    ),
+    "allowed_paths,match",
+    [c[1:] for c in _REJECTION_CASES],
+    ids=[c[0] for c in _REJECTION_CASES],
 )
-def test_rejects_repo_wide_scope(path: str) -> None:
+def test_scope_rejection_matrix(allowed_paths: tuple[str, ...], match: str | None) -> None:
     scope = PromptScope(
         role="software-engineer",
         context="dadaia-workspace",
         release_id="v0.1.15",
         task_id="T-015-18",
         prompt="unsafe",
-        allowed_paths=(path,),
+        allowed_paths=allowed_paths,
     )
 
-    with pytest.raises(PromptScopeError, match="repo-wide"):
-        LifecyclePromptBuilder().build(scope)
+    if match is not None:
+        with pytest.raises(PromptScopeError, match=match):
+            LifecyclePromptBuilder().build(scope)
+    else:
+        with pytest.raises(PromptScopeError):
+            LifecyclePromptBuilder().build(scope)
 
 
-def test_build_threads_resolved_model_into_request() -> None:
+# --- ② threading: resolved_model + persona + persona-defaults-None -----------------------
+
+
+def test_build_threads_resolved_model_persona_and_persona_defaults_none() -> None:
     # T-28-A-07: PromptScope.resolved_model flows into AgentRunRequest.resolved_model.
     from dadaia_workspace.core.models.workflow_execution import (
         PolicySource,
@@ -118,7 +113,7 @@ def test_build_threads_resolved_model_into_request() -> None:
         reasoning="high",
         source=PolicySource.DEFAULT_OVERLAY,
     )
-    scope = PromptScope(
+    model_scope = PromptScope(
         role="qa-engineer",
         context="dadaia-workspace",
         release_id="v0.1.28",
@@ -127,15 +122,13 @@ def test_build_threads_resolved_model_into_request() -> None:
         allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
         resolved_model=resolved,
     )
-    built = LifecyclePromptBuilder().build(scope)
-    assert built.request.resolved_model == resolved
+    built_model = LifecyclePromptBuilder().build(model_scope)
+    assert built_model.request.resolved_model == resolved
 
-
-def test_build_threads_persona_into_request() -> None:
     # T-44-4: PromptScope.persona flows DIRECTLY into AgentRunRequest.persona (QA advisory —
     # not only transitively via the envelope).
     mandate = "You are acting as the software-engineer. Implement with tests."
-    scope = PromptScope(
+    persona_scope = PromptScope(
         role="software-engineer",
         context="dadaia-workspace",
         release_id="v0.1.44",
@@ -144,11 +137,9 @@ def test_build_threads_persona_into_request() -> None:
         allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
         persona=mandate,
     )
-    built = LifecyclePromptBuilder().build(scope)
-    assert built.request.persona == mandate
+    built_persona = LifecyclePromptBuilder().build(persona_scope)
+    assert built_persona.request.persona == mandate
 
-
-def test_build_persona_defaults_to_none() -> None:
     # A scope with no persona threads ``None`` — the byte-stable persona-less path.
-    built = LifecyclePromptBuilder().build(_scope())
-    assert built.request.persona is None
+    built_default = LifecyclePromptBuilder().build(_scope())
+    assert built_default.request.persona is None

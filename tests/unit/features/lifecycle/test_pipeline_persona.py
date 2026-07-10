@@ -1,4 +1,4 @@
-"""T-44-6 — pipeline ``_scope`` resolves role → persona (single / multi-role / shared).
+"""T-44-6 — pipeline ``_scope`` resolves role -> persona (single / multi-role / shared).
 
 The pipeline gives every model-driven step's ``role`` the matching Layer-2 persona mandate,
 threaded into the scope so the worker envelope carries an operative directive. A
@@ -64,7 +64,10 @@ def _envelope_for(step: PipelineStep) -> str:
     return build_prompt_envelope(built.request)
 
 
-def test_single_role_step_carries_persona_operative_directive() -> None:
+# --- ① single-role + multi-role mandates in envelope with OPERATIVE DIRECTIVE -----------
+
+
+def test_single_and_multi_role_mandates_carried_in_envelope() -> None:
     # spec_create's role is product-engineer — the envelope must carry the operative
     # directive plus the product-engineer mandate body.
     scope = _pipeline()._scope(_step("spec_create", "product-engineer"), "run1")
@@ -77,31 +80,30 @@ def test_single_role_step_carries_persona_operative_directive() -> None:
     # The product-engineer mandate is the resolved body.
     assert "product-engineer" in payload["persona"]
 
+    # plan_review names "qa-engineer, software-architect" — both mandates must be carried,
+    # each clearly delimited by a role header, and the operative directive applied.
+    role = "qa-engineer, software-architect"
+    multi_scope = _pipeline()._scope(_step("plan_review", role), "run1")
+    assert multi_scope.persona is not None
+    assert "### Persona — qa-engineer" in multi_scope.persona
+    assert "### Persona — software-architect" in multi_scope.persona
 
-def test_shared_role_step_has_no_persona_block() -> None:
+    multi_payload = json.loads(_envelope_for(_step("plan_review", role)))
+    assert "OPERATIVE DIRECTIVE" in multi_payload["persona"]
+    assert "### Persona — qa-engineer" in multi_payload["persona"]
+    assert "### Persona — software-architect" in multi_payload["persona"]
+
+
+# --- ② shared/unmapped(PM) roles get NO persona block ------------------------------------
+
+
+def test_shared_and_unmapped_roles_get_no_persona_block() -> None:
     scope = _pipeline()._scope(_step("write_scope", "shared"), "run1")
     assert scope.persona is None
 
     payload = json.loads(_envelope_for(_step("write_scope", "shared")))
     assert "persona" not in payload
 
-
-def test_unmapped_role_step_has_no_persona_block() -> None:
     # project-manager has no persona atom (D-1) → no persona block.
-    scope = _pipeline()._scope(_step("orchestrate", "project-manager"), "run1")
-    assert scope.persona is None
-
-
-def test_multi_role_step_carries_both_mandates() -> None:
-    # plan_review names "qa-engineer, software-architect" — both mandates must be carried,
-    # each clearly delimited by a role header, and the operative directive applied.
-    role = "qa-engineer, software-architect"
-    scope = _pipeline()._scope(_step("plan_review", role), "run1")
-    assert scope.persona is not None
-    assert "### Persona — qa-engineer" in scope.persona
-    assert "### Persona — software-architect" in scope.persona
-
-    payload = json.loads(_envelope_for(_step("plan_review", role)))
-    assert "OPERATIVE DIRECTIVE" in payload["persona"]
-    assert "### Persona — qa-engineer" in payload["persona"]
-    assert "### Persona — software-architect" in payload["persona"]
+    pm_scope = _pipeline()._scope(_step("orchestrate", "project-manager"), "run1")
+    assert pm_scope.persona is None

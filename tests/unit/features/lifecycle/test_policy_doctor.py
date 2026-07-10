@@ -15,6 +15,10 @@ mirroring the ``BL-*`` backlog-doctor style). The checks:
   with a matching harness; an invalid overlay file fails actionably (never crashes).
 * WMP-7 — no ``claude``/``opencode`` Layer-2 residue in any built-in profile or governed
   catalog step.
+* WMP-PERSONA (AC-4) — every model-driven step's role resolves to a real persona atom.
+
+CRITICAL: forbidden Layer-2 harness (claude/opencode) is a HARD error at whichever WMP code
+reports it — param cases must survive.
 """
 
 from __future__ import annotations
@@ -62,91 +66,28 @@ def _doctor(workspace: Path, *, catalog: WorkflowCatalog | None = None) -> list[
 
 
 # ---------------------------------------------------------------------------
-# Clean tree
+# Clean tree — zero ERRORs. Absorbs the catalog-invariants / completed-catalog /
+# persona-clean / valid-overlay restatements as extra asserts on the same doctor run.
 # ---------------------------------------------------------------------------
 
 
-def test_clean_tree_no_overlay_passes(tmp_path: Path) -> None:
-    """The built-in catalog + profiles + no overlay must produce zero ERROR findings."""
+def test_clean_tree_zero_errors_and_closure_present(tmp_path: Path) -> None:
+    """The built-in catalog + profiles + no overlay must produce zero ERROR findings across
+    every WMP invariant (WMP-1..5, WMP-7, WMP-PERSONA), a valid overlay stays clean too, and
+    the completed catalog (T-29-D-01 AC-8) includes closure."""
     workspace = _workspace(tmp_path)
     findings = _doctor(workspace)
     errors = [f for f in findings if f.severity is Severity.ERROR]
     assert errors == [], [f.to_dict() for f in errors]
 
+    persona = [f for f in findings if f.code is PolicyDoctorCode.WMP_PERSONA]
+    assert persona == [], [f.to_dict() for f in persona]
 
-# ---------------------------------------------------------------------------
-# WMP-6 — overlay overrides
-# ---------------------------------------------------------------------------
+    for f in findings:
+        d = f.to_dict()
+        assert set(d) >= {"code", "severity", "message"}
+        assert d["code"].startswith("WMP-")
 
-
-def test_overlay_unknown_step_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    _write_overlay(
-        workspace,
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {
-                        "implementation": {"steps": {"no_such_step": "codex-review-deep"}}
-                    }
-                }
-            },
-        },
-    )
-    findings = _doctor(workspace)
-    codes = {f.code for f in findings if f.severity is Severity.ERROR}
-    assert PolicyDoctorCode.WMP_OVERLAY in codes
-    msg = " ".join(f.message for f in findings if f.code is PolicyDoctorCode.WMP_OVERLAY)
-    assert "no_such_step" in msg
-
-
-def test_overlay_harness_mismatch_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    # implement resolves to a codex step by default; a pi profile mismatches its harness.
-    _write_overlay(
-        workspace,
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {
-                        "implementation": {"steps": {"implement": "pi-implementation-standard"}}
-                    }
-                }
-            },
-        },
-    )
-    findings = _doctor(workspace)
-    assert PolicyDoctorCode.WMP_OVERLAY in {
-        f.code for f in findings if f.severity is Severity.ERROR
-    }
-
-
-def test_overlay_unknown_profile_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    _write_overlay(
-        workspace,
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "not-a-profile"}}}
-                }
-            },
-        },
-    )
-    findings = _doctor(workspace)
-    assert PolicyDoctorCode.WMP_OVERLAY in {
-        f.code for f in findings if f.severity is Severity.ERROR
-    }
-
-
-def test_valid_overlay_passes(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
     _write_overlay(
         workspace,
         {
@@ -159,72 +100,183 @@ def test_valid_overlay_passes(tmp_path: Path) -> None:
             },
         },
     )
-    findings = _doctor(workspace)
-    assert [f for f in findings if f.severity is Severity.ERROR] == []
+    valid_overlay_findings = _doctor(workspace)
+    assert [f for f in valid_overlay_findings if f.severity is Severity.ERROR] == []
+
+    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
+
+    assert governed_workflow_catalog().workflow("closure") is not None
 
 
 # ---------------------------------------------------------------------------
-# WMP-8 — invalid state file does not crash
+# ① overlay-error matrix param: unknown step / unknown profile / harness mismatch /
+#    unknown workflow (incl. harness-map-only)
 # ---------------------------------------------------------------------------
 
 
-def test_invalid_policy_json_is_actionable_error_not_crash(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    path = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
-    path.write_text("{ this is not json", encoding="utf-8")
-    findings = _doctor(workspace)  # must not raise
-    overlay_errors = [
-        f for f in findings if f.code is PolicyDoctorCode.WMP_STATE and f.severity is Severity.ERROR
-    ]
-    assert overlay_errors
-    assert (
-        "invalid" in overlay_errors[0].message.lower()
-        or "json" in overlay_errors[0].message.lower()
-    )
-
-
-def test_unknown_top_level_field_is_actionable_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    _write_overlay(
-        workspace,
-        {"schema_version": "workflow-model-policy-v1", "bogus": 1, "contexts": {}},
-    )
-    findings = _doctor(workspace)
-    assert PolicyDoctorCode.WMP_STATE in {f.code for f in findings if f.severity is Severity.ERROR}
-
-
-# ---------------------------------------------------------------------------
-# WMP-1/2/3/4/5/7 — catalog/profile invariants on the real built-in catalog
-# ---------------------------------------------------------------------------
-
-
-def test_catalog_invariants_hold_on_builtins(tmp_path: Path) -> None:
-    """The real governed catalog + built-in profiles satisfy WMP-1..5 and WMP-7."""
-    workspace = _workspace(tmp_path)
-    findings = _doctor(workspace)
-    bad = {
-        PolicyDoctorCode.WMP_WORKFLOW_ID,
-        PolicyDoctorCode.WMP_STEP_ID,
-        PolicyDoctorCode.WMP_PROFILE,
-        PolicyDoctorCode.WMP_FRAGMENT,
-        PolicyDoctorCode.WMP_OUTPUT_SCHEMA,
-        PolicyDoctorCode.WMP_LAYER2_RESIDUE,
+def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, object]:
+    """A persisted overlay that only overrides a step's harness (no profile override)."""
+    return {
+        "schema_version": "workflow-model-policy-v1",
+        "policy_id": "default",
+        "contexts": {
+            "default": {"workflows": {workflow: {"harnesses": {step: harness}}}},
+        },
     }
-    offending = [f for f in findings if f.code in bad and f.severity is Severity.ERROR]
-    assert offending == [], [f.to_dict() for f in offending]
 
 
-def test_to_dict_round_trip(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "case_id,overlay,expected_substring",
+    [
+        (
+            "unknown-step",
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "default": {
+                        "workflows": {
+                            "implementation": {"steps": {"no_such_step": "codex-review-deep"}}
+                        }
+                    }
+                },
+            },
+            "no_such_step",
+        ),
+        (
+            "harness-mismatch",
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "default": {
+                        "workflows": {
+                            "implementation": {"steps": {"implement": "pi-implementation-standard"}}
+                        }
+                    }
+                },
+            },
+            None,
+        ),
+        (
+            "unknown-profile",
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "default": {
+                        "workflows": {"implementation": {"steps": {"implement": "not-a-profile"}}}
+                    }
+                },
+            },
+            None,
+        ),
+        (
+            "unknown-workflow-harness-map",
+            _harness_overlay("ghost", step="implement", harness="pi"),
+            "ghost",
+        ),
+    ],
+    ids=["unknown-step", "harness-mismatch", "unknown-profile", "unknown-workflow-harness-map"],
+)
+def test_overlay_error_matrix(
+    tmp_path: Path, case_id: str, overlay: dict[str, object], expected_substring: str | None
+) -> None:
     workspace = _workspace(tmp_path)
+    _write_overlay(workspace, overlay)
     findings = _doctor(workspace)
-    for f in findings:
-        d = f.to_dict()
-        assert set(d) >= {"code", "severity", "message"}
-        assert d["code"].startswith("WMP-")
+    assert PolicyDoctorCode.WMP_OVERLAY in {
+        f.code for f in findings if f.severity is Severity.ERROR
+    }
+    if expected_substring is not None:
+        msg = " ".join(f.message for f in findings if f.code is PolicyDoctorCode.WMP_OVERLAY)
+        assert expected_substring in msg
 
 
 # ---------------------------------------------------------------------------
-# Fixture-driven proof the catalog checks actually bite (deliberately broken catalogs)
+# ② state-file hard errors param: invalid JSON no-crash / unknown top-level field /
+#    forbidden Layer-2 step harness / forbidden default_harness
+# ---------------------------------------------------------------------------
+
+# Layering (T-29-D-01): a FORBIDDEN Layer-2 harness (claude/opencode) in an overlay is
+# rejected one layer earlier than the doctor's resolver check — at STORE LOAD, by the
+# overlay schema/parse enum (harness in {codex,pi}). It therefore surfaces as a WMP-STATE
+# error (an invalid/unloadable overlay), not WMP-OVERLAY/WMP-LAYER2-RESIDUE. The invariant
+# the doctor must uphold is: a forbidden Layer-2 harness in the overlay is a HARD ERROR and
+# never silently passes — regardless of which WMP code reports it.
+_FORBIDDEN_HARNESS_CODES = {
+    PolicyDoctorCode.WMP_STATE,
+    PolicyDoctorCode.WMP_OVERLAY,
+    PolicyDoctorCode.WMP_LAYER2_RESIDUE,
+}
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "invalid-json",
+        "unknown-top-level-field",
+        "forbidden-step-harness",
+        "forbidden-default-harness",
+    ],
+)
+def test_state_file_hard_errors_matrix(tmp_path: Path, case_id: str) -> None:
+    workspace = _workspace(tmp_path)
+    if case_id == "invalid-json":
+        path = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
+        path.write_text("{ this is not json", encoding="utf-8")
+        findings = _doctor(workspace)  # must not raise
+        overlay_errors = [
+            f
+            for f in findings
+            if f.code is PolicyDoctorCode.WMP_STATE and f.severity is Severity.ERROR
+        ]
+        assert overlay_errors
+        assert (
+            "invalid" in overlay_errors[0].message.lower()
+            or "json" in overlay_errors[0].message.lower()
+        )
+    elif case_id == "unknown-top-level-field":
+        _write_overlay(
+            workspace,
+            {"schema_version": "workflow-model-policy-v1", "bogus": 1, "contexts": {}},
+        )
+        findings = _doctor(workspace)
+        assert PolicyDoctorCode.WMP_STATE in {
+            f.code for f in findings if f.severity is Severity.ERROR
+        }
+    elif case_id == "forbidden-step-harness":
+        _write_overlay(
+            workspace, _harness_overlay("implementation", step="implement", harness="claude")
+        )
+        findings = _doctor(workspace)  # must not raise
+        codes = {f.code for f in findings if f.severity is Severity.ERROR}
+        assert codes & _FORBIDDEN_HARNESS_CODES, (
+            "a forbidden Layer-2 step harness in the overlay must be a hard doctor error, "
+            f"got {[c.value for c in codes]}"
+        )
+    else:  # forbidden-default-harness
+        _write_overlay(
+            workspace,
+            {
+                "schema_version": "workflow-model-policy-v1",
+                "policy_id": "default",
+                "contexts": {
+                    "default": {"workflows": {"implementation": {"default_harness": "claude"}}},
+                },
+            },
+        )
+        findings = _doctor(workspace)  # must not raise
+        codes = {f.code for f in findings if f.severity is Severity.ERROR}
+        assert codes & _FORBIDDEN_HARNESS_CODES, (
+            "a forbidden Layer-2 default harness must be a hard doctor error, "
+            f"got {[c.value for c in codes]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# ③ broken-catalog bites param over (catalog fixture, WMP code) + generic-step-no-
+#    obligation negative
 # ---------------------------------------------------------------------------
 
 
@@ -241,19 +293,14 @@ def _step(
     )
 
 
-def test_duplicate_workflow_id_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _duplicate_workflow_catalog() -> WorkflowCatalog:
     wf = CatalogWorkflow(
-        workflow_id="dup",
-        steps=(_step("a", harness="codex", profile="codex-review-deep"),),
+        workflow_id="dup", steps=(_step("a", harness="codex", profile="codex-review-deep"),)
     )
-    broken = WorkflowCatalog(workflows=(wf, wf))
-    findings = _doctor(workspace, catalog=broken)
-    assert PolicyDoctorCode.WMP_WORKFLOW_ID in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(wf, wf))
 
 
-def test_duplicate_step_id_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _duplicate_step_catalog() -> WorkflowCatalog:
     wf = CatalogWorkflow(
         workflow_id="w",
         steps=(
@@ -261,32 +308,24 @@ def test_duplicate_step_id_is_error(tmp_path: Path) -> None:
             _step("same", harness="codex", profile="codex-review-deep"),
         ),
     )
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_STEP_ID in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(wf,))
 
 
-def test_claude_harness_residue_in_catalog_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _claude_residue_catalog() -> WorkflowCatalog:
     wf = CatalogWorkflow(
-        workflow_id="w",
-        steps=(_step("a", harness="claude", profile="codex-review-deep"),),
+        workflow_id="w", steps=(_step("a", harness="claude", profile="codex-review-deep"),)
     )
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_LAYER2_RESIDUE in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(wf,))
 
 
-def test_opencode_harness_residue_in_catalog_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _opencode_residue_catalog() -> WorkflowCatalog:
     wf = CatalogWorkflow(
-        workflow_id="w",
-        steps=(_step("a", harness="opencode", profile="codex-review-deep"),),
+        workflow_id="w", steps=(_step("a", harness="opencode", profile="codex-review-deep"),)
     )
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_LAYER2_RESIDUE in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(wf,))
 
 
-def test_fragment_driven_step_missing_output_schema_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _missing_output_schema_catalog() -> WorkflowCatalog:
     step = CatalogStep(
         label="a",
         role="software-engineer",
@@ -295,35 +334,18 @@ def test_fragment_driven_step_missing_output_schema_is_error(tmp_path: Path) -> 
         fragments=("implementation.implement_tdd",),
         output_schema=None,
     )
-    wf = CatalogWorkflow(workflow_id="w", steps=(step,))
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_OUTPUT_SCHEMA in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(CatalogWorkflow(workflow_id="w", steps=(step,)),))
 
 
-def test_generic_step_without_fragments_no_output_schema_obligation(tmp_path: Path) -> None:
-    """A not-yet-fragment-migrated worker step (no fragments) is not WMP-5-flagged."""
-    workspace = _workspace(tmp_path)
-    wf = CatalogWorkflow(
-        workflow_id="w",
-        steps=(_step("a", harness="codex", profile="codex-review-deep", schema=None),),
-    )
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_OUTPUT_SCHEMA not in {f.code for f in findings}
-
-
-def test_default_profile_harness_mismatch_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
-    # pi profile declared as default for a codex step.
+def _profile_harness_mismatch_catalog() -> WorkflowCatalog:
     wf = CatalogWorkflow(
         workflow_id="w",
         steps=(_step("a", harness="codex", profile="pi-implementation-standard"),),
     )
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_PROFILE in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(wf,))
 
 
-def test_unresolved_fragment_is_error(tmp_path: Path) -> None:
-    workspace = _workspace(tmp_path)
+def _unresolved_fragment_catalog() -> WorkflowCatalog:
     step = CatalogStep(
         label="a",
         role="software-engineer",
@@ -332,30 +354,58 @@ def test_unresolved_fragment_is_error(tmp_path: Path) -> None:
         fragments=("nonexistent.fragment",),
         output_schema="agent-run-result-v1",
     )
-    wf = CatalogWorkflow(workflow_id="w", steps=(step,))
-    findings = _doctor(workspace, catalog=WorkflowCatalog(workflows=(wf,)))
-    assert PolicyDoctorCode.WMP_FRAGMENT in {f.code for f in findings}
+    return WorkflowCatalog(workflows=(CatalogWorkflow(workflow_id="w", steps=(step,)),))
+
+
+_BROKEN_CATALOG_CASES = (
+    ("duplicate-workflow-id", _duplicate_workflow_catalog, PolicyDoctorCode.WMP_WORKFLOW_ID),
+    ("duplicate-step-id", _duplicate_step_catalog, PolicyDoctorCode.WMP_STEP_ID),
+    ("claude-residue", _claude_residue_catalog, PolicyDoctorCode.WMP_LAYER2_RESIDUE),
+    ("opencode-residue", _opencode_residue_catalog, PolicyDoctorCode.WMP_LAYER2_RESIDUE),
+    ("missing-output-schema", _missing_output_schema_catalog, PolicyDoctorCode.WMP_OUTPUT_SCHEMA),
+    ("profile-harness-mismatch", _profile_harness_mismatch_catalog, PolicyDoctorCode.WMP_PROFILE),
+    ("unresolved-fragment", _unresolved_fragment_catalog, PolicyDoctorCode.WMP_FRAGMENT),
+)
+
+
+@pytest.mark.parametrize(
+    "build_catalog,expected_code",
+    [c[1:] for c in _BROKEN_CATALOG_CASES],
+    ids=[c[0] for c in _BROKEN_CATALOG_CASES],
+)
+def test_broken_catalog_bites(
+    tmp_path: Path, build_catalog, expected_code: PolicyDoctorCode
+) -> None:
+    workspace = _workspace(tmp_path)
+    findings = _doctor(workspace, catalog=build_catalog())
+    assert expected_code in {f.code for f in findings}
+
+    if build_catalog is _missing_output_schema_catalog:
+        # Negative control alongside the positive bite above: a not-yet-fragment-migrated
+        # worker step (no fragments) is NOT WMP-5-flagged (only the fragment-driven step
+        # with a missing schema is).
+        control_wf = CatalogWorkflow(
+            workflow_id="w",
+            steps=(_step("a", harness="codex", profile="codex-review-deep", schema=None),),
+        )
+        control_findings = _doctor(
+            _workspace(tmp_path / "control"), catalog=WorkflowCatalog(workflows=(control_wf,))
+        )
+        assert PolicyDoctorCode.WMP_OUTPUT_SCHEMA not in {f.code for f in control_findings}
 
 
 # ---------------------------------------------------------------------------
-# T-29-D-01 — the harness dimension (v0.1.29). An overlay can now override a
-# step's harness; the doctor must validate it through the same shared resolver.
+# ④ pi harness-only overlay auto-profile valid + doctor-surfaces-persona-failure
 # ---------------------------------------------------------------------------
 
 
-def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, object]:
-    """A persisted overlay that only overrides a step's harness (no profile override)."""
-    return {
-        "schema_version": "workflow-model-policy-v1",
-        "policy_id": "default",
-        "contexts": {
-            "default": {"workflows": {workflow: {"harnesses": {step: harness}}}},
-        },
-    }
-
-
-def test_overlay_step_harness_pi_resolves_via_auto_profile(tmp_path: Path) -> None:
-    """A harness-only overlay (pi) on a step with a pi default profile is valid (auto-profile)."""
+def test_pi_harness_only_overlay_auto_profile_valid_and_persona_failure_surfaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A harness-only overlay (pi) on a step with a pi default profile is valid
+    (auto-profile), and a model-driven step whose role resolves to project-manager / no
+    persona atom is surfaced by the aggregated doctor as a WMP-PERSONA ERROR (AC-4
+    anti-regression)."""
     workspace = _workspace(tmp_path)
     _write_overlay(workspace, _harness_overlay("implementation", step="implement", harness="pi"))
     findings = _doctor(workspace)
@@ -363,80 +413,6 @@ def test_overlay_step_harness_pi_resolves_via_auto_profile(tmp_path: Path) -> No
         f.to_dict() for f in findings if f.severity is Severity.ERROR
     ]
 
-
-# Layering (T-29-D-01): a FORBIDDEN Layer-2 harness (claude/opencode) in an overlay is
-# rejected one layer earlier than the doctor's resolver check — at STORE LOAD, by the
-# overlay schema/parse enum (harness in {codex,pi}). It therefore surfaces as a WMP-STATE
-# error (an invalid/unloadable overlay), not WMP-OVERLAY/WMP-LAYER2-RESIDUE. The invariant
-# the doctor must uphold is: a forbidden Layer-2 harness in the overlay is a HARD ERROR and
-# never silently passes — regardless of which WMP code reports it. The resolver-level
-# WMP-OVERLAY check still guards the residual paths the schema does NOT constrain (an unknown
-# workflow/step harness override, or a valid harness with no step default profile), proven by
-# the unknown-workflow test below + the valid-pi auto-profile test above.
-_FORBIDDEN_HARNESS_CODES = {
-    PolicyDoctorCode.WMP_STATE,
-    PolicyDoctorCode.WMP_OVERLAY,
-    PolicyDoctorCode.WMP_LAYER2_RESIDUE,
-}
-
-
-def test_overlay_step_harness_forbidden_layer2_is_hard_error(tmp_path: Path) -> None:
-    """An overlay step-harness naming a forbidden Layer-2 harness (claude) is a hard error."""
-    workspace = _workspace(tmp_path)
-    _write_overlay(
-        workspace, _harness_overlay("implementation", step="implement", harness="claude")
-    )
-    findings = _doctor(workspace)  # must not raise
-    codes = {f.code for f in findings if f.severity is Severity.ERROR}
-    assert codes & _FORBIDDEN_HARNESS_CODES, (
-        "a forbidden Layer-2 step harness in the overlay must be a hard doctor error, "
-        f"got {[c.value for c in codes]}"
-    )
-
-
-def test_overlay_default_harness_forbidden_layer2_is_hard_error(tmp_path: Path) -> None:
-    """A forbidden default_harness (claude) is caught as a hard error (schema → WMP-STATE)."""
-    workspace = _workspace(tmp_path)
-    _write_overlay(
-        workspace,
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {"workflows": {"implementation": {"default_harness": "claude"}}},
-            },
-        },
-    )
-    findings = _doctor(workspace)  # must not raise
-    codes = {f.code for f in findings if f.severity is Severity.ERROR}
-    assert codes & _FORBIDDEN_HARNESS_CODES, (
-        "a forbidden Layer-2 default harness must be a hard doctor error, "
-        f"got {[c.value for c in codes]}"
-    )
-
-
-def test_overlay_harness_unknown_workflow_is_error(tmp_path: Path) -> None:
-    """A harness override targeting a workflow not in the governed catalog is flagged."""
-    workspace = _workspace(tmp_path)
-    _write_overlay(workspace, _harness_overlay("ghost", step="implement", harness="pi"))
-    findings = _doctor(workspace)
-    msg = " ".join(f.message for f in findings if f.code is PolicyDoctorCode.WMP_OVERLAY)
-    assert "ghost" in msg
-
-
-def test_persona_resolution_clean_tree_no_persona_findings(tmp_path: Path) -> None:
-    """WMP-PERSONA (AC-4): the shipped catalog produces zero persona-resolution findings."""
-    workspace = _workspace(tmp_path)
-    findings = _doctor(workspace)
-    persona = [f for f in findings if f.code is PolicyDoctorCode.WMP_PERSONA]
-    assert persona == [], [f.to_dict() for f in persona]
-
-
-def test_doctor_surfaces_persona_resolution_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A model-driven step whose role resolves to project-manager / no persona atom is
-    surfaced by the aggregated doctor as a WMP-PERSONA ERROR (AC-4 anti-regression)."""
     from dadaia_workspace.features.lifecycle import persona_doctor
 
     monkeypatch.setattr(
@@ -444,23 +420,11 @@ def test_doctor_surfaces_persona_resolution_failure(
         "model_driven_step_roles",
         lambda: {"ghost.pm_step": "project-manager", "ghost.dangling": "no-such-persona"},
     )
-    workspace = _workspace(tmp_path)
-    findings = _doctor(workspace)  # must not raise
-    persona = [f for f in findings if f.code is PolicyDoctorCode.WMP_PERSONA]
-    assert len(persona) == 2, [f.to_dict() for f in findings]
+    persona_workspace = _workspace(tmp_path / "persona")
+    persona_findings = _doctor(persona_workspace)  # must not raise
+    persona = [f for f in persona_findings if f.code is PolicyDoctorCode.WMP_PERSONA]
+    assert len(persona) == 2, [f.to_dict() for f in persona_findings]
     assert all(f.severity is Severity.ERROR for f in persona)
     joined = " ".join(f.message for f in persona)
     assert "project-manager" in joined
     assert "no-such-persona" in joined
-
-
-def test_completed_catalog_with_closure_passes_all_wmp(tmp_path: Path) -> None:
-    """T-29-D-01 (AC-8): WMP-1..WMP-7 pass over the completed catalog (closure added)."""
-    workspace = _workspace(tmp_path)
-    findings = _doctor(workspace)
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    assert errors == [], [f.to_dict() for f in errors]
-    # And closure is actually in the governed catalog the doctor validated.
-    from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
-
-    assert governed_workflow_catalog().workflow("closure") is not None

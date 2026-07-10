@@ -4,24 +4,18 @@ This is the back-compat guard for the keyword-only, no-default ``is_review`` par
 (D-2 / C2): the test ENUMERATES the known call sites and asserts each passes ``is_review``.
 A new caller that omits the flag (or a new module that calls ``build_fragment_suffix``
 without it) FAILS this test. It also asserts no new ``expected_schema=`` is wired at the
-call sites (A4 — the default ``agent-run-result-v1`` stands; no per-step schema wiring).
+call sites (A4 — the default ``agent-run-result-v1`` stands; no per-step schema wiring), and
+a whole-tree AST scan guards every OTHER lifecycle module too (not just the declared callers).
 
-The threading is asserted on the assembled source-level call (the keyword argument actually
-passed), complemented by a behaviour check that ``build_fragment_suffix`` produces the
-review-vs-create text for ``is_review=True``/``False`` respectively.
+The review-vs-create behavioral pin (``build_fragment_suffix`` producing verdict text for
+``is_review=True``/``False``) lives in ``test_fragment_suffix_is_review.py`` — not repeated
+here.
 """
 
 from __future__ import annotations
 
 import ast
 from pathlib import Path
-
-import pytest
-
-from dadaia_workspace.features.lifecycle.prompt_builder import (
-    FragmentBundle,
-    build_fragment_suffix,
-)
 
 _LIFECYCLE = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "features" / "lifecycle"
 
@@ -55,26 +49,25 @@ def _is_review_kw(call: ast.Call) -> ast.expr | None:
     return None
 
 
-@pytest.mark.parametrize("rel_path", sorted(_CALLER_MODULES))
-def test_each_caller_threads_is_review(rel_path: str) -> None:
-    source = (_LIFECYCLE / rel_path).read_text(encoding="utf-8")
-    calls = _suffix_calls(source)
-    assert calls, f"{rel_path} is a declared build_fragment_suffix caller but has no call"
-    expected = _CALLER_MODULES[rel_path]
-    for call in calls:
-        value = _is_review_kw(call)
-        assert value is not None, f"{rel_path}: build_fragment_suffix call omits is_review="
-        assert ast.unparse(value) == expected, (
-            f"{rel_path}: expected is_review={expected!r}, got {ast.unparse(value)!r}"
-        )
-        # No per-step expected_schema wiring at the call site (A4).
-        assert all(kw.arg != "expected_schema" for kw in call.keywords), (
-            f"{rel_path}: build_fragment_suffix call must not wire expected_schema="
-        )
+def test_every_caller_threads_is_review_and_no_other_module_omits_it() -> None:
+    for rel_path in sorted(_CALLER_MODULES):
+        source = (_LIFECYCLE / rel_path).read_text(encoding="utf-8")
+        calls = _suffix_calls(source)
+        assert calls, f"{rel_path} is a declared build_fragment_suffix caller but has no call"
+        expected = _CALLER_MODULES[rel_path]
+        for call in calls:
+            value = _is_review_kw(call)
+            assert value is not None, f"{rel_path}: build_fragment_suffix call omits is_review="
+            assert ast.unparse(value) == expected, (
+                f"{rel_path}: expected is_review={expected!r}, got {ast.unparse(value)!r}"
+            )
+            # No per-step expected_schema wiring at the call site (A4).
+            assert all(kw.arg != "expected_schema" for kw in call.keywords), (
+                f"{rel_path}: build_fragment_suffix call must not wire expected_schema="
+            )
 
-
-def test_no_other_module_calls_build_fragment_suffix_without_flag() -> None:
-    """Any lifecycle module that calls build_fragment_suffix must thread is_review."""
+    # Whole-tree scan: any lifecycle module that calls build_fragment_suffix must thread
+    # is_review — not just the declared callers above.
     offenders: list[str] = []
     for path in _LIFECYCLE.rglob("*.py"):
         calls = _suffix_calls(path.read_text(encoding="utf-8"))
@@ -82,19 +75,3 @@ def test_no_other_module_calls_build_fragment_suffix_without_flag() -> None:
             if _is_review_kw(call) is None:
                 offenders.append(str(path.relative_to(_LIFECYCLE)))
     assert not offenders, f"build_fragment_suffix called without is_review= in: {offenders}"
-
-
-def _bundle() -> FragmentBundle:
-    return FragmentBundle(
-        fragment_id="spec.create",
-        role="product-engineer",
-        body="body",
-        output_schema="release-scope-handoff-v1",
-    )
-
-
-def test_threading_behaviour_review_vs_create() -> None:
-    review = build_fragment_suffix(_bundle(), selected_context="", is_review=True)
-    create = build_fragment_suffix(_bundle(), selected_context="", is_review=False)
-    assert "verdict" in review.lower()
-    assert "verdict" not in create.lower()

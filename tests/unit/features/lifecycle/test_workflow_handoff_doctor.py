@@ -4,13 +4,19 @@ Pins A26: the doctor fails on orphan, malformed, stale, undeclared, and
 unconsumed-required workflow-step payloads, and reports ``ok`` when the ledger and the
 on-disk data plane are coherent. Built on the real ``WorkflowHandoffResolver.produce`` +
 ``JsonLifecycleRunStore`` so payloads land on disk under ``.dadaia/runs/lifecycle/``.
+
+CRITICAL: the promote_to_evidence terminal exemption (v0.1.71 on-disk healing) AND its
+delete_after_consumed control — exemption without its control is a hole.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import os
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import (
@@ -66,83 +72,68 @@ def _kinds(report) -> set[WorkflowHandoffFindingKind]:  # type: ignore[no-untype
     return {f.kind for f in report.findings}
 
 
-# --- ok ---------------------------------------------------------------------------
+# --- ① ok-on-coherent + orphan/malformed/undeclared param -------------------------------
 
 
-def test_doctor_ok_on_coherent_ledger(tmp_path: Path) -> None:
+@pytest.mark.parametrize("case_id", ["ok", "orphan", "malformed", "undeclared"])
+def test_finding_kind_bites_matrix(tmp_path: Path, case_id: str) -> None:
+    if case_id == "ok":
+        _workspace(tmp_path)
+        resolver = _resolver(tmp_path)
+        resolver.produce(
+            _run(),
+            producer_step="release_scope",
+            attempt=0,
+            output_schema="release-scope-handoff-v1",
+            payload={"summary": "scope"},
+        )
+        ok_report = _doctor(tmp_path).run()
+        assert ok_report.ok is True
+        assert ok_report.findings == ()
+    elif case_id == "orphan":
+        _workspace(tmp_path)
+        resolver = _resolver(tmp_path)
+        _run_result, record = resolver.produce(
+            _run(),
+            producer_step="release_scope",
+            attempt=0,
+            output_schema="release-scope-handoff-v1",
+            payload={"summary": "scope"},
+        )
+        (tmp_path / record.payload_ref).unlink()
+        report = _doctor(tmp_path).run()
+        assert report.ok is False
+        assert WorkflowHandoffFindingKind.ORPHAN in _kinds(report)
+    elif case_id == "malformed":
+        _workspace(tmp_path)
+        # No ledger; just a garbage on-disk payload.
+        JsonLifecycleRunStore(tmp_path).save(_run())
+        steps = tmp_path / ".dadaia" / "runs" / "lifecycle" / "run-1" / "steps"
+        steps.mkdir(parents=True)
+        (steps / "bad-attempt-0.step-payload.json").write_text("{not json", encoding="utf-8")
+        report = _doctor(tmp_path).run()
+        assert report.ok is False
+        assert WorkflowHandoffFindingKind.MALFORMED in _kinds(report)
+    else:  # undeclared
+        _workspace(tmp_path)
+        JsonLifecycleRunStore(tmp_path).save(_run())
+        steps = tmp_path / ".dadaia" / "runs" / "lifecycle" / "run-1" / "steps"
+        steps.mkdir(parents=True)
+        # Valid JSON object but no matching ledger record.
+        (steps / "ghost-attempt-0.step-payload.json").write_text('{"x": 1}', encoding="utf-8")
+        report = _doctor(tmp_path).run()
+        assert report.ok is False
+        assert WorkflowHandoffFindingKind.UNDECLARED in _kinds(report)
+
+
+# --- ② stale-past-TTL + unconsumed-required-on-terminal ---------------------------------
+
+
+def test_stale_past_ttl_and_unconsumed_required_on_terminal(tmp_path: Path) -> None:
     _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
-    run, _ = resolver.produce(
-        _run(),
-        producer_step="release_scope",
-        attempt=0,
-        output_schema="release-scope-handoff-v1",
-        payload={"summary": "scope"},
-    )
-    report = _doctor(tmp_path).run()
-    assert report.ok is True
-    assert report.findings == ()
-
-
-# --- orphan -----------------------------------------------------------------------
-
-
-def test_doctor_flags_orphan_when_payload_file_missing(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
-    run, record = resolver.produce(
-        _run(),
-        producer_step="release_scope",
-        attempt=0,
-        output_schema="release-scope-handoff-v1",
-        payload={"summary": "scope"},
-    )
-    (tmp_path / record.payload_ref).unlink()
-    report = _doctor(tmp_path).run()
-    assert report.ok is False
-    assert WorkflowHandoffFindingKind.ORPHAN in _kinds(report)
-
-
-# --- malformed --------------------------------------------------------------------
-
-
-def test_doctor_flags_malformed_on_disk_payload(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    # No ledger; just a garbage on-disk payload.
-    JsonLifecycleRunStore(tmp_path).save(_run())
-    steps = tmp_path / ".dadaia" / "runs" / "lifecycle" / "run-1" / "steps"
-    steps.mkdir(parents=True)
-    (steps / "bad-attempt-0.step-payload.json").write_text("{not json", encoding="utf-8")
-    report = _doctor(tmp_path).run()
-    assert report.ok is False
-    assert WorkflowHandoffFindingKind.MALFORMED in _kinds(report)
-
-
-# --- undeclared -------------------------------------------------------------------
-
-
-def test_doctor_flags_undeclared_on_disk_payload(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    JsonLifecycleRunStore(tmp_path).save(_run())
-    steps = tmp_path / ".dadaia" / "runs" / "lifecycle" / "run-1" / "steps"
-    steps.mkdir(parents=True)
-    # Valid JSON object but no matching ledger record.
-    (steps / "ghost-attempt-0.step-payload.json").write_text('{"x": 1}', encoding="utf-8")
-    report = _doctor(tmp_path).run()
-    assert report.ok is False
-    assert WorkflowHandoffFindingKind.UNDECLARED in _kinds(report)
-
-
-# --- stale ------------------------------------------------------------------------
-
-
-def test_doctor_flags_stale_consumed_all_past_ttl(tmp_path: Path) -> None:
-    import os
-
-    _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
+    stale_resolver = _resolver(tmp_path)
     # Produce a delete-after-consumed payload with one consumer, then fully consume it.
-    run, record = resolver.produce(
+    run, record = stale_resolver.produce(
         _run(),
         producer_step="release_scope",
         attempt=0,
@@ -151,7 +142,7 @@ def test_doctor_flags_stale_consumed_all_past_ttl(tmp_path: Path) -> None:
         declared_consumers=("spec_create",),
         retention_mode=RetentionMode.DELETE_AFTER_CONSUMED,
     )
-    resolver.record_consumption(
+    stale_resolver.record_consumption(
         run,
         producer_step="release_scope",
         producer_attempt=0,
@@ -161,19 +152,15 @@ def test_doctor_flags_stale_consumed_all_past_ttl(tmp_path: Path) -> None:
     # Age the on-disk payload past the consumed TTL (tmp_ttl_seconds).
     old = (NOW - dt.timedelta(seconds=SlopPolicy().tmp_ttl_seconds + 99)).timestamp()
     os.utime(tmp_path / record.payload_ref, (old, old))
-    report = _doctor(tmp_path).run()
-    assert report.ok is False
-    assert WorkflowHandoffFindingKind.STALE in _kinds(report)
+    stale_report = _doctor(tmp_path).run()
+    assert stale_report.ok is False
+    assert WorkflowHandoffFindingKind.STALE in _kinds(stale_report)
 
-
-# --- unconsumed-required ----------------------------------------------------------
-
-
-def test_doctor_flags_unconsumed_required_on_terminal_run(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
+    unconsumed_root = tmp_path / "unconsumed"
+    _workspace(unconsumed_root)
+    unconsumed_resolver = _resolver(unconsumed_root)
     # A producer with a declared consumer that never consumes; the run is terminal.
-    run, _ = resolver.produce(
+    unconsumed_run, _ = unconsumed_resolver.produce(
         _run(),
         producer_step="release_scope",
         attempt=0,
@@ -181,26 +168,29 @@ def test_doctor_flags_unconsumed_required_on_terminal_run(tmp_path: Path) -> Non
         payload={"summary": "scope"},
         declared_consumers=("spec_create",),
     )
-    terminal = dataclasses.replace(run, status=LifecycleRunStatus.COMPLETED)
-    JsonLifecycleRunStore(tmp_path).save(terminal)
-    report = _doctor(tmp_path).run()
-    assert report.ok is False
-    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(report)
+    terminal = dataclasses.replace(unconsumed_run, status=LifecycleRunStatus.COMPLETED)
+    JsonLifecycleRunStore(unconsumed_root).save(terminal)
+    unconsumed_report = _doctor(unconsumed_root).run()
+    assert unconsumed_report.ok is False
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(unconsumed_report)
 
 
-# --- v0.1.71 FR4: promote_to_evidence exemption --------------------------------------
-# Reproduces bug ``handoffs-doctor-blocks-terminal-promote-to-evidence``: a terminal
-# APPROVED implement-review's review verdict payload has retention_mode=PROMOTE_TO_EVIDENCE
-# + declared_consumers=(implement) and is never consumed — because it is promoted to
-# evidence, not consumed. It must NOT be flagged unconsumed_required (heals pre-fix runs
-# on disk with no migration). RED before FR4: this asserts ``ok is True`` where the
-# pre-fix doctor reported UNCONSUMED_REQUIRED.
+# --- promote_to_evidence exemption + its delete_after_consumed control -----------------
 
 
-def test_doctor_does_not_flag_terminal_promote_to_evidence_payload(tmp_path: Path) -> None:
+def test_promote_to_evidence_exempt_delete_after_consumed_control_still_flags(
+    tmp_path: Path,
+) -> None:
+    """v0.1.71 FR4: reproduces bug ``handoffs-doctor-blocks-terminal-promote-to-evidence``:
+    a terminal APPROVED implement-review's review verdict payload has
+    retention_mode=PROMOTE_TO_EVIDENCE + declared_consumers=(implement) and is never
+    consumed — because it is promoted to evidence, not consumed. It must NOT be flagged
+    unconsumed_required (heals pre-fix runs on disk with no migration). FR4.2 control: the
+    exemption is scoped to PROMOTE_TO_EVIDENCE — a terminal delete_after_consumed required
+    payload that was never consumed still flags."""
     _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
-    run, _ = resolver.produce(
+    exempt_resolver = _resolver(tmp_path)
+    exempt_run, _ = exempt_resolver.produce(
         _run(),
         producer_step="review_qa",
         attempt=0,
@@ -209,19 +199,16 @@ def test_doctor_does_not_flag_terminal_promote_to_evidence_payload(tmp_path: Pat
         declared_consumers=("implement",),
         retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
     )
-    terminal = dataclasses.replace(run, status=LifecycleRunStatus.COMPLETED)
-    JsonLifecycleRunStore(tmp_path).save(terminal)
-    report = _doctor(tmp_path).run()
-    assert report.ok is True, [f.to_dict() for f in report.findings]
-    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED not in _kinds(report)
+    exempt_terminal = dataclasses.replace(exempt_run, status=LifecycleRunStatus.COMPLETED)
+    JsonLifecycleRunStore(tmp_path).save(exempt_terminal)
+    exempt_report = _doctor(tmp_path).run()
+    assert exempt_report.ok is True, [f.to_dict() for f in exempt_report.findings]
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED not in _kinds(exempt_report)
 
-
-def test_doctor_still_flags_terminal_delete_after_consumed_unconsumed(tmp_path: Path) -> None:
-    """FR4.2 control: the exemption is scoped to PROMOTE_TO_EVIDENCE — a terminal
-    delete_after_consumed required payload that was never consumed still flags."""
-    _workspace(tmp_path)
-    resolver = _resolver(tmp_path)
-    run, _ = resolver.produce(
+    control_root = tmp_path / "control"
+    _workspace(control_root)
+    control_resolver = _resolver(control_root)
+    control_run, _ = control_resolver.produce(
         _run(),
         producer_step="release_scope",
         attempt=0,
@@ -230,13 +217,13 @@ def test_doctor_still_flags_terminal_delete_after_consumed_unconsumed(tmp_path: 
         declared_consumers=("spec_create",),
         retention_mode=RetentionMode.DELETE_AFTER_CONSUMED,
     )
-    terminal = dataclasses.replace(run, status=LifecycleRunStatus.COMPLETED)
-    JsonLifecycleRunStore(tmp_path).save(terminal)
-    report = _doctor(tmp_path).run()
-    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(report)
+    control_terminal = dataclasses.replace(control_run, status=LifecycleRunStatus.COMPLETED)
+    JsonLifecycleRunStore(control_root).save(control_terminal)
+    control_report = _doctor(control_root).run()
+    assert WorkflowHandoffFindingKind.UNCONSUMED_REQUIRED in _kinds(control_report)
 
 
-# --- v0.1.71 FR2: --context/--release-id are REAL run filters -------------------------
+# --- v0.1.71 FR2: --context/--release-id are REAL run filters, scoping runs AND disk scan --
 
 
 def _run_in(run_id: str, context: str, release_id: str) -> LifecycleRun:
@@ -252,7 +239,7 @@ def _run_in(run_id: str, context: str, release_id: str) -> LifecycleRun:
     )
 
 
-def test_doctor_context_filter_scopes_to_matched_runs_only(tmp_path: Path) -> None:
+def test_context_filter_scopes_runs_and_disk_scan_to_matched_runs_only(tmp_path: Path) -> None:
     """A context/release filter narrows the report AND the on-disk scan to the matched
     runs — an unconsumed_required defect in another context's run is excluded, and that
     other run's on-disk payload is NOT mis-flagged ``undeclared`` against the narrowed

@@ -7,14 +7,16 @@ discovers every workflow step sequence and asserts:
 (a) every prompt-bearing model step (``role != "python"``) names a fragment — would have
     caught the original ``review_security``/``review_code`` generic-prompt holes;
 (b) no orphan fragments — every shipped fragment under ``public/lifecycle_fragments/``
-    (excluding ``_README.md``) is cited by ≥1 step's ``fragment_id``/``shared_fragment_ids``
-    (so ``conflict_scan`` + ``memory_selection`` must stay wired);
+    (excluding ``_README.md``) is cited by ≥1 step's ``fragment_id``/``shared_fragment_ids``;
 (c) per-step enumeration (AC-2/AC-3): the EXACT set of create/review steps that must cite
-    ``shared.anti_slop`` and the exact set that must cite ``shared.output_handoff`` each do —
-    a single step dropping a shared fragment FAILS this (a ``>=1`` orphan count is insufficient).
+    ``shared.anti_slop`` and the exact set that must cite ``shared.output_handoff``/
+    ``shared.memory_selection`` each do — a single step dropping a shared fragment FAILS this
+    (a ``>=1`` orphan count is insufficient). Guardrail class: a step silently dropping a
+    shared discipline fragment must keep failing per-step.
 
 Item E: the discovered set of workflow ``_SEQUENCE`` modules is asserted equal to the known
-set, so a future 7th workflow cannot silently escape the guardrail.
+set (folded into the citation-set param as a derivation guard), so a future 7th workflow
+cannot silently escape the guardrail.
 """
 
 from __future__ import annotations
@@ -23,6 +25,8 @@ import importlib
 import pkgutil
 import re
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.features.lifecycle import pipeline, workflows
@@ -143,25 +147,6 @@ def _all_cited_ids() -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Item E — the discovered workflow set is exactly the known six
-# ---------------------------------------------------------------------------
-
-
-def test_discovered_sequence_modules_match_known_set() -> None:
-    """A future 7th workflow with a `_SEQUENCE` cannot silently escape the guardrail."""
-    discovered = {
-        name
-        for _finder, name, _ispkg in pkgutil.iter_modules(workflows.__path__)
-        if not name.startswith("_")
-        and hasattr(importlib.import_module(f"{workflows.__name__}.{name}"), "_SEQUENCE")
-    }
-    assert discovered == _KNOWN_SEQUENCE_MODULES, (
-        "workflow `_SEQUENCE` modules changed; update the guardrail's enumerated set "
-        f"(discovered={sorted(discovered)}, known={sorted(_KNOWN_SEQUENCE_MODULES)})"
-    )
-
-
-# ---------------------------------------------------------------------------
 # (a) — no model step falls back to a generic prompt
 # ---------------------------------------------------------------------------
 
@@ -176,11 +161,11 @@ def test_no_model_step_uses_generic_prompt() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (b) — no orphan fragments
+# (b) — no orphan fragments (conflict_scan + memory_selection wired is a strict subset)
 # ---------------------------------------------------------------------------
 
 
-def test_no_orphan_fragments() -> None:
+def test_no_orphan_or_dangling_fragments_and_discovered_sequence_set_matches_known() -> None:
     shipped = _shipped_fragment_ids()
     cited = _all_cited_ids()
     orphans = sorted(fid for fid in shipped if fid not in cited)
@@ -188,29 +173,41 @@ def test_no_orphan_fragments() -> None:
     # Every citation must resolve to a shipped fragment (no dangling fragment id).
     dangling = sorted(fid for fid in cited if fid not in shipped)
     assert dangling == [], f"dangling fragment citations (cited but not shipped): {dangling}"
-
-
-def test_conflict_scan_and_memory_selection_are_wired() -> None:
-    """The two formerly-orphan fragments (v0.1.43) are each cited by ≥1 step."""
+    # The two formerly-orphan fragments (v0.1.43) are each cited by ≥1 step — a strict
+    # instance of the no-orphan property above, kept as a named regression pin.
     assert _citers("backlog_definition.conflict_scan")
     assert _citers("shared.memory_selection")
 
+    # Item E: a future 7th workflow with a `_SEQUENCE` cannot silently escape the guardrail
+    # — the derivation guard behind every required-citer set in this module.
+    discovered = {
+        name
+        for _finder, name, _ispkg in pkgutil.iter_modules(workflows.__path__)
+        if not name.startswith("_")
+        and hasattr(importlib.import_module(f"{workflows.__name__}.{name}"), "_SEQUENCE")
+    }
+    assert discovered == _KNOWN_SEQUENCE_MODULES, (
+        "workflow `_SEQUENCE` modules changed; update the guardrail's enumerated set "
+        f"(discovered={sorted(discovered)}, known={sorted(_KNOWN_SEQUENCE_MODULES)})"
+    )
+
 
 # ---------------------------------------------------------------------------
-# (c) — per-step enumeration for the shared disciplines
+# (c) + Item E — per-step required-citer sets, plus the discovered-sequence-set derivation
 # ---------------------------------------------------------------------------
 
-
-def test_anti_slop_cited_by_every_required_step() -> None:
-    missing = sorted(_REQUIRED_ANTI_SLOP - _citers("shared.anti_slop"))
-    assert missing == [], f"steps missing shared.anti_slop: {missing}"
-
-
-def test_output_handoff_cited_by_every_required_step() -> None:
-    missing = sorted(_REQUIRED_OUTPUT_HANDOFF - _citers("shared.output_handoff"))
-    assert missing == [], f"steps missing shared.output_handoff: {missing}"
+_REQUIRED_CITER_CASES = (
+    ("anti_slop", "shared.anti_slop", _REQUIRED_ANTI_SLOP),
+    ("output_handoff", "shared.output_handoff", _REQUIRED_OUTPUT_HANDOFF),
+    ("memory_selection", "shared.memory_selection", _REQUIRED_MEMORY_SELECTION),
+)
 
 
-def test_memory_selection_cited_by_every_required_step() -> None:
-    missing = sorted(_REQUIRED_MEMORY_SELECTION - _citers("shared.memory_selection"))
-    assert missing == [], f"steps missing shared.memory_selection: {missing}"
+@pytest.mark.parametrize(
+    "tag,required",
+    [c[1:] for c in _REQUIRED_CITER_CASES],
+    ids=[c[0] for c in _REQUIRED_CITER_CASES],
+)
+def test_shared_discipline_cited_by_every_required_step(tag: str, required: set[str]) -> None:
+    missing = sorted(required - _citers(tag))
+    assert missing == [], f"steps missing {tag}: {missing}"

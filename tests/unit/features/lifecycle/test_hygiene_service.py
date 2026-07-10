@@ -1,4 +1,9 @@
-"""Unit tests for lifecycle hygiene status service."""
+"""Unit tests for lifecycle hygiene status service.
+
+CRITICAL: v0.1.74 ``canonical_zone_doc`` protection + ``cleanup_candidate_count -
+protected_residual_count`` preflight arithmetic — this release's own regression guard, kept
+verbatim.
+"""
 
 from __future__ import annotations
 
@@ -22,7 +27,12 @@ def _write(path: Path, *, age: dt.timedelta) -> Path:
     return path
 
 
-def test_status_uses_slop_policy_ttls_without_deleting(tmp_path: Path) -> None:
+# --- ① TTL status + explicit-policy + WorkspaceClean-reconciled param -----------------
+
+
+def test_status_uses_slop_policy_ttls_default_and_explicit_reconciled_with_workspace_clean(
+    tmp_path: Path,
+) -> None:
     old_report = _write(
         tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
         age=dt.timedelta(hours=49),
@@ -62,18 +72,43 @@ def test_status_uses_slop_policy_ttls_without_deleting(tmp_path: Path) -> None:
     assert old_handoff.exists()
     assert old_tmp.exists()
 
+    # An explicit SlopPolicy overrides the defaults.
+    explicit_report = _write(
+        tmp_path / ".dadaia" / "reports" / "ctx2" / "agent" / "old.html",
+        age=dt.timedelta(seconds=11),
+    )
+    policy = SlopPolicy(reports_ttl_seconds=10, handoff_ttl_seconds=60, tmp_ttl_seconds=60)
+    explicit_counters = LifecycleHygieneService(tmp_path, policy=policy, now=NOW).status()
+    assert explicit_counters.expired_totals[HygieneZone.REPORTS] >= 1
+    assert explicit_report.exists()
 
-def test_status_reports_unknown_top_level_dirs(tmp_path: Path) -> None:
+    # WorkspaceCleanService's default TTLs are reconciled with the same SlopPolicy.
+    recent_report = _write(
+        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "recent.html",
+        age=dt.timedelta(hours=47),
+    )
+    result = WorkspaceCleanService(tmp_path, now=NOW).clean(dry_run=True)
+    candidate_paths = {candidate.path for candidate in result.candidates}
+    assert old_tmp in candidate_paths
+    assert old_report in candidate_paths
+    assert old_handoff in candidate_paths
+    assert recent_report not in candidate_paths
+
+
+# --- ② unknown top-level dirs ----------------------------------------------------------
+
+
+def test_status_reports_unknown_top_level_dirs_and_counts_orphan_malformed_handoffs(
+    tmp_path: Path,
+) -> None:
     (tmp_path / ".dadaia" / "reports").mkdir(parents=True)
     (tmp_path / ".dadaia" / "imgs").mkdir()
     (tmp_path / ".dadaia" / "references").mkdir()
 
-    counters = LifecycleHygieneService(tmp_path, now=NOW).status()
+    dirs_counters = LifecycleHygieneService(tmp_path, now=NOW).status()
 
-    assert counters.unknown_top_level_dirs == ("imgs", "references")
+    assert dirs_counters.unknown_top_level_dirs == ("imgs", "references")
 
-
-def test_status_counts_orphan_and_malformed_handoffs(tmp_path: Path) -> None:
     handoff_root = tmp_path / ".dadaia" / "handoff" / "ctx"
     handoff_root.mkdir(parents=True)
     (handoff_root / "orphan.handoff.json").write_text(
@@ -98,46 +133,6 @@ def test_status_counts_orphan_and_malformed_handoffs(tmp_path: Path) -> None:
 
     assert counters.orphan_handoff_count == 1
     assert counters.malformed_handoff_count == 3
-
-
-def test_workspace_clean_default_ttls_are_reconciled_to_slop_policy(tmp_path: Path) -> None:
-    old_tmp = _write(
-        tmp_path / ".dadaia" / "tmp" / "workflow" / "old.txt",
-        age=dt.timedelta(hours=25),
-    )
-    old_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
-        age=dt.timedelta(hours=49),
-    )
-    old_handoff = _write(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "old.handoff.json",
-        age=dt.timedelta(hours=25),
-    )
-    recent_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "recent.html",
-        age=dt.timedelta(hours=47),
-    )
-
-    result = WorkspaceCleanService(tmp_path, now=NOW).clean(dry_run=True)
-    candidate_paths = {candidate.path for candidate in result.candidates}
-
-    assert old_tmp in candidate_paths
-    assert old_report in candidate_paths
-    assert old_handoff in candidate_paths
-    assert recent_report not in candidate_paths
-
-
-def test_lifecycle_hygiene_accepts_explicit_policy(tmp_path: Path) -> None:
-    old_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
-        age=dt.timedelta(seconds=11),
-    )
-    policy = SlopPolicy(reports_ttl_seconds=10, handoff_ttl_seconds=60, tmp_ttl_seconds=60)
-
-    counters = LifecycleHygieneService(tmp_path, policy=policy, now=NOW).status()
-
-    assert counters.expired_totals[HygieneZone.REPORTS] == 1
-    assert old_report.exists()
 
 
 def test_zone_doc_agents_md_is_canonical_never_unprotected(tmp_path: Path) -> None:

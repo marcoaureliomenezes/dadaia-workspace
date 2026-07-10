@@ -17,9 +17,9 @@
   Write set: `tests/unit/core/**`, `tests/unit/hooks/**`, `tests/unit/cli/**`,
   `tests/unit/*.py`, `tests/unit/helpers/**`, `tests/unit/public/**`,
   `tests/unit/scripts/**`
-- [-] **T-5** Lifecycle cluster per `plan-lifecycle.md` (515→~185).
+- [x] **T-5** Lifecycle cluster per `plan-lifecycle.md` (515→~185).
   Write set: `tests/unit/features/lifecycle/**`
-- [ ] **T-6** Unit-features-rest incl. spec_context per `plan-unit-features-rest.md`
+- [-] **T-6** Unit-features-rest incl. spec_context per `plan-unit-features-rest.md`
   (1,035→250) + **FR2 frozen-suite re-baseline** (successor baseline named; QA
   adjudication recorded in the task commit + CLOSURE).
   Write set: `tests/unit/features/**` (excluding `panel/`, `lifecycle/`)
