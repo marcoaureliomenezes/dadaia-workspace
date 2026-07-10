@@ -234,17 +234,17 @@ _MALFORMED_CASES = (
     ids=[c[0] for c in _MALFORMED_CASES],
 )
 def test_malformed_frontmatter_rejected(tmp_path: Path, mutate, match: str) -> None:
-    text = mutate(_VALID_FRONTMATTER)
-    loader = _write_fragment(tmp_path, "fixture.md", text)
-    with pytest.raises(FragmentValidationError, match=match):
-        loader.load_fragment(Path("shared") / "fixture.md")
-
-
-def test_valid_fixture_loads(tmp_path: Path) -> None:
-    loader = _write_fragment(tmp_path, "fixture.md", _VALID_FRONTMATTER)
-    fragment = loader.load_fragment(Path("shared") / "fixture.md")
+    # Positive control: the base (unmutated) fixture loads cleanly — proves the
+    # rejections below are caused by the mutation, not a broken base fixture.
+    valid_loader = _write_fragment(tmp_path / "valid", "fixture.md", _VALID_FRONTMATTER)
+    fragment = valid_loader.load_fragment(Path("shared") / "fixture.md")
     assert fragment.id == "shared.fixture"
     assert fragment.dynamic_inputs == ("available_evidence",)
+
+    text = mutate(_VALID_FRONTMATTER)
+    loader = _write_fragment(tmp_path / "mutated", "fixture.md", text)
+    with pytest.raises(FragmentValidationError, match=match):
+        loader.load_fragment(Path("shared") / "fixture.md")
 
 
 # ---------------------------------------------------------------------------

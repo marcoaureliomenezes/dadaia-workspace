@@ -58,35 +58,53 @@ def _run(tmp_path: Path, payload: dict[str, Any], *, session_id: str = "claude-s
 
 
 @pytest.mark.parametrize(
-    ("tool_name", "input_key", "path_fn"),
+    ("tool_name", "input_key", "path_fn", "expect_reason"),
     [
         # An in-repo non-spec file is UNGATED by the SDD gate and is a subdir write (not a
         # new root entry), so both pre_gate policies allow it.
-        ("Write", "file_path", lambda ws: ws / "repos" / "a" / "src" / "thing.py"),
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / "repos" / "a" / "src" / "thing.py",
+            None,
+        ),
         # NotebookEdit is excluded from the root-whitelist tool set but IS an SDD write
         # tool. A README-sibling junk.ipynb at root is UNGATED by SDD and exempt from
         # root-whitelist for NotebookEdit → allowed (parity with standalone).
-        ("NotebookEdit", "notebook_path", lambda ws: ws / "junk.ipynb"),
+        ("NotebookEdit", "notebook_path", lambda ws: ws / "junk.ipynb", None),
+        ("Read", "file_path", lambda ws: "x", None),
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr",
+            "SEC-01",
+        ),
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / "junk.txt",
+            "ROOT WHITELIST GATE",
+        ),
+    ],
+    ids=[
+        "allow-parity-in-repo-subdir-write",
+        "allow-parity-notebook-edit-root-exempt",
+        "non-write-tool-allows",
+        "protected-sessions-blocks-fail-closed",
+        "root-whitelist-forbidden-entry-blocks",
     ],
 )
-def test_allow_parity(tmp_path: Path, tool_name: str, input_key: str, path_fn: Any) -> None:
+def test_non_write_and_protected_matrix(
+    tmp_path: Path, tool_name: str, input_key: str, path_fn: Any, expect_reason: str | None
+) -> None:
     ws = _mk_workspace(tmp_path, "a")
     target = path_fn(ws)
     block = _run(tmp_path, {"tool_name": tool_name, "tool_input": {input_key: str(target)}})
-    assert block is None
-
-
-def test_non_write_tool_allows(tmp_path: Path) -> None:
-    _mk_workspace(tmp_path, "a")
-    assert _run(tmp_path, {"tool_name": "Read", "tool_input": {"file_path": "x"}}) is None
-
-
-def test_protected_sessions_blocks_fail_closed(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / ".dadaia" / "sessions" / "runtime" / "a.ptr"
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is not None
-    assert "SEC-01" in block["reason"]
+    if expect_reason is None:
+        assert block is None
+    else:
+        assert block is not None
+        assert expect_reason in block["reason"]
 
 
 @pytest.mark.parametrize(
@@ -115,15 +133,6 @@ def test_apply_patch_multi_file_most_restrictive_blocks_whole_patch(
     block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
     assert block is not None
     assert reason_fragment in block["reason"] or reason_fragment.upper() in block["reason"].upper()
-
-
-def test_root_whitelist_forbidden_entry_blocks(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "a")
-    block = _run(
-        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "junk.txt")}}
-    )
-    assert block is not None
-    assert "ROOT WHITELIST GATE" in block["reason"]
 
 
 # --------------------------------------------------------------------------- #
@@ -165,7 +174,9 @@ def test_main_is_subprocess_free(
     assert pre_gate.main() == 0
 
 
-def test_evaluate_payload_first_block_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # root-whitelist policy fires before the SDD gate: a forbidden-root block short-circuits
     # and the SDD policy is never consulted.
     calls: list[str] = []
@@ -182,8 +193,6 @@ def test_evaluate_payload_first_block_wins(monkeypatch: pytest.MonkeyPatch) -> N
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) == "ROOT BLOCK"
     assert calls == ["rw"]
 
-
-def test_faulty_policy_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
     def explode(_p: dict[str, object]) -> str | None:
         raise RuntimeError("boom")
 
@@ -257,16 +266,6 @@ def test_telemetry_failure_does_not_change_verdict(
 # --------------------------------------------------------------------------- #
 
 
-def test_pi_raw_lowercase_write_name_is_not_a_write_tool(tmp_path: Path) -> None:
-    # PI's built-in tool is named "write" (lowercase) — NOT in the gate's WRITE_TOOLS
-    # vocabulary, so an unmapped payload would slip through. This is exactly why the
-    # `.pi/extensions/dadaia-sdd-gate.ts` shim maps write→Write before calling pre_gate.
-    assert _common.is_write_tool("write") is False
-    assert _common.is_write_tool("edit") is False
-    assert _common.is_write_tool("Write") is True
-    assert _common.is_write_tool("Edit") is True
-
-
 @pytest.mark.parametrize(
     ("rel_path", "expect_blocked", "reason_fragment"),
     [
@@ -282,6 +281,14 @@ def test_pi_raw_lowercase_write_name_is_not_a_write_tool(tmp_path: Path) -> None
 def test_pi_mapped_write_name_hits_real_gate(
     tmp_path: Path, rel_path: str, expect_blocked: bool, reason_fragment: str | None
 ) -> None:
+    # PI's built-in tool is named "write" (lowercase) — NOT in the gate's WRITE_TOOLS
+    # vocabulary, so an unmapped payload would slip through. This is exactly why the
+    # `.pi/extensions/dadaia-sdd-gate.ts` shim maps write→Write before calling pre_gate.
+    assert _common.is_write_tool("write") is False
+    assert _common.is_write_tool("edit") is False
+    assert _common.is_write_tool("Write") is True
+    assert _common.is_write_tool("Edit") is True
+
     ws = _mk_workspace(tmp_path, "a")
     target = ws / "repos" / "a" / rel_path
     block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})

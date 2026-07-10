@@ -27,10 +27,11 @@ def _write(path: Path, *, age: dt.timedelta) -> Path:
     return path
 
 
-# --- ① TTL status + explicit-policy + WorkspaceClean-reconciled param -----------------
+# --- ① TTL status + explicit-policy + WorkspaceClean-reconciled param, plus
+#       ② unknown top-level dirs + orphan/malformed handoff counting ------------------
 
 
-def test_status_uses_slop_policy_ttls_default_and_explicit_reconciled_with_workspace_clean(
+def test_status_ttl_policy_workspace_clean_reconciled_and_unknown_dirs_orphan_handoffs(
     tmp_path: Path,
 ) -> None:
     old_report = _write(
@@ -94,22 +95,17 @@ def test_status_uses_slop_policy_ttls_default_and_explicit_reconciled_with_works
     assert old_handoff in candidate_paths
     assert recent_report not in candidate_paths
 
+    # --- ② unknown top-level dirs + orphan/malformed handoff counting, own workspace ---
+    dirs_ws = tmp_path.parent / (tmp_path.name + "-dirs")
+    (dirs_ws / ".dadaia" / "reports").mkdir(parents=True)
+    (dirs_ws / ".dadaia" / "imgs").mkdir()
+    (dirs_ws / ".dadaia" / "references").mkdir()
 
-# --- ② unknown top-level dirs ----------------------------------------------------------
-
-
-def test_status_reports_unknown_top_level_dirs_and_counts_orphan_malformed_handoffs(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / ".dadaia" / "reports").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "imgs").mkdir()
-    (tmp_path / ".dadaia" / "references").mkdir()
-
-    dirs_counters = LifecycleHygieneService(tmp_path, now=NOW).status()
+    dirs_counters = LifecycleHygieneService(dirs_ws, now=NOW).status()
 
     assert dirs_counters.unknown_top_level_dirs == ("imgs", "references")
 
-    handoff_root = tmp_path / ".dadaia" / "handoff" / "ctx"
+    handoff_root = dirs_ws / ".dadaia" / "handoff" / "ctx"
     handoff_root.mkdir(parents=True)
     (handoff_root / "orphan.handoff.json").write_text(
         json.dumps({"artifact": {"path": ".dadaia/reports/ctx/missing.html"}}),
@@ -129,7 +125,7 @@ def test_status_reports_unknown_top_level_dirs_and_counts_orphan_malformed_hando
         encoding="utf-8",
     )
 
-    counters = LifecycleHygieneService(tmp_path, now=NOW).status()
+    counters = LifecycleHygieneService(dirs_ws, now=NOW).status()
 
     assert counters.orphan_handoff_count == 1
     assert counters.malformed_handoff_count == 3

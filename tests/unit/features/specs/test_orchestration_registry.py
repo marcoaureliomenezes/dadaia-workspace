@@ -136,19 +136,16 @@ def _doc1_errors(issues: list[SpecsDoctorIssue]) -> list[SpecsDoctorIssue]:
     return [i for i in issues if i.code == "D-OC-1" and i.severity == Severity.ERROR]
 
 
-def test_doc1_all_correct_no_errors(tmp_path: Path) -> None:
-    """Case 1 of AC-OC-10: all references correct → D-OC-1 emits zero errors."""
-    specs = _make_minimal_specs(tmp_path)
-    pub = _make_public_dir(tmp_path)
-
-    issues = SpecsDoctor(specs, public_dir=pub).check()
-    doc1 = _doc1_errors(issues)
-    assert doc1 == [], f"Expected 0 D-OC-1 errors, got: {[i.description for i in doc1]}"
-
-
 @pytest.mark.parametrize(
     ("mutate", "expect_substrings"),
     [
+        pytest.param(
+            # Case 1 of AC-OC-10: all references correct → D-OC-1 emits zero errors
+            # (no mutation; expect_substrings is empty, handled specially below).
+            lambda pub: None,
+            (),
+            id="all-correct-no-errors",
+        ),
         pytest.param(
             lambda pub: (pub / "workflows" / "hotfix-release.workflow.md").unlink(),
             ("hotfix-release", "Tier-1"),
@@ -184,9 +181,10 @@ def test_doc1_all_correct_no_errors(tmp_path: Path) -> None:
     ],
 )
 def test_doc1_error_matrix(  # type: ignore[no-untyped-def]
-    tmp_path: Path, mutate, expect_substrings: tuple[str, str]
+    tmp_path: Path, mutate, expect_substrings: tuple[str, ...]
 ) -> None:
-    """Cases 2-4 of AC-OC-10: forward Tier-1, forward Tier-2, and reverse orphan errors."""
+    """Case 1 of AC-OC-10 (all correct, zero errors) plus cases 2-4 (forward Tier-1,
+    forward Tier-2, and reverse orphan errors)."""
     specs = _make_minimal_specs(tmp_path)
     pub = _make_public_dir(tmp_path)
 
@@ -194,6 +192,11 @@ def test_doc1_error_matrix(  # type: ignore[no-untyped-def]
 
     issues = SpecsDoctor(specs, public_dir=pub).check()
     doc1 = _doc1_errors(issues)
+
+    if not expect_substrings:
+        assert doc1 == [], f"Expected 0 D-OC-1 errors, got: {[i.description for i in doc1]}"
+        return
+
     assert doc1, "Expected at least one D-OC-1 error"
     messages = [i.description for i in doc1]
     for substring in expect_substrings:

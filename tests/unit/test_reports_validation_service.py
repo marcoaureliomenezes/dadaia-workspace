@@ -192,12 +192,11 @@ def test_check_hash_table(tmp_path: Path) -> None:
     )
     assert missing_service.check_hash(missing_handoff) == "missing_artifact"
 
-
-def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path) -> None:
-    fake = FakeHandoffValidator(canned_errors=[])
+    # Workspace-relative artifact.path resolution (a report path composed relative to
+    # the workspace root, not the handoff's own directory).
     handoff_root = tmp_path / ".dadaia" / "handoff"
     handoff_root.mkdir(parents=True)
-    service = ReportsValidationService(validator=fake, reports_root=handoff_root)
+    relative_service = ReportsValidationService(validator=fake, reports_root=handoff_root)
 
     artifact = tmp_path / ".dadaia" / "reports" / "dadaia-workspace" / "qa-engineer" / "report.html"
     artifact.parent.mkdir(parents=True)
@@ -219,7 +218,7 @@ def test_check_hash_resolves_workspace_relative_report_artifact(tmp_path: Path) 
     }
     handoff_path.write_text(json.dumps(doc), encoding="utf-8")
 
-    assert service.check_hash(handoff_path) == "match"
+    assert relative_service.check_hash(handoff_path) == "match"
 
 
 def test_check_hash_rejects_artifact_path_outside_workspace(tmp_path: Path) -> None:

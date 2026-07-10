@@ -75,7 +75,7 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
 # ───────────────────────────── registry (FR-S03) — 1 param ────────────────────
 
 
-def test_registry_plan_and_latest_version() -> None:
+def test_registry_plan_latest_version_and_idempotent_chain(tmp_path: Path) -> None:
     keys = [s.key for s in _registry.REGISTRY]
     assert "tree-v2" in keys
     first = _registry.REGISTRY[0]
@@ -88,8 +88,6 @@ def test_registry_plan_and_latest_version() -> None:
     with pytest.raises(ValueError, match="downgrade"):
         _registry.plan(1, 0)
 
-
-def test_chain_idempotent_on_already_migrated_tree(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     (specs / "releases" / "legacy").mkdir(parents=True)  # already migrated
     # tree-v2 on a tree with nothing legacy to move is a safe no-op (no moves).

@@ -40,35 +40,31 @@ _runner = CliRunner()
 
 
 # ---------------------------------------------------------------------------
-# stage() — manifest + codex runtime adapters
+# stage() — manifest + codex runtime adapters, plus
+# install(target="all") + pi projection block (Ring-1, tree, idempotent, system-note,
+# doctor pi-ok)
 # ---------------------------------------------------------------------------
 
 
-def test_stage_creates_manifest_and_copies_codex_runtime_adapters(tmp_path: Path) -> None:
-    workspace = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
+def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage_workspace = tmp_path / "stage-ws"
+    stage_manager = FileSystemPublicAssetManager()
 
-    manager.stage(workspace)
+    stage_manager.stage(stage_workspace)
 
-    manifest_path = workspace / ".dadaia" / "agentic" / "manifest.json"
+    manifest_path = stage_workspace / ".dadaia" / "agentic" / "manifest.json"
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
 
     assert (
-        workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "design-ctx" / "SKILL.md"
+        stage_workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "design-ctx" / "SKILL.md"
     ).exists()
     assert any(asset["path"] == "runtime/codex/design-ctx/SKILL.md" for asset in manifest["assets"])
 
-
-# ---------------------------------------------------------------------------
-# install(target="all") + pi projection block (Ring-1, tree, idempotent, system-note,
-# doctor pi-ok)
-# ---------------------------------------------------------------------------
-
-
-def test_install_all_and_pi_projection_block(tmp_path: Path) -> None:
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
 
@@ -149,31 +145,27 @@ def test_install_all_and_pi_projection_block(tmp_path: Path) -> None:
     assert "/home/" not in context_prompt
     assert "dadaia" in context_prompt
 
-
-def test_cli_install_target_pi_projects_and_doctor_clean(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Layer-1 e2e through the REAL CLI: `dadaia public install --target pi` is the
-    command the operator runs to 'enter pi'. Drive it via CliRunner against an isolated
-    temp workspace, then `dadaia public doctor` — assert the `.pi/` tree lands and doctor
-    reports the pi projection green (proving the operator-facing path, not just the
-    manager API)."""
+    # Layer-1 e2e through the REAL CLI: `dadaia public install --target pi` is the
+    # command the operator runs to 'enter pi'. Drive it via CliRunner against an
+    # isolated temp workspace, then `dadaia public doctor` — assert the `.pi/` tree
+    # lands and doctor reports the pi projection green (proving the operator-facing
+    # path, not just the manager API).
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
-    workspace = tmp_path / "ws"
+    cli_workspace = tmp_path / "cli-ws"
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(workspace)
-    monkeypatch.chdir(workspace)
+    ).init(cli_workspace)
+    monkeypatch.chdir(cli_workspace)
 
     install = _runner.invoke(app, ["public", "install", "--target", "pi"])
     assert install.exit_code == 0, install.output
 
-    assert (workspace / ".pi" / "SYSTEM.md").exists()
-    assert (workspace / ".pi" / "settings.json").exists()
-    assert (workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
+    assert (cli_workspace / ".pi" / "SYSTEM.md").exists()
+    assert (cli_workspace / ".pi" / "settings.json").exists()
+    assert (cli_workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
 
     doctor = _runner.invoke(app, ["public", "doctor"])
     assert doctor.exit_code == 0, doctor.output
@@ -185,32 +177,34 @@ def test_cli_install_target_pi_projects_and_doctor_clean(
 # ---------------------------------------------------------------------------
 
 
-def test_install_refuses_dadaia_workspace_source_root(tmp_path: Path) -> None:
-    workspace = tmp_path / "dadaia-workspace"
-    workspace.mkdir()
-    (workspace / "dadaia_workspace" / "public").mkdir(parents=True)
-    (workspace / "pyproject.toml").write_text(
-        '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
-        encoding="utf-8",
-    )
-
-    manager = FileSystemPublicAssetManager()
-
-    with pytest.raises(PublicAssetError, match="Refusing to project public runtime assets"):
-        manager.install(workspace, target="all")
-
-    assert not (workspace / ".dadaia").exists()
-    assert not (workspace / ".codex").exists()
-
-
 # ---------------------------------------------------------------------------
+# Safety (never touch the dadaia-workspace source root itself) +
 # overwrite-stale/skip-canonical/force
 # ---------------------------------------------------------------------------
 
 
-def test_install_overwrite_skip_force_and_doctor_drift_tracking(tmp_path: Path) -> None:
+def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_tracking(
+    tmp_path: Path,
+) -> None:
     """T-PROP-01: hash-compare governs overwrite-without-force / skip-when-canonical /
-    force; doctor tracks the dadaia-scoped AGENTS.md files for drift."""
+    force; doctor tracks the dadaia-scoped AGENTS.md files for drift. Plus: install()
+    refuses to project onto the dadaia-workspace source root itself (own workspace)."""
+    source_root = tmp_path / "dadaia-workspace"
+    source_root.mkdir()
+    (source_root / "dadaia_workspace" / "public").mkdir(parents=True)
+    (source_root / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+        encoding="utf-8",
+    )
+
+    source_root_manager = FileSystemPublicAssetManager()
+
+    with pytest.raises(PublicAssetError, match="Refusing to project public runtime assets"):
+        source_root_manager.install(source_root, target="all")
+
+    assert not (source_root / ".dadaia").exists()
+    assert not (source_root / ".codex").exists()
+
     workspace = tmp_path / "ws"
     agents_md = workspace / "AGENTS.md"
     agents_md.parent.mkdir(parents=True, exist_ok=True)
@@ -456,12 +450,22 @@ def _codex_toml_fields(ws: Path, agent: str) -> dict[str, str]:
     return out
 
 
-def test_model_policy_overlay_lockstep_rendering_and_invalid_fails_loud(
+def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_rerender(
     tmp_path: Path,
 ) -> None:
     """AC-2/AC-3 + F-1: no-overlay renders the balanced roster; an overlay change moves
     BOTH .claude md and .codex toml together at install (byte-stable repeats); an
-    invalid overlay fails loud before any write."""
+    invalid overlay fails loud before any write.
+
+    Plus FR7 — AC-5, all three directions + F-2 pin, plus the invalid-vs-missing overlay
+    doctor distinction (own workspace):
+    1. Immediately after a policy re-render, doctor reports [ok] on every
+       ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
+    2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
+    3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
+       render seam (F-2 — never a global ``_compare`` patch).
+    4. A missing overlay is not a doctor ERROR; an invalid overlay is.
+    """
     ws = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()
     manager.install(ws, target="all")
@@ -547,32 +551,19 @@ def test_model_policy_overlay_lockstep_rendering_and_invalid_fails_loud(
     after = (invalid_ws / ".claude" / "agents" / "software-engineer.md").read_bytes()
     assert after == before
 
+    # FR7 doctor rerender/hand-edit-drift/invalid-overlay-error, own workspace.
+    doctor_ws = tmp_path / "doctor-ws"
+    doctor_manager = FileSystemPublicAssetManager()
+    doctor_manager.install(doctor_ws, target="all")
 
-def test_doctor_policy_rerender_ok_hand_edit_drift_and_invalid_overlay_error(
-    tmp_path: Path,
-) -> None:
-    """FR7 — AC-5, all three directions + F-2 pin, plus the invalid-vs-missing overlay
-    doctor distinction:
-
-    1. Immediately after a policy re-render, doctor reports [ok] on every
-       ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
-    2. A hand-edited projected ``.claude/agents/*.md`` reads [drift].
-    3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
-       render seam (F-2 — never a global ``_compare`` patch).
-    4. A missing overlay is not a doctor ERROR; an invalid overlay is.
-    """
-    ws = tmp_path / "ws"
-    manager = FileSystemPublicAssetManager()
-    manager.install(ws, target="all")
-
-    clean = manager.doctor(ws)
+    clean = doctor_manager.doctor(doctor_ws)
     assert not any("agent-model-policy ERROR" in r for r in clean), (
         "missing overlay must not emit an agent-model-policy ERROR line"
     )
 
-    states = ws / ".dadaia" / "states"
-    states.mkdir(parents=True, exist_ok=True)
-    (states / "agent_model_policy.json").write_text(
+    doctor_states = doctor_ws / ".dadaia" / "states"
+    doctor_states.mkdir(parents=True, exist_ok=True)
+    (doctor_states / "agent_model_policy.json").write_text(
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
@@ -581,9 +572,9 @@ def test_doctor_policy_rerender_ok_hand_edit_drift_and_invalid_overlay_error(
         ),
         encoding="utf-8",
     )
-    manager.install(ws, target="all")
+    doctor_manager.install(doctor_ws, target="all")
 
-    reports = manager.doctor(ws)
+    reports = doctor_manager.doctor(doctor_ws)
     agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:agents/")]
     assert agent_lines, "expected claude:agents doctor lines"
     bad = [r for r in agent_lines if not r.startswith("[ok]")]
@@ -596,16 +587,16 @@ def test_doctor_policy_rerender_ok_hand_edit_drift_and_invalid_overlay_error(
     rule_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:rules/")]
     assert rule_lines and all(r.startswith("[ok]") for r in rule_lines), rule_lines[:5]
 
-    target = ws / ".claude" / "agents" / "software-engineer.md"
+    target = doctor_ws / ".claude" / "agents" / "software-engineer.md"
     target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
-    reports2 = manager.doctor(ws)
+    reports2 = doctor_manager.doctor(doctor_ws)
     assert any(
         r.startswith("[drift]") and r.endswith("claude:agents/software-engineer.md")
         for r in reports2
     ), [r for r in reports2 if "software-engineer" in r]
 
-    (states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
-    reports3 = manager.doctor(ws)
+    (doctor_states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
+    reports3 = doctor_manager.doctor(doctor_ws)
     assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports3), [
         r for r in reports3 if "policy" in r
     ]

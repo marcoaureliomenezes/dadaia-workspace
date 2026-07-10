@@ -139,7 +139,9 @@ def test_ctx_url_1_table(
 # ---------------------------------------------------------------------------
 
 
-def test_inv5_detected_fixable_and_fix_removes_stale_repo(tmp_path: Path) -> None:
+def test_inv5_detected_fixable_fix_removes_stale_repo_and_no_issues_returns_empty(
+    tmp_path: Path,
+) -> None:
     ctx = _ctx("stale", state=ContextState.DEAD)
     repo_dir = tmp_path / "repos" / "stale"
     repo_dir.mkdir(parents=True)
@@ -154,10 +156,6 @@ def test_inv5_detected_fixable_and_fix_removes_stale_repo(tmp_path: Path) -> Non
     assert not repo_dir.exists()
     assert any("stale" in a for a in actions)
 
-
-def test_fix_no_issues_returns_empty(tmp_path: Path) -> None:
-    ctx = _ctx("alpha", state=ContextState.ALIVE)
-    (tmp_path / "repos" / "alpha").mkdir(parents=True)
-    svc, _ = _make_doctor(tmp_path, [ctx])
-    actions = svc.fix()
-    assert actions == []
+    # No issues left ⇒ a second fix() pass returns an empty action list.
+    second_actions = svc.fix()
+    assert second_actions == []

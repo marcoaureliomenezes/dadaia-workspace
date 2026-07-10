@@ -114,15 +114,25 @@ def test_push_argv_contract_upstream_vs_explicit_refspec(monkeypatch: pytest.Mon
 
 
 @pytest.mark.parametrize(
-    "bad_url",
-    ["ext::sh -c id", "-oProxyCommand=evil", "--upload-pack=evil"],
+    ("url", "allowed"),
+    [
+        pytest.param("ext::sh -c id", False, id="reject-ext-scheme"),
+        pytest.param("-oProxyCommand=evil", False, id="reject-proxycommand-flag-injection"),
+        pytest.param("--upload-pack=evil", False, id="reject-upload-pack-flag-injection"),
+        pytest.param("https://github.com/o/r.git", True, id="allow-https"),
+        pytest.param("ssh://git@github.com/o/r.git", True, id="allow-ssh-uri"),
+        pytest.param("git@github.com:o/r.git", True, id="allow-ssh-scp-style"),
+        pytest.param("/local/path/repo", True, id="allow-local-path"),
+        pytest.param("file:///srv/repo", True, id="allow-file-scheme"),
+    ],
 )
-def test_clone_rejects_disallowed_url_scheme(
-    bad_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_clone_url_scheme_accept_reject_matrix(
+    url: str, allowed: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """F-05: clone() rejects non-https/ssh transports BEFORE invoking git. This is
-    the ONLY coverage of the hostile-URL transport-injection reject matrix
-    (ext::/ProxyCommand/upload-pack) — never reduce this param list."""
+    """F-05: clone() rejects non-https/ssh transports BEFORE invoking git (the ONLY
+    coverage of the hostile-URL transport-injection reject matrix —
+    ext::/ProxyCommand/upload-pack — never reduce this param list), and allows every
+    legitimate https/ssh/local/file URL through to git."""
     ran = {"called": False}
 
     def _spy(*_a: object, **_k: object) -> subprocess.CompletedProcess[str]:
@@ -131,25 +141,10 @@ def test_clone_rejects_disallowed_url_scheme(
 
     monkeypatch.setattr(git_subprocess, "_run", _spy)
 
-    with pytest.raises(GitCloneError):
-        GitSubprocessClient().clone(bad_url, tmp_path / "dest")
-
-    assert ran["called"] is False, "git must not run for a disallowed URL"
-
-
-@pytest.mark.parametrize(
-    "ok_url",
-    [
-        "https://github.com/o/r.git",
-        "ssh://git@github.com/o/r.git",
-        "git@github.com:o/r.git",
-        "/local/path/repo",
-        "file:///srv/repo",
-    ],
-)
-def test_clone_allows_network_url_schemes(
-    ok_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Allowed https/ssh URLs pass validation and reach git."""
-    monkeypatch.setattr(git_subprocess, "_run", lambda *_a, **_k: _result(0))
-    GitSubprocessClient().clone(ok_url, tmp_path / "dest")  # must not raise
+    if allowed:
+        GitSubprocessClient().clone(url, tmp_path / "dest")  # must not raise
+        assert ran["called"] is True
+    else:
+        with pytest.raises(GitCloneError):
+            GitSubprocessClient().clone(url, tmp_path / "dest")
+        assert ran["called"] is False, "git must not run for a disallowed URL"

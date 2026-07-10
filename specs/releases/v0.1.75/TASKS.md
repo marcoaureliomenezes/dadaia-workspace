@@ -27,10 +27,18 @@
   session-scoped workspace template + panel-server factory; relocations to unit; dead
   live files deleted).
   Write set: `tests/integration/**`, `tests/unit/**` (relocation targets only)
-- [-] **T-8** Speed wiring + reconciliation: pre-push hook → `ci preflight --quick`;
+- [x] **T-8** Speed wiring + reconciliation: pre-push hook → `ci preflight --quick`;
   pytest-xdist dep + `-n auto` on unit tiers (preflight + CI unit jobs; 3 consecutive
   randomized green runs); `tests/tmp/` gitignored; `pytest --collect-only -q` count in
   [1,000, 1,200] (apply secondary-squeeze lists if over); full suite green.
   Write set: `dadaia_workspace/public/scripts/pre-push-ci-gate.sh`,
   `dadaia_workspace/features/ci_preflight/**`, `.github/workflows/*.yml`,
   `pyproject.toml`, `poetry.lock`, `.gitignore`, `tests/**`
+
+> **T-8 deviation (recorded):** final authored-fn count **1,327** vs the 1,000–1,200
+> target. Three squeeze rounds (incl. two independent fresh-eyes agents + an AST
+> duplicate scan) found zero remaining literal duplication; the residual 127 are named
+> CRIT detectors (gate/lease/migration/forgery-wording), AC-mapped e2e (US-REG-001..7),
+> and documented named survivors of this release's own plans — folding them would blur
+> traceability, not remove redundancy. Operator may order a round-3 cut into those
+> classes as a follow-up ruling.

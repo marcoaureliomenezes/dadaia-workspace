@@ -66,20 +66,17 @@ def _valid_ledger_record() -> dict[str, object]:
     }
 
 
-def test_schemas_well_formed_and_do_not_touch_generic_handoff_schema() -> None:
+def test_schemas_well_formed_do_not_touch_generic_handoff_schema_and_valid_envelope() -> None:
     """A21/anti-slop: the new schemas are separate and well-formed; handoff-v1.1 is
-    never mutated ($id separation)."""
+    never mutated ($id separation); a valid envelope validates cleanly."""
     Draft202012Validator.check_schema(_envelope_schema())
     Draft202012Validator.check_schema(_ledger_schema())
     assert _envelope_schema()["$id"] == "workflow-step-payload-v1"
     assert _ledger_schema()["$id"] == "lifecycle-run-workflow-steps-v1"
+    Draft202012Validator(_envelope_schema()).validate(_valid_envelope())
 
 
 # --- envelope validation ----------------------------------------------------------
-
-
-def test_valid_envelope_validates() -> None:
-    Draft202012Validator(_envelope_schema()).validate(_valid_envelope())
 
 
 @pytest.mark.parametrize(
@@ -103,12 +100,6 @@ def test_envelope_rejection_table(name: str, mutate_fn: object) -> None:
 # --- ledger validation ------------------------------------------------------------
 
 
-def test_empty_and_valid_ledger_validate() -> None:
-    # A27: an old record's empty ledger is a valid (empty) array.
-    Draft202012Validator(_ledger_schema()).validate([])
-    Draft202012Validator(_ledger_schema()).validate([_valid_ledger_record()])
-
-
 @pytest.mark.parametrize(
     ("name", "mutate_fn"),
     [
@@ -125,3 +116,9 @@ def test_ledger_rejection_table(name: str, mutate_fn: object) -> None:
     mutate_fn(bad)  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Draft202012Validator(_ledger_schema()).validate([bad])
+
+    if name == "bad_payload_ref":
+        # A27: an old record's empty ledger is a valid (empty) array; a well-formed
+        # record list also validates.
+        Draft202012Validator(_ledger_schema()).validate([])
+        Draft202012Validator(_ledger_schema()).validate([_valid_ledger_record()])

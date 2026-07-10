@@ -76,7 +76,7 @@ def test_create_stores_context_and_rejects_duplicate(
 # ------------------------------------------------------------------ alive (T-10b)
 
 
-def test_alive_clone_behavior_and_state(
+def test_alive_clone_behavior_state_and_not_found(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
@@ -96,17 +96,13 @@ def test_alive_clone_behavior_and_state(
     assert ctx2.state == ContextState.ALIVE
     assert len(git.cloned) == 1
 
+    # No clone at all when the repo dir is already present before the first alive().
+    other_svc = service
+    (workspace_root / "repos" / "other-repo").mkdir(parents=True)
+    other_svc.create("other", "other-repo", "https://github.com/org/other-repo")
+    other_svc.alive("other")
+    assert len(git.cloned) == 1  # unchanged — no new clone for "other"
 
-def test_alive_no_clone_if_repo_already_present(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "my-repo").mkdir(parents=True)
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    assert len(git.cloned) == 0
-
-
-def test_alive_not_found_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
         service.alive("ghost")
 
@@ -114,7 +110,7 @@ def test_alive_not_found_raises(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ dead (T-10b)
 
 
-def test_dead_removes_repo_syncs_dirty_and_pushes(
+def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
     service: SpecContextService, workspace_root: Path, git: FakeGitClient
 ) -> None:
     """AC-T10b-2: dead() sets state=DEAD, dead_since=<now>, syncs the dirty tracked
@@ -135,9 +131,7 @@ def test_dead_removes_repo_syncs_dirty_and_pushes(
     assert repo in git.committed  # tracked-dirty auto-synced (FR-R7)
     assert repo in git.pushed
 
-
-def test_dead_state_error_when_not_alive_and_not_found(service: SpecContextService) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    # Calling dead() again (already DEAD, not ALIVE) is a state error.
     with pytest.raises(ContextStateError):
         service.dead("proj")
 

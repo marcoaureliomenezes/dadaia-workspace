@@ -43,10 +43,8 @@ def test_every_check_argv_carries_its_cache_flag(quick: bool, name: str, flag: s
     argv = _check(name, quick=quick)
     assert flag in argv
 
-
-def test_mypy_cache_dir_points_outside_the_lib_repo() -> None:
-    argv = _check("mypy --strict")
-    idx = argv.index("--cache-dir")
-    cache_dir = Path(argv[idx + 1])
-    repo_root = Path(__file__).resolve().parents[4]
-    assert repo_root not in cache_dir.parents and cache_dir != repo_root
+    if name == "mypy --strict" and not quick:
+        idx = argv.index("--cache-dir")
+        cache_dir = Path(argv[idx + 1])
+        repo_root = Path(__file__).resolve().parents[4]
+        assert repo_root not in cache_dir.parents and cache_dir != repo_root

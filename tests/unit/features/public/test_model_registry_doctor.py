@@ -70,6 +70,18 @@ def test_current_tree_resolves_clean() -> None:
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
 
+    # PRICING_TABLE is no longer imported into model_resolution (audit A3 fix): the
+    # cross-feature `features.public -> features.telemetry.pricing` import was removed,
+    # since PRICING_TABLE is a derived view over core.model_registry (the registry
+    # claude-id set IS the pricing key-set by construction). Pins the symbol is gone
+    # from the module namespace so the old monkeypatch vector cannot silently reappear.
+    import dadaia_workspace.features.public.model_resolution as mod
+
+    assert not hasattr(mod, "PRICING_TABLE"), (
+        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
+        "edge removed in audit A3; the pricing key-set is registry-derived."
+    )
+
 
 # ---------------------------------------------------------------------------
 # Unknown-model / overlay / plugin variants — 1 param matrix
@@ -130,28 +142,3 @@ def test_unknown_model_variants(
     assert any("pack-agent" in line for line in plugin_reports), plugin_reports
 
 
-def test_pricing_keyset_is_registry_derived_not_cross_feature_import(
-    tmp_path: Path,
-) -> None:
-    """PRICING_TABLE is no longer imported into model_resolution (audit A3 fix).
-
-    The cross-feature ``features.public -> features.telemetry.pricing`` import was
-    removed: ``PRICING_TABLE`` is a derived view over ``core.model_registry`` so the
-    registry claude-id set IS the pricing key-set by construction. This test pins that
-    the symbol is gone from the module namespace (so the old monkeypatch vector cannot
-    silently reappear) and that the live tree still resolves clean.
-    """
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    assert not hasattr(mod, "PRICING_TABLE"), (
-        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
-        "edge removed in audit A3; the pricing key-set is registry-derived."
-    )
-
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-
-    reports = check_model_resolution(public_dir)
-
-    assert not _has_error(reports)
-    assert "[ok] model-resolution" in reports

@@ -23,7 +23,7 @@ from dadaia_workspace.core.models.backlog import (
 pytestmark = pytest.mark.unit
 
 
-def test_subject_kind_members_and_valid_construction() -> None:
+def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
     assert {k.value for k in SubjectKind} == {
         "code",
         "api",
@@ -47,8 +47,6 @@ def test_subject_kind_members_and_valid_construction() -> None:
         assert subject.kind is kind
         assert subject.ref == ref
 
-
-def test_intent_is_frozen() -> None:
     intent = Intent(subject=Subject(SubjectKind.INVARIANT, "INV-1"), change="x")
     with pytest.raises(AttributeError):
         intent.change = "y"  # type: ignore[misc]
@@ -57,15 +55,16 @@ def test_intent_is_frozen() -> None:
 # ── code ref validation privacy law — the absolute-path rejection is the CRIT row ──
 
 
-def test_code_ref_rejects_absolute_path() -> None:
-    """PRIVACY: an absolute operator-local path must never bind as a code ref."""
-    with pytest.raises(ValueError, match="module-relative|absolute"):
-        Subject(SubjectKind.CODE, "/home/marco/workspace/foo.py#Bar")
-
-
 @pytest.mark.parametrize(
     ("name", "kind", "ref", "match"),
     [
+        (
+            # PRIVACY: an absolute operator-local path must never bind as a code ref.
+            "rejects_absolute_path",
+            SubjectKind.CODE,
+            "/home/marco/workspace/foo.py#Bar",
+            "module-relative|absolute",
+        ),
         (
             "requires_hash_symbol",
             SubjectKind.CODE,

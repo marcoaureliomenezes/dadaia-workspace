@@ -156,11 +156,13 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
         return exc.code, exc.read()
 
 
-def test_claude_aggregate_envelope_values_top_agent_and_no_auth(
+def test_claude_aggregate_envelope_no_auth_codex_aggregate_and_deleted_detail_route(
     sessions_server: Any,
 ) -> None:
     """Claude aggregate: envelope keys, values, top_agent, no sessions array, default
-    runtime, no-auth (credential-less GET still 200)."""
+    runtime, no-auth (credential-less GET still 200). Plus codex aggregate (cost
+    null/unknown, counts, operator top-agent) + deleted /api/sessions/<runtime>/<id>
+    detail route -> standard 404 (same seeded-fixture server)."""
     base, token, _ = sessions_server
 
     status, body = _get(f"{base}/api/sessions")
@@ -199,12 +201,7 @@ def test_claude_aggregate_envelope_values_top_agent_and_no_auth(
     assert data["runtime"] == "claude"
     assert data["total_sessions"] == _CLAUDE_TOTAL_SESSIONS
 
-
-def test_codex_aggregate_and_deleted_detail_route(sessions_server: Any) -> None:
-    """Codex aggregate (cost null/unknown, counts, operator top-agent) + deleted
-    /api/sessions/<runtime>/<id> detail route -> standard 404."""
-    base, token, _ = sessions_server
-
+    # Codex aggregate (cost null/unknown, counts, operator top-agent).
     status, body = _get(f"{base}/api/sessions?runtime=codex", token=token)
     assert status == 200
     data = json.loads(body)

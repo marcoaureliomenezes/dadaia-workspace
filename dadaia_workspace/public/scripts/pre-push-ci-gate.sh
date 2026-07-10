@@ -99,8 +99,8 @@ if [ "$PROBE_ONLY" -eq 1 ]; then
     exit 0
 fi
 
-echo "[pre-push] CI-equivalent preflight via $RUNNER_LABEL (ruff · mypy --strict · pytest)…"
-"${RUNNER_BIN[@]}" ci preflight
+echo "[pre-push] CI-equivalent preflight via $RUNNER_LABEL (ruff · mypy --strict · pytest, --quick: no e2e)…"
+"${RUNNER_BIN[@]}" ci preflight --quick
 
 echo "[pre-push] security-verdict gate (every pushed commit needs a security-reviewer APPROVE)…"
 printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check

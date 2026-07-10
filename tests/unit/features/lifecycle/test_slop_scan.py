@@ -48,9 +48,7 @@ def test_directory_tree_counts_as_one_entry_with_recursive_size(tmp_path: Path) 
     assert entry.is_dir is True
     assert entry.size_bytes == 400, "recursive size = sum of all contained file bytes"
 
-
-def test_canonical_manifest_derives_from_root_whitelist() -> None:
-    # Drift guard: the metric reads the same source the gate enforces.
+    # Drift guard: the canonical-manifest metric reads the same source the gate enforces.
     assert canonical_root_manifest() == frozenset(root_whitelist._WHITELIST)
 
 

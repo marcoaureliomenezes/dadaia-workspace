@@ -29,19 +29,15 @@ from dadaia_workspace.core.model_registry import REGISTRY
 # ---------------------------------------------------------------------------
 
 
-def test_gpt_only_invariant_no_claude_id_anywhere() -> None:
+def test_gpt_only_invariant_no_claude_id_anywhere_and_every_id_in_allowlist() -> None:
+    """No second drifting table: no catalog id is claude-*, and every catalog id is
+    in the registry-codex|allowlist union."""
+    known = harness_models.known_layer2_model_ids()
     for harness in harness_models.harnesses():
         for option in options_for(harness):
             assert not option.model_id.startswith("claude-"), (
                 f"{harness} catalog leaked a Claude id: {option.model_id}"
             )
-
-
-def test_every_catalog_id_is_in_the_layer2_allowlist() -> None:
-    """No second drifting table: each catalog id is in the registry-codex|allowlist union."""
-    known = harness_models.known_layer2_model_ids()
-    for harness in harness_models.harnesses():
-        for option in options_for(harness):
             assert option.model_id in known, f"{option.model_id} is not in the Layer-2 allowlist"
 
 
@@ -121,22 +117,16 @@ def test_ambiguous_bare_model_id_is_rejected() -> None:
     assert "gpt-5.5:high" in str(exc.value)
     assert "gpt-5.5:medium" in str(exc.value)
 
-
-def test_invalid_model_raises_with_valid_set_listed() -> None:
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc2:
         validate(PI_HARNESS, "gpt-9.9:high")
-    message = str(exc.value)
+    message = str(exc2.value)
     for choice in model_choices(PI_HARNESS):
         assert choice in message
 
-
-def test_validate_for_harness_with_no_catalog_raises() -> None:
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc3:
         validate("fake", "gpt-5.5:high")
-    assert "no discrete model catalog" in str(exc.value)
+    assert "no discrete model catalog" in str(exc3.value)
 
-
-def test_options_for_unknown_harness_is_empty() -> None:
     assert options_for("nonexistent") == ()
 
 

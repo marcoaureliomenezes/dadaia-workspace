@@ -17,6 +17,7 @@ from dadaia_workspace.features.backlog.doctor import (
     Severity,
     run_backlog_doctor,
 )
+from dadaia_workspace.features.spec_artifacts.new_artifacts import backlog_new
 
 pytestmark = pytest.mark.integration
 
@@ -105,11 +106,18 @@ def _plant_stale(specs: Path, src: Path) -> None:
     )
 
 
-def test_clean_tree_matrix_each_violation_flagged_and_stale_noop_without_ledger(
+def test_clean_tree_matrix_each_violation_flagged_stale_noop_and_fresh_stub_status_gate(
     tmp_path: Path,
 ) -> None:
     """One fn: clean-tree zero findings + parametrized BL-SCHEMA/DUP/CONFLICT/STALE
-    planters (each ERRORs) + stale-noop-without-ledger (never a false ERROR, §3.7.6)."""
+    planters (each ERRORs) + stale-noop-without-ledger (never a false ERROR, §3.7.6).
+
+    Plus (own workspace, v0.1.55 FR5): a fresh ``dadaia backlog new`` stub (status:
+    idea, no intents, no catalog.json) is doctor-clean: zero BL-SCHEMA errors. AC-7(e):
+    the SAME stub flipped to ``status: candidate`` FIRES BL-SCHEMA (a candidate
+    carrying no intents is not exempt) — proving the gate is status-gated, not a
+    blanket exemption.
+    """
     specs, src = _build_specs(tmp_path)
     _write_item(specs, "clean-one", _VALID_INTENT_WIDGET)
     _write_item(
@@ -137,3 +145,33 @@ def test_clean_tree_matrix_each_violation_flagged_and_stale_noop_without_ledger(
     _write_item(noop_specs, "live-feature", _VALID_INTENT_WIDGET)
     noop_findings = _run(noop_specs, noop_src)
     assert not any(f.code is BacklogDoctorCode.BL_STALE for f in noop_findings)
+
+    # Fresh-stub status gate: no catalog.json, real backlog_new + real doctor engine.
+    fresh_specs = tmp_path / "fresh-stub-case" / "specs"
+    fresh_specs.mkdir(parents=True)
+    fresh_src = tmp_path / "fresh-stub-case" / "src"
+    fresh_src.mkdir()
+
+    def _run_fresh_doctor() -> list:
+        return run_backlog_doctor(
+            specs_dir=fresh_specs,
+            source_root=fresh_src,
+            catalog_path=fresh_specs / "memory" / "product" / "catalog.json",  # absent
+            alias_map_path=fresh_specs / "no-aliases.txt",  # absent → tolerated
+            archive_root=fresh_specs / "_archive",  # absent → BL-STALE no-op
+            cli_anchors=frozenset(),
+        )
+
+    result = backlog_new(fresh_specs, "my-fresh-idea")
+    assert result.path.is_file()
+
+    fresh_findings = _run_fresh_doctor()
+    fresh_schema = [f for f in fresh_findings if f.code is BacklogDoctorCode.BL_SCHEMA]
+    assert fresh_schema == [], [f.to_dict() for f in fresh_schema]
+
+    text = result.path.read_text(encoding="utf-8")
+    assert "status: idea" in text
+    result.path.write_text(text.replace("status: idea", "status: candidate"), encoding="utf-8")
+
+    fresh_schema2 = [f for f in _run_fresh_doctor() if f.code is BacklogDoctorCode.BL_SCHEMA]
+    assert fresh_schema2, "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"

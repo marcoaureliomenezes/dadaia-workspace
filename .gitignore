@@ -69,6 +69,10 @@ test-results/
 tests/e2e/panel/screenshots/
 img/
 
+# xdist-parallel / scratch test-run artefacts (never commit; README documents the zone)
+tests/tmp/*
+!tests/tmp/README.md
+
 # dadaia fcntl lock files (never commit — runtime only)
 .dadaia/states/.ws_lock
 .dadaia/states/ctx_locks/*.lock

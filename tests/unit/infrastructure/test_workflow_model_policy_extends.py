@@ -158,10 +158,13 @@ def test_extends_validation_matrix(
         assert "extend itself" in message or "cycle" in message
 
 
-def test_extends_default_root_is_valid_and_round_trips_through_save_load(
+def test_extends_default_root_and_no_extends_round_trip_through_save_load(
     tmp_path: Path,
 ) -> None:
-    # A context may extend the 'default' root even when 'default' carries no overrides.
+    """A context may extend the 'default' root even when 'default' carries no
+    overrides, and the extends chain round-trips through save/load. L7: a
+    v0.1.28/29-shaped overlay (no extends key anywhere) parses, resolves, and
+    round-trips byte-identically — to_dict carries no `extends` key."""
     overlay = {
         "schema_version": "workflow-model-policy-v1",
         "policy_id": "default",
@@ -194,11 +197,8 @@ def test_extends_default_root_is_valid_and_round_trips_through_save_load(
     assert loaded.extends == {"child": "default"}
     assert loaded.step_profile("child", "implementation", "implement") == "pi-reasoning-high"
 
-
-def test_no_extends_back_compat_round_trip(tmp_path: Path) -> None:
-    # L7: a v0.1.28/29-shaped overlay (no extends key anywhere) parses, resolves, and
-    # round-trips byte-identically — to_dict carries no `extends` key.
-    overlay = {
+    # L7: no extends key anywhere.
+    no_extends_overlay = {
         "schema_version": "workflow-model-policy-v1",
         "policy_id": "default",
         "contexts": {
@@ -209,17 +209,17 @@ def test_no_extends_back_compat_round_trip(tmp_path: Path) -> None:
             }
         },
     }
-    store = _store(tmp_path)
-    parsed = store.parse(overlay)
-    assert parsed.extends == {}
-    assert parsed.step_profile("default", "implementation", "implement") == (
+    no_extends_store = _store(tmp_path / "no-extends")
+    parsed_ne = no_extends_store.parse(no_extends_overlay)
+    assert parsed_ne.extends == {}
+    assert parsed_ne.step_profile("default", "implementation", "implement") == (
         "codex-implementation-standard"
     )
-    payload = parsed.to_dict()
+    payload = parsed_ne.to_dict()
     assert "extends" not in payload["contexts"]["default"]
     # round-trips through save/load unchanged
-    store.save(parsed)
-    loaded = store.load()
-    assert loaded is not None
-    assert loaded.extends == {}
-    assert loaded.to_dict() == payload
+    no_extends_store.save(parsed_ne)
+    loaded_ne = no_extends_store.load()
+    assert loaded_ne is not None
+    assert loaded_ne.extends == {}
+    assert loaded_ne.to_dict() == payload

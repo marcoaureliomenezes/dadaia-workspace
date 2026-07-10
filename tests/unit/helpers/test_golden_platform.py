@@ -97,13 +97,13 @@ _DCX9_CANON = "[error] codex hook wrapper probe failed .dadaia/hooks/pre_gate.sh
 )
 def test_canon_env_line_table(name: str, raw: str, expected: str) -> None:
     assert canon_env_line(raw) == expected
-
-
-def test_canon_env_line_both_os_phrasings_converge() -> None:
-    """The two OS phrasings of the SAME probe failure become one canonical line."""
-    linux = "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: exited 127 (D-CX-9)"
-    windows = "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: [WinError 193] (D-CX-9)"
-    assert canon_env_line(linux) == canon_env_line(windows) == _DCX9_CANON
+    if name == "linux_phrasing":
+        # The two OS phrasings of the SAME probe failure become one canonical line.
+        windows = (
+            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: "
+            "[WinError 193] %1 is not a valid Win32 application (D-CX-9)"
+        )
+        assert canon_env_line(raw) == canon_env_line(windows) == _DCX9_CANON
 
 
 # ---------------------------------------------------------------------------
@@ -232,9 +232,6 @@ def test_norm_stderr_collapses_rich_box_wrapped_output() -> None:
     assert "No such option: --model" in out
     assert "\x1b[" not in out
     assert "│" not in out and "╭" not in out
-
-
-def test_norm_stderr_default_and_wide_glyphs_variants() -> None:
     # The 7-site variant: box chars → space, ``\s+`` → single space (no strip).
     assert norm_stderr("│ a  b │") == " a b "
     # The policy-CLI variant: wide glyph range incl. smart quotes, stripped.

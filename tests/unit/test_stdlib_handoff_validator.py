@@ -111,18 +111,14 @@ def test_validation_rejection_table(name: str, doc_fn: object, expect_field_frag
         expect_field_fragment in e.field_path or expect_field_fragment in e.message for e in errors
     )
 
-
-def test_error_message_includes_field_path() -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
-    doc = {**_MINIMAL_VALID, "agent": 999}
-    errors = list(validator.validate(doc))
-    assert errors, "expected at least one error"
-    for error in errors:
-        if "agent" in error.field_path:
-            assert re.search(r"agent", str(error))
-            break
-    else:
-        pytest.fail("No error about 'agent' field_path found")
+    if name == "wrong_type_agent":
+        # The error message includes the field path (not just a bare code).
+        for error in errors:
+            if "agent" in error.field_path:
+                assert re.search(r"agent", str(error))
+                break
+        else:
+            pytest.fail("No error about 'agent' field_path found")
 
 
 def test_schema_load_failures_raise_handoff_schema_error(tmp_path: Path) -> None:
@@ -180,26 +176,25 @@ def test_verdict_field_table(name: str, doc_fn: object, expect_valid: bool) -> N
         assert len(errors) >= 1
         assert any("verdict" in e.field_path for e in errors)
 
-
-def test_stdlib_validator_accepts_v1_1_sidecar_with_verdict() -> None:
-    """AC-4.3 — StdlibHandoffValidator exits cleanly (no errors) on a v1.1 sidecar
-    containing verdict: 'APPROVED', mirroring what dadaia reports validate does."""
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
-    sidecar: dict[str, object] = {
-        "schema_version": "handoff-v1.1",
-        "agent": "qa-engineer",
-        "context": "dadaia-workspace",
-        "produced_at": "2026-05-31T10:00:00Z",
-        "scope": "dadaia-workspace/panel-kanban-v1",
-        "metrics": {"tests_run": 5, "tests_passed": 5},
-        "artifact": {
-            "type": "report",
-            "content_hash": "a" * 64,
-        },
-        "verdict": "APPROVED",
-        "verdict_reason": "All Playwright board scenarios passed.",
-    }
-    errors = list(validator.validate(sidecar))
-    assert errors == [], (
-        f"Expected no validation errors on v1.1 sidecar with verdict=APPROVED; got: {errors}"
-    )
+    if name == "verdict_approved":
+        # AC-4.3 — StdlibHandoffValidator exits cleanly (no errors) on a v1.1 sidecar
+        # containing verdict: 'APPROVED', mirroring what dadaia reports validate does.
+        sidecar: dict[str, object] = {
+            "schema_version": "handoff-v1.1",
+            "agent": "qa-engineer",
+            "context": "dadaia-workspace",
+            "produced_at": "2026-05-31T10:00:00Z",
+            "scope": "dadaia-workspace/panel-kanban-v1",
+            "metrics": {"tests_run": 5, "tests_passed": 5},
+            "artifact": {
+                "type": "report",
+                "content_hash": "a" * 64,
+            },
+            "verdict": "APPROVED",
+            "verdict_reason": "All Playwright board scenarios passed.",
+        }
+        sidecar_errors = list(validator.validate(sidecar))
+        assert sidecar_errors == [], (
+            f"Expected no validation errors on v1.1 sidecar with verdict=APPROVED; "
+            f"got: {sidecar_errors}"
+        )

@@ -146,16 +146,15 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
         f"expected >50% reduction; before={before}B after={after}B ratio={after / before:.3f}"
     )
 
-
-def test_catalog_on_disk_unchanged_self_pull_depth_intact(tmp_path: Path) -> None:
-    ws = _ws_with_catalog(tmp_path)
+    # catalog.json on disk must stay byte-identical (self-pull depth intact) across a
+    # SEPARATE inject run — the digest is a projection, never a rewrite of the source.
     catalog_path = ws / "repos" / "ctx" / "specs" / "memory" / "product" / "catalog.json"
-    before = catalog_path.read_bytes()
+    on_disk_before = catalog_path.read_bytes()
     _run(tmp_path, "dig3")
-    after = catalog_path.read_bytes()
-    assert before == after, "catalog.json on disk must stay byte-identical"
+    on_disk_after = catalog_path.read_bytes()
+    assert on_disk_before == on_disk_after, "catalog.json on disk must stay byte-identical"
     # The full summary must still be present on disk (self-pull depth intact).
-    on_disk = json.loads(after.decode("utf-8"))
+    on_disk = json.loads(on_disk_after.decode("utf-8"))
     assert "summary" in on_disk["features"][0]
 
 

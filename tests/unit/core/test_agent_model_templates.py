@@ -156,9 +156,10 @@ def test_assert_templates_resolve_rejects_malformed(
     with pytest.raises(ValueError, match=match):
         _assert_templates_resolve(build_fn())  # type: ignore[operator]
 
-
-def test_live_built_in_passes_the_assert() -> None:
-    _assert_templates_resolve(_BUILT_IN)  # must not raise
+    if name == "duplicate_template_id":
+        # Companion positive proof: the live built-in roster passes the same
+        # assert cleanly (must not raise).
+        _assert_templates_resolve(_BUILT_IN)
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +263,18 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             "claude-sonnet-5",
             ("claude-sonnet-5", "medium", "override"),
         ),
+        (
+            # AC-3: an unrelated agent keeps the applied template when only ONE
+            # other agent in the overlay is overridden.
+            "ac3_other_agents_keep_applied_template_when_only_one_overridden",
+            "qa-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template="subscription-saver",
+                overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
+            ),
+            None,
+            ("claude-sonnet-5", "high", "template"),
+        ),
     ],
 )
 def test_resolve_agent_model_precedence_table(
@@ -274,15 +287,6 @@ def test_resolve_agent_model_precedence_table(
     overlay = overlay_fn()  # type: ignore[operator]
     resolved = resolve_agent_model(agent, overlay, pack_default=pack_default)
     assert (resolved.model, resolved.effort, resolved.source) == expected
-
-
-def test_ac3_other_agents_keep_applied_template_when_only_one_overridden() -> None:
-    overlay = AgentModelPolicyOverlay(
-        applied_template="subscription-saver",
-        overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
-    )
-    other = resolve_agent_model("qa-engineer", overlay)
-    assert (other.model, other.effort, other.source) == ("claude-sonnet-5", "high", "template")
 
 
 @pytest.mark.parametrize(

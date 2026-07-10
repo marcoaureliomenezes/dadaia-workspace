@@ -221,12 +221,6 @@ _NONE_CASES = (
 )
 
 
-@pytest.mark.parametrize("body", [c[1] for c in _NONE_CASES], ids=[c[0] for c in _NONE_CASES])
-def test_none_and_non_path_token_yields_empty(tmp_path: Path, body: str) -> None:
-    _write_tasks(tmp_path, body)
-    assert write_scope_from_tasks(tmp_path, _RELEASE) == ()
-
-
 # --- ③ never-guess param: zero/multiple reserved x internal/consumer grammar (4 cases) --
 
 _NEVER_GUESS_CASES = (
@@ -293,8 +287,11 @@ _NEVER_GUESS_CASES = (
 )
 
 
+_EMPTY_RESULT_CASES = _NONE_CASES + _NEVER_GUESS_CASES
+
+
 @pytest.mark.parametrize(
-    "body", [c[1] for c in _NEVER_GUESS_CASES], ids=[c[0] for c in _NEVER_GUESS_CASES]
+    "body", [c[1] for c in _EMPTY_RESULT_CASES], ids=[c[0] for c in _EMPTY_RESULT_CASES]
 )
 def test_never_guess_matrix(tmp_path: Path, body: str) -> None:
     _write_tasks(tmp_path, body)

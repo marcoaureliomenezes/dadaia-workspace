@@ -46,17 +46,15 @@ def test_register_conflict_raises_port_conflict_error() -> None:
         svc.register(port=3000, project="my-frontend-wave6")
 
 
-def test_register_saves_entry_with_url_default() -> None:
-    store = FakeServerRegistryStore()
-    svc = _svc(store)
-    svc.register(port=3000, project="my-frontend")
-    entry = store.get(3000)
-    assert entry is not None
-    assert entry.project == "my-frontend"
-    assert entry.url == "http://localhost:3000"
+def test_register_saves_entry_idempotent_stale_and_ttl_expired_overwrite() -> None:
+    default_store = FakeServerRegistryStore()
+    default_svc = _svc(default_store)
+    default_svc.register(port=3000, project="my-frontend")
+    default_entry = default_store.get(3000)
+    assert default_entry is not None
+    assert default_entry.project == "my-frontend"
+    assert default_entry.url == "http://localhost:3000"
 
-
-def test_register_idempotent_stale_and_ttl_expired_overwrite() -> None:
     # Same project, same port ⇒ idempotent no-op.
     idem_store = FakeServerRegistryStore()
     idem_probe = FakeProcessProbe()
@@ -93,7 +91,7 @@ def test_register_idempotent_stale_and_ttl_expired_overwrite() -> None:
 # ------------------------------------------------------------------ release
 
 
-def test_release_removes_and_release_all_for_project() -> None:
+def test_release_removes_release_all_and_raises_on_wrong_project_or_missing_port() -> None:
     store = FakeServerRegistryStore()
     store.save(_entry(3000, "my-frontend"))
     svc = _svc(store)
@@ -110,13 +108,11 @@ def test_release_removes_and_release_all_for_project() -> None:
     assert all_store.get(3001) is None
     assert all_store.get(3002) is not None
 
-
-def test_release_wrong_project_and_nonexistent_port_raise() -> None:
-    store = FakeServerRegistryStore()
-    store.save(_entry(3000, "my-frontend"))
-    svc = _svc(store)
+    wrong_store = FakeServerRegistryStore()
+    wrong_store.save(_entry(3000, "my-frontend"))
+    wrong_svc = _svc(wrong_store)
     with pytest.raises(PortConflictError, match="my-frontend"):
-        svc.release(port=3000, project="my-frontend-wave6")
+        wrong_svc.release(port=3000, project="my-frontend-wave6")
 
     empty_svc = _svc()
     with pytest.raises(PortNotRegisteredError):

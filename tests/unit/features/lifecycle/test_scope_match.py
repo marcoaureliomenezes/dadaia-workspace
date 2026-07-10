@@ -13,7 +13,7 @@ from dadaia_workspace.core.scope_match import (
 )
 
 
-def test_matches_path_glob_forms_and_scope_allowed_rules() -> None:
+def test_matches_path_glob_forms_scope_rules_and_forbidden_wins() -> None:
     assert matches_path("foo/bar/baz.txt", "foo/**") is True
     assert matches_path("foo", "foo/**") is True
     assert matches_path("foo/bar.txt", "foo/*") is True
@@ -26,8 +26,6 @@ def test_matches_path_glob_forms_and_scope_allowed_rules() -> None:
     # No allowed patterns declared → only forbidden constrains.
     assert is_in_scope("z/b", allowed=(), forbidden=("q/**",)) is True
 
-
-def test_forbidden_wins_and_out_of_scope_paths_filter() -> None:
     assert (
         is_in_scope(
             "repos/x/secrets.py", allowed=("repos/x/**",), forbidden=("repos/x/secrets.py",)

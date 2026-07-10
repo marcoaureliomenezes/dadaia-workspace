@@ -93,41 +93,39 @@ def _make_ctx(name: str, repo_slug: str = "test-repo") -> object:
     )
 
 
-def test_json_context_store_roundtrips_non_ascii_and_valid_utf8(tmp_path: Path) -> None:
+def test_json_stores_roundtrip_non_ascii_and_valid_utf8(tmp_path: Path) -> None:
+    """JsonContextStore and JsonServerRegistryStore both round-trip non-ASCII data
+    (names/paths) correctly and the on-disk file is valid UTF-8."""
     from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
-    states_dir = tmp_path / "states"
-    states_dir.mkdir()
-    store = JsonContextStore(states_dir)
+    ctx_states_dir = tmp_path / "ctx-states"
+    ctx_states_dir.mkdir()
+    ctx_store = JsonContextStore(ctx_states_dir)
 
     name = "projet-café"
-    store.save(_make_ctx(name))
-    store.save(_make_ctx("日本語テスト", repo_slug="jp-repo"))
+    ctx_store.save(_make_ctx(name))
+    ctx_store.save(_make_ctx("日本語テスト", repo_slug="jp-repo"))
 
-    contexts = store.list_all()
+    contexts = ctx_store.list_all()
     assert any(c.name == name for c in contexts), "Context name should survive round-trip"
     assert any(c.name == "日本語テスト" for c in contexts)
 
-    state_file = states_dir / "spec_contexts.json"
-    raw = state_file.read_bytes()
-    decoded = raw.decode("utf-8")  # must not raise
-    data = json.loads(decoded)
-    assert "contexts" in data
+    ctx_state_file = ctx_states_dir / "spec_contexts.json"
+    ctx_raw = ctx_state_file.read_bytes()
+    ctx_decoded = ctx_raw.decode("utf-8")  # must not raise
+    ctx_data = json.loads(ctx_decoded)
+    assert "contexts" in ctx_data
 
-
-def test_json_server_registry_store_roundtrips_non_ascii_and_valid_utf8(
-    tmp_path: Path,
-) -> None:
     from dadaia_workspace.core.models.server_registry import PortEntry
     from dadaia_workspace.infrastructure.json_server_registry_store import (
         JsonServerRegistryStore,
     )
 
-    states_dir = tmp_path / "states"
-    states_dir.mkdir()
-    store = JsonServerRegistryStore(states_dir)
+    registry_states_dir = tmp_path / "registry-states"
+    registry_states_dir.mkdir()
+    registry_store = JsonServerRegistryStore(registry_states_dir)
 
-    store.save(
+    registry_store.save(
         PortEntry(
             port=3100,
             project="café-résumé-テスト",
@@ -136,7 +134,7 @@ def test_json_server_registry_store_roundtrips_non_ascii_and_valid_utf8(
             url="http://localhost:3100",
         )
     )
-    store.save(
+    registry_store.save(
         PortEntry(
             port=3200,
             project="日本語プロジェクト",
@@ -146,10 +144,10 @@ def test_json_server_registry_store_roundtrips_non_ascii_and_valid_utf8(
         )
     )
 
-    all_entries = store.list_all()
+    all_entries = registry_store.list_all()
     assert any(e.project == "café-résumé-テスト" for e in all_entries)
     assert any(e.project == "日本語プロジェクト" for e in all_entries)
 
-    state_file = states_dir / "server_registry.json"
-    raw = state_file.read_bytes()
-    raw.decode("utf-8")  # must not raise — verifies UTF-8 encoding on disk
+    registry_state_file = registry_states_dir / "server_registry.json"
+    registry_raw = registry_state_file.read_bytes()
+    registry_raw.decode("utf-8")  # must not raise — verifies UTF-8 encoding on disk

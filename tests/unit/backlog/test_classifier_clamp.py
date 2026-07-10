@@ -33,11 +33,6 @@ def _classify_one(downgrade) -> Verdict:  # type: ignore[no-untyped-def]
     return results[0].verdict
 
 
-def test_no_downgrade_default_stays_divergent() -> None:
-    """The default offline seam (returns None) leaves the differing pair DIVERGENT_CONFLICT."""
-    assert _classify_one(no_downgrade) is Verdict.DIVERGENT_CONFLICT
-
-
 @pytest.mark.parametrize("allowed", [Verdict.OVERLAP, Verdict.SUPERSEDES, Verdict.DEPENDS_ON])
 def test_allowed_downgrade_verdicts_are_applied(allowed: Verdict) -> None:
     """OVERLAP / SUPERSEDES / DEPENDS_ON each downgrade the pair correctly."""
@@ -56,6 +51,11 @@ def test_allowed_downgrade_verdicts_are_applied(allowed: Verdict) -> None:
 def test_conflict_masking_verdicts_are_rejected(masking: Verdict | None) -> None:
     """UNRELATED / DUPLICATE / DIVERGENT_CONFLICT / None can never erase the conflict."""
     assert _classify_one(lambda _n, _e: masking) is Verdict.DIVERGENT_CONFLICT
+
+    if masking is None:
+        # The default offline seam (no_downgrade, returns None) is the production
+        # instance of this same None-masking branch — pin it directly too.
+        assert _classify_one(no_downgrade) is Verdict.DIVERGENT_CONFLICT
 
 
 @pytest.mark.parametrize("garbage", ["unrelated-typo", "merge?", "OVERLAP ", "", "garbage"])

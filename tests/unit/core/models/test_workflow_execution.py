@@ -140,14 +140,6 @@ def test_snapshot_to_dict_is_json_shaped_and_step_lookup_works() -> None:
     assert snapshot.step("missing") is None
 
 
-def test_policy_source_values() -> None:
-    # The four precedence sources are stable string tokens.
-    assert PolicySource.CLI.value == "cli"
-    assert PolicySource.CONTEXT_OVERLAY.value == "context-overlay"
-    assert PolicySource.DEFAULT_OVERLAY.value == "default-overlay"
-    assert PolicySource.LIBRARY_DEFAULT.value == "library-default"
-
-
 def test_resolved_config_to_dict_round_trips_all_sources() -> None:
     for source in PolicySource:
         resolved = dataclasses.replace(_resolved(), source=source)

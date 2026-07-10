@@ -197,14 +197,20 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
 # ---------------------------------------------------------------------------
 
 
-def test_select_lock_adapter_returns_posix_when_has_fcntl(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With has_fcntl=True, _select_lock_adapter() returns the POSIX adapter module.
+def test_select_lock_adapter_returns_posix_and_windows_by_has_fcntl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_select_lock_adapter() routes by PLATFORM.has_fcntl: POSIX adapter when True,
+    Windows adapter when False.
 
-    Monkeypatches PLATFORM so the test is platform-neutral (runs on Linux).
-    Does NOT use importorskip — this test exercises the selection logic directly.
+    Monkeypatches PLATFORM so the test is platform-neutral (runs on Linux). Does NOT
+    use importorskip for the POSIX leg — it exercises the selection logic directly.
     """
+    import importlib.util
+
     from dadaia_workspace.core.platform import Capabilities
 
+    # --- has_fcntl=True -> POSIX adapter ---
     # The POSIX adapter module imports fcntl at module load; on Windows it cannot
     # be imported at all, so selecting it is meaningless there — skip.
     pytest.importorskip("fcntl")
@@ -224,20 +230,10 @@ def test_select_lock_adapter_returns_posix_when_has_fcntl(monkeypatch: pytest.Mo
         "Container must route to POSIX adapter when PLATFORM.has_fcntl is True."
     )
 
-
-def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """With has_fcntl=False, _select_lock_adapter() returns the Windows adapter module.
-
-    Monkeypatches PLATFORM to simulate Windows capabilities, and injects a fake
-    'dadaia_workspace.infrastructure.file_lock_windows' module into sys.modules to
-    prevent the module-level Windows platform guard from raising on Linux.
-    """
-    import importlib.util
-
-    from dadaia_workspace.core.platform import Capabilities
-
+    # --- has_fcntl=False -> Windows adapter ---
+    # Injects a fake 'dadaia_workspace.infrastructure.file_lock_windows' module into
+    # sys.modules to prevent the module-level Windows platform guard from raising on
+    # Linux.
     win_caps = Capabilities.detect("win32")
     assert win_caps.has_fcntl is False  # pre-condition
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", win_caps)
@@ -248,9 +244,9 @@ def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
         # Real Windows runner: the Windows adapter imports cleanly (no module-level
         # guard fires), so assert the genuinely-selected module by name. Avoids the
         # fake-vs-real identity fragility of sys.modules injection on Windows.
-        adapter = container._select_lock_adapter()
-        assert adapter.__name__ == module_key, (
-            f"Expected {module_key} adapter, got {adapter!r}. "
+        win_adapter = container._select_lock_adapter()
+        assert win_adapter.__name__ == module_key, (
+            f"Expected {module_key} adapter, got {win_adapter!r}. "
             "Container must route to the Windows adapter when has_fcntl is False."
         )
     else:
@@ -261,9 +257,9 @@ def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
         original = sys.modules.pop(module_key, None)
         sys.modules[module_key] = _fake_windows_mod
         try:
-            adapter = container._select_lock_adapter()
-            assert adapter is _fake_windows_mod, (
-                f"Expected file_lock_windows adapter, got {adapter!r}. "
+            win_adapter = container._select_lock_adapter()
+            assert win_adapter is _fake_windows_mod, (
+                f"Expected file_lock_windows adapter, got {win_adapter!r}. "
                 "Container must route to Windows adapter when PLATFORM.has_fcntl is False."
             )
         finally:
@@ -277,7 +273,7 @@ def test_select_lock_adapter_returns_windows_when_not_has_fcntl(
 # ---------------------------------------------------------------------------
 
 
-def test_build_workflow_model_profile_registry_returns_catalog() -> None:
+def test_build_workflow_model_profile_registry_catalog_and_policy_store(tmp_path: Path) -> None:
     catalog = container.build_workflow_model_profile_registry()
     impl = catalog.workflow("implementation")
     assert impl is not None
@@ -288,8 +284,6 @@ def test_build_workflow_model_profile_registry_returns_catalog() -> None:
         "review_code",
     ]
 
-
-def test_build_workflow_model_policy_store_guard_and_canonical_path(tmp_path: Path) -> None:
     with pytest.raises(WorkspaceNotInitializedError):
         container.build_workflow_model_policy_store(tmp_path)
 
@@ -328,17 +322,17 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
     assert overlay_impl is not None
     assert overlay_impl.model_profile == "codex-review-deep"
 
-
-def test_build_workflow_policy_resolver_invalid_overlay_raises(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    bad = tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
+    # An invalid (unparseable) overlay file raises rather than silently degrading.
+    bad_ws = tmp_path.parent / (tmp_path.name + "-bad-overlay")
+    _init_states(bad_ws)
+    bad = bad_ws / ".dadaia" / "states" / "workflow_model_policy.json"
     bad.write_text("{ not valid json", encoding="utf-8")
     from dadaia_workspace.core.models.workflow_execution import (
         WorkflowModelPolicyStoreError,
     )
 
     with pytest.raises(WorkflowModelPolicyStoreError):
-        container.build_workflow_policy_resolver(tmp_path)
+        container.build_workflow_policy_resolver(bad_ws)
 
 
 def test_build_lifecycle_pipeline_accepts_policy_snapshot(tmp_path: Path) -> None:

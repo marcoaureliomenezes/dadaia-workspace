@@ -60,8 +60,14 @@ def test_root1_block_table(tmp_path: Path, name: str, setup_fn: object) -> None:
     _init_workspace(tmp_path)
     setup_fn(tmp_path)  # type: ignore[operator]
     svc = _make_doctor(tmp_path)
-    codes = {i.code for i in svc.check()}
+    issues = svc.check()
+    codes = {i.code for i in issues}
     assert "ROOT-1" in codes
+    if name == "stray_file":
+        # ROOT-1 issues are not auto-fixable (requires human relocation).
+        root1_issues = [i for i in issues if i.code == "ROOT-1"]
+        assert len(root1_issues) == 1
+        assert root1_issues[0].fixable is False
 
 
 @pytest.mark.parametrize(
@@ -102,16 +108,6 @@ def test_root1_allow_table(tmp_path: Path, name: str, setup_fn: object) -> None:
     svc = _make_doctor(tmp_path)
     codes = {i.code for i in svc.check()}
     assert "ROOT-1" not in codes
-
-
-def test_root1_is_not_fixable(tmp_path: Path) -> None:
-    """ROOT-1 issues are not auto-fixable (requires human relocation)."""
-    _init_workspace(tmp_path)
-    (tmp_path / "some_stray.py").write_text("x = 1")
-    svc = _make_doctor(tmp_path)
-    root1_issues = [i for i in svc.check() if i.code == "ROOT-1"]
-    assert len(root1_issues) == 1
-    assert root1_issues[0].fixable is False
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +240,9 @@ def test_root4_allow_table(tmp_path: Path, name: str, setup_fn: object) -> None:
     assert "ROOT-4" not in codes
 
 
-def test_root4_unknown_subdir_flags_and_is_not_fixable(tmp_path: Path) -> None:
+def test_root4_unknown_subdir_flags_not_fixable_and_absent_dadaia_dir_no_root4(
+    tmp_path: Path,
+) -> None:
     _init_workspace(tmp_path)
     (tmp_path / ".dadaia" / "mystery-tool-output").mkdir()
     svc = _make_doctor(tmp_path)
@@ -252,12 +250,9 @@ def test_root4_unknown_subdir_flags_and_is_not_fixable(tmp_path: Path) -> None:
     assert len(root4_issues) == 1
     assert root4_issues[0].fixable is False
 
-
-def test_no_dadaia_dir_no_root4(tmp_path: Path) -> None:
-    """If .dadaia/ is absent, ROOT-4 is not triggered."""
-    # Minimal workspace without .dadaia existing (pathological but defensive)
+    # If .dadaia/ is absent entirely, ROOT-4 is not triggered (pathological but defensive).
     ctx_store = FakeContextStore()
     git_client = FakeGitClient()
-    svc = DoctorService(ctx_store, git_client, tmp_path)
-    issues = svc._check_root_4()
+    absent_svc = DoctorService(ctx_store, git_client, tmp_path.parent / (tmp_path.name + "-bare"))
+    issues = absent_svc._check_root_4()
     assert issues == []

@@ -19,30 +19,11 @@ from dadaia_workspace.infrastructure.runtime_files import (
 )
 
 
-def test_write_step_payload_is_immutable(tmp_path: Path) -> None:
-    """Run-ledger immutability is an audit-trail invariant — keep verbatim."""
-    adapter = FilesystemRuntimeFileAdapter(tmp_path)
-    adapter.write_step_payload(run_id="run-1", producer_step="qa", attempt=1, content='{"a": 1}\n')
-    with pytest.raises(RuntimeFilePathError):
-        adapter.write_step_payload(
-            run_id="run-1", producer_step="qa", attempt=1, content='{"a": 2}\n'
-        )
-
-
-def test_read_step_payload_outside_zone_returns_none(tmp_path: Path) -> None:
-    """Confinement: reads never escape the run zone via traversal or absolute paths."""
-    adapter = FilesystemRuntimeFileAdapter(tmp_path)
-    (tmp_path / ".dadaia" / "handoff").mkdir(parents=True, exist_ok=True)
-    sneaky = tmp_path / ".dadaia" / "handoff" / "x.json"
-    sneaky.write_text("secret", encoding="utf-8")
-    assert adapter.read_step_payload(".dadaia/handoff/x.json") is None
-    assert adapter.read_step_payload("/etc/passwd") is None
-    assert adapter.read_step_payload("../../../etc/passwd") is None
-
-
 @pytest.mark.parametrize(
     "case",
     [
+        "is-immutable",
+        "read-outside-zone-returns-none",
         "lands-under-workspace-root-runs-zone",
         "distinguishes-attempts",
         "rejects-negative-attempt",
@@ -55,7 +36,26 @@ def test_read_step_payload_outside_zone_returns_none(tmp_path: Path) -> None:
 def test_write_step_payload_and_read_matrix(tmp_path: Path, case: str) -> None:
     adapter = FilesystemRuntimeFileAdapter(tmp_path)
 
-    if case == "lands-under-workspace-root-runs-zone":
+    if case == "is-immutable":
+        """Run-ledger immutability is an audit-trail invariant — keep verbatim."""
+        adapter.write_step_payload(
+            run_id="run-1", producer_step="qa", attempt=1, content='{"a": 1}\n'
+        )
+        with pytest.raises(RuntimeFilePathError):
+            adapter.write_step_payload(
+                run_id="run-1", producer_step="qa", attempt=1, content='{"a": 2}\n'
+            )
+
+    elif case == "read-outside-zone-returns-none":
+        """Confinement: reads never escape the run zone via traversal or absolute paths."""
+        (tmp_path / ".dadaia" / "handoff").mkdir(parents=True, exist_ok=True)
+        sneaky = tmp_path / ".dadaia" / "handoff" / "x.json"
+        sneaky.write_text("secret", encoding="utf-8")
+        assert adapter.read_step_payload(".dadaia/handoff/x.json") is None
+        assert adapter.read_step_payload("/etc/passwd") is None
+        assert adapter.read_step_payload("../../../etc/passwd") is None
+
+    elif case == "lands-under-workspace-root-runs-zone":
         ref = adapter.write_step_payload(
             run_id="run-1", producer_step="release_scope", attempt=0, content='{"k": 1}\n'
         )

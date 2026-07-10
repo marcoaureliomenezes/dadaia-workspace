@@ -55,7 +55,7 @@ def _resolved(bug_id: str, *, ts: str = "2026-07-01T14:00:00Z") -> BugEvent:
 # ---------------------------------------------------------------------------
 
 
-def test_redact_text_masks_home_and_ip() -> None:
+def test_redact_text_masks_home_and_ip_leaves_version_tokens_untouched() -> None:
     raw = "failed at /home/marco/workspace/x connecting to 10.1.2.3 and /Users/jane/notes"
     out = redact_text(raw)
     assert "marco" not in out
@@ -64,9 +64,7 @@ def test_redact_text_masks_home_and_ip() -> None:
     assert "/home/[REDACTED]" in out
     assert "/Users/[REDACTED]" in out
     assert "[REDACTED-IP]" in out
-
-
-def test_redact_leaves_version_tokens_untouched() -> None:
+    # False-positive guard: version tokens must never be mistaken for a path/IP.
     assert redact_text("shipped in v0.1.46 build 1.2.3") == "shipped in v0.1.46 build 1.2.3"
 
 
@@ -195,7 +193,9 @@ def test_status_stats_and_archived_fold_coherently(tmp_path: Path) -> None:
     svc.append_event(_resolved("closed-1"))
     svc.append_event(_reported("archived-then-resolved", severity="HIGH"))
     svc.append_event(_resolved("archived-then-resolved"))
-    svc.append_event(BugEvent("archived-then-resolved", "archived", "2026-07-01T16:00:00Z", "auditor"))
+    svc.append_event(
+        BugEvent("archived-then-resolved", "archived", "2026-07-01T16:00:00Z", "auditor")
+    )
 
     open_bugs = svc.status()
     assert {s.bug_id for s in open_bugs} == {"open-1"}

@@ -29,7 +29,12 @@ def _init_workspace(workspace: Path) -> None:
     FileSystemPublicAssetManager().stage(workspace)
 
 
-def test_orchestrate_list_and_show_json(tmp_path: Path, monkeypatch) -> None:
+def test_orchestrate_list_show_json_removed_verbs_and_uninitialized_workspace_errors(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """list/show --json contract (AC-2). Plus: the retired run/status/resume honest-no-op
+    verbs error out (AC-2); an unknown workflow name errors; list on an uninitialized
+    workspace errors."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -47,25 +52,15 @@ def test_orchestrate_list_and_show_json(tmp_path: Path, monkeypatch) -> None:
     # The gate kind is preserved (never collapsed to a boolean) — AC-2.
     assert all("gate" in stage for stage in data["stages"])
 
-
-def test_orchestrate_removed_verbs_error_and_uninitialized_workspace_errors(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """The retired run/status/resume honest-no-op verbs error out (AC-2); an unknown
-    workflow name errors; list on an uninitialized workspace errors."""
-    initialized_ws = tmp_path / "initialized"
-    _init_workspace(initialized_ws)
-    monkeypatch.chdir(initialized_ws)
-
     unknown_result = _runner.invoke(app, ["orchestrate", "show", "no-such-workflow", "--json"])
     assert unknown_result.exit_code == 2
 
     run_result = _runner.invoke(app, ["orchestrate", "run", "audit-fanout"])
     assert run_result.exit_code != 0
 
-    # Sibling (not nested) root so upward .dadaia resolution from `initialized_ws`
-    # never interferes.
-    uninitialized_ws = tmp_path / "uninitialized"
+    # Genuinely separate root (not nested under `tmp_path`) so upward .dadaia resolution
+    # never finds the initialized tree.
+    uninitialized_ws = tmp_path.parent / (tmp_path.name + "-uninitialized")
     uninitialized_ws.mkdir()
     monkeypatch.chdir(uninitialized_ws)
     uninitialized_result = _runner.invoke(app, ["orchestrate", "list"])

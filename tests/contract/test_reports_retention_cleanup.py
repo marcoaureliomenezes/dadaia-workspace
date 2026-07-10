@@ -23,28 +23,27 @@ def _old_report(tmp_path: Path, rel: str = "ctx/qa/old.html") -> Path:
     return report
 
 
-def test_cleanup_contract_does_not_delete_external_symlink_target(tmp_path: Path) -> None:
+def test_cleanup_contract_symlink_safety_and_malformed_sidecar_deletion(
+    tmp_path: Path,
+) -> None:
     external = tmp_path / "external.html"
     external.write_text("<html>external</html>", encoding="utf-8")
     link = tmp_path / ".dadaia" / "reports" / "ctx" / "qa" / "old.html"
     link.parent.mkdir(parents=True)
     os.symlink(external, link)
 
-    result = _service(tmp_path).cleanup()
+    symlink_result = _service(tmp_path).cleanup()
 
-    assert result.candidates == ()
-    assert result.deleted_paths == ()
+    assert symlink_result.candidates == ()
+    assert symlink_result.deleted_paths == ()
     assert external.exists()
 
-
-def test_cleanup_contract_deletes_malformed_adjacent_sidecar_with_report(
-    tmp_path: Path,
-) -> None:
-    report = _old_report(tmp_path)
+    sidecar_ws = tmp_path.parent / (tmp_path.name + "-sidecar")
+    report = _old_report(sidecar_ws)
     sidecar = report.with_name("old.handoff.json")
     sidecar.write_text("{not json", encoding="utf-8")
 
-    result = _service(tmp_path).cleanup()
+    result = _service(sidecar_ws).cleanup()
 
     assert report in result.deleted_paths
     assert sidecar in result.deleted_paths

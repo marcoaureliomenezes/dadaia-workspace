@@ -70,15 +70,6 @@ def test_blocks_bare_workspace_invocation(command: str, expected_correction: str
         # $DADAIA_BIN override.
         "$DADAIA_BIN doctor",
         "${DADAIA_BIN} doctor",
-    ],
-)
-def test_allows_venv_rooted_or_overridden(command: str) -> None:
-    assert venv_guard.evaluate_payload(_bash(command)) is None
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
         # ADR-G4 explicit exclusions — never matched.
         "pytest -p no:cacheprovider",
         "ruff check .",
@@ -93,7 +84,7 @@ def test_allows_venv_rooted_or_overridden(command: str) -> None:
         "python -m http.server",
     ],
 )
-def test_allows_unmatched_commands(command: str) -> None:
+def test_allows_venv_rooted_overridden_or_unmatched(command: str) -> None:
     assert venv_guard.evaluate_payload(_bash(command)) is None
 
 

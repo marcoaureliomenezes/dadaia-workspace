@@ -97,6 +97,20 @@ def test_dirty_mutating_no_lease_emits_flag_advisory_only_no_lease_mutation(
     # criterion4: the lease record is byte-for-byte unchanged.
     assert lease_path.read_bytes() == before, "reconciler must not mutate the lease record"
 
+    # Companion: the full PostToolUse main() returns 0 even on this exact out-of-lease
+    # dirty MUTATING flagging path (criterion1) — proving never-blocks holds end-to-end,
+    # not just at the pure _reconcile_working_tree layer.
+    ws2 = _make_workspace(tmp_path.parent / (tmp_path.name + "-main"))
+    _bind_session(ws2)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws2))
+    monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
+    # No held lease for the bound context → this is the flagging branch.
+    monkeypatch.setattr(lease, "contexts_for_session", lambda ws_, sid: [])
+    monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
+    monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
+    assert sdd_post_gate.main() == 0
+    assert len(_flags(ws2)) == 1
+
 
 @pytest.mark.parametrize(
     ("name", "setup_fn"),
@@ -122,22 +136,22 @@ def test_dirty_mutating_no_lease_emits_flag_advisory_only_no_lease_mutation(
                 sdd_post_gate, "_porcelain_paths", lambda repo: ["specs/bugs/some-bug.md"]
             ),
         ),
+        (
+            # No session record written ⇒ no bound context ⇒ no flag, even with dirt.
+            "no_bound_context",
+            lambda ws, mp: mp.setattr(
+                sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"]
+            ),
+        ),
     ],
 )
 def test_no_flag_table(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, setup_fn: object
 ) -> None:
     ws = _make_workspace(tmp_path)
-    _bind_session(ws)
+    if name != "no_bound_context":
+        _bind_session(ws)
     setup_fn(ws, monkeypatch)  # type: ignore[operator]
-    sdd_post_gate._reconcile_working_tree(ws, _SID)
-    assert _flags(ws) == []
-
-
-def test_no_bound_context_no_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    ws = _make_workspace(tmp_path)
-    # No session record written ⇒ no bound context.
-    monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
     sdd_post_gate._reconcile_working_tree(ws, _SID)
     assert _flags(ws) == []
 
@@ -200,21 +214,3 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert len(_flags(ws)) == 2, "after the window the reconciler runs again"
 
 
-def test_main_never_raises_exit_allow_on_flagging_path(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """The full PostToolUse main() returns 0 even on the exact out-of-lease dirty MUTATING
-    flagging path (criterion1) — proving never-blocks holds end-to-end, not just at the
-    pure ``_reconcile_working_tree`` layer.
-    """
-    ws = _make_workspace(tmp_path)
-    _bind_session(ws)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
-    # No held lease for the bound context → this is the flagging branch.
-    monkeypatch.setattr(lease, "contexts_for_session", lambda ws_, sid: [])
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
-    monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
-
-    assert sdd_post_gate.main() == 0
-    assert len(_flags(ws)) == 1

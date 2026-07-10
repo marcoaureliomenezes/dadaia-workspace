@@ -12,6 +12,8 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 
 _runner = CliRunner()
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch) -> Path:
@@ -23,9 +25,16 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_export_list_then_create_archive_excluding_mnt(workspace: Path, tmp_path: Path) -> None:
+def test_export_list_create_archive_excluding_mnt_and_import_round_trip(
+    workspace: Path, tmp_path: Path
+) -> None:
     """--list alone creates no archive; a real export creates exactly one tar.gz; and
-    --exclude-mnt skips the mnt/ subtree inside it."""
+    --exclude-mnt skips the mnt/ subtree inside it.
+
+    Plus: the real generated archive round-trips through ``dadaia import`` — extracting
+    workspace state into a fresh destination without activation side effects (stronger
+    than a hand-crafted synthetic fixture, since it exercises the actual export shape).
+    """
     list_result = _runner.invoke(app, ["export", "--list", "--exclude-mnt"])
     assert list_result.exit_code == 0, list_result.output
     archives = (
@@ -50,3 +59,19 @@ def test_export_list_then_create_archive_excluding_mnt(workspace: Path, tmp_path
     with tarfile.open(created[0], "r:gz") as tar:
         names = tar.getnames()
     assert not any("mnt/" in n for n in names)
+
+    # Import round-trip: the real generated archive extracts cleanly, no activation.
+    import_dest = tmp_path / "imported"
+    import_result = _runner.invoke(
+        app,
+        [
+            "import",
+            str(created[0]),
+            "--workspace",
+            str(import_dest),
+            "--skip-mnt",
+            "--skip-activate",
+        ],
+    )
+    assert import_result.exit_code == 0, import_result.output
+    assert (import_dest / ".dadaia" / "states").exists()

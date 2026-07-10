@@ -71,25 +71,11 @@ def test_bad_pack_value_is_bad_parameter(
     assert result.stdout == ""
 
 
-def test_plugin_uninstall_drops_ledger_and_prints_restored_agents(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Success drops the pack from the ledger and prints the restored agents (AC-1)."""
-    monkeypatch.chdir(_workspace(tmp_path))
-    _runner.invoke(app, ["plugin", "install", "frontend-design"])
-    assert _ledger(tmp_path)["plugins"] == ["frontend-design"]
-
-    result = _runner.invoke(app, ["plugin", "uninstall", "frontend-design"])
-    assert result.exit_code == 0, result.output
-    assert "frontend-engineer" in result.stdout
-    assert "design-specialist" in result.stdout
-    assert _ledger(tmp_path) == {"schema_version": "1", "plugins": []}
-
-
 def test_ledger_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """install records the canonical ledger shape; re-install is idempotent (single entry);
     a second pack appends (devops enables devops-engineer); uninstalling a known-but-not-
-    installed pack is an idempotent no-op (exit 0, 'no change', ledger byte-identical)."""
+    installed pack is an idempotent no-op (exit 0, 'no change', ledger byte-identical);
+    a real uninstall drops the pack from the ledger and prints the restored agents (AC-1)."""
     monkeypatch.chdir(_workspace(tmp_path))
 
     result = _runner.invoke(app, ["plugin", "install", "frontend-design"])
@@ -111,6 +97,13 @@ def test_ledger_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     second = _runner.invoke(app, ["plugin", "install", "devops"])
     assert second.exit_code == 0, second.output
     assert _ledger(tmp_path)["plugins"] == ["frontend-design", "devops"]
+
+    # A real uninstall drops the pack from the ledger and prints the restored agents.
+    uninstall_result = _runner.invoke(app, ["plugin", "uninstall", "frontend-design"])
+    assert uninstall_result.exit_code == 0, uninstall_result.output
+    assert "frontend-engineer" in uninstall_result.stdout
+    assert "design-specialist" in uninstall_result.stdout
+    assert _ledger(tmp_path) == {"schema_version": "1", "plugins": ["devops"]}
 
 
 def test_list_and_doctor_reflect_install_state(

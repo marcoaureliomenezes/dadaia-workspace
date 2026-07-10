@@ -35,8 +35,9 @@ def _make_manager(public_dir: Path) -> FileSystemPublicAssetManager:
     return mgr
 
 
-def test_projected_drift_exits_nonzero(tmp_path: Path) -> None:
-    """T-PROP-02 AC-1: staged SHA differs from projected → [drift] emitted."""
+def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
+    """T-PROP-02 AC-1/AC-3: staged SHA differs from projected → [drift]; staged asset
+    with no projection at all → [missing]. Both are the doctor's non-zero-exit codes."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
     mgr = _make_manager(public_dir)
@@ -49,20 +50,13 @@ def test_projected_drift_exits_nonzero(tmp_path: Path) -> None:
     line = mgr._compare(staged, projected, "stage:test.md")
     assert line.startswith("[drift]"), f"Expected [drift], got: {line!r}"
 
+    staged2 = tmp_path / "staged2.md"
+    projected2 = tmp_path / "non_existent.md"
+    _write(staged2, b"# some content\n")
+    # projected2 does NOT exist
 
-def test_staged_but_not_installed_exits_nonzero(tmp_path: Path) -> None:
-    """T-PROP-02 AC-3: staged asset with no projection → [missing] emitted."""
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-    mgr = _make_manager(public_dir)
-
-    staged = tmp_path / "staged.md"
-    projected = tmp_path / "non_existent.md"
-    _write(staged, b"# some content\n")
-    # projected does NOT exist
-
-    line = mgr._compare(staged, projected, "stage:test.md")
-    assert line.startswith("[missing]"), f"Expected [missing], got: {line!r}"
+    line2 = mgr._compare(staged2, projected2, "stage:test.md")
+    assert line2.startswith("[missing]"), f"Expected [missing], got: {line2!r}"
 
 
 def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
@@ -106,7 +100,9 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     )
     src, dst, label, _transform = script_expectations[0]
     script_line = mgr._compare(src, dst, label)
-    assert script_line.startswith("[ok]"), f"Expected [ok] for matching scripts, got: {script_line!r}"
+    assert script_line.startswith("[ok]"), (
+        f"Expected [ok] for matching scripts, got: {script_line!r}"
+    )
 
 
 @pytest.mark.parametrize(

@@ -332,6 +332,11 @@ def test_wikilinks_broken_valid_and_product_subdir(tmp_path: Path) -> None:
 
 
 def test_duplicate_errors_and_unknown_warns(tmp_path: Path) -> None:
+    """Duplicate heading -> ERROR; unknown heading -> WARN, not ERROR. T-46-23
+    (DRIFT-5) NEGATIVE case folded in: the allowlist widening for the known
+    workflow/backlog headings must NOT weaken the check — a genuinely-unknown
+    heading that merely *resembles* the widened ones (same version-tag style) is
+    NOT in the allowlist and MUST still produce a WARN."""
     schema = _load_schema_real()
 
     dup_atom = _make_atom(
@@ -357,32 +362,27 @@ def test_duplicate_errors_and_unknown_warns(tmp_path: Path) -> None:
     assert unknown_result.has_warnings, "Unknown heading should produce a WARNING"
     assert any("allowlist" in w.lower() or "unknown" in w.lower() for w in unknown_result.warnings)
 
-
-def test_widening_does_not_disable_heading_check(tmp_path: Path) -> None:
-    """T-46-23 (DRIFT-5) NEGATIVE test: the allowlist widening for the known
-    workflow/backlog headings must NOT weaken the check. A genuinely-unknown heading
-    that merely *resembles* the widened ones (same version-tag style) is NOT in the
-    allowlist and MUST still produce a WARN. The widening adds exactly the enumerated
-    known strings — it does not turn the heading gate into a no-op.
-    """
-    unknown = "Totally Fabricated subsystem (v9.9.9)"
-    assert unknown not in _lint_mod.HEADING_ALLOWLIST, (
+    unknown_widening = "Totally Fabricated subsystem (v9.9.9)"
+    assert unknown_widening not in _lint_mod.HEADING_ALLOWLIST, (
         "Test precondition: the fabricated heading must not be in the allowlist."
     )
-
-    schema = _load_schema_real()
-    md_path = _make_atom(
-        tmp_path,
+    widening_dir = tmp_path / "widening"
+    widening_dir.mkdir()
+    widening_atom = _make_atom(
+        widening_dir,
         slug="test-atom",
-        body=f"## Propósito\n\nBody.\n\n## {unknown}\n\nContent.\n",
+        body=f"## Propósito\n\nBody.\n\n## {unknown_widening}\n\nContent.\n",
     )
-
-    result = lint_atom(md_path, tmp_path, schema)
-
-    assert not result.has_errors, f"Unknown heading should not ERROR. Got: {result.errors}"
-    assert result.has_warnings, "A heading outside the widened allowlist must still WARN"
-    assert any("allowlist" in w.lower() or unknown.lower() in w.lower() for w in result.warnings), (
-        f"Warning should mention the allowlist / the unknown heading. Got: {result.warnings}"
+    widening_result = lint_atom(widening_atom, widening_dir, schema)
+    assert not widening_result.has_errors, (
+        f"Unknown heading should not ERROR. Got: {widening_result.errors}"
+    )
+    assert widening_result.has_warnings, "A heading outside the widened allowlist must still WARN"
+    assert any(
+        "allowlist" in w.lower() or unknown_widening.lower() in w.lower()
+        for w in widening_result.warnings
+    ), (
+        f"Warning should mention the allowlist / the unknown heading. Got: {widening_result.warnings}"
     )
 
 
@@ -478,6 +478,38 @@ def test_workspace_allowlist_load_and_merge(tmp_path: Path) -> None:
     [no_ext_result] = [r for r in no_ext_results if r.path == no_ext_atom]
     assert any("allowlist" in w for w in no_ext_result.warnings)
 
+    # F-79 (v0.1.48 W3): the ENGLISH Group-A canon headings pass lint with no
+    # warnings, and PT Group-A entries are KEPT — consumer workspaces carry PT atoms.
+    en_dir = tmp_path / "en"
+    en_dir.mkdir()
+    en_body = (
+        "## Purpose\n\nBody.\n\n"
+        "## Usage flow\n\nBody.\n\n"
+        "## Typical trigger\n\nBody.\n\n"
+        "## Differentiator\n\nBody.\n\n"
+        "## Runtime state touched\n\nBody.\n\n"
+        "## Dependencies\n\nBody.\n"
+    )
+    en_atom = _make_atom(en_dir, slug="test-atom", body=en_body)
+    en_result = lint_atom(en_atom, en_dir, schema)
+    assert not en_result.has_errors, f"EN Group-A canon must not ERROR. Got: {en_result.errors}"
+    assert not en_result.has_warnings, f"EN Group-A canon must not WARN. Got: {en_result.warnings}"
+
+    pt_dir = tmp_path / "pt"
+    pt_dir.mkdir()
+    pt_body = (
+        "## Propósito\n\nBody.\n\n"
+        "## Fluxo de uso\n\nBody.\n\n"
+        "## Trigger típico\n\nBody.\n\n"
+        "## Diferencial\n\nBody.\n\n"
+        "## Estado runtime tocado\n\nBody.\n\n"
+        "## Dependências\n\nBody.\n"
+    )
+    pt_atom = _make_atom(pt_dir, slug="test-atom", body=pt_body)
+    pt_result = lint_atom(pt_atom, pt_dir, schema)
+    assert not pt_result.has_errors, f"PT Group-A legacy must not ERROR. Got: {pt_result.errors}"
+    assert not pt_result.has_warnings, f"PT Group-A legacy must not WARN. Got: {pt_result.warnings}"
+
 
 def test_scaffold_atom_headings_are_allowlisted() -> None:
     """Every ``##`` heading of the LINTED scaffold atoms is curated-allowlisted.
@@ -571,39 +603,3 @@ def test_allowlist_content_pins(name: str, required_headings: list[str]) -> None
     allowlist = _lint_mod.HEADING_ALLOWLIST
     missing = [h for h in required_headings if h not in allowlist]
     assert not missing, f"{name}: headings missing from allowlist: {missing}"
-
-
-def test_english_and_portuguese_group_a_canon_pass(tmp_path: Path) -> None:
-    """F-79 (v0.1.48 W3): the ENGLISH Group-A canon headings pass lint with no
-    warnings, and PT Group-A entries are KEPT — consumer workspaces carry PT atoms."""
-    schema = _load_schema_real()
-
-    en_dir = tmp_path / "en"
-    en_dir.mkdir()
-    en_body = (
-        "## Purpose\n\nBody.\n\n"
-        "## Usage flow\n\nBody.\n\n"
-        "## Typical trigger\n\nBody.\n\n"
-        "## Differentiator\n\nBody.\n\n"
-        "## Runtime state touched\n\nBody.\n\n"
-        "## Dependencies\n\nBody.\n"
-    )
-    en_atom = _make_atom(en_dir, slug="test-atom", body=en_body)
-    en_result = lint_atom(en_atom, en_dir, schema)
-    assert not en_result.has_errors, f"EN Group-A canon must not ERROR. Got: {en_result.errors}"
-    assert not en_result.has_warnings, f"EN Group-A canon must not WARN. Got: {en_result.warnings}"
-
-    pt_dir = tmp_path / "pt"
-    pt_dir.mkdir()
-    pt_body = (
-        "## Propósito\n\nBody.\n\n"
-        "## Fluxo de uso\n\nBody.\n\n"
-        "## Trigger típico\n\nBody.\n\n"
-        "## Diferencial\n\nBody.\n\n"
-        "## Estado runtime tocado\n\nBody.\n\n"
-        "## Dependências\n\nBody.\n"
-    )
-    pt_atom = _make_atom(pt_dir, slug="test-atom", body=pt_body)
-    pt_result = lint_atom(pt_atom, pt_dir, schema)
-    assert not pt_result.has_errors, f"PT Group-A legacy must not ERROR. Got: {pt_result.errors}"
-    assert not pt_result.has_warnings, f"PT Group-A legacy must not WARN. Got: {pt_result.warnings}"

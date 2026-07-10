@@ -17,6 +17,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
+
 def _init_git_repo(path: Path, initial_commit: bool = True) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
@@ -28,10 +29,13 @@ def _init_git_repo(path: Path, initial_commit: bool = True) -> None:
         subprocess.run(["git", "commit", "-m", "init"], cwd=path, capture_output=True)
 
 
-def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout(tmp_path: Path) -> None:
+def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_paths(
+    tmp_path: Path,
+) -> None:
     """One fn walking the full GitSubprocessClient repo lifecycle against real git:
     clone -> is_dirty(false) -> is_dirty(true) -> commit_all -> nothing-to-commit noop
-    -> has_remote(false/true) -> current_branch -> checkout."""
+    -> has_remote(false/true) -> current_branch -> checkout. Plus the error paths:
+    clone of an invalid URL and checkout of a missing branch."""
     client = GitSubprocessClient()
 
     src = tmp_path / "src"
@@ -73,15 +77,10 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout(tmp_path: Path
     client.checkout(dest, orig)
     assert client.current_branch(dest) == orig
 
-
-def test_error_paths_clone_invalid_url_and_checkout_missing_branch(tmp_path: Path) -> None:
-    client = GitSubprocessClient()
-
-    dest = tmp_path / "dest"
+    # Error paths: clone of an invalid URL, checkout of a missing branch.
+    error_dest = tmp_path / "error-dest"
     with pytest.raises(GitCloneError):
-        client.clone("/no/such/repo", dest)
+        client.clone("/no/such/repo", error_dest)
 
-    repo = tmp_path / "repo"
-    _init_git_repo(repo)
     with pytest.raises(GitSyncError):
-        client.checkout(repo, "no-such-branch")
+        client.checkout(dest, "no-such-branch")

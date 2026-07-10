@@ -152,13 +152,6 @@ def test_sid_resolution_renewal_table(
     assert _lease_heartbeat(tmp_path, "ctx") != old
 
 
-def test_empty_session_id_is_noop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    _scrub_session_env(monkeypatch)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: {})
-    assert sdd_post_gate.main() == 0
-
-
 # --- Parity (b): session-id strip (CWE-22) via resolve_session_id ----------------------
 
 
@@ -202,12 +195,19 @@ def _setup_workspace_unresolvable(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(sdd_post_gate, "_resolve_workspace", _raise_no_workspace)
 
 
+def _setup_empty_session_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _scrub_session_env(monkeypatch)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(_common, "read_stdin_json", lambda: {})
+
+
 @pytest.mark.parametrize(
     ("name", "setup_fn"),
     [
         ("corrupt_session_file", _setup_corrupt_session_file),
         ("missing_session_file", _setup_missing_session_file),
         ("workspace_unresolvable", _setup_workspace_unresolvable),
+        ("empty_session_id_is_noop", _setup_empty_session_id),
     ],
 )
 def test_fail_open_table(

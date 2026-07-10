@@ -249,7 +249,7 @@ def _make_aggregator(conn: sqlite3.Connection, scs: _FakeSCS | None = None) -> T
 # ---------------------------------------------------------------------------
 
 
-def test_agent_listing_and_context_breakdown() -> None:
+def test_agent_listing_context_breakdown_cost_suspect_pricing_age_and_pagination() -> None:
     conn = _make_conn()
     _seed_db(conn)
     agg = _make_aggregator(conn)
@@ -286,40 +286,14 @@ def test_agent_listing_and_context_breakdown() -> None:
     if fractions:
         assert sum(fractions) == pytest.approx(1.0, abs=1e-6)
 
-
-# ---------------------------------------------------------------------------
-# cost-known/suspect/pricing-age — 1 test
-# ---------------------------------------------------------------------------
-
-
-def test_cost_known_suspect_and_pricing_age() -> None:
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
-    arch = next(a for a in result.agents if a.agent_id == "software-architect")
+    # cost-known/suspect/pricing-age.
     assert arch.cost_known is False
     assert arch.total_cost_usd is None
-
-    main = next(a for a in result.agents if a.agent_id == "claude (main)")
     assert main.suspect_count == 1
-
     assert result.pricing_age_days is not None
     assert result.pricing_age_days > 0
 
-
-# ---------------------------------------------------------------------------
-# pagination/window — 1 test
-# ---------------------------------------------------------------------------
-
-
-def test_pagination_and_window_days() -> None:
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
+    # pagination/window_days.
     # list_sessions_by_agent respects limit and offset.
     all_sessions = agg.list_sessions_by_agent("claude (main)", limit=50, offset=0)
     assert len(all_sessions) == 2

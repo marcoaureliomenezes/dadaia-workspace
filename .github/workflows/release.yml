@@ -46,7 +46,7 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow" tests/unit
+        run: poetry run pytest -q -m "unit and not slow" tests/unit -n auto
 
   contract-coverage:
     name: Contract coverage (pytest)

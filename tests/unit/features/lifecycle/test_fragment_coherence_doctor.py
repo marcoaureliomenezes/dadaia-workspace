@@ -82,23 +82,21 @@ class _SabotagedLoader(FragmentLoader):
 # ---------------------------------------------------------------------------
 
 
-def test_ac5_doctor_green_on_current_tree() -> None:
-    report = run_fragment_coherence_doctor()
-    assert report.ok is True
-    assert [f for f in report.findings if f.severity is Severity.ERROR] == []
-    # the ~inert shared/implementation inputs are FRAG-COH-2 WARN (not ERROR).
-    warns = [f for f in report.findings if f.code is FragCohCode.FRAG_COH_2]
-    assert warns and all(f.severity is Severity.WARNING for f in warns)
-    # The coherence doctor does NOT re-implement or modify persona_doctor.
-    assert persona_doctor.check_persona_resolution().ok is True
-
-
 # ---------------------------------------------------------------------------
 # ① AC-5 RED-first — unregistered input on selector-wired main fires FRAG-COH-2
 # ---------------------------------------------------------------------------
 
 
-def test_ac5_red_first_unregistered_input_on_selector_wired_main_fires_frag_coh_2() -> None:
+def test_ac5_doctor_green_on_current_tree_and_red_first_sabotaged_loader() -> None:
+    clean_report = run_fragment_coherence_doctor()
+    assert clean_report.ok is True
+    assert [f for f in clean_report.findings if f.severity is Severity.ERROR] == []
+    # the ~inert shared/implementation inputs are FRAG-COH-2 WARN (not ERROR).
+    warns = [f for f in clean_report.findings if f.code is FragCohCode.FRAG_COH_2]
+    assert warns and all(f.severity is Severity.WARNING for f in warns)
+    # The coherence doctor does NOT re-implement or modify persona_doctor.
+    assert persona_doctor.check_persona_resolution().ok is True
+
     report = run_fragment_coherence_doctor(loader=_SabotagedLoader())
     assert report.ok is False
     coh2_errors = [

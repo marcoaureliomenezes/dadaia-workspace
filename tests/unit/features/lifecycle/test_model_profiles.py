@@ -62,18 +62,17 @@ def test_registry_catalog_invariants() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_no_layer2_residue_in_registry() -> None:
-    for profile in model_profiles.list_profiles():
-        assert not profile.model_id.startswith("claude-")
-        assert profile.harness in {"codex", "pi"}
-
-
 # ---------------------------------------------------------------------------
 # ③ profiles_for filter / coverage / unknown-empty
 # ---------------------------------------------------------------------------
 
 
 def test_profiles_for_filters_covers_both_harnesses_and_unknown_is_empty() -> None:
+    # ② Layer-2 residue: no claude-* id + harness in {codex, pi}.
+    for profile in model_profiles.list_profiles():
+        assert not profile.model_id.startswith("claude-")
+        assert profile.harness in {"codex", "pi"}
+
     harnesses = {p.harness for p in model_profiles.list_profiles()}
     assert "codex" in harnesses
     assert "pi" in harnesses

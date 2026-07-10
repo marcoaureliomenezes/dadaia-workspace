@@ -125,7 +125,7 @@ def test_validate_table(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_extract_creates_files(tmp_path: Path) -> None:
+def test_extract_creates_files_and_skips_env_files(tmp_path: Path) -> None:
     archive = tmp_path / "ws.tar.gz"
     with tarfile.open(archive, "w:gz") as tar:
         payload = b"content"
@@ -137,24 +137,22 @@ def test_extract_creates_files(tmp_path: Path) -> None:
     svc.extract(archive, dest, skip_mnt=False)
     assert (dest / ".dadaia" / "states" / "spec_contexts.json").read_text() == "content"
 
-
-def test_extract_skips_env_files(tmp_path: Path) -> None:
-    """CRIT: `.env` never lands in an imported workspace — a secret exfil guard."""
-    archive = tmp_path / "ws-env.tar.gz"
-    with tarfile.open(archive, "w:gz") as tar:
+    # CRIT: `.env` never lands in an imported workspace — a secret exfil guard.
+    archive2 = tmp_path / "ws-env.tar.gz"
+    with tarfile.open(archive2, "w:gz") as tar2:
         safe = b"content"
         info1 = tarfile.TarInfo(".dadaia/states/ctx.json")
         info1.size = len(safe)
-        tar.addfile(info1, io.BytesIO(safe))
+        tar2.addfile(info1, io.BytesIO(safe))
         secret = b"SECRET=abc"
         info2 = tarfile.TarInfo(".env")
         info2.size = len(secret)
-        tar.addfile(info2, io.BytesIO(secret))
-    dest = tmp_path / "ws-out-env"
-    svc = ImportService(workspace_root=dest)
-    svc.extract(archive, dest, skip_mnt=False)
-    assert (dest / ".dadaia" / "states" / "ctx.json").exists()
-    assert not (dest / ".env").exists()  # .env was skipped
+        tar2.addfile(info2, io.BytesIO(secret))
+    dest2 = tmp_path / "ws-out-env"
+    svc2 = ImportService(workspace_root=dest2)
+    svc2.extract(archive2, dest2, skip_mnt=False)
+    assert (dest2 / ".dadaia" / "states" / "ctx.json").exists()
+    assert not (dest2 / ".env").exists()  # .env was skipped
 
 
 # ---------------------------------------------------------------------------
@@ -196,18 +194,18 @@ def test_patch_state_rewrites_and_clears_primary(tmp_path: Path) -> None:
     assert ctx.get("alive_since") is None
     assert not (states / "primary_context.json").exists()
 
+    # No .dadaia/states/spec_contexts.json in a fresh workspace — a no-op, must not raise.
+    empty_ws = tmp_path.parent / (tmp_path.name + "-empty")
+    empty_svc = ImportService(workspace_root=empty_ws)
+    empty_svc.patch_state(empty_ws, Path("/old/ws"))
 
-def test_patch_state_no_file_and_non_dict_entries_are_noop(tmp_path: Path) -> None:
-    svc = ImportService(workspace_root=tmp_path)
-    # No .dadaia/states/spec_contexts.json — should be a no-op.
-    svc.patch_state(tmp_path, Path("/old/ws"))  # must not raise
-
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
+    # Non-dict context entries are handled silently (no crash).
+    empty_states = empty_ws / ".dadaia" / "states"
+    empty_states.mkdir(parents=True)
+    (empty_states / "spec_contexts.json").write_text(
         json.dumps({"version": "1", "contexts": ["not_a_dict", 42]})
     )
-    svc.patch_state(tmp_path, Path("/old/ws"))  # should handle non-dict entries silently
+    empty_svc.patch_state(empty_ws, Path("/old/ws"))
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +284,7 @@ def test_rewrite_paths_in_value_table(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_restore_contexts_skip_and_no_ativo_are_empty_errors(tmp_path: Path) -> None:
+def test_restore_contexts_skip_no_ativo_and_activate_succeeds_and_fails(tmp_path: Path) -> None:
     svc = ImportService(workspace_root=tmp_path)
 
     skip_manifest = ImportManifest(
@@ -314,8 +312,6 @@ def test_restore_contexts_skip_and_no_ativo_are_empty_errors(tmp_path: Path) -> 
     # No ativo contexts → no subprocess calls, returns empty errors.
     assert svc.restore_contexts(inativo_manifest, tmp_path, skip=False) == ()
 
-
-def test_restore_contexts_activate_succeeds_and_fails(tmp_path: Path) -> None:
     ativo_manifest = ImportManifest(
         version="1",
         exported_at="2026-01-01T00:00:00Z",

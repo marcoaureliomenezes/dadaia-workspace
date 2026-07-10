@@ -328,32 +328,32 @@ def test_skip_bad_frontmatter_file_others_still_load(
         ),
     ],
 )
-def test_raw_to_dto_edge_cases(raw: dict[str, Any], assert_fn: Any) -> None:
+def test_raw_to_dto_edge_cases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, raw: dict[str, Any], assert_fn: Any
+) -> None:
     if isinstance(assert_fn, str) and assert_fn.startswith("raises:"):
         match = assert_fn[len("raises:") :]
         with pytest.raises(MissingDispatchBandError, match=match):
             _raw_to_dto(raw)
+        if raw.get("name") == "bad-band-range":
+            # Companion composition-point proof: via read_canonical_agents (not the
+            # direct _raw_to_dto call), an out-of-range dispatch_band skips the agent
+            # silently rather than propagating the raise.
+            monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
+            _write_agent(
+                _agentic_dir(tmp_path),
+                "bad-band-agent.md",
+                "name: bad-band-agent\ndescription: Invalid band.\ndispatch_band: 99\n",
+                "# BadBand\n",
+            )
+            agents = read_canonical_agents(
+                workspace_root=tmp_path, store_factory=MarkdownAgentStore
+            )
+            names = {a.id for a in agents}
+            assert "bad-band-agent" not in names
         return
     dto = _raw_to_dto(raw)
     assert assert_fn(dto)
-
-
-def test_read_canonical_agents_skips_invalid_dispatch_band(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Via read_canonical_agents (not the direct _raw_to_dto call), an invalid
-    dispatch_band skips the agent silently rather than propagating the raise —
-    the composition point that turns the typed error into a skip."""
-    monkeypatch.delenv("DADAIA_AGENTS_DIR", raising=False)
-    _write_agent(
-        _agentic_dir(tmp_path),
-        "bad-band-agent.md",
-        "name: bad-band-agent\ndescription: Invalid band.\ndispatch_band: 99\n",
-        "# BadBand\n",
-    )
-    agents = read_canonical_agents(workspace_root=tmp_path, store_factory=MarkdownAgentStore)
-    names = {a.id for a in agents}
-    assert "bad-band-agent" not in names
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +377,19 @@ def test_get_prompt_happy_path_returns_body_without_frontmatter(
     assert path.name == "my-agent.md"
     assert "name: my-agent" not in body
     assert "model: gpt-4" not in body
+
+    # The v0.1.8 public roster uses a single unified software-engineer (not
+    # language-split) and every loaded DTO is a real AgentDTO instance
+    # (executed-path proof for read_lesson).
+    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
+    public_agents = read_canonical_agents(
+        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
+    )
+    assert all(isinstance(a, AgentDTO) for a in public_agents)
+    ids = {a.id for a in public_agents}
+    assert "software-engineer" in ids
+    assert "software-engineer-python" not in ids
+    assert "software-engineer-node" not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -456,24 +469,9 @@ def test_get_prompt_symlink_escape_raises_invalid(
 # ---------------------------------------------------------------------------
 # Real-consumer regression: the public roster stays coherent (unified
 # software-engineer, no split agents, AgentDTO importable end-to-end).
+# Folded into test_get_prompt_happy_path_returns_body_without_frontmatter above.
 # ---------------------------------------------------------------------------
 
 _PUBLIC_AGENTS_DIR = (
     Path(__file__).parent.parent.parent.parent.parent / "dadaia_workspace" / "public" / "agents"
 )
-
-
-def test_public_agent_roster_uses_unified_software_engineer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The v0.1.8 public roster uses a single unified software-engineer (not language-split)
-    and every loaded DTO is a real AgentDTO instance (executed-path proof for read_lesson)."""
-    monkeypatch.setenv("DADAIA_AGENTS_DIR", str(_PUBLIC_AGENTS_DIR))
-    agents = read_canonical_agents(
-        workspace_root=Path("/does/not/matter"), store_factory=MarkdownAgentStore
-    )
-    assert all(isinstance(a, AgentDTO) for a in agents)
-    ids = {a.id for a in agents}
-    assert "software-engineer" in ids
-    assert "software-engineer-python" not in ids
-    assert "software-engineer-node" not in ids

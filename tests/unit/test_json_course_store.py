@@ -17,7 +17,7 @@ def _make_course(slug: str = "py101") -> Course:
     )
 
 
-def test_save_roundtrip_multiple_and_update(tmp_path: Path) -> None:
+def test_save_roundtrip_update_delete_and_persists_to_disk(tmp_path: Path) -> None:
     store = JsonCourseStore(tmp_path)
     assert store.list_all() == []
     assert store.get("ghost") is None
@@ -53,9 +53,6 @@ def test_save_roundtrip_multiple_and_update(tmp_path: Path) -> None:
     assert fetched.name == "New Name"
     assert fetched.module_number == 2
 
-
-def test_delete_removes_noop_on_missing_and_persists_to_disk(tmp_path: Path) -> None:
-    store = JsonCourseStore(tmp_path)
     store.save(_make_course("todel"))
     store.delete("todel")
     assert store.get("todel") is None

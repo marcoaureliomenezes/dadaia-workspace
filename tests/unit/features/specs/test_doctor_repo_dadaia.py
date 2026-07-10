@@ -43,16 +43,15 @@ def test_repo_dadaia1_flags_fixes_and_stays_silent_without_it(tmp_path: Path) ->
     issues_c = SpecsDoctor(specs_c).check()
     assert not any(i.code == "REPO-DADAIA-1" for i in issues_c)
 
-
-def test_repo_dadaia1_with_states_flagged_but_never_auto_removed(tmp_path: Path) -> None:
-    specs = _specs_tree(tmp_path)
-    (specs.parent / ".dadaia" / "states").mkdir(parents=True)
-    (specs.parent / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
-
-    doctor = SpecsDoctor(specs)
-    issues = doctor.check()
-    issue = next(i for i in issues if i.code == "REPO-DADAIA-1")
-    assert issue.fixable is False  # states/ present — operator decision, never auto-remove
-
-    doctor.fix(issues)
-    assert (specs.parent / ".dadaia" / "states").exists()
+    # a .dadaia/ WITH states/ is flagged but never auto-removed (operator decision).
+    specs_d = _specs_tree(tmp_path / "d")
+    (specs_d.parent / ".dadaia" / "states").mkdir(parents=True)
+    (specs_d.parent / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    doctor_d = SpecsDoctor(specs_d)
+    issues_d = doctor_d.check()
+    issue_d = next(i for i in issues_d if i.code == "REPO-DADAIA-1")
+    assert issue_d.fixable is False  # states/ present — operator decision, never auto-remove
+    doctor_d.fix(issues_d)
+    assert (specs_d.parent / ".dadaia" / "states").exists()

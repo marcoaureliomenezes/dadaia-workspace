@@ -166,9 +166,29 @@ def test_ac2_install_uninstall_cycle_equals_never_installed(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_ac3_double_uninstall_noop_and_multi_pack_isolation(tmp_path: Path) -> None:
+class _FailingWriteStore:
+    """A PluginStore whose write raises — injects a failure AT the ledger step (ADR-U4)."""
+
+    def __init__(self) -> None:
+        self._inner = JsonPluginStore()
+
+    def read(self, states_dir: Path) -> InstalledPlugins | None:
+        return self._inner.read(states_dir)
+
+    def write(self, states_dir: Path, installed: InstalledPlugins) -> None:
+        raise RuntimeError("injected ledger-write failure (ADR-U4 ordering probe)")
+
+
+def test_ac3_double_uninstall_noop_multi_pack_isolation_and_files_before_ledger(
+    tmp_path: Path,
+) -> None:
     """A second uninstall changes nothing — ledger + projected files byte-stable. With
-    both packs installed, uninstalling devops leaves frontend-design fully intact."""
+    both packs installed, uninstalling devops leaves frontend-design fully intact.
+
+    Plus ADR-U4 observable: files are restored FIRST; a ledger-write failure leaves the
+    ledger entry present, so ``plugin doctor`` still surfaces the pack — never a silent
+    half-state.
+    """
     ws, mgr = _fresh_ws(tmp_path, "ws")
     mgr.install_plugin(ws, _PACK)
     mgr.uninstall_plugin(ws, _PACK)
@@ -201,70 +221,50 @@ def test_ac3_double_uninstall_noop_and_multi_pack_isolation(tmp_path: Path) -> N
     assert any(f"plugin:{_PACK}:" in ln for ln in mgr2.doctor_plugins(ws2))
     assert not any("plugin:devops:" in ln for ln in mgr2.doctor_plugins(ws2))
 
-
-class _FailingWriteStore:
-    """A PluginStore whose write raises — injects a failure AT the ledger step (ADR-U4)."""
-
-    def __init__(self) -> None:
-        self._inner = JsonPluginStore()
-
-    def read(self, states_dir: Path) -> InstalledPlugins | None:
-        return self._inner.read(states_dir)
-
-    def write(self, states_dir: Path, installed: InstalledPlugins) -> None:
-        raise RuntimeError("injected ledger-write failure (ADR-U4 ordering probe)")
-
-
-def test_ac3_files_before_ledger_interrupted_uninstall_keeps_ledger_entry(
-    tmp_path: Path,
-) -> None:
-    """ADR-U4 observable: files are restored FIRST; a ledger-write failure leaves the ledger
-    entry present, so ``plugin doctor`` still surfaces the pack — never a silent half-state."""
-    ws, mgr = _fresh_ws(tmp_path, "ws")
-    mgr.install_plugin(ws, _PACK)
+    # ADR-U4: files-before-ledger ordering, own workspace (a failure injected at the
+    # ledger write leaves the ledger entry present — never a silent half-state).
+    ws3, mgr3 = _fresh_ws(tmp_path, "ws3")
+    mgr3.install_plugin(ws3, _PACK)
 
     failing = FileSystemPublicAssetManager(plugin_store=_FailingWriteStore())
     with pytest.raises(RuntimeError, match="injected ledger-write failure"):
-        failing.uninstall_plugin(ws, _PACK)
+        failing.uninstall_plugin(ws3, _PACK)
 
     # File phase already ran: the claude agent is back to the stub…
-    stub = (ws / ".claude" / "agents" / "frontend-engineer.md").read_text(encoding="utf-8")
+    stub = (ws3 / ".claude" / "agents" / "frontend-engineer.md").read_text(encoding="utf-8")
     assert "[PLUGIN REQUIRED]" in stub, "file restore did not precede the ledger write"
     # …but the ledger STILL lists the pack (files first, ledger last) ⇒ doctor non-silent.
-    assert _ledger_plugins(ws) == (_PACK,)
-    assert mgr.doctor_plugins(ws), "plugin doctor went silent on the interrupted half-state"
+    assert _ledger_plugins(ws3) == (_PACK,)
+    assert mgr3.doctor_plugins(ws3), "plugin doctor went silent on the interrupted half-state"
 
 
 # ---------------------------------------------------------------------------
-# AC-4 — profile-scoped uninstall (ADR-U3, Ruling 13 symmetry)
-# ---------------------------------------------------------------------------
-
-
-def test_ac4_claude_only_profile_uninstall_never_touches_codex(tmp_path: Path) -> None:
-    """In a claude-only profile, install→uninstall never creates or deletes under .codex/."""
-    ws, mgr = _fresh_ws(tmp_path, "ws", harnesses=("claude",))
-    assert not (ws / ".codex").exists()
-
-    mgr.install_plugin(ws, _PACK)
-    assert not (ws / ".codex").exists(), "claude-only install created a .codex orphan"
-
-    mgr.uninstall_plugin(ws, _PACK)
-    assert not (ws / ".codex").exists(), "claude-only uninstall created a .codex orphan"
-    stub = (ws / ".claude" / "agents" / "frontend-engineer.md").read_text(encoding="utf-8")
-    assert "[PLUGIN REQUIRED]" in stub
-
-
-# ---------------------------------------------------------------------------
+# AC-4 — profile-scoped uninstall (ADR-U3, Ruling 13 symmetry), plus
 # AC-5 — drift never silent + repos/** untouched (ADR-U1)
 # ---------------------------------------------------------------------------
 
 
-def test_ac5_drift_restored_removed_repos_untouched_and_unstaged_pack(
+def test_ac4_claude_only_profile_never_touches_codex_ac5_drift_restored_removed_and_repos_untouched(
     tmp_path: Path,
 ) -> None:
-    """A hand-edited pack agent md is [drift-restored]; a hand-edited pack skill is
-    [drift-removed]; nothing under repos/ is ever touched by uninstall. An unstaged
-    pack -> ledger-only removal with a non-silent [skip]-class line (FR2)."""
+    """In a claude-only profile, install→uninstall never creates or deletes under
+    .codex/. Plus (own workspace, default profile): a hand-edited pack agent md is
+    [drift-restored]; a hand-edited pack skill is [drift-removed]; nothing under
+    repos/ is ever touched by uninstall. An unstaged pack -> ledger-only removal with
+    a non-silent [skip]-class line (FR2)."""
+    profile_ws, profile_mgr = _fresh_ws(tmp_path, "profile-ws", harnesses=("claude",))
+    assert not (profile_ws / ".codex").exists()
+
+    profile_mgr.install_plugin(profile_ws, _PACK)
+    assert not (profile_ws / ".codex").exists(), "claude-only install created a .codex orphan"
+
+    profile_mgr.uninstall_plugin(profile_ws, _PACK)
+    assert not (profile_ws / ".codex").exists(), "claude-only uninstall created a .codex orphan"
+    profile_stub = (profile_ws / ".claude" / "agents" / "frontend-engineer.md").read_text(
+        encoding="utf-8"
+    )
+    assert "[PLUGIN REQUIRED]" in profile_stub
+
     ws, mgr = _fresh_ws(tmp_path, "ws")
     consumer = ws / "repos" / "game" / "AGENTS.md"
     consumer.parent.mkdir(parents=True)

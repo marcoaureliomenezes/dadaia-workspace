@@ -160,7 +160,7 @@ def test_auto_profile_on_harness_override_and_explicit_profile_not_overridden() 
     assert pi_on_pi_impl.model_profile == "pi-reasoning-high"
 
 
-def test_explicit_profile_conflicts_with_effective_harness_rejected() -> None:
+def test_explicit_profile_conflicts_with_effective_harness_and_layer2_residue_rejected() -> None:
     # --harness pi + a codex --step-model is a clean rejection (AC-2 conflict).
     with pytest.raises(PolicyResolutionError) as exc:
         _resolver().resolve(
@@ -175,11 +175,9 @@ def test_explicit_profile_conflicts_with_effective_harness_rejected() -> None:
     assert "harness" in msg
     assert "pi" in msg
 
-
-def test_layer2_residue_harness_rejected() -> None:
     # AC-9: claude/opencode never accepted as a Layer-2 worker harness.
     for bad in ("claude", "opencode", "claude_sdk"):
-        with pytest.raises(PolicyResolutionError) as exc:
+        with pytest.raises(PolicyResolutionError) as exc2:
             _resolver().resolve(_WORKFLOW, context="default", default_harness=bad)
-        msg = str(exc.value).lower()
-        assert "codex" in msg or "pi" in msg
+        msg2 = str(exc2.value).lower()
+        assert "codex" in msg2 or "pi" in msg2

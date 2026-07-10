@@ -25,13 +25,14 @@ def _old(path: Path, content: str = "content") -> Path:
     return _write(path, age=dt.timedelta(hours=72), content=content)
 
 
-def test_cleanup_dry_run_default_then_apply_deletes_only_safe_zone_expired_files(
+def test_cleanup_dry_run_default_apply_deletes_safe_zone_and_symlink_prune(
     tmp_path: Path,
 ) -> None:
     """Default is dry-run (no deletion, candidates reported); --apply-equivalent
     (dry_run=False) deletes only expired files under the safe zones (reports/handoff/
     tmp) — states/locks/repos/runs are untouched even when stale, and a fresh tmp file
-    survives."""
+    survives. Plus (own workspace): an escaping symlink is never followed for deletion,
+    and an emptied safe-zone directory is pruned."""
     stale = _old(tmp_path / ".dadaia" / "tmp" / "agent" / "old.txt")
 
     dry_result = LifecycleHygieneService(tmp_path, now=NOW).cleanup()
@@ -68,6 +69,24 @@ def test_cleanup_dry_run_default_then_apply_deletes_only_safe_zone_expired_files
     assert lock_file.exists()
     assert repo_file.exists()
     assert run_file.exists()
+
+    # Escaping symlink is never followed for deletion; empty safe dirs get pruned.
+    symlink_ws = tmp_path / "symlink-case"
+    external = _old(symlink_ws / "external.html")
+    link = symlink_ws / ".dadaia" / "reports" / "ctx" / "agent" / "old.html"
+    link.parent.mkdir(parents=True)
+    os.symlink(external, link)
+    symlink_stale = _old(symlink_ws / ".dadaia" / "tmp" / "agent" / "day" / "old.txt")
+    empty_dir = symlink_stale.parent
+
+    symlink_result = LifecycleHygieneService(symlink_ws, now=NOW).cleanup(dry_run=False)
+
+    assert external.exists()
+    assert link.exists()
+    assert not symlink_stale.exists()
+    assert not empty_dir.exists()
+    assert link not in symlink_result.deleted_paths
+    assert empty_dir in symlink_result.pruned_dirs
 
 
 def test_cleanup_protection_classes_important_operator_referenced_and_malformed(
@@ -159,21 +178,3 @@ def test_cleanup_protection_classes_important_operator_referenced_and_malformed(
         ".dadaia/handoff/ctx/2026-06-01T000000Z-qa-review.handoff.json",
         ".dadaia/handoff/ctx/2026-06-01T000000Z-security-audit.handoff.json",
     }
-
-
-def test_cleanup_rejects_escaping_symlink_and_prunes_empty_safe_dirs(tmp_path: Path) -> None:
-    external = _old(tmp_path / "external.html")
-    link = tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html"
-    link.parent.mkdir(parents=True)
-    os.symlink(external, link)
-    stale = _old(tmp_path / ".dadaia" / "tmp" / "agent" / "day" / "old.txt")
-    empty_dir = stale.parent
-
-    result = LifecycleHygieneService(tmp_path, now=NOW).cleanup(dry_run=False)
-
-    assert external.exists()
-    assert link.exists()
-    assert not stale.exists()
-    assert not empty_dir.exists()
-    assert link not in result.deleted_paths
-    assert empty_dir in result.pruned_dirs

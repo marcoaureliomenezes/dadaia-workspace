@@ -61,10 +61,13 @@ def _plant_bl_schema_violation(repo: Path) -> Path:
     return bad
 
 
-def test_unrelated_commit_passes_despite_preexisting_backlog_debt(tmp_path: Path) -> None:
+def test_unrelated_commit_passes_despite_preexisting_debt_no_backlog_dir_noop_and_staged_violation_blocks(
+    tmp_path: Path,
+) -> None:
     """(a) staged non-backlog paths + broken backlog on disk ⇒ gate skips, does NOT block.
     Also folds in: a repo with no specs/backlog/ (not an SDD spec context) is a silent
-    no-op (must not attempt the git-diff scoping at all)."""
+    no-op (must not attempt the git-diff scoping at all). (b) a staged specs/backlog
+    violation still blocks the commit (BL-SCHEMA ERROR), own repo."""
     repo = _init_repo(tmp_path)
     # Pre-existing backlog debt sits in the working tree but is NOT part of this commit.
     _plant_bl_schema_violation(repo)
@@ -82,13 +85,11 @@ def test_unrelated_commit_passes_despite_preexisting_backlog_debt(tmp_path: Path
     _git(no_backlog_repo, "config", "user.name", "Test")
     _run_backlog_doctor_gate(no_backlog_repo)
 
-
-def test_staged_backlog_violation_still_blocks(tmp_path: Path) -> None:
-    """(b) a staged specs/backlog violation still blocks the commit (BL-SCHEMA ERROR)."""
-    repo = _init_repo(tmp_path)
-    _plant_bl_schema_violation(repo)
-    _git(repo, "add", "specs/backlog/bad.md")
+    # (b) a staged specs/backlog violation still blocks the commit, own repo.
+    blocking_repo = _init_repo(tmp_path.parent / (tmp_path.name + "-blocking"))
+    _plant_bl_schema_violation(blocking_repo)
+    _git(blocking_repo, "add", "specs/backlog/bad.md")
 
     with pytest.raises(typer.Exit) as exc:
-        _run_backlog_doctor_gate(repo)
+        _run_backlog_doctor_gate(blocking_repo)
     assert exc.value.exit_code == 1

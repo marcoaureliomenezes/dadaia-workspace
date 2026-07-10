@@ -48,9 +48,12 @@ def _seed_context(
         )
 
 
-def test_next_json_text_and_all_completed(tmp_path: Path, monkeypatch) -> None:
+def test_next_json_text_all_completed_no_active_release_and_plan_without_owners(
+    tmp_path: Path, monkeypatch
+) -> None:
     """--json is parseable with the correct next/pending agents; the text form prints
-    the same next agent; once every agent has a handoff, next_agent is None."""
+    the same next agent; once every agent has a handoff, next_agent is None. Plus the
+    exit-3 error paths: no active release, and a PLAN with no declared owners."""
     json_ws = tmp_path / "json-case"
     _init_workspace(json_ws)
     _seed_context(json_ws, handoffs={"qa-engineer": _RELEASE})
@@ -81,8 +84,7 @@ def test_next_json_text_and_all_completed(tmp_path: Path, monkeypatch) -> None:
     assert completed_payload["next_agent"] is None
     assert completed_payload["pending_agents"] == []
 
-
-def test_next_exit_3_no_active_release_and_plan_without_owners(tmp_path: Path, monkeypatch) -> None:
+    # Exit-3 error paths: no active release, and a PLAN with no declared owners.
     no_release_ws = tmp_path / "no-release-case"
     _init_workspace(no_release_ws)
     _seed_context(no_release_ws, active="release: none\nphase: DISCOVERY\n")

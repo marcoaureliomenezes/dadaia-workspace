@@ -52,7 +52,9 @@ def _build(
 # --- Kept: first pending agent identified + wrong-release handoff excluded ---
 
 
-def test_first_pending_agent_identified(tmp_path: Path) -> None:
+def test_first_pending_agent_identified_and_other_release_handoff_excluded(
+    tmp_path: Path,
+) -> None:
     svc = _build(
         tmp_path,
         plan="**Owner:** qa-engineer\n**Owner:** devops-engineer\n**Owner:** software-engineer\n",
@@ -63,15 +65,13 @@ def test_first_pending_agent_identified(tmp_path: Path) -> None:
     assert result.completed_agents == ["qa-engineer"]
     assert result.pending_agents == ["devops-engineer", "software-engineer"]
 
-
-def test_handoff_for_other_release_does_not_count(tmp_path: Path) -> None:
-    svc = _build(
-        tmp_path,
+    other_release_svc = _build(
+        tmp_path.parent / (tmp_path.name + "-other-release"),
         plan="**Owner:** qa-engineer\n",
         handoffs={"qa-engineer": "some-other-release"},
     )
-    result = svc.resolve_next()
-    assert result.next_agent == "qa-engineer"  # wrong-release handoff ignored
+    other_release_result = other_release_svc.resolve_next()
+    assert other_release_result.next_agent == "qa-engineer"  # wrong-release handoff ignored
 
 
 # --- Error-raises matrix (no active release / no owners / non-canonical) ---

@@ -128,35 +128,15 @@ def test_per_zone_ttl_and_real_delete(
 # ---------------------------------------------------------------------------
 
 
-def test_operator_exception_files_never_deleted(tmp_path: Path) -> None:
-    ws = _make_workspace(tmp_path)
-
-    protected_exact = _write_file(
-        ws / ".dadaia" / "tmp" / "operator-notes.txt",
-        mtime_offset=dt.timedelta(days=10),
-    )
-    protected_glob = _write_file(
-        ws / ".dadaia" / "tmp" / "operator-screenshot.png",
-        mtime_offset=dt.timedelta(days=10),
-    )
-    exc_file = ws / ".dadaia" / "states" / "root_exceptions.txt"
-    exc_file.write_text("operator-notes.txt\n*.png\n")
-
-    svc = WorkspaceCleanService(ws)
-    result = svc.clean(dry_run=False)
-
-    assert protected_exact.exists(), "exact-name-exempted file must never be deleted"
-    assert protected_exact not in result.deleted
-    assert protected_glob.exists(), "glob-exempted file must never be deleted"
-    assert protected_glob not in result.deleted
-
-
 # ---------------------------------------------------------------------------
-# CRITICAL: never deletes outside .dadaia/, and every candidate lives under it.
+# CRITICAL: never deletes outside .dadaia/, every candidate lives under it, and
+# operator-exception files (exact + glob) are never deleted.
 # ---------------------------------------------------------------------------
 
 
-def test_never_deletes_outside_dadaia_and_candidate_zone_guard(tmp_path: Path) -> None:
+def test_never_deletes_outside_dadaia_candidate_zone_guard_and_operator_exceptions(
+    tmp_path: Path,
+) -> None:
     ws = _make_workspace(tmp_path)
     outside = _write_file(
         ws / "repos" / "myrepo" / "important.py",
@@ -175,3 +155,21 @@ def test_never_deletes_outside_dadaia_and_candidate_zone_guard(tmp_path: Path) -
         assert dadaia_dir in c.path.parents or c.path.parent == dadaia_dir, (
             f"candidate path {c.path} is outside .dadaia/"
         )
+
+    protected_exact = _write_file(
+        ws / ".dadaia" / "tmp" / "operator-notes.txt",
+        mtime_offset=dt.timedelta(days=10),
+    )
+    protected_glob = _write_file(
+        ws / ".dadaia" / "tmp" / "operator-screenshot.png",
+        mtime_offset=dt.timedelta(days=10),
+    )
+    exc_file = ws / ".dadaia" / "states" / "root_exceptions.txt"
+    exc_file.write_text("operator-notes.txt\n*.png\n")
+
+    exception_result = svc.clean(dry_run=False)
+
+    assert protected_exact.exists(), "exact-name-exempted file must never be deleted"
+    assert protected_exact not in exception_result.deleted
+    assert protected_glob.exists(), "glob-exempted file must never be deleted"
+    assert protected_glob not in exception_result.deleted

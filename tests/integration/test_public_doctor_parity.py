@@ -93,11 +93,19 @@ def _add_consumer(
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_root_consumer_labels_and_runtime_expectations(tmp_path: Path) -> None:
+def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregistered(
+    tmp_path: Path,
+) -> None:
     """Root labels always present (no consumers); exactly 4 labels with one registry-listed
     consumer (root x2 + consumer x2, bannerless-source consumer classifies [foreign]);
     drift detected for a modified destination; and ``_runtime_expectations`` yields the
-    root labels in the manager's doctor output after a stage+install cycle."""
+    root labels in the manager's doctor output after a stage+install cycle.
+
+    Plus: the REAL ``manager.doctor()`` emits ``[foreign]`` on BOTH paired consumer lines
+    for a hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]``
+    (Ruling 16; bug public-doctor-flags-hand-authored-consumer-agents-md); and a consumer
+    repo NOT registered in ``spec_contexts.json`` is absent from doctor labels entirely
+    (registry-based detection, v0.1.58 FR4, Ruling G)."""
     # Root labels present even without consumers.
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)
@@ -186,38 +194,28 @@ def test_doctor_root_consumer_labels_and_runtime_expectations(tmp_path: Path) ->
         f"Expected 'root:CLAUDE.md' in doctor output.\n  Lines: {sorted(label_set)}"
     )
 
-
-# ---------------------------------------------------------------------------
-# Fn 2 — drift-detected + foreign-pair hand-authored + unregistered-consumer-excluded.
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_foreign_pair_and_unregistered_consumer_excluded(tmp_path: Path) -> None:
-    """The REAL ``manager.doctor()`` emits ``[foreign]`` on BOTH paired consumer lines for a
-    hand-authored (no-banner) consumer AGENTS.md — never ``[drift]``/``[missing]`` (Ruling
-    16; bug public-doctor-flags-hand-authored-consumer-agents-md); and a consumer repo NOT
-    registered in ``spec_contexts.json`` is absent from doctor labels entirely (registry-
-    based detection, v0.1.58 FR4, Ruling G)."""
-    public_dir = _make_minimal_public(tmp_path)
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
+    # Fn 2 — drift-detected + foreign-pair hand-authored + unregistered-consumer-excluded,
+    # own workspace.
+    foreign_public_dir = _make_minimal_public(tmp_path / "foreign-case")
+    workspace_root2 = tmp_path / "foreign-case" / "workspace"
+    workspace_root2.mkdir(parents=True)
 
     slug = "game"
-    consumer = _add_consumer(workspace_root, slug)
+    consumer = _add_consumer(workspace_root2, slug)
     hand_authored = "# My Game Repo\n\nHand-authored, repo-owned rules. NOT lib-originated.\n"
     (consumer / "AGENTS.md").write_text(hand_authored, encoding="utf-8")
 
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
-    manager.stage(workspace_root)
-    manager.install(workspace_root, target="all", force=True)
+    manager._public_dir = foreign_public_dir  # noqa: SLF001
+    manager.stage(workspace_root2)
+    manager.install(workspace_root2, target="all", force=True)
 
     # INSTALL side: the hand-authored file survives byte-identical, no CLAUDE.md orphan.
     assert (consumer / "AGENTS.md").read_text(encoding="utf-8") == hand_authored
     assert not (consumer / "CLAUDE.md").exists()
 
     # DOCTOR side via the REAL manager.doctor(): the consumer pair is [foreign] (Ruling 16).
-    lines = manager.doctor(workspace_root)
+    lines = manager.doctor(workspace_root2)
     assert "[foreign] repos/game:AGENTS.md" in lines, lines
     assert "[foreign] repos/game:CLAUDE.md" in lines, lines
     consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]

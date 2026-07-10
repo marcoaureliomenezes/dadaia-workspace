@@ -188,9 +188,11 @@ def test_context_uninitialized_workspace_and_v1_workspace_exit_nonzero(
 # ---------------------------------------------------------------------------
 
 
-def test_context_bind_default_read_persistence_and_confirmation(workspace: Path) -> None:
-    """FR-R4-01: bind with NO --mode exits 0, defaults to read, persists READ, and
-    prints a human confirmation (context/mode/session id) — never a shell export line."""
+def test_context_bind_read_persistence_variants(workspace: Path) -> None:
+    """FR-R4-01/02: bind with NO --mode exits 0, defaults to read, persists READ, and
+    prints a human confirmation (context/mode/session id) — never a shell export line.
+    Explicit --mode read persists READ; legacy --mode spec alias maps and persists as
+    READ too (no lease-taking)."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
@@ -204,11 +206,6 @@ def test_context_bind_default_read_persistence_and_confirmation(workspace: Path)
     assert record["mode"] == "READ"
     assert record["context"] == "myctx"
 
-
-def test_context_bind_explicit_read_and_spec_alias_persist_read(workspace: Path) -> None:
-    """FR-R4-02: explicit --mode read persists READ; legacy --mode spec alias maps
-    and persists as READ too (no lease-taking)."""
-    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
     assert result.exit_code == 0, result.output
     record = _session_record_for(workspace, result.output)

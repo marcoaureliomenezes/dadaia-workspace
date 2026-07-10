@@ -286,6 +286,17 @@ def test_prefix_bytes_are_byte_identical_across_steps(tmp_path: Path) -> None:
     # The recorded hash is sha256 of those exact shared prefix bytes (cacheable invariant).
     assert effective_hash == hashlib.sha256(common_prefix.encode("utf-8")).hexdigest()
 
+    # No whole-memory injection by default (cost regression guard). The sentinel lives
+    # deep in architecture.md's body. The release-definition fragments only ever pull
+    # architecture under the bounded `summary` policy, so no step's prompt may contain
+    # the whole atom body — the sentinel must never appear in ANY prompt.
+    for step in result.steps:
+        if step.prompt_text is None:
+            continue
+        assert _MEMORY_SENTINEL not in step.prompt_text, (
+            f"step {step.label} leaked the whole memory corpus into its prompt"
+        )
+
 
 # ---------------------------------------------------------------------------
 # ② static_inputs reach prompt + missing-static-input degrades gracefully
@@ -347,28 +358,3 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
         assert _ARCH_STATIC_MARKER in step.prompt_text
 
 
-# ---------------------------------------------------------------------------
-# No whole-memory injection by default (cost regression guard)
-# ---------------------------------------------------------------------------
-
-
-def test_default_step_does_not_inject_whole_memory_corpus(tmp_path: Path) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(
-        tmp_path,
-        store,
-        lambda kind: _KindFake(kind, _approved()),
-        prefix=_stable_prefix(),
-    )
-
-    result = wf.run("obs-4")
-
-    # The sentinel lives deep in architecture.md's body. The release-definition fragments
-    # only ever pull architecture under the bounded `summary` policy, so no step's prompt
-    # may contain the whole atom body — the sentinel must never appear in ANY prompt.
-    for step in result.steps:
-        if step.prompt_text is None:
-            continue
-        assert _MEMORY_SENTINEL not in step.prompt_text, (
-            f"step {step.label} leaked the whole memory corpus into its prompt"
-        )

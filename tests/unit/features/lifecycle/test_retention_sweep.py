@@ -198,18 +198,15 @@ def test_important_marked_report_spared_and_canonical_top_level_dir_never_touche
     assert states_file.exists()
     assert all(not p.startswith(".dadaia/states") for p in canonical_result.reclaimed_paths)
 
-
-# --- symlink-escape refusal -----------------------------------
-
-
-def test_symlink_escaping_dadaia_is_refused(tmp_path: Path) -> None:
+    # --- symlink-escape refusal ---
     # A symlink planted inside a swept zone that resolves OUTSIDE .dadaia must be refused:
     # following it would delete an arbitrary external tree.
-    outside = tmp_path / "outside_target"
-    outside.mkdir()
+    symlink_root = tmp_path / "symlink"
+    outside = symlink_root / "outside_target"
+    outside.mkdir(parents=True)
     (outside / "precious.txt").write_bytes(b"do-not-delete")
 
-    link = tmp_path / ".dadaia" / "tmp" / "escape"
+    link = symlink_root / ".dadaia" / "tmp" / "escape"
     link.parent.mkdir(parents=True, exist_ok=True)
     link.symlink_to(outside, target_is_directory=True)
     # A symlink is collected as a candidate unconditionally (the deleter treats it as a
@@ -218,10 +215,10 @@ def test_symlink_escaping_dadaia_is_refused(tmp_path: Path) -> None:
     # os.utime(link, follow_symlinks=False) here: that is unavailable on Windows
     # (NotImplementedError) and is unnecessary for this assertion.
 
-    result = _sweep(tmp_path).sweep(apply=True)
+    symlink_result = _sweep(symlink_root).sweep(apply=True)
 
     assert outside.exists()
     assert (outside / "precious.txt").exists(), "symlink-escape must never delete outside .dadaia"
-    skipped = dict(result.skipped)
-    assert ".dadaia/tmp/escape" in skipped
-    assert skipped[".dadaia/tmp/escape"] is RetentionSkipReason.ESCAPE
+    symlink_skipped = dict(symlink_result.skipped)
+    assert ".dadaia/tmp/escape" in symlink_skipped
+    assert symlink_skipped[".dadaia/tmp/escape"] is RetentionSkipReason.ESCAPE

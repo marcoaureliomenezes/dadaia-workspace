@@ -153,16 +153,11 @@ def test_legacy_schema_or_state_raises_schema_version_error(
         store.list_all()
     assert "dadaia migrate" in str(exc_info.value)
 
-
-# ---------------------------------------------------------------------------
-# AC-T10a-7: Written JSON must not contain is_primary or activated_at
-# ---------------------------------------------------------------------------
-
-
-def test_written_json_has_no_legacy_fields(tmp_path: Path) -> None:
-    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields
-    (the v2 shape)."""
-    store = JsonContextStore(tmp_path)
+    # AC-T10a-7: spec_contexts.json written by the store (fresh v2 store, separate
+    # workspace) has no legacy fields — is_primary / activated_at never round-trip.
+    fresh_ws = tmp_path.parent / (tmp_path.name + "-fresh")
+    fresh_ws.mkdir(parents=True, exist_ok=True)
+    fresh_store = JsonContextStore(fresh_ws)
     ctx = SpecContextProject(
         name="myctx",
         state=ContextState.ALIVE,
@@ -173,9 +168,9 @@ def test_written_json_has_no_legacy_fields(tmp_path: Path) -> None:
         dead_since=None,
         current_branch="main",
     )
-    store.save(ctx)
-    ctx_file = tmp_path / "spec_contexts.json"
-    data = json.loads(ctx_file.read_text())
+    fresh_store.save(ctx)
+    fresh_ctx_file = fresh_ws / "spec_contexts.json"
+    data = json.loads(fresh_ctx_file.read_text())
     row = data["contexts"][0]
     assert "is_primary" not in row
     assert "activated_at" not in row

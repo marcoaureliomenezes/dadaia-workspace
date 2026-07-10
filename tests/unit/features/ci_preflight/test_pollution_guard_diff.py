@@ -65,22 +65,10 @@ def _run_guard_cycle(
     return session.exitstatus
 
 
-def test_session_created_pollution_dir_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
-) -> None:
-    status = _run_guard_cycle(
-        monkeypatch,
-        tmp_path,
-        preexisting=(),
-        created_during=(".ruff_cache",),
-        capsys=capsys,
-    )
-    assert status == 1
-
-
 @pytest.mark.parametrize(
     ("preexisting", "created_during", "expect_status"),
     [
+        pytest.param((), (".ruff_cache",), 1, id="session-created-pollution-dir-fails"),
         pytest.param((".ruff_cache", ".mypy_cache"), (), 0, id="preexisting-only-does-not-fail"),
         pytest.param(
             (".mypy_cache",),

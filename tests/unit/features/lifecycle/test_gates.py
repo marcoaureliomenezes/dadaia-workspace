@@ -326,9 +326,7 @@ def test_review_gate_rejects_wrong_identity_or_unresolved_findings(
     assert result.accepted is False
     assert reason in result.reasons
 
-
-def test_review_gate_rejects_stale_approval() -> None:
-    result = HandoffGateValidator().validate(
+    stale_result = HandoffGateValidator().validate(
         _multi_agent_handoff(agent="security-reviewer"),
         _multi_agent_requirement(agent="security-reviewer"),
         context="dadaia-workspace",
@@ -339,5 +337,5 @@ def test_review_gate_rejects_stale_approval() -> None:
         age_seconds=601,
     )
 
-    assert result.accepted is False
-    assert "stale handoff" in result.reasons
+    assert stale_result.accepted is False
+    assert "stale handoff" in stale_result.reasons

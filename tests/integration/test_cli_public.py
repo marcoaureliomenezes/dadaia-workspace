@@ -25,7 +25,19 @@ def _init_ws(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_public_stage_install_all_and_force_smoke(tmp_path: Path, monkeypatch) -> None:
+def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Stage + install --target all + --force smoke, then T-PROP-02 integration: doctor
+    CLI exits 0 on clean workspace, non-zero on drift.
+
+    The doctor sub-cases are tested using patched service responses so the test is
+    deterministic regardless of the real workspace state. The CLI layer
+    (command/exit-code routing) is exercised in full; only the service return value
+    is stubbed.
+    """
+    from unittest.mock import MagicMock, patch
+
     _init_ws(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -38,20 +50,6 @@ def test_public_stage_install_all_and_force_smoke(tmp_path: Path, monkeypatch) -
 
     force_result = _runner.invoke(app, ["public", "install", "--force"])
     assert force_result.exit_code == 0, force_result.output
-
-
-def test_public_doctor_exit_code_routing_clean_and_drift(tmp_path: Path, monkeypatch) -> None:
-    """T-PROP-02 integration: doctor CLI exits 0 on clean workspace, non-zero on drift.
-
-    The two sub-cases are tested using patched service responses so the test is
-    deterministic regardless of the real workspace state. The CLI layer
-    (command/exit-code routing) is exercised in full; only the service return value
-    is stubbed.
-    """
-    from unittest.mock import MagicMock, patch
-
-    _init_ws(tmp_path)
-    monkeypatch.chdir(tmp_path)
 
     ok_lines = ["[ok] stage:agents/qa-engineer.md", "[not-applicable] codex:config.toml"]
     with patch("dadaia_workspace.cli.commands.public.container") as mock_container:

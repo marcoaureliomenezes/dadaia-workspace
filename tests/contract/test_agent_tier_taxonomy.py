@@ -74,17 +74,6 @@ def _plugin_body_agents() -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
-def test_roster_counts_are_nine_core_and_three_plugin() -> None:
-    assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
-    assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
-    bodies = _plugin_body_agents()
-    assert {p.stem for p in bodies} == {
-        "frontend-engineer",
-        "design-specialist",
-        "devops-engineer",
-    }, [p.name for p in bodies]
-
-
 # ---------------------------------------------------------------------------
 # (a) the 3 built-in templates, verbatim (the SPEC FR2 table)
 # ---------------------------------------------------------------------------
@@ -178,11 +167,21 @@ def test_no_template_assigns_fable_to_security_reviewer() -> None:
 
 
 def test_core_and_plugin_agent_frontmatter_tiers() -> None:
-    """(e): staged core bodies carry ``dispatch_band`` but NO ``model:``/``effort:``
-    (v0.1.65 FR1: the model/effort pinning moved from per-file frontmatter to the
-    template registry, asserted above; the projected files carry them, the staged
-    sources must not). (f): plugin pack bodies carry ``dispatch_band: 3`` +
-    ``model: claude-sonnet-5`` (registry tier ``plugin``)."""
+    """(g): roster counts unchanged (9 core, 3 plugin). (e): staged core bodies carry
+    ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
+    pinning moved from per-file frontmatter to the template registry, asserted above;
+    the projected files carry them, the staged sources must not). (f): plugin pack
+    bodies carry ``dispatch_band: 3`` + ``model: claude-sonnet-5`` (registry tier
+    ``plugin``)."""
+    assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
+    assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
+    bodies = _plugin_body_agents()
+    assert {p.stem for p in bodies} == {
+        "frontend-engineer",
+        "design-specialist",
+        "devops-engineer",
+    }, [p.name for p in bodies]
+
     seen: set[str] = set()
     for md in _core_agents():
         fm = _frontmatter(md)

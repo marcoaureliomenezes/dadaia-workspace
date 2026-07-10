@@ -184,20 +184,13 @@ def test_build_memory_bootstrap_is_byte_identical_golden(tmp_path: Path) -> None
     assert '"slug": "agent-comms"' in built
     assert '"path": "specs/memory/product/agents/agent-comms.md"' in built
 
-
-def test_bootstrap_empty_when_no_memory_dir_or_host_path_leak(tmp_path: Path) -> None:
-    """Platform-invariance (v0.1.55): the host ``specs_dir`` path never leaks into output.
-
-    The golden is built purely from fixture file CONTENT, so the ``tmp_path`` sandbox
-    path (an absolute, OS-specific host path) must not appear anywhere in the bootstrap.
-    A second case in this fn: no ``memory/`` dir ⇒ empty bootstrap (the guard clause),
-    unchanged under FR4.
-    """
-    specs = _build_fixture_specs(tmp_path)
-    built = ctx_inject._build_memory(specs)
+    # Platform-invariance (v0.1.55): the host `specs_dir` path never leaks into output.
+    # The golden is built purely from fixture file CONTENT, so the tmp_path sandbox path
+    # (an absolute, OS-specific host path) must not appear anywhere in the bootstrap.
     assert str(tmp_path) not in built
     assert str(specs) not in built
 
+    # No `memory/` dir ⇒ empty bootstrap (the guard clause), unchanged under FR4.
     empty_specs = tmp_path / "empty-specs"
     empty_specs.mkdir()
     assert ctx_inject._build_memory(empty_specs) == ""

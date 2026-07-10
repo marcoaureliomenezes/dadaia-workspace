@@ -169,7 +169,9 @@ def test_text_denylist_flags_and_scans_root_agents_md(
     assert any("AGENTS.md" in line and _TEST_TERM in line.lower() for line in root_report)
 
 
-def test_bytecode_cache_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _seed_denylist_env(monkeypatch, tmp_path)
     public_dir = tmp_path / "public"
     cache_dir = public_dir / "skills" / "sample" / "__pycache__"
@@ -180,9 +182,7 @@ def test_bytecode_cache_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
     assert _manager(public_dir)._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
 
-
-def test_baseline_data_loads_with_version_header() -> None:
-    """Packaged baseline data ships with a versioned, documented header."""
+    # Packaged baseline data ships with a versioned, documented header.
     patterns = _load_privacy_baseline()
     assert patterns, "baseline must ship at least one structural pattern"
     ids = {p.id for p in patterns}
@@ -215,28 +215,25 @@ def test_load_denylist_source_formats(
     monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(source))
     assert _load_privacy_denylist() == expected
 
+    if name == "dict_format":
+        # Malformed JSON, a missing source path, and neither env nor workspace present
+        # all resolve to an empty tuple (fail-open on the loader side, never a crash).
+        no_ws = tmp_path / "no_workspace"
+        no_ws.mkdir()
 
-def test_load_denylist_returns_empty_when_unresolvable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Malformed JSON, a missing source path, and neither env nor workspace present all
-    resolve to an empty tuple (fail-open on the loader side, never a crash)."""
-    no_ws = tmp_path / "no_workspace"
-    no_ws.mkdir()
+        malformed = tmp_path / "malformed.json"
+        malformed.write_text("{not valid json", encoding="utf-8")
+        monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(malformed))
+        monkeypatch.chdir(no_ws)
+        assert _load_privacy_denylist() == ()
 
-    malformed = tmp_path / "malformed.json"
-    malformed.write_text("{not valid json", encoding="utf-8")
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(malformed))
-    monkeypatch.chdir(no_ws)
-    assert _load_privacy_denylist() == ()
+        monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "nope.json"))
+        monkeypatch.chdir(no_ws)
+        assert _load_privacy_denylist() == ()
 
-    monkeypatch.setenv(_PRIVACY_DENYLIST_ENV, str(tmp_path / "nope.json"))
-    monkeypatch.chdir(no_ws)
-    assert _load_privacy_denylist() == ()
-
-    monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
-    monkeypatch.chdir(no_ws)
-    assert _load_privacy_denylist() == ()
+        monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
+        monkeypatch.chdir(no_ws)
+        assert _load_privacy_denylist() == ()
 
 
 def test_load_denylist_env_precedence_and_workspace_fallback(

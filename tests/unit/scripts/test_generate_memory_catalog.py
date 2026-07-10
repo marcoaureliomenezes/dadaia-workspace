@@ -26,6 +26,8 @@ import types
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Locate + import the script module
 # ---------------------------------------------------------------------------
@@ -109,27 +111,27 @@ def _make_memory_dir(tmp_path: Path) -> tuple[Path, Path]:
     return memory_dir, product_dir
 
 
-def test_empty_product_dir_returns_empty_catalog(tmp_path: Path) -> None:
-    """generate_catalog on an empty product/ dir returns an empty features list."""
-    memory_dir, _ = _make_memory_dir(tmp_path)
+def test_empty_dir_single_atom_shape_and_top_level_keys(tmp_path: Path) -> None:
+    """generate_catalog on an empty product/ dir returns an empty features list; a single
+    atom produces a catalog entry matching the expected shape; the catalog dict carries
+    the required top-level keys."""
+    memory_dir, product_dir = _make_memory_dir(tmp_path)
 
     catalog, errors = generate_catalog(memory_dir)
-
     assert not errors, f"Unexpected errors: {errors}"
     assert catalog is not None
     assert catalog["features"] == []
 
-
-def test_single_atom_catalog_shape(tmp_path: Path) -> None:
-    """Single atom produces catalog with 1 entry matching the expected shape."""
-    memory_dir, product_dir = _make_memory_dir(tmp_path)
     _make_product_atom(product_dir, slug="workspace-init")
 
-    catalog, errors = generate_catalog(memory_dir)
+    catalog2, errors2 = generate_catalog(memory_dir, context="my-workspace")
 
-    assert not errors, f"Unexpected errors: {errors}"
-    assert catalog is not None
-    features = catalog["features"]
+    assert not errors2, f"Unexpected errors: {errors2}"
+    assert catalog2 is not None
+    assert "generated_at" in catalog2
+    assert catalog2["context"] == "my-workspace"
+    assert "features" in catalog2
+    features = catalog2["features"]
     assert len(features) == 1
 
     feat = features[0]
@@ -148,20 +150,6 @@ def test_single_atom_catalog_shape(tmp_path: Path) -> None:
     assert feat["depends_on"] == []
     assert "path" in feat
     assert feat["path"].endswith("workspace-init.md")
-
-
-def test_catalog_top_level_keys(tmp_path: Path) -> None:
-    """Catalog dict has required top-level keys."""
-    memory_dir, product_dir = _make_memory_dir(tmp_path)
-    _make_product_atom(product_dir, slug="test-feature")
-
-    catalog, errors = generate_catalog(memory_dir, context="my-workspace")
-
-    assert not errors
-    assert catalog is not None
-    assert "generated_at" in catalog
-    assert catalog["context"] == "my-workspace"
-    assert "features" in catalog
 
 
 def test_multiple_atoms_ranks(tmp_path: Path) -> None:
@@ -214,54 +202,48 @@ def test_missing_required_field_returns_error(tmp_path: Path) -> None:
     )
 
 
-def test_depends_on_from_wikilinks(tmp_path: Path) -> None:
-    """depends_on is populated from [[slug]] wikilinks in the body."""
+@pytest.mark.parametrize(
+    ("body", "extra_slugs", "target_slug", "expected"),
+    [
+        pytest.param(
+            "## Propósito\n\nSee [[feature-b]] and [[feature-c]] for context.\n",
+            ("feature-b", "feature-c"),
+            "feature-a",
+            {"feature-b", "feature-c"},
+            id="from-wikilinks",
+        ),
+        pytest.param(None, (), "standalone", set(), id="empty-when-no-wikilinks"),
+        pytest.param(
+            "## Propósito\n\nSee [[other]] and again [[other]].\n",
+            (),
+            "feature-a",
+            {"other"},
+            id="deduplicates-wikilinks",
+        ),
+    ],
+)
+def test_depends_on_matrix(
+    tmp_path: Path,
+    body: str | None,
+    extra_slugs: tuple[str, ...],
+    target_slug: str,
+    expected: set[str],
+) -> None:
+    """depends_on is derived from [[slug]] wikilinks in the body: populated, empty, deduped."""
     memory_dir, product_dir = _make_memory_dir(tmp_path)
-    _make_product_atom(
-        product_dir,
-        slug="feature-a",
-        body="## Propósito\n\nSee [[feature-b]] and [[feature-c]] for context.\n",
-    )
-    _make_product_atom(product_dir, slug="feature-b")
-    _make_product_atom(product_dir, slug="feature-c")
+    if body is not None:
+        _make_product_atom(product_dir, slug=target_slug, body=body)
+    else:
+        _make_product_atom(product_dir, slug=target_slug)
+    for slug in extra_slugs:
+        _make_product_atom(product_dir, slug=slug)
 
     catalog, errors = generate_catalog(memory_dir)
 
     assert not errors, f"Unexpected errors: {errors}"
     assert catalog is not None
-
-    feat_a = next(f for f in catalog["features"] if f["slug"] == "feature-a")
-    assert set(feat_a["depends_on"]) == {"feature-b", "feature-c"}
-
-
-def test_depends_on_empty_when_no_wikilinks(tmp_path: Path) -> None:
-    """depends_on is empty when no wikilinks are present in the body."""
-    memory_dir, product_dir = _make_memory_dir(tmp_path)
-    _make_product_atom(product_dir, slug="standalone")
-
-    catalog, errors = generate_catalog(memory_dir)
-
-    assert not errors
-    assert catalog is not None
-    feat = catalog["features"][0]
-    assert feat["depends_on"] == []
-
-
-def test_depends_on_deduplicates_wikilinks(tmp_path: Path) -> None:
-    """Duplicate wikilinks in the body appear only once in depends_on."""
-    memory_dir, product_dir = _make_memory_dir(tmp_path)
-    _make_product_atom(
-        product_dir,
-        slug="feature-a",
-        body="## Propósito\n\nSee [[other]] and again [[other]].\n",
-    )
-
-    catalog, errors = generate_catalog(memory_dir)
-
-    assert not errors
-    assert catalog is not None
-    feat = catalog["features"][0]
-    assert feat["depends_on"].count("other") == 1
+    feat = next(f for f in catalog["features"] if f["slug"] == target_slug)
+    assert set(feat["depends_on"]) == expected
 
 
 def test_generate_index_md_has_expected_sections(tmp_path: Path) -> None:

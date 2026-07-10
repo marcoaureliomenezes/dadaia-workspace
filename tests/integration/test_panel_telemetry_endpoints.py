@@ -202,8 +202,11 @@ def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes
         return exc.code, headers, exc.read()
 
 
-def test_endpoints_no_auth_window_days_forwarding_and_404_body(panel_server) -> None:
-    """No-auth contract (credential-less 200) + window_days forwarding + 404 body lists endpoints."""
+def test_endpoints_no_auth_window_days_forwarding_404_body_and_security_headers(
+    panel_server,
+) -> None:
+    """No-auth contract (credential-less 200) + window_days forwarding + 404 body lists
+    endpoints + CSP-on-HTML / nosniff-on-JSON security headers."""
     base, token, stub = panel_server
 
     # No-auth: every telemetry endpoint serves credential-less.
@@ -240,10 +243,7 @@ def test_endpoints_no_auth_window_days_forwarding_and_404_body(panel_server) -> 
     assert "/api/agents" in body_text
     assert "/api/workflows" in body_text
 
-
-def test_security_headers_csp_on_html_and_nosniff_on_json(panel_server) -> None:
-    base, token, stub = panel_server
-
+    # Security headers: CSP on HTML, nosniff on JSON.
     status, headers, _ = _get(f"{base}/")
     assert status == 200
     assert "content-security-policy" in {k.lower() for k in headers}

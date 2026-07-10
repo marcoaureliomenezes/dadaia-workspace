@@ -145,11 +145,12 @@ def _make_claude() -> claude_sdk_runtime.ClaudeSdkAdapter:
     ids=["pi", "codex", "claude_sdk"],
 )
 def test_redaction_parity_across_all_three_adapters(make_adapter: AdapterFactory) -> None:
-    """Every real adapter scrubs a secret-named env value identically.
-
-    This is the falsifiable divergence test: if any adapter's redaction drifted
-    from the shared base, its output for this input would differ.
-    """
+    """Every real adapter scrubs a secret-named env value identically (the
+    falsifiable divergence test: if any adapter's redaction drifted from the
+    shared base, its output for this input would differ), AND parity holds for
+    every secret-name fragment family (TOKEN/KEY/SECRET/...) with an
+    empty-valued secret-named key skipped, never redacted as a literal empty
+    match."""
     adapter = make_adapter()
     text = "connection failed using token sk-secret-123 to PATH /bin"
     redacted = adapter._redact(text)
@@ -160,17 +161,6 @@ def test_redaction_parity_across_all_three_adapters(make_adapter: AdapterFactory
     # Identical scrub for every adapter (the single-source guarantee).
     assert redacted == "connection failed using token [REDACTED] to PATH /bin"
 
-
-@pytest.mark.parametrize(
-    "make_adapter",
-    [_make_pi, _make_codex, _make_claude],
-    ids=["pi", "codex", "claude_sdk"],
-)
-def test_no_secret_named_env_value_is_left_unredacted(make_adapter: AdapterFactory) -> None:
-    """Parity for every secret-name fragment family (TOKEN/KEY/SECRET/...); an
-    empty-valued secret-named key is also skipped, never redacted as a literal
-    empty match."""
-    adapter = make_adapter()
     adapter._environ = {
         "MY_TOKEN": "t-val",
         "API_KEY": "k-val",

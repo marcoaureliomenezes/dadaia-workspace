@@ -23,9 +23,13 @@ def _skip_git_context(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bug_reporter, "_git_context", lambda *_args, **_kwargs: "")
 
 
-def test_report_exception_entry_fields_traceback_and_appends(tmp_path: Path) -> None:
+def test_report_exception_and_doctor_finding_entry_fields_traceback_and_appends(
+    tmp_path: Path,
+) -> None:
     """report_exception writes one entry per call with the expected fields, captures a
-    traceback tail, and multiple calls append (atomic append, never overwrite)."""
+    traceback tail, and multiple calls append (atomic append, never overwrite).
+    report_doctor_finding writes the finding message, multiple findings append, and the
+    command field is derived from the source string — both share one bugs_path store."""
     report_exception(tmp_path, "dadaia context deactivate foo", ValueError("test error"))
 
     bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
@@ -56,30 +60,23 @@ def test_report_exception_entry_fields_traceback_and_appends(tmp_path: Path) -> 
     assert len(entries) == 3
     assert entries[2]["exception_type"] == "TypeError"
 
-
-def test_report_doctor_finding_entry_multiple_and_command_derived(tmp_path: Path) -> None:
-    """report_doctor_finding writes the finding message, multiple findings append, and the
-    command field is derived from the source string."""
     report_doctor_finding(tmp_path, "doctor-public", "[missing] stage:agents/foo.md")
-
-    bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
-    assert bugs_path.exists()
     entries = json.loads(bugs_path.read_text(encoding="utf-8"))
-    assert len(entries) == 1
-    entry = entries[0]
-    assert entry["message"] == "[missing] stage:agents/foo.md"
-    assert entry["source"] == "doctor-public"
-    assert entry["status"] == "open"
-    assert entry["exception_type"] is None
-    assert entry["traceback_tail"] is None
-    assert entry["command"] == "dadaia doctor public"
+    assert len(entries) == 4
+    finding_entry = entries[3]
+    assert finding_entry["message"] == "[missing] stage:agents/foo.md"
+    assert finding_entry["source"] == "doctor-public"
+    assert finding_entry["status"] == "open"
+    assert finding_entry["exception_type"] is None
+    assert finding_entry["traceback_tail"] is None
+    assert finding_entry["command"] == "dadaia doctor public"
 
     report_doctor_finding(
         tmp_path, "doctor-public", "[warn] git-dirty: dadaia_workspace/public/agents/bar.md"
     )
     entries = json.loads(bugs_path.read_text(encoding="utf-8"))
-    assert len(entries) == 2
-    assert entries[1]["message"] == "[warn] git-dirty: dadaia_workspace/public/agents/bar.md"
+    assert len(entries) == 5
+    assert entries[4]["message"] == "[warn] git-dirty: dadaia_workspace/public/agents/bar.md"
 
 
 @pytest.mark.parametrize(

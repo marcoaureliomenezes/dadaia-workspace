@@ -73,29 +73,31 @@ def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
     assert _SHA_A[:12] in d.message
 
 
-def test_malformed_handoff_skipped_good_approve_still_passes(tmp_path: Path) -> None:
-    ctx_dir = tmp_path / "demo-ctx"
-    ctx_dir.mkdir(parents=True)
-    (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
-    _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert d.allowed
-
-
 # ---------------------------------------------------------------------------
-# Pass-without-verdict cases (deletion / tag / empty stdin) — 1 param
+# Pass-without-verdict cases (deletion / tag / empty stdin / malformed sibling
+# handoff skipped while a good approve still passes) — 1 param
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "ref_line",
+    ("ref_line", "setup"),
     [
-        pytest.param(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}", id="branch-deletion"),
-        pytest.param(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}", id="tag-push"),
-        pytest.param("", id="empty-stdin-no-refs"),
+        pytest.param(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}", None, id="branch-deletion"),
+        pytest.param(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}", None, id="tag-push"),
+        pytest.param("", None, id="empty-stdin-no-refs"),
+        pytest.param(
+            f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",
+            "malformed_sibling",
+            id="malformed-handoff-skipped-good-approve-still-passes",
+        ),
     ],
 )
-def test_passes_without_verdict(tmp_path: Path, ref_line: str) -> None:
+def test_passes_without_verdict(tmp_path: Path, ref_line: str, setup: str | None) -> None:
+    if setup == "malformed_sibling":
+        ctx_dir = tmp_path / "demo-ctx"
+        ctx_dir.mkdir(parents=True)
+        (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
+        _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
     d = push_gate_decision(tmp_path, _refs(ref_line))
     assert d.allowed
 

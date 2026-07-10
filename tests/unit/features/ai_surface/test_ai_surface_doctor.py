@@ -152,7 +152,5 @@ def test_not_flagged_negatives(tmp_path: Path, relpath: str, content: str) -> No
     target.write_text(content, encoding="utf-8")
     drifts = _drift_lines(check_ai_surface_ritual(public))
     assert drifts == [], f"expected no false-positive drift; got: {drifts}"
-
-
-def test_missing_public_dir_returns_empty(tmp_path: Path) -> None:
+    # A missing public/ dir is also never flagged — empty result, not an error.
     assert check_ai_surface_ritual(tmp_path / "nope") == []

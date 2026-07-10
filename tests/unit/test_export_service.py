@@ -44,23 +44,6 @@ def test_resolve_includes_drops_dotenv_files(tmp_path: Path) -> None:
     assert all(not arc.endswith(".env") for arc in arcs)
 
 
-def test_resolve_includes_skips_missing_and_run_returns_archive_path(tmp_path: Path) -> None:
-    svc, store, _ = _service(tmp_path)
-    includes = svc.resolve_includes(ExportOptions(exclude_mnt=True))
-    assert includes == []
-
-    store.save(_ctx("alpha"))
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
-
-    out = tmp_path / "dist"
-    result = svc.run(ExportOptions(output=out, exclude_mnt=True))
-
-    assert result.path is not None
-    assert result.path.exists()
-    assert result.path.suffix == ".gz"
-
-
 def test_build_manifest_records_branch_and_refresh_updates_it(tmp_path: Path) -> None:
     svc, store, git = _service(tmp_path)
     store.save(_ctx("alpha", branch="main"))
@@ -83,18 +66,30 @@ def test_build_manifest_records_branch_and_refresh_updates_it(tmp_path: Path) ->
     assert updated.current_branch == "feature/test"
 
 
-def test_create_archive_includes_manifest(tmp_path: Path) -> None:
+def test_resolve_includes_skips_missing_run_and_archive_include_manifest(
+    tmp_path: Path,
+) -> None:
     svc, store, _ = _service(tmp_path)
+    includes = svc.resolve_includes(ExportOptions(exclude_mnt=True))
+    assert includes == []
+
     store.save(_ctx("alpha"))
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
-    out = tmp_path / "out"
-    out.mkdir()
 
+    out = tmp_path / "dist"
+    result = svc.run(ExportOptions(output=out, exclude_mnt=True))
+
+    assert result.path is not None
+    assert result.path.exists()
+    assert result.path.suffix == ".gz"
+
+    out2 = tmp_path / "out"
+    out2.mkdir()
     options = ExportOptions(exclude_mnt=True)
-    includes = svc.resolve_includes(options)
-    manifest = svc.build_manifest(includes, options)
-    archive = svc.create_archive(includes, manifest, out)
+    includes2 = svc.resolve_includes(options)
+    manifest = svc.build_manifest(includes2, options)
+    archive = svc.create_archive(includes2, manifest, out2)
 
     import tarfile
 

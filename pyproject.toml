@@ -86,6 +86,7 @@ import-linter = ">=2.11"
 #       .dadaia/.venv/bin/pip install --upgrade 'pip>=25.3' 'poetry>=2.3.4' 'dulwich>=1.2.5'
 #     then re-verify: .dadaia/.venv/bin/pip list | grep -Ei '^(pip|poetry|dulwich) '
 hypothesis = ">=6.100"
+pytest-xdist = "^3.8.0"
 
 [build-system]
 requires = ["poetry-core"]

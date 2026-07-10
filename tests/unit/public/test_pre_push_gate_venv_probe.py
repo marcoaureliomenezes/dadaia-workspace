@@ -103,21 +103,6 @@ def _run_probe(
     )
 
 
-def test_dadaia_bin_env_override_wins(tmp_path: Path) -> None:
-    """$DADAIA_BIN wins over every other source."""
-    repo = tmp_path / "repos" / "slug"
-    repo.mkdir(parents=True)
-    bin_dir = _make_repo_with_fake_git(tmp_path, repo)
-    fake_bin = tmp_path / "custom" / "dadaia"
-    _write_executable(fake_bin)
-
-    res = _run_probe(repo, path_dirs=[bin_dir], extra_env={"DADAIA_BIN": str(fake_bin)})
-
-    assert res.returncode == 0, res.stderr
-    assert "DADAIA_BIN" in res.stdout
-    assert str(fake_bin) in res.stdout
-
-
 @pytest.mark.parametrize(
     ("name", "setup_fn", "expect_label"),
     [
@@ -145,6 +130,19 @@ def test_runner_resolution_branch_table(
     tmp_path: Path, name: str, setup_fn: object, expect_label: str
 ) -> None:
     if name == "walk_up_to_workspace_venv":
+        # $DADAIA_BIN wins over every other source (companion assertion, same fixture
+        # shape, before the workspace-venv walk-up branch is exercised below).
+        env_repo = tmp_path / "env-repos" / "slug"
+        env_repo.mkdir(parents=True)
+        env_bin_dir = _make_repo_with_fake_git(tmp_path, env_repo)
+        fake_bin = tmp_path / "custom" / "dadaia"
+        _write_executable(fake_bin)
+        env_res = _run_probe(
+            env_repo, path_dirs=[env_bin_dir], extra_env={"DADAIA_BIN": str(fake_bin)}
+        )
+        assert env_res.returncode == 0, env_res.stderr
+        assert "DADAIA_BIN" in env_res.stdout
+        assert str(fake_bin) in env_res.stdout
         ws = tmp_path / "ws"
         repo = ws / "repos" / "slug"
         repo.mkdir(parents=True)
@@ -177,19 +175,6 @@ def test_runner_resolution_branch_table(
     assert expect_label in res.stdout
 
 
-def test_none_found_fails_closed(tmp_path: Path) -> None:
-    """No runner anywhere → exit 1 with a clear error, never silently skip."""
-    repo = tmp_path / "isolated"
-    repo.mkdir(parents=True)
-    bin_dir = _make_repo_with_fake_git(tmp_path, repo)  # only stub git on PATH
-
-    res = _run_probe(repo, path_dirs=[bin_dir])
-
-    assert res.returncode == 1
-    assert "ERROR" in res.stderr
-    assert "could not locate the dadaia runner" in res.stderr
-
-
 @pytest.mark.parametrize(
     ("name", "with_poetry", "override_env", "expected_present", "expected_absent"),
     [
@@ -207,6 +192,17 @@ def test_precedence_table(
     expected_present: str,
     expected_absent: str,
 ) -> None:
+    if name == "dadaia_bin_precedes_workspace_venv":
+        # No runner anywhere → exit 1 with a clear error, never silently skip
+        # (companion negative control, fail-CLOSED — CRIT-adjacent never-push-red).
+        isolated_repo = tmp_path / "isolated"
+        isolated_repo.mkdir(parents=True)
+        isolated_bin_dir = _make_repo_with_fake_git(tmp_path, isolated_repo)
+        isolated_res = _run_probe(isolated_repo, path_dirs=[isolated_bin_dir])
+        assert isolated_res.returncode == 1
+        assert "ERROR" in isolated_res.stderr
+        assert "could not locate the dadaia runner" in isolated_res.stderr
+
     ws = tmp_path / "ws"
     repo = ws / "repos" / "slug"
     repo.mkdir(parents=True)

@@ -149,26 +149,23 @@ def _make_aggregator(conn: sqlite3.Connection) -> TelemetryAggregator:
 # ---------------------------------------------------------------------------
 
 
-def test_zero_known_cost_is_zero_not_null() -> None:
-    conn = _make_conn()
-    _insert_agent(conn, "agent-a", "claude")
-    _insert_session(conn, "s1", "claude", "agent-a")
-    _insert_event(conn, "e1", "s1", "agent-a", cost_micro_usd=0)
-    conn.commit()
-
-    result = _make_aggregator(conn).aggregate_sessions("claude")
-
-    assert result.total_cost_usd == 0.0
-    assert result.total_cost_usd is not None
-    assert result.cost_known is True
-
-
 # ---------------------------------------------------------------------------
-# Cost-nullability cases 1-6 — 1 param
+# Cost-nullability cases 1-7 (incl. zero-known-cost-is-zero-not-null) — 1 param
 # ---------------------------------------------------------------------------
 
 
 def test_cost_nullability_matrix() -> None:
+    # a known cost of exactly 0 -> 0.0, not null (0 != null decision).
+    conn_zero = _make_conn()
+    _insert_agent(conn_zero, "agent-a", "claude")
+    _insert_session(conn_zero, "s1", "claude", "agent-a")
+    _insert_event(conn_zero, "e1", "s1", "agent-a", cost_micro_usd=0)
+    conn_zero.commit()
+    zero_result = _make_aggregator(conn_zero).aggregate_sessions("claude")
+    assert zero_result.total_cost_usd == 0.0
+    assert zero_result.total_cost_usd is not None
+    assert zero_result.cost_known is True
+
     # codex/pi: cost forced null + unknown, even with a stray non-null cost row.
     conn_codex = _make_conn()
     _insert_agent(conn_codex, "agent-x", "codex")

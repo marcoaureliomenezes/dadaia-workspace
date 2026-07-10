@@ -158,12 +158,6 @@ def _assert_contiguous_gfm_tables(index_md: str, renderer: str) -> int:
     return tables
 
 
-def test_both_renderers_emit_contiguous_gfm_table(tmp_path: Path) -> None:
-    lib_index, script_index = _both_indexes(tmp_path)
-    _assert_contiguous_gfm_tables(lib_index, "features/specs/catalog.py")
-    _assert_contiguous_gfm_tables(script_index, "generate-memory-catalog.py")
-
-
 # ---------------------------------------------------------------------------
 # F-84 — identical features JSON (field order pinned) + timestamp shape
 # ---------------------------------------------------------------------------
@@ -224,6 +218,10 @@ def test_agent_tier_dropped_and_absence_tolerated(tmp_path: Path) -> None:
     """v0.1.53 FR3: agent_tier is NOT emitted by either renderer even though fixture
     atoms still carry it in frontmatter ('drop'), and an atom entirely missing the
     field still generates cleanly with byte-identical output ('tolerate')."""
+    lib_index, script_index = _both_indexes(tmp_path)
+    _assert_contiguous_gfm_tables(lib_index, "features/specs/catalog.py")
+    _assert_contiguous_gfm_tables(script_index, "generate-memory-catalog.py")
+
     lib_cat, script_cat = _both_catalogs(tmp_path)
     for name, cat in (("lib", lib_cat), ("script", script_cat)):
         features = cat["features"]

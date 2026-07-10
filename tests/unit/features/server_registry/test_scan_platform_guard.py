@@ -93,13 +93,12 @@ def test_per_function_guards_when_no_proc_fs(case: str, call) -> None:  # type: 
     else:
         assert result == ""
 
-
-def test_pid_belongs_to_current_user_guards_missing_getuid() -> None:
-    """_pid_belongs_to_current_user must not raise AttributeError when os.getuid is
-    absent (simulates Windows) — the getattr(os, 'getuid', None) guard path."""
-    with (
-        patch.object(scan_module, "PLATFORM", _WITH_PROC_CAPS),
-        patch.object(os, "getuid", None, create=True),
-    ):
-        result = _pid_belongs_to_current_user(99999)
-    assert isinstance(result, bool)
+    if case == "pid-belongs":
+        # _pid_belongs_to_current_user must not raise AttributeError when os.getuid
+        # is absent (simulates Windows) — the getattr(os, 'getuid', None) guard path.
+        with (
+            patch.object(scan_module, "PLATFORM", _WITH_PROC_CAPS),
+            patch.object(os, "getuid", None, create=True),
+        ):
+            guarded_result = _pid_belongs_to_current_user(99999)
+        assert isinstance(guarded_result, bool)

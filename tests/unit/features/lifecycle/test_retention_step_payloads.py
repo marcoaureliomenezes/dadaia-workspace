@@ -63,28 +63,14 @@ def _sweep(
 # --- live-run safety --------------------------------------------------------------
 
 
-def test_preserves_live_run_step_payloads(tmp_path: Path) -> None:
-    """A live run's step payloads are NEVER reclaimed, even when past TTL."""
-    ref = _step_payload(
-        tmp_path, "live-run", "qa-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
-    )
-    # The live-claim set claims the run's steps dir (what the container injects for a
-    # non-terminal run).
-    live = frozenset({".dadaia/runs/lifecycle/live-run/steps"})
-
-    result = _sweep(tmp_path, live=live, reclaim_allow=frozenset({ref})).sweep(apply=True)
-
-    assert (tmp_path / ref).is_file(), "live-run step payload must survive"
-    assert ref not in set(result.reclaimed_paths)
-
-
 # --- consumed_all past TTL is reclaimed; others survive ---------------------------
 
 
 def test_reclaims_consumed_all_past_ttl_not_consumed_sibling_protected(tmp_path: Path) -> None:
     """Only consumed_all delete-after-consumed payloads past TTL are reclaimed; a
     not-yet-consumed sibling in the same run is protected, and the now-empty steps/ dir is
-    pruned after reclaim (idempotency / no rediscovery)."""
+    pruned after reclaim (idempotency / no rediscovery). A live run's step payloads are
+    NEVER reclaimed, even when past TTL."""
     eligible = _step_payload(
         tmp_path, "done-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
     )
@@ -98,6 +84,19 @@ def test_reclaims_consumed_all_past_ttl_not_consumed_sibling_protected(tmp_path:
     assert (tmp_path / not_consumed).is_file(), "not-consumed_all payload protected"
     assert eligible in set(result.reclaimed_paths)
     assert not_consumed not in set(result.reclaimed_paths)
+
+    live_ws = tmp_path / "live-ws"
+    ref = _step_payload(
+        live_ws, "live-run", "qa-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
+    )
+    # The live-claim set claims the run's steps dir (what the container injects for a
+    # non-terminal run).
+    live = frozenset({".dadaia/runs/lifecycle/live-run/steps"})
+
+    live_result = _sweep(live_ws, live=live, reclaim_allow=frozenset({ref})).sweep(apply=True)
+
+    assert (live_ws / ref).is_file(), "live-run step payload must survive"
+    assert ref not in set(live_result.reclaimed_paths)
 
 
 # --- ① promoted-evidence + within-TTL spared --------------------------------------

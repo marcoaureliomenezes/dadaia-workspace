@@ -134,14 +134,11 @@ def index_html() -> str:
 
 @pytest.mark.parametrize("section", PANEL_PRIMARY_TAB_SLUGS)
 def test_tab_and_section_present(index_html: str, section: str) -> None:
-    """Every primary tab renders its nav id, data-section attr, and #section-* tabpanel."""
+    """Every primary tab renders its nav id, data-section attr, and #section-* tabpanel;
+    the .nav-tab selector (the styled control the e2e keys on) is present."""
     assert f'id="tab-{section}"' in index_html, f"missing tab id tab-{section}"
     assert f'data-section="{section}"' in index_html, f"missing data-section={section}"
     assert f'id="section-{section}"' in index_html, f"missing #section-{section}"
-
-
-def test_nav_tab_class_present(index_html: str) -> None:
-    """The .nav-tab selector (the styled control the e2e keys on) is present."""
     assert 'class="nav-tab' in index_html
 
 

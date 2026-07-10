@@ -117,6 +117,7 @@ def _setup_ambiguous_two_markers(ws: Path) -> None:
 @pytest.mark.parametrize(
     ("name", "setup_fn", "ancestry"),
     [
+        ("dir_absent", lambda ws: None, "unset"),
         ("no_markers", lambda ws: None, "unset"),
         (
             "legacy_empty_marker",
@@ -162,6 +163,13 @@ def test_persisted_bind_context_none_table(
     tmp_path: Path, name: str, setup_fn: object, ancestry: object
 ) -> None:
     ws = _mk_ws(tmp_path)
+    if name == "dir_absent":
+        # A workspace with no bind_epoch dir at all must not raise.
+        states = ws / ".dadaia" / "states"
+        states.mkdir(parents=True, exist_ok=True)
+        (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
+        assert specs_resolver._persisted_bind_context(ws) is None
+        return
     setup_fn(ws)  # type: ignore[operator]
     if name == "empty_marker_with_ancestry":
         ancestry = frozenset({os.getppid(), 1234})
@@ -169,14 +177,6 @@ def test_persisted_bind_context_none_table(
         assert specs_resolver._persisted_bind_context(ws) is None
     else:
         assert specs_resolver._persisted_bind_context(ws, ancestry) is None  # type: ignore[arg-type]
-
-
-def test_persisted_bind_context_none_when_dir_absent(tmp_path: Path) -> None:
-    # A workspace with no bind_epoch dir at all must not raise.
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
-    assert specs_resolver._persisted_bind_context(tmp_path) is None
 
 
 def test_two_markers_disjoint_chains_never_cross_attribute(tmp_path: Path) -> None:
@@ -279,14 +279,15 @@ def test_resolve_specs_dir_no_bind_table(
         specs_resolver.resolve_specs_dir(None, **kwargs)  # type: ignore[arg-type]
 
 
-def test_resolve_specs_dir_refuses_workspace_root_specs(
+def test_resolve_specs_dir_refuses_workspace_root_specs_and_explicit_still_wins(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """v0.1.50 FR4: a specs/ AT the workspace root violates the root law ⇒ refuse.
 
     This exact shape was the disposed bug's landing zone
     (bugs-append-bound-session-falls-through-to-cwd-specs); the refusal message is
-    actionable and redaction-safe (no absolute path echoed).
+    actionable and redaction-safe (no absolute path echoed). An explicit
+    --specs-dir bypasses the persisted-bind fallback entirely.
     """
     ws = _mk_ws(tmp_path, slug="proj")  # a real workspace root, no bind marker
     (ws / "specs").mkdir()
@@ -297,15 +298,9 @@ def test_resolve_specs_dir_refuses_workspace_root_specs(
     assert "Workspace Root" in str(exc_info.value)
     assert str(ws) not in str(exc_info.value)
 
-
-def test_resolve_specs_dir_explicit_still_wins(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """An explicit --specs-dir bypasses the persisted-bind fallback entirely."""
-    ws = _mk_ws(tmp_path, slug="proj")
-    _stamp(ws, "proj", pid=os.getppid())
-    _clean_env(monkeypatch)
-    monkeypatch.chdir(ws)
-    explicit = ws / "elsewhere"
+    ws2 = _mk_ws(tmp_path.parent / (tmp_path.name + "-explicit"), slug="proj")
+    _stamp(ws2, "proj", pid=os.getppid())
+    monkeypatch.chdir(ws2)
+    explicit = ws2 / "elsewhere"
     explicit.mkdir()
     assert specs_resolver.resolve_specs_dir(str(explicit)) == explicit.resolve()

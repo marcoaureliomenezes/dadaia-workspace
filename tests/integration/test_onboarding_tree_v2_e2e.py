@@ -20,6 +20,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 
 # Repo root: tests/integration/test_onboarding_tree_v2_e2e.py → 3 parents up = repo root
@@ -28,7 +30,9 @@ _SCAFFOLD_SRC = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 
 
-def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
+def test_ac_o1_copytree_scaffold_produces_valid_v2_tree_and_repo_specs_have_no_tree_errors(
+    tmp_path: Path,
+) -> None:
     """AC-O-1 (updated memory-markdown-source-v1): A specs/ tree materialised via copytree
     from public/scaffold/ (the exact mechanism used by `dadaia context activate`) must:
       1. Contain the v2 mandatory directories (backlog/, bugs/, releases/) each with
@@ -92,4 +96,18 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree(tmp_path: Path) -> None:
     assert tree_errors == [], (
         "Fresh copytree-from-scaffold specs/ must produce 0 TREE-* ERROR issues:\n"
         + "\n".join(f"  {i.code}: {i.description}" for i in tree_errors)
+    )
+
+    # The repository's own real specs tree must also produce 0 TREE-* ERROR issues.
+    repo_specs = _REPO_ROOT / "specs"
+    if not repo_specs.exists():
+        pytest.skip("specs/ not found outside the dadaia-workspace repo context")
+
+    repo_issues = SpecsDoctor(repo_specs, public_dir=_PUBLIC_DIR).check()
+    repo_tree_errors = [
+        i for i in repo_issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR
+    ]
+    assert repo_tree_errors == [], (
+        "Repository specs triggered TREE ERROR invariants:\n"
+        + "\n".join(f"  {issue.code}: {issue.description}" for issue in repo_tree_errors)
     )

@@ -38,16 +38,6 @@ _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 
 # ---------------------------------------------------------------------------
-# LAW 1 standalone: claude is never a Layer-2 worker.
-# ---------------------------------------------------------------------------
-
-
-def test_claude_is_never_layer2() -> None:
-    assert is_l2("claude") is False
-    assert can_be_workflow_worker("claude") is False
-
-
-# ---------------------------------------------------------------------------
 # R1 contract — L2 roster ⇔ model catalog (order-independent) standalone.
 # ---------------------------------------------------------------------------
 
@@ -96,9 +86,8 @@ def test_capability_predicates_table(
     harness: str, expect_l1: bool, expect_l2: bool, expect_worker: bool
 ) -> None:
     assert is_l1(harness) is expect_l1
-    if harness != "claude":  # claude's L2/worker case is covered standalone above
-        assert is_l2(harness) is expect_l2
-        assert can_be_workflow_worker(harness) is expect_worker
+    assert is_l2(harness) is expect_l2
+    assert can_be_workflow_worker(harness) is expect_worker
 
 
 # ---------------------------------------------------------------------------

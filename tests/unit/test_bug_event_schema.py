@@ -91,11 +91,6 @@ def _archived() -> dict[str, object]:
     }
 
 
-def test_schema_well_formed_and_scoped_id() -> None:
-    Draft202012Validator.check_schema(_schema())
-    assert _schema()["$id"] == "bug-event-v1"
-
-
 # --- one valid document per event kind --------------------------------------------
 
 
@@ -107,12 +102,12 @@ def test_schema_well_formed_and_scoped_id() -> None:
 def test_each_event_kind_validates(doc: dict[str, object]) -> None:
     Draft202012Validator(_schema()).validate(doc)
 
-
-def test_archived_needs_no_payload() -> None:
-    """`archived` is a non-terminal annotation — the 4 top-level fields are enough."""
-    doc = _archived()
-    assert set(doc) == {"bug_id", "event", "ts", "reported_by"}
-    Draft202012Validator(_schema()).validate(doc)
+    if doc.get("event") == "archived":
+        # `archived` is a non-terminal annotation — the 4 top-level fields are enough.
+        assert set(doc) == {"bug_id", "event", "ts", "reported_by"}
+        # Schema well-formedness + scoped $id (checked once, piggybacked here).
+        Draft202012Validator.check_schema(_schema())
+        assert _schema()["$id"] == "bug-event-v1"
 
 
 # --- rejection cases (not positive-only) — the guardrail's rejection rows ---------

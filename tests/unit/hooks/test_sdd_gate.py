@@ -93,29 +93,43 @@ def _write_lease_record(ws: Path, ctx: str, record: dict[str, object]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "tool_name", "tool_input_fn"),
+    ("name", "tool_name", "tool_input_fn", "expect_block", "reason_contains"),
     [
-        ("non_write_tool", "Read", lambda ws: {"file_path": "x"}),
-        ("unparseable_target", "Write", lambda ws: {}),
-        ("ungated_path", "Write", lambda ws: {"file_path": str(ws / "README.md")}),
+        ("non_write_tool", "Read", lambda ws: {"file_path": "x"}, False, None),
+        ("unparseable_target", "Write", lambda ws: {}, False, None),
+        (
+            "ungated_path",
+            "Write",
+            lambda ws: {"file_path": str(ws / "README.md")},
+            False,
+            None,
+        ),
+        (
+            # PARITY (c): .dadaia/sessions/ is the sole fail-CLOSED path — blocked
+            # unconditionally.
+            "protected_sessions_blocks",
+            "Write",
+            lambda ws: {"file_path": str(ws / ".dadaia" / "sessions" / "runtime" / "a.ptr")},
+            True,
+            "SEC-01",
+        ),
     ],
 )
-def test_allow_parity(tmp_path: Path, name: str, tool_name: str, tool_input_fn: Any) -> None:
+def test_allow_parity(
+    tmp_path: Path,
+    name: str,
+    tool_name: str,
+    tool_input_fn: Any,
+    expect_block: bool,
+    reason_contains: str | None,
+) -> None:
     ws = _mk_workspace(tmp_path, "a")
     block = _run(tmp_path, {"tool_name": tool_name, "tool_input": tool_input_fn(ws)})
-    assert block is None
-
-
-def test_protected_sessions_blocks(tmp_path: Path) -> None:
-    # PARITY (c): .dadaia/sessions/ is the sole fail-CLOSED path — blocked unconditionally.
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / ".dadaia" / "sessions" / "runtime" / "a.ptr"
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-    )
-    assert block is not None
-    assert "SEC-01" in block["reason"]
+    if expect_block:
+        assert block is not None
+        assert reason_contains is not None and reason_contains in block["reason"]
+    else:
+        assert block is None
 
 
 @pytest.mark.parametrize(
@@ -182,7 +196,9 @@ def test_apply_patch_multi_file_most_restrictive(
         assert block is None
 
 
-def test_path_first_context_slug_parity(tmp_path: Path) -> None:
+def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_blocks(
+    tmp_path: Path,
+) -> None:
     # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST acquire repos/B's
     # lease, never repos/A's (fixes gate-cross-context-lock-contamination).
     ws = _mk_workspace(tmp_path, "A", "B")  # A is first-ALIVE
@@ -200,37 +216,31 @@ def test_path_first_context_slug_parity(tmp_path: Path) -> None:
     assert (lock_dir / "B.lock.json").exists()
     assert not (lock_dir / "A.lock.json").exists()
 
-
-def test_mutating_no_context_fails_open(tmp_path: Path) -> None:
     # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open (no lease).
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / "specs" / "releases" / "x" / "TASKS.md"
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    ws2 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-no-ctx"), "a")
+    target2 = ws2 / "specs" / "releases" / "x" / "TASKS.md"
+    block2 = _run(
+        ws2,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target2)}},
     )
-    assert block is None
+    assert block2 is None
 
-
-def test_live_foreign_lease_blocks_real(tmp_path: Path) -> None:
-    # PARITY: a genuine fresh foreign lease held by THIS (alive) process makes the gate BLOCK
-    # — reproduced harness-real by seeding a real lease, no monkeypatch of acquire.
-    ws = _mk_workspace(tmp_path, "B")
-    # A different session already holds B's lease, stamped with a live pid (this process).
-    lease.acquire(ws, "B", "owner-A", "rel-1", "implementation", pid=os.getpid())
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
+    # PARITY: a genuine fresh foreign lease held by THIS (alive) process makes the gate
+    # BLOCK — reproduced harness-real by seeding a real lease, no monkeypatch of acquire.
+    ws3 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-foreign"), "B")
+    lease.acquire(ws3, "B", "owner-A", "rel-1", "implementation", pid=os.getpid())
+    target3 = ws3 / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target3.parent.mkdir(parents=True, exist_ok=True)
+    block3 = _run(
+        ws3,
+        {"tool_name": "Write", "tool_input": {"file_path": str(target3)}},
         session_id="intruder",
     )
-    assert block is not None
+    assert block3 is not None
     # The yield-iff-live-foreign message names the holder and the contended context.
-    assert "SDD LOCK" in block["reason"]
-    assert "owner-A" in block["reason"]
-    assert "context 'B'" in block["reason"]
+    assert "SDD LOCK" in block3["reason"]
+    assert "owner-A" in block3["reason"]
+    assert "context 'B'" in block3["reason"]
 
 
 # --------------------------------------------------------------------------- #
@@ -353,86 +363,118 @@ def test_resolve_mode_precedence(
 # --------------------------------------------------------------------------- #
 
 
-def test_read_mode_blocks_mutating_no_lease_written(tmp_path: Path) -> None:
-    # FR-R4-03: a READ-bound session's MUTATING write → BLOCK, and NO lease record is
-    # written (non-acquiring). Message names the documented path, with no auto-rebind nag.
-    ws = _mk_workspace(tmp_path, "B")
-    _write_session_record(ws, "sess-read", "READ")
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id="sess-read",
-    )
-    assert block is not None
-    assert "read" in block["reason"].lower()
-    assert "--mode implementation" in block["reason"]
-    # Non-acquiring: the gate must NOT have created the lease record.
-    assert not (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
-
-
-def test_read_mode_allows_additive_in_repo(tmp_path: Path) -> None:
-    # FR-R4-03: a READ session's ADDITIVE write (in-repo specs/bugs) is allowed.
-    ws = _mk_workspace(tmp_path, "B")
-    _write_session_record(ws, "sess-read", "READ")
-    target = ws / "repos" / "B" / "specs" / "bugs" / "some-bug.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id="sess-read",
-    )
-    assert block is None
-
-
-def test_read_mode_protected_still_blocks(tmp_path: Path) -> None:
-    # PROTECTED stays fail-closed regardless of mode (unchanged by R4) — a second CRIT
-    # row for PROTECTED, this time with mode=READ (see test_protected_sessions_blocks
-    # for the base mode=IMPLEMENTATION case).
-    ws = _mk_workspace(tmp_path, "B")
-    _write_session_record(ws, "sess-read", "READ")
-    target = ws / ".dadaia" / "sessions" / "runtime" / "B.ptr"
-    block = _run(
-        tmp_path,
-        {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
-        session_id="sess-read",
-    )
-    assert block is not None
-    assert "SEC-01" in block["reason"]
-
-
 @pytest.mark.parametrize(
-    ("name", "mode"),
+    (
+        "session_id",
+        "session_mode",
+        "target_fn",
+        "expect_block",
+        "lease_forbidden",
+        "lease_expected",
+        "reason_checks",
+        "reason_lower",
+    ),
     [
-        (
+        pytest.param(
+            "sess-read",
+            "READ",
+            lambda ws: ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md",
+            True,
+            True,
+            False,
+            ("read", "--mode implementation"),
+            True,
+            id="read-mode-blocks-mutating-no-lease-written",
+        ),
+        pytest.param(
+            "sess-read",
+            "READ",
+            lambda ws: ws / "repos" / "B" / "specs" / "bugs" / "some-bug.md",
+            False,
+            False,
+            False,
+            (),
+            False,
+            id="read-mode-allows-additive-in-repo",
+        ),
+        pytest.param(
+            "sess-read",
+            "READ",
+            lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "B.ptr",
+            True,
+            False,
+            False,
+            ("SEC-01",),
+            False,
+            id="read-mode-protected-still-blocks",
+        ),
+        pytest.param(
             # FR-R4-03 / D-3: only explicit READ blocks MUTATING. BOUND_REVIEW is
             # lease-taking, so a free lease is acquired exactly like implementation.
-            "bound_review_acquires_like_implementation",
+            "sess-rev",
             "BOUND_REVIEW",
+            lambda ws: ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md",
+            False,
+            False,
+            True,
+            (),
+            False,
+            id="bound-review-acquires-like-implementation",
         ),
-        (
+        pytest.param(
             # FR-R4-04: no bind record, no env → IMPLEMENTATION; free-lease acquire
-            # proceeds. (session_id "unbound" has no record at all.)
-            "missing_mode_acquires_free_lease",
+            # proceeds. (session_id "unbound" has no record at all — session_mode=None.)
+            "unbound",
             None,
+            lambda ws: ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md",
+            False,
+            False,
+            True,
+            (),
+            False,
+            id="missing-mode-acquires-free-lease",
         ),
     ],
 )
-def test_mode_acquires_free_lease(tmp_path: Path, name: str, mode: str | None) -> None:
+def test_read_mode_matrix(
+    tmp_path: Path,
+    session_id: str,
+    session_mode: str | None,
+    target_fn: Any,
+    expect_block: bool,
+    lease_forbidden: bool,
+    lease_expected: bool,
+    reason_checks: tuple[str, ...],
+    reason_lower: bool,
+) -> None:
+    # FR-R4-03: READ-bound session's write outcome depends on path class. MUTATING →
+    # BLOCK (non-acquiring, no lease record, --mode implementation hint). ADDITIVE →
+    # ALLOW. PROTECTED stays fail-closed regardless of mode (second CRIT row for
+    # PROTECTED — see test_allow_parity's protected_sessions_blocks row for the base
+    # IMPLEMENTATION case). BOUND_REVIEW and missing-mode(unbound) both acquire a free
+    # lease exactly like IMPLEMENTATION — only explicit READ blocks MUTATING.
     ws = _mk_workspace(tmp_path, "B")
-    session_id = "sess-rev" if mode is not None else "unbound"
-    if mode is not None:
-        _write_session_record(ws, session_id, mode)
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    if session_mode is not None:
+        _write_session_record(ws, session_id, session_mode)
+    target = target_fn(ws)
     target.parent.mkdir(parents=True, exist_ok=True)
     block = _run(
         tmp_path,
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
         session_id=session_id,
     )
-    assert block is None  # acquired cleanly
-    assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+    if expect_block:
+        assert block is not None
+        reason = block["reason"].lower() if reason_lower else block["reason"]
+        for check in reason_checks:
+            assert check in reason
+    else:
+        assert block is None
+    if lease_forbidden:
+        # Non-acquiring: the gate must NOT have created the lease record.
+        assert not (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+    if lease_expected:
+        assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
 
 
 # --------------------------------------------------------------------------- #
@@ -465,31 +507,33 @@ def test_mode_acquires_free_lease(tmp_path: Path, name: str, mode: str | None) -
         ("ignores_unparseable_pid", {"harness_pid": "nope"}, "getppid"),
     ],
 )
-def test_resolve_holder_pid(name: str, payload: dict[str, object], expected: object) -> None:
+def test_resolve_holder_pid(
+    tmp_path: Path, name: str, payload: dict[str, object], expected: object
+) -> None:
     want = os.getppid() if expected == "getppid" else expected
     assert sdd_gate._resolve_holder_pid(payload) == want
 
-
-def test_gate_threads_payload_pid_into_lease_record(tmp_path: Path) -> None:
-    # End-to-end through the real hook subprocess: a payload-supplied harness pid is the pid
-    # stamped into the lease record (proving the gate threads the LONG-LIVED pid, not its own
-    # ephemeral child pid). The pid is a known-alive process (this test process).
-    ws = _mk_workspace(tmp_path, "B")
-    target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    my_pid = os.getpid()
-    block = _run(
-        tmp_path,
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target)},
-            "harness_pid": my_pid,
-        },
-        session_id="s-pid",
-    )
-    assert block is None
-    rec = lease.read_record(ws, "B")
-    assert rec is not None and rec["pid"] == my_pid, rec
+    if name == "prefers_payload_harness_pid_int":
+        # End-to-end companion: through the real hook subprocess, a payload-supplied
+        # harness pid is the pid stamped into the lease record (proving the gate
+        # threads the LONG-LIVED pid, not its own ephemeral child pid). Uses a
+        # known-alive pid (this test process), not the synthetic 4242 above.
+        ws = _mk_workspace(tmp_path, "B")
+        target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        my_pid = os.getpid()
+        block = _run(
+            tmp_path,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": str(target)},
+                "harness_pid": my_pid,
+            },
+            session_id="s-pid",
+        )
+        assert block is None
+        rec = lease.read_record(ws, "B")
+        assert rec is not None and rec["pid"] == my_pid, rec
 
 
 # --------------------------------------------------------------------------- #
@@ -591,28 +635,30 @@ def test_resolve_mode_liveness_precedence_matrix(
     resolving_sid, expected_mode = setup_fn(ws)
     assert sdd_gate._resolve_mode(ws, resolving_sid, "a") == expected_mode
 
-
-def test_resolve_mode_dead_leftover_record_blocks_mutating_write(tmp_path: Path) -> None:
-    # End-to-end: with a dead leftover record + fresh READ incumbent, a MUTATING write is
-    # blocked (READ enforced), and no lease is written by the blocked attempt.
-    ws = _mk_workspace(tmp_path, "a")
-    stale_hb = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
-    _write_lease_record(
-        ws,
-        "a",
-        {"session_id": "old-impl", "heartbeat": stale_hb, "ttl": 120, "pid": 0},
-    )
-    bind_sid = "sess_freshread2"
-    _write_session_record(ws, bind_sid, "READ")
-    session_identity.set_incumbent(ws, "a", bind_sid)
-    target = ws / "repos" / "a" / "src" / "mod.py"
-    payload = {
-        "tool_name": "Write",
-        "tool_input": {"file_path": str(target), "content": "x = 1\n"},
-    }
-    env = claude_hook_env(ws, session_id="harness-reviewer2")
-    env.pop("CLAUDE_CODE_SESSION_ID", None)
-    env.pop("DADAIA_CONTEXT", None)
-    result = run_hook_subprocess("sdd_gate", {**payload, "session_id": "harness-reviewer2"}, env)
-    assert result.returncode == 0, result.stderr
-    assert result.block_envelope() is not None  # READ enforced ⇒ MUTATING blocked
+    if name == "dead_leftover_honored_nf4":
+        # End-to-end companion (NF-4): the SAME dead-leftover + fresh-READ-incumbent
+        # setup, driven through the real hook subprocess, blocks a MUTATING write
+        # (READ enforced) rather than merely resolving READ in isolation.
+        ws2 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-e2e"), "a")
+        stale_hb2 = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
+        _write_lease_record(
+            ws2,
+            "a",
+            {"session_id": "old-impl", "heartbeat": stale_hb2, "ttl": 120, "pid": 0},
+        )
+        bind_sid2 = "sess_freshread2"
+        _write_session_record(ws2, bind_sid2, "READ")
+        session_identity.set_incumbent(ws2, "a", bind_sid2)
+        target2 = ws2 / "repos" / "a" / "src" / "mod.py"
+        payload2 = {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target2), "content": "x = 1\n"},
+        }
+        env2 = claude_hook_env(ws2, session_id="harness-reviewer2")
+        env2.pop("CLAUDE_CODE_SESSION_ID", None)
+        env2.pop("DADAIA_CONTEXT", None)
+        result2 = run_hook_subprocess(
+            "sdd_gate", {**payload2, "session_id": "harness-reviewer2"}, env2
+        )
+        assert result2.returncode == 0, result2.stderr
+        assert result2.block_envelope() is not None  # READ enforced ⇒ MUTATING blocked

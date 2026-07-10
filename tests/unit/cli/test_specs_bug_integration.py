@@ -125,7 +125,16 @@ def _import_prompt() -> Callable[[Path], None]:
     return _prompt_open_bugs
 
 
-def test_operator_confirms_marks_all_in_release(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("confirm_return", "expected_status"),
+    [
+        pytest.param(True, "in_release", id="confirms-marks-all-in-release"),
+        pytest.param(False, "open", id="declines-leaves-entries-unchanged"),
+    ],
+)
+def test_operator_confirm_decline_matrix(
+    tmp_path: Path, confirm_return: bool, expected_status: str
+) -> None:
     _write_bugs(
         tmp_path,
         [
@@ -134,21 +143,10 @@ def test_operator_confirms_marks_all_in_release(tmp_path: Path) -> None:
         ],
     )
     _prompt_open_bugs = _import_prompt()
-    with patch("typer.echo"), patch("typer.confirm", return_value=True) as mock_confirm:
+    with patch("typer.echo"), patch("typer.confirm", return_value=confirm_return) as mock_confirm:
         _prompt_open_bugs(tmp_path)
     mock_confirm.assert_called_once()
 
     bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
     entries = json.loads(bugs_path.read_text(encoding="utf-8"))
-    assert all(e["status"] == "in_release" for e in entries)
-
-
-def test_operator_declines_leaves_entries_unchanged(tmp_path: Path) -> None:
-    _write_bugs(tmp_path, [{"id": "i1", "status": "open", "message": "some bug"}])
-    _prompt_open_bugs = _import_prompt()
-    with patch("typer.echo"), patch("typer.confirm", return_value=False):
-        _prompt_open_bugs(tmp_path)
-
-    bugs_path = tmp_path / ".dadaia" / "bugs" / "reported.json"
-    entries = json.loads(bugs_path.read_text(encoding="utf-8"))
-    assert entries[0]["status"] == "open"
+    assert all(e["status"] == expected_status for e in entries)

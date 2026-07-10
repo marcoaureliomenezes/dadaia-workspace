@@ -172,11 +172,12 @@ def _payload(output: str) -> dict[str, object]:
     return payload
 
 
-# ── A1+A2 — define writes the ledger, then define -> close removes the item + zero
-# BL-STALE (A1's ledger-write assertion folds in mid-loop, before close runs) ─────────
+# ── A1+A2+A4 — define writes the ledger, then define -> close removes the item + zero
+# BL-STALE (A1's ledger-write assertion folds in mid-loop, before close runs), plus the
+# A4 boundary: a bad **Consumes:** surfaces as post_step_error (own workspace) ────────
 
 
-def test_define_writes_ledger_then_close_removes_item_zero_stale(
+def test_define_writes_ledger_close_removes_item_zero_stale_and_bad_consumes_fails_loud(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = _init_workspace(tmp_path)
@@ -229,22 +230,19 @@ def test_define_writes_ledger_then_close_removes_item_zero_stale(
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert stale == [], f"unexpected BL-STALE: {[f.to_dict() for f in stale]}"
 
-
-# ── A4 boundary — a bad **Consumes:** surfaces as post_step_error ───────────────────
-
-
-def test_bad_consumes_fails_loud(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    # A4 boundary: a bad **Consumes:** surfaces as post_step_error, own workspace.
+    bad_ws_root = tmp_path.parent / (tmp_path.name + "-bad-consumes")
+    bad_workspace = _init_workspace(bad_ws_root)
+    monkeypatch.chdir(bad_workspace)
     _install_fake_factory(monkeypatch)
     # Declare a slug that has no live backlog item file.
-    _plant_specs(workspace, consumes="ghost-slug", with_item=True)
+    _plant_specs(bad_workspace, consumes="ghost-slug", with_item=True)
 
-    result = _define(["--harness", "fake"])
-    payload = _payload(result.output)
+    bad_result = _define(["--harness", "fake"])
+    bad_payload = _payload(bad_result.output)
     # The definition itself completed; the producer post-step failed loud (no silent skip).
-    assert payload["completed"] is True
-    error = payload.get("post_step_error")
-    assert isinstance(error, str) and "ghost-slug" in error, payload
+    assert bad_payload["completed"] is True
+    error = bad_payload.get("post_step_error")
+    assert isinstance(error, str) and "ghost-slug" in error, bad_payload
     # No ledger was written from the failed declaration.
-    assert not (workspace / "specs" / "_archive" / _RELEASE / "consumed_backlog.json").exists()
+    assert not (bad_workspace / "specs" / "_archive" / _RELEASE / "consumed_backlog.json").exists()

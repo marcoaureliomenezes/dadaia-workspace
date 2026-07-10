@@ -67,7 +67,9 @@ def test_server_register_list_json_and_show(workspace: Path) -> None:
     assert "dadaia server next" in no_entry_result.output
 
 
-def test_server_conflict_release_next_and_idempotent(workspace: Path) -> None:
+def test_server_conflict_release_next_idempotent_clean_and_uninitialized_exit(
+    workspace: Path, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _runner.invoke(app, ["server", "register", "--port", "3000", "--project", "my-frontend"])
 
     conflict_result = _runner.invoke(
@@ -98,10 +100,7 @@ def test_server_conflict_release_next_and_idempotent(workspace: Path) -> None:
     next_idempotent_data = json.loads(next_idempotent_result.stdout)
     assert next_idempotent_data["port"] == 3073
 
-
-def test_server_clean_dry_run_apply_and_uninitialized_workspace_exit(
-    workspace: Path, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
+    # clean dry-run/apply + uninitialized-workspace exit — same workspace/CLI flow.
     registry_path = workspace / ".dadaia" / "states" / "server_registry.json"
 
     def _plant_expired_entry() -> None:
@@ -125,12 +124,12 @@ def test_server_clean_dry_run_apply_and_uninitialized_workspace_exit(
     assert dry_run_result.exit_code == 0, dry_run_result.output
     assert "3000" in dry_run_result.output
     data_after_dry_run = json.loads(registry_path.read_text())
-    assert len(data_after_dry_run["entries"]) == 1
+    assert len(data_after_dry_run["entries"]) == 2
 
     apply_result = _runner.invoke(app, ["server", "clean"])
     assert apply_result.exit_code == 0, apply_result.output
     data_after_apply = json.loads(registry_path.read_text())
-    assert data_after_apply["entries"] == []
+    assert [entry["port"] for entry in data_after_apply["entries"]] == [3073]
 
     # A genuinely separate root (not nested under the initialized `workspace`), so
     # upward .dadaia resolution never finds the initialized tree.

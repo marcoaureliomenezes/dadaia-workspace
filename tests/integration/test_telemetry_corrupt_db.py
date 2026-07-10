@@ -1,10 +1,12 @@
-"""Integration tests for corrupt-SQLite graceful degradation (T-AM-21).
+"""Integration tests for corrupt-SQLite graceful degradation (T-AM-21) + filesystem
+permission hardening (T-AM-20, folded in — same TelemetryService target, same stubs).
 
-Merged per plan-integration.md (11 -> 2):
+Merged per plan-integration.md (11 -> 2), plus the T-AM-20 permissions fn folded in:
   1. corruption: integrity-check -> quarantine rename (+wal/shm siblings) -> is_degraded;
      healthy negative.
   2. degraded HTTP: agents/sessions 503 + body message, workflows 200 unaffected,
      non-telemetry route unaffected (table).
+  3. permission hardening: state_dir 0o700 + db 0o600, idempotent on drift (POSIX-only).
 
 Uses tmp_path to avoid touching real state. The stub readers and aggregator ensure no
 real operator data is read.
@@ -14,8 +16,10 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import os
 import pathlib
 import sqlite3
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -170,6 +174,45 @@ def test_corrupt_db_detection_quarantine_siblings_and_healthy_negative(
     assert not healthy_svc.is_degraded
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.chmod mode bits are no-op on Windows")
+def test_state_dir_0700_db_0600_and_idempotent_on_drift(tmp_path: pathlib.Path) -> None:
+    """Filesystem permission hardening (T-AM-20): state_dir 0o700 (created + corrected
+    from 0o755) + db 0o600 (idempotent on drift), own workspace."""
+    state_dir = tmp_path / "perm-telemetry"
+    assert not state_dir.exists()
+
+    _make_service(state_dir, tmp_path)
+    assert state_dir.exists(), "state_dir was not created"
+    mode = state_dir.stat().st_mode & 0o777
+    assert mode == 0o700, f"state_dir has mode 0o{mode:o} — expected 0o700."
+
+    # Pre-existing dir with permissive mode is corrected to 0o700 by the constructor.
+    other_state_dir = tmp_path / "perm-telemetry-existing"
+    other_state_dir.mkdir(parents=True)
+    os.chmod(other_state_dir, 0o755)
+    _make_service(other_state_dir, tmp_path)
+    mode = other_state_dir.stat().st_mode & 0o777
+    assert mode == 0o700, f"state_dir mode was not corrected — got 0o{mode:o}, expected 0o700."
+
+    # SQLite file created with 0o600 after refresh().
+    svc = _make_service(state_dir, tmp_path)
+    svc.refresh()
+    db_path = state_dir / "telemetry.sqlite"
+    assert db_path.exists(), "telemetry.sqlite was not created after refresh()"
+    mode = db_path.stat().st_mode & 0o777
+    assert mode == 0o600, f"telemetry.sqlite has mode 0o{mode:o} — expected 0o600."
+
+    # Idempotent: external drift is corrected back to 0o600 on the next refresh.
+    os.chmod(db_path, 0o644)
+    svc._last_refresh = 0.0
+    svc.refresh()
+    mode = db_path.stat().st_mode & 0o777
+    assert mode == 0o600, (
+        f"telemetry.sqlite mode reverted to 0o{mode:o} — expected 0o600 "
+        "after second refresh corrected drift."
+    )
+
+
 class TestHandlerDegradedResponses:
     """Panel handler returns 503 when service is degraded; non-telemetry routes unaffected."""
 
@@ -224,18 +267,14 @@ class TestHandlerDegradedResponses:
             f"Expected {expected_status} for {path} (with_token={with_token}), got {status}. "
             f"Body: {body!r}"
         )
-
-    def test_503_body_contains_degraded_message_and_quarantine_hint(
-        self, degraded_panel: Any
-    ) -> None:
-        base, token = degraded_panel
-        status, body = _get(f"{base}/api/agents", token=token)
-        assert status == 503
-        data = json.loads(body)
-        assert data.get("error") == "telemetry_degraded"
-        body_text = body.decode("utf-8", errors="replace")
-        assert "telemetry_degraded" in body_text
-        assert "corrupt" in body_text.lower(), (
-            "503 message should mention the quarantine location so the operator "
-            "can find the corrupt file."
-        )
+        if path == "/api/agents" and with_token:
+            # 503 body carries the degraded message + a quarantine-location hint, so the
+            # operator can find the corrupt file (folded companion assertion, same fixture).
+            data = json.loads(body)
+            assert data.get("error") == "telemetry_degraded"
+            body_text = body.decode("utf-8", errors="replace")
+            assert "telemetry_degraded" in body_text
+            assert "corrupt" in body_text.lower(), (
+                "503 message should mention the quarantine location so the operator "
+                "can find the corrupt file."
+            )

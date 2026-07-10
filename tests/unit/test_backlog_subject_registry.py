@@ -158,22 +158,16 @@ def test_code_anchor_table(
         assert "NoSuchSymbol" in result.message  # actionable: names the ref
 
 
-# ── cli kind (Typer app tree) ───────────────────────────────────────────────────
+# ── cli kind (Typer app tree) + catalog kind ────────────────────────────────────
 
 
-def test_cli_anchor_resolves_and_unknown_halts(fixture_tree: dict[str, Path]) -> None:
+def test_cli_and_catalog_anchor_resolve_and_unknown_halts(fixture_tree: dict[str, Path]) -> None:
     reg = _build(fixture_tree)
     result = reg.bind("backlog doctor", SubjectKind.CLI)
     assert result.status is BindStatus.RESOLVED
     assert result.anchor is not None and result.anchor.id == "backlog doctor"
     assert reg.bind("backlog frobnicate", SubjectKind.CLI).status is BindStatus.UNRESOLVED
 
-
-# ── catalog kind ────────────────────────────────────────────────────────────────
-
-
-def test_catalog_slug_resolves_and_unknown_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("alpha-feature", SubjectKind.CATALOG).status is BindStatus.RESOLVED
     assert reg.bind("gamma-feature", SubjectKind.CATALOG).status is BindStatus.UNRESOLVED
 
@@ -189,6 +183,14 @@ def test_doc_kind_table(fixture_tree: dict[str, Path]) -> None:
         is BindStatus.RESOLVED
     )
     assert reg.bind("SPEC-DOC-12345", SubjectKind.DOC).status is BindStatus.UNRESOLVED
+
+    # panel/api — alias-map ONLY in R1.
+    # The alias map maps "the panel API" -> panel:/api/widgets.
+    result = reg.bind("the panel API", SubjectKind.PANEL)
+    assert result.status is BindStatus.RESOLVED
+    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
+    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
+    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
 
 
 # ── invariant kind ──────────────────────────────────────────────────────────────
@@ -221,19 +223,6 @@ def test_invariant_resolves_unknown_halts_and_never_mints_from_py_or_tests(
         tests_reg.bind("INV-test-fixture-leak", SubjectKind.INVARIANT).status
         is BindStatus.UNRESOLVED
     )
-
-
-# ── panel/api — alias-map ONLY in R1 ─────────────────────────────────────────────
-
-
-def test_panel_resolves_only_via_alias_never_auto_derives(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    # The alias map maps "the panel API" -> panel:/api/widgets.
-    result = reg.bind("the panel API", SubjectKind.PANEL)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
-    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
-    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
 
 
 # ── alias collapses synonym to one anchor (acceptance §3.7.5), and absence tolerated ──

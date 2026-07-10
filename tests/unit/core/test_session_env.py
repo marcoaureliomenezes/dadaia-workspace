@@ -75,15 +75,13 @@ def test_entry_harness_precedence_table(
     assert entry_harness() == expected
 
 
-def test_garbage_pin_falls_through_to_codex_session_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_garbage_pin_falls_through_and_envelope_scrub_neutralizes_developer_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "opencode")
     monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
     assert entry_harness() == "codex"
 
-
-def test_envelope_scrub_neutralizes_developer_codex_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
     # AC-4 pytest half: a developer running pytest inside a codex TUI carries
     # CODEX_SESSION_ID; the shared envelope scrub must neutralize it so a defaulted
     # harness resolves fake (None here), never a real worker.

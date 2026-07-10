@@ -88,22 +88,20 @@ def test_library_default_resolution_and_overlay_override() -> None:
     assert cli_impl.model_profile == "codex-implementation-standard"
     assert cli_impl.source is PolicySource.CLI
 
-
-def test_non_default_context_overlay_honored_with_harness_consistent_override() -> None:
     # WS-OVERLAYS (replaces the D-2 collapse, A15): an overlay keyed on a non-default
     # context IS honored. The override must be harness-consistent — here 'other' sets both
     # the per-step harness to pi and a pi profile, so resolution succeeds.
-    overlay = WorkflowModelPolicyOverlay(
+    non_default_overlay = WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={"other": {_WORKFLOW: {"implement": "pi-reasoning-high"}}},
         step_harness_overlay={"other": {_WORKFLOW: {"implement": "pi"}}},
     )
-    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="other")
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.model_profile == "pi-reasoning-high"
-    assert impl.harness == "pi"
-    assert impl.source is PolicySource.DEFAULT_OVERLAY
+    other_snapshot = _resolver(non_default_overlay).resolve(_WORKFLOW, context="other")
+    other_impl = other_snapshot.step("implement")
+    assert other_impl is not None
+    assert other_impl.model_profile == "pi-reasoning-high"
+    assert other_impl.harness == "pi"
+    assert other_impl.source is PolicySource.DEFAULT_OVERLAY
 
 
 # --- ② error matrix param ---------------------------------------------------------------

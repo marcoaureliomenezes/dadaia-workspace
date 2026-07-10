@@ -41,10 +41,18 @@ def _bytecode_artifacts_under_public() -> list[str]:
     return sorted(pyc + caches)
 
 
-def test_pre_push_ci_gate_script_ships_and_pyproject_excludes_bytecode() -> None:
+def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache(
+    tmp_path: Path,
+) -> None:
     """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
     explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
-    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel."""
+    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel.
+
+    Also: the canonical public asset tree carries no bytecode at rest (precondition),
+    and executing the catalog + lint scripts must not write __pycache__ under public/.
+    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
+    under test (the call-site ``-B`` would mask a missing guard).
+    """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
     assert "pre-push-ci-gate.sh" in listing
 
@@ -54,14 +62,6 @@ def test_pre_push_ci_gate_script_ships_and_pyproject_excludes_bytecode() -> None
     assert "**/__pycache__" in exclude
     assert "**/*.pyc" in exclude
 
-
-def test_running_public_scripts_leaves_no_pycache(tmp_path: Path) -> None:
-    """The canonical public asset tree carries no bytecode at rest (precondition), and
-    executing the catalog + lint scripts must not write __pycache__ under public/.
-
-    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
-    under test (the call-site ``-B`` would mask a missing guard).
-    """
     if not _MEMORY_DIR.is_dir():
         pytest.skip("specs/memory not present in this checkout")
 
