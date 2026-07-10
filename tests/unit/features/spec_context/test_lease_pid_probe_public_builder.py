@@ -6,15 +6,17 @@ side-door probe resolver (``_main_pid_probe``) retargets its dynamic ``importlib
 to that public builder — staying **dynamic** so the static import graph keeps ZERO
 ``features -> infrastructure`` edge (the import-linter ignore-cap stays 26).
 
-Positive / invariant unit tests mandated by architect A8 + AC-4:
+Positive / invariant behavior mandated by architect A8 + AC-4, merged into one
+parametrized decision table:
 
     resolves the public builder  -> ``_main_pid_probe()`` returns exactly what
                                     ``process_probe_adapter.build_pid_probe`` produces
                                     (retarget proof — RED against the pre-FR6 tree, which
                                     resolved the private hook builder)
-    live probe                   -> the resolved probe reports THIS process alive
     builder None                 -> ``_main_pid_probe()`` degrades to None (TTL-only)
     builder raises               -> ``_main_pid_probe()`` degrades to None (fail-open)
+
+Plus one live-wiring test: the resolved probe reports THIS process alive.
 """
 
 from __future__ import annotations
@@ -27,21 +29,31 @@ from dadaia_workspace.features.spec_context import lease
 from dadaia_workspace.infrastructure import process_probe_adapter
 
 
-def test_main_pid_probe_resolves_the_public_infra_builder(
-    monkeypatch: pytest.MonkeyPatch,
+def _sentinel(_pid: int) -> bool:
+    return True
+
+
+def _boom() -> lease.PidProbe | None:
+    raise RuntimeError("adapter unavailable")
+
+
+@pytest.mark.parametrize(
+    ("builder", "expected"),
+    [
+        pytest.param(lambda: _sentinel, "sentinel", id="resolves-the-public-infra-builder"),
+        pytest.param(lambda: None, None, id="degrades-to-none-when-builder-returns-none"),
+        pytest.param(_boom, None, id="degrades-to-none-when-builder-raises"),
+    ],
+)
+def test_main_pid_probe_resolution_matrix(  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch, builder, expected: str | None
 ) -> None:
-    """``_main_pid_probe`` resolves ``process_probe_adapter.build_pid_probe`` (retarget proof).
-
-    Monkeypatching the PUBLIC builder must change what ``_main_pid_probe`` returns; this
-    fails against the pre-FR6 tree (which resolved the private hook builder).
-    """
-
-    def sentinel(_pid: int) -> bool:
-        return True
-
-    monkeypatch.setattr(process_probe_adapter, "build_pid_probe", lambda: sentinel)
-
-    assert lease._main_pid_probe() is sentinel
+    monkeypatch.setattr(process_probe_adapter, "build_pid_probe", builder)
+    result = lease._main_pid_probe()
+    if expected == "sentinel":
+        assert result is _sentinel
+    else:
+        assert result is None
 
 
 def test_main_pid_probe_returns_a_live_probe() -> None:
@@ -50,25 +62,3 @@ def test_main_pid_probe_returns_a_live_probe() -> None:
 
     assert probe is not None
     assert probe(os.getpid()) is True
-
-
-def test_main_pid_probe_degrades_to_none_when_builder_returns_none(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """builder yields None ⇒ ``_main_pid_probe`` is None ⇒ lease degrades to TTL-only."""
-    monkeypatch.setattr(process_probe_adapter, "build_pid_probe", lambda: None)
-
-    assert lease._main_pid_probe() is None
-
-
-def test_main_pid_probe_degrades_to_none_when_builder_raises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """builder raising ⇒ fail-open None (the side door never deadlocks the gate)."""
-
-    def _boom() -> lease.PidProbe | None:
-        raise RuntimeError("adapter unavailable")
-
-    monkeypatch.setattr(process_probe_adapter, "build_pid_probe", _boom)
-
-    assert lease._main_pid_probe() is None

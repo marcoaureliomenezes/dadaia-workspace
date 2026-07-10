@@ -70,28 +70,28 @@ def _eff1(root: Path) -> list[str]:
     return [i.description for i in _doctor(root).check() if i.code == "EFF-1"]
 
 
-def test_absent_marker_emits_no_eff1(tmp_path: Path) -> None:
-    """*absent* ⇒ no EFF-1 (fresh-workspace happy path unchanged)."""
+@pytest.mark.parametrize(
+    "marker_content",
+    [
+        pytest.param(None, id="absent-marker-no-eff1"),
+        pytest.param(lambda: _marker_json(datetime.now(tz=UTC)), id="fresh-marker-no-eff1"),
+        pytest.param(
+            lambda: _marker_json(datetime.now(tz=UTC) - timedelta(days=29)),
+            id="boundary-at-threshold-no-eff1",
+        ),
+    ],
+)
+def test_no_eff1_matrix(tmp_path: Path, marker_content) -> None:  # type: ignore[no-untyped-def]
+    """Absent, fresh, and at-threshold (≤30d) markers all emit no EFF-1."""
     _init_workspace(tmp_path)
+    if marker_content is not None:
+        _write_marker(tmp_path, marker_content())
     assert _eff1(tmp_path) == []
 
 
-def test_fresh_marker_emits_no_eff1(tmp_path: Path) -> None:
-    """*fresh* (recorded just now) ⇒ no EFF-1."""
-    _init_workspace(tmp_path)
-    _write_marker(tmp_path, _marker_json(datetime.now(tz=UTC)))
-    assert _eff1(tmp_path) == []
-
-
-def test_boundary_marker_at_threshold_emits_no_eff1(tmp_path: Path) -> None:
-    """Exactly at the threshold (≤ 30d) ⇒ no EFF-1 (the '> threshold' boundary)."""
-    _init_workspace(tmp_path)
-    _write_marker(tmp_path, _marker_json(datetime.now(tz=UTC) - timedelta(days=29)))
-    assert _eff1(tmp_path) == []
-
-
-def test_stale_marker_emits_eff1_through_check(tmp_path: Path) -> None:
-    """*stale* (> 30d) ⇒ EFF-1 with the staleness age + clearing command (AC-11(e) target)."""
+def test_stale_marker_emits_eff1_and_is_manual_not_fixable(tmp_path: Path) -> None:
+    """*stale* (> 30d) ⇒ EFF-1 with the staleness age + clearing command (AC-11(e) target),
+    and the issue is a manual (non-auto-fixable) issue — rendered '[manual]' by the CLI."""
     _init_workspace(tmp_path)
     _write_marker(tmp_path, _marker_json(datetime.now(tz=UTC) - timedelta(days=45)))
     descriptions = _eff1(tmp_path)
@@ -101,36 +101,26 @@ def test_stale_marker_emits_eff1_through_check(tmp_path: Path) -> None:
     assert f"threshold {EFFICIENCY_AUDIT_STALE_DAYS}d" in desc
     assert "dadaia reports mark-efficiency-audit" in desc
 
+    eff1_issues = [i for i in _doctor(tmp_path).check() if i.code == "EFF-1"]
+    assert eff1_issues and all(i.fixable is False for i in eff1_issues)
 
-def test_stale_marker_eff1_is_manual_not_fixable(tmp_path: Path) -> None:
-    """EFF-1 is a manual (non-auto-fixable) issue — rendered '[manual]' by the CLI."""
+
+@pytest.mark.parametrize(
+    "marker_content",
+    [
+        pytest.param("{not valid json", id="invalid-json"),
+        pytest.param(
+            json.dumps({"schema_version": "1", "by": "x"}), id="missing-last-efficiency-audit-field"
+        ),
+        pytest.param(
+            json.dumps({"schema_version": "1", "last_efficiency_audit": "not-a-date"}),
+            id="unparseable-timestamp",
+        ),
+    ],
+)
+def test_malformed_marker_matrix(tmp_path: Path, marker_content: str) -> None:
+    """Every malformed-marker shape ⇒ EFF-1 'malformed marker', NEVER a crash."""
     _init_workspace(tmp_path)
-    _write_marker(tmp_path, _marker_json(datetime.now(tz=UTC) - timedelta(days=45)))
-    eff1 = [i for i in _doctor(tmp_path).check() if i.code == "EFF-1"]
-    assert eff1 and all(i.fixable is False for i in eff1)
-
-
-def test_malformed_invalid_json_emits_eff1_no_crash(tmp_path: Path) -> None:
-    """*malformed* (invalid JSON) ⇒ EFF-1 'malformed marker', never a crash."""
-    _init_workspace(tmp_path)
-    _write_marker(tmp_path, "{not valid json")
-    descriptions = _eff1(tmp_path)
-    assert len(descriptions) == 1 and "malformed" in descriptions[0]
-
-
-def test_malformed_missing_field_emits_eff1(tmp_path: Path) -> None:
-    """*malformed* (missing 'last_efficiency_audit') ⇒ EFF-1 'malformed marker'."""
-    _init_workspace(tmp_path)
-    _write_marker(tmp_path, json.dumps({"schema_version": "1", "by": "x"}))
-    descriptions = _eff1(tmp_path)
-    assert len(descriptions) == 1 and "malformed" in descriptions[0]
-
-
-def test_malformed_unparseable_timestamp_emits_eff1(tmp_path: Path) -> None:
-    """*malformed* (unparseable timestamp) ⇒ EFF-1, never a crash."""
-    _init_workspace(tmp_path)
-    _write_marker(
-        tmp_path, json.dumps({"schema_version": "1", "last_efficiency_audit": "not-a-date"})
-    )
+    _write_marker(tmp_path, marker_content)
     descriptions = _eff1(tmp_path)
     assert len(descriptions) == 1 and "malformed" in descriptions[0]

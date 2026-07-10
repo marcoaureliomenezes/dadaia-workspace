@@ -39,7 +39,7 @@ def mem_conn() -> sqlite3.Connection:
 
 
 def _user_version(conn: sqlite3.Connection) -> int:
-    return conn.execute("PRAGMA user_version").fetchone()[0]
+    return int(conn.execute("PRAGMA user_version").fetchone()[0])
 
 
 def _tables(conn: sqlite3.Connection) -> set[str]:
@@ -65,62 +65,37 @@ def _apply_up_to_version(conn: sqlite3.Connection, target: int) -> None:
         current = version
 
 
-class TestSchemaMigrations:
-    def test_apply_migrations_sets_correct_user_version(self, mem_conn: sqlite3.Connection) -> None:
-        assert _user_version(mem_conn) == 0
-        apply_migrations(mem_conn)
-        assert _user_version(mem_conn) == SCHEMA_VERSION
+def test_migration_idempotence_and_version(mem_conn: sqlite3.Connection) -> None:
+    assert _user_version(mem_conn) == 0
+    apply_migrations(mem_conn)
+    assert _user_version(mem_conn) == SCHEMA_VERSION == 6
 
-    def test_apply_migrations_twice_is_stable(self, mem_conn: sqlite3.Connection) -> None:
-        apply_migrations(mem_conn)
-        apply_migrations(mem_conn)
-        assert _user_version(mem_conn) == SCHEMA_VERSION
+    # Re-applying is stable and raises nothing.
+    apply_migrations(mem_conn)
+    assert _user_version(mem_conn) == SCHEMA_VERSION
 
-    def test_apply_migrations_twice_raises_no_error(self, mem_conn: sqlite3.Connection) -> None:
-        # Must not raise any exception on re-apply.
-        apply_migrations(mem_conn)
-        apply_migrations(mem_conn)
 
-    def test_all_expected_tables_created(self, mem_conn: sqlite3.Connection) -> None:
-        apply_migrations(mem_conn)
-        assert EXPECTED_TABLES.issubset(_tables(mem_conn))
+def test_tables_indices_and_migration6_drops_dead_tables(mem_conn: sqlite3.Connection) -> None:
+    apply_migrations(mem_conn)
+    assert EXPECTED_TABLES.issubset(_tables(mem_conn))
+    assert EXPECTED_INDICES.issubset(_indices(mem_conn))
 
-    def test_all_expected_indices_created(self, mem_conn: sqlite3.Connection) -> None:
-        apply_migrations(mem_conn)
-        assert EXPECTED_INDICES.issubset(_indices(mem_conn))
+    # Migration 6 drops the dead tables (workflows/workflow_agents) while preserving
+    # the four core tables — verified both via applying only through migration 5
+    # (dead tables exist) and via a direct sqlite_master query after full migration.
+    fresh_conn = sqlite3.connect(":memory:")
+    _apply_up_to_version(fresh_conn, 5)
+    tables_after_5 = _tables(fresh_conn)
+    assert "workflows" in tables_after_5
+    assert "workflow_agents" in tables_after_5
 
-    def test_schema_version_constant(self) -> None:
-        assert SCHEMA_VERSION == 6
+    apply_migrations(fresh_conn)
+    assert _user_version(fresh_conn) == 6
+    surviving = _tables(fresh_conn)
+    assert not (DEAD_TABLES & surviving), f"dead tables still present: {DEAD_TABLES & surviving}"
+    assert EXPECTED_TABLES.issubset(surviving), "Core tables must survive migration 6"
 
-    def test_migration_6_drops_dead_tables(self, mem_conn: sqlite3.Connection) -> None:
-        """Migration 6 removes workflows and workflow_agents (marked DEAD in migration 5)."""
-        # Apply only migrations 1–5 so the dead tables exist beforehand.
-        _apply_up_to_version(mem_conn, 5)
-        tables_after_5 = _tables(mem_conn)
-        assert "workflows" in tables_after_5, "workflows must exist after migration 5"
-        assert "workflow_agents" in tables_after_5, "workflow_agents must exist after migration 5"
-
-        # Now apply migration 6 incrementally via the public API.
-        apply_migrations(mem_conn)
-        assert _user_version(mem_conn) == 6
-
-        # Dead tables must be gone.
-        surviving = _tables(mem_conn)
-        dead_surviving = DEAD_TABLES & surviving
-        assert not dead_surviving, (
-            f"Expected dead tables to be dropped by migration 6, "
-            f"but still present: {dead_surviving}"
-        )
-
-    def test_migration_6_preserves_core_tables(self, mem_conn: sqlite3.Connection) -> None:
-        """Migration 6 must not drop the four core tables."""
-        apply_migrations(mem_conn)
-        assert EXPECTED_TABLES.issubset(_tables(mem_conn)), "Core tables must survive migration 6"
-
-    def test_migration_6_sqlite_master_query(self, mem_conn: sqlite3.Connection) -> None:
-        """Verify via sqlite_master that dead tables are absent after full migration."""
-        apply_migrations(mem_conn)
-        rows = mem_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workflows', 'workflow_agents')"
-        ).fetchall()
-        assert rows == [], f"sqlite_master still contains dead tables after migration 6: {rows}"
+    rows = mem_conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workflows', 'workflow_agents')"
+    ).fetchall()
+    assert rows == []

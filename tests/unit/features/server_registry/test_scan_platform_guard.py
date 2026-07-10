@@ -1,16 +1,16 @@
 """Platform-guard tests for scan_unregistered_listeners.
 
-These tests run on ALL platforms (no pytestmark skipif).  They verify that
+These tests run on ALL platforms (no pytestmark skipif). They verify that
 scan.py returns [] with an INFO log when PLATFORM.has_proc_fs is False,
-simulating macOS / Windows behavior.
-
-The per-function guards in _read_cmdline, _read_cwd, and
-_pid_belongs_to_current_user are also exercised here.
+simulating macOS / Windows behavior — every facet of that single guard is
+merged into one test; the per-function guards (_read_cmdline, _read_cwd,
+_pid_belongs_to_current_user) are merged into a second parametrized test.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import replace
 from unittest.mock import patch
 
@@ -26,10 +26,6 @@ from dadaia_workspace.features.server_registry.scan import (
     scan_unregistered_listeners,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _NO_PROC_CAPS = replace(PLATFORM, has_proc_fs=False)
 _WITH_PROC_CAPS = replace(PLATFORM, has_proc_fs=True)
 
@@ -43,28 +39,25 @@ def _entry(port: int, project: str = "demo") -> PortEntry:
     )
 
 
-# ---------------------------------------------------------------------------
-# scan_unregistered_listeners — early-return when no /proc
-# ---------------------------------------------------------------------------
+def test_scan_inert_when_no_proc_fs(caplog: pytest.LogCaptureFixture) -> None:
+    """When PLATFORM.has_proc_fs is False, scan is entirely inert: returns [],
+    logs INFO, never invokes ss, and ignores even a non-None _output_provider."""
+    called: list[bool] = []
 
+    def _provider() -> str:
+        called.append(True)
+        return "LISTEN 0 0 0.0.0.0:9999 0.0.0.0:*\n"
 
-def test_scan_returns_empty_list_when_no_proc_fs(caplog: pytest.LogCaptureFixture) -> None:
-    """When PLATFORM.has_proc_fs is False, scan must return [] immediately."""
     with (
         patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS),
+        patch.object(scan_module, "_ss_command_output") as mock_ss,
         caplog.at_level(logging.INFO, logger="dadaia_workspace.features.server_registry.scan"),
     ):
-        result = scan_unregistered_listeners([_entry(4999)])
+        result = scan_unregistered_listeners([_entry(4999)], _output_provider=_provider)
+
     assert result == []
-
-
-def test_scan_logs_info_when_no_proc_fs(caplog: pytest.LogCaptureFixture) -> None:
-    """When PLATFORM.has_proc_fs is False, scan must emit an INFO log."""
-    with (
-        patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS),
-        caplog.at_level(logging.INFO, logger="dadaia_workspace.features.server_registry.scan"),
-    ):
-        scan_unregistered_listeners([])
+    assert called == [], "_output_provider should not have been called"
+    mock_ss.assert_not_called()
     assert any(
         "orphan detection disabled" in record.message
         for record in caplog.records
@@ -72,71 +65,41 @@ def test_scan_logs_info_when_no_proc_fs(caplog: pytest.LogCaptureFixture) -> Non
     ), f"Expected INFO 'orphan detection disabled' in logs; got: {caplog.records}"
 
 
-def test_scan_does_not_call_ss_when_no_proc_fs() -> None:
-    """When PLATFORM.has_proc_fs is False, ss subprocess must not be invoked."""
-    with (
-        patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS),
-        patch.object(scan_module, "_ss_command_output") as mock_ss,
-    ):
-        scan_unregistered_listeners([])
-    mock_ss.assert_not_called()
-
-
-def test_scan_early_return_ignores_output_provider_when_no_proc_fs() -> None:
-    """Even a non-None _output_provider must be ignored when has_proc_fs is False."""
-    called = []
-
-    def _provider() -> str:
-        called.append(True)
-        return "LISTEN 0 0 0.0.0.0:9999 0.0.0.0:*\n"
-
+@pytest.mark.parametrize(
+    ("case", "call"),
+    [
+        pytest.param(
+            "read-cmdline",
+            lambda: _read_cmdline(99999),
+            id="read_cmdline-returns-empty-when-no-proc-fs",
+        ),
+        pytest.param(
+            "read-cwd",
+            lambda: _read_cwd(99999),
+            id="read_cwd-returns-empty-when-no-proc-fs",
+        ),
+        pytest.param(
+            "pid-belongs",
+            lambda: _pid_belongs_to_current_user(99999),
+            id="pid_belongs_to_current_user-returns-false-when-no-proc-fs",
+        ),
+    ],
+)
+def test_per_function_guards_when_no_proc_fs(case: str, call) -> None:  # type: ignore[no-untyped-def]
     with patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS):
-        result = scan_unregistered_listeners([], _output_provider=_provider)
-
-    assert result == []
-    assert called == [], "_output_provider should not have been called"
-
-
-# ---------------------------------------------------------------------------
-# Per-function guards
-# ---------------------------------------------------------------------------
+        result = call()
+    if case == "pid-belongs":
+        assert result is False
+    else:
+        assert result == ""
 
 
-def test_read_cmdline_returns_empty_when_no_proc_fs() -> None:
-    """_read_cmdline must return '' when PLATFORM.has_proc_fs is False."""
-    with patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS):
-        result = _read_cmdline(99999)
-    assert result == ""
-
-
-def test_read_cwd_returns_empty_when_no_proc_fs() -> None:
-    """_read_cwd must return '' when PLATFORM.has_proc_fs is False."""
-    with patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS):
-        result = _read_cwd(99999)
-    assert result == ""
-
-
-def test_pid_belongs_to_current_user_returns_false_when_no_proc_fs() -> None:
-    """_pid_belongs_to_current_user must return False when PLATFORM.has_proc_fs is False."""
-    with patch.object(scan_module, "PLATFORM", _NO_PROC_CAPS):
-        result = _pid_belongs_to_current_user(99999)
-    assert result is False
-
-
-def test_pid_belongs_to_current_user_returns_false_when_no_getuid() -> None:
-    """_pid_belongs_to_current_user must return False when os.getuid does not exist.
-
-    This test verifies that the getattr(os, 'getuid', None) guard does not
-    raise an AttributeError (simulates Windows where os.getuid is absent).
-    """
-    import os
-
+def test_pid_belongs_to_current_user_guards_missing_getuid() -> None:
+    """_pid_belongs_to_current_user must not raise AttributeError when os.getuid is
+    absent (simulates Windows) — the getattr(os, 'getuid', None) guard path."""
     with (
         patch.object(scan_module, "PLATFORM", _WITH_PROC_CAPS),
         patch.object(os, "getuid", None, create=True),
     ):
-        # We use getattr(os, 'getuid', None) in the impl; this simulates Windows
         result = _pid_belongs_to_current_user(99999)
-    # On Linux getuid exists; we rely on the getattr guard only when it's absent.
-    # This test verifies the guard path doesn't raise AttributeError.
     assert isinstance(result, bool)

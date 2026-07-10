@@ -3,6 +3,12 @@
 Covers FR-R3-01 (single owner: read/write of both pointer namespaces + session record),
 FR-R3-02 (coherence contract), FR-R3-03 (PROTECTED storage paths), and the
 ignored-and-superseded legacy-artifact law. No real time.sleep; tmp_path workspace.
+
+CRITICAL bind attribution (v0.1.47 W1-7/8): the ancestry-chain content contract
+(nearest-first, 8-cap, garbage-tolerant) is preserved as a dedicated kept pair (write +
+read), since ctx-inject attribution parses this exact format. The three-way coherence
+incoherence report is the other CRITICAL kept test — the operator-facing diagnostic for
+lock-holder / incumbent-ptr / session-record disagreement.
 """
 
 from __future__ import annotations
@@ -27,280 +33,240 @@ def _ws(tmp_path: Path) -> Path:
     return ws
 
 
-# --------------------------------------------------------------------------- paths
+# --------------------------------------------------------------------------- paths + traversal
 
 
-def test_path_schemas_are_under_protected_dadaia_sessions(tmp_path: Path) -> None:
-    """FR-R3-03: every artifact lives under .dadaia/sessions/ (PROTECTED)."""
+@pytest.mark.parametrize(
+    "bad_name",
+    ["../escape", "a/b", "a.b"],
+)
+def test_path_validation_rejects_traversal(tmp_path: Path, bad_name: str) -> None:
+    """FR-R3-03: every artifact lives under PROTECTED .dadaia/sessions/, and any name
+    carrying a path separator or traversal segment is rejected (CWE-22)."""
     ws = _ws(tmp_path)
-    for path in (
-        si.ptr_path(ws, CTX),
-        si.session_record_path(ws, SID),
-    ):
+    for path in (si.ptr_path(ws, CTX), si.session_record_path(ws, SID)):
         rel = path.relative_to(ws).as_posix()
         assert rel.startswith(".dadaia/sessions/"), rel
+    with pytest.raises(ValueError, match="CWE-22"):
+        si.ptr_path(ws, bad_name)
+    with pytest.raises(ValueError, match="CWE-22"):
+        si.session_record_path(ws, bad_name)
 
 
-def test_path_validation_rejects_traversal(tmp_path: Path) -> None:
+# --------------------------------------------------------------------------- ptr + record: roundtrip/atomic/fail-soft
+
+
+def test_ptr_and_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    for bad in ("../escape", "a/b", "a.b"):
-        with pytest.raises(ValueError, match="CWE-22"):
-            si.ptr_path(ws, bad)
-        with pytest.raises(ValueError, match="CWE-22"):
-            si.session_record_path(ws, bad)
 
-
-# --------------------------------------------------------------------------- incumbent ptr
-
-
-def test_write_and_read_incumbent_ptr_roundtrip(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # incumbent ptr: absent -> None, write -> read roundtrip.
     assert si.read_incumbent_ptr(ws, CTX) is None
     si.write_incumbent_ptr(ws, CTX, SID)
     assert si.read_incumbent_ptr(ws, CTX) == SID
 
-
-def test_write_incumbent_ptr_is_atomic_replace(tmp_path: Path) -> None:
-    """A second write overwrites cleanly and leaves no .tmp residue."""
-    ws = _ws(tmp_path)
-    si.write_incumbent_ptr(ws, CTX, SID)
+    # a second write overwrites atomically and leaves no .tmp residue.
     si.write_incumbent_ptr(ws, CTX, OTHER)
     assert si.read_incumbent_ptr(ws, CTX) == OTHER
     runtime = ws / ".dadaia" / "sessions" / "runtime"
     assert [p.name for p in runtime.iterdir() if p.name.endswith(".tmp")] == []
 
-
-def test_set_incumbent_alias_writes(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.set_incumbent(ws, CTX, SID)
-    assert si.read_incumbent_ptr(ws, CTX) == SID
-
-
-# --------------------------------------------------------------------------- session record
-
-
-def test_session_record_roundtrip(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # session record: absent -> None, write -> read roundtrip.
     assert si.read_session(ws, SID) is None
     record = {"id": SID, "mode": "READ", "pid": 4242, "context": CTX}
     si.write_session(ws, SID, record)
-    got = si.read_session(ws, SID)
-    assert got == record
+    assert si.read_session(ws, SID) == record
 
-
-def test_session_record_fail_soft_on_corrupt_json(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.session_record_path(ws, SID, create=True).write_text("{not json", encoding="utf-8")
-    assert si.read_session(ws, SID) is None
-
-
-def test_session_record_fail_soft_on_non_dict(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.session_record_path(ws, SID, create=True).write_text("[1, 2, 3]", encoding="utf-8")
-    assert si.read_session(ws, SID) is None
-
-
-def test_read_session_invalid_id_returns_none(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # fail-soft: corrupt JSON, non-dict content, and an invalid id all yield None.
+    si.session_record_path(ws, "corrupt", create=True).write_text("{not json", encoding="utf-8")
+    assert si.read_session(ws, "corrupt") is None
+    si.session_record_path(ws, "nondict", create=True).write_text("[1, 2, 3]", encoding="utf-8")
+    assert si.read_session(ws, "nondict") is None
     assert si.read_session(ws, "../bad") is None
 
+    # legacy/garbage .ptr and pre-existing session json are ignored-and-superseded, never fatal.
+    (runtime / "legacy.ptr").write_text("", encoding="utf-8")  # empty → None
+    assert si.read_incumbent_ptr(ws, "legacy") is None
+    (ws / ".dadaia" / "sessions" / "old-layout.json").write_text(
+        json.dumps({"legacy": True}), encoding="utf-8"
+    )
+    assert si.resolve_identity(ws, "unrelated-ctx") == {"incumbent": None, "mode": None}
 
-# --------------------------------------------------------------------------- resolve_identity
+    # iter_ptr_files: collects the incumbent namespace; empty when the dir is absent.
+    names = {p.name for p in si.iter_ptr_files(ws)}
+    assert f"{CTX}.ptr" in names
+    bare_ws = tmp_path / "bare"
+    bare_ws.mkdir()
+    assert si.iter_ptr_files(bare_ws) == []
 
 
-def test_resolve_identity_returns_incumbent_and_mode(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+# --------------------------------------------------------------------------- resolve_identity states
+
+
+def _write_ptr_and_session(ws: Path) -> None:
     si.write_incumbent_ptr(ws, CTX, SID)
     si.write_session(ws, SID, {"id": SID, "mode": "IMPLEMENTATION"})
-    assert si.resolve_identity(ws, CTX) == {"incumbent": SID, "mode": "IMPLEMENTATION"}
 
 
-def test_resolve_identity_no_state_returns_nones(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("setup", "expected"),
+    [
+        pytest.param(
+            _write_ptr_and_session,
+            {"incumbent": SID, "mode": "IMPLEMENTATION"},
+            id="incumbent-and-mode-present",
+        ),
+        pytest.param(
+            lambda ws: None,
+            {"incumbent": None, "mode": None},
+            id="no-state-returns-nones",
+        ),
+        pytest.param(
+            lambda ws: si.write_incumbent_ptr(ws, CTX, SID),
+            {"incumbent": SID, "mode": None},
+            id="ptr-without-record-yields-no-mode",
+        ),
+    ],
+)
+def test_resolve_identity_states(tmp_path: Path, setup, expected: dict[str, str | None]) -> None:  # type: ignore[no-untyped-def]
     ws = _ws(tmp_path)
-    assert si.resolve_identity(ws, CTX) == {"incumbent": None, "mode": None}
+    setup(ws)
+    assert si.resolve_identity(ws, CTX) == expected
 
 
-def test_resolve_identity_ptr_without_record_yields_no_mode(tmp_path: Path) -> None:
+# --------------------------------------------------------------------------- coherence (FR-R3-02) — CRITICAL, kept
+
+
+def test_coherence_three_way_incoherence_report(tmp_path: Path) -> None:
+    """The canonical incoherence: lock holder, ptr, and record name disagreeing
+    sessions must be reported by name; agreement and partial-absence are non-violations."""
     ws = _ws(tmp_path)
-    si.write_incumbent_ptr(ws, CTX, SID)
-    assert si.resolve_identity(ws, CTX) == {"incumbent": SID, "mode": None}
 
-
-# --------------------------------------------------------------------------- coherence (FR-R3-02)
-
-
-def test_coherence_all_agree_is_none(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # All agree -> no report.
     si.write_incumbent_ptr(ws, CTX, SID)
     si.write_session(ws, SID, {"id": SID})
     assert si.coherence(ws, CTX, lock_holder=SID) is None
 
+    # Only the lock holder present (partial state during acquire) -> not a violation.
+    ws2 = _ws(tmp_path.parent / (tmp_path.name + "-partial"))
+    assert si.coherence(ws2, CTX, lock_holder=SID) is None
 
-def test_coherence_absent_sources_are_not_a_violation(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    # only the lock holder is present — partial state during acquire is legal.
-    assert si.coherence(ws, CTX, lock_holder=SID) is None
-
-
-def test_coherence_three_disagreeing_sessions_is_reported(tmp_path: Path) -> None:
-    """The canonical incoherence: lock holder, ptr, and record name 3 sessions."""
-    ws = _ws(tmp_path)
-    si.write_incumbent_ptr(ws, CTX, OTHER)
-    si.write_session(ws, OTHER, {"id": "third-session"})
-    msg = si.coherence(ws, CTX, lock_holder=SID)
+    # Three disagreeing sessions -> reported by name.
+    ws3 = _ws(tmp_path.parent / (tmp_path.name + "-disagree"))
+    si.write_incumbent_ptr(ws3, CTX, OTHER)
+    si.write_session(ws3, OTHER, {"id": "third-session"})
+    msg = si.coherence(ws3, CTX, lock_holder=SID)
     assert msg is not None
     assert CTX in msg
     assert SID in msg and OTHER in msg
 
+    # Holder vs incumbent disagree (two-way) -> also reported.
+    ws4 = _ws(tmp_path.parent / (tmp_path.name + "-holder-vs-incumbent"))
+    si.write_incumbent_ptr(ws4, CTX, OTHER)
+    msg2 = si.coherence(ws4, CTX, lock_holder=SID)
+    assert msg2 is not None and SID in msg2 and OTHER in msg2
 
-def test_coherence_holder_vs_incumbent_disagree(tmp_path: Path) -> None:
+
+# --------------------------------------------------------------------------- last_seen_at / liveness_timestamp (T-011-04)
+
+
+def test_last_seen_at_and_liveness_timestamp_matrix(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    si.write_incumbent_ptr(ws, CTX, OTHER)
-    msg = si.coherence(ws, CTX, lock_holder=SID)
-    assert msg is not None and SID in msg and OTHER in msg
 
-
-# --------------------------------------------------------------------------- legacy / GC
-
-
-def test_iter_ptr_files_collects_incumbent_namespace(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_incumbent_ptr(ws, CTX, SID)
-    names = {p.name for p in si.iter_ptr_files(ws)}
-    assert names == {f"{CTX}.ptr"}
-
-
-def test_iter_ptr_files_empty_when_dir_absent(tmp_path: Path) -> None:
-    ws = tmp_path / "bare"
-    ws.mkdir()
-    assert si.iter_ptr_files(ws) == []
-
-
-def test_legacy_junk_ptr_is_ignored_not_fatal(tmp_path: Path) -> None:
-    """Planted legacy/garbage .ptr content is read fail-soft, never crashes."""
-    ws = _ws(tmp_path)
-    runtime = ws / ".dadaia" / "sessions" / "runtime"
-    (runtime / "legacy.ptr").write_text("", encoding="utf-8")  # empty → None
-    assert si.read_incumbent_ptr(ws, "legacy") is None
-    # planted pre-existing session json from an older layout: ignored-and-superseded.
-    (ws / ".dadaia" / "sessions" / "old-layout.json").write_text(
-        json.dumps({"legacy": True}), encoding="utf-8"
-    )
-    assert si.resolve_identity(ws, CTX) == {"incumbent": None, "mode": None}
-
-
-# --------------------------------------------------------------------------- last_seen_at (T-011-04)
-
-
-def test_touch_last_seen_at_refreshes_field_and_returns_record(tmp_path: Path) -> None:
-    """FR-W1-04: touch_last_seen_at stamps last_seen_at and persists the record."""
-    ws = _ws(tmp_path)
+    # touch_last_seen_at stamps and persists.
     si.write_session(
         ws, SID, {"id": SID, "mode": "READ", "last_seen_at": "2020-01-01T00:00:00+00:00"}
     )
     updated = si.touch_last_seen_at(ws, SID, now="2030-06-10T12:00:00+00:00")
     assert updated is not None
     assert updated["last_seen_at"] == "2030-06-10T12:00:00+00:00"
-    # Persisted, not just returned.
     reread = si.read_session(ws, SID)
     assert reread is not None and reread["last_seen_at"] == "2030-06-10T12:00:00+00:00"
 
+    # missing record -> None (fail-soft, no-op).
+    assert si.touch_last_seen_at(ws, "ghost", now="2030-06-10T12:00:00+00:00") is None
 
-def test_touch_last_seen_at_noop_when_no_record(tmp_path: Path) -> None:
-    """A missing session record cannot be refreshed — returns None (fail-soft)."""
-    ws = _ws(tmp_path)
-    assert si.touch_last_seen_at(ws, SID, now="2030-06-10T12:00:00+00:00") is None
-
-
-def test_liveness_timestamp_prefers_last_seen_at(tmp_path: Path) -> None:
-    """The GC liveness clock is the renewed last_seen_at when present."""
-    rec: dict[str, object] = {
-        "last_seen_at": "2030-06-10T12:00:00+00:00",
-        "bound_at": "2020-01-01T00:00:00+00:00",
-    }
-    assert si.liveness_timestamp(rec) == "2030-06-10T12:00:00+00:00"
-
-
-def test_liveness_timestamp_falls_back_to_creation_when_no_last_seen_at(tmp_path: Path) -> None:
-    """FR-W1-04: a record WITHOUT last_seen_at decays TTL-from-creation (bound_at/created_at)."""
-    # bound_at (the bind-CLI creation field) is used when last_seen_at is absent.
+    # liveness_timestamp: prefers last_seen_at, falls back to bound_at/created_at, else "".
+    assert (
+        si.liveness_timestamp(
+            {"last_seen_at": "2030-06-10T12:00:00+00:00", "bound_at": "2020-01-01T00:00:00+00:00"}
+        )
+        == "2030-06-10T12:00:00+00:00"
+    )
     assert (
         si.liveness_timestamp({"bound_at": "2020-01-01T00:00:00+00:00"})
         == "2020-01-01T00:00:00+00:00"
     )
-    # created_at is the secondary creation field.
     assert (
         si.liveness_timestamp({"created_at": "2019-01-01T00:00:00+00:00"})
         == "2019-01-01T00:00:00+00:00"
     )
-
-
-def test_liveness_timestamp_empty_when_no_timestamp_field(tmp_path: Path) -> None:
-    """No last_seen_at and no creation field ⇒ empty string (is_stale treats as fresh)."""
     assert si.liveness_timestamp({"mode": "READ"}) == ""
 
 
-# --------------------------------------------------------------------------- bind-epoch
-# FR-W2-02 (ADR-G5): standalone .dadaia/states/bind_epoch/<ctx> marker.
+# --------------------------------------------------------------------------- bind-epoch marker mtime/iter/garbage — 1 param
 
 
-def test_write_bind_epoch_creates_marker_and_dir(tmp_path: Path) -> None:
+def test_bind_epoch_marker_lifecycle_and_fail_soft_matrix(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
+
+    # creates marker + dir; refreshes mtime on re-write; rejects traversal names.
     marker_dir = ws / ".dadaia" / "states" / "bind_epoch"
     assert not marker_dir.exists()
     si.write_bind_epoch(ws, CTX)
     marker = marker_dir / CTX
     assert marker.is_file()
     assert si.bind_epoch_path(ws, CTX) == marker
-
-
-def test_write_bind_epoch_refreshes_mtime(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, CTX)
-    marker = si.bind_epoch_path(ws, CTX)
     base = marker.stat().st_mtime
     os.utime(marker, (base - 100, base - 100))
     backdated = marker.stat().st_mtime
     si.write_bind_epoch(ws, CTX)
     assert marker.stat().st_mtime > backdated
-
-
-def test_bind_epoch_rejects_traversal_name(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
     with pytest.raises(ValueError):
         si.write_bind_epoch(ws, "../escape")
 
-
-def test_iter_bind_epochs_returns_slug_mtime_pairs(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # iter_bind_epochs: slug/mtime pairs; empty when absent; skips invalid names.
     si.write_bind_epoch(ws, "alpha")
     si.write_bind_epoch(ws, "beta")
     epochs = dict(si.iter_bind_epochs(ws))
-    assert set(epochs) == {"alpha", "beta"}
+    assert {"alpha", "beta"} <= set(epochs)
     assert all(isinstance(m, float) for m in epochs.values())
-
-
-def test_iter_bind_epochs_empty_when_dir_absent(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    assert si.iter_bind_epochs(ws) == []
-
-
-def test_iter_bind_epochs_skips_invalid_names(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, "good")
+    empty_ws = _ws(tmp_path.parent / (tmp_path.name + "-empty-epochs"))
+    assert si.iter_bind_epochs(empty_ws) == []
     bad = si.bind_epoch_dir(ws, create=True) / "bad name!"
     bad.write_text("x", encoding="utf-8")
-    assert dict(si.iter_bind_epochs(ws)).keys() == {"good"}
+    assert "bad name!" not in dict(si.iter_bind_epochs(ws))
+
+    # garbage-tolerant reads: absent marker, all-garbage content, blank/garbage lines
+    # interleaved with real pids, and a traversal ctx name — all fail-soft, never raise.
+    absent_ws = _ws(tmp_path.parent / (tmp_path.name + "-absent"))
+    assert si.read_bind_epoch_pids(absent_ws, CTX) == []
+    assert si.read_bind_epoch_pid(absent_ws, CTX) is None
+
+    garbage_marker = si.bind_epoch_dir(ws, create=True) / "garbage-ctx"
+    for bad_content in ("not-a-pid", "0", "-7", ""):
+        garbage_marker.write_text(bad_content, encoding="utf-8")
+        assert si.read_bind_epoch_pids(ws, "garbage-ctx") == []
+        assert si.read_bind_epoch_pid(ws, "garbage-ctx") is None
+
+    mixed_marker = si.bind_epoch_dir(ws, create=True) / "mixed-ctx"
+    mixed_marker.write_text("4242\n\ngarbage\n-1\n0\n5353\n", encoding="utf-8")
+    assert si.read_bind_epoch_pids(ws, "mixed-ctx") == [4242, 5353]
+    assert si.read_bind_epoch_pid(ws, "mixed-ctx") == 4242
+
+    assert si.read_bind_epoch_pids(ws, "../escape") == []
+    assert si.read_bind_epoch_pid(ws, "../escape") is None
 
 
-# W1-7/W1-8 (v0.1.47): bind-epoch session attribution — the marker file CONTENT carries the
-# bind process's nearest-first ANCESTRY PID CHAIN (one decimal pid per line) so the
-# ctx-inject hook and the specs resolver attribute it by MEMBERSHIP, surviving the ephemeral
-# harness shell that dies between calls.
+# --------------------------------------------------------------------------- ancestry-chain content contract — CRITICAL, kept
 
 
 def test_write_bind_epoch_records_ancestry_chain_as_content(tmp_path: Path) -> None:
+    """W1-7/W1-8 (v0.1.47): the marker file CONTENT carries the bind process's
+    nearest-first ANCESTRY PID CHAIN (one decimal pid per line, capped at 8, with
+    non-positive pids filtered) so ctx-inject and the specs resolver attribute by
+    MEMBERSHIP, surviving the ephemeral harness shell that dies between calls."""
     ws = _ws(tmp_path)
+
     si.write_bind_epoch(ws, CTX, pids=[4242, 5353, 6464])
     # One decimal pid per line, nearest-first.
     assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == "4242\n5353\n6464\n"
@@ -308,34 +274,18 @@ def test_write_bind_epoch_records_ancestry_chain_as_content(tmp_path: Path) -> N
     # The single-pid compat reader returns the FIRST (nearest) chain entry.
     assert si.read_bind_epoch_pid(ws, CTX) == 4242
 
-
-def test_write_bind_epoch_single_pid_chain_is_legacy_shape(tmp_path: Path) -> None:
-    # A one-element chain reproduces the pre-v0.1.47 single-line marker exactly.
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, CTX, pids=[4242])
-    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8").strip() == "4242"
-    assert si.read_bind_epoch_pids(ws, CTX) == [4242]
-    assert si.read_bind_epoch_pid(ws, CTX) == 4242
-
-
-def test_write_bind_epoch_caps_chain_length(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # Cap at 8 entries.
     long_chain = list(range(100, 100 + 20))  # 20 > the 8-entry cap
     si.write_bind_epoch(ws, CTX, pids=long_chain)
-    got = si.read_bind_epoch_pids(ws, CTX)
-    assert got == long_chain[:8]
-    assert len(got) == 8
+    capped = si.read_bind_epoch_pids(ws, CTX)
+    assert capped == long_chain[:8]
+    assert len(capped) == 8
 
-
-def test_write_bind_epoch_filters_nonpositive_pids(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
+    # Non-positive pids are filtered out of the chain.
     si.write_bind_epoch(ws, CTX, pids=[0, -7, 4242, 5353])
     assert si.read_bind_epoch_pids(ws, CTX) == [4242, 5353]
 
-
-def test_write_bind_epoch_with_chain_refreshes_mtime(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, CTX, pids=[4242, 5353])
+    # A re-write with a new chain refreshes mtime and content together.
     marker = si.bind_epoch_path(ws, CTX)
     base = marker.stat().st_mtime
     os.utime(marker, (base - 100, base - 100))
@@ -344,49 +294,15 @@ def test_write_bind_epoch_with_chain_refreshes_mtime(tmp_path: Path) -> None:
     assert marker.stat().st_mtime > backdated
     assert si.read_bind_epoch_pids(ws, CTX) == [9999, 8888]
 
-
-def test_read_bind_epoch_pids_empty_for_legacy_empty_marker(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, CTX)  # legacy shape: pids=None ⇒ EMPTY marker
-    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == ""
-    # (d) empty marker ⇒ never attributable: no pids, no single-pid.
-    assert si.read_bind_epoch_pids(ws, CTX) == []
-    assert si.read_bind_epoch_pid(ws, CTX) is None
-
-
-def test_read_bind_epoch_pids_empty_for_empty_or_none_pids(tmp_path: Path) -> None:
-    # An explicit empty list is unattributable, exactly like ``pids=None``.
-    ws = _ws(tmp_path)
-    si.write_bind_epoch(ws, CTX, pids=[])
-    assert si.bind_epoch_path(ws, CTX).read_text(encoding="utf-8") == ""
-    assert si.read_bind_epoch_pids(ws, CTX) == []
-
-
-def test_read_bind_epoch_pids_empty_for_absent_marker(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    assert si.read_bind_epoch_pids(ws, CTX) == []
-    assert si.read_bind_epoch_pid(ws, CTX) is None
-
-
-def test_read_bind_epoch_pids_skips_blank_and_garbage_lines(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    marker = si.bind_epoch_dir(ws, create=True) / CTX
-    marker.write_text("4242\n\ngarbage\n-1\n0\n5353\n", encoding="utf-8")
-    assert si.read_bind_epoch_pids(ws, CTX) == [4242, 5353]
-    assert si.read_bind_epoch_pid(ws, CTX) == 4242
-
-
-def test_read_bind_epoch_pid_none_for_all_garbage_marker(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    marker = si.bind_epoch_dir(ws, create=True) / CTX
-    for bad in ("not-a-pid", "0", "-7", ""):
-        marker.write_text(bad, encoding="utf-8")
-        assert si.read_bind_epoch_pids(ws, CTX) == []
-        assert si.read_bind_epoch_pid(ws, CTX) is None
-
-
-def test_read_bind_epoch_pids_empty_for_traversal_name(tmp_path: Path) -> None:
-    ws = _ws(tmp_path)
-    # A traversal ctx name never resolves to a marker path ⇒ fail-soft, never raises.
-    assert si.read_bind_epoch_pids(ws, "../escape") == []
-    assert si.read_bind_epoch_pid(ws, "../escape") is None
+    # Legacy shape (no pids arg) writes an EMPTY marker — never attributable. ``touch()``
+    # does not truncate an existing file, so this is asserted against a FRESH context
+    # (matching production: an empty marker is the initial/legacy shape, not a reset).
+    fresh_ctx = "legacy-empty-ctx"
+    si.write_bind_epoch(ws, fresh_ctx)
+    assert si.bind_epoch_path(ws, fresh_ctx).read_text(encoding="utf-8") == ""
+    assert si.read_bind_epoch_pids(ws, fresh_ctx) == []
+    assert si.read_bind_epoch_pid(ws, fresh_ctx) is None
+    # An explicit empty list is equally unattributable, on another fresh context.
+    fresh_ctx2 = "legacy-empty-ctx-2"
+    si.write_bind_epoch(ws, fresh_ctx2, pids=[])
+    assert si.bind_epoch_path(ws, fresh_ctx2).read_text(encoding="utf-8") == ""

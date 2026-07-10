@@ -19,11 +19,11 @@
   `tests/unit/scripts/**`
 - [x] **T-5** Lifecycle cluster per `plan-lifecycle.md` (515→~185).
   Write set: `tests/unit/features/lifecycle/**`
-- [-] **T-6** Unit-features-rest incl. spec_context per `plan-unit-features-rest.md`
+- [x] **T-6** Unit-features-rest incl. spec_context per `plan-unit-features-rest.md`
   (1,035→250) + **FR2 frozen-suite re-baseline** (successor baseline named; QA
   adjudication recorded in the task commit + CLOSURE).
   Write set: `tests/unit/features/**` (excluding `panel/`, `lifecycle/`)
-- [ ] **T-7** Integration cluster per `plan-integration.md` (574→~145; shared
+- [-] **T-7** Integration cluster per `plan-integration.md` (574→~145; shared
   session-scoped workspace template + panel-server factory; relocations to unit; dead
   live files deleted).
   Write set: `tests/integration/**`, `tests/unit/**` (relocation targets only)

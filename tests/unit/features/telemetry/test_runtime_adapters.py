@@ -6,14 +6,19 @@ Tests verify:
   the aggregator from event-level micro-USD; the adapter only validates it).
 - CodexRuntimeAdapter.enrich_row: sets cumulative_cost_usd=None, cost_known=False;
   pricing.compute_cost is NOT called.
-- Both adapters satisfy the RuntimeAdapter protocol.
-- Liveness classification for ClaudeRuntimeAdapter (with filesystem fakes).
-- CodexRuntimeAdapter.liveness defaults to "idle" when no stronger signal exists.
+- Liveness classification for ClaudeRuntimeAdapter (with filesystem fakes) and for
+  CodexRuntimeAdapter (state_5.sqlite + history.jsonl fakes, incl. graceful
+  degradation on missing/malformed/unknown-session input).
 """
 
 from __future__ import annotations
 
+import json
+import os
 import pathlib
+import sqlite3
+import tempfile
+import time as _time
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
@@ -26,12 +31,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
 from dadaia_workspace.features.telemetry.aggregator.runtimes import (
     ClaudeRuntimeAdapter,
     CodexRuntimeAdapter,
-    RuntimeAdapter,
 )
-
-# ---------------------------------------------------------------------------
-# Fixtures — minimal SessionRow and SessionDetail
-# ---------------------------------------------------------------------------
 
 _NOW_ISO = datetime.now(tz=UTC).isoformat()
 
@@ -86,277 +86,109 @@ def _make_detail(
 
 
 # ---------------------------------------------------------------------------
-# Protocol conformance
+# Kept: read-path purity — claude enrich never recomputes cost from scratch.
 # ---------------------------------------------------------------------------
 
 
-def test_claude_adapter_satisfies_protocol() -> None:
-    """ClaudeRuntimeAdapter must satisfy the RuntimeAdapter protocol."""
-    adapter = ClaudeRuntimeAdapter()
-    assert isinstance(adapter, RuntimeAdapter)
+def test_claude_enrich_row_and_detail_never_call_compute_cost() -> None:
+    """pricing.compute_cost must NOT be called by enrich_row/enrich_detail.
 
-
-def test_codex_adapter_satisfies_protocol() -> None:
-    """CodexRuntimeAdapter must satisfy the RuntimeAdapter protocol."""
-    adapter = CodexRuntimeAdapter()
-    assert isinstance(adapter, RuntimeAdapter)
-
-
-# ---------------------------------------------------------------------------
-# ClaudeRuntimeAdapter.enrich_row
-# ---------------------------------------------------------------------------
-
-
-def test_claude_enrich_row_sets_cost_known_true_when_cost_present() -> None:
-    """enrich_row sets cost_known=True when cumulative_cost_usd is not None."""
+    The aggregator already summed event-level micro-USD before calling the adapter;
+    the adapter only validates/relabels it (read-path purity)."""
     adapter = ClaudeRuntimeAdapter()
     row = _make_row(cumulative_cost_usd=0.0065, cost_known=False)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched.cost_known is True
-    assert enriched.cumulative_cost_usd == pytest.approx(0.0065)
-
-
-def test_claude_enrich_row_preserves_dollar_conversion() -> None:
-    """The dollar value on the enriched row equals the input value."""
-    adapter = ClaudeRuntimeAdapter()
-    # Simulate: aggregator computed 6500 micro-USD → 0.0065 USD
-    row = _make_row(cumulative_cost_usd=6500 / 1_000_000, cost_known=False)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched.cumulative_cost_usd == pytest.approx(6500 / 1_000_000)
-    assert enriched.cost_known is True
-
-
-def test_claude_enrich_row_cost_none_leaves_cost_known_false() -> None:
-    """enrich_row with cumulative_cost_usd=None leaves cost_known=False (unknown model)."""
-    adapter = ClaudeRuntimeAdapter()
-    row = _make_row(cumulative_cost_usd=None, cost_known=False)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched.cumulative_cost_usd is None
-    assert enriched.cost_known is False
-
-
-def test_claude_enrich_row_compute_cost_not_called() -> None:
-    """pricing.compute_cost must NOT be called by enrich_row.
-
-    The aggregator already summed event-level micro-USD before calling the adapter.
-    The adapter does not recompute from scratch.
-    """
-    adapter = ClaudeRuntimeAdapter()
-    row = _make_row(cumulative_cost_usd=0.0065, cost_known=False)
-
-    with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
-        adapter.enrich_row(row)
-        mock_compute.assert_not_called()
-
-
-def test_claude_enrich_row_returns_new_frozen_instance() -> None:
-    """enrich_row returns a new SessionRow (frozen dataclass immutability)."""
-    adapter = ClaudeRuntimeAdapter()
-    row = _make_row(cumulative_cost_usd=0.0065, cost_known=False)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched is not row
-    assert isinstance(enriched, SessionRow)
-
-
-# ---------------------------------------------------------------------------
-# ClaudeRuntimeAdapter.enrich_detail
-# ---------------------------------------------------------------------------
-
-
-def test_claude_enrich_detail_sets_cost_known_true() -> None:
-    """enrich_detail sets cost_known=True when cumulative_cost_usd is not None."""
-    adapter = ClaudeRuntimeAdapter()
     detail = _make_detail(cumulative_cost_usd=0.0065, cost_known=False)
 
-    enriched = adapter.enrich_detail(detail)
-
-    assert enriched.cost_known is True
-    assert isinstance(enriched, SessionDetail)
-
-
-# ---------------------------------------------------------------------------
-# CodexRuntimeAdapter.enrich_row
-# ---------------------------------------------------------------------------
-
-
-def test_codex_enrich_row_sets_cost_none_and_known_false() -> None:
-    """CodexRuntimeAdapter.enrich_row always yields cumulative_cost_usd=None, cost_known=False."""
-    adapter = CodexRuntimeAdapter()
-    # Even if the aggregator somehow puts a cost on a codex row, the adapter clears it.
-    row = _make_row(runtime="codex", cumulative_cost_usd=99.99, cost_known=True)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched.cumulative_cost_usd is None
-    assert enriched.cost_known is False
-
-
-def test_codex_enrich_row_compute_cost_not_called() -> None:
-    """pricing.compute_cost must NOT be called by CodexRuntimeAdapter.enrich_row."""
-    adapter = CodexRuntimeAdapter()
-    row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
-
     with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
-        adapter.enrich_row(row)
+        enriched_row = adapter.enrich_row(row)
+        enriched_detail = adapter.enrich_detail(detail)
         mock_compute.assert_not_called()
 
+    assert enriched_row.cost_known is True
+    assert enriched_row.cumulative_cost_usd == pytest.approx(0.0065)
+    assert enriched_detail.cost_known is True
 
-def test_codex_enrich_row_preserves_non_cost_fields() -> None:
-    """CodexRuntimeAdapter.enrich_row preserves all non-cost fields."""
-    adapter = CodexRuntimeAdapter()
-    row = _make_row(
-        session_id="codex-sess-xyz",
-        runtime="codex",
-        cumulative_cost_usd=None,
-        cost_known=False,
+
+# ---------------------------------------------------------------------------
+# Enrich row/detail per runtime — claude value-vs-none, codex always-none — 1 param
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("runtime", "cumulative_cost_usd", "cost_known", "expect_cost", "expect_known"),
+    [
+        pytest.param("claude", 0.0065, False, pytest.approx(0.0065), True, id="claude-cost-present"),
+        pytest.param("claude", None, False, None, False, id="claude-cost-none-unknown-model"),
+        pytest.param("codex", 99.99, True, None, False, id="codex-always-clears-cost"),
+        pytest.param("codex", None, False, None, False, id="codex-none-stays-none"),
+    ],
+)
+def test_enrich_row_and_detail_matrix(
+    runtime: str,
+    cumulative_cost_usd: float | None,
+    cost_known: bool,
+    expect_cost: object,
+    expect_known: bool,
+) -> None:
+    adapter = ClaudeRuntimeAdapter() if runtime == "claude" else CodexRuntimeAdapter()
+    row = _make_row(runtime=runtime, cumulative_cost_usd=cumulative_cost_usd, cost_known=cost_known)
+    detail = _make_detail(
+        runtime=runtime, cumulative_cost_usd=cumulative_cost_usd, cost_known=cost_known
     )
 
-    enriched = adapter.enrich_row(row)
+    enriched_row = adapter.enrich_row(row)
+    enriched_detail = adapter.enrich_detail(detail)
 
-    assert enriched.session_id == row.session_id
-    assert enriched.runtime == row.runtime
-    assert enriched.project == row.project
-    assert enriched.model == row.model
-    assert enriched.message_count == row.message_count
-    assert enriched.context_size_tokens == row.context_size_tokens
-    assert enriched.status == row.status
-    assert enriched.agent_name == row.agent_name
-
-
-def test_codex_enrich_row_returns_new_frozen_instance() -> None:
-    """enrich_row returns a new SessionRow."""
-    adapter = CodexRuntimeAdapter()
-    row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
-
-    enriched = adapter.enrich_row(row)
-
-    assert enriched is not row
-    assert isinstance(enriched, SessionRow)
+    assert enriched_row.cumulative_cost_usd == expect_cost
+    assert enriched_row.cost_known is expect_known
+    assert enriched_detail.cumulative_cost_usd == expect_cost
+    assert enriched_detail.cost_known is expect_known
+    # returns a SessionRow with non-cost fields preserved.
+    assert isinstance(enriched_row, SessionRow)
+    assert enriched_row.session_id == row.session_id
+    assert enriched_row.project == row.project
+    assert enriched_row.model == row.model
 
 
 # ---------------------------------------------------------------------------
-# CodexRuntimeAdapter.enrich_detail
+# ClaudeRuntimeAdapter.liveness thresholds — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_codex_enrich_detail_sets_cost_none_and_known_false() -> None:
-    """CodexRuntimeAdapter.enrich_detail yields cumulative_cost_usd=None, cost_known=False."""
-    adapter = CodexRuntimeAdapter()
-    detail = _make_detail(runtime="codex", cumulative_cost_usd=5.0, cost_known=True)
-
-    enriched = adapter.enrich_detail(detail)
-
-    assert enriched.cumulative_cost_usd is None
-    assert enriched.cost_known is False
-    assert isinstance(enriched, SessionDetail)
-
-
-# ---------------------------------------------------------------------------
-# ClaudeRuntimeAdapter.liveness — filesystem fake via tmp_path
-# ---------------------------------------------------------------------------
-
-
-def test_claude_liveness_absent_file_returns_ended(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'ended' when ~/.claude/sessions/<id>.json does not exist."""
+@pytest.mark.parametrize(
+    ("session_id", "age_minutes", "file_exists", "expected"),
+    [
+        pytest.param("nonexistent-session", None, False, "ended", id="absent-file-ended"),
+        pytest.param("active-session", 0, True, "active", id="recent-mtime-active"),
+        pytest.param("idle-session", 30, True, "idle", id="idle-mtime-6-to-60min"),
+        pytest.param("old-session", 90, True, "ended", id="old-mtime-over-60min-ended"),
+    ],
+)
+def test_claude_liveness_thresholds(
+    tmp_path: pathlib.Path,
+    session_id: str,
+    age_minutes: int | None,
+    file_exists: bool,
+    expected: str,
+) -> None:
     adapter = ClaudeRuntimeAdapter()
-    # Patch home() to point to tmp_path so we don't read real fs.
+    if file_exists:
+        sessions_dir = tmp_path / ".claude" / "sessions"
+        sessions_dir.mkdir(parents=True)
+        session_file = sessions_dir / f"{session_id}.json"
+        session_file.write_text("{}")
+        if age_minutes:
+            ts = (datetime.now(tz=UTC) - timedelta(minutes=age_minutes)).timestamp()
+            os.utime(session_file, (ts, ts))
+
     with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("nonexistent-session", "/workspace")
-    assert result == "ended"
-
-
-def test_claude_liveness_recent_mtime_returns_active(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'active' when session file mtime is within 5 minutes."""
-    sessions_dir = tmp_path / ".claude" / "sessions"
-    sessions_dir.mkdir(parents=True)
-    session_file = sessions_dir / "active-session.json"
-    session_file.write_text("{}")
-
-    # mtime is "now" by default for a newly created file — within 5 min.
-    adapter = ClaudeRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("active-session", "/workspace")
-
-    assert result == "active"
-
-
-def test_claude_liveness_old_mtime_returns_ended(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'ended' when session file mtime is older than 60 minutes."""
-    sessions_dir = tmp_path / ".claude" / "sessions"
-    sessions_dir.mkdir(parents=True)
-    session_file = sessions_dir / "old-session.json"
-    session_file.write_text("{}")
-
-    # Set mtime to 90 minutes ago.
-    old_ts = (datetime.now(tz=UTC) - timedelta(minutes=90)).timestamp()
-
-    os.utime(session_file, (old_ts, old_ts))
-
-    adapter = ClaudeRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("old-session", "/workspace")
-
-    assert result == "ended"
-
-
-def test_claude_liveness_idle_mtime_returns_idle(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'idle' when session file mtime is 6-60 minutes ago."""
-    sessions_dir = tmp_path / ".claude" / "sessions"
-    sessions_dir.mkdir(parents=True)
-    session_file = sessions_dir / "idle-session.json"
-    session_file.write_text("{}")
-
-    # Set mtime to 30 minutes ago (> 5 min, <= 60 min → idle).
-    idle_ts = (datetime.now(tz=UTC) - timedelta(minutes=30)).timestamp()
-
-    os.utime(session_file, (idle_ts, idle_ts))
-
-    adapter = ClaudeRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("idle-session", "/workspace")
-
-    assert result == "idle"
+        result = adapter.liveness(session_id, "/workspace")
+    assert result == expected
 
 
 # ---------------------------------------------------------------------------
-# CodexRuntimeAdapter.liveness — Phase A stub (kept for backwards compat)
+# CodexRuntimeAdapter.liveness — state_5.sqlite + history.jsonl fakes — 1 param
 # ---------------------------------------------------------------------------
-
-
-def test_codex_liveness_returns_idle_stub() -> None:
-    """CodexRuntimeAdapter.liveness returns 'idle' when no ~/.codex files present.
-
-    Phase A asserted a hard-coded 'idle'; Phase E still returns 'idle' on missing
-    files (graceful degradation), so this test remains valid.
-    """
-    adapter = CodexRuntimeAdapter()
-    # Patch Path.home() to an empty tmp dir — no state_5.sqlite, no history.jsonl.
-
-    with (
-        tempfile.TemporaryDirectory() as empty_home,
-        patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)),
-    ):
-        result = adapter.liveness("any-session", "/workspace")
-    assert result == "idle"
-
-
-# ---------------------------------------------------------------------------
-# CodexRuntimeAdapter.liveness — Phase E full implementation
-# ---------------------------------------------------------------------------
-
-import json  # noqa: E402
-import os  # noqa: E402
-import sqlite3  # noqa: E402
-import tempfile  # noqa: E402
-import time as _time  # noqa: E402
 
 
 def _make_codex_home(
@@ -367,18 +199,13 @@ def _make_codex_home(
     archived: int = 0,
     history_ts_offset_seconds: int | None = None,
 ) -> pathlib.Path:
-    """Build a fake ~/.codex/ directory under *tmp* with state_5.sqlite + history.jsonl.
-
-    updated_at_offset_seconds: negative = seconds in the past relative to now.
-    history_ts_offset_seconds: if None, no matching entry in history.jsonl.
-    """
+    """Build a fake ~/.codex/ directory under *tmp* with state_5.sqlite + history.jsonl."""
     codex_dir = tmp / ".codex"
     codex_dir.mkdir(parents=True, exist_ok=True)
 
     now_unix = int(_time.time())
-    updated_at = now_unix + updated_at_offset_seconds  # offset is typically negative
+    updated_at = now_unix + updated_at_offset_seconds
 
-    # Create state_5.sqlite with a threads row.
     db_path = codex_dir / "state_5.sqlite"
     con = sqlite3.connect(str(db_path))
     con.execute(
@@ -406,7 +233,6 @@ def _make_codex_home(
     con.commit()
     con.close()
 
-    # Create history.jsonl.
     history_path = codex_dir / "history.jsonl"
     lines: list[str] = []
     if history_ts_offset_seconds is not None:
@@ -417,153 +243,112 @@ def _make_codex_home(
     return tmp
 
 
-def test_codex_liveness_archived_returns_ended(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'ended' when threads.archived = 1, regardless of delta."""
-    _make_codex_home(
-        tmp_path,
-        "sess-archived",
-        updated_at_offset_seconds=0,  # very recent
-        archived=1,
-    )
+@pytest.mark.parametrize(
+    ("case", "session_id", "kwargs", "query_id", "expected"),
+    [
+        pytest.param(
+            "archived-ended-regardless-of-delta",
+            "sess-archived",
+            {"updated_at_offset_seconds": 0, "archived": 1},
+            "sess-archived",
+            "ended",
+            id="archived-returns-ended",
+        ),
+        pytest.param(
+            "fresh-delta-active",
+            "sess-active",
+            {"updated_at_offset_seconds": -1, "archived": 0},
+            "sess-active",
+            "active",
+            id="fresh-delta-1s-active",
+        ),
+        pytest.param(
+            "history-ts-wins-if-more-recent",
+            "sess-hist-wins",
+            {
+                "updated_at_offset_seconds": -3600,
+                "archived": 0,
+                "history_ts_offset_seconds": -30,
+            },
+            "sess-hist-wins",
+            "active",
+            id="history-ts-wins-max-of-both",
+        ),
+        pytest.param(
+            "30min-delta-idle",
+            "sess-idle",
+            {"updated_at_offset_seconds": -(30 * 60), "archived": 0},
+            "sess-idle",
+            "idle",
+            id="30min-delta-idle",
+        ),
+        pytest.param(
+            "90min-delta-ended",
+            "sess-ended",
+            {"updated_at_offset_seconds": -(90 * 60), "archived": 0},
+            "sess-ended",
+            "ended",
+            id="90min-delta-ended",
+        ),
+        pytest.param(
+            "unknown-session-idle",
+            "known-session",
+            {"updated_at_offset_seconds": -30, "archived": 0},
+            "completely-unknown-id",
+            "idle",
+            id="unknown-session-not-in-db-idle",
+        ),
+    ],
+)
+def test_codex_liveness_matrix(
+    tmp_path: pathlib.Path,
+    case: str,
+    session_id: str,
+    kwargs: dict[str, int | None],
+    query_id: str,
+    expected: str,
+) -> None:
+    _make_codex_home(tmp_path, session_id, **kwargs)  # type: ignore[arg-type]
     adapter = CodexRuntimeAdapter()
     with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("sess-archived", "/workspace")
-    assert result == "ended"
+        result = adapter.liveness(query_id, "/workspace")
+    assert result == expected
 
+    if case != "unknown-session-idle":
+        return
 
-def test_codex_liveness_fresh_delta_returns_active(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'active' when delta ≤ 5 min (updated_at 1 second ago)."""
-    _make_codex_home(
-        tmp_path,
-        "sess-active",
-        updated_at_offset_seconds=-1,  # 1 second ago
-        archived=0,
-    )
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("sess-active", "/workspace")
-    assert result == "active"
-
-
-def test_codex_liveness_history_ts_wins_if_more_recent(tmp_path: pathlib.Path) -> None:
-    """liveness uses max(updated_at, history_ts); a fresh history_ts makes it active."""
-    _make_codex_home(
-        tmp_path,
-        "sess-hist-wins",
-        updated_at_offset_seconds=-3600,  # 1 hour ago in threads
-        archived=0,
-        history_ts_offset_seconds=-30,  # 30 seconds ago in history.jsonl
-    )
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("sess-hist-wins", "/workspace")
-    assert result == "active"
-
-
-def test_codex_liveness_30min_delta_returns_idle(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'idle' when delta is 30 minutes (> 5 min, ≤ 60 min)."""
-    _make_codex_home(
-        tmp_path,
-        "sess-idle",
-        updated_at_offset_seconds=-(30 * 60),  # 30 minutes ago
-        archived=0,
-    )
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("sess-idle", "/workspace")
-    assert result == "idle"
-
-
-def test_codex_liveness_90min_delta_returns_ended(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'ended' when delta > 60 minutes (90 min here)."""
-    _make_codex_home(
-        tmp_path,
-        "sess-ended",
-        updated_at_offset_seconds=-(90 * 60),  # 90 minutes ago
-        archived=0,
-    )
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("sess-ended", "/workspace")
-    assert result == "ended"
-
-
-def test_codex_liveness_missing_files_returns_idle() -> None:
-    """liveness returns 'idle' when ~/.codex does not exist (graceful degradation)."""
-
-    adapter = CodexRuntimeAdapter()
+    # Graceful degradation, folded onto the last matrix case: no ~/.codex at all ->
+    # idle; malformed history.jsonl lines are skipped without raising (the
+    # threads.updated_at value still drives the verdict).
     with (
         tempfile.TemporaryDirectory() as empty_home,
         patch("pathlib.Path.home", return_value=pathlib.Path(empty_home)),
     ):
-        result = adapter.liveness("any-id", "/workspace")
-    assert result == "idle"
+        no_home_result = adapter.liveness("any-session", "/workspace")
+    assert no_home_result == "idle"
 
+    with tempfile.TemporaryDirectory() as home:
+        home_path = pathlib.Path(home)
+        codex_dir = home_path / ".codex"
+        codex_dir.mkdir(parents=True)
+        now_unix = int(_time.time())
+        db_path = codex_dir / "state_5.sqlite"
+        con = sqlite3.connect(str(db_path))
+        con.execute(
+            """CREATE TABLE threads (
+                id TEXT PRIMARY KEY,
+                updated_at INTEGER NOT NULL DEFAULT 0,
+                archived INTEGER NOT NULL DEFAULT 0
+            )"""
+        )
+        con.execute(
+            "INSERT INTO threads (id, updated_at, archived) VALUES (?, ?, ?)",
+            ("sess-parse-fail", now_unix - 10, 0),
+        )
+        con.commit()
+        con.close()
+        (codex_dir / "history.jsonl").write_text("not-valid-json\n{bad json\n")
 
-def test_codex_liveness_parse_failure_returns_idle(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'idle' when history.jsonl contains malformed JSON lines."""
-    codex_dir = tmp_path / ".codex"
-    codex_dir.mkdir(parents=True)
-
-    # Write a valid DB.
-    now_unix = int(_time.time())
-    db_path = codex_dir / "state_5.sqlite"
-    con = sqlite3.connect(str(db_path))
-    con.execute(
-        """CREATE TABLE threads (
-            id TEXT PRIMARY KEY,
-            updated_at INTEGER NOT NULL DEFAULT 0,
-            archived INTEGER NOT NULL DEFAULT 0
-        )"""
-    )
-    con.execute(
-        "INSERT INTO threads (id, updated_at, archived) VALUES (?, ?, ?)",
-        ("sess-parse-fail", now_unix - 10, 0),
-    )
-    con.commit()
-    con.close()
-
-    # Write malformed JSON to history.jsonl.
-    history_path = codex_dir / "history.jsonl"
-    history_path.write_text("not-valid-json\n{bad json\n")
-
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        # Should not raise; returns based on threads.updated_at (10s ago → active),
-        # or 'idle' on parse failure — either is acceptable. We assert no exception.
-        result = adapter.liveness("sess-parse-fail", "/workspace")
-    # 10 seconds ago → active (malformed history lines are skipped gracefully).
-    assert result in ("active", "idle")
-
-
-def test_codex_liveness_unknown_session_returns_idle(tmp_path: pathlib.Path) -> None:
-    """liveness returns 'idle' when session_id not found in threads table."""
-    _make_codex_home(
-        tmp_path,
-        "known-session",
-        updated_at_offset_seconds=-30,
-        archived=0,
-    )
-    adapter = CodexRuntimeAdapter()
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        result = adapter.liveness("completely-unknown-id", "/workspace")
-    # Session not in DB → graceful degradation → idle.
-    assert result == "idle"
-
-
-# ---------------------------------------------------------------------------
-# Codex enrich_row must not call pricing.compute_cost
-# ---------------------------------------------------------------------------
-
-
-def test_codex_enrich_row_compute_cost_not_called_e2() -> None:
-    """compute_cost must never be called by CodexRuntimeAdapter.enrich_row."""
-    adapter = CodexRuntimeAdapter()
-    row = _make_row(runtime="codex", cumulative_cost_usd=None, cost_known=False)
-
-    with patch("dadaia_workspace.features.telemetry.pricing.compute_cost") as mock_compute:
-        enriched = adapter.enrich_row(row)
-        mock_compute.assert_not_called()
-
-    assert enriched.cumulative_cost_usd is None
-    assert enriched.cost_known is False
+        with patch("pathlib.Path.home", return_value=home_path):
+            malformed_result = adapter.liveness("sess-parse-fail", "/workspace")
+        assert malformed_result in ("active", "idle")

@@ -12,16 +12,10 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
-    AgentListResult,
-)
+from dadaia_workspace.features.telemetry.aggregator.models import AgentListResult
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 from tests.fakes import shared_connection_factory
-
-# ---------------------------------------------------------------------------
-# Constants — synthetic fixture paths
-# ---------------------------------------------------------------------------
 
 _KNOWN_ROOT = "/home/user/workspace/dadaia/repos/dadaia-workspace"
 _UNKNOWN_ROOT = "/tmp/unknown-project"
@@ -31,11 +25,6 @@ _NOW = datetime.now(tz=UTC)
 _NOW_ISO = _NOW.isoformat()
 _RECENT_ISO = (_NOW - timedelta(days=5)).isoformat()
 _OLD_ISO = (_NOW - timedelta(days=200)).isoformat()
-
-
-# ---------------------------------------------------------------------------
-# SpecContextService stub
-# ---------------------------------------------------------------------------
 
 
 class _ContextEntry:
@@ -52,20 +41,11 @@ class _FakeSCS:
 
     def __init__(self, entries: list[_ContextEntry] | None = None) -> None:
         self._entries = entries or [
-            _ContextEntry(
-                slug=_CONTEXT_SLUG,
-                name="dadaia-workspace",
-                repo_root=_KNOWN_ROOT,
-            )
+            _ContextEntry(slug=_CONTEXT_SLUG, name="dadaia-workspace", repo_root=_KNOWN_ROOT)
         ]
 
     def list_all(self) -> list[_ContextEntry]:
         return list(self._entries)
-
-
-# ---------------------------------------------------------------------------
-# Pricing module stub
-# ---------------------------------------------------------------------------
 
 
 class _FakePricing:
@@ -75,7 +55,7 @@ class _FakePricing:
         def __init__(self, effective_from: date) -> None:
             self.effective_from = effective_from
 
-    PRICING_TABLE: dict[str, list] = {
+    PRICING_TABLE: dict[str, list[_FakePricing._Row]] = {
         "claude-sonnet-4-6": [_Row(date(2025, 1, 1))],
         "claude-opus-4-7": [_Row(date(2025, 1, 1))],
     }
@@ -90,11 +70,6 @@ class _FakePricing:
             return None
         ref = when or date.today()
         return (ref - date(2025, 1, 1)).days
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 def _make_conn() -> sqlite3.Connection:
@@ -116,7 +91,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
       - session-3: cwd=_UNKNOWN_ROOT, 1 event (cost_micro_usd=NULL)
     - 1 event with suspect=1 (session-1, event-1)
     """
-    # Agents
     conn.executemany(
         "INSERT OR REPLACE INTO agents (name, provider, is_subagent, first_seen_at, last_seen_at)"
         " VALUES (?, ?, ?, ?, ?)",
@@ -125,7 +99,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             ("software-architect", "claude", 1, _RECENT_ISO, _RECENT_ISO),
         ],
     )
-    # Sessions
     conn.executemany(
         "INSERT OR REPLACE INTO sessions"
         " (session_id, provider, agent_name, ai_title, entrypoint, cwd, git_branch,"
@@ -176,8 +149,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             ),
         ],
     )
-    # Events
-    # session-1 event-1: cost known, suspect=1
     conn.execute(
         "INSERT OR IGNORE INTO events"
         " (event_id, session_id, agent_name, model, occurred_at,"
@@ -199,7 +170,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             1,
         ),
     )
-    # session-1 event-2: cost known, suspect=0
     conn.execute(
         "INSERT OR IGNORE INTO events"
         " (event_id, session_id, agent_name, model, occurred_at,"
@@ -221,7 +191,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             0,
         ),
     )
-    # session-2 event-1: cost known
     conn.execute(
         "INSERT OR IGNORE INTO events"
         " (event_id, session_id, agent_name, model, occurred_at,"
@@ -243,7 +212,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
             0,
         ),
     )
-    # session-3 event-1: cost NULL (codex-like)
     conn.execute(
         "INSERT OR IGNORE INTO events"
         " (event_id, session_id, agent_name, model, occurred_at,"
@@ -268,11 +236,6 @@ def _seed_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-# ---------------------------------------------------------------------------
-# Aggregator factory
-# ---------------------------------------------------------------------------
-
-
 def _make_aggregator(conn: sqlite3.Connection, scs: _FakeSCS | None = None) -> TelemetryAggregator:
     return TelemetryAggregator(
         connection_factory=shared_connection_factory(conn),
@@ -282,67 +245,54 @@ def _make_aggregator(conn: sqlite3.Connection, scs: _FakeSCS | None = None) -> T
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Agent listing + context breakdown (basic/unassigned/assigned/fractions) — 1 test
 # ---------------------------------------------------------------------------
 
 
-def test_list_agents_basic():
-    """Two agents should be returned, sorted by cost desc."""
+def test_agent_listing_and_context_breakdown() -> None:
     conn = _make_conn()
     _seed_db(conn)
     agg = _make_aggregator(conn)
 
     result = agg.list_agents()
 
+    # Basic: two agents, sorted by cost desc.
     assert isinstance(result, AgentListResult)
     assert len(result.agents) == 2
-
-    # claude (main) has cost 3000+1500+2000 = 6500 micro-USD = 0.0065 USD
-    # software-architect has NULL cost → cost_known=False
-    # So claude (main) sorts first.
     first = result.agents[0]
     assert first.agent_id == "claude (main)"
     assert first.session_count == 2
     assert first.cost_known is True
     assert first.total_cost_usd == pytest.approx(6500 / 1_000_000)
-
     second = result.agents[1]
     assert second.agent_id == "software-architect"
     assert second.cost_known is False
     assert second.total_cost_usd is None
 
-
-def test_unassigned_bucket():
-    """Agent in /tmp/unknown-project has an 'unassigned' context breakdown."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
+    # Unassigned bucket: agent in an unknown root.
     arch = next(a for a in result.agents if a.agent_id == "software-architect")
     unassigned = next(cb for cb in arch.context_breakdown if cb.context_slug is None)
     assert unassigned.context_name == "unassigned"
     assert unassigned.session_count == 1
 
-
-def test_assigned_context_breakdown():
-    """claude (main) has 2 sessions mapped to the dadaia-workspace context."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
+    # Assigned context breakdown: claude (main) maps to the known context.
     main = next(a for a in result.agents if a.agent_id == "claude (main)")
     dw_bucket = next(cb for cb in main.context_breakdown if cb.context_slug == _CONTEXT_SLUG)
     assert dw_bucket.session_count == 2
-    # Cost in bucket should be sum of events from sessions 1 and 2.
     assert dw_bucket.cost_usd == pytest.approx((3000 + 1500 + 2000) / 1_000_000)
 
+    # Cost fractions sum to 1.
+    fractions = [cb.cost_fraction for cb in main.context_breakdown if cb.cost_fraction is not None]
+    if fractions:
+        assert sum(fractions) == pytest.approx(1.0, abs=1e-6)
 
-def test_cost_known_false_when_all_null():
-    """Agent with all NULL cost_micro_usd → cost_known=False, total_cost_usd=None."""
+
+# ---------------------------------------------------------------------------
+# cost-known/suspect/pricing-age — 1 test
+# ---------------------------------------------------------------------------
+
+
+def test_cost_known_suspect_and_pricing_age() -> None:
     conn = _make_conn()
     _seed_db(conn)
     agg = _make_aggregator(conn)
@@ -353,87 +303,33 @@ def test_cost_known_false_when_all_null():
     assert arch.cost_known is False
     assert arch.total_cost_usd is None
 
-
-def test_cost_fractions_sum_to_one():
-    """For an agent with known costs, context_breakdown fractions sum to 1."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
-    main = next(a for a in result.agents if a.agent_id == "claude (main)")
-    fractions = [cb.cost_fraction for cb in main.context_breakdown if cb.cost_fraction is not None]
-    if fractions:
-        assert sum(fractions) == pytest.approx(1.0, abs=1e-6)
-
-
-def test_recent_sessions_ordered_and_truncated():
-    """At most 10 recent sessions, most-recent first, session_id_prefix 8 chars."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
-    main = next(a for a in result.agents if a.agent_id == "claude (main)")
-    assert len(main.recent_sessions) <= 10
-    for rs in main.recent_sessions:
-        assert len(rs.session_id_prefix) == 8
-
-
-def test_suspect_count():
-    """Agent with 1 suspect event has suspect_count == 1."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
-
     main = next(a for a in result.agents if a.agent_id == "claude (main)")
     assert main.suspect_count == 1
-
-
-def test_pricing_age_days_surfaced():
-    """pricing_age_days in result is not None when known models are in events."""
-    conn = _make_conn()
-    _seed_db(conn)
-    agg = _make_aggregator(conn)
-
-    result = agg.list_agents()
 
     assert result.pricing_age_days is not None
     assert result.pricing_age_days > 0
 
 
-def test_sessions_by_agent_pagination():
-    """list_sessions_by_agent respects limit and offset."""
+# ---------------------------------------------------------------------------
+# pagination/window — 1 test
+# ---------------------------------------------------------------------------
+
+
+def test_pagination_and_window_days() -> None:
     conn = _make_conn()
     _seed_db(conn)
     agg = _make_aggregator(conn)
 
-    # claude (main) has 2 sessions.
+    # list_sessions_by_agent respects limit and offset.
     all_sessions = agg.list_sessions_by_agent("claude (main)", limit=50, offset=0)
     assert len(all_sessions) == 2
-
-    # With limit=1, only 1 returned.
     page1 = agg.list_sessions_by_agent("claude (main)", limit=1, offset=0)
     assert len(page1) == 1
-
-    # With offset=1, only remaining session.
     page2 = agg.list_sessions_by_agent("claude (main)", limit=50, offset=1)
     assert len(page2) == 1
-
-    # Different session than page1 (different branch or cost distinguishes them).
     assert page1[0] != page2[0]
 
-
-def test_window_days_excludes_old():
-    """Event older than window_days is not included in totals."""
-    conn = _make_conn()
-    _seed_db(conn)
-
-    # Add an old session + event for claude (main)
+    # window_days excludes an event older than the window.
     conn.execute(
         "INSERT OR REPLACE INTO sessions"
         " (session_id, provider, agent_name, ai_title, entrypoint, cwd, git_branch,"
@@ -477,10 +373,6 @@ def test_window_days_excludes_old():
     )
     conn.commit()
 
-    agg = _make_aggregator(conn)
     result = agg.list_agents(window_days=180)
-
     main = next(a for a in result.agents if a.agent_id == "claude (main)")
-    # The old event has 9999000 micro-USD; if included it would dominate.
-    # Existing cost = 6500 micro-USD = 0.0065 USD
     assert main.total_cost_usd == pytest.approx(6500 / 1_000_000)

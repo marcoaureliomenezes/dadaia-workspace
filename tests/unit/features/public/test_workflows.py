@@ -1,11 +1,11 @@
-"""Workflow catalog fixture tests.
+"""Workflow catalog fixture test.
 
 Asserts exactly 2 generic workflows ship in the public default surface
 after the v0.1.8/v0.1.9 surface reduction (7 old workflows deleted,
 2 new ones — release-ship and audit-fanout — replace them).
 
-These tests read from the canonical source directory
-dadaia_workspace/public/workflows/ — no mocks, no fakes.
+Reads from the canonical source directory dadaia_workspace/public/workflows/ —
+no mocks, no fakes.
 """
 
 from __future__ import annotations
@@ -31,14 +31,8 @@ def _workflow_names() -> frozenset[str]:
     )
 
 
-def test_exactly_2_workflows_survive() -> None:
-    """Exactly 2 generic workflows must remain in public/workflows/ (v0.1.9 surface)."""
-    names = _workflow_names()
-    assert len(names) == 2, f"Expected 2 workflows, found {len(names)}: {sorted(names)}"
-
-
-def test_surviving_workflow_names_match_expected_set() -> None:
-    """The public workflow catalog matches the current canonical set."""
+def test_surviving_workflow_names_match_expected_set_exactly() -> None:
+    """The public workflow catalog is exactly 2 workflows and matches the exact set."""
     names = _workflow_names()
     assert names == _EXPECTED_SURVIVING_WORKFLOWS, (
         f"Surviving workflows mismatch.\n"

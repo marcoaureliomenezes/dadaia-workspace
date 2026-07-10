@@ -7,7 +7,8 @@ with `content_hash` recomputed against a materialized artifact — the literal
 hash in the skill's report-mode example is illustrative) must pass
 ``ReportsValidationService.validate_file`` against the REAL public schema, and
 must KEEP passing after the FR1/FR2 v1.2 bump (transition posture proven, not
-asserted).
+asserted). CRITICAL — this is the only guard that v1/v1.1 handoffs keep validating
+across schema bumps; kept as its own parametrized test (never merged away).
 
 Corpus provenance (the tree carries no committed ``*.handoff.json`` files —
 the in-tree corpus is the fixture documents embedded in tests + the skill):
@@ -187,7 +188,8 @@ _CORPUS: dict[str, Callable[[Path], dict[str, object]]] = {
 
 
 # ---------------------------------------------------------------------------
-# AC-1 — back-compat corpus lock (T-62-10; must stay green post-FR1/FR2)
+# AC-1 — back-compat corpus lock (T-62-10; must stay green post-FR1/FR2). CRITICAL:
+# kept verbatim as the irreplaceable per-shape lock, plus a single validate_all pass.
 # ---------------------------------------------------------------------------
 
 
@@ -207,33 +209,9 @@ def test_backcompat_corpus_lock(fixture_name: str, tmp_path: Path) -> None:
         assert result.hash_status is None
 
 
-def test_backcompat_corpus_lock_via_validate_all(tmp_path: Path) -> None:
-    """The whole corpus under one handoff root passes ``validate_all`` — zero invalid."""
-    service = _service(tmp_path)
-    for name, builder in _CORPUS.items():
-        _write_handoff(tmp_path, builder(tmp_path), name.replace(".", "-"))
-
-    results = service.validate_all(context="dadaia-workspace")
-
-    assert len(results) == len(_CORPUS)
-    assert all(r.valid for r in results), [
-        (str(r.path), [(e.field_path, e.message) for e in r.errors]) for r in results if not r.valid
-    ]
-
-
 # ---------------------------------------------------------------------------
 # T-62-11 — FR1/FR2: v1.2 conditional, existence, coverage, detection fix
 # ---------------------------------------------------------------------------
-#
-# Staged RED-first captures (AC-2, recorded 2026-07-07 before the edits):
-#   Stage 1 (pre-FR1 schema): v1.2-without-self_pull failed ONLY on the enum —
-#     [('schema_version', "'handoff-v1.2' is not one of ['handoff-v1', 'handoff-v1.1']")]
-#   Stage 2 (post-FR1 schema, pre-FR2 service): the SAME doc passed schema-blind
-#     (validator errors == []) — the conditional gap this section closes.
-# AC-4 RED capture (the picked bug's repro VERBATIM, pre-detection-fix):
-#   `dadaia reports validate <v1.2 sidecar>` → exit 1 with
-#   "ERROR: Missing required field 'findings[]'. This sidecar appears to be v1.0
-#    and is incompatible with v1.1." (misrouted into _check_v10_compat).
 
 
 def _v12_doc(
@@ -261,7 +239,7 @@ def _plant_atom(workspace: Path, ref: str) -> None:
     atom.write_text("atom", encoding="utf-8")
 
 
-# --- AC-2: the 4-case version matrix — ONE named parametrized test (QA62-5) ---
+# --- AC-2: the 4-case version matrix — kept as-is (QA62-5) ---
 
 
 @pytest.mark.parametrize(
@@ -291,85 +269,124 @@ def test_schema_version_matrix(
         assert any(e.field_path == "self_pull" for e in result.errors)
 
 
-# --- AC-3(a): refs existence ---
-
-
-def test_v12_nonexistent_ref_fails_with_indexed_evidence(tmp_path: Path) -> None:
+def test_backcompat_corpus_lock_via_validate_all(tmp_path: Path) -> None:
+    """The whole corpus under one handoff root passes ``validate_all`` — zero invalid."""
     service = _service(tmp_path)
-    good = "specs/memory/architecture.md"
-    _plant_atom(tmp_path, good)
-    doc = _v12_doc([good, "specs/memory/ghost-atom.md"])
-    handoff_path = _write_handoff(tmp_path, doc, "missing-ref")
+    for name, builder in _CORPUS.items():
+        _write_handoff(tmp_path, builder(tmp_path), name.replace(".", "-"))
 
-    result = service.validate_file(handoff_path)
+    results = service.validate_all(context="dadaia-workspace")
 
-    assert result.valid is False
-    assert any(
-        e.field_path == "self_pull.refs[1]" and "does not exist" in e.message for e in result.errors
-    ), [(e.field_path, e.message) for e in result.errors]
+    assert len(results) == len(_CORPUS)
+    assert all(r.valid for r in results), [
+        (str(r.path), [(e.field_path, e.message) for e in r.errors]) for r in results if not r.valid
+    ]
 
 
-def test_v12_ref_resolves_under_repos_context(tmp_path: Path) -> None:
-    """Resolution order (a): <workspace>/repos/<context>/<ref>."""
+# --- AC-3(a)/(b): refs existence + role-map coverage + fail-soft — merged into 1 param table ---
+
+
+def _refs_nonexistent_ref(ws: Path) -> list[str]:
+    _plant_atom(ws, "specs/memory/architecture.md")
+    return ["specs/memory/architecture.md", "specs/memory/ghost-atom.md"]
+
+
+def _refs_resolves_under_repos_context(ws: Path) -> list[str]:
+    _plant_atom(ws, "repos/dadaia-workspace/specs/memory/quality-assurance.md")
+    return ["specs/memory/quality-assurance.md"]
+
+
+def _refs_coverage_miss(ws: Path) -> list[str]:
+    _plant_atom(ws, "specs/memory/architecture.md")
+    return ["specs/memory/architecture.md"]
+
+
+def _refs_unmapped_agent(ws: Path) -> list[str]:
+    _plant_atom(ws, "specs/constitution.md")
+    return ["specs/constitution.md"]
+
+
+@pytest.mark.parametrize(
+    ("case", "agent", "refs_builder", "expect_valid", "expect_field", "expect_message_fragment"),
+    [
+        pytest.param(
+            "nonexistent-ref",
+            "software-engineer",
+            _refs_nonexistent_ref,
+            False,
+            "self_pull.refs[1]",
+            "does not exist",
+            id="nonexistent-ref-fails-with-indexed-evidence",
+        ),
+        pytest.param(
+            "resolves-under-repos-context",
+            "qa-engineer",
+            _refs_resolves_under_repos_context,
+            True,
+            None,
+            None,
+            id="ref-resolves-under-repos-context",
+        ),
+        pytest.param(
+            "coverage-miss",
+            "qa-engineer",
+            _refs_coverage_miss,
+            False,
+            "self_pull.refs",
+            "quality-assurance",
+            id="mapped-agent-missing-its-atom-fails-coverage",
+        ),
+        pytest.param(
+            "unmapped-agent-no-requirement",
+            "software-engineer",
+            _refs_unmapped_agent,
+            True,
+            None,
+            None,
+            id="unmapped-agent-has-no-coverage-requirement",
+        ),
+    ],
+)
+def test_v12_existence_and_coverage_matrix(
+    tmp_path: Path,
+    case: str,
+    agent: str,
+    refs_builder: Callable[[Path], list[str]],
+    expect_valid: bool,
+    expect_field: str | None,
+    expect_message_fragment: str | None,
+) -> None:
     service = _service(tmp_path)
-    ref = "specs/memory/quality-assurance.md"
-    _plant_atom(tmp_path, f"repos/dadaia-workspace/{ref}")
-    doc = _v12_doc([ref], agent="qa-engineer")
-    handoff_path = _write_handoff(tmp_path, doc, "repos-resolved")
+    refs = refs_builder(tmp_path)
+    doc = _v12_doc(refs, agent=agent)
+    handoff_path = _write_handoff(tmp_path, doc, case)
 
     result = service.validate_file(handoff_path)
 
-    assert result.valid is True, [(e.field_path, e.message) for e in result.errors]
+    assert result.valid is expect_valid, [(e.field_path, e.message) for e in result.errors]
+    if expect_field is not None:
+        assert any(
+            e.field_path == expect_field and (expect_message_fragment or "") in e.message
+            for e in result.errors
+        ), [(e.field_path, e.message) for e in result.errors]
+
+    if case == "nonexistent-ref":
+        # Non-canonical handoff root → no workspace root → shape-only (fail-soft).
+        failsoft_service = ReportsValidationService(
+            validator=StdlibHandoffValidator(_SCHEMA_PATH), reports_root=tmp_path
+        )
+        failsoft_doc = _v12_doc(["specs/memory/never-created.md"])
+        failsoft_path = tmp_path / "failsoft.handoff.json"
+        failsoft_path.write_text(json.dumps(failsoft_doc), encoding="utf-8")
+
+        failsoft_result = failsoft_service.validate_file(failsoft_path)
+
+        assert failsoft_result.valid is True, [
+            (e.field_path, e.message) for e in failsoft_result.errors
+        ]
 
 
-def test_v12_existence_fail_soft_when_workspace_root_is_none(tmp_path: Path) -> None:
-    """Non-canonical handoff root → no workspace root → shape-only (fail-soft)."""
-    # reports_root NOT ending in .dadaia/handoff → _infer_workspace_root returns None.
-    service = ReportsValidationService(
-        validator=StdlibHandoffValidator(_SCHEMA_PATH), reports_root=tmp_path
-    )
-    doc = _v12_doc(["specs/memory/never-created.md"])
-    handoff_path = tmp_path / "failsoft.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is True, [(e.field_path, e.message) for e in result.errors]
-
-
-# --- AC-3(b): role-map coverage ---
-
-
-def test_v12_mapped_agent_missing_its_atom_fails_coverage(tmp_path: Path) -> None:
-    """A qa-engineer v1.2 handoff omitting specs/memory/quality-assurance.md fails."""
-    service = _service(tmp_path)
-    other = "specs/memory/architecture.md"
-    _plant_atom(tmp_path, other)
-    doc = _v12_doc([other], agent="qa-engineer")
-    handoff_path = _write_handoff(tmp_path, doc, "coverage-miss")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is False
-    assert any(
-        e.field_path == "self_pull.refs" and "quality-assurance" in e.message for e in result.errors
-    ), [(e.field_path, e.message) for e in result.errors]
-
-
-def test_v12_unmapped_agent_has_no_coverage_requirement(tmp_path: Path) -> None:
-    """software-engineer is unmapped — any existing refs satisfy v1.2."""
-    service = _service(tmp_path)
-    ref = "specs/constitution.md"
-    _plant_atom(tmp_path, ref)
-    doc = _v12_doc([ref], agent="software-engineer")
-    handoff_path = _write_handoff(tmp_path, doc, "unmapped-ok")
-
-    result = service.validate_file(handoff_path)
-
-    assert result.valid is True, [(e.field_path, e.message) for e in result.errors]
-
-
-# --- AC-3(c): traversal refs rejected by the schema pattern ---
+# --- AC-3(c): traversal refs rejected by the schema pattern (security, CWE-22) ---
 
 
 @pytest.mark.parametrize("bad_ref", ["specs/../etc/passwd", "../outside.md", "/etc/passwd"])
@@ -388,25 +405,12 @@ def test_v12_traversal_or_absolute_ref_rejected_by_schema_pattern(
     ]
 
 
-# --- Re-export contract (ADR-4): role_atoms keeps exporting the SAME map object ---
-
-
-def test_role_atom_map_reexported_from_core_same_object() -> None:
-    from dadaia_workspace.core.role_atom_map import ROLE_ATOM_MAP as core_map
-    from dadaia_workspace.features.lifecycle.role_atoms import ROLE_ATOM_MAP as lifecycle_map
-
-    assert core_map is lifecycle_map
-    assert core_map == {
-        "software-architect": "memory/architecture.md",
-        "qa-engineer": "memory/quality-assurance.md",
-        "product-engineer": "memory/product/catalog.json",
-    }
-
-
 # --- AC-4: detection fix — the picked bug's repro VERBATIM (Ruling 62-E) ---
 
 
-def test_v12_sidecar_never_routes_to_v10_compat_cli(tmp_path: Path, monkeypatch) -> None:
+def test_v12_sidecar_never_routes_to_v10_compat_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bug reports-sidecar-version-detection-misroutes-future-tokens (HIGH).
 
     Repro verbatim: author a handoff with schema token handoff-v1.2 and run

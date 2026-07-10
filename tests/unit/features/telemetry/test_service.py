@@ -20,13 +20,9 @@ from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa
 from dadaia_workspace.features.telemetry.store.dao import TelemetryDao  # noqa: E402
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
-
 
 class _FakeSCS:
-    def list_all(self) -> list:
+    def list_all(self) -> list[Any]:
         return []
 
 
@@ -35,12 +31,12 @@ class _FakePricing:
         def __init__(self, effective_from: date) -> None:
             self.effective_from = effective_from
 
-    PRICING_TABLE: dict[str, list] = {
+    PRICING_TABLE: dict[str, list[_FakePricing._Row]] = {
         "claude-sonnet-4-6": [_Row(date(2025, 1, 1))],
     }
 
     @staticmethod
-    def compute_cost(usage: dict, model: str, when: date) -> int | None:
+    def compute_cost(usage: dict[str, int], model: str, when: date) -> int | None:
         if model not in ("claude-sonnet-4-6",):
             return None
         tok = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
@@ -71,14 +67,14 @@ class _FakeAggregator:
     def __init__(self) -> None:
         self.list_agents_call_count = 0
 
-    def list_agents(self, **kwargs: Any) -> list:
+    def list_agents(self, **kwargs: Any) -> list[Any]:
         self.list_agents_call_count += 1
         return []
 
-    def list_workflows(self) -> list:
+    def list_workflows(self) -> list[Any]:
         return []
 
-    def list_sessions_by_agent(self, agent_id: str, **kwargs: Any) -> list:
+    def list_sessions_by_agent(self, agent_id: str, **kwargs: Any) -> list[Any]:
         return []
 
 
@@ -96,11 +92,6 @@ class _FakeRefreshLock:
 
     def release(self) -> None:
         self.release_call_count += 1
-
-
-# ---------------------------------------------------------------------------
-# Helper to build a service with injectable parts
-# ---------------------------------------------------------------------------
 
 
 def _make_service(
@@ -130,7 +121,6 @@ def _make_service(
     agg = aggregator or _FakeAggregator()
 
     def _dao_factory() -> TelemetryDao:
-        # Return the same in-memory DAO each time.
         return dao_instance
 
     svc = TelemetryService(
@@ -148,11 +138,6 @@ def _make_service(
     return svc, cr, cdx
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 def test_refuses_uid_zero(tmp_path: pathlib.Path) -> None:
     """TelemetryService constructor raises PermissionError when uid=0."""
     with pytest.raises(PermissionError, match="root"):
@@ -163,95 +148,82 @@ def test_refuses_uid_zero(tmp_path: pathlib.Path) -> None:
         )
 
 
-def test_state_dir_created(tmp_path: pathlib.Path) -> None:
-    """Service init creates state_dir if it does not exist."""
-    state_dir = tmp_path / "deep" / "nested" / "state"
-    assert not state_dir.exists()
-
-    _make_service(
-        state_dir=state_dir,
-        workspace_root=tmp_path,
-    )
-
-    assert state_dir.exists()
-    assert state_dir.is_dir()
-
-
-def test_refresh_cached_within_ttl(tmp_path: pathlib.Path) -> None:
-    """Calling refresh twice within TTL does not trigger a second ingest cycle."""
+def test_refresh_ttl_concurrency_and_di_lock_matrix(tmp_path: pathlib.Path) -> None:
+    # TTL cache: calling refresh twice within TTL skips a second ingest cycle.
     _time = [0.0]
 
     def _fake_now() -> float:
         return _time[0]
 
     svc, cr, cdx = _make_service(
-        state_dir=tmp_path / "state",
-        workspace_root=tmp_path,
+        state_dir=tmp_path / "ttl" / "state",
+        workspace_root=tmp_path / "ttl",
         now_fn=_fake_now,
     )
-
-    # First refresh — should run.
     svc.refresh()
     first_count = cr.call_count
-
-    # Advance time by 10 s (less than 30s TTL).
-    _time[0] = 10.0
+    _time[0] = 10.0  # < 30s TTL
     svc.refresh()
-
-    # Reader should not have been called again.
     assert cr.call_count == first_count
 
-
-def test_refresh_runs_all_readers(tmp_path: pathlib.Path) -> None:
-    """refresh() calls both readers."""
-    svc, cr, cdx = _make_service(
-        state_dir=tmp_path / "state",
-        workspace_root=tmp_path,
+    # readers: refresh() calls both readers at least once.
+    svc2, cr2, cdx2 = _make_service(
+        state_dir=tmp_path / "readers" / "state",
+        workspace_root=tmp_path / "readers",
     )
-    svc.refresh()
+    svc2.refresh()
+    assert cdx2.call_count >= 1
 
-    # codex reader is always called once per cycle.
-    assert cdx.call_count >= 1
-
-
-def test_concurrent_refresh_no_op(tmp_path: pathlib.Path) -> None:
-    """A second service instance with the same lock file skips refresh."""
+    # concurrent refresh: a lock held externally means no readers run.
     import fcntl
 
-    state_dir = tmp_path / "state"
+    state_dir = tmp_path / "concurrent" / "state"
     state_dir.mkdir(parents=True)
     lock_path = state_dir / "telemetry.lock"
-
-    # Pre-acquire the lock as if another process holds it.
     lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
     try:
-        svc, cr, cdx = _make_service(
-            state_dir=state_dir,
-            workspace_root=tmp_path,
+        svc3, cr3, cdx3 = _make_service(
+            state_dir=state_dir, workspace_root=tmp_path / "concurrent"
         )
-        svc.refresh()
-        # Lock was held externally, so no readers should have run.
-        assert cr.call_count == 0
-        assert cdx.call_count == 0
+        svc3.refresh()
+        assert cr3.call_count == 0
+        assert cdx3.call_count == 0
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         os.close(lock_fd)
 
-
-def test_list_agents_passthrough(tmp_path: pathlib.Path) -> None:
-    """service.list_agents() triggers refresh and delegates to aggregator."""
+    # list_agents passthrough: triggers refresh and delegates to the aggregator.
     fake_agg = _FakeAggregator()
-    svc, _, _ = _make_service(
-        state_dir=tmp_path / "state",
-        workspace_root=tmp_path,
+    svc4, _, _ = _make_service(
+        state_dir=tmp_path / "passthrough" / "state",
+        workspace_root=tmp_path / "passthrough",
         aggregator=fake_agg,
     )
-
-    svc.list_agents()
-
+    svc4.list_agents()
     assert fake_agg.list_agents_call_count == 1
+
+    # DI refresh_lock: injected lock is used (acquire+release) and its failure skips readers.
+    fake_lock = _FakeRefreshLock()
+    svc5, cr5, _ = _make_service(
+        state_dir=tmp_path / "dilock" / "state",
+        workspace_root=tmp_path / "dilock",
+        refresh_lock=fake_lock,
+    )
+    svc5.refresh()
+    assert fake_lock.acquire_call_count == 1
+    assert fake_lock.release_call_count == 1
+
+    fake_lock_fail = _FakeRefreshLock(always_fail=True)
+    svc6, cr6, cdx6 = _make_service(
+        state_dir=tmp_path / "dilockfail" / "state",
+        workspace_root=tmp_path / "dilockfail",
+        refresh_lock=fake_lock_fail,
+    )
+    svc6.refresh()
+    assert cr6.call_count == 0
+    assert cdx6.call_count == 0
+    assert fake_lock_fail.release_call_count == 0
 
 
 def test_cost_backfill(tmp_path: pathlib.Path) -> None:
@@ -265,7 +237,6 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     seed.execute("PRAGMA foreign_keys=ON")
     apply_migrations(seed)
 
-    # Seed a session + agent + event with NULL cost.
     seed.execute(
         "INSERT OR REPLACE INTO agents (name, provider, is_subagent, first_seen_at, last_seen_at)"
         " VALUES ('claude (main)', 'claude', 0, '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
@@ -289,7 +260,6 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
     seed.close()
 
     def _dao_factory() -> TelemetryDao:
-        # Fresh writable connection per refresh; the service closes it in finally.
         conn = sqlite3.connect(str(db_file))
         conn.execute("PRAGMA foreign_keys=ON")
         return TelemetryDao(conn)
@@ -306,7 +276,6 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
 
     svc.refresh()
 
-    # Check that cost_micro_usd is now set — via our own fresh connection.
     check = sqlite3.connect(str(db_file))
     try:
         row = check.execute(
@@ -316,40 +285,3 @@ def test_cost_backfill(tmp_path: pathlib.Path) -> None:
         check.close()
     assert row[0] is not None
     assert row[0] > 0
-
-
-def test_refresh_lock_di_injected_is_used(tmp_path: pathlib.Path) -> None:
-    """Injected refresh_lock is called on refresh() — not the default platform adapter."""
-    fake_lock = _FakeRefreshLock()
-
-    svc, cr, _ = _make_service(
-        state_dir=tmp_path / "state",
-        workspace_root=tmp_path,
-        refresh_lock=fake_lock,
-    )
-
-    svc.refresh()
-
-    assert fake_lock.acquire_call_count == 1, (
-        "refresh_lock.try_acquire must be called exactly once per refresh()"
-    )
-    assert fake_lock.release_call_count == 1, (
-        "refresh_lock.release must be called once (in finally block)"
-    )
-
-
-def test_refresh_lock_di_fail_skips_readers(tmp_path: pathlib.Path) -> None:
-    """When injected refresh_lock returns False, readers are not called."""
-    fake_lock = _FakeRefreshLock(always_fail=True)
-
-    svc, cr, cdx = _make_service(
-        state_dir=tmp_path / "state",
-        workspace_root=tmp_path,
-        refresh_lock=fake_lock,
-    )
-
-    svc.refresh()
-
-    assert cr.call_count == 0, "readers must NOT run when lock acquire fails"
-    assert cdx.call_count == 0, "readers must NOT run when lock acquire fails"
-    assert fake_lock.release_call_count == 0, "release must NOT be called when acquire fails"

@@ -15,6 +15,9 @@ Three states under test:
 
 The pid-liveness probe is injected at construction (composition-root seam) so the
 verdict is deterministic — no real ``os.kill``.
+
+CRITICAL: the doctor must never GC a live holder — kept verbatim as a named test,
+alongside the reclaim-helper decision table (the underlying predicate).
 """
 
 from __future__ import annotations
@@ -79,44 +82,34 @@ def _lock_gc_codes(doctor: DoctorService) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# State (1): TTL-expired + dead pid -> reclaimable
+# States (1)+(2): reclaimable — dead pid, and pre-pid (no pid field) — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_ttl_expired_dead_pid_reported_and_reclaimed(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("pid", "probe_alive"),
+    [
+        pytest.param(4242, False, id="ttl-expired-dead-pid"),
+        pytest.param(None, True, id="ttl-expired-pidless-record"),  # no pid ⇒ no veto
+    ],
+)
+def test_reclaimable_states_reported_and_reclaimed(
+    tmp_path: Path, pid: int | None, probe_alive: bool
+) -> None:
     ws = _make_workspace(tmp_path)
-    path = _seed_stale(ws, pid=4242)
-    doctor = _doctor(ws, alive=False)
+    path = _seed_stale(ws, pid=pid)
+    doctor = _doctor(ws, alive=probe_alive)
 
     reported = _lock_gc_codes(doctor)
-    assert reported, "expected LOCK-GC for TTL-expired dead-holder record"
-    assert "reclaim" in reported[0].lower() or "stale" in reported[0].lower()
+    assert reported, "expected LOCK-GC for a reclaimable TTL-expired record"
 
     actions = doctor.fix()
-    assert not path.exists(), "TTL-expired dead-holder record should be reclaimed by --fix"
+    assert not path.exists(), "reclaimable TTL-expired record should be removed by --fix"
     assert any("LOCK-GC" in a for a in actions)
 
 
 # ---------------------------------------------------------------------------
-# State (2): TTL-expired + NO pid field (pre-pid record) -> reclaimable
-# ---------------------------------------------------------------------------
-
-
-def test_ttl_expired_pidless_record_reported_and_reclaimed(tmp_path: Path) -> None:
-    ws = _make_workspace(tmp_path)
-    path = _seed_stale(ws, pid=None)
-    # Probe reports alive, but a pre-pid record has nothing to veto on -> still reclaimable.
-    doctor = _doctor(ws, alive=True)
-
-    reported = _lock_gc_codes(doctor)
-    assert reported, "expected LOCK-GC for TTL-expired pre-pid record"
-
-    doctor.fix()
-    assert not path.exists(), "pre-pid TTL-expired record should be reclaimed by --fix"
-
-
-# ---------------------------------------------------------------------------
-# State (3): TTL-expired + ALIVE pid -> NEVER reclaimed
+# State (3): TTL-expired + ALIVE pid -> NEVER reclaimed — CRITICAL
 # ---------------------------------------------------------------------------
 
 
@@ -134,7 +127,7 @@ def test_ttl_expired_alive_pid_never_reclaimed(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Reclaim helper unit semantics (lease.reclaim)
+# Reclaim helper unit semantics (lease.reclaim) — CRITICAL decision table
 # ---------------------------------------------------------------------------
 
 

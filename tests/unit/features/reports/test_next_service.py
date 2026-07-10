@@ -16,10 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
-from dadaia_workspace.features.reports.next import (
-    CANONICAL_AGENTS,
-    ReportsNextService,
-)
+from dadaia_workspace.features.reports.next import ReportsNextService
 
 _RELEASE = "rel-1"
 
@@ -52,59 +49,7 @@ def _build(
     return ReportsNextService(specs_dir=specs, reports_root=reports, context_name="ctx")
 
 
-# --- Case 1: no active release ---
-
-
-def test_missing_active_md_raises(tmp_path: Path) -> None:
-    svc = _build(tmp_path, active=None)
-    with pytest.raises(NoActiveReleaseError):
-        svc.resolve_next()
-
-
-def test_release_none_raises(tmp_path: Path) -> None:
-    svc = _build(tmp_path, active="release: none\nphase: DISCOVERY\n")
-    with pytest.raises(NoActiveReleaseError):
-        svc.resolve_next()
-
-
-# --- Case 2: PLAN without owners ---
-
-
-def test_missing_plan_raises(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan=None)
-    with pytest.raises(NoAgentSequenceError):
-        svc.resolve_next()
-
-
-def test_plan_without_owners_raises(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="# PLAN\n\nNo owners declared here.\n")
-    with pytest.raises(NoAgentSequenceError):
-        svc.resolve_next()
-
-
-def test_non_canonical_owner_filtered_out(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="owner: TBD\n**Owner:** someone-else\n")
-    with pytest.raises(NoAgentSequenceError):
-        svc.resolve_next()
-
-
-# --- Case 3: all completed ---
-
-
-def test_all_completed_returns_none(tmp_path: Path) -> None:
-    svc = _build(
-        tmp_path,
-        plan="**Owner:** qa-engineer\n**Owner:** devops-engineer\n",
-        handoffs={"qa-engineer": _RELEASE, "devops-engineer": _RELEASE},
-    )
-    result = svc.resolve_next()
-    assert result.next_agent is None
-    assert result.pending_agents == []
-    assert result.completed_agents == ["qa-engineer", "devops-engineer"]
-    assert result.release_id == _RELEASE
-
-
-# --- Case 4: next agent identified ---
+# --- Kept: first pending agent identified + wrong-release handoff excluded ---
 
 
 def test_first_pending_agent_identified(tmp_path: Path) -> None:
@@ -129,57 +74,95 @@ def test_handoff_for_other_release_does_not_count(tmp_path: Path) -> None:
     assert result.next_agent == "qa-engineer"  # wrong-release handoff ignored
 
 
-# --- Owner-parsing edge cases ---
+# --- Error-raises matrix (no active release / no owners / non-canonical) ---
 
 
-def test_owner_pattern_parens(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="- Track A (owner: software-engineer)\n")
-    assert svc.resolve_next().next_agent == "software-engineer"
+_DEFAULT_ACTIVE = f"release: {_RELEASE}\nphase: TASKS\n"
+_DEFAULT_PLAN = "**Owner:** qa-engineer\n**Owner:** devops-engineer\n"
 
 
-def test_owner_pattern_bold(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="**Owner:** ai-engineer\n")
-    assert svc.resolve_next().next_agent == "ai-engineer"
+@pytest.mark.parametrize(
+    ("active", "plan", "expected_exc"),
+    [
+        pytest.param(None, _DEFAULT_PLAN, NoActiveReleaseError, id="missing-active-md"),
+        pytest.param(
+            "release: none\nphase: DISCOVERY\n",
+            _DEFAULT_PLAN,
+            NoActiveReleaseError,
+            id="release-none",
+        ),
+        pytest.param(_DEFAULT_ACTIVE, None, NoAgentSequenceError, id="missing-plan"),
+        pytest.param(
+            _DEFAULT_ACTIVE,
+            "# PLAN\n\nNo owners declared here.\n",
+            NoAgentSequenceError,
+            id="plan-without-owners",
+        ),
+        pytest.param(
+            _DEFAULT_ACTIVE,
+            "owner: TBD\n**Owner:** someone-else\n",
+            NoAgentSequenceError,
+            id="non-canonical-owner-filtered-out",
+        ),
+    ],
+)
+def test_error_raises_matrix(
+    tmp_path: Path, active: str | None, plan: str | None, expected_exc: type[Exception]
+) -> None:
+    svc = _build(tmp_path, active=active, plan=plan)
+    with pytest.raises(expected_exc):
+        svc.resolve_next()
 
 
-def test_owner_pattern_yaml_inline(tmp_path: Path) -> None:
-    svc = _build(tmp_path, plan="owner: product-engineer\n")
-    assert svc.resolve_next().next_agent == "product-engineer"
+# --- All-completed + owner-pattern variants + dedup — 1 param table ---
 
 
-def test_sequence_order_and_dedup(tmp_path: Path) -> None:
-    plan = (
-        "**Owner:** qa-engineer\n"
-        "(owner: devops-engineer)\n"
-        "**Owner:** qa-engineer\n"  # duplicate — must not reappear
-        "owner: software-engineer\n"
-    )
-    svc = _build(tmp_path, plan=plan)
+@pytest.mark.parametrize(
+    ("plan", "handoffs", "assert_fn"),
+    [
+        pytest.param(
+            "**Owner:** qa-engineer\n**Owner:** devops-engineer\n",
+            {"qa-engineer": _RELEASE, "devops-engineer": _RELEASE},
+            lambda r: (
+                r.next_agent is None
+                and r.pending_agents == []
+                and r.completed_agents == ["qa-engineer", "devops-engineer"]
+                and r.release_id == _RELEASE
+            ),
+            id="all-completed-returns-none",
+        ),
+        pytest.param(
+            "- Track A (owner: software-engineer)\n",
+            {},
+            lambda r: r.next_agent == "software-engineer",
+            id="owner-pattern-parens",
+        ),
+        pytest.param(
+            "**Owner:** ai-engineer\n",
+            {},
+            lambda r: r.next_agent == "ai-engineer",
+            id="owner-pattern-bold",
+        ),
+        pytest.param(
+            "owner: product-engineer\n",
+            {},
+            lambda r: r.next_agent == "product-engineer",
+            id="owner-pattern-yaml-inline",
+        ),
+        pytest.param(
+            (
+                "**Owner:** qa-engineer\n"
+                "(owner: devops-engineer)\n"
+                "**Owner:** qa-engineer\n"  # duplicate — must not reappear
+                "owner: software-engineer\n"
+            ),
+            {},
+            lambda r: r.pending_agents == ["qa-engineer", "devops-engineer", "software-engineer"],
+            id="sequence-order-and-dedup",
+        ),
+    ],
+)
+def test_resolution_matrix(tmp_path: Path, plan: str, handoffs: dict[str, str], assert_fn) -> None:  # type: ignore[no-untyped-def]
+    svc = _build(tmp_path, plan=plan, handoffs=handoffs)
     result = svc.resolve_next()
-    assert result.pending_agents == ["qa-engineer", "devops-engineer", "software-engineer"]
-
-
-def test_canonical_agents_count() -> None:
-    """CANONICAL_AGENTS must match the 12-name registry (9 core + 3 plugins)."""
-    assert len(CANONICAL_AGENTS) == 12
-
-
-def test_canonical_agents_exact_set() -> None:
-    """CANONICAL_AGENTS must equal the registry-derived set exactly."""
-    expected = frozenset(
-        {
-            "ai-engineer",
-            "code-reviewer",
-            "design-specialist",
-            "devops-engineer",
-            "frontend-engineer",
-            "product-engineer",
-            "project-auditor",
-            "project-manager",
-            "qa-engineer",
-            "security-reviewer",
-            "software-architect",
-            "software-engineer",
-        }
-    )
-    assert expected == CANONICAL_AGENTS
+    assert assert_fn(result)

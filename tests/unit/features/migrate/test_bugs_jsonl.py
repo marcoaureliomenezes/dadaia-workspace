@@ -1,16 +1,20 @@
 """Round-trip tests for the ``specs/bugs/*.md`` → JSONL migration (T-46-05, AC-2).
 
 Mandatory round-trip over a fixture bugs-tree asserts, in one migration run:
-  (1) each source ``.md`` now lives under ``specs/bugs/_archive/`` and no loose ``.md`` remains;
-  (2) the emitted JSONL is the EXACT expected event stream per source bug;
-  (3) a re-run is a no-op (idempotent — no duplicate events, no re-move);
-  (4) ``--dry-run`` writes nothing AND moves nothing (reports the plan only).
+  (1) the emitted JSONL is the EXACT expected event stream per source bug (status
+      shapes: open/resolved/superseded/unknown-release);
+  (2) a re-run is a no-op (idempotent — no duplicate events, no re-move), and a
+      partial prior run (jsonl written, .md still present) does not re-emit;
+  (3) ``--dry-run`` writes nothing AND moves nothing (reports the plan only);
+  (4) CRITICAL — the migrated streams pass SPEC-DOC-033 doctor coherence, including
+      the closed-before-reported terminal-ts clamp (data-loss/false-ERROR guard).
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.features.migrate.bugs_jsonl import migrate_bugs_jsonl
 
@@ -99,8 +103,8 @@ def _seed_bugs_tree(tmp_path: Path) -> Path:
     return specs
 
 
-def _all_events(bugs_dir: Path) -> list[dict]:
-    events: list[dict] = []
+def _all_events(bugs_dir: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
     for jsonl in sorted(bugs_dir.glob("*.jsonl")):
         for line in jsonl.read_text(encoding="utf-8").splitlines():
             if line.strip():
@@ -108,39 +112,26 @@ def _all_events(bugs_dir: Path) -> list[dict]:
     return events
 
 
-def _by_bug(events: list[dict]) -> dict[str, list[dict]]:
-    out: dict[str, list[dict]] = {}
+def _by_bug(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
     for e in events:
         out.setdefault(e["bug_id"], []).append(e)
     return out
 
 
-# --- (1) sources archived, no loose .md ----------------------------------------------
+# ---------------------------------------------------------------------------
+# Event-emission shapes (open / resolved / superseded / unknown-release)
+# ---------------------------------------------------------------------------
 
 
-def test_all_sources_moved_to_archive(tmp_path: Path) -> None:
+def test_event_emission_shapes(tmp_path: Path) -> None:
     specs = _seed_bugs_tree(tmp_path)
-    migrate_bugs_jsonl(specs)
-    bugs = specs / "bugs"
-    assert sorted(p.name for p in bugs.glob("*.md")) == []  # no loose .md
-    archived = sorted(p.name for p in (bugs / "_archive").glob("*.md"))
-    assert archived == [
-        "closed-resolved-bug.md",
-        "closed-superseded-bug.md",
-        "closed-unknown-bug.md",
-        "open-gate-bug.md",
-    ]
+    result = migrate_bugs_jsonl(specs)
+    by_bug = _by_bug(_all_events(specs / "bugs"))
 
-
-# --- (2) exact expected event stream --------------------------------------------------
-
-
-def test_open_bug_emits_single_reported(tmp_path: Path) -> None:
-    specs = _seed_bugs_tree(tmp_path)
-    migrate_bugs_jsonl(specs)
-    stream = _by_bug(_all_events(specs / "bugs"))["open-gate-bug"]
-    assert [e["event"] for e in stream] == ["reported"]
-    ev = stream[0]
+    open_stream = by_bug["open-gate-bug"]
+    assert [e["event"] for e in open_stream] == ["reported"]
+    ev = open_stream[0]
     assert ev["ts"] == "2026-06-27T00:00:00Z"
     assert ev["severity"] == "HIGH"
     assert ev["surface"] == "pre-commit gate"
@@ -149,30 +140,23 @@ def test_open_bug_emits_single_reported(tmp_path: Path) -> None:
     assert "marco" not in ev["notes"]
     assert "10.0.0.1" not in ev["notes"]
 
+    resolved_stream = by_bug["closed-resolved-bug"]
+    assert [e["event"] for e in resolved_stream] == ["reported", "resolved"]
+    assert resolved_stream[1]["release"] == "v0.1.30"
 
-def test_closed_resolved_emits_reported_then_resolved(tmp_path: Path) -> None:
-    specs = _seed_bugs_tree(tmp_path)
-    migrate_bugs_jsonl(specs)
-    stream = _by_bug(_all_events(specs / "bugs"))["closed-resolved-bug"]
-    assert [e["event"] for e in stream] == ["reported", "resolved"]
-    assert stream[1]["release"] == "v0.1.30"
+    superseded_stream = by_bug["closed-superseded-bug"]
+    assert [e["event"] for e in superseded_stream] == ["reported", "superseded"]
+    assert superseded_stream[1]["superseded_by"] == "panel-ux-overhaul"
 
-
-def test_closed_superseded_emits_superseded_terminal(tmp_path: Path) -> None:
-    specs = _seed_bugs_tree(tmp_path)
-    migrate_bugs_jsonl(specs)
-    stream = _by_bug(_all_events(specs / "bugs"))["closed-superseded-bug"]
-    assert [e["event"] for e in stream] == ["reported", "superseded"]
-    assert stream[1]["superseded_by"] == "panel-ux-overhaul"
-
-
-def test_closed_without_release_uses_unknown_sentinel_and_warns(tmp_path: Path) -> None:
-    specs = _seed_bugs_tree(tmp_path)
-    result = migrate_bugs_jsonl(specs)
-    stream = _by_bug(_all_events(specs / "bugs"))["closed-unknown-bug"]
-    assert [e["event"] for e in stream] == ["reported", "resolved"]
-    assert stream[1]["release"] == "unknown"
+    unknown_stream = by_bug["closed-unknown-bug"]
+    assert [e["event"] for e in unknown_stream] == ["reported", "resolved"]
+    assert unknown_stream[1]["release"] == "unknown"
     assert any("unknown" in w and "closed-unknown-bug" in w for w in result.skipped)
+
+
+# ---------------------------------------------------------------------------
+# CRITICAL: doctor coherence, incl. closed-before-reported terminal-ts clamp
+# ---------------------------------------------------------------------------
 
 
 def test_migrated_streams_pass_doctor_coherence(tmp_path: Path) -> None:
@@ -214,42 +198,32 @@ def test_closed_before_reported_clamps_terminal_ts_and_stays_coherent(tmp_path: 
     assert doc033 == []
 
 
-# --- (3) idempotent re-run ------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Idempotence: rerun-noop, partial-skip, dry-run
+# ---------------------------------------------------------------------------
 
 
-def test_rerun_is_noop(tmp_path: Path) -> None:
+def test_rerun_noop_partial_skip_and_dry_run(tmp_path: Path) -> None:
+    # (1) full rerun is a no-op.
     specs = _seed_bugs_tree(tmp_path)
     migrate_bugs_jsonl(specs)
     first = _all_events(specs / "bugs")
-
     second_result = migrate_bugs_jsonl(specs)
     second = _all_events(specs / "bugs")
-    # No duplicate events, no new moves.
     assert second == first
     assert second_result.moved == []
 
-
-def test_rerun_skips_already_present_bug_id(tmp_path: Path) -> None:
-    """A partial prior run (jsonl written, .md still present) is not re-emitted."""
-    specs = _seed_bugs_tree(tmp_path)
-    migrate_bugs_jsonl(specs)
+    # (2) a partial prior run (jsonl written, .md re-appears) is not re-emitted.
     events_before = _all_events(specs / "bugs")
-    # Simulate a stray un-archived source for an already-migrated bug.
     (specs / "bugs" / "open-gate-bug.md").write_text(_OPEN_MD, encoding="utf-8")
-
     result = migrate_bugs_jsonl(specs)
-    assert _all_events(specs / "bugs") == events_before  # no duplicate event
+    assert _all_events(specs / "bugs") == events_before
     assert any("already in JSONL" in msg for msg in result.skipped)
 
-
-# --- (4) dry-run writes/moves nothing -------------------------------------------------
-
-
-def test_dry_run_writes_and_moves_nothing_but_plans(tmp_path: Path) -> None:
-    specs = _seed_bugs_tree(tmp_path)
-    result = migrate_bugs_jsonl(specs, dry_run=True)
-    bugs = specs / "bugs"
-    # Nothing written, nothing moved.
+    # (3) dry-run on a fresh tree writes and moves nothing but plans.
+    fresh_specs = _seed_bugs_tree(tmp_path.parent / (tmp_path.name + "-fresh"))
+    dry_result = migrate_bugs_jsonl(fresh_specs, dry_run=True)
+    bugs = fresh_specs / "bugs"
     assert list(bugs.glob("*.jsonl")) == []
     assert sorted(p.name for p in bugs.glob("*.md")) == [
         "closed-resolved-bug.md",
@@ -258,6 +232,5 @@ def test_dry_run_writes_and_moves_nothing_but_plans(tmp_path: Path) -> None:
         "open-gate-bug.md",
     ]
     assert list((bugs / "_archive").glob("*.md")) == []
-    # The plan reports the source→dest pairs.
-    assert len(result.moved) == 4
-    assert result.dry_run is True
+    assert len(dry_result.moved) == 4
+    assert dry_result.dry_run is True

@@ -3,18 +3,21 @@
 Release v0.1.46 / T-46-04 (AC-1). Covers per-line schema validity, the rotation ceiling,
 and event coherence over the terminal set {resolved, superseded, deferred, rejected}.
 
-Coherence tests require BOTH incoherence classes to ERROR — (a) terminal-without-prior-
-``reported`` and (b) double-terminal — PLUS a valid ``reported``→``resolved`` negative
-control that must NOT error, PLUS an ``archived``-after-``resolved`` case that must NOT
-error (the non-terminal exemption).
+Bug-stream coherence (SPEC-DOC-033) guards the event-sourced ledger — the cross-file
+chronological-ordering test is kept as a named test (a reported in an earlier file makes
+a terminal in a later file coherent, proving the check reads files in ts order, not
+lexical file order).
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
+import pytest
+
+from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
 
 def _bugs_dir(specs: Path) -> Path:
@@ -23,7 +26,9 @@ def _bugs_dir(specs: Path) -> Path:
     return d
 
 
-def _reported(bug_id: str, *, severity: str = "HIGH", ts: str = "2026-07-01T13:00:00Z") -> dict:
+def _reported(
+    bug_id: str, *, severity: str = "HIGH", ts: str = "2026-07-01T13:00:00Z"
+) -> dict[str, Any]:
     return {
         "bug_id": bug_id,
         "event": "reported",
@@ -42,7 +47,7 @@ def _reported(bug_id: str, *, severity: str = "HIGH", ts: str = "2026-07-01T13:0
     }
 
 
-def _resolved(bug_id: str, *, ts: str = "2026-07-01T14:00:00Z") -> dict:
+def _resolved(bug_id: str, *, ts: str = "2026-07-01T14:00:00Z") -> dict[str, Any]:
     return {
         "bug_id": bug_id,
         "event": "resolved",
@@ -52,69 +57,14 @@ def _resolved(bug_id: str, *, ts: str = "2026-07-01T14:00:00Z") -> dict:
     }
 
 
-def _write_log(bugs: Path, name: str, events: list[dict]) -> Path:
+def _write_log(bugs: Path, name: str, events: list[dict[str, Any]]) -> Path:
     path = bugs / name
     path.write_text("".join(json.dumps(e) + "\n" for e in events), encoding="utf-8")
     return path
 
 
-def _doc033(specs: Path) -> list:
+def _doc033(specs: Path) -> list[SpecsDoctorIssue]:
     return [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-033"]
-
-
-# --- no-op / clean --------------------------------------------------------------------
-
-
-def test_no_bugs_dir_is_noop(tmp_path: Path) -> None:
-    (tmp_path / "specs").mkdir()
-    assert _doc033(tmp_path / "specs") == []
-
-
-def test_coherent_reported_then_resolved_is_clean_negative_control(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_log(bugs, "20260701T13Z-00.jsonl", [_reported("bug-a"), _resolved("bug-a")])
-    assert _doc033(specs) == []
-
-
-def test_archived_after_resolved_is_exempt_and_clean(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    archived = {
-        "bug_id": "bug-a",
-        "event": "archived",
-        "ts": "2026-07-01T15:00:00Z",
-        "reported_by": "project-auditor",
-    }
-    _write_log(bugs, "20260701T13Z-00.jsonl", [_reported("bug-a"), _resolved("bug-a"), archived])
-    assert _doc033(specs) == []
-
-
-# --- coherence: the two incoherence classes -------------------------------------------
-
-
-def test_terminal_without_prior_reported_errors(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_log(bugs, "20260701T13Z-00.jsonl", [_resolved("orphan")])
-    errors = _doc033(specs)
-    assert len(errors) == 1
-    assert errors[0].severity is Severity.ERROR
-    assert "no prior 'reported'" in errors[0].description
-
-
-def test_double_terminal_errors(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_log(
-        bugs,
-        "20260701T13Z-00.jsonl",
-        [_reported("bug-a"), _resolved("bug-a"), _resolved("bug-a", ts="2026-07-01T16:00:00Z")],
-    )
-    errors = _doc033(specs)
-    assert len(errors) == 1
-    assert errors[0].severity is Severity.ERROR
-    assert "second terminal event" in errors[0].description
 
 
 def test_coherence_spans_multiple_files_in_chronological_order(tmp_path: Path) -> None:
@@ -126,61 +76,132 @@ def test_coherence_spans_multiple_files_in_chronological_order(tmp_path: Path) -
     assert _doc033(specs) == []
 
 
-# --- per-line schema validity ---------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Violation rows — terminal-without-reported, double-terminal, malformed,
+# schema-fail (x2), over-ceiling — 1 param
+# ---------------------------------------------------------------------------
 
 
-def test_malformed_json_line_errors(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("build", "expect_description_contains"),
+    [
+        pytest.param(
+            lambda bugs: _write_log(bugs, "20260701T13Z-00.jsonl", [_resolved("orphan")]),
+            "no prior 'reported'",
+            id="terminal-without-prior-reported",
+        ),
+        pytest.param(
+            lambda bugs: _write_log(
+                bugs,
+                "20260701T13Z-00.jsonl",
+                [
+                    _reported("bug-a"),
+                    _resolved("bug-a"),
+                    _resolved("bug-a", ts="2026-07-01T16:00:00Z"),
+                ],
+            ),
+            "second terminal event",
+            id="double-terminal",
+        ),
+        pytest.param(
+            lambda bugs: (bugs / "20260701T13Z-00.jsonl").write_text("{not json\n", encoding="utf-8"),
+            "not valid JSON",
+            id="malformed-json-line",
+        ),
+        pytest.param(
+            lambda bugs: _write_log(
+                bugs,
+                "20260701T13Z-00.jsonl",
+                [
+                    {
+                        "bug_id": "b",
+                        "event": "reported",
+                        "ts": "2026-07-01T13:00:00Z",
+                        "reported_by": "se",
+                        "title": "only a title",
+                    }
+                ],
+            ),
+            "schema",
+            id="reported-missing-required-payload-fails-schema",
+        ),
+        pytest.param(
+            lambda bugs: _write_log(
+                bugs,
+                "20260701T13Z-00.jsonl",
+                [
+                    {
+                        "bug_id": "b",
+                        "event": "exploded",
+                        "ts": "2026-07-01T13:00:00Z",
+                        "reported_by": "se",
+                    }
+                ],
+            ),
+            "schema",
+            id="bad-event-enum-fails-schema",
+        ),
+        pytest.param(
+            lambda bugs: _write_log(
+                bugs, "20260701T13Z-00.jsonl", [_reported(f"b{i}") for i in range(1001)]
+            ),
+            "rotation ceiling",
+            id="over-ceiling-1001-rows",
+        ),
+    ],
+)
+def test_violation_matrix(tmp_path: Path, build, expect_description_contains: str) -> None:  # type: ignore[no-untyped-def]
     specs = tmp_path / "specs"
     bugs = _bugs_dir(specs)
-    (bugs / "20260701T13Z-00.jsonl").write_text("{not json\n", encoding="utf-8")
+    build(bugs)
     errors = _doc033(specs)
-    assert len(errors) == 1
-    assert "not valid JSON" in errors[0].description
+    matching = [e for e in errors if expect_description_contains in e.description]
+    assert matching, f"Expected an error containing {expect_description_contains!r}, got: {errors}"
+    assert all(e.severity is Severity.ERROR for e in matching)
 
 
-def test_reported_missing_required_payload_fails_schema(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# Clean rows — noop/negative-control/archived-exempt/at-ceiling — 1 param
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(lambda specs: None, id="no-bugs-dir-noop"),
+        pytest.param(
+            lambda specs: _write_log(
+                _bugs_dir(specs), "20260701T13Z-00.jsonl", [_reported("bug-a"), _resolved("bug-a")]
+            ),
+            id="coherent-reported-then-resolved-negative-control",
+        ),
+        pytest.param(
+            lambda specs: _write_log(
+                _bugs_dir(specs),
+                "20260701T13Z-00.jsonl",
+                [
+                    _reported("bug-a"),
+                    _resolved("bug-a"),
+                    {
+                        "bug_id": "bug-a",
+                        "event": "archived",
+                        "ts": "2026-07-01T15:00:00Z",
+                        "reported_by": "project-auditor",
+                    },
+                ],
+            ),
+            id="archived-after-resolved-exempt",
+        ),
+        pytest.param(
+            lambda specs: _write_log(
+                _bugs_dir(specs), "20260701T13Z-00.jsonl", [_reported(f"b{i}") for i in range(1000)]
+            ),
+            id="exactly-at-ceiling-clean",
+        ),
+    ],
+)
+def test_clean_matrix(tmp_path: Path, build) -> None:  # type: ignore[no-untyped-def]
     specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    incomplete = {
-        "bug_id": "b",
-        "event": "reported",
-        "ts": "2026-07-01T13:00:00Z",
-        "reported_by": "se",
-        "title": "only a title",
-    }
-    _write_log(bugs, "20260701T13Z-00.jsonl", [incomplete])
-    errors = _doc033(specs)
-    assert any("schema" in e.description for e in errors)
-    assert all(e.severity is Severity.ERROR for e in errors)
-
-
-def test_bad_event_enum_fails_schema(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    bad = {"bug_id": "b", "event": "exploded", "ts": "2026-07-01T13:00:00Z", "reported_by": "se"}
-    _write_log(bugs, "20260701T13Z-00.jsonl", [bad])
-    errors = _doc033(specs)
-    assert any("schema" in e.description for e in errors)
-
-
-# --- rotation ceiling -----------------------------------------------------------------
-
-
-def test_over_ceiling_errors(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    # 1001 valid reported rows (distinct bug_ids so coherence stays clean) > 1000 ceiling.
-    events = [_reported(f"b{i}") for i in range(1001)]
-    _write_log(bugs, "20260701T13Z-00.jsonl", events)
-    errors = _doc033(specs)
-    ceiling = [e for e in errors if "rotation ceiling" in e.description]
-    assert len(ceiling) == 1
-    assert ceiling[0].severity is Severity.ERROR
-
-
-def test_exactly_ceiling_is_clean(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    events = [_reported(f"b{i}") for i in range(1000)]
-    _write_log(bugs, "20260701T13Z-00.jsonl", events)
-    assert [e for e in _doc033(specs) if "rotation ceiling" in e.description] == []
+    specs.mkdir(exist_ok=True)
+    build(specs)
+    assert _doc033(specs) == []

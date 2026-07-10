@@ -2,6 +2,10 @@
 
 Covers FR-S02 (version stamp), FR-S03 (registry), FR-S04 (backup-first), FR-S05
 (upgrade orchestration). Determinism via injected ``clock``.
+
+CRITICAL migration chain (data loss risk): idempotence on an already-migrated tree,
+dry-run writing nothing, and backup-before-write ordering are each kept as named
+tests — they are the irreplaceable data-loss detectors for this framework.
 """
 
 from __future__ import annotations
@@ -19,9 +23,6 @@ from dadaia_workspace.features.migrate import upgrade as _upgrade
 _FIXED = lambda: datetime(2026, 6, 8, 3, 8, 8, tzinfo=UTC)  # noqa: E731
 
 
-# ───────────────────────────── version (FR-S02) ─────────────────────────────
-
-
 def _write_constitution(specs_dir: Path, body: str) -> Path:
     specs_dir.mkdir(parents=True, exist_ok=True)
     path = specs_dir / "constitution.md"
@@ -29,64 +30,61 @@ def _write_constitution(specs_dir: Path, body: str) -> Path:
     return path
 
 
-def test_absent_constitution_is_version_zero(tmp_path: Path) -> None:
-    assert _version.read_pattern_version(tmp_path / "specs") == 0
+# ───────────────────────────── version (FR-S02) — 1 param ─────────────────────
 
 
-def test_no_frontmatter_is_version_zero(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("body", "expected_version", "assert_extra"),
+    [
+        pytest.param(None, 0, None, id="absent-constitution-is-version-zero"),
+        pytest.param("# Constitution\n\nbody\n", 0, None, id="no-frontmatter-is-version-zero"),
+        pytest.param(
+            "---\nspecs_pattern_version: 1\n---\n# Constitution\n",
+            1,
+            None,
+            id="read-stamped-version",
+        ),
+    ],
+)
+def test_version_read_matrix(
+    tmp_path: Path, body: str | None, expected_version: int, assert_extra: object
+) -> None:
     specs = tmp_path / "specs"
-    _write_constitution(specs, "# Constitution\n\nbody\n")
-    assert _version.read_pattern_version(specs) == 0
+    if body is not None:
+        _write_constitution(specs, body)
+    assert _version.read_pattern_version(specs) == expected_version
 
 
-def test_read_stamped_version(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_constitution(specs, "---\nspecs_pattern_version: 1\n---\n# Constitution\n")
-    assert _version.read_pattern_version(specs) == 1
-
-
-def test_write_version_creates_frontmatter(tmp_path: Path) -> None:
+def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
+    # Creates frontmatter on a bare file, preserving the body.
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n\nbody\n")
     _version.write_pattern_version(specs, 1)
     assert _version.read_pattern_version(specs) == 1
-    # Original body preserved after the new frontmatter block.
     assert "# Constitution" in (specs / "constitution.md").read_text(encoding="utf-8")
 
-
-def test_write_version_updates_existing_stamp(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_constitution(specs, "---\nspecs_pattern_version: 0\nother: keep\n---\n# C\n")
-    _version.write_pattern_version(specs, 1)
-    text = (specs / "constitution.md").read_text(encoding="utf-8")
-    assert _version.read_pattern_version(specs) == 1
-    assert "other: keep" in text  # sibling frontmatter keys preserved
-
-
-# ───────────────────────────── registry (FR-S03) ─────────────────────────────
+    # Updates an existing stamp, preserving sibling frontmatter keys.
+    specs2 = tmp_path / "specs2"
+    _write_constitution(specs2, "---\nspecs_pattern_version: 0\nother: keep\n---\n# C\n")
+    _version.write_pattern_version(specs2, 1)
+    text = (specs2 / "constitution.md").read_text(encoding="utf-8")
+    assert _version.read_pattern_version(specs2) == 1
+    assert "other: keep" in text
 
 
-def test_tree_v2_registered_as_first_step() -> None:
+# ───────────────────────────── registry (FR-S03) — 1 param ────────────────────
+
+
+def test_registry_plan_and_latest_version() -> None:
     keys = [s.key for s in _registry.REGISTRY]
     assert "tree-v2" in keys
     first = _registry.REGISTRY[0]
     assert (first.from_version, first.to_version) == (0, 1)
 
-
-def test_latest_version_matches_canonical() -> None:
     assert _registry.latest_version() == _version.CANONICAL_SPECS_VERSION
-
-
-def test_plan_empty_when_at_target() -> None:
     assert _registry.plan(1, 1) == []
+    assert [s.key for s in _registry.plan(0, 1)] == ["tree-v2"]
 
-
-def test_plan_walks_zero_to_one() -> None:
-    steps = _registry.plan(0, 1)
-    assert [s.key for s in steps] == ["tree-v2"]
-
-
-def test_plan_rejects_downgrade() -> None:
     with pytest.raises(ValueError, match="downgrade"):
         _registry.plan(1, 0)
 
@@ -99,40 +97,39 @@ def test_chain_idempotent_on_already_migrated_tree(tmp_path: Path) -> None:
     assert results[0][1].moved == []
 
 
-# ───────────────────────────── backup (FR-S04) ─────────────────────────────
+# ───────────────────────────── backup (FR-S04) + doctor integration — 1 param ─
 
 
-def test_backup_label_format() -> None:
+def test_backup_label_location_copy_and_doctor_visibility(tmp_path: Path) -> None:
     label = _backup.backup_label(0, 1, clock=_FIXED)
     assert label == "0→1-20260608T030808Z"
 
-
-def test_backup_copies_tree_into_specs_bkp(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     specs.mkdir()
     (specs / "constitution.md").write_text("# C\n", encoding="utf-8")
+    assert _backup.backup_root(specs) == tmp_path / "specs_bkp"
+
     dest = _backup.backup_specs(specs, 0, 1, clock=_FIXED)
     assert dest.parent.name == "specs_bkp"
     assert (dest / "constitution.md").read_text(encoding="utf-8") == "# C\n"
 
+    # Doctor: below-canonical tree warns; canonical-stamped tree is silent.
+    from dadaia_workspace.features.specs import Severity, SpecsDoctor
 
-def test_backup_root_is_sibling_of_specs(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    assert _backup.backup_root(specs) == tmp_path / "specs_bkp"
+    below = SpecsDoctor(specs).check()
+    version_warns = [i for i in below if i.code == "SPECS-VERSION"]
+    assert len(version_warns) == 1
+    assert version_warns[0].severity == Severity.WARNING
+    assert "dadaia specs upgrade" in version_warns[0].description
+
+    canonical_specs = tmp_path / "specs_canonical"
+    stamp = _version.CANONICAL_SPECS_VERSION
+    _write_constitution(canonical_specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
+    canonical_issues = SpecsDoctor(canonical_specs).check()
+    assert [i for i in canonical_issues if i.code == "SPECS-VERSION"] == []
 
 
-# ───────────────────────────── upgrade (FR-S05) ─────────────────────────────
-
-
-def test_upgrade_noop_when_already_canonical(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_constitution(
-        specs, f"---\nspecs_pattern_version: {_version.CANONICAL_SPECS_VERSION}\n---\n# C\n"
-    )
-    result = _upgrade.upgrade(specs, clock=_FIXED)
-    assert result.no_op is True
-    assert result.backup_path is None
-    assert not (tmp_path / "specs_bkp").exists()
+# ───────────────────────────── upgrade (FR-S05) — CRITICAL, kept named ────────
 
 
 def test_upgrade_dry_run_writes_nothing(tmp_path: Path) -> None:
@@ -149,6 +146,9 @@ def test_upgrade_dry_run_writes_nothing(tmp_path: Path) -> None:
 
 
 def test_upgrade_backup_first_chain_restamp(tmp_path: Path) -> None:
+    """The order contract: backup happens BEFORE the chain mutates the tree, the
+    chain applies, and the tree is re-stamped to canonical only after both — and a
+    second run against the now-canonical tree is idempotent (no second backup)."""
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n")  # version 0
     (specs / "foundation").mkdir()
@@ -166,38 +166,17 @@ def test_upgrade_backup_first_chain_restamp(tmp_path: Path) -> None:
     # 3. re-stamped to canonical
     assert _version.read_pattern_version(specs) == _version.CANONICAL_SPECS_VERSION
 
-
-def test_upgrade_is_idempotent(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_constitution(specs, "# C\n")
-    (specs / "foundation").mkdir()
-    (specs / "foundation" / "SPEC.md").write_text("x", encoding="utf-8")
-    _upgrade.upgrade(specs, clock=_FIXED)
     # Second run: already at target → no-op, no second backup.
     second = _upgrade.upgrade(specs, clock=_FIXED)
     assert second.no_op is True
+    assert second.backup_path is None
 
-
-# ─────────────────────── doctor integration (FR-S05/S06) ───────────────────────
-
-
-def test_doctor_warns_on_below_version_tree(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs import Severity, SpecsDoctor
-
-    specs = tmp_path / "specs"
-    _write_constitution(specs, "# Constitution\n")  # unstamped → version 0
-    issues = SpecsDoctor(specs).check()
-    version_warns = [i for i in issues if i.code == "SPECS-VERSION"]
-    assert len(version_warns) == 1
-    assert version_warns[0].severity == Severity.WARNING
-    assert "dadaia specs upgrade" in version_warns[0].description
-
-
-def test_doctor_silent_on_canonical_tree(tmp_path: Path) -> None:
-    from dadaia_workspace.features.specs.doctor import SpecsDoctor
-
-    specs = tmp_path / "specs"
-    stamp = _version.CANONICAL_SPECS_VERSION
-    _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
-    issues = SpecsDoctor(specs).check()
-    assert [i for i in issues if i.code == "SPECS-VERSION"] == []
+    # A tree already stamped canonical before any upgrade call is a no-op from the start.
+    fresh_specs = tmp_path.parent / (tmp_path.name + "-fresh-canonical") / "specs"
+    _write_constitution(
+        fresh_specs, f"---\nspecs_pattern_version: {_version.CANONICAL_SPECS_VERSION}\n---\n# C\n"
+    )
+    fresh_result = _upgrade.upgrade(fresh_specs, clock=_FIXED)
+    assert fresh_result.no_op is True
+    assert fresh_result.backup_path is None
+    assert not (fresh_specs.parent / "specs_bkp").exists()

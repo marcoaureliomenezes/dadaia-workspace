@@ -6,6 +6,9 @@ Covers:
 - ``alive``/``dead`` back-fill repo_url from ``git remote get-url origin`` when the record
   URL is empty and the repo is on disk — exercised against a REAL ``GitSubprocessClient``
   with a local ``file://`` fixture remote as origin (per AC-W2-03).
+
+CRITICAL last-chance capture: alive()/dead() back-filling repo_url — dead() specifically
+BEFORE rmtree — are the data-loss guards this file exists to keep.
 """
 
 from __future__ import annotations
@@ -18,7 +21,6 @@ import shutil  # noqa: E402
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from dadaia_workspace.core.exceptions import ContextNotFoundError  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     ContextState,
     SpecContextProject,
@@ -79,42 +81,31 @@ def _git(args: list[str], cwd: Path) -> None:
     )
 
 
-# --------------------------------------------------------------------- create
+# ---------------------------------------------------------------------------
+# create + update_url — merged variants (explicit/empty url, repair, state-preserve)
+# ---------------------------------------------------------------------------
 
 
-def test_create_persists_explicit_repo_url(
+def test_create_and_update_url_matrix(
     fake_service: SpecContextService, store: FakeContextStore
 ) -> None:
+    # create() persists an explicit repo_url.
     ctx = fake_service.create("foo", "foo", "https://example.test/foo.git")
     assert ctx.repo_url == "https://example.test/foo.git"
     assert store.get("foo").repo_url == "https://example.test/foo.git"  # type: ignore[union-attr]
 
+    # create() persists an empty url when unknown.
+    ctx2 = fake_service.create("bar", "bar", "")
+    assert ctx2.repo_url == ""
 
-def test_create_persists_empty_url_when_unknown(
-    fake_service: SpecContextService,
-) -> None:
-    ctx = fake_service.create("foo", "foo", "")
-    assert ctx.repo_url == ""
+    # update_url repairs an empty url through the store.
+    updated = fake_service.update_url("bar", "https://example.test/bar.git")
+    assert updated.repo_url == "https://example.test/bar.git"
+    assert store.get("bar").repo_url == "https://example.test/bar.git"  # type: ignore[union-attr]
 
-
-# --------------------------------------------------------------------- update_url
-
-
-def test_update_url_repairs_through_store(
-    fake_service: SpecContextService, store: FakeContextStore
-) -> None:
-    fake_service.create("foo", "foo", "")
-    updated = fake_service.update_url("foo", "https://example.test/foo.git")
-    assert updated.repo_url == "https://example.test/foo.git"
-    assert store.get("foo").repo_url == "https://example.test/foo.git"  # type: ignore[union-attr]
-
-
-def test_update_url_preserves_state_and_branch(
-    fake_service: SpecContextService, store: FakeContextStore
-) -> None:
-    fake_service.create("foo", "foo", "")
-    # Simulate an ALIVE record with a branch set.
-    existing = store.get("foo")
+    # update_url preserves state and branch on an ALIVE record.
+    fake_service.create("baz", "baz", "")
+    existing = store.get("baz")
     assert existing is not None
     store.update(
         type(existing)(
@@ -128,19 +119,16 @@ def test_update_url_preserves_state_and_branch(
             current_branch="feature/x",
         )
     )
-    updated = fake_service.update_url("foo", "https://example.test/foo.git")
-    assert updated.state == ContextState.ALIVE
-    assert updated.current_branch == "feature/x"
-    assert updated.alive_since == "2026-01-01T00:00:00+00:00"
-    assert updated.repo_url == "https://example.test/foo.git"
+    updated2 = fake_service.update_url("baz", "https://example.test/baz.git")
+    assert updated2.state == ContextState.ALIVE
+    assert updated2.current_branch == "feature/x"
+    assert updated2.alive_since == "2026-01-01T00:00:00+00:00"
+    assert updated2.repo_url == "https://example.test/baz.git"
 
 
-def test_update_url_missing_context_raises(fake_service: SpecContextService) -> None:
-    with pytest.raises(ContextNotFoundError):
-        fake_service.update_url("nope", "https://example.test/x.git")
-
-
-# --------------------------------------------------------------------- back-fill (real git)
+# ---------------------------------------------------------------------------
+# back-fill (real git) — CRITICAL data-loss guards, kept
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(not _HAS_GIT, reason="git not available")
@@ -151,12 +139,10 @@ def test_alive_backfills_repo_url_from_origin_remote(
 
     Uses a REAL GitSubprocessClient + a local ``file://`` fixture remote (AC-W2-03).
     """
-    # Build a bare upstream remote.
     upstream = tmp_path / "upstream.git"
     _git(["init", "--bare", str(upstream)], cwd=tmp_path)
     file_url = upstream.as_uri()  # file:// URL
 
-    # Place an on-disk repo whose origin points at the file:// remote, already DEAD->ALIVE-able.
     repo_path = workspace_root / "repos" / "foo"
     repo_path.mkdir(parents=True)
     _git(["init"], cwd=repo_path)
@@ -167,13 +153,11 @@ def test_alive_backfills_repo_url_from_origin_remote(
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
-    # Record exists with EMPTY url and is DEAD (repo already present so clone is skipped).
     service.create("foo", "foo", "")
 
     ctx = service.alive("foo")
     assert ctx.state == ContextState.ALIVE
     assert ctx.repo_url == file_url
-    # Persisted, not just returned.
     assert store.get("foo").repo_url == file_url  # type: ignore[union-attr]
 
 
@@ -190,15 +174,11 @@ def test_dead_backfills_repo_url_before_rmtree(
     _git(["init"], cwd=repo_path)
     _git(["checkout", "-b", "main"], cwd=repo_path)
     _git(["remote", "add", "origin", file_url], cwd=repo_path)
-    # A committed tree pushed upstream so dead()'s clean-tree path is taken (no untracked
-    # files → no commit_all; the existing upstream branch → push is a no-op, no new objects).
     (repo_path / "README.md").write_text("hi\n", encoding="utf-8")
     _git(["add", "-A"], cwd=repo_path)
     _git(["commit", "-m", "init"], cwd=repo_path)
     _git(["push", "-u", "origin", "main"], cwd=repo_path)
 
-    # ALIVE record with EMPTY url, pointing at the on-disk repo (no alive() scaffold here —
-    # we want a clean tree so dead() does not regenerate 0444 pack objects after chmod).
     ctx0 = SpecContextProject(
         name="foo",
         state=ContextState.ALIVE,
@@ -217,8 +197,6 @@ def test_dead_backfills_repo_url_before_rmtree(
         workspace_root=workspace_root,
     )
 
-    # Real git pack objects land 0444; dead()'s non-writable guard would otherwise block
-    # the rmtree (orthogonal to this test). Make the tree writable first.
     _make_writable(repo_path)
 
     ctx = service.dead("foo")

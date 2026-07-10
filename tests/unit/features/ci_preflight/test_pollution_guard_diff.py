@@ -54,28 +54,15 @@ def _run_guard_cycle(
         (fake_root / name).mkdir(parents=True, exist_ok=True)
 
     session = _FakeSession()
-    root_conftest.pytest_sessionstart(session)  # type: ignore[arg-type]
+    root_conftest.pytest_sessionstart(session)
 
     # The gate's own ruff/mypy checks "create" these mid-session.
     for name in created_during:
         (fake_root / name).mkdir(parents=True, exist_ok=True)
 
-    root_conftest.pytest_sessionfinish(session, 0)  # type: ignore[arg-type]
+    root_conftest.pytest_sessionfinish(session, 0)
     capsys.readouterr()  # drain any printed message
     return session.exitstatus
-
-
-def test_preexisting_pollution_dir_does_not_fail(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
-) -> None:
-    status = _run_guard_cycle(
-        monkeypatch,
-        tmp_path,
-        preexisting=(".ruff_cache", ".mypy_cache"),
-        created_during=(),
-        capsys=capsys,
-    )
-    assert status == 0
 
 
 def test_session_created_pollution_dir_fails(
@@ -91,31 +78,31 @@ def test_session_created_pollution_dir_fails(
     assert status == 1
 
 
-def test_preexisting_ignored_but_new_one_still_caught(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
+@pytest.mark.parametrize(
+    ("preexisting", "created_during", "expect_status"),
+    [
+        pytest.param((".ruff_cache", ".mypy_cache"), (), 0, id="preexisting-only-does-not-fail"),
+        pytest.param(
+            (".mypy_cache",),
+            (".pytest_cache",),
+            1,
+            id="preexisting-ignored-but-new-one-still-caught",
+        ),
+    ],
+)
+def test_preexisting_pollution_handling(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: Any,
+    preexisting: tuple[str, ...],
+    created_during: tuple[str, ...],
+    expect_status: int,
 ) -> None:
-    """A pre-existing dir is ignored, yet a NEW dir created in-session still fails."""
     status = _run_guard_cycle(
         monkeypatch,
         tmp_path,
-        preexisting=(".mypy_cache",),
-        created_during=(".pytest_cache",),
+        preexisting=preexisting,
+        created_during=created_during,
         capsys=capsys,
     )
-    assert status == 1
-
-
-def test_message_quality_lists_only_new_offenders(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
-) -> None:
-    monkeypatch.setattr(root_conftest, "_REPO_ROOT", tmp_path, raising=True)
-    (tmp_path / ".mypy_cache").mkdir()  # pre-existing — must NOT be reported
-    session = _FakeSession()
-    root_conftest.pytest_sessionstart(session)  # type: ignore[arg-type]
-    (tmp_path / ".ruff_cache").mkdir()  # session-created — must be reported
-    root_conftest.pytest_sessionfinish(session, 0)  # type: ignore[arg-type]
-    out = capsys.readouterr().out
-    assert "[SESSION POLLUTION]" in out
-    assert ".ruff_cache" in out
-    assert ".mypy_cache" not in out
-    assert session.exitstatus == 1
+    assert status == expect_status

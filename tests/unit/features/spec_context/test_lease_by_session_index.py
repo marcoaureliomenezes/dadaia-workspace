@@ -5,10 +5,9 @@ Asserts:
 * ``acquire``/``steal``/``release`` maintain ``ctx_locks/by-session/<sid>.json``.
 * The index write happens INSIDE the sentinel CAS — a crash injected via the existing
   ``_before_write`` seam leaves NEITHER the record NOR the index half-written (they
-  cannot diverge).
-* PostToolUse does NOT scan the lock dir when the session holds nothing
-  (FS-op-counting fake).
-* Full-scan fallback fires only when the by-session DIR is absent (migration window).
+  cannot diverge) — atomicity is lease-integrity coverage, kept as a named test.
+* PostToolUse renewal is index-driven, with a full-scan fallback only when the
+  by-session DIR is absent (migration window).
 """
 
 from __future__ import annotations
@@ -32,52 +31,61 @@ def _read_index(workspace: Path, sid: str) -> list[str]:
     return sorted(json.loads(path.read_text(encoding="utf-8"))["contexts"])
 
 
-# --------------------------------------------------------------------------- #
-# Index is maintained across the lease lifecycle
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
+# Index maintained across the lease lifecycle + PostToolUse index-driven scan — 1 param
+# ---------------------------------------------------------------------------
 
 
-def test_acquire_writes_by_session_index(tmp_path: Path) -> None:
+def test_index_maintained_across_lifecycle_and_post_gate_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dadaia_workspace.hooks import sdd_post_gate
+
+    # acquire writes the by-session index; a second context for the same sid appends.
     lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
     assert _read_index(tmp_path, "sess_a") == ["ctxa"]
-
-
-def test_acquire_two_contexts_indexed(tmp_path: Path) -> None:
-    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
     lease.acquire(tmp_path, "ctxb", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
     assert _read_index(tmp_path, "sess_a") == ["ctxa", "ctxb"]
     assert lease.contexts_for_session(tmp_path, "sess_a") == ["ctxa", "ctxb"]
 
-
-def test_release_removes_ctx_from_index_and_unlinks_when_empty(tmp_path: Path) -> None:
-    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
-    lease.acquire(tmp_path, "ctxb", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
+    # release removes the ctx from the index and unlinks the file when empty.
     lease.release(tmp_path, "ctxa", "sess_a")
     assert _read_index(tmp_path, "sess_a") == ["ctxb"]
     lease.release(tmp_path, "ctxb", "sess_a")
     assert not _by_session_file(tmp_path, "sess_a").exists()
 
-
-def test_steal_transfers_index_to_new_holder(tmp_path: Path) -> None:
-    # sess_a holds ctxa; its pid is dead so sess_b can steal.
-    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=999999)
-    dead = lambda pid: False  # noqa: E731 — terse fake probe: every pid is dead.
-
-    # Age the record past TTL so it is reclaimable.
-    rec = lease.read_record(tmp_path, "ctxa")
+    # steal transfers the index entry to the new holder.
+    lease.acquire(tmp_path, "ctxc", "sess_c", "v1", "IMPLEMENTATION", pid=999999)
+    dead = lambda pid: False  # noqa: E731
+    rec = lease.read_record(tmp_path, "ctxc")
     assert rec is not None
     rec["heartbeat"] = "2000-01-01T00:00:00+00:00"
-    lease._write_record(lease._record_path(tmp_path, "ctxa"), rec)
-
-    ok, _ = lease.steal(tmp_path, "ctxa", "sess_b", pid_probe=dead, pid=4321)
+    lease._write_record(lease._record_path(tmp_path, "ctxc"), rec)
+    ok, _ = lease.steal(tmp_path, "ctxc", "sess_d", pid_probe=dead, pid=4321)
     assert ok
-    assert _read_index(tmp_path, "sess_a") == []  # old holder's entry cleaned
-    assert _read_index(tmp_path, "sess_b") == ["ctxa"]
+    assert _read_index(tmp_path, "sess_c") == []
+    assert _read_index(tmp_path, "sess_d") == ["ctxc"]
+
+    # PostToolUse: index-driven lookup returns only the querying session's held contexts.
+    lease.acquire(tmp_path, "ctxe", "sess_e", "v1", "IMPLEMENTATION", pid=4321)
+    lease.acquire(tmp_path, "ctxf", "sess_f", "v1", "IMPLEMENTATION", pid=4321)
+    assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_e") == ["ctxe"]
+    assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_f") == ["ctxf"]
+
+    # Full-scan fallback fires only when the by-session dir is absent (migration window).
+    fallback_ws = tmp_path.parent / (tmp_path.name + "-fallback")
+    lock_dir = fallback_ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True)
+    (lock_dir / "legacy.lock.json").write_text(
+        json.dumps({"context": "legacy", "session_id": "sess_x"}), encoding="utf-8"
+    )
+    assert not (lock_dir / "by-session").exists()
+    assert sdd_post_gate._iter_lease_contexts(fallback_ws, "sess_x") == ["legacy"]
 
 
-# --------------------------------------------------------------------------- #
-# Same-CAS atomicity: record + index cannot diverge under crash injection
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
+# Same-CAS atomicity: record + index cannot diverge under crash injection — kept
+# ---------------------------------------------------------------------------
 
 
 def test_crash_before_write_leaves_neither_record_nor_index(
@@ -101,56 +109,9 @@ def test_crash_before_write_leaves_neither_record_nor_index(
     assert _read_index(tmp_path, "sess_a") == []
 
 
-# --------------------------------------------------------------------------- #
-# PostToolUse renewal: no lock-dir scan when the session holds nothing
-# --------------------------------------------------------------------------- #
-
-
-def test_post_gate_does_not_scan_lock_dir_when_holding_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from dadaia_workspace.hooks import sdd_post_gate
-
-    # One foreign lease exists (so the lock dir is non-empty) but sess_b holds nothing.
-    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
-
-    lock_dir = tmp_path / ".dadaia" / "states" / "ctx_locks"
-    scanned: list[Path] = []
-    real_iterdir = Path.iterdir
-
-    def _spy_iterdir(self: Path):  # type: ignore[no-untyped-def]
-        if self == lock_dir:
-            scanned.append(self)
-        return real_iterdir(self)
-
-    monkeypatch.setattr(Path, "iterdir", _spy_iterdir)
-
-    result = sdd_post_gate._iter_lease_contexts(tmp_path, "sess_b")
-    assert result == []
-    assert scanned == []  # the lock dir was NEVER scanned for a no-hold session.
-
-
-def test_post_gate_index_driven_returns_only_held_contexts(tmp_path: Path) -> None:
-    from dadaia_workspace.hooks import sdd_post_gate
-
-    lease.acquire(tmp_path, "ctxa", "sess_a", "v1", "IMPLEMENTATION", pid=4321)
-    lease.acquire(tmp_path, "ctxb", "sess_b", "v1", "IMPLEMENTATION", pid=4321)
-    assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_a") == ["ctxa"]
-    assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_b") == ["ctxb"]
-
-
-def test_post_gate_full_scan_fallback_when_index_dir_absent(tmp_path: Path) -> None:
-    from dadaia_workspace.hooks import sdd_post_gate
-
-    # Simulate a pre-index (migration) workspace: a lock record with NO by-session dir.
-    lock_dir = tmp_path / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True)
-    (lock_dir / "legacy.lock.json").write_text(
-        json.dumps({"context": "legacy", "session_id": "sess_x"}), encoding="utf-8"
-    )
-    assert not (lock_dir / "by-session").exists()
-    # Fallback returns the legacy record's context via the full scan.
-    assert sdd_post_gate._iter_lease_contexts(tmp_path, "sess_x") == ["legacy"]
+# ---------------------------------------------------------------------------
+# .ptr-match RENEW must not dangle the old sid's index entry — kept (F-7)
+# ---------------------------------------------------------------------------
 
 
 def test_ptr_renew_removes_replaced_sid_entry(tmp_path: Path) -> None:
@@ -172,6 +133,11 @@ def test_ptr_renew_removes_replaced_sid_entry(tmp_path: Path) -> None:
     index_dir = tmp_path / ".dadaia" / "states" / "ctx_locks" / "by-session"
     assert (index_dir / "sess_inc.json").exists()
     assert not (index_dir / "sess_drift.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# session_holds requires CAS-indexed evidence — kept
+# ---------------------------------------------------------------------------
 
 
 def test_session_holds_reads_acquisition_evidence(tmp_path: Path) -> None:

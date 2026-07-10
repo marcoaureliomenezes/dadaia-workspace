@@ -11,7 +11,8 @@ relative path resolved from the handoff file's own directory, so ``repos/...`` b
 The fix: ANY relative ``artifact.path`` that exists under ``workspace_root`` resolves
 workspace-rooted; the handoff-dir-relative fallback is kept for legacy artifacts that only
 exist there; when a path is resolvable BOTH ways, workspace-root wins; the
-``_within_workspace`` guard (resolve + relative_to, symlink-safe) is preserved.
+``_within_workspace`` guard (resolve + relative_to, symlink-safe) is preserved — security
+coverage against path-escape (CWE-22).
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.features.reports.validation import (
     ReportsValidationService,
@@ -87,25 +90,10 @@ def test_resolve_repos_specs_audits_artifact_validates(tmp_path: Path) -> None:
     assert service.check_hash(handoff_path) == "match"
 
 
-def test_resolve_legacy_handoff_dir_relative_still_validates(tmp_path: Path) -> None:
-    """A sibling artifact that exists ONLY next to the handoff still validates."""
-    service, handoff_root = _make_service(tmp_path)
-
-    ctx_dir = handoff_root / "dadaia-workspace"
-    ctx_dir.mkdir()
-    sibling = ctx_dir / "report.html"
-    sibling.write_bytes(b"<html>legacy sibling</html>")
-    content_hash = hashlib.sha256(sibling.read_bytes()).hexdigest()
-
-    handoff_path = ctx_dir / "2026-06-10T000000Z-report.handoff.json"
-    _write_handoff(handoff_path, "report.html", content_hash)
-
-    assert service.check_hash(handoff_path) == "match"
-
-
 def test_workspace_root_wins_when_path_resolvable_both_ways(tmp_path: Path) -> None:
     """When the SAME relative path exists workspace-rooted AND handoff-relative,
-    the workspace-rooted file must win.
+    the workspace-rooted file must win (also proves the legacy handoff-dir-relative
+    fallback resolves at all, via the losing side).
 
     Two distinct files share the relative path ``shared/artifact.md`` — one under the
     workspace root, one under the handoff dir. The handoff's ``content_hash`` matches
@@ -132,47 +120,40 @@ def test_workspace_root_wins_when_path_resolvable_both_ways(tmp_path: Path) -> N
 
     assert service.check_hash(handoff_path) == "match"
 
+    # And the legacy fallback alone (no workspace-rooted competitor) still resolves.
+    ctx_dir2 = handoff_root / "legacy-ctx"
+    ctx_dir2.mkdir()
+    sibling = ctx_dir2 / "report.html"
+    sibling.write_bytes(b"<html>legacy sibling</html>")
+    sibling_hash = hashlib.sha256(sibling.read_bytes()).hexdigest()
+    legacy_handoff = ctx_dir2 / "2026-06-10T000000Z-report.handoff.json"
+    _write_handoff(legacy_handoff, "report.html", sibling_hash)
+    assert service.check_hash(legacy_handoff) == "match"
 
-def test_absolute_path_outside_workspace_rejected(tmp_path: Path) -> None:
-    """An absolute path outside the workspace is rejected by the guard."""
+
+@pytest.mark.parametrize(
+    "bad_ref_builder",
+    ["absolute-outside", "dotdot-escape"],
+)
+def test_escape_paths_rejected(tmp_path: Path, bad_ref_builder: str) -> None:
+    """Absolute-outside and ``..``-traversal artifact paths are both rejected by the
+    ``_within_workspace`` guard (resolve + relative_to, symlink-safe — CWE-22)."""
     service, handoff_root = _make_service(tmp_path)
 
-    outside = tmp_path.parent / "t011_07_outside.md"
+    outside = tmp_path.parent / f"t011_07_{bad_ref_builder}.md"
     outside.write_bytes(b"outside the workspace")
     try:
         ctx_dir = handoff_root / "dadaia-workspace"
-        ctx_dir.mkdir()
-        handoff_path = ctx_dir / "2026-06-10T000000Z-outside.handoff.json"
-        _write_handoff(
-            handoff_path,
-            str(outside),
-            hashlib.sha256(outside.read_bytes()).hexdigest(),
+        ctx_dir.mkdir(exist_ok=True)
+        handoff_path = ctx_dir / f"2026-06-10T000000Z-{bad_ref_builder}.handoff.json"
+        ref = (
+            str(outside)
+            if bad_ref_builder == "absolute-outside"
+            else "../../../../" + outside.name
         )
-
-        assert service.check_hash(handoff_path) == "missing_artifact"
-    finally:
-        outside.unlink(missing_ok=True)
-
-
-def test_dotdot_escape_path_rejected(tmp_path: Path) -> None:
-    """A ``..`` traversal escaping the workspace is rejected by the guard.
-
-    The schema rejects ``..`` for real callers; this asserts the resolver's own
-    ``_within_workspace`` guard is a defence-in-depth backstop independent of the schema.
-    """
-    service, handoff_root = _make_service(tmp_path)
-
-    outside = tmp_path.parent / "t011_07_dotdot.md"
-    outside.write_bytes(b"escaped via dotdot")
-    try:
-        ctx_dir = handoff_root / "dadaia-workspace"
-        ctx_dir.mkdir()
-        handoff_path = ctx_dir / "2026-06-10T000000Z-dotdot.handoff.json"
-        # From <ws>/.dadaia/handoff/dadaia-workspace/ climb out of the workspace.
-        escape_ref = "../../../../t011_07_dotdot.md"
         _write_handoff(
             handoff_path,
-            escape_ref,
+            ref,
             hashlib.sha256(outside.read_bytes()).hexdigest(),
         )
 

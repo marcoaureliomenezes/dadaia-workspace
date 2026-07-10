@@ -4,14 +4,16 @@ Acceptance criteria (SPEC §8 AC-08):
     - Stale ctx_locks/<ctx>.lock.json absent after doctor --fix.
     - TTL-expired .dadaia/sessions/<id>.json absent after doctor --fix.
     - Orphan ctx_locks/<ctx>.lock.sentinel (mtime > 30s) absent after doctor --fix.
+    - Invalid/missing-fields lock files deleted by --fix.
     - No stale records: doctor --fix exits 0, nothing deleted.
 
 Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
 semantics now measure against the heartbeat-renewed ``last_seen_at`` (with TTL-from-creation
 fallback for pre-heartbeat records), resolved by ``session_identity.liveness_timestamp``;
-the bind-CLI pid is never consulted (dead by construction). The pre-existing graveyard-GC
-fixtures here already used ``last_seen_at`` as the heartbeat key; the T-011-04 additions
-below exercise the REAL renewal path (PostToolUse heartbeat) — no planted-pid fixtures.
+the bind-CLI pid is never consulted (dead by construction).
+
+CRITICAL GC: renewed-bind survival prevents live-session collection — kept verbatim,
+exercising the REAL PostToolUse renewal path (no planted-pid fixtures).
 """
 
 from __future__ import annotations
@@ -29,10 +31,6 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_workspace(tmp_path: Path) -> Path:
@@ -67,15 +65,16 @@ def _fresh_iso() -> str:
 
 
 # ---------------------------------------------------------------------------
-# T-016-06 AC-08a: stale ctx_locks/<ctx>.lock.json deleted by --fix
+# Stale/invalid artifact deletion matrix — lock, session, sentinel, invalid, missing-fields
 # ---------------------------------------------------------------------------
 
 
-def test_stale_lock_json_deleted_after_fix(tmp_path: Path) -> None:
-    """Stale ctx_locks/myctx.lock.json written to tmp workspace; doctor --fix deletes it."""
+def test_gc_deletion_matrix(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    sessions_dir = ws / ".dadaia" / "sessions"
 
+    # (a) stale ctx_locks/<ctx>.lock.json → LOCK-GC (probe-aware reclaim).
     lock_file = ctx_locks_dir / "myctx.lock.json"
     stale_rec = {
         "context": "myctx",
@@ -87,31 +86,8 @@ def test_stale_lock_json_deleted_after_fix(tmp_path: Path) -> None:
         "ttl": 1800,
     }
     lock_file.write_text(json.dumps(stale_rec, indent=2), encoding="utf-8")
-    assert lock_file.exists(), "Precondition: lock file must exist before fix"
 
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not lock_file.exists(), (
-        f"Stale lock file should be deleted after doctor fix, but still exists. Actions: {actions}"
-    )
-    # Re-classification (T-011-02): a stale-but-valid record is reclaimed under LOCK-GC
-    # (probe-aware) rather than LOCK-NEW; LOCK-NEW now covers only structural corruption.
-    assert any("LOCK-GC" in a and "myctx.lock.json" in a for a in actions), (
-        f"Expected LOCK-GC action for myctx.lock.json, got: {actions}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# T-016-06 AC-08b: TTL-expired session file deleted by --fix
-# ---------------------------------------------------------------------------
-
-
-def test_expired_session_file_deleted_after_fix(tmp_path: Path) -> None:
-    """TTL-expired .dadaia/sessions/<id>.json deleted by doctor --fix (graveyard GC)."""
-    ws = _make_workspace(tmp_path)
-    sessions_dir = ws / ".dadaia" / "sessions"
-
+    # (b) TTL-expired .dadaia/sessions/<id>.json → GRAVEYARD-GC.
     sess_file = sessions_dir / "old-sess-001.json"
     expired_sess = {
         "session_id": "old-sess-001",
@@ -123,61 +99,48 @@ def test_expired_session_file_deleted_after_fix(tmp_path: Path) -> None:
         "ttl_seconds": 300,
     }
     sess_file.write_text(json.dumps(expired_sess, indent=2), encoding="utf-8")
-    assert sess_file.exists(), "Precondition: session file must exist before fix"
 
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not sess_file.exists(), (
-        f"Expired session file should be deleted after doctor fix, but still exists. "
-        f"Actions: {actions}"
-    )
-    assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), (
-        f"Expected GRAVEYARD-GC action for old-sess-001.json, got: {actions}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# T-016-06 AC-08c: orphan sentinel (mtime > 30s) deleted by --fix
-# ---------------------------------------------------------------------------
-
-
-def test_orphan_sentinel_deleted_after_fix(tmp_path: Path) -> None:
-    """Orphan ctx_locks/<ctx>.lock.sentinel with mtime > 30s deleted by doctor --fix."""
-    ws = _make_workspace(tmp_path)
-    ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
-
+    # (c) orphan sentinel (mtime > 30s) → SENTINEL-GC.
     sentinel = ctx_locks_dir / "myctx.lock.sentinel"
     sentinel.write_text("", encoding="utf-8")
-    assert sentinel.exists()
-
-    # Backdate mtime to 60 seconds ago to make it "orphaned"
     old_mtime = time.time() - 60.0
     os.utime(str(sentinel), (old_mtime, old_mtime))
 
+    # (d) invalid JSON lock file → LOCK-NEW.
+    bad_lock = ctx_locks_dir / "badctx.lock.json"
+    bad_lock.write_text("NOT JSON {{{", encoding="utf-8")
+
+    # (e) lock file missing required fields → LOCK-NEW.
+    incomplete_lock = ctx_locks_dir / "incompletectx.lock.json"
+    incomplete_rec = {"context": "incompletectx"}  # missing everything else
+    incomplete_lock.write_text(json.dumps(incomplete_rec, indent=2), encoding="utf-8")
+
     doctor = _make_doctor(ws)
     actions = doctor.fix()
 
-    assert not sentinel.exists(), (
-        f"Orphan sentinel should be deleted after doctor fix, but still exists. Actions: {actions}"
-    )
-    assert any("SENTINEL-GC" in a and "myctx.lock.sentinel" in a for a in actions), (
-        f"Expected SENTINEL-GC action for myctx.lock.sentinel, got: {actions}"
-    )
+    assert not lock_file.exists()
+    assert any("LOCK-GC" in a and "myctx.lock.json" in a for a in actions), actions
+    assert not sess_file.exists()
+    assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
+    assert not sentinel.exists()
+    assert any("SENTINEL-GC" in a and "myctx.lock.sentinel" in a for a in actions), actions
+    assert not bad_lock.exists()
+    assert any("LOCK-NEW" in a and "badctx.lock.json" in a for a in actions), actions
+    assert not incomplete_lock.exists()
+    assert any("LOCK-NEW" in a and "incompletectx.lock.json" in a for a in actions), actions
 
 
 # ---------------------------------------------------------------------------
-# T-016-06 AC-08d: no stale records → --fix exits 0, nothing deleted
+# Clean-exit + TTL-from-creation fallback — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_no_stale_records_fix_exits_clean(tmp_path: Path) -> None:
-    """No stale records: doctor fix exits 0, no files deleted."""
+def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
     sessions_dir = ws / ".dadaia" / "sessions"
 
-    # Write a FRESH lock record (well within TTL)
+    # No stale records: doctor fix exits clean, nothing deleted.
     lock_file = ctx_locks_dir / "freshctx.lock.json"
     fresh_rec = {
         "context": "freshctx",
@@ -189,8 +152,6 @@ def test_no_stale_records_fix_exits_clean(tmp_path: Path) -> None:
         "ttl": 1800,
     }
     lock_file.write_text(json.dumps(fresh_rec, indent=2), encoding="utf-8")
-
-    # Write a FRESH session file
     sess_file = sessions_dir / "live-sess.json"
     fresh_sess = {
         "session_id": "live-sess",
@@ -202,33 +163,62 @@ def test_no_stale_records_fix_exits_clean(tmp_path: Path) -> None:
         "ttl_seconds": 1800,
     }
     sess_file.write_text(json.dumps(fresh_sess, indent=2), encoding="utf-8")
-
-    # Write a FRESH sentinel (mtime = now, age < 30s)
     sentinel = ctx_locks_dir / "freshctx.lock.sentinel"
     sentinel.write_text("", encoding="utf-8")
 
     doctor = _make_doctor(ws)
     actions = doctor.fix()
 
-    # Nothing should be deleted
-    assert lock_file.exists(), "Fresh lock file should NOT be deleted"
-    assert sess_file.exists(), "Fresh session file should NOT be deleted"
-    assert sentinel.exists(), "Fresh sentinel should NOT be deleted (age < 30s)"
-
+    assert lock_file.exists()
+    assert sess_file.exists()
+    assert sentinel.exists()
     gc_actions = [a for a in actions if "GC" in a or "LOCK-NEW" in a]
     assert gc_actions == [], f"Expected no GC actions for fresh records, got: {gc_actions}"
 
+    # TTL-from-creation fallback: a record WITHOUT last_seen_at uses bound_at for GC;
+    # the session-record pid is NEVER consulted for bind GC.
+    from dadaia_workspace.features.spec_context import session_identity
+
+    stale_id = "sess_pre01"
+    session_identity.write_session(
+        ws,
+        stale_id,
+        {
+            "session_id": stale_id,
+            "context": "myctx",
+            "mode": "READ",
+            "pid": 4242,
+            "bound_at": _stale_iso(ttl=300),
+            "ttl_seconds": 300,
+        },
+    )
+    fresh_id = "sess_pre02"
+    session_identity.write_session(
+        ws,
+        fresh_id,
+        {
+            "session_id": fresh_id,
+            "context": "myctx",
+            "mode": "READ",
+            "pid": 4242,
+            "bound_at": _fresh_iso(),
+            "ttl_seconds": 300,
+        },
+    )
+
+    doctor2 = _make_doctor(ws)
+    actions2 = doctor2.fix()
+
+    assert not (ws / ".dadaia" / "sessions" / f"{stale_id}.json").exists(), (
+        f"Pre-last_seen_at record stale by creation must be collected. Actions: {actions2}"
+    )
+    assert (ws / ".dadaia" / "sessions" / f"{fresh_id}.json").exists(), (
+        f"Pre-last_seen_at record fresh by creation must be spared. Actions: {actions2}"
+    )
+
 
 # ---------------------------------------------------------------------------
-# T-016-06: invalid/missing-fields lock file deleted by --fix
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# T-011-04 (FR-W1-04 / ADR-8 amended): heartbeat-renewed last_seen_at bind GC.
-# Exercises the REAL renewal path — NO planted-pid fixtures. A PostToolUse hook
-# invocation refreshes the bind record's last_seen_at; the GC sweep then spares it,
-# and the gate still resolves READ for that sid.
+# T-011-04 (FR-W1-04 / ADR-8 amended): heartbeat-renewed last_seen_at bind GC — CRITICAL
 # ---------------------------------------------------------------------------
 
 
@@ -244,9 +234,6 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 
     from dadaia_workspace.hooks import sdd_post_gate
 
-    # Env vars that would override the stdin session_id (resolve_session_id order). They
-    # must be cleared so the renewal honestly targets the bind sid fed via the payload —
-    # exactly as a real harness delivers it through stdin, not via a leaked operator env.
     override_vars = (
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
@@ -339,91 +326,4 @@ def test_stale_unrenewed_bind_is_collected(tmp_path: Path) -> None:
     )
     assert any("GRAVEYARD-GC" in a and sess_id in a for a in actions), (
         f"Expected GRAVEYARD-GC for the dead bind, got: {actions}"
-    )
-
-
-def test_bind_without_last_seen_at_decays_ttl_from_creation(tmp_path: Path) -> None:
-    """FR-W1-04: a record WITHOUT last_seen_at uses TTL-from-creation (bound_at) for GC.
-
-    A pre-last_seen_at record whose bound_at is past TTL is collected; one whose bound_at
-    is fresh is spared. The session-record pid is NEVER consulted for bind GC.
-    """
-    ws = _make_workspace(tmp_path)
-    from dadaia_workspace.features.spec_context import session_identity
-
-    # Stale-by-creation: bound_at past TTL, no last_seen_at at all.
-    stale_id = "sess_pre01"
-    session_identity.write_session(
-        ws,
-        stale_id,
-        {
-            "session_id": stale_id,
-            "context": "myctx",
-            "mode": "READ",
-            "pid": 4242,
-            "bound_at": _stale_iso(ttl=300),
-            "ttl_seconds": 300,
-        },
-    )
-    # Fresh-by-creation: bound_at recent, no last_seen_at.
-    fresh_id = "sess_pre02"
-    session_identity.write_session(
-        ws,
-        fresh_id,
-        {
-            "session_id": fresh_id,
-            "context": "myctx",
-            "mode": "READ",
-            "pid": 4242,
-            "bound_at": _fresh_iso(),
-            "ttl_seconds": 300,
-        },
-    )
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not (ws / ".dadaia" / "sessions" / f"{stale_id}.json").exists(), (
-        f"Pre-last_seen_at record stale by creation must be collected. Actions: {actions}"
-    )
-    assert (ws / ".dadaia" / "sessions" / f"{fresh_id}.json").exists(), (
-        f"Pre-last_seen_at record fresh by creation must be spared. Actions: {actions}"
-    )
-
-
-def test_invalid_lock_file_deleted_after_fix(tmp_path: Path) -> None:
-    """Invalid JSON lock file is deleted by doctor --fix."""
-    ws = _make_workspace(tmp_path)
-    ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
-
-    bad_lock = ctx_locks_dir / "badctx.lock.json"
-    bad_lock.write_text("NOT JSON {{{", encoding="utf-8")
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not bad_lock.exists(), "Invalid JSON lock file should be deleted by fix"
-    assert any("LOCK-NEW" in a and "badctx.lock.json" in a for a in actions), (
-        f"Expected LOCK-NEW action for badctx.lock.json, got: {actions}"
-    )
-
-
-def test_missing_fields_lock_file_deleted_after_fix(tmp_path: Path) -> None:
-    """Lock file missing required fields is deleted by doctor --fix."""
-    ws = _make_workspace(tmp_path)
-    ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
-
-    incomplete_lock = ctx_locks_dir / "incompletectx.lock.json"
-    incomplete_rec = {
-        "context": "incompletectx",
-        # Missing: release, session_id, mode, acquired_at, heartbeat, ttl
-    }
-    incomplete_lock.write_text(json.dumps(incomplete_rec, indent=2), encoding="utf-8")
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not incomplete_lock.exists(), "Incomplete lock file should be deleted by fix"
-    assert any("LOCK-NEW" in a and "incompletectx.lock.json" in a for a in actions), (
-        f"Expected LOCK-NEW action for incompletectx.lock.json, got: {actions}"
     )
