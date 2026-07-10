@@ -12,8 +12,12 @@ Bug ledger: **5 open** (2026-07-10 remote intake: 1 CRITICAL lease-identity self
 4 HIGH lifecycle) + P0 cross-harness lock audit
 (`specs/audits/2026-07-10-lock-risk-audit-cross-harness.md`) awaiting disposition.
 
-Next release: **v0.1.76 — bug + audit remediation** (open work outranks backlog),
-absorbing the overlapping backlog entries `central-bind-resolution-seam`,
-`preflight-block-reasons-missing-operator-command`,
-`implement-review-write-scope-from-tasks-parity` per the 5-release plan in
+Backlog consolidated to 5 entries (PR #147) and **release-defined 2026-07-10** under
+the operator-ratified **NO-LOCKS DOCTRINE**: v0.1.76 lock liberation (advisory
+presence replaces the blocking lease — P0, disposes the CRITICAL bug + full audit) →
+v0.1.77 central bind-resolution seam (P0) → v0.1.78 lifecycle correctness &
+diagnosability (P1, disposes the 4 HIGH bugs) → v0.1.79 panel agentic-layers reorg
+(P2) → v0.1.80 deprecation strips (P3, ship ≥ 2026-08-01). Full definitions in
 `specs/backlog/candidates.md`.
+
+Next release: **v0.1.76 — lock liberation (advisory presence)**.
