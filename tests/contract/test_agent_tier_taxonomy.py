@@ -74,20 +74,6 @@ def _plugin_body_agents() -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
-def test_core_roster_is_exactly_nine() -> None:
-    assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
-    assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
-
-
-def test_plugin_bodies_are_exactly_three() -> None:
-    bodies = _plugin_body_agents()
-    assert {p.stem for p in bodies} == {
-        "frontend-engineer",
-        "design-specialist",
-        "devops-engineer",
-    }, [p.name for p in bodies]
-
-
 # ---------------------------------------------------------------------------
 # (a) the 3 built-in templates, verbatim (the SPEC FR2 table)
 # ---------------------------------------------------------------------------
@@ -137,37 +123,18 @@ _MODEL_TIER: dict[str, str] = {
 }
 
 
-def test_builtin_templates_pin_the_fr2_table_verbatim() -> None:
-    """(a): the 3 templates cover exactly the 9 core agents with the pinned cells."""
+def test_builtin_templates_pin_fr2_table_default_and_registry_tiers() -> None:
+    """(a)+(b)+(d): the FR2 table verbatim, ``balanced`` is the single default, and every
+    template cell's model resolves in REGISTRY with the pinned tier."""
     templates = {t.id: t for t in list_templates()}
     assert set(templates) == set(_EXPECTED_TEMPLATES), sorted(templates)
+    registry = registry_by_claude_id()
     for template_id, expected_roster in _EXPECTED_TEMPLATES.items():
         template = templates[template_id]
         actual = {agent: (a.model, a.effort) for agent, a in template.assignments.items()}
         assert actual == expected_roster, (
             f"template {template_id!r} drifted from the FR2 table: {actual}"
         )
-
-
-def test_balanced_is_the_single_default_template() -> None:
-    """(b): exactly one default template, and it is ``balanced``."""
-    assert default_template().id == "balanced"
-    defaults = [t.id for t in list_templates() if t.default]
-    assert defaults == ["balanced"]
-
-
-def test_no_template_assigns_fable_to_security_reviewer() -> None:
-    """(c): G-1 — Fable is NEVER assigned to security-reviewer, in any template."""
-    for template in list_templates():
-        assert template.assignments["security-reviewer"].model != "claude-fable-5", (
-            f"template {template.id!r} assigns Fable to security-reviewer (G-1 violation)"
-        )
-
-
-def test_every_template_model_is_registry_known_with_expected_tier() -> None:
-    """(d): every template cell's model resolves in REGISTRY with the pinned tier."""
-    registry = registry_by_claude_id()
-    for template in list_templates():
         for agent, assignment in template.assignments.items():
             assert assignment.model in registry, (
                 f"{template.id}/{agent}: model {assignment.model!r} not registry-known"
@@ -181,19 +148,40 @@ def test_every_template_model_is_registry_known_with_expected_tier() -> None:
                 f"{_MODEL_TIER[assignment.model]!r} registry tier"
             )
 
+    assert default_template().id == "balanced"
+    defaults = [t.id for t in list_templates() if t.default]
+    assert defaults == ["balanced"]
+
+
+def test_no_template_assigns_fable_to_security_reviewer() -> None:
+    """(c): G-1 — Fable is NEVER assigned to security-reviewer, in any template."""
+    for template in list_templates():
+        assert template.assignments["security-reviewer"].model != "claude-fable-5", (
+            f"template {template.id!r} assigns Fable to security-reviewer (G-1 violation)"
+        )
+
 
 # ---------------------------------------------------------------------------
 # (e) staged core bodies are model-agnostic; dispatch_band stays numeric+mandatory
 # ---------------------------------------------------------------------------
 
 
-def test_core_agents_carry_numeric_tier_and_pinned_model_effort() -> None:
-    """(e): staged core bodies carry ``dispatch_band`` but NO ``model:``/``effort:``.
+def test_core_and_plugin_agent_frontmatter_tiers() -> None:
+    """(g): roster counts unchanged (9 core, 3 plugin). (e): staged core bodies carry
+    ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
+    pinning moved from per-file frontmatter to the template registry, asserted above;
+    the projected files carry them, the staged sources must not). (f): plugin pack
+    bodies carry ``dispatch_band: 3`` + ``model: claude-sonnet-5`` (registry tier
+    ``plugin``)."""
+    assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
+    assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
+    bodies = _plugin_body_agents()
+    assert {p.stem for p in bodies} == {
+        "frontend-engineer",
+        "design-specialist",
+        "devops-engineer",
+    }, [p.name for p in bodies]
 
-    v0.1.65 FR1: the model/effort pinning moved from per-file frontmatter to the
-    template registry (asserted above); the projected files carry them, the staged
-    sources must not. The test NAME is kept from the v0.1.60/64 contract.
-    """
     seen: set[str] = set()
     for md in _core_agents():
         fm = _frontmatter(md)
@@ -212,13 +200,6 @@ def test_core_agents_carry_numeric_tier_and_pinned_model_effort() -> None:
         seen.add(md.stem)
     assert seen == set(CORE_AGENTS), f"roster/template mismatch: missing {set(CORE_AGENTS) - seen}"
 
-
-# ---------------------------------------------------------------------------
-# (f) plugin pack bodies: dispatch_band 3 + claude-sonnet-5 (tier plugin)
-# ---------------------------------------------------------------------------
-
-
-def test_plugin_agents_carry_tier3_sonnet_plugin_model() -> None:
     registry = registry_by_claude_id()
     for md in _plugin_body_agents():
         fm = _frontmatter(md)

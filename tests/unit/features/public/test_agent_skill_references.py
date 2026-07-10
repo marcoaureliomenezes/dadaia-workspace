@@ -50,15 +50,20 @@ def _parse_frontmatter(path: pathlib.Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def test_agent_skill_references_exist() -> None:
+def test_agent_skill_references_exist_and_problematic_skill_files_have_frontmatter() -> None:
     """Every skill listed in an agent's frontmatter must have a SKILL.md on disk.
 
     Parses all ``.md`` files under ``dadaia_workspace/public/agents/``, extracts
     the ``skills:`` list from each file's YAML frontmatter, and asserts that
     ``dadaia_workspace/public/skills/<name>/SKILL.md`` exists for each entry.
-
     Failure message lists every (agent, missing_skill_path) pair so the fix is
     unambiguous.
+
+    Also (relocated from tests/integration/test_public_assets.py, T-7, v0.1.75): a
+    static frontmatter-shape lint over the runtime-adapter SKILL.md files that
+    currently require it — no fs mutation, no install/stage, pure file-read + string
+    check. The set of checked skills is scoped to files that actually exist in the
+    current public/ surface (agent-surface-reduction removed frontend/design skills).
     """
     agent_files = sorted(_AGENTS_DIR.glob("*.md"))
     assert agent_files, f"No agent .md files found in {_AGENTS_DIR}"
@@ -80,3 +85,22 @@ def test_agent_skill_references_exist() -> None:
         "The following agent skill references point to missing SKILL.md files:\n"
         + "\n".join(broken)
     )
+
+    public_dir = _REPO_ROOT / "dadaia_workspace" / "public"
+    # Only skills that survived the agent-surface-reduction (v0.2.0) are checked.
+    # frontend/design skills (ux-ui-review, design-report-quality-gate, etc.) were
+    # removed from the core install; codex runtime adapters (design-ctx, frontend-ctx)
+    # remain and are checked here.
+    candidate_paths = [
+        public_dir / "runtime" / "codex" / "design-ctx" / "SKILL.md",
+        public_dir / "runtime" / "codex" / "frontend-ctx" / "SKILL.md",
+    ]
+    skill_paths = [p for p in candidate_paths if p.exists()]
+
+    for skill_path in skill_paths:
+        text = skill_path.read_text(encoding="utf-8")
+        assert text.startswith("---\n"), f"{skill_path} must start with YAML frontmatter"
+        assert "\n---\n" in text[4:], f"{skill_path} must close YAML frontmatter"
+        frontmatter = text.split("\n---\n", 1)[0]
+        assert "\nname: " in frontmatter
+        assert "\ndescription: " in frontmatter

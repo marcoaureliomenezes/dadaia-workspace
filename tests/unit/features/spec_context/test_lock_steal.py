@@ -1,10 +1,10 @@
-"""Unit tests for lease.steal — stale vs live lease behavior (T-016-05).
+"""Unit tests for lease.steal — audit logging + absent-record handling (T-016-05).
 
-Acceptance criteria:
-    - Stale record (heartbeat >= TTL ago) → steal returns (True, new_record)
-      with the caller's session_id.
-    - Fresh record (heartbeat < TTL ago via FakeClock) → steal returns
-      (False, existing_record) and the record is unchanged.
+The stale/fresh TTL decision rows are covered by test_lease_pid_liveness.py (the
+gate-side pid-veto decision table) and test_lease_main_probe.py (the CLI-wiring
+proof) — kept there as the single owner to avoid duplicated coverage. This file
+keeps the two facets unique to ``steal`` itself: absence-as-stale creation, and the
+audit trail a successful steal writes.
 """
 
 from __future__ import annotations
@@ -14,10 +14,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.features.spec_context.lease import _record_path, steal
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 class FakeClock:
@@ -67,69 +63,6 @@ def _make_record(
         "heartbeat": now_iso,
         "ttl": ttl,
     }
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
-def test_steal_stale_record_returns_true_with_new_session(tmp_path: Path) -> None:
-    """Stale record (heartbeat >= TTL ago) → steal succeeds, new session_id written."""
-    ws = _make_workspace(tmp_path)
-    ctx = "myctx"
-    ttl = 1800
-
-    # Build a clock and set the heartbeat far in the past
-    clock_now = FakeClock(datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC))
-    stale_heartbeat = clock_now._dt - timedelta(seconds=ttl + 1)  # stale
-
-    old_rec = _make_record(ctx, "old-session", heartbeat=stale_heartbeat, ttl=ttl)
-    # Override heartbeat to the stale time
-    old_rec["heartbeat"] = stale_heartbeat.isoformat()
-    _write_record(ws, ctx, old_rec)
-
-    new_session = "new-sess-001"
-    ok, rec = steal(ws, ctx, new_session, clock=clock_now)
-
-    assert ok is True, f"Expected steal to succeed, got ok={ok}, rec={rec}"
-    assert rec is not None
-    assert rec.get("session_id") == new_session, (
-        f"Expected new session_id={new_session}, got {rec.get('session_id')}"
-    )
-
-    # Record on disk should reflect the new owner
-    stored = json.loads(_record_path(ws, ctx).read_text())
-    assert stored.get("session_id") == new_session
-
-
-def test_steal_fresh_record_returns_false_unchanged(tmp_path: Path) -> None:
-    """Fresh record (heartbeat < TTL ago) → steal refuses, record unchanged."""
-    ws = _make_workspace(tmp_path)
-    ctx = "myctx"
-    ttl = 1800
-
-    # The clock is set such that the heartbeat is 100 seconds old — within TTL.
-    clock_now = FakeClock(datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC))
-    fresh_heartbeat = clock_now._dt - timedelta(seconds=100)  # well within TTL
-
-    old_rec = _make_record(ctx, "live-session", heartbeat=fresh_heartbeat, ttl=ttl)
-    old_rec["heartbeat"] = fresh_heartbeat.isoformat()
-    _write_record(ws, ctx, old_rec)
-
-    new_session = "intruder-sess"
-    ok, rec = steal(ws, ctx, new_session, clock=clock_now)
-
-    assert ok is False, f"Expected steal to be refused, got ok={ok}"
-    assert rec is not None
-    assert rec.get("session_id") == "live-session", (
-        f"Expected original session_id='live-session', got {rec.get('session_id')}"
-    )
-
-    # Record on disk should be unchanged
-    stored = json.loads(_record_path(ws, ctx).read_text())
-    assert stored.get("session_id") == "live-session"
-    assert stored.get("heartbeat") == fresh_heartbeat.isoformat()
 
 
 def test_steal_absent_record_creates_new(tmp_path: Path) -> None:

@@ -68,11 +68,20 @@ def _ctx(tmp_path: Path) -> SpecContext:
     return SpecContext(specs_dir=specs, release_id=_RELEASE)
 
 
-def test_backlog_index_registered() -> None:
+def test_backlog_index_registered_and_does_not_read_body(tmp_path: Path) -> None:
+    """FRONTMATTER-ONLY CONTRACT: this test proves the selector's registration AND the
+    single load-bearing guarantee (the body prose is never leaked)."""
     assert "backlog_index" in known_dynamic_inputs()
 
+    selector = ContextSelector(_ctx(tmp_path))
+    result = selector.select("backlog_index", MaxContextPolicy.SUMMARY)
 
-def test_backlog_index_returns_bound_intents_and_status(tmp_path: Path) -> None:
+    assert "must NEVER be read" not in result.content
+
+
+def test_backlog_index_returns_bound_intents_status_and_excludes_non_items(
+    tmp_path: Path,
+) -> None:
     selector = ContextSelector(_ctx(tmp_path))
     result = selector.select("backlog_index", MaxContextPolicy.SUMMARY)
 
@@ -90,23 +99,11 @@ def test_backlog_index_returns_bound_intents_and_status(tmp_path: Path) -> None:
     assert any("alpha-item.md" in ref for ref in result.refs)
     assert any("beta-item.md" in ref for ref in result.refs)
 
-
-def test_backlog_index_excludes_non_item_files(tmp_path: Path) -> None:
-    selector = ContextSelector(_ctx(tmp_path))
-    result = selector.select("backlog_index", MaxContextPolicy.SUMMARY)
-
-    assert "ideas" not in result.content.lower().replace("candidate", "")
+    # ideas.md/candidates.md/catalog.json are excluded from both content and refs.
+    assert "ideas" not in content.lower().replace("candidate", "")
     assert not any("ideas.md" in ref for ref in result.refs)
     assert not any("candidates.md" in ref for ref in result.refs)
     assert not any("catalog.json" in ref for ref in result.refs)
-
-
-def test_backlog_index_does_not_read_body(tmp_path: Path) -> None:
-    selector = ContextSelector(_ctx(tmp_path))
-    result = selector.select("backlog_index", MaxContextPolicy.SUMMARY)
-
-    # The body prose marker must never leak into a frontmatter-only index.
-    assert "must NEVER be read" not in result.content
 
 
 def test_backlog_index_empty_when_no_backlog(tmp_path: Path) -> None:

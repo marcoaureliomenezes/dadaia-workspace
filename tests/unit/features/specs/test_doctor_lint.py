@@ -54,65 +54,74 @@ class _TimeoutProcessRunner:
         raise TimeoutError("command timed out after 30s")
 
 
-def test_lint1_clean_exit_returns_no_issues(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "stderr", "expected_severity", "expect_no_issue", "message_fragment"),
+    [
+        pytest.param(0, "", "", None, True, None, id="clean-exit-no-issues"),
+        pytest.param(
+            1,
+            "frontmatter invalid",
+            "",
+            Severity.ERROR,
+            False,
+            "frontmatter invalid",
+            id="error-exit-maps-to-error",
+        ),
+        pytest.param(
+            2,
+            "",
+            "token drift",
+            Severity.WARNING,
+            False,
+            "token drift",
+            id="warning-exit-maps-to-warning",
+        ),
+    ],
+)
+def test_lint1_exit_code_severity_mapping(
+    tmp_path: Path,
+    returncode: int,
+    stdout: str,
+    stderr: str,
+    expected_severity: Severity | None,
+    expect_no_issue: bool,
+    message_fragment: str | None,
+) -> None:
     specs = _make_specs_with_memory(tmp_path)
-
-    doctor = MemoryValidator(specs, process_runner=_FakeProcessRunner(returncode=0))
-    assert doctor.check_lint1_memory_atoms() == []
-
-
-def test_lint1_error_exit_maps_to_error(tmp_path: Path) -> None:
-    specs = _make_specs_with_memory(tmp_path)
-
     doctor = MemoryValidator(
         specs,
-        process_runner=_FakeProcessRunner(returncode=1, stdout="frontmatter invalid"),
+        process_runner=_FakeProcessRunner(returncode=returncode, stdout=stdout, stderr=stderr),
     )
     issues = doctor.check_lint1_memory_atoms()
 
+    if expect_no_issue:
+        assert issues == []
+        return
     assert len(issues) == 1
     assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.ERROR
-    assert "frontmatter invalid" in issues[0].description
+    assert issues[0].severity == expected_severity
+    assert message_fragment is not None and message_fragment in issues[0].description
 
 
-def test_lint1_warning_exit_maps_to_warning(tmp_path: Path) -> None:
-    specs = _make_specs_with_memory(tmp_path)
-
-    doctor = MemoryValidator(
-        specs,
-        process_runner=_FakeProcessRunner(returncode=2, stderr="token drift"),
-    )
-    issues = doctor.check_lint1_memory_atoms()
-
-    assert len(issues) == 1
-    assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.WARNING
-    assert "token drift" in issues[0].description
-
-
-def test_lint1_timeout_maps_to_warning(tmp_path: Path) -> None:
-    specs = _make_specs_with_memory(tmp_path)
-
-    doctor = MemoryValidator(specs, process_runner=_TimeoutProcessRunner())
-    issues = doctor.check_lint1_memory_atoms()
-
-    assert len(issues) == 1
-    assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.WARNING
-    assert "timed out" in issues[0].description
-
-
-def test_lint1_missing_script_maps_to_warning(
+def test_lint1_timeout_and_missing_script_degrade_to_warning(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     specs = _make_specs_with_memory(tmp_path)
+
+    # Timeout degrades to a WARNING, never a crash.
+    timeout_issues = MemoryValidator(
+        specs, process_runner=_TimeoutProcessRunner()
+    ).check_lint1_memory_atoms()
+    assert len(timeout_issues) == 1
+    assert timeout_issues[0].code == "LINT-1"
+    assert timeout_issues[0].severity == Severity.WARNING
+    assert "timed out" in timeout_issues[0].description
+
+    # A missing lint script also degrades to a WARNING.
     missing_script = tmp_path / "missing-lint.py"
     monkeypatch.setattr(doctor_module, "_LINT_SCRIPT", missing_script)
-
-    issues = MemoryValidator(specs).check_lint1_memory_atoms()
-
-    assert len(issues) == 1
-    assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.WARNING
-    assert str(missing_script) in issues[0].description
+    missing_issues = MemoryValidator(specs).check_lint1_memory_atoms()
+    assert len(missing_issues) == 1
+    assert missing_issues[0].code == "LINT-1"
+    assert missing_issues[0].severity == Severity.WARNING
+    assert str(missing_script) in missing_issues[0].description

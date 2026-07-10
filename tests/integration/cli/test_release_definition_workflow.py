@@ -149,90 +149,6 @@ def _define(args: list[str]) -> Result:
     )
 
 
-# 1 -- full happy path ------------------------------------------------------
-
-
-def test_full_sequence_reaches_commit_gate_and_advances(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-    _install_fake_factory(monkeypatch)
-
-    result = _define(["--harness", "fake"])
-
-    assert result.exit_code == 0, result.output
-    payload = _payload(result.output)
-    assert payload["status"] == "OK"
-    assert payload["completed"] is True
-    assert payload["final_phase"] == "implementation"
-    steps = payload["steps"]
-    assert isinstance(steps, list)
-    labels = [step["label"] for step in steps]
-    # All 8 model steps + the terminal Python commit gate ran.
-    assert labels == [
-        "release_scope",
-        "spec_create",
-        "spec_arch_review",
-        "spec_qa_review",
-        "plan_create",
-        "plan_review",
-        "tasks_create",
-        "tasks_implementability_review",
-        "definition_commit_gate",
-    ]
-    commit_gate = steps[-1]
-    assert commit_gate["label"] == "definition_commit_gate"
-    assert commit_gate["is_gate"] is True
-    assert commit_gate["accepted"] is True
-
-
-# 2 -- scoped (non-generic) fragment prompts --------------------------------
-
-
-def test_emitted_prompts_are_fragment_scoped_not_generic(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """At least one step prompt carries fragment-sourced content; no generic suffix."""
-    from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    # Build the same workflow the CLI builds and capture the emitted prompt text. (The
-    # JSON envelope omits prompt_text by design; we inspect it via the workflow object,
-    # which is the exact instance the CLI runs.)
-    wf = container.build_release_definition_workflow(
-        workspace,
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        default_runtime_kind=AgentRuntimeKind.FAKE,
-    )
-    outcome = wf.run("scoped-prompt-run")
-
-    scope_step = next(s for s in outcome.steps if s.label == "release_scope")
-    assert scope_step.prompt_text is not None
-    # Fragment-sourced content: the explicit fragment id is present...
-    assert "fragment:release_definition.release_scope" in scope_step.prompt_text
-    # ...along with the coherent worker-output contract (v0.1.32 / D-1): the single
-    # transport schema is the worker emit target via `schema`; the fragment's domain schema
-    # is NOT surfaced as a competing schema-to-emit in the "## Required output" section.
-    required = scope_step.prompt_text[scope_step.prompt_text.index("## Required output") :]
-    assert "agent-run-result-v1" in required
-    assert "release-scope-handoff-v1" not in required
-    # ...and the generic "Run the {label} step for release …" suffix (pipeline.py) never
-    # appears for ANY release-definition step.
-    for step in outcome.steps:
-        if step.prompt_text is None:
-            continue
-        assert f"Run the {step.label} step for release" not in step.prompt_text
-        assert "Run the release-define step" not in step.prompt_text
-    # Sanity: every model step in the sequence emitted a fragment-scoped prompt.
-    model_labels = {s.label for s in _SEQUENCE if s.fragment_id is not None}
-    emitted_with_prompt = {s.label for s in outcome.steps if s.prompt_text is not None}
-    assert model_labels <= emitted_with_prompt
-
-
 # 3 -- rejected review blocks advancement -----------------------------------
 
 
@@ -283,15 +199,42 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
       (a) the SAME step assembles a byte-identical fragment bundle regardless of harness;
       (b) both harnesses pass through the same Python gate logic (both accepted);
       (c) the mixed-harness run completes identically to the single-harness path.
+
+    The single-harness baseline below IS the full happy-path proof (all 8 model steps +
+    terminal Python commit gate, release advances to IMPLEMENTATION) — absorbing the
+    former standalone happy-path test. Fragment-scoped (non-generic) prompt assertions
+    are folded in as this fn already builds workflow objects directly.
     """
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import _SEQUENCE
+
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
     _install_fake_factory(monkeypatch)
 
-    # Single-harness baseline: everything on pi.
+    # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 8
+    # model steps + the terminal Python commit gate ran, release advances to IMPLEMENTATION.
     baseline = _define(["--harness", "pi"])
     assert baseline.exit_code == 0, baseline.output
     baseline_payload = _payload(baseline.output)
+    assert baseline_payload["status"] == "OK"
+    assert baseline_payload["completed"] is True
+    assert baseline_payload["final_phase"] == "implementation"
+    baseline_labels = [step["label"] for step in baseline_payload["steps"]]
+    assert baseline_labels == [
+        "release_scope",
+        "spec_create",
+        "spec_arch_review",
+        "spec_qa_review",
+        "plan_create",
+        "plan_review",
+        "tasks_create",
+        "tasks_implementability_review",
+        "definition_commit_gate",
+    ]
+    baseline_commit_gate = baseline_payload["steps"][-1]
+    assert baseline_commit_gate["label"] == "definition_commit_gate"
+    assert baseline_commit_gate["is_gate"] is True
+    assert baseline_commit_gate["accepted"] is True
 
     # Mixed: release_scope on pi, adjacent spec_create on codex — real --step-harness path.
     mixed = _define(["--harness", "pi", "--step-harness", "spec_create=codex"])
@@ -353,3 +296,27 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert [s["accepted"] for s in mixed_steps] == [s["accepted"] for s in baseline_steps]
     assert mixed_payload["final_phase"] == baseline_payload["final_phase"] == "implementation"
     assert mixed_payload["completed"] is baseline_payload["completed"] is True
+
+    # Scoped (non-generic) fragment prompts: at least one step prompt carries
+    # fragment-sourced content; no generic suffix. Reuses the wf_pi/out_pi run built above.
+    scope_step = next(s for s in out_pi.steps if s.label == "release_scope")
+    assert scope_step.prompt_text is not None
+    # Fragment-sourced content: the explicit fragment id is present...
+    assert "fragment:release_definition.release_scope" in scope_step.prompt_text
+    # ...along with the coherent worker-output contract (v0.1.32 / D-1): the single
+    # transport schema is the worker emit target via `schema`; the fragment's domain schema
+    # is NOT surfaced as a competing schema-to-emit in the "## Required output" section.
+    required = scope_step.prompt_text[scope_step.prompt_text.index("## Required output") :]
+    assert "agent-run-result-v1" in required
+    assert "release-scope-handoff-v1" not in required
+    # ...and the generic "Run the {label} step for release …" suffix (pipeline.py) never
+    # appears for ANY release-definition step.
+    for step in out_pi.steps:
+        if step.prompt_text is None:
+            continue
+        assert f"Run the {step.label} step for release" not in step.prompt_text
+        assert "Run the release-define step" not in step.prompt_text
+    # Sanity: every model step in the sequence emitted a fragment-scoped prompt.
+    model_labels = {s.label for s in _SEQUENCE if s.fragment_id is not None}
+    emitted_with_prompt = {s.label for s in out_pi.steps if s.prompt_text is not None}
+    assert model_labels <= emitted_with_prompt

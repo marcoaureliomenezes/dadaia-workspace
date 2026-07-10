@@ -1,4 +1,9 @@
-"""Unit tests for lifecycle hygiene status service."""
+"""Unit tests for lifecycle hygiene status service.
+
+CRITICAL: v0.1.74 ``canonical_zone_doc`` protection + ``cleanup_candidate_count -
+protected_residual_count`` preflight arithmetic — this release's own regression guard, kept
+verbatim.
+"""
 
 from __future__ import annotations
 
@@ -22,7 +27,13 @@ def _write(path: Path, *, age: dt.timedelta) -> Path:
     return path
 
 
-def test_status_uses_slop_policy_ttls_without_deleting(tmp_path: Path) -> None:
+# --- ① TTL status + explicit-policy + WorkspaceClean-reconciled param, plus
+#       ② unknown top-level dirs + orphan/malformed handoff counting ------------------
+
+
+def test_status_ttl_policy_workspace_clean_reconciled_and_unknown_dirs_orphan_handoffs(
+    tmp_path: Path,
+) -> None:
     old_report = _write(
         tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
         age=dt.timedelta(hours=49),
@@ -62,19 +73,39 @@ def test_status_uses_slop_policy_ttls_without_deleting(tmp_path: Path) -> None:
     assert old_handoff.exists()
     assert old_tmp.exists()
 
+    # An explicit SlopPolicy overrides the defaults.
+    explicit_report = _write(
+        tmp_path / ".dadaia" / "reports" / "ctx2" / "agent" / "old.html",
+        age=dt.timedelta(seconds=11),
+    )
+    policy = SlopPolicy(reports_ttl_seconds=10, handoff_ttl_seconds=60, tmp_ttl_seconds=60)
+    explicit_counters = LifecycleHygieneService(tmp_path, policy=policy, now=NOW).status()
+    assert explicit_counters.expired_totals[HygieneZone.REPORTS] >= 1
+    assert explicit_report.exists()
 
-def test_status_reports_unknown_top_level_dirs(tmp_path: Path) -> None:
-    (tmp_path / ".dadaia" / "reports").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "imgs").mkdir()
-    (tmp_path / ".dadaia" / "references").mkdir()
+    # WorkspaceCleanService's default TTLs are reconciled with the same SlopPolicy.
+    recent_report = _write(
+        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "recent.html",
+        age=dt.timedelta(hours=47),
+    )
+    result = WorkspaceCleanService(tmp_path, now=NOW).clean(dry_run=True)
+    candidate_paths = {candidate.path for candidate in result.candidates}
+    assert old_tmp in candidate_paths
+    assert old_report in candidate_paths
+    assert old_handoff in candidate_paths
+    assert recent_report not in candidate_paths
 
-    counters = LifecycleHygieneService(tmp_path, now=NOW).status()
+    # --- ② unknown top-level dirs + orphan/malformed handoff counting, own workspace ---
+    dirs_ws = tmp_path.parent / (tmp_path.name + "-dirs")
+    (dirs_ws / ".dadaia" / "reports").mkdir(parents=True)
+    (dirs_ws / ".dadaia" / "imgs").mkdir()
+    (dirs_ws / ".dadaia" / "references").mkdir()
 
-    assert counters.unknown_top_level_dirs == ("imgs", "references")
+    dirs_counters = LifecycleHygieneService(dirs_ws, now=NOW).status()
 
+    assert dirs_counters.unknown_top_level_dirs == ("imgs", "references")
 
-def test_status_counts_orphan_and_malformed_handoffs(tmp_path: Path) -> None:
-    handoff_root = tmp_path / ".dadaia" / "handoff" / "ctx"
+    handoff_root = dirs_ws / ".dadaia" / "handoff" / "ctx"
     handoff_root.mkdir(parents=True)
     (handoff_root / "orphan.handoff.json").write_text(
         json.dumps({"artifact": {"path": ".dadaia/reports/ctx/missing.html"}}),
@@ -94,50 +125,10 @@ def test_status_counts_orphan_and_malformed_handoffs(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    counters = LifecycleHygieneService(tmp_path, now=NOW).status()
+    counters = LifecycleHygieneService(dirs_ws, now=NOW).status()
 
     assert counters.orphan_handoff_count == 1
     assert counters.malformed_handoff_count == 3
-
-
-def test_workspace_clean_default_ttls_are_reconciled_to_slop_policy(tmp_path: Path) -> None:
-    old_tmp = _write(
-        tmp_path / ".dadaia" / "tmp" / "workflow" / "old.txt",
-        age=dt.timedelta(hours=25),
-    )
-    old_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
-        age=dt.timedelta(hours=49),
-    )
-    old_handoff = _write(
-        tmp_path / ".dadaia" / "handoff" / "ctx" / "old.handoff.json",
-        age=dt.timedelta(hours=25),
-    )
-    recent_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "recent.html",
-        age=dt.timedelta(hours=47),
-    )
-
-    result = WorkspaceCleanService(tmp_path, now=NOW).clean(dry_run=True)
-    candidate_paths = {candidate.path for candidate in result.candidates}
-
-    assert old_tmp in candidate_paths
-    assert old_report in candidate_paths
-    assert old_handoff in candidate_paths
-    assert recent_report not in candidate_paths
-
-
-def test_lifecycle_hygiene_accepts_explicit_policy(tmp_path: Path) -> None:
-    old_report = _write(
-        tmp_path / ".dadaia" / "reports" / "ctx" / "agent" / "old.html",
-        age=dt.timedelta(seconds=11),
-    )
-    policy = SlopPolicy(reports_ttl_seconds=10, handoff_ttl_seconds=60, tmp_ttl_seconds=60)
-
-    counters = LifecycleHygieneService(tmp_path, policy=policy, now=NOW).status()
-
-    assert counters.expired_totals[HygieneZone.REPORTS] == 1
-    assert old_report.exists()
 
 
 def test_zone_doc_agents_md_is_canonical_never_unprotected(tmp_path: Path) -> None:
@@ -177,3 +168,100 @@ def test_zone_doc_agents_md_is_canonical_never_unprotected(tmp_path: Path) -> No
     assert agents_handoff.exists()
     assert agents_tmp.exists()
     assert not stale_sibling.exists()
+
+
+# ---------------------------------------------------------------------------
+# Relocated from tests/integration/test_lifecycle_hygiene_snapshot.py (T-7, v0.1.75):
+# to_dict/from_dict schema roundtrip — unit-level serialization, no fs/subprocess.
+# ---------------------------------------------------------------------------
+
+
+def _write_with_content(path: Path, *, age: dt.timedelta, content: str = "content") -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    timestamp = (NOW - age).timestamp()
+    os.utime(path, (timestamp, timestamp))
+    return path
+
+
+def test_hygiene_snapshot_json_schema_round_trips_with_candidates(tmp_path: Path) -> None:
+    from dadaia_workspace.core.models.hygiene import HygieneSnapshot
+
+    report_ref = ".dadaia/reports/dadaia-workspace/qa/old.html"
+    _write_with_content(
+        tmp_path / report_ref,
+        age=dt.timedelta(hours=72),
+        content="<html><body>old review</body></html>",
+    )
+    _write_with_content(
+        tmp_path / ".dadaia" / "handoff" / "dadaia-workspace" / "qa-review.handoff.json",
+        age=dt.timedelta(hours=72),
+        content=json.dumps(
+            {
+                "context": "dadaia-workspace",
+                "release_id": "v0.1.15",
+                "run_id": "run-015",
+                "agent": "qa-engineer",
+                "verdict": "APPROVED",
+                "artifact": {"path": report_ref},
+            }
+        ),
+    )
+    _write_with_content(
+        tmp_path / ".dadaia" / "tmp" / "workflow" / "old.txt",
+        age=dt.timedelta(hours=72),
+    )
+
+    service = LifecycleHygieneService(
+        tmp_path,
+        now=NOW,
+        active_release_id="v0.1.15",
+    )
+    cleanup = service.cleanup(dry_run=True)
+    snapshot = HygieneSnapshot(
+        schema_version="hygiene-snapshot-v1",
+        timestamp=NOW.isoformat().replace("+00:00", "Z"),
+        context="dadaia-workspace",
+        release_id="v0.1.15",
+        run_id="run-015",
+        policy=service.policy,
+        counters=service.status(),
+        candidates=cleanup.candidates,
+    )
+
+    payload = snapshot.to_dict()
+    restored = HygieneSnapshot.from_dict(payload)
+
+    assert set(payload) == {
+        "schema_version",
+        "timestamp",
+        "context",
+        "release_id",
+        "run_id",
+        "policy",
+        "counters",
+        "candidates",
+    }
+    assert payload["schema_version"] == "hygiene-snapshot-v1"
+    assert payload["context"] == "dadaia-workspace"
+    assert payload["release_id"] == "v0.1.15"
+    assert payload["run_id"] == "run-015"
+    assert payload["policy"] == service.policy.to_dict()
+    assert payload["counters"]["zone_totals"] == {
+        "reports": 1,
+        "handoff": 1,
+        "tmp": 1,
+    }
+    assert payload["counters"]["expired_totals"] == {
+        "reports": 1,
+        "handoff": 1,
+        "tmp": 1,
+    }
+    assert payload["counters"]["cleanup_candidate_count"] == 3
+    assert payload["counters"]["protected_residual_count"] == 2
+    assert isinstance(payload["counters"]["scan_elapsed_ms"], int)
+    assert payload["counters"]["scan_elapsed_ms"] >= 0
+    assert len(payload["candidates"]) == 3
+    assert any(candidate["protected"] is True for candidate in payload["candidates"])
+    assert any(candidate["zone"] == HygieneZone.TMP.value for candidate in payload["candidates"])
+    assert restored == snapshot

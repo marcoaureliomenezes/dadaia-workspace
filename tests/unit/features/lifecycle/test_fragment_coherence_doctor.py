@@ -78,25 +78,25 @@ class _SabotagedLoader(FragmentLoader):
 
 
 # ---------------------------------------------------------------------------
-# AC-5 — green on the current tree; RED-first on a sabotaged main fragment
+# AC-5 — green on the current tree (persona_doctor stays green, never re-implemented)
 # ---------------------------------------------------------------------------
 
 
-def test_ac5_doctor_green_on_current_tree() -> None:
-    report = run_fragment_coherence_doctor()
-    assert report.ok is True
-    assert [f for f in report.findings if f.severity is Severity.ERROR] == []
+# ---------------------------------------------------------------------------
+# ① AC-5 RED-first — unregistered input on selector-wired main fires FRAG-COH-2
+# ---------------------------------------------------------------------------
+
+
+def test_ac5_doctor_green_on_current_tree_and_red_first_sabotaged_loader() -> None:
+    clean_report = run_fragment_coherence_doctor()
+    assert clean_report.ok is True
+    assert [f for f in clean_report.findings if f.severity is Severity.ERROR] == []
     # the ~inert shared/implementation inputs are FRAG-COH-2 WARN (not ERROR).
-    warns = [f for f in report.findings if f.code is FragCohCode.FRAG_COH_2]
+    warns = [f for f in clean_report.findings if f.code is FragCohCode.FRAG_COH_2]
     assert warns and all(f.severity is Severity.WARNING for f in warns)
-
-
-def test_ac5_persona_doctor_stays_green_and_untouched() -> None:
     # The coherence doctor does NOT re-implement or modify persona_doctor.
     assert persona_doctor.check_persona_resolution().ok is True
 
-
-def test_ac5_red_first_unregistered_input_on_selector_wired_main_fires_frag_coh_2() -> None:
     report = run_fragment_coherence_doctor(loader=_SabotagedLoader())
     assert report.ok is False
     coh2_errors = [
@@ -116,7 +116,7 @@ def test_ac5_red_first_unregistered_input_on_selector_wired_main_fires_frag_coh_
 
 
 # ---------------------------------------------------------------------------
-# FRAG-COH-1 / FRAG-COH-3 / FRAG-COH-4 unit bites
+# ② FRAG-COH-1 / FRAG-COH-3 / FRAG-COH-4 bite param
 # ---------------------------------------------------------------------------
 
 
@@ -146,52 +146,54 @@ class _StaticLoader(FragmentLoader):
         return list(self._fragments)
 
 
-def test_frag_coh_1_unmapped_role_fires_error() -> None:
-    loader = _StaticLoader([_fragment(id="fixture.bad", role="no-such-role")])
-    report = run_fragment_coherence_doctor(loader=loader)
-    coh1 = [f for f in report.findings if f.code is FragCohCode.FRAG_COH_1]
+def test_frag_coh_1_3_4_bites(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FRAG-COH-1 (unmapped role -> ERROR; shared/python roles pass), FRAG-COH-3 (orphan
+    fragment -> WARN, never ERROR), and FRAG-COH-4 (ROLE_ATOM_MAP drift -> ERROR) share the
+    ``_StaticLoader``/monkeypatch fixture shape — one bite table."""
+    bad = run_fragment_coherence_doctor(
+        loader=_StaticLoader([_fragment(id="fixture.bad", role="no-such-role")])
+    )
+    coh1 = [f for f in bad.findings if f.code is FragCohCode.FRAG_COH_1]
     assert coh1 and coh1[0].severity is Severity.ERROR
     assert "no-such-role" in coh1[0].message
-    assert report.ok is False
+    assert bad.ok is False
 
-
-def test_frag_coh_1_shared_and_python_roles_pass() -> None:
-    loader = _StaticLoader(
-        [_fragment(id="fixture.s", role="shared"), _fragment(id="fixture.p", role="python")]
+    ok = run_fragment_coherence_doctor(
+        loader=_StaticLoader(
+            [_fragment(id="fixture.s", role="shared"), _fragment(id="fixture.p", role="python")]
+        )
     )
-    report = run_fragment_coherence_doctor(loader=loader)
-    assert [f for f in report.findings if f.code is FragCohCode.FRAG_COH_1] == []
+    assert [f for f in ok.findings if f.code is FragCohCode.FRAG_COH_1] == []
 
-
-def test_frag_coh_3_orphan_fragment_warns() -> None:
     # a non-shared fragment bound to no workflow step → orphan WARN (never an ERROR).
-    loader = _StaticLoader([_fragment(id="fixture.orphan", role="product-engineer")])
-    report = run_fragment_coherence_doctor(loader=loader)
-    coh3 = [f for f in report.findings if f.code is FragCohCode.FRAG_COH_3]
+    orphan_report = run_fragment_coherence_doctor(
+        loader=_StaticLoader([_fragment(id="fixture.orphan", role="product-engineer")])
+    )
+    coh3 = [f for f in orphan_report.findings if f.code is FragCohCode.FRAG_COH_3]
     assert coh3 and all(f.severity is Severity.WARNING for f in coh3)
     assert any("orphan" in f.message for f in coh3)
 
-
-def test_frag_coh_4_map_drift_fires_error(monkeypatch: pytest.MonkeyPatch) -> None:
     # Point qa-engineer's mapped atom at a path the canonical oracle does NOT seed → every
     # covered qa-engineer step's atom is absent from its injected refs → FRAG-COH-4 ERROR
     # (the mechanical grounding proof bites; ambient-tree-independent).
     monkeypatch.setitem(role_atoms.ROLE_ATOM_MAP, "qa-engineer", "memory/does-not-exist.md")
-    report = run_fragment_coherence_doctor()
-    coh4 = [f for f in report.findings if f.code is FragCohCode.FRAG_COH_4]
+    drift_report = run_fragment_coherence_doctor()
+    coh4 = [f for f in drift_report.findings if f.code is FragCohCode.FRAG_COH_4]
     assert coh4 and all(f.severity is Severity.ERROR for f in coh4)
     assert any("does-not-exist.md" in f.message for f in coh4)
-    assert report.ok is False
+    assert drift_report.ok is False
 
 
 # ---------------------------------------------------------------------------
-# W2 boundary — FRAG-COH-4 scope EXCLUDES backlog_definition; FRAG-COH-2 INCLUDES it
+# ③ W2 boundary scopes + sel_constitution static-input + write_set_guidance indirection
 # ---------------------------------------------------------------------------
 
 
-def test_fr2_covered_scope_excludes_backlog_definition() -> None:
+def test_w2_boundary_and_sel_constitution_indirection(tmp_path: Path) -> None:
+    # W2 boundary: FRAG-COH-4's covered scope EXCLUDES backlog_definition (mixin-only, no
+    # _run_model_step); FRAG-COH-2's selector-wired scope INCLUDES it.
     covered = fcd._fr2_covered_sequences()
-    assert "backlog_definition" not in covered  # mixin-only, no _run_model_step (W2 boundary)
+    assert "backlog_definition" not in covered
     assert set(covered) == {
         "release_definition",
         "audit",
@@ -200,8 +202,6 @@ def test_fr2_covered_scope_excludes_backlog_definition() -> None:
         "pipeline",
     }
 
-
-def test_selector_wired_scope_includes_backlog_definition() -> None:
     wired = fcd._selector_wired_sequences()
     assert "backlog_definition" in wired  # its main-fragment inputs ARE resolved (assembly mixin)
     main_ids = fcd._selector_wired_main_fragment_ids()
@@ -209,18 +209,9 @@ def test_selector_wired_scope_includes_backlog_definition() -> None:
     # the selector-less implementation.* pipeline fragments are NOT selector-wired mains.
     assert "implementation.qa_review" not in main_ids
 
-
-# ---------------------------------------------------------------------------
-# sel_constitution decision (A4) — kept registered + both paths intact
-# ---------------------------------------------------------------------------
-
-
-def test_sel_constitution_registered() -> None:
-    # NOT dead: the selector stays registered under its named-atom key.
+    # sel_constitution (A4) — NOT dead: the selector stays registered under its named-atom key.
     assert "constitution.md" in known_dynamic_inputs()
 
-
-def test_spec_create_static_constitution_injection_intact(tmp_path: Path) -> None:
     specs = _seed_specs(tmp_path)
     # spec_create declares specs/constitution.md as a static input (the DIRECT path).
     fragment = FragmentLoader().load_fragment(_SPEC_CREATE)
@@ -231,11 +222,7 @@ def test_spec_create_static_constitution_injection_intact(tmp_path: Path) -> Non
     assert resolved.present is True
     assert "# Constitution" in resolved.content
 
-
-def test_write_set_guidance_indirection_reaches_constitution(tmp_path: Path) -> None:
     # The INDIRECT chain (A4): write_set_guidance → sel_write_set_guidance → sel_constitution.
-    specs = _seed_specs(tmp_path)
-    selector = ContextSelector(SpecContext(specs_dir=specs, release_id="v0.1.57"))
     result = selector.select("write_set_guidance", MaxContextPolicy.SUMMARY)
     # resolves through sel_constitution to the constitution.md ref (never mistaken for dead).
     assert result.refs == ("specs/constitution.md",)

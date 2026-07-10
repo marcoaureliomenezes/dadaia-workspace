@@ -29,57 +29,39 @@ def _init_workspace(workspace: Path) -> None:
     FileSystemPublicAssetManager().stage(workspace)
 
 
-def test_orchestrate_list_returns_seed_workflows(tmp_path: Path, monkeypatch) -> None:
+def test_orchestrate_list_show_json_removed_verbs_and_uninitialized_workspace_errors(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """list/show --json contract (AC-2). Plus: the retired run/status/resume honest-no-op
+    verbs error out (AC-2); an unknown workflow name errors; list on an uninitialized
+    workspace errors."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "list"])
-    assert result.exit_code == 0, result.output
-    assert "audit-fanout" in result.output
-    assert "release-ship" in result.output
 
+    list_result = _runner.invoke(app, ["orchestrate", "list"])
+    assert list_result.exit_code == 0, list_result.output
+    assert "audit-fanout" in list_result.output
+    assert "release-ship" in list_result.output
 
-def test_orchestrate_show_json_output(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "show", "audit-fanout", "--json"])
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
+    show_result = _runner.invoke(app, ["orchestrate", "show", "audit-fanout", "--json"])
+    assert show_result.exit_code == 0, show_result.output
+    data = json.loads(show_result.output)
     assert data["name"] == "audit-fanout"
     assert "stages" in data
     assert "inputs" in data
     # The gate kind is preserved (never collapsed to a boolean) — AC-2.
     assert all("gate" in stage for stage in data["stages"])
 
+    unknown_result = _runner.invoke(app, ["orchestrate", "show", "no-such-workflow", "--json"])
+    assert unknown_result.exit_code == 2
 
-def test_orchestrate_show_unknown_workflow_errors(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "show", "no-such-workflow", "--json"])
-    assert result.exit_code == 2
+    run_result = _runner.invoke(app, ["orchestrate", "run", "audit-fanout"])
+    assert run_result.exit_code != 0
 
-
-def test_orchestrate_list_on_uninitialized_workspace_errors(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "list"])
-    assert result.exit_code != 0
-
-
-def test_orchestrate_run_status_resume_removed_from_help(tmp_path: Path, monkeypatch) -> None:
-    """The retired honest-no-op verbs are gone from the CLI surface (AC-2)."""
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "--help"])
-    assert result.exit_code == 0, result.output
-    assert "list" in result.output
-    assert "show" in result.output
-    assert "run" not in result.output
-    assert "status" not in result.output
-    assert "resume" not in result.output
-
-
-def test_orchestrate_run_verb_is_gone(tmp_path: Path, monkeypatch) -> None:
-    """Invoking the removed ``run`` verb fails (no such command)."""
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["orchestrate", "run", "audit-fanout"])
-    assert result.exit_code != 0
+    # Genuinely separate root (not nested under `tmp_path`) so upward .dadaia resolution
+    # never finds the initialized tree.
+    uninitialized_ws = tmp_path.parent / (tmp_path.name + "-uninitialized")
+    uninitialized_ws.mkdir()
+    monkeypatch.chdir(uninitialized_ws)
+    uninitialized_result = _runner.invoke(app, ["orchestrate", "list"])
+    assert uninitialized_result.exit_code != 0

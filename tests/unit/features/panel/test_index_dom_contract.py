@@ -5,34 +5,22 @@ This is the **index-HTML behavior lock** for the v0.1.59 Panel UX Overhaul. The
 it does NOT cover the index page. This module fills that gap: it renders the REAL index
 via ``render_index`` over fixed, POPULATED fakes and asserts the presence of the full
 e2e selector contract (the same selectors the GH-only Playwright suite keys on), so that
-a dropped selector fails loudly in unit CI *before* the SSR-HTML restyle (W2–W6) touches
-anything.
+a dropped selector fails loudly in unit CI *before* an SSR-HTML restyle touches anything.
 
 Contract character (Q5 — NEVER re-baselined this release):
   This is a **presence-invariant** contract test, not a byte-golden. It survives an
-  intentional restyle because it asserts *selector presence*, not markup bytes. It is
-  **NEVER re-baselined in v0.1.59** (symmetric with Ruling C for the api-golden): any
+  intentional restyle because it asserts *selector presence*, not markup bytes. Any
   wave that must change one of the asserted selectors is a STOP-and-rescope declared on
-  that wave's AC-11 ledger line — never a silent edit here. By design FR2–FR6 rename
-  none of the asserted selectors, so this lock should never move.
+  that wave's AC-11 ledger line — never a silent edit here.
 
-Fixture (A3 — the fakes MUST render the data-dependent selectors):
-  ``.memory-chip`` / ``.context-card`` / ``.card-zone-*`` / ``.card-name`` are emitted
-  ONLY by ``_render_context_card``, run once per context. The fixed fakes therefore
-  include **≥1 SpecContextProject** (+ ≥1 server row), modelled on
-  ``test_views_index._make_context`` / ``_build_service`` — NOT the empty
-  ``test_security_headers._render_index_html`` fake (whose ``list_all()`` returns ``[]``,
-  rendering zero cards, so ``.memory-chip`` would never render and the lock would
-  silently drop that assertion). We reuse only the render *mechanics*, never an empty
-  fixture. The unconditional selectors (6 tabs/sections, ``.nav-tab``, theme + runtime
-  switchers) render with any fake; only the card selectors need the populated context.
+FR4 (v0.1.75): the primary tab list is single-sourced in
+``conftest.PANEL_PRIMARY_TABS`` — this module consumes it instead of a private
+hardcoded list, so a v0.1.77 tab change edits ONE list.
 
-Relation to test_views_index.py (A4/Q6 — CONSOLIDATES, does not replace):
-  ``test_views_index.py`` already partially locks the index HTML (tab ids + labels + the
-  active default; the 6 tabpanels; the section marker strings; the 5 memory chips + card
-  zones; the ``/static/*`` links). This module CONSOLIDATES those into one e2e-selector
-  presence invariant — it does NOT replace ``test_views_index.py``, which SURVIVES
-  unchanged.
+Three survivors, the sole selector-presence lock for the index page:
+  1. tabs + sections + nav-tab param (walks conftest.PANEL_PRIMARY_TABS).
+  2. Populated-context card selectors (.memory-chip / .context-card / zones).
+  3. Theme cluster + runtime switcher values (mint/sage/warm; claude/codex/pi).
 """
 
 from __future__ import annotations
@@ -46,13 +34,9 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
+from .conftest import PANEL_PRIMARY_TAB_SLUGS
+
 pytestmark = pytest.mark.unit
-
-
-# ---------------------------------------------------------------------------
-# Fakes + populated fixture (modelled on test_views_index._make_context /
-# _build_service — A3; NEVER the empty test_security_headers fake).
-# ---------------------------------------------------------------------------
 
 
 class _FakeServerRegistryService:
@@ -104,7 +88,7 @@ def _make_entry(port: int, project: str) -> tuple[PortEntry, PortStatus]:
 
 
 def _render_populated_index() -> str:
-    """Render the real index over ≥1 SpecContextProject + ≥1 server row.
+    """Render the real index over >=1 SpecContextProject + >=1 server row.
 
     ``workspace_root`` is a fixed literal path (NOT resolved from cwd) so the render
     never reads host state — v0.1.58 golden law.
@@ -138,51 +122,38 @@ def _theme_switcher_fragment(html: str) -> str:
     return html[start:end]
 
 
-# ---------------------------------------------------------------------------
-# The 6-tab / 6-section nav contract (Ruling A — the nav set is pinned).
-# ---------------------------------------------------------------------------
-
-_SECTIONS = ["memories", "workflows", "subagents", "sessions", "reports", "academy", "servers"]
-
-
 @pytest.fixture(scope="module")
 def index_html() -> str:
     return _render_populated_index()
 
 
-@pytest.mark.parametrize("section", _SECTIONS)
-def test_tab_id_and_data_section_present(index_html: str, section: str) -> None:
-    """Every one of the 6 nav tabs is present with its id AND its data-section attr."""
+# ---------------------------------------------------------------------------
+# 1. tabs + sections + nav-tab param (single-sourced via conftest)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("section", PANEL_PRIMARY_TAB_SLUGS)
+def test_tab_and_section_present(index_html: str, section: str) -> None:
+    """Every primary tab renders its nav id, data-section attr, and #section-* tabpanel;
+    the .nav-tab selector (the styled control the e2e keys on) is present."""
     assert f'id="tab-{section}"' in index_html, f"missing tab id tab-{section}"
     assert f'data-section="{section}"' in index_html, f"missing data-section={section}"
-
-
-@pytest.mark.parametrize("section", _SECTIONS)
-def test_section_panel_present(index_html: str, section: str) -> None:
-    """Every one of the 6 #section-* tabpanels is present in the rendered index."""
     assert f'id="section-{section}"' in index_html, f"missing #section-{section}"
-
-
-def test_nav_tab_class_present(index_html: str) -> None:
-    """The .nav-tab selector (the styled control the e2e keys on) is present."""
     assert 'class="nav-tab' in index_html
 
 
 # ---------------------------------------------------------------------------
-# Data-dependent card selectors — require the POPULATED context fixture (A3).
+# 2. Populated-context card selectors
 # ---------------------------------------------------------------------------
 
 
-def test_memory_chip_present_with_populated_context(index_html: str) -> None:
-    """.memory-chip renders ONLY when ≥1 context card renders (A3 fixture guard)."""
+def test_populated_context_card_selectors(index_html: str) -> None:
+    """.memory-chip and the .context-card anatomy render only with >=1 populated context
+    (A3 fixture guard — do NOT use an empty fixture here)."""
     assert 'class="memory-chip"' in index_html, (
-        ".memory-chip absent — the fixture must carry ≥1 SpecContextProject so "
-        "_render_context_card runs (do NOT use the empty test_security_headers fake)"
+        ".memory-chip absent — the fixture must carry >=1 SpecContextProject so "
+        "_render_context_card runs"
     )
-
-
-def test_context_card_and_zones_present(index_html: str) -> None:
-    """The context card anatomy (.context-card + .card-zone-* + .card-name) renders."""
     assert 'class="context-card"' in index_html
     assert 'class="card-name"' in index_html
     for zone in ("card-zone-a", "card-zone-b", "card-zone-c", "card-zone-d"):
@@ -190,51 +161,24 @@ def test_context_card_and_zones_present(index_html: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Theme switcher cluster (theme-switcher.spec.ts contract).
+# 3. Theme cluster + runtime switcher values
 # ---------------------------------------------------------------------------
 
 
-def test_theme_button_in_topbar_with_haspopup(index_html: str) -> None:
-    """#theme-btn lives in the .topbar and advertises aria-haspopup="menu"."""
+def test_theme_and_runtime_clusters(index_html: str) -> None:
     topbar = _topbar_fragment(index_html)
     assert 'id="theme-btn"' in topbar, "#theme-btn must render inside .topbar"
     assert 'aria-haspopup="menu"' in topbar, "#theme-btn must carry aria-haspopup=menu"
 
-
-def test_theme_menu_is_role_menu(index_html: str) -> None:
-    """#theme-menu is present and carries role="menu"."""
-    fragment = _theme_switcher_fragment(index_html)
-    assert 'id="theme-menu"' in fragment
-    assert 'role="menu"' in fragment
-
-
-@pytest.mark.parametrize("value", ["mint", "sage", "warm"])
-def test_three_theme_values_present(index_html: str, value: str) -> None:
-    """The three [data-theme-value] menu items (mint/sage/warm) are present."""
-    assert f'data-theme-value="{value}"' in index_html, f"missing data-theme-value={value}"
-
-
-def test_theme_swatch_dot_present(index_html: str) -> None:
-    """The .theme-swatch-dot swatch (per menu item) renders."""
+    theme_fragment = _theme_switcher_fragment(index_html)
+    assert 'id="theme-menu"' in theme_fragment
+    assert 'role="menu"' in theme_fragment
     assert 'class="theme-swatch-dot' in index_html
 
+    for value in ("mint", "sage", "warm"):
+        assert f'data-theme-value="{value}"' in index_html, f"missing data-theme-value={value}"
 
-# ---------------------------------------------------------------------------
-# Runtime switcher (rendered inside the Sessions section — sessions.py).
-# ---------------------------------------------------------------------------
-
-
-def test_runtime_switcher_present(index_html: str) -> None:
-    """The .runtime-switcher radiogroup renders in the Sessions section."""
     assert 'class="runtime-switcher"' in index_html
-
-
-def test_runtime_buttons_present(index_html: str) -> None:
-    """The .runtime-btn controls render."""
     assert 'class="runtime-btn' in index_html
-
-
-@pytest.mark.parametrize("value", ["claude", "codex", "pi"])
-def test_runtime_values_present(index_html: str, value: str) -> None:
-    """Each [data-runtime-value] (claude/codex/pi) is present."""
-    assert f'data-runtime-value="{value}"' in index_html, f"missing data-runtime-value={value}"
+    for value in ("claude", "codex", "pi"):
+        assert f'data-runtime-value="{value}"' in index_html, f"missing data-runtime-value={value}"

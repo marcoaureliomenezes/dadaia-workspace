@@ -5,7 +5,8 @@ The two lifecycle emitters (``LifecyclePreflightService.blocked_push_preflight``
 populated from the run's recorded ``InjectedContext`` refs (deduplicated, order kept).
 When zero refs are available the role→atom map is the fallback; when THAT is also
 empty the emitter falls back to an HONEST ``handoff-v1.1`` (ADR-5 — the only
-sanctioned v1.1 emission; never a v1.2 with empty or fabricated refs).
+sanctioned v1.1 emission; never a v1.2 with empty or fabricated refs). ADR-5
+never-fabricate-self_pull must survive as named cases.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFileKind, RuntimeFileRef
+from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
 from dadaia_workspace.features.lifecycle.service import (
     LifecyclePreflightService,
     resolve_emitted_handoff_version,
@@ -76,15 +78,17 @@ def test_blocked_push_emits_v12_with_deduped_injected_refs() -> None:
     }
 
 
-def test_blocked_push_zero_refs_falls_back_to_honest_v11() -> None:
-    """ADR-5: agent 'lifecycle' is unmapped — zero refs must yield honest v1.1."""
+# --- ① honest-v1.1 fallback matrix: zero-refs / role-map-atom-present / atom-absent / -----
+#     unmapped / blank-refs-never-fabricated
+
+
+def test_honest_v11_fallback_matrix(tmp_path: Path) -> None:
+    # zero-refs (unmapped agent 'lifecycle' via the service) -> honest v1.1, no self_pull.
     payload = _emit_blocked_push(_FakeRuntimeFiles())
     assert payload["schema_version"] == "handoff-v1.1"
     assert "self_pull" not in payload
 
-
-def test_resolver_role_map_fallback_requires_existing_atom(tmp_path: Path) -> None:
-    """Zero injected refs + mapped role + atom on disk → v1.2 via the role map."""
+    # role-map-atom-present: mapped role + atom on disk -> v1.2 via the role map.
     specs_dir = tmp_path / "specs"
     (specs_dir / "memory").mkdir(parents=True)
     (specs_dir / "memory" / "architecture.md").write_text("# arch", encoding="utf-8")
@@ -94,46 +98,40 @@ def test_resolver_role_map_fallback_requires_existing_atom(tmp_path: Path) -> No
     assert version == "handoff-v1.2"
     assert self_pull == {"refs": ["specs/memory/architecture.md"]}
 
-
-def test_resolver_role_map_fallback_missing_atom_is_honest_v11(tmp_path: Path) -> None:
-    """Mapped role but atom absent on disk → never fabricate; honest v1.1."""
-    version, self_pull = resolve_emitted_handoff_version(
+    # atom-absent: mapped role but atom absent on disk -> never fabricate; honest v1.1.
+    missing_version, missing_self_pull = resolve_emitted_handoff_version(
         agent="software-architect", injected_refs=(), specs_dir=tmp_path
     )
-    assert version == "handoff-v1.1"
-    assert self_pull is None
+    assert missing_version == "handoff-v1.1"
+    assert missing_self_pull is None
 
-
-def test_resolver_unmapped_agent_no_specs_dir_is_honest_v11() -> None:
-    version, self_pull = resolve_emitted_handoff_version(
+    # unmapped agent, no specs_dir -> honest v1.1.
+    unmapped_version, unmapped_self_pull = resolve_emitted_handoff_version(
         agent="lifecycle", injected_refs=(), specs_dir=None
     )
-    assert version == "handoff-v1.1"
-    assert self_pull is None
+    assert unmapped_version == "handoff-v1.1"
+    assert unmapped_self_pull is None
 
-
-def test_resolver_never_emits_v12_with_empty_refs() -> None:
-    """Empty/blank injected refs never produce a fabricated v1.2 self_pull."""
-    version, self_pull = resolve_emitted_handoff_version(
+    # blank-refs-never-fabricated: empty/whitespace injected refs never produce a
+    # fabricated v1.2 self_pull.
+    blank_version, blank_self_pull = resolve_emitted_handoff_version(
         agent="lifecycle", injected_refs=("", "  "), specs_dir=None
     )
-    assert version == "handoff-v1.1"
-    assert self_pull is None
+    assert blank_version == "handoff-v1.1"
+    assert blank_self_pull is None
+
+
+# --- ② gate accept-set widened param + reject-unknown-token --------------------------
 
 
 @pytest.mark.parametrize("token", ["handoff-v1", "handoff-v1.1", "handoff-v1.2"])
 def test_gates_accept_set_widened(token: str) -> None:
-    """FR3 accept-set widening: gates accept {v1, v1.1, v1.2}."""
-    from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
-
+    """FR3 accept-set widening: gates accept {v1, v1.1, v1.2}; an unknown token outside
+    that set is still rejected."""
     reasons: list[str] = []
     HandoffGateValidator()._schema_version({"schema_version": token}, reasons)
     assert reasons == []
 
-
-def test_gates_reject_unknown_token() -> None:
-    from dadaia_workspace.features.lifecycle.gates import HandoffGateValidator
-
-    reasons: list[str] = []
-    HandoffGateValidator()._schema_version({"schema_version": "handoff-v1.3"}, reasons)
-    assert reasons == ["malformed schema_version"]
+    unknown_reasons: list[str] = []
+    HandoffGateValidator()._schema_version({"schema_version": "handoff-v1.3"}, unknown_reasons)
+    assert unknown_reasons == ["malformed schema_version"]

@@ -93,8 +93,10 @@ def _file_io_offenses(source: str) -> list[tuple[int, str]]:
     return offenses
 
 
-def test_core_modules_outside_authorized_set_do_no_file_io() -> None:
-    """No unauthorized ``core/`` module performs file I/O (the ratchet is GREEN)."""
+def test_core_file_io_purity_ratchet_and_authorized_set_grounded() -> None:
+    """No unauthorized ``core/`` module performs file I/O (the ratchet is GREEN), and
+    every authorized stem names a real ``core/`` module (no stale exception — a stem
+    that no longer maps to a file would silently widen the exception surface)."""
     violations: list[str] = []
     for module in _core_modules():
         if module.stem in _AUTHORIZED_STEMS:
@@ -111,14 +113,6 @@ def test_core_modules_outside_authorized_set_do_no_file_io() -> None:
         "rationale in specs/memory/architecture.md — never let it in by accident."
     )
 
-
-def test_authorized_set_is_grounded_in_reality() -> None:
-    """Every authorized stem must name a real ``core/`` module (no stale exception).
-
-    A stem that no longer maps to a file would silently widen the exception surface, so pin
-    the authorized set to the tree: if an authorized module is relocated out of ``core/``
-    (R7 work), this fails and forces the set to shrink in the same change.
-    """
     present = {m.stem for m in _core_modules()}
     stale = sorted(_AUTHORIZED_STEMS - present)
     assert not stale, (

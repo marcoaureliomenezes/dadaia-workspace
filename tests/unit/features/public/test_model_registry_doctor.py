@@ -31,48 +31,7 @@ def _has_error(reports: list[str]) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 1. Unknown-model fixture ⇒ error
-# ---------------------------------------------------------------------------
-
-
-def test_unknown_model_in_agent_frontmatter_errors(tmp_path: Path) -> None:
-    public_dir = tmp_path / "public"
-    _write_agent(public_dir / "agents", "ghost-agent", "claude-does-not-exist")
-
-    reports = check_model_resolution(public_dir)
-
-    assert _has_error(reports)
-    offending = [r for r in reports if "ghost-agent" in r]
-    assert offending, reports
-    assert "claude-does-not-exist" in offending[0]
-    # No spurious [ok] model-resolution when an unknown id is present.
-    assert "[ok] model-resolution" not in reports
-
-
-def test_known_model_in_agent_frontmatter_ok(tmp_path: Path) -> None:
-    public_dir = tmp_path / "public"
-    _write_agent(public_dir / "agents", "good-agent", "claude-fable-5")
-    _write_agent(public_dir / "agents", "another", "claude-opus-4-8")
-
-    reports = check_model_resolution(public_dir)
-
-    assert not _has_error(reports)
-    assert "[ok] model-resolution" in reports
-
-
-def test_missing_agents_dir_is_clean(tmp_path: Path) -> None:
-    # No agents dir → only the key-set check runs (current tree is consistent).
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-
-    reports = check_model_resolution(public_dir)
-
-    assert not _has_error(reports)
-    assert "[ok] model-resolution" in reports
-
-
-# ---------------------------------------------------------------------------
-# 2. Key-set desync fixture (monkeypatched derived view) ⇒ error
+# Keyset desync — the drift bug this check exists to close
 # ---------------------------------------------------------------------------
 
 
@@ -96,38 +55,8 @@ def test_keyset_desync_modelmap_vs_pricing_errors(
     assert "[ok] model-resolution" not in reports
 
 
-def test_pricing_keyset_is_registry_derived_not_cross_feature_import(
-    tmp_path: Path,
-) -> None:
-    """PRICING_TABLE is no longer imported into model_resolution (audit A3 fix).
-
-    The cross-feature ``features.public -> features.telemetry.pricing`` import was
-    removed: ``PRICING_TABLE`` is a derived view over ``core.model_registry`` so the
-    registry claude-id set IS the pricing key-set by construction, and the doctor
-    check now computes it from ``REGISTRY`` directly. This test pins that the symbol
-    is gone from the module namespace (so the old monkeypatch vector cannot silently
-    reappear) and that the live tree still resolves clean. The genuine
-    PRICING_TABLE↔registry coherence guard lives in
-    ``tests/unit/features/telemetry/test_pricing.py`` (key-set equality assertions).
-    """
-    import dadaia_workspace.features.public.model_resolution as mod
-
-    assert not hasattr(mod, "PRICING_TABLE"), (
-        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
-        "edge removed in audit A3; the pricing key-set is registry-derived."
-    )
-
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-
-    reports = check_model_resolution(public_dir)
-
-    assert not _has_error(reports)
-    assert "[ok] model-resolution" in reports
-
-
 # ---------------------------------------------------------------------------
-# 3. Current tree ⇒ ok (real canonical public/ dir)
+# Live-tree resolves clean (real canonical public/ dir)
 # ---------------------------------------------------------------------------
 
 
@@ -141,45 +70,73 @@ def test_current_tree_resolves_clean() -> None:
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
 
+    # PRICING_TABLE is no longer imported into model_resolution (audit A3 fix): the
+    # cross-feature `features.public -> features.telemetry.pricing` import was removed,
+    # since PRICING_TABLE is a derived view over core.model_registry (the registry
+    # claude-id set IS the pricing key-set by construction). Pins the symbol is gone
+    # from the module namespace so the old monkeypatch vector cannot silently reappear.
+    import dadaia_workspace.features.public.model_resolution as mod
+
+    assert not hasattr(mod, "PRICING_TABLE"), (
+        "model_resolution must not import PRICING_TABLE — that was the cross-feature "
+        "edge removed in audit A3; the pricing key-set is registry-derived."
+    )
+
 
 # ---------------------------------------------------------------------------
-# v0.1.65 FR7 (T-65-09) — resolved-roster + plugin staged-model validation
+# Unknown-model / overlay / plugin variants — 1 param matrix
 # ---------------------------------------------------------------------------
 
 
-def test_resolved_roster_validates_against_registry_and_vocab(tmp_path: Path) -> None:
-    """FR7: check_model_resolution validates the RESOLVED (model, effort) per core
-    agent — a synthetic overlay carrying an out-of-registry model errors."""
+def test_unknown_model_variants(
+    tmp_path: Path,
+) -> None:
+    """Unknown model ids surface as ERROR across every source: agent frontmatter,
+    resolved overlay (FR7 T-65-09), and plugin pack staged frontmatter."""
     from dadaia_workspace.core.models.agent_model_policy import (
         AgentModelOverride,
         AgentModelPolicyOverlay,
     )
 
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
+    # agent frontmatter
+    public_dir = tmp_path / "agent"
+    _write_agent(public_dir / "agents", "ghost-agent", "claude-does-not-exist")
+    reports = check_model_resolution(public_dir)
+    assert _has_error(reports)
+    offending = [r for r in reports if "ghost-agent" in r]
+    assert offending, reports
+    assert "claude-does-not-exist" in offending[0]
+    assert "[ok] model-resolution" not in reports
+
+    # resolved overlay
+    overlay_dir = tmp_path / "overlay"
+    overlay_dir.mkdir()
     bad_overlay = AgentModelPolicyOverlay(
         applied_template=None,
         overrides={"software-engineer": AgentModelOverride(model="claude-ghost-9")},
     )
-    reports = check_model_resolution(public_dir, overlay=bad_overlay)
-    assert _has_error(reports), reports
-    assert any("software-engineer" in line for line in reports), reports
+    overlay_reports = check_model_resolution(overlay_dir, overlay=bad_overlay)
+    assert _has_error(overlay_reports), overlay_reports
+    assert any("software-engineer" in line for line in overlay_reports), overlay_reports
 
+    # valid overlay stays clean
+    clean_overlay_dir = tmp_path / "overlay-clean"
+    clean_overlay_dir.mkdir()
+    good_overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
+    clean_reports = check_model_resolution(clean_overlay_dir, overlay=good_overlay)
+    assert clean_reports == ["[ok] model-resolution"], clean_reports
 
-def test_resolved_roster_clean_with_valid_overlay(tmp_path: Path) -> None:
-    from dadaia_workspace.core.models.agent_model_policy import AgentModelPolicyOverlay
+    # known model in agent frontmatter stays clean
+    known_dir = tmp_path / "known"
+    _write_agent(known_dir / "agents", "good-agent", "claude-fable-5")
+    _write_agent(known_dir / "agents", "another", "claude-opus-4-8")
+    known_reports = check_model_resolution(known_dir)
+    assert not _has_error(known_reports)
+    assert "[ok] model-resolution" in known_reports
 
-    public_dir = tmp_path / "public"
-    public_dir.mkdir()
-    overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
-    reports = check_model_resolution(public_dir, overlay=overlay)
-    assert reports == ["[ok] model-resolution"], reports
-
-
-def test_plugin_staged_model_must_resolve_in_registry(tmp_path: Path) -> None:
-    """FR7: plugin pack staged frontmatter models are validated too."""
-    public_dir = tmp_path / "public"
-    _write_agent(public_dir / "plugins" / "somepack" / "agents", "pack-agent", "claude-bogus-1")
-    reports = check_model_resolution(public_dir)
-    assert _has_error(reports), reports
-    assert any("pack-agent" in line for line in reports), reports
+    # plugin pack staged frontmatter
+    plugin_dir = tmp_path / "plugin"
+    _write_agent(plugin_dir / "plugins" / "somepack" / "agents", "pack-agent", "claude-bogus-1")
+    plugin_reports = check_model_resolution(plugin_dir)
+    assert _has_error(plugin_reports), plugin_reports
+    assert any("pack-agent" in line for line in plugin_reports), plugin_reports

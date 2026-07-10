@@ -79,9 +79,13 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
-def test_codex_thread_id_bind_persists_and_resolver_attributes(
+def test_codex_thread_id_bind_persists_resolver_attributes_and_negative_control(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """CRITICAL-adjacent (minimal merge only, v0.1.76 rewrites): a real bind persists a
+    thread-keyed session record and makes the bound context resolver-attributable with
+    no --specs-dir; negative control confirms no bind means no record and no
+    attribution."""
     ws = _make_workspace(tmp_path)
     monkeypatch.chdir(ws)
     monkeypatch.setenv("CODEX_THREAD_ID", _THREAD_ID)
@@ -110,17 +114,13 @@ def test_codex_thread_id_bind_persists_and_resolver_attributes(
     resolved = resolve_specs_dir_for_cli(None)
     assert resolved == (ws / "repos" / _CTX / "specs").resolve()
 
+    # (3) negative control: no bind -> no thread-keyed record -> resolver cannot
+    # attribute, in a fresh unbound workspace.
+    unbound_ws = _make_workspace(tmp_path / "unbound-root")
+    monkeypatch.chdir(unbound_ws)
 
-def test_codex_thread_id_absent_session_record_never_created_without_bind(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Negative control: no bind ⇒ no thread-keyed record ⇒ resolver cannot attribute."""
-    ws = _make_workspace(tmp_path)
-    monkeypatch.chdir(ws)
-    monkeypatch.setenv("CODEX_THREAD_ID", _THREAD_ID)
-
-    thread_record_path = ws / ".dadaia" / "sessions" / f"{_THREAD_ID}.json"
-    assert not thread_record_path.exists()
+    unbound_thread_record_path = unbound_ws / ".dadaia" / "sessions" / f"{_THREAD_ID}.json"
+    assert not unbound_thread_record_path.exists()
 
     with pytest.raises(typer.BadParameter):  # no bind, no cwd/specs fallback
         resolve_specs_dir_for_cli(None)

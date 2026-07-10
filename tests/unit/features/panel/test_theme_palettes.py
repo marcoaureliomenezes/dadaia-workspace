@@ -1,4 +1,11 @@
-"""Unit contracts for panel theme palettes."""
+"""Unit contracts for panel theme palettes — the single a11y-contrast owner.
+
+Real detector: WCAG AA contrast computed from the PARSED CSS (never hardcoded
+literals — see ``test_panel_css_contrast.py``'s replaced role). Two survivors:
+  1. Required tokens per theme are declared.
+  2. Body/link contrast meets WCAG AA, computed from real parsed CSS + the warm
+     focus-visible token folds in as an extra assertion.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +15,8 @@ import pytest
 
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
+
+pytestmark = pytest.mark.unit
 
 
 def _luminance(hex_color: str) -> float:
@@ -59,14 +68,16 @@ def test_theme_declares_required_color_tokens(theme: str) -> None:
 
 @pytest.mark.parametrize("theme", ["mint", "sage", "warm"])
 def test_theme_body_and_link_contrast_meet_wcag_aa(theme: str) -> None:
-    """Theme text and link colors must meet WCAG AA contrast on their surfaces."""
+    """Theme text and link colors must meet WCAG AA contrast on their surfaces
+    (computed from parsed CSS, never hardcoded literals)."""
     tokens = _theme_tokens(theme)
     assert _contrast(tokens["--color-text"], tokens["--color-bg"]) >= 4.5
     assert _contrast(tokens["--color-accent-dark"], tokens["--color-surface"]) >= 4.5
 
+    if theme != "warm":
+        return
 
-def test_warm_focus_visible_uses_accessible_token_outline() -> None:
-    """Warm focus styling must use the darker accent token for visible focus."""
+    # Warm focus-visible styling uses the darker accent token for visible focus.
     warm_focus_match = re.search(
         r'\[data-theme="warm"\][^{]*focus-visible[^{]*\{([^}]+)\}',
         STRUCTURE_CSS,

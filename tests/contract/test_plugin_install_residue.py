@@ -34,20 +34,17 @@ _INSTALL_COMMAND = "dadaia plugin install"
 _RETIRED_WORDING = ("not yet distributed", "no install command exists")
 
 
-def test_plugin_scope_names_install_command() -> None:
-    """The canonical ``plugin-scope`` rule names ``dadaia plugin install`` (v0.1.60 FR5)."""
+def test_plugin_scope_names_install_command_and_dropped_retired_wording() -> None:
+    """The canonical ``plugin-scope`` rule names ``dadaia plugin install`` (v0.1.60
+    FR5) and the retired ADR-4 honest-relabel wording is gone from it (v0.1.60)."""
     assert _PLUGIN_SCOPE.is_file(), f"plugin-scope rule missing: {_PLUGIN_SCOPE}"
     text = _PLUGIN_SCOPE.read_text(encoding="utf-8")
     assert _INSTALL_COMMAND in text, (
         "the plugin-scope rule must name the install command "
         f"'{_INSTALL_COMMAND}' now that packs are installable (v0.1.60 FR2/FR5)"
     )
-
-
-def test_plugin_scope_dropped_retired_relabel_wording() -> None:
-    """The retired ADR-4 honest-relabel wording is gone from the canonical rule (v0.1.60)."""
-    text = _PLUGIN_SCOPE.read_text(encoding="utf-8").lower()
-    offenders = [phrase for phrase in _RETIRED_WORDING if phrase in text]
+    lowered = text.lower()
+    offenders = [phrase for phrase in _RETIRED_WORDING if phrase in lowered]
     assert not offenders, (
         "plugin-scope still carries the retired 'not yet distributed'/'no install command "
         f"exists' wording superseded by v0.1.60: {offenders}"

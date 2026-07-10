@@ -11,6 +11,9 @@ Pins A24 + v0.1.56 FR3 (T-56-30):
 - the bounded retry count (default 2) BLOCKS for operator intervention when exceeded
   (retry EXHAUSTION, distinct from a structural evidence block).
 
+CRITICAL: bounded-retry arithmetic (3 attempts @ max=2) + structural-vs-exhaustion block
+distinction + exact-attempt consumption.
+
 Hermetic: real ``JsonLifecycleRunStore`` + real ``FilesystemRuntimeFileAdapter`` under
 ``tmp_path``, a fake runtime whose verdict is scripted per review attempt.
 """
@@ -19,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -188,19 +193,18 @@ def test_implement_attempt_2_consumes_exact_qa_attempt_1(tmp_path: Path) -> None
     assert "verdict: REJECTED" in impl2.prompt
 
 
-# --- FR2 (v0.1.68) AC2.2: REJECTED rounds still declare the implement consumer; ------------
-# --- the terminal APPROVED round declares none. ---------------------------------------------
+# --- ① FR2 (v0.1.68) AC2.2 declared-consumers per round + well-formed-REJECTED-retries ------
 
 
-def test_rejected_rounds_declare_implement_consumer_terminal_round_declares_none(
+def test_declared_consumers_per_round_and_rejected_round_retries_then_completes(
     tmp_path: Path,
 ) -> None:
-    """AC2.2 — a REJECTED→REJECTED→APPROVED sequence: qa#0 and qa#1 (both REJECTED)
+    """AC2.2 — a REJECTED->REJECTED->APPROVED sequence: qa#0 and qa#1 (both REJECTED)
     each declare the ``implement`` consumer (the next attempt genuinely consumes that
-    exact rejection digest — proven by ``test_implement_attempt_2_consumes_exact_qa_attempt_1``
-    above); qa#2 (the terminal APPROVED round) declares NO consumer, since no further
-    implement attempt will ever run to consume it.
-    """
+    exact rejection digest); qa#2 (the terminal APPROVED round) declares NO consumer, since
+    no further implement attempt will ever run to consume it. A single well-formed REJECTED
+    round (AC-4(d)) retries — never blocks — then COMPLETES on the next APPROVED, carrying
+    the review#0 digest into the round-1 implement prompt."""
     _workspace(tmp_path)
     runtime = _ScriptedReviewRuntime(AgentRuntimeKind.FAKE, ["REJECTED", "REJECTED", "APPROVED"])
     pipeline = _build(tmp_path, runtime, max_retries=2)
@@ -225,6 +229,21 @@ def test_rejected_rounds_declare_implement_consumer_terminal_round_declares_none
 
     # The terminal APPROVED round declares NO consumer.
     assert qa2.declared_consumers == ()
+
+    # Single-retry variant: round 0 REJECTED did NOT block; round 1 APPROVED COMPLETED it.
+    single_runtime = _ScriptedReviewRuntime(AgentRuntimeKind.FAKE, ["REJECTED", "APPROVED"])
+    single_pipeline = _build(tmp_path, single_runtime, max_retries=2)
+    single_result = single_pipeline.run_implement_review_loop(
+        "loop-rejretry", implement_step=_steps()[0], review_step=_steps()[1]
+    )
+    assert single_result.completed is True
+    assert single_result.blocked is None
+    assert single_result.attempts == 2
+    assert [r.review_verdict for r in single_result.rounds] == ["REJECTED", "APPROVED"]
+    impl1 = next(
+        r for r in single_runtime.received_requests if r.task_id == "loop-rejretry#a1:implement"
+    )
+    assert "handoff qa#0" in impl1.prompt
 
 
 # --- A24: bounded retry exceeded → BLOCK (retry EXHAUSTION, not a structural block) ---------
@@ -252,50 +271,31 @@ def test_loop_blocks_after_bounded_retries_exceeded(tmp_path: Path) -> None:
     assert run.phase is LifecyclePhase.BLOCKED
 
 
-def test_loop_completes_on_first_approval(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    pipeline = _pipeline(tmp_path, ["APPROVED"], max_retries=2)
+# --- ② first-approval completes + round-1 digest / round-0 no-digest -------------------
 
-    result = pipeline.run_implement_review_loop(
+
+def test_loop_completes_on_first_approval_and_digest_appears_only_from_round_1(
+    tmp_path: Path,
+) -> None:
+    """AC-4(a) RED-first: revert the digest-injection line ⇒ this assertion FAILS. Also
+    proves the fast-path: a first-attempt APPROVED completes with exactly one implement +
+    one qa payload and no retry."""
+    _workspace(tmp_path)
+    fast_pipeline = _pipeline(tmp_path, ["APPROVED"], max_retries=2)
+    fast_result = fast_pipeline.run_implement_review_loop(
         "loop-fast", implement_step=_steps()[0], review_step=_steps()[1]
     )
+    assert fast_result.completed is True
+    assert fast_result.attempts == 1
+    fast_run = JsonLifecycleRunStore(tmp_path).load("loop-fast")
+    assert fast_run is not None
+    assert fast_run.workflow_steps.find("implement", 0) is not None
+    assert fast_run.workflow_steps.find("qa", 0) is not None
+    assert fast_run.workflow_steps.find("implement", 1) is None
 
-    assert result.completed is True
-    assert result.attempts == 1
-    run = JsonLifecycleRunStore(tmp_path).load("loop-fast")
-    assert run is not None
-    # Exactly one implement + one qa payload.
-    assert run.workflow_steps.find("implement", 0) is not None
-    assert run.workflow_steps.find("qa", 0) is not None
-    assert run.workflow_steps.find("implement", 1) is None
-
-
-def test_loop_requires_resolver(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    pipeline = LifecyclePipeline(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=JsonLifecycleRunStore(tmp_path),
-        runtime_factory=lambda kind: _ScriptedReviewRuntime(kind, ["APPROVED"]),  # type: ignore[arg-type]
-    )
-    import pytest
-
-    with pytest.raises(ValueError):
-        pipeline.run_implement_review_loop(
-            "loop-x", implement_step=_steps()[0], review_step=_steps()[1]
-        )
-
-
-# --- AC-4(a): the implement#N prompt carries the review#N-1 rejection digest -----------------
-
-
-def test_implement_prompt_contains_prior_review_digest(tmp_path: Path) -> None:
-    """RED-first (AC-4(a)): revert the digest-injection line ⇒ this assertion FAILS."""
-    _workspace(tmp_path)
     # round 0 REJECTED → round 1 implement gets the review#0 digest → round 1 APPROVED.
     runtime = _ScriptedReviewRuntime(AgentRuntimeKind.FAKE, ["REJECTED", "APPROVED"])
     pipeline = _build(tmp_path, runtime, max_retries=2)
-
     result = pipeline.run_implement_review_loop(
         "digest-run", implement_step=_steps()[0], review_step=_steps()[1]
     )
@@ -309,6 +309,18 @@ def test_implement_prompt_contains_prior_review_digest(tmp_path: Path) -> None:
     impl1 = next(r for r in runtime.received_requests if r.task_id == "digest-run#a1:implement")
     assert "handoff qa#0" in impl1.prompt
     assert "verdict: REJECTED" in impl1.prompt
+
+    # Constructor guard: a pipeline wired without a handoff resolver refuses to run the loop.
+    resolverless = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ScriptedReviewRuntime(kind, ["APPROVED"]),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ValueError):
+        resolverless.run_implement_review_loop(
+            "loop-x", implement_step=_steps()[0], review_step=_steps()[1]
+        )
 
 
 # --- AC-4(b): an evidence-less worker BLOCKS the loop via the STRUCTURAL gate ----------------
@@ -340,26 +352,3 @@ def test_loop_blocks_on_evidence_less_worker_via_structural_gate(tmp_path: Path)
     run = JsonLifecycleRunStore(tmp_path).load("loop-noevidence")
     assert run is not None
     assert run.phase is LifecyclePhase.BLOCKED
-
-
-# --- AC-4(d): a well-formed REJECTED round retries (never blocks) then COMPLETES -------------
-
-
-def test_well_formed_rejected_round_retries_then_completes(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    runtime = _ScriptedReviewRuntime(AgentRuntimeKind.FAKE, ["REJECTED", "APPROVED"])
-    pipeline = _build(tmp_path, runtime, max_retries=2)
-
-    result = pipeline.run_implement_review_loop(
-        "loop-rejretry", implement_step=_steps()[0], review_step=_steps()[1]
-    )
-
-    # Round 0 REJECTED did NOT block (well-formed evidence); round 1 APPROVED COMPLETED it.
-    assert result.completed is True
-    assert result.blocked is None
-    assert result.attempts == 2
-    assert [r.review_verdict for r in result.rounds] == ["REJECTED", "APPROVED"]
-
-    # The round-1 implement received the review#0 digest (the retry consumed the rejection).
-    impl1 = next(r for r in runtime.received_requests if r.task_id == "loop-rejretry#a1:implement")
-    assert "handoff qa#0" in impl1.prompt

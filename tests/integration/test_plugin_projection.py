@@ -103,24 +103,21 @@ def test_descriptors_present_zero_plugin_install_equals_golden_b(tmp_path: Path)
     )
 
 
-def test_absent_plugin_doctor_byte_equals_golden_b(tmp_path: Path) -> None:
-    """AC-5: doctor() with descriptors present + no plugin installed == golden (b)."""
+def test_absent_plugin_doctor_byte_equals_golden_b_with_descriptor_stage_lines(
+    tmp_path: Path,
+) -> None:
+    """AC-5: doctor() with descriptors present + no plugin installed == golden (b);
+    golden (b) is the descriptors-present baseline — it INCLUDES ``stage:plugins/*``
+    (what distinguishes it from the plugin-blind golden (a); if the descriptor-source
+    lines ever vanished from golden (b), the byte-lock would stop covering the new
+    staging inventory)."""
+    doctor = _capture_doctor(tmp_path)
     assert_golden(
         _DOCTOR_GOLDEN_B,
-        _capture_doctor(tmp_path),
+        doctor,
         "plugin-golden-b-doctor-report",
         message=_golden_b_message("plugin-golden-b-doctor-report"),
     )
-
-
-def test_golden_b_includes_descriptor_stage_lines(tmp_path: Path) -> None:
-    """Guard: golden (b) is the descriptors-present baseline — it INCLUDES stage:plugins/*.
-
-    This is what distinguishes golden (b) from the plugin-blind golden (a). If the
-    descriptor-source lines ever vanish from golden (b), the byte-lock would stop covering
-    the new staging inventory.
-    """
-    doctor = _capture_doctor(tmp_path)
     assert any(ln == "[ok] stage:plugins/frontend-design/pack.json" for ln in doctor), doctor
     assert any(ln == "[ok] stage:plugins/devops/pack.json" for ln in doctor), doctor
 
@@ -192,11 +189,20 @@ def _claude_agent(ws: Path) -> Path:
     return ws / ".claude" / "agents" / f"{_AGENT}.md"
 
 
-def test_plugin_install_projects_real_body_over_stub(tmp_path: Path) -> None:
-    """AC-3: install_plugin overwrites the core stub with the pack body + records the ledger.
+def test_plugin_install_projects_body_idempotent_core_precedence_claude_only_and_doctor(
+    tmp_path: Path,
+) -> None:
+    """AC-3: install_plugin overwrites the core stub with the pack body + records the
+    ledger; a re-install is a no-op (every projected file hash-compare [skip]); AC-4: a
+    following core `install(target=all)` keeps the pack body, not the stub (the clobber
+    the ledger-read now prevents). AC-15: in a claude-only profile, install_plugin
+    projects only the claude agent (no ``.codex/`` orphan). AC-5 + AC-11(c): doctor
+    reports [ok] for a projected pack file (no false drift on the stub); a stale file
+    reads [drift]; a removed file reads [missing] — a stale/absent installed-pack file
+    is never silent.
 
-    RED-first: pre-projection-code there was no projection at all (the W1 `_project_pack`
-    seam was a no-op), so `.claude/agents/frontend-engineer.md` stayed the stub.
+    RED-first (pre-fix): there was no projection at all (the W1 ``_project_pack`` seam
+    was a no-op), and a core install re-ran the stub projection over the pack body.
     """
     ws, mgr = _staged_workspace_with_pack_body(tmp_path)
     # Pre-install: the projected claude agent is the core stub.
@@ -207,73 +213,48 @@ def test_plugin_install_projects_real_body_over_stub(tmp_path: Path) -> None:
     projected = _claude_agent(ws).read_text(encoding="utf-8")
     assert projected == _PACK_BODY_RENDERED
     assert "[PLUGIN REQUIRED]" not in projected
-    # Ledger records the pack (not per-harness).
     ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
     assert ledger is not None and ledger.plugins == (_PACK,)
-    # Codex toml is the pack render on the sonnet/plugin tier (gpt-5.3-codex), not opus.
     codex_toml = (ws / ".codex" / "agents" / f"{_AGENT}.toml").read_text(encoding="utf-8")
     assert 'model = "gpt-5.3-codex"' in codex_toml
     assert "gpt-5.5" not in codex_toml
 
-
-def test_plugin_install_is_idempotent(tmp_path: Path) -> None:
-    """AC-3: a re-install is a no-op — every projected file is a hash-compare [skip]."""
-    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
-    mgr.install_plugin(ws, _PACK)
+    # Idempotent re-install: every projected file is a hash-compare [skip].
     lines = mgr.install_plugin(ws, _PACK)
     assert all(not ln.startswith("[ok]   ") for ln in lines), lines
     assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
 
-
-def test_core_install_keeps_pack_body_precedence(tmp_path: Path) -> None:
-    """AC-4: a following core `install(target=all)` keeps the pack body, not the stub.
-
-    RED-first: pre-precedence-code, a core install re-ran the stub projection over the pack
-    body (the clobber the ledger-read now prevents).
-    """
-    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
-    mgr.install_plugin(ws, _PACK)
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
-
+    # Core install precedence: keeps the pack body, not the stub.
     mgr.install(ws, target="all", force=True)
-
     assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
 
+    # AC-15: claude-only profile, own workspace — projects only the claude agent.
+    profile_root = tmp_path / "profile-root"
+    profile_root.mkdir()
+    profile_ws, profile_mgr = _staged_workspace_with_pack_body(profile_root, harnesses=("claude",))
+    profile_mgr.install_plugin(profile_ws, _PACK)
 
-def test_claude_only_profile_projects_no_codex_orphan(tmp_path: Path) -> None:
-    """AC-15: in a claude-only profile, install_plugin projects only the claude agent."""
-    ws, mgr = _staged_workspace_with_pack_body(tmp_path, harnesses=("claude",))
-    mgr.install_plugin(ws, _PACK)
-
-    assert _claude_agent(ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
+    assert _claude_agent(profile_ws).read_text(encoding="utf-8") == _PACK_BODY_RENDERED
     # No .codex/ orphan — the claude-only profile never projects a codex agent.
-    assert not (ws / ".codex" / "agents" / f"{_AGENT}.toml").exists()
+    assert not (profile_ws / ".codex" / "agents" / f"{_AGENT}.toml").exists()
     # The ledger records the pack, not a per-harness selection.
-    ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
-    assert ledger is not None and ledger.plugins == (_PACK,)
+    profile_ledger = JsonPluginStore().read(profile_ws / ".dadaia" / "states")
+    assert profile_ledger is not None and profile_ledger.plugins == (_PACK,)
 
-
-def test_doctor_reports_installed_pack_ok(tmp_path: Path) -> None:
-    """AC-5: doctor reports [ok] for the projected pack file (and no false drift on the stub)."""
-    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
-    mgr.install_plugin(ws, _PACK)
-    report = mgr.doctor(ws)
+    # AC-5 + AC-11(c): doctor [ok]/[drift]/[missing] on the pack file, own workspace.
+    doctor_root = tmp_path / "doctor-root"
+    doctor_root.mkdir()
+    doctor_ws, doctor_mgr = _staged_workspace_with_pack_body(doctor_root)
+    doctor_mgr.install_plugin(doctor_ws, _PACK)
+    report = doctor_mgr.doctor(doctor_ws)
     assert f"[ok] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
-    # The core loop no longer emits a stub-vs-projection line for the overridden agent.
     assert f"[drift] claude:agents/{_AGENT}.md" not in report
 
+    doctor_agent = _claude_agent(doctor_ws)
+    doctor_agent.write_text("# tampered\n", encoding="utf-8")
+    report2 = doctor_mgr.doctor(doctor_ws)
+    assert f"[drift] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report2
 
-def test_doctor_non_silent_on_stale_pack_file(tmp_path: Path) -> None:
-    """AC-5 + AC-11(c): a stale/absent installed-pack file is never silent."""
-    ws, mgr = _staged_workspace_with_pack_body(tmp_path)
-    mgr.install_plugin(ws, _PACK)
-
-    # Tamper: drift.
-    _claude_agent(ws).write_text("# tampered\n", encoding="utf-8")
-    report = mgr.doctor(ws)
-    assert f"[drift] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
-
-    # Remove: missing.
-    _claude_agent(ws).unlink()
-    report = mgr.doctor(ws)
-    assert f"[missing] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
+    doctor_agent.unlink()
+    report3 = doctor_mgr.doctor(doctor_ws)
+    assert f"[missing] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report3

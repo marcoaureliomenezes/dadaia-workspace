@@ -41,10 +41,11 @@ def _make_workspace(root: Path) -> Path:
     return specs
 
 
-def test_cli_doctor_reaches_coherence_check_on_incoherent_state(
+def test_cli_doctor_reaches_coherence_check_incoherent_and_coherent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An incoherent lease↔session pair → CLI doctor output names SPEC-DOC-029.
+    """An incoherent lease↔session pair → CLI doctor output names SPEC-DOC-029;
+    a coherent pair → no SPEC-DOC-029.
 
     The CLI resolves the workspace root from cwd; we chdir into the tmp workspace so
     ``_resolve_workspace_state_dir`` finds its ``.dadaia/`` and wires the backstop.
@@ -66,24 +67,16 @@ def test_cli_doctor_reaches_coherence_check_on_incoherent_state(
 
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
-
     assert "SPEC-DOC-029" in result.output, result.output
 
-
-def test_cli_doctor_coherent_state_has_no_doc_029(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A coherent lease↔session state → no SPEC-DOC-029 from the CLI."""
-    specs = _make_workspace(tmp_path)
-    ctx = "ctx-a"
-
-    lease.acquire(tmp_path, ctx, "sessS1", "rel-1", "implementation")
-    session_identity.write_session(tmp_path, "sessS1", {"session_id": "sessS1"})
-
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
-
-    assert "SPEC-DOC-029" not in result.output, result.output
+    # Coherent case: a second, independent context whose lock/session both name S1.
+    specs2 = _make_workspace(tmp_path / "coherent-case")
+    ctx2 = "ctx-b"
+    lease.acquire(tmp_path / "coherent-case", ctx2, "sessS1", "rel-1", "implementation")
+    session_identity.write_session(tmp_path / "coherent-case", "sessS1", {"session_id": "sessS1"})
+    monkeypatch.chdir(tmp_path / "coherent-case")
+    result2 = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs2)])
+    assert "SPEC-DOC-029" not in result2.output, result2.output
 
 
 def test_cli_doctor_external_specs_dir_isolates_live_state(

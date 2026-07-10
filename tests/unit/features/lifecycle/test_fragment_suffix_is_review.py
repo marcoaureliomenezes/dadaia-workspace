@@ -10,9 +10,13 @@ These tests pin three facets of the v0.1.32 coherent contract (D-1/D-2/D-3, A1/A
   ``output_schema`` as a competing schema-to-emit.
 - A4b / C6: ``pipeline._generic_prompt`` is step-kind-aware too (review -> verdict instruction;
   create -> no self-verdict) — the second stale surface.
+
+CRITICAL: review-only verdict instruction + single schema target (A2).
 """
 
 from __future__ import annotations
+
+import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -49,39 +53,28 @@ def _required_output_section(suffix: str) -> str:
     return suffix[suffix.index(marker) :]
 
 
-# --- A1: step-kind-aware verdict instruction ---------------------------------------
+# --- ① suffix param: review-instructs-verdict / create-does-not / single-transport-schema ---
 
 
-def test_review_step_suffix_instructs_verdict() -> None:
-    suffix = build_fragment_suffix(_bundle(), selected_context="", is_review=True)
+@pytest.mark.parametrize("is_review", [True, False], ids=["review", "create"])
+def test_suffix_verdict_instruction_is_step_kind_aware(is_review: bool) -> None:
+    suffix = build_fragment_suffix(_bundle(), selected_context="", is_review=is_review)
     section = _required_output_section(suffix)
-    assert "structured_output.verdict" in section
-    assert "APPROVED" in section and "REJECTED" in section
+    if is_review:
+        assert "structured_output.verdict" in section
+        assert "APPROVED" in section and "REJECTED" in section
+    else:
+        assert "verdict" not in section.lower()
+        # A create step still emits an artifact + artifact_refs.
+        assert "artifact_refs" in section
+    # A2 — exactly one schema target regardless of step kind: the transport id, named via
+    # the `schema` field; the fragment's domain schema is NOT surfaced as a competing target.
+    assert _TRANSPORT_SCHEMA in section
+    assert "`schema`" in section
+    assert _DOMAIN_SCHEMA not in section
 
 
-def test_create_step_suffix_does_not_instruct_verdict() -> None:
-    suffix = build_fragment_suffix(_bundle(), selected_context="", is_review=False)
-    section = _required_output_section(suffix)
-    assert "verdict" not in section.lower()
-    # A create step still emits an artifact + artifact_refs.
-    assert "artifact_refs" in section
-
-
-# --- A2: exactly one schema target, the transport id in `schema` --------------------
-
-
-def test_required_output_names_only_the_transport_schema() -> None:
-    for is_review in (True, False):
-        suffix = build_fragment_suffix(_bundle(), selected_context="", is_review=is_review)
-        section = _required_output_section(suffix)
-        # The transport id is the single emit target, named via the `schema` field.
-        assert _TRANSPORT_SCHEMA in section
-        assert "`schema`" in section
-        # The fragment's domain schema is NOT surfaced as a competing schema-to-emit.
-        assert _DOMAIN_SCHEMA not in section
-
-
-# --- A4b / C6: pipeline._generic_prompt is step-kind-aware --------------------------
+# --- ② A4b / C6: pipeline._generic_prompt is step-kind-aware -------------------------
 
 
 class _MemoryRunStore:
@@ -133,14 +126,11 @@ def _generic_step(*, is_review: bool) -> PipelineStep:
     )
 
 
-def test_generic_prompt_review_step_instructs_verdict() -> None:
-    pipeline = _pipeline()
-    prompt = pipeline._generic_prompt(_generic_step(is_review=True))
-    assert "structured_output.verdict" in prompt
-    assert "APPROVED" in prompt and "REJECTED" in prompt
-
-
-def test_generic_prompt_create_step_does_not_instruct_verdict() -> None:
-    pipeline = _pipeline()
-    prompt = pipeline._generic_prompt(_generic_step(is_review=False))
-    assert "verdict" not in prompt.lower()
+@pytest.mark.parametrize("is_review", [True, False], ids=["review", "create"])
+def test_generic_prompt_verdict_instruction_is_step_kind_aware(is_review: bool) -> None:
+    prompt = _pipeline()._generic_prompt(_generic_step(is_review=is_review))
+    if is_review:
+        assert "structured_output.verdict" in prompt
+        assert "APPROVED" in prompt and "REJECTED" in prompt
+    else:
+        assert "verdict" not in prompt.lower()

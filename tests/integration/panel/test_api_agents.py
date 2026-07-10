@@ -1,29 +1,25 @@
 """Integration tests for GET /api/agents — end-to-end HTTP (no browser).
 
-Coverage areas:
-  - Telemetry overlay merge: real PanelService + real canonical agents + stub telemetry
-  - ?active_window_days query parameter honoured (200 and 400 boundary)
-  - Bearer token enforcement (401 without token, 200 with valid token)
-  - Defence-in-depth on traversal in agent_id prompt endpoint
+Coverage areas (merged per plan-integration.md, 21 -> 3):
+  1. response shape + real-agents + telemetry overlay + active/inactive status
+  2. ?active_window_days query parameter table (default/custom/min/max/out-of-range)
+  3. /api/agents/<id>/prompt table (valid 200, unknown 404, traversal/uppercase 400)
 
-Pattern mirrors test_panel_telemetry_endpoints.py: ThreadingHTTPServer on port 0,
-real PanelService wired to real canonical agent files, stub telemetry service.
-No mocks — fakes/stubs only.
+Pattern: real PanelService + real canonical agents + stub telemetry, over the shared
+``panel_server_factory``. No mocks — fakes/stubs only. Bearer trio deleted (no-auth
+contract pinned in tests/unit/features/panel/test_no_auth_contract.py); one
+credential-less GET is folded into fn 1.
 """
 
 from __future__ import annotations
 
 import datetime
 import json
-import threading
-from http.server import ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
-from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
@@ -37,21 +33,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     TokenTotals,
 )
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-
-# ---------------------------------------------------------------------------
-# Hermetic workspace_root
-#
-# These tests must NOT depend on a pre-existing on-disk .dadaia/agentic/ staging
-# dir (gitignored — absent on a clean checkout / CI). The `staged_root` fixture
-# stages the canonical, tracked public/ assets into a tmp workspace_root, so the
-# panel server reads a freshly-materialised agent + workflow catalog.
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Stub TelemetryService
-# ---------------------------------------------------------------------------
+from tests.integration.panel.conftest import get
 
 
 def _make_recent_session(date: str, cost_usd: float | None = 0.10) -> RecentSession:
@@ -66,10 +48,7 @@ def _make_recent_session(date: str, cost_usd: float | None = 0.10) -> RecentSess
     )
 
 
-def _make_agent_summary(
-    agent_id: str,
-    last_activity_at: str,
-) -> AgentSummary:
+def _make_agent_summary(agent_id: str, last_activity_at: str) -> AgentSummary:
     today = datetime.date.today().isoformat()
     return AgentSummary(
         agent_id=agent_id,
@@ -100,8 +79,8 @@ class StubTelemetryService:
     """Returns a controlled AgentListResult with one active and one inactive agent.
 
     The two summaries target real agent IDs present in the staged catalog:
-      - "software-engineer"  → recent activity (active)
-      - "qa-engineer"               → activity 400 days ago (inactive with default window)
+      - "software-engineer" -> recent activity (active)
+      - "qa-engineer"       -> activity 400 days ago (inactive with default window)
     """
 
     def list_agents(
@@ -111,9 +90,7 @@ class StubTelemetryService:
         limit: int = 50,
     ) -> AgentListResult:
         now = datetime.datetime.now(tz=datetime.UTC)
-        # Active: last activity is 1 day ago
         active_ts = (now - datetime.timedelta(days=1)).isoformat()
-        # Inactive: last activity is 400 days ago
         inactive_ts = (now - datetime.timedelta(days=400)).isoformat()
         return AgentListResult(
             generated_at=now.isoformat(),
@@ -126,13 +103,7 @@ class StubTelemetryService:
             ],
         )
 
-    # Satisfy duck-type for other handler paths
     is_degraded: bool = False
-
-
-# ---------------------------------------------------------------------------
-# Minimal stub dependencies for PanelService
-# ---------------------------------------------------------------------------
 
 
 class _StubRegistry:
@@ -145,303 +116,123 @@ class _StubSpecContextService:
         return []
 
 
-# ---------------------------------------------------------------------------
-# Server fixture builder
-# ---------------------------------------------------------------------------
-
-
-def _build_agents_server(
-    token: str,
-    stub_telemetry: StubTelemetryService,
-    workspace_root: Path,
-) -> ThreadingHTTPServer:
-    """Build a server wired with real PanelService pointing at real agent files."""
+@pytest.fixture(scope="module")
+def agents_server(panel_server_factory, staged_root: Path) -> str:
+    stub_telemetry = StubTelemetryService()
     panel_service = PanelService(
         registry=_StubRegistry(),  # type: ignore[arg-type]
         spec_context=_StubSpecContextService(),  # type: ignore[arg-type]
-        workspace_root=workspace_root,
+        workspace_root=staged_root,
         telemetry=stub_telemetry,
         agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
-
-    def _stub_html(**kw: Any) -> tuple[int, str, bytes]:
-        return (200, "text/html; charset=utf-8", b"<html>ok</html>")
-
-    def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
-        return (200, "application/json; charset=utf-8", b"{}")
-
-    views: dict[str, Any] = {
-        "index": _stub_html,
-        "api_servers": _stub_json,
-        "api_contexts": _stub_json,
-        "api_agents": render_api_agents_canonical(panel_service),
-        "api_agent_prompt": render_api_agent_prompt(panel_service),
-        "api_workflows": _stub_json,
-        "api_workflow_detail": _stub_json,
-        "memory": _stub_html,
-        "memory_view": _stub_html,
-        "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
-    }
-    HandlerClass = make_handler_class(views, token=token, telemetry=stub_telemetry)
-    return ThreadingHTTPServer(("127.0.0.1", 0), HandlerClass)
+    return panel_server_factory(
+        {
+            "api_agents": render_api_agents_canonical(panel_service),
+            "api_agent_prompt": render_api_agent_prompt(panel_service),
+        },
+        telemetry=stub_telemetry,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-import urllib.error  # noqa: E402
-import urllib.request  # noqa: E402
-
-
-def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:
-    req = urllib.request.Request(url)
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            headers = {k.lower(): v for k, v in resp.headers.items()}
-            return resp.status, headers, resp.read()
-    except urllib.error.HTTPError as exc:
-        headers = {k.lower(): v for k, v in exc.headers.items()}
-        return exc.code, headers, exc.read()
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-_TEST_TOKEN = "integration-test-token-pr3-20"
-
-
-@pytest.fixture(scope="module")
-def staged_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Stage canonical (tracked) public/ assets into a hermetic tmp workspace_root.
-
-    Independent of any pre-existing on-disk .dadaia/agentic/ staging (gitignored,
-    absent on a clean checkout). The stager materialises agents/ + workflows/ from
-    the package's own public/ dir.
-    """
-    root = tmp_path_factory.mktemp("panel-agents-ws")
-    FileSystemPublicAssetManager().stage(root)
-    return root
-
-
-@pytest.fixture(scope="module")
-def agents_server(staged_root: Path):
-    """Real-file-backed panel server; yields (base_url, token, stub_telemetry)."""
-    stub_tel = StubTelemetryService()
-    server = _build_agents_server(_TEST_TOKEN, stub_tel, staged_root)
-    port = server.server_address[1]
-    base_url = f"http://127.0.0.1:{port}"
-    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
-    thread.start()
-    yield base_url, _TEST_TOKEN, stub_tel
-    server.shutdown()
-
-
-# ---------------------------------------------------------------------------
-# Tests: Bearer enforcement
-# ---------------------------------------------------------------------------
-
-
-class TestBearerEnforcement:
-    """Renamed semantics: routes serve credential-less — no-auth contract (operator decision 2026-06-11)."""
-
-    def test_agents_200_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents without Authorization → 200."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents")
-        assert status == 200
-
-    def test_agents_200_with_stray_auth_header(self, agents_server: Any) -> None:
-        """A stray Authorization header is ignored — still 200."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents", token="wrong-token")
-        assert status == 200
-
-    def test_agents_200_with_correct_token(self, agents_server: Any) -> None:
-        """GET /api/agents with correct Bearer → 200."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents", token=token)
-        assert status == 200
-
-
-# ---------------------------------------------------------------------------
-# Tests: Telemetry overlay merge
-# ---------------------------------------------------------------------------
-
-
-class TestTelemetryOverlayMerge:
-    """Telemetry data must be merged over canonical agents.
-
-    The stub returns data for "software-engineer" and "qa-engineer" which
-    are real agents in the staged catalog. The overlay must inject their
-    telemetry sub-objects.
-    """
-
-    def test_agents_response_shape(self, agents_server: Any) -> None:
-        """GET /api/agents → top-level keys match SPEC §5.1."""
-        base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents", token=token)
+class TestAgentsResponseShapeAndOverlay:
+    def test_response_shape_real_agents_overlay_and_status(
+        self, agents_server: str, staged_root: Path
+    ) -> None:
+        """Shape + real agents + telemetry overlay + active/inactive status; no auth needed."""
+        status, _, body = get(f"{agents_server}/api/agents")
         assert status == 200
         data = json.loads(body)
         for key in ("generated_at", "status_window_days", "window_days", "agents"):
             assert key in data, f"missing top-level key: {key}"
 
-    def test_agents_list_contains_real_agents(self, agents_server: Any) -> None:
-        """Every item in 'agents' corresponds to a canonical agent file on disk."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
-        data = json.loads(body)
         agent_ids = {a["agent_id"] for a in data["agents"]}
-        # The staged catalog has software-engineer and qa-engineer
         assert "software-engineer" in agent_ids
         assert "qa-engineer" in agent_ids
 
-    def test_telemetry_overlay_injected(self, agents_server: Any) -> None:
-        """Agents that have telemetry data have non-zero session_count in telemetry sub-object."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
-        data = json.loads(body)
+        # Every returned agent has a real on-disk file in the staged catalog.
+        agents_dir = staged_root / ".dadaia" / "agentic" / "agents"
+        disk_ids = {p.stem for p in agents_dir.glob("*.md")}
+        assert agent_ids.issubset(disk_ids), (
+            f"Response contains agents not on disk: {agent_ids - disk_ids}"
+        )
+
         by_id = {a["agent_id"]: a for a in data["agents"]}
         se = by_id.get("software-engineer")
         assert se is not None
         assert "telemetry" in se
         assert se["telemetry"]["session_count"] == 5
-
-    def test_telemetry_only_agents_excluded(self, agents_server: Any, staged_root: Path) -> None:
-        """Agents in telemetry but not in canonical catalog are excluded from response."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
-        data = json.loads(body)
-        # The stub injects data for "software-engineer" and "qa-engineer" — only
-        # those present in the canonical files should appear. Telemetry-only agents excluded.
-        canonical_ids = {a["agent_id"] for a in data["agents"]}
-        # All returned agents must have a real on-disk file in the staged catalog
-        agents_dir = staged_root / ".dadaia" / "agentic" / "agents"
-        disk_ids = {p.stem for p in agents_dir.glob("*.md")}
-        assert canonical_ids.issubset(disk_ids), (
-            f"Response contains agents not on disk: {canonical_ids - disk_ids}"
-        )
-
-    def test_status_active_for_recent_agent(self, agents_server: Any) -> None:
-        """Agent with last_activity 1 day ago → status='active' (window=30d)."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
-        data = json.loads(body)
-        by_id = {a["agent_id"]: a for a in data["agents"]}
-        se = by_id.get("software-engineer")
-        assert se is not None
         assert se["status"] == "active"
 
-    def test_status_inactive_for_old_agent(self, agents_server: Any) -> None:
-        """Agent with last_activity 400 days ago → status='inactive' (window=30d)."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
-        data = json.loads(body)
-        by_id = {a["agent_id"]: a for a in data["agents"]}
         qa = by_id.get("qa-engineer")
         assert qa is not None
         assert qa["status"] == "inactive"
 
 
-# ---------------------------------------------------------------------------
-# Tests: ?active_window_days query parameter
-# ---------------------------------------------------------------------------
-
-
-class TestActiveWindowDays:
-    def test_active_window_days_default_is_30(self, agents_server: Any) -> None:
-        """No ?active_window_days → status_window_days=30 in response."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents", token=token)
+class TestActiveWindowDaysTable:
+    @pytest.mark.parametrize(
+        ("query", "expected_status", "expected_window"),
+        [
+            ("", 200, 30),  # default
+            ("?active_window_days=365", 200, 365),  # custom / max boundary
+            ("?active_window_days=1", 200, None),  # min boundary
+            ("?active_window_days=366", 400, None),  # out of range
+            ("?active_window_days=0", 400, None),  # out of range
+        ],
+    )
+    def test_active_window_days(
+        self,
+        agents_server: str,
+        query: str,
+        expected_status: int,
+        expected_window: int | None,
+    ) -> None:
+        status, _, body = get(f"{agents_server}/api/agents{query}")
+        assert status == expected_status
         data = json.loads(body)
-        assert data["status_window_days"] == 30
+        if expected_status == 200:
+            if expected_window is not None:
+                assert data["status_window_days"] == expected_window
+        else:
+            assert data.get("error") == "invalid_parameter"
 
-    def test_active_window_days_custom_honoured(self, agents_server: Any) -> None:
-        """?active_window_days=365 → status_window_days=365 in response."""
-        base, token, _ = agents_server
-        _, _, body = _get(f"{base}/api/agents?active_window_days=365", token=token)
-        data = json.loads(body)
-        assert data["status_window_days"] == 365
-
-    def test_active_window_days_boundary_min_1(self, agents_server: Any) -> None:
-        """?active_window_days=1 is the minimum valid value → 200."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents?active_window_days=1", token=token)
+    def test_large_in_range_window_keeps_old_agent_inactive(self, agents_server: str) -> None:
+        status, _, body = get(f"{agents_server}/api/agents?active_window_days=365")
         assert status == 200
-
-    def test_active_window_days_boundary_max_365(self, agents_server: Any) -> None:
-        """?active_window_days=365 is the maximum valid value → 200."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents?active_window_days=365", token=token)
-        assert status == 200
-
-    def test_active_window_days_out_of_range_400(self, agents_server: Any) -> None:
-        """?active_window_days=366 is out of range → 400."""
-        base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents?active_window_days=366", token=token)
-        assert status == 400
-        data = json.loads(body)
-        assert data.get("error") == "invalid_parameter"
-
-    def test_active_window_days_zero_out_of_range_400(self, agents_server: Any) -> None:
-        """?active_window_days=0 is out of range → 400."""
-        base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents?active_window_days=0", token=token)
-        assert status == 400
-
-    def test_active_window_days_large_changes_status(self, agents_server: Any) -> None:
-        """?active_window_days=500 (out of range) → 400; ?active_window_days=365 (max) with old agent still inactive."""
-        base, token, _ = agents_server
-        # With window=365, qa-engineer (400 days ago) should still be inactive
-        _, _, body = _get(f"{base}/api/agents?active_window_days=365", token=token)
         data = json.loads(body)
         by_id = {a["agent_id"]: a for a in data["agents"]}
-        qa = by_id.get("qa-engineer")
-        assert qa is not None
-        assert qa["status"] == "inactive"
+        assert by_id["qa-engineer"]["status"] == "inactive"
 
 
-# ---------------------------------------------------------------------------
-# Tests: path-traversal defence on /api/agents/<id>/prompt
-# ---------------------------------------------------------------------------
-
-
-class TestAgentPromptTraversalDefence:
-    def test_prompt_traversal_dot_dot_slash_rejected(self, agents_server: Any) -> None:
-        """GET /api/agents/../etc/passwd/prompt → 400 (path traversal blocked)."""
-        base, token, _ = agents_server
-        # URL-encode .. segments; the handler should reject even un-encoded forms
-        status, _, _ = _get(f"{base}/api/agents/..%2Fetc%2Fpasswd/prompt", token=token)
-        assert status in (400, 404), f"Expected 400 or 404, got {status}"
-
-    def test_prompt_invalid_id_format_rejected(self, agents_server: Any) -> None:
-        """GET /api/agents/<uppercase>/prompt → 400 (fails regex validation)."""
-        base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents/INVALID_UPPER/prompt", token=token)
-        assert status == 400
+class TestAgentPromptTable:
+    @pytest.mark.parametrize(
+        ("path", "expected_status", "error_code"),
+        [
+            ("/api/agents/..%2Fetc%2Fpasswd/prompt", None, None),  # 400 or 404
+            ("/api/agents/INVALID_UPPER/prompt", 400, "invalid_agent_id"),
+            ("/api/agents/software-engineer/prompt", 200, None),
+            ("/api/agents/does-not-exist/prompt", 404, None),
+        ],
+    )
+    def test_prompt_endpoint_table(
+        self,
+        agents_server: str,
+        path: str,
+        expected_status: int | None,
+        error_code: str | None,
+    ) -> None:
+        status, _, body = get(f"{agents_server}{path}")
+        if expected_status is None:
+            assert status in (400, 404)
+            return
+        assert status == expected_status
         data = json.loads(body)
-        assert data.get("error") == "invalid_agent_id"
+        if error_code:
+            assert data.get("error") == error_code
+        if expected_status == 200:
+            assert "system_prompt" in data
+            assert data["agent_id"] == "software-engineer"
 
-    def test_prompt_valid_known_agent_200(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer/prompt → 200 with system_prompt key."""
-        base, token, _ = agents_server
-        status, _, body = _get(f"{base}/api/agents/software-engineer/prompt", token=token)
-        assert status == 200
-        data = json.loads(body)
-        assert "system_prompt" in data
-        assert data["agent_id"] == "software-engineer"
-
-    def test_prompt_unknown_agent_404(self, agents_server: Any) -> None:
-        """GET /api/agents/does-not-exist/prompt → 404."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents/does-not-exist/prompt", token=token)
-        assert status == 404
-
-    def test_prompt_200_without_token(self, agents_server: Any) -> None:
-        """GET /api/agents/software-engineer/prompt without token → 200 (no-auth contract (operator decision 2026-06-11))."""
-        base, token, _ = agents_server
-        status, _, _ = _get(f"{base}/api/agents/software-engineer/prompt")
+    def test_prompt_no_credential_required(self, agents_server: str) -> None:
+        status, _, _ = get(f"{agents_server}/api/agents/software-engineer/prompt")
         assert status == 200

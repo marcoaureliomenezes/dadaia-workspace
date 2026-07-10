@@ -9,14 +9,12 @@ old marker made the fan-out empty by construction. These tests assert:
   consumer repo (alive OR dead — Ruling H); a registry context with no on-disk
   repo is skipped without error; the self-repo is skipped; the tri-copy
   (``specs/AGENTS.md`` / ``specs/memory/AGENTS.md``) is never written (Ruling I).
-- **A5 / Ruling L** — a divergent (hand-edited) consumer root ``AGENTS.md`` is
-  restored to canonical AND ``_write_pair`` emits a DISTINCT
-  ``[updated] ... (overwrote divergent workspace-law copy)`` line (never a
-  silent ``[ok]``); a nested subtree ``repos/<slug>/src/AGENTS.md`` is never
-  touched.
-- **AC-7** — ``_doctor_guardrail_pair`` flags stale/missing consumer copies:
-  the returned report list carries ``[drift]`` / ``[missing]`` / ``[ok]`` for
-  ``repos/<slug>:AGENTS.md`` — never ``[skip]`` for a real consumer repo.
+- Ruling L — a nested subtree ``repos/<slug>/src/AGENTS.md`` is never touched
+  by the fan-out (divergent-root restore + [updated] classification is owned by
+  ``test_consumer_fanout_provenance.py``).
+- Doctor never-skip / drift / missing coverage for a registered consumer is
+  owned by ``test_consumer_fanout_provenance.py`` and
+  ``test_consumer_fanout_containment.py``.
 """
 
 from __future__ import annotations
@@ -24,26 +22,26 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
-    _CANONICAL_AGENTS_BANNER,
     _CLAUDE_MD_STUB,
-    _doctor_guardrail_pair,
+    _consumer_repos_for_root,
     _install_workspace_guardrail_pair,
+    _is_self_repo,
 )
+
+_INSTALLED_VERSION = "1.2.3"
+_OTHER_VERSION = "0.0.1"
 
 # This suite's source is a SYNTHETIC BANNERLESS ``AGENTS.md``. Under the v0.1.60 FR9
 # module-constant banner discriminator, a consumer copy projected from a bannerless source
 # carries NO provenance banner and therefore classifies ``[foreign]`` (repo-owned) — a
-# DELIBERATE Ruling-L amendment, recorded here, never a silent regen. Cases that must keep a
-# lib-owned classification ([updated]) re-fixture the consumer content to EMBED
-# ``_CANONICAL_AGENTS_BANNER``.
+# DELIBERATE Ruling-L amendment. Cases that must keep a lib-owned classification
+# ([updated]) live in ``test_consumer_fanout_provenance.py``.
 _SOURCE_CONTENT = b"# AGENTS\n\nWorkspace-law guardrail content for fan-out tests.\n"
-
-
-# ---------------------------------------------------------------------------
-# Fixture helpers
-# ---------------------------------------------------------------------------
 
 
 def _write_registry(workspace_root: Path, entries: list[tuple[str, str]]) -> None:
@@ -97,10 +95,6 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _labels(lines: list[str]) -> set[str]:
-    return {ln.split(" ", 1)[1] for ln in lines if " " in ln}
-
-
 # ---------------------------------------------------------------------------
 # AC-6 — fan-out fires for a registry-listed marker-less consumer
 # ---------------------------------------------------------------------------
@@ -126,208 +120,193 @@ def test_fan_out_fires_for_registry_listed_marker_less_consumer(tmp_path: Path) 
     assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
 
 
-def test_dead_context_repo_is_also_fanned(tmp_path: Path) -> None:
-    """Ruling H: fan-out reaches a DEAD context's on-disk repo too, not only alive."""
+@pytest.mark.parametrize(
+    "case",
+    [
+        "dead-context-repo-is-also-fanned",
+        "registry-context-without-on-disk-repo-skipped",
+        "self-repo-is-skipped",
+        "tri-copy-targets-not-written",
+        "nested-subtree-agents-md-left-untouched",
+    ],
+)
+def test_fan_out_targeting_matrix(tmp_path: Path, case: str) -> None:
+    """Ruling H/I: dead contexts are still fanned; a registered context with no
+    on-disk repo is skipped without error; the self-repo (dadaia-workspace) is
+    never overwritten; the tri-copy targets are never produced by this fan-out;
+    and (Ruling L) a nested subtree AGENTS.md is never touched — only the repo
+    ROOT pair is lib-owned."""
     source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("deadctx", "dead")])
-    repo = _make_repo(tmp_path, "deadctx")
 
-    _install_workspace_guardrail_pair(source, tmp_path, force=False)
+    if case == "dead-context-repo-is-also-fanned":
+        _write_registry(tmp_path, [("deadctx", "dead")])
+        repo = _make_repo(tmp_path, "deadctx")
+        _install_workspace_guardrail_pair(source, tmp_path, force=False)
+        assert (repo / "AGENTS.md").exists(), (
+            "a dead context's on-disk repo must still receive the pair"
+        )
+        assert _sha(repo / "AGENTS.md") == _sha(source)
 
-    assert (repo / "AGENTS.md").exists(), (
-        "a dead context's on-disk repo must still receive the pair"
-    )
-    assert _sha(repo / "AGENTS.md") == _sha(source)
+    elif case == "registry-context-without-on-disk-repo-skipped":
+        _write_registry(tmp_path, [("ghost", "alive"), ("demo", "alive")])
+        demo = _make_repo(tmp_path, "demo")  # ghost intentionally NOT created
+        # Must not raise even though repos/ghost/ does not exist.
+        _install_workspace_guardrail_pair(source, tmp_path, force=False)
+        assert (demo / "AGENTS.md").exists(), "the on-disk context (demo) must be written"
+        assert not (tmp_path / "repos" / "ghost").exists(), "the absent context is not materialized"
 
+    elif case == "self-repo-is-skipped":
+        _write_registry(tmp_path, [("dadaia-workspace", "alive"), ("demo", "alive")])
+        self_repo = _make_repo(tmp_path, "dadaia-workspace")
+        (self_repo / "pyproject.toml").write_text(
+            '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+            encoding="utf-8",
+        )
+        demo = _make_repo(tmp_path, "demo")
+        _install_workspace_guardrail_pair(source, tmp_path, force=False)
+        assert not (self_repo / "AGENTS.md").exists(), "self-repo must never be overwritten"
+        assert (demo / "AGENTS.md").exists(), "a non-self consumer is still written"
 
-def test_registry_context_without_on_disk_repo_skipped_silently(tmp_path: Path) -> None:
-    """A registered context whose ``repos/<slug>/`` is absent is skipped without error."""
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("ghost", "alive"), ("demo", "alive")])
-    demo = _make_repo(tmp_path, "demo")  # ghost intentionally NOT created
+    elif case == "tri-copy-targets-not-written":
+        _write_registry(tmp_path, [("demo", "alive")])
+        _make_repo(tmp_path, "demo")
+        (tmp_path / "specs" / "memory").mkdir(parents=True)
+        _install_workspace_guardrail_pair(source, tmp_path, force=False)
+        assert not (tmp_path / "specs" / "AGENTS.md").exists()
+        assert not (tmp_path / "specs" / "memory" / "AGENTS.md").exists()
 
-    # Must not raise even though repos/ghost/ does not exist.
-    _install_workspace_guardrail_pair(source, tmp_path, force=False)
-
-    assert (demo / "AGENTS.md").exists(), "the on-disk context (demo) must be written"
-    assert not (tmp_path / "repos" / "ghost").exists(), "the absent context is not materialized"
-
-
-def test_self_repo_is_skipped(tmp_path: Path) -> None:
-    """The dadaia-workspace source tree (self) is skipped; other consumers still write."""
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("dadaia-workspace", "alive"), ("demo", "alive")])
-    self_repo = _make_repo(tmp_path, "dadaia-workspace")
-    (self_repo / "pyproject.toml").write_text(
-        '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
-        encoding="utf-8",
-    )
-    demo = _make_repo(tmp_path, "demo")
-
-    _install_workspace_guardrail_pair(source, tmp_path, force=False)
-
-    assert not (self_repo / "AGENTS.md").exists(), "self-repo must never be overwritten"
-    assert (demo / "AGENTS.md").exists(), "a non-self consumer is still written"
-
-
-def test_tri_copy_targets_not_written_by_fan_out(tmp_path: Path) -> None:
-    """Ruling I: the fan-out writes ONLY workspace-root + consumer-repo roots.
-
-    ``specs/AGENTS.md`` and ``specs/memory/AGENTS.md`` (the v0.1.48 tri-copy)
-    are never produced by the guardrail fan-out.
-    """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    _make_repo(tmp_path, "demo")
-    (tmp_path / "specs" / "memory").mkdir(parents=True)
-
-    _install_workspace_guardrail_pair(source, tmp_path, force=False)
-
-    assert not (tmp_path / "specs" / "AGENTS.md").exists()
-    assert not (tmp_path / "specs" / "memory" / "AGENTS.md").exists()
+    else:  # nested-subtree-agents-md-left-untouched
+        _write_registry(tmp_path, [("demo", "alive")])
+        repo = _make_repo(tmp_path, "demo")
+        nested = repo / "src" / "AGENTS.md"
+        nested.parent.mkdir(parents=True)
+        operator_content = b"# Operator-authored nested AGENTS for repos/demo/src\n"
+        nested.write_bytes(operator_content)
+        _install_workspace_guardrail_pair(source, tmp_path, force=False)
+        assert nested.read_bytes() == operator_content, (
+            "nested subtree AGENTS.md must remain untouched"
+        )
+        # The root pair was still installed.
+        assert (repo / "AGENTS.md").exists()
 
 
 # ---------------------------------------------------------------------------
-# A5 / Ruling L — divergent consumer root restored, DISTINCT [updated] line
+# Relocated from test_public_assets.py (T-2, v0.1.75): the module-level
+# _consumer_repos_for_root / _is_self_repo functions share this file's registry
+# fixture family. The former instance-method duplicates
+# (manager._consumer_repos / manager._is_self_repo, both thin delegations to
+# these same module functions) were DELETED as byte-duplicates.
 # ---------------------------------------------------------------------------
 
 
-def test_divergent_consumer_root_restored_with_updated_line(tmp_path: Path) -> None:
-    """A divergent but BANNER-BEARING (lib-owned) consumer root ``AGENTS.md`` is restored to
-    canonical AND ``_write_pair`` emits the DISTINCT ``[updated]`` line — never a silent
-    ``[ok]``.
+def _add_marker_consumer(
+    workspace_root: Path, slug: str, pkg_version: str = _OTHER_VERSION
+) -> Path:
+    """Register a consumer repo under workspace_root/repos/ (v0.1.58 FR4).
 
-    v0.1.60 FR9 amendment: only a *provable canonical projection* (carries
-    ``_CANONICAL_AGENTS_BANNER``) is lib-owned and eligible for restore; the divergent copy is
-    re-fixtured WITH the banner to keep the ``[updated]`` classification (a bannerless
-    divergent copy is now ``[foreign]`` — see the provenance suite).
+    Detection is registry-based (Ruling G): the slug is registered in
+    ``spec_contexts.json``. The ``.dadaia/agentic/manifest.json`` is still written
+    because ``_is_self_repo`` reads ``package_version`` from it for the self-skip
+    check (RETAINED, Ruling G) — it is NO LONGER what drives detection.
     """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    repo = _make_repo(tmp_path, "demo")
-    (repo / "AGENTS.md").write_bytes(
-        _CANONICAL_AGENTS_BANNER.encode() + b"\n# HAND-EDITED divergent (but lib-owned) copy\n"
+    consumer = workspace_root / "repos" / slug
+    (consumer / ".dadaia" / "agentic").mkdir(parents=True, exist_ok=True)
+    manifest = {"schema_version": "1", "package_version": pkg_version}
+    (consumer / ".dadaia" / "agentic" / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
     )
+    _write_registry(workspace_root, [(slug, "alive")])
+    return consumer
 
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(source, tmp_path, force=False, installed=installed)
 
-    # Restored to canonical.
-    assert _sha(repo / "AGENTS.md") == _sha(source), "divergent consumer copy must be restored"
+def test_consumer_repos_for_root_registry_detection(tmp_path: Path) -> None:
+    """A registry-registered on-disk repo is returned (v0.1.58 FR4); a bare on-disk
+    repo NOT in the registry is invisible — no stderr [skip] line either, for a
+    fully bare repo or a repo carrying only a (no-longer-driving) in-repo
+    ``.dadaia/`` marker; a plain file inside repos/ is skipped."""
+    assert _consumer_repos_for_root(tmp_path) == []
 
-    updated_lines = [
-        e
-        for e in installed
-        if e.startswith("[updated]")
-        and str(repo / "AGENTS.md") in e
-        and "overwrote divergent workspace-law copy" in e
-    ]
-    assert updated_lines, (
-        "a divergent consumer overwrite must emit a DISTINCT [updated] line, not a silent [ok].\n"
-        f"  installed: {installed}"
+    consumer = _add_marker_consumer(tmp_path, "my-repo")
+    assert consumer in _consumer_repos_for_root(tmp_path)
+
+    unregistered = tmp_path / "repos" / "no-markers"
+    unregistered.mkdir(parents=True)
+    assert unregistered not in _consumer_repos_for_root(tmp_path)
+
+    partial = tmp_path / "repos" / "partial"
+    (partial / ".dadaia").mkdir(parents=True)
+    assert partial not in _consumer_repos_for_root(tmp_path)
+
+    repos_dir = tmp_path / "repos"
+    (repos_dir / "somefile.txt").write_text("x")
+    # A file in repos/ contributes nothing (still only the registered consumer).
+    assert _consumer_repos_for_root(tmp_path) == [consumer]
+
+
+def test_is_self_repo_manifest_and_pyproject_precedence(tmp_path: Path) -> None:
+    """self-repo identification: manifest package_version match; missing/invalid/
+    different-version manifest is NOT self; a poetry OR PEP-621 pyproject.toml
+    named dadaia-workspace IS self (with or without a manifest — pyproject wins);
+    a differently-named or malformed pyproject falls through to the manifest
+    check (never raises)."""
+    with patch(
+        "dadaia_workspace.infrastructure.workspace_guardrail._package_version",
+        return_value=_INSTALLED_VERSION,
+    ):
+        matching = _add_marker_consumer(tmp_path, "self", pkg_version=_INSTALLED_VERSION)
+        assert _is_self_repo(matching) is True
+
+        different = _add_marker_consumer(tmp_path, "other", pkg_version=_OTHER_VERSION)
+        assert _is_self_repo(different) is False
+
+    no_manifest = tmp_path / "repos" / "no-manifest"
+    (no_manifest / ".dadaia" / "agentic").mkdir(parents=True)
+    assert _is_self_repo(no_manifest) is False
+
+    invalid_json = tmp_path / "repos" / "bad-json"
+    (invalid_json / ".dadaia" / "agentic").mkdir(parents=True)
+    (invalid_json / ".dadaia" / "agentic" / "manifest.json").write_text(
+        "NOT JSON", encoding="utf-8"
     )
-    # It must NOT be reported as a plain fresh-create [ok].
-    assert not any(e.startswith("[ok]") and str(repo / "AGENTS.md") in e for e in installed), (
-        "the divergent-overwrite line must not masquerade as a fresh [ok]."
+    assert _is_self_repo(invalid_json) is False
+
+    empty_version = tmp_path / "repos" / "empty-ver"
+    (empty_version / ".dadaia" / "agentic").mkdir(parents=True)
+    (empty_version / ".dadaia" / "agentic" / "manifest.json").write_text(
+        json.dumps({"package_version": ""}), encoding="utf-8"
     )
+    assert _is_self_repo(empty_version) is False
 
+    for slug, pyproject in {
+        "poetry": '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+        "pep621": '[project]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
+    }.items():
+        pyproject_consumer = tmp_path / "repos" / slug
+        pyproject_consumer.mkdir(parents=True)
+        (pyproject_consumer / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+        assert _is_self_repo(pyproject_consumer) is True
 
-def test_nested_subtree_agents_md_left_untouched(tmp_path: Path) -> None:
-    """Ruling L: operator customization in a nested ``repos/<slug>/src/AGENTS.md``
-    is NEVER touched by the fan-out — only the repo ROOT pair is lib-owned.
-    """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    repo = _make_repo(tmp_path, "demo")
-    nested = repo / "src" / "AGENTS.md"
-    nested.parent.mkdir(parents=True)
-    operator_content = b"# Operator-authored nested AGENTS for repos/demo/src\n"
-    nested.write_bytes(operator_content)
-
-    _install_workspace_guardrail_pair(source, tmp_path, force=False)
-
-    assert nested.read_bytes() == operator_content, "nested subtree AGENTS.md must remain untouched"
-    # The root pair was still installed.
-    assert (repo / "AGENTS.md").exists()
-
-
-# ---------------------------------------------------------------------------
-# AC-7 — doctor flags stale/missing consumer copies (never [skip])
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_flags_foreign_for_bannerless_consumer(tmp_path: Path) -> None:
-    """A bannerless (hand-authored / stale-bannerless) ``repos/demo/AGENTS.md`` yields
-    ``[foreign] repos/demo:AGENTS.md`` — never ``[skip]``.
-
-    v0.1.60 FR9 amendment ([drift]→[foreign]): under the module-constant banner, a consumer
-    AGENTS.md that does NOT carry ``_CANONICAL_AGENTS_BANNER`` is repo-owned, not a drift — so
-    ``public doctor`` does not perpetually flag it. (A banner-bearing stale copy is still
-    ``[drift]`` — see ``test_consumer_fanout_provenance.py``.)
-    """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    repo = _make_repo(tmp_path, "demo")
-    (repo / "AGENTS.md").write_bytes(b"# STALE bannerless consumer copy\n")
-    (repo / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
-
-    lines = _doctor_guardrail_pair(source, tmp_path)
-
-    assert "[foreign] repos/demo:AGENTS.md" in lines, (
-        f"bannerless consumer AGENTS.md must be flagged [foreign] in the report list.\n  lines: {lines}"
+    other_lib = tmp_path / "repos" / "other-lib"
+    other_lib.mkdir(parents=True)
+    (other_lib / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "some-other-lib"\nversion = "1.0.0"\n', encoding="utf-8"
     )
-    assert not any(ln.startswith("[skip]") for ln in lines), (
-        "the doctor report list must never contain a [skip] line for a real consumer repo."
+    assert _is_self_repo(other_lib) is False
+
+    broken_pyproject = tmp_path / "repos" / "broken-pyproject"
+    broken_pyproject.mkdir(parents=True)
+    (broken_pyproject / "pyproject.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
+    assert _is_self_repo(broken_pyproject) is False  # falls through, never raises
+
+    # pyproject guard fires before the manifest check; result is still True even
+    # with a non-matching manifest version present.
+    lib_with_manifest = tmp_path / "repos" / "lib-with-manifest"
+    lib_with_manifest.mkdir(parents=True)
+    (lib_with_manifest / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n', encoding="utf-8"
     )
-
-
-def test_doctor_flags_missing_consumer(tmp_path: Path) -> None:
-    """An absent ``repos/demo/AGENTS.md`` yields ``[missing] repos/demo:AGENTS.md``."""
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    _make_repo(tmp_path, "demo")  # repo exists; AGENTS.md not written
-
-    lines = _doctor_guardrail_pair(source, tmp_path)
-
-    assert "[missing] repos/demo:AGENTS.md" in lines, (
-        f"absent consumer AGENTS.md must be flagged [missing].\n  lines: {lines}"
+    (lib_with_manifest / ".dadaia" / "agentic").mkdir(parents=True)
+    (lib_with_manifest / ".dadaia" / "agentic" / "manifest.json").write_text(
+        json.dumps({"package_version": "999.0.0"}), encoding="utf-8"
     )
-
-
-def test_doctor_reports_foreign_for_fresh_bannerless_consumer(tmp_path: Path) -> None:
-    """After a fresh install of a BANNERLESS source the consumer copy reads
-    ``[foreign] repos/demo:AGENTS.md``.
-
-    v0.1.60 FR9 amendment ([ok]→[foreign]): the synthetic source carries no banner, so the
-    projected consumer copy is not a provable lib-owned projection — it classifies
-    ``[foreign]``. In production the shipped ``data/AGENTS.md`` DOES carry the banner, so a
-    real fresh consumer reads ``[ok]`` (covered by ``test_consumer_fanout_provenance.py``).
-    """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    _make_repo(tmp_path, "demo")
-
-    _install_workspace_guardrail_pair(source, tmp_path, force=True)
-    lines = _doctor_guardrail_pair(source, tmp_path)
-
-    labels = _labels(lines)
-    assert "repos/demo:AGENTS.md" in labels
-    assert "repos/demo:CLAUDE.md" in labels
-    assert "[foreign] repos/demo:AGENTS.md" in lines, (
-        f"a bannerless fresh consumer copy must read [foreign].\n  lines: {lines}"
-    )
-
-
-def test_doctor_never_skips_a_registered_consumer(tmp_path: Path) -> None:
-    """Ruling J: a registered on-disk consumer is always represented by a
-    ``[drift]``/``[missing]``/``[ok]`` line — the report list never carries a
-    ``[skip]`` for it.
-    """
-    source = _make_source(tmp_path)
-    _write_registry(tmp_path, [("demo", "alive")])
-    _make_repo(tmp_path, "demo")
-
-    lines = _doctor_guardrail_pair(source, tmp_path)
-
-    assert any("repos/demo:AGENTS.md" in ln for ln in lines)
-    assert not any("[skip]" in ln for ln in lines)
+    assert _is_self_repo(lib_with_manifest) is True

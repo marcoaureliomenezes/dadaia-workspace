@@ -24,6 +24,8 @@ def _drift_ptr(workspace: Path, ctx: str, to_sid: str) -> None:
 
 
 def test_confirmed_holder_with_drifted_ptr_is_coherent(tmp_path: Path) -> None:
+    """The false-positive fix: a confirmed live holder's drifted ptr is drift, not
+    forgery — coherence() returns None (no incoherence report)."""
     lease.acquire(tmp_path, "ctxa", "sess_holder", "v1", "IMPLEMENTATION", pid=4321)
     _drift_ptr(tmp_path, "ctxa", "sess_later_read_bind")
 
@@ -35,10 +37,11 @@ def test_confirmed_holder_with_drifted_ptr_is_coherent(tmp_path: Path) -> None:
     assert message is None
 
 
-def test_unconfirmed_divergence_still_reports(tmp_path: Path) -> None:
-    """An evidence-less lock holder + divergent ptr keeps the incoherence message."""
+def test_unconfirmed_divergence_and_legacy_default_both_still_report(tmp_path: Path) -> None:
+    """An evidence-less lock holder + divergent ptr keeps the incoherence message
+    (unconfirmed case), and the same holds without the confirmation flag at all
+    (legacy back-compat default)."""
     _drift_ptr(tmp_path, "ctxa", "sess_ptr_only")
-
     confirmed = lease.session_holds(tmp_path, "ctxa", "sess_forged")
     assert confirmed is False
     message = session_identity.coherence(
@@ -47,9 +50,6 @@ def test_unconfirmed_divergence_still_reports(tmp_path: Path) -> None:
     assert message is not None
     assert "incoherence" in message
 
-
-def test_default_keeps_legacy_behavior(tmp_path: Path) -> None:
-    """Without the confirmation flag, divergence reports as before (back-compat)."""
-    _drift_ptr(tmp_path, "ctxa", "sess_ptr")
-    message = session_identity.coherence(tmp_path, "ctxa", lock_holder="sess_lock")
-    assert message is not None
+    _drift_ptr(tmp_path, "ctxb", "sess_ptr")
+    legacy_message = session_identity.coherence(tmp_path, "ctxb", lock_holder="sess_lock")
+    assert legacy_message is not None

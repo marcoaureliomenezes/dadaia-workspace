@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.cli.commands.lifecycle import _runs_summary
 from dadaia_workspace.core.models.lifecycle import (
     LifecyclePhase,
@@ -42,32 +44,43 @@ def _save(tmp_path: Path, run_id: str, context: str, release_id: str) -> None:
     )
 
 
-def test_runs_summary_filters_by_context_and_release(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("name", "context", "release_id", "expected_matched", "expected_extra"),
+    [
+        (
+            "filters_by_context_and_release",
+            "dd-chain-capture",
+            "v0.2.0",
+            2,
+            {"context": "dd-chain-capture", "release_id": "v0.2.0", "by_status": {"completed": 2}},
+        ),
+        ("no_filter_counts_all", None, None, 2, {}),
+        ("context_only_filter", "dd-chain-capture", None, 2, {}),
+    ],
+)
+def test_runs_summary_table(
+    tmp_path: Path,
+    name: str,
+    context: str | None,
+    release_id: str | None,
+    expected_matched: int,
+    expected_extra: dict[str, object],
+) -> None:
     _workspace(tmp_path)
-    _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
-    _save(tmp_path, "r2", "dd-chain-capture", "v0.2.0")
-    _save(tmp_path, "r3", "dd-chain-capture", "v0.3.0")
-    _save(tmp_path, "r4", "some-other-context", "v0.2.0")
+    if name == "filters_by_context_and_release":
+        _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
+        _save(tmp_path, "r2", "dd-chain-capture", "v0.2.0")
+        _save(tmp_path, "r3", "dd-chain-capture", "v0.3.0")
+        _save(tmp_path, "r4", "some-other-context", "v0.2.0")
+    elif name == "no_filter_counts_all":
+        _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
+        _save(tmp_path, "r2", "some-other-context", "v0.9.9")
+    else:  # context_only_filter
+        _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
+        _save(tmp_path, "r2", "dd-chain-capture", "v0.3.0")
+        _save(tmp_path, "r3", "other", "v0.2.0")
 
-    scoped = _runs_summary(tmp_path, context="dd-chain-capture", release_id="v0.2.0")
-    assert scoped["matched"] == 2
-    assert scoped["context"] == "dd-chain-capture"
-    assert scoped["release_id"] == "v0.2.0"
-    assert scoped["by_status"] == {"completed": 2}
-
-
-def test_runs_summary_no_filter_counts_all(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
-    _save(tmp_path, "r2", "some-other-context", "v0.9.9")
-    summary = _runs_summary(tmp_path, context=None, release_id=None)
-    assert summary["matched"] == 2
-
-
-def test_runs_summary_context_only_filter(tmp_path: Path) -> None:
-    _workspace(tmp_path)
-    _save(tmp_path, "r1", "dd-chain-capture", "v0.2.0")
-    _save(tmp_path, "r2", "dd-chain-capture", "v0.3.0")
-    _save(tmp_path, "r3", "other", "v0.2.0")
-    summary = _runs_summary(tmp_path, context="dd-chain-capture", release_id=None)
-    assert summary["matched"] == 2
+    summary = _runs_summary(tmp_path, context=context, release_id=release_id)
+    assert summary["matched"] == expected_matched
+    for key, value in expected_extra.items():
+        assert summary[key] == value

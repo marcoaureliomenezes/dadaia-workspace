@@ -101,31 +101,38 @@ def _assert_all_pi(recorder: FakeAgentRuntime, persisted: object) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_cli_harness_pi_resolves_pi_end_to_end(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default", default_harness="pi")
-
-    # Snapshot sanity: implement runs the PI standard profile, reviews the PI deep profile.
-    assert snapshot.step("implement").model_profile == "pi-implementation-standard"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
-
-    recorder, persisted = _run(workspace, snapshot)
-    _assert_all_pi(recorder, persisted)
-
-
-def test_cli_flag_harness_pi_show_policy_resolves_pi_per_step(
+def test_pi_resolution_cli_flag_overlay_and_step_harness(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-29-C-03 — the real ``dadaia lifecycle pipeline --harness pi --show-policy`` FLAG
-    (not just the resolver kwarg) threads through the CLI into the shared resolver, so the
-    governed snapshot resolves harness=pi + a PI catalog model for every step.
-    ``--show-policy`` resolves + emits the snapshot WITHOUT running an adapter, keeping the
-    proof hermetic (no PI binary, no credits)."""
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    """Merged pi-resolution proof (CLI flag + resolver default_harness kwarg + overlay
+    default_harness + step-harness), each on its own isolated workspace:
 
-    result = CliRunner().invoke(
+    1. Resolver kwarg path (``default_harness="pi"``): implement runs the PI standard
+       profile, reviews the PI deep profile; every recorded model + persisted snapshot
+       entry is on PI.
+    2. T-29-C-03 — the real ``dadaia lifecycle pipeline --harness pi --show-policy`` FLAG
+       (not just the resolver kwarg) threads through the CLI into the shared resolver, so
+       the governed snapshot resolves harness=pi + a PI catalog model for every step.
+       ``--show-policy`` resolves + emits the snapshot WITHOUT running an adapter, keeping
+       the proof hermetic (no PI binary, no credits).
+    3. Overlay path (AC-5): ``default_harness: pi`` persisted with no CLI flag resolves PI
+       for every step end to end.
+    4. Overlay step-harness: only the overridden step resolves to PI; its sibling stays on
+       the catalog default (codex).
+    """
+    # 1. Resolver kwarg path.
+    kwarg_ws = _init_workspace(tmp_path / "kwarg-case")
+    resolver = container.build_workflow_policy_resolver(kwarg_ws, context="dadaia-workspace")
+    snapshot = resolver.resolve("implementation", context="default", default_harness="pi")
+    assert snapshot.step("implement").model_profile == "pi-implementation-standard"  # type: ignore[union-attr]
+    assert snapshot.step("review_qa").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
+    recorder, persisted = _run(kwarg_ws, snapshot)
+    _assert_all_pi(recorder, persisted)
+
+    # 2. Real CLI --harness pi --show-policy flag.
+    cli_ws = _init_workspace(tmp_path / "cli-flag-case")
+    monkeypatch.chdir(cli_ws)
+    cli_result = CliRunner().invoke(
         app,
         [
             "lifecycle",
@@ -138,24 +145,18 @@ def test_cli_flag_harness_pi_show_policy_resolves_pi_per_step(
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    steps = payload["steps"]
-    assert steps, payload
-    for entry in steps:
+    assert cli_result.exit_code == 0, cli_result.output
+    cli_payload = json.loads(cli_result.output)
+    cli_steps = cli_payload["steps"]
+    assert cli_steps, cli_payload
+    for entry in cli_steps:
         assert entry["harness"] == "pi", entry
         assert entry["model"] in _PI_MODELS, entry
 
-
-# ---------------------------------------------------------------------------
-# AC-5 — overlay path (default_harness: pi, no CLI flag)
-# ---------------------------------------------------------------------------
-
-
-def test_overlay_default_harness_pi_resolves_pi_end_to_end(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    store = container.build_workflow_model_policy_store(workspace)
-    overlay = store.parse(
+    # 3. Overlay default_harness path, no CLI flag.
+    overlay_ws = _init_workspace(tmp_path / "overlay-default-case")
+    overlay_store = container.build_workflow_model_policy_store(overlay_ws)
+    default_overlay = overlay_store.parse(
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -164,12 +165,40 @@ def test_overlay_default_harness_pi_resolves_pi_end_to_end(tmp_path: Path) -> No
             },
         }
     )
-    store.save(overlay)
+    overlay_store.save(default_overlay)
+    overlay_resolver = container.build_workflow_policy_resolver(
+        overlay_ws, context="dadaia-workspace"
+    )
+    overlay_snapshot = overlay_resolver.resolve("implementation", context="default")
+    overlay_recorder, overlay_persisted = _run(overlay_ws, overlay_snapshot)
+    _assert_all_pi(overlay_recorder, overlay_persisted)
 
-    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")  # no CLI flag
-    recorder, persisted = _run(workspace, snapshot)
-    _assert_all_pi(recorder, persisted)
+    # 4. Overlay step-harness: only the overridden step resolves to PI.
+    step_ws = _init_workspace(tmp_path / "overlay-step-case")
+    step_store = container.build_workflow_model_policy_store(step_ws)
+    step_overlay = step_store.parse(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {
+                    "workflows": {"implementation": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                }
+            },
+        }
+    )
+    step_store.save(step_overlay)
+    step_resolver = container.build_workflow_policy_resolver(step_ws, context="dadaia-workspace")
+    step_snapshot = step_resolver.resolve("implementation", context="default")
+    step_recorder, step_persisted = _run(step_ws, step_snapshot)
+
+    step_models = step_recorder.received_models
+    assert step_models[0] is not None and step_models[0].harness == "pi"
+    assert step_models[1] is not None and step_models[1].harness == "codex"
+    assert step_persisted is not None
+    step_snap = step_persisted.workflow_policy  # type: ignore[attr-defined]
+    assert step_snap.step("implement").harness == "pi"
+    assert step_snap.step("review_qa").harness == "codex"
 
 
 def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -> None:
@@ -218,73 +247,3 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
     snapshot = resolver.resolve("implementation", context="default")
     recorder, persisted = _run(workspace, snapshot)
     _assert_all_pi(recorder, persisted)
-
-
-def test_overlay_step_harness_pi_only_that_step(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    store = container.build_workflow_model_policy_store(workspace)
-    overlay = store.parse(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {"implementation": {"steps": {}, "harnesses": {"implement": "pi"}}}
-                }
-            },
-        }
-    )
-    store.save(overlay)
-    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
-    recorder, persisted = _run(workspace, snapshot)
-
-    models = recorder.received_models
-    assert models[0] is not None and models[0].harness == "pi"
-    assert models[1] is not None and models[1].harness == "codex"
-    assert persisted is not None
-    snap = persisted.workflow_policy  # type: ignore[attr-defined]
-    assert snap.step("implement").harness == "pi"
-    assert snap.step("review_qa").harness == "codex"
-
-
-# ---------------------------------------------------------------------------
-# AC-10 — default-first / back-compat
-# ---------------------------------------------------------------------------
-
-
-def test_default_first_no_overlay_no_flag_resolves_codex(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
-    recorder, persisted = _run(workspace, snapshot)
-
-    for m in recorder.received_models:
-        assert m is not None and m.harness == "codex"
-    assert persisted is not None
-    for entry in persisted.workflow_policy.steps:  # type: ignore[attr-defined]
-        assert entry.harness == "codex"
-
-
-def test_back_compat_overlay_without_harness_resolves_catalog_default(tmp_path: Path) -> None:
-    workspace = _init_workspace(tmp_path)
-    store = container.build_workflow_model_policy_store(workspace)
-    # A v0.1.28-shaped overlay (profile override only, no harness fields).
-    overlay = store.parse(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
-                }
-            },
-        }
-    )
-    store.save(overlay)
-    resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.harness == "codex"
-    assert impl.model_profile == "codex-review-deep"

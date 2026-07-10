@@ -91,19 +91,8 @@ def test_loader_captures_frontmatter_parse_error_with_line_and_column(tmp_path: 
     assert item.status is None
 
 
-def test_loader_leaves_well_formed_items_untouched(tmp_path: Path) -> None:
-    backlog = _write_backlog(tmp_path, "good.md", _WELL_FORMED_CONTENT)
-    items = load_backlog_items(backlog)
-    assert len(items) == 1
-    item = items[0]
-    assert item.frontmatter_error is None
-    assert item.status == "candidate"
-    assert len(item.intents) == 1
-    assert item.intents[0].subject.ref == "pkg/mod.py#some_symbol"
-
-
 # ---------------------------------------------------------------------------
-# Doctor: dedicated finding + downstream suppression
+# Doctor: dedicated finding + downstream suppression vs well-formed still flagged
 # ---------------------------------------------------------------------------
 
 
@@ -122,7 +111,10 @@ def test_doctor_emits_parse_error_finding_not_no_intents(tmp_path: Path) -> None
     assert not any("invalid status" in m for m in messages)
 
 
-def test_doctor_still_flags_missing_intents_on_well_formed_item(tmp_path: Path) -> None:
+def test_doctor_still_flags_well_formed_items_unaffected(tmp_path: Path) -> None:
+    """A parse-error item's suppression must not bleed into other items: a well-formed
+    item with no intents still gets 'no intents[]', and a well-formed item with an
+    unresolved subject still surfaces it."""
     backlog = _write_backlog(
         tmp_path, "no-intents.md", "---\nstatus: candidate\n---\n\n# No intents\n"
     )
@@ -131,9 +123,8 @@ def test_doctor_still_flags_missing_intents_on_well_formed_item(tmp_path: Path) 
     assert any("no intents[] declared" in f.message for f in findings)
     assert not any("frontmatter YAML parse error" in f.message for f in findings)
 
-
-def test_doctor_still_surfaces_unresolved_subjects_on_well_formed_item(tmp_path: Path) -> None:
-    backlog = _write_backlog(tmp_path, "good.md", _WELL_FORMED_CONTENT)
-    items = load_backlog_items(backlog)
-    findings = _check_schema(_ctx(items))
-    assert any("unresolved: pkg/mod.py#some_symbol" in f.message for f in findings)
+    backlog2 = _write_backlog(tmp_path, "good.md", _WELL_FORMED_CONTENT)
+    items2 = load_backlog_items(backlog2)
+    findings2 = _check_schema(_ctx(items2))
+    assert any("unresolved: pkg/mod.py#some_symbol" in f.message for f in findings2)
+    assert not any("frontmatter YAML parse error" in f.message for f in findings2)

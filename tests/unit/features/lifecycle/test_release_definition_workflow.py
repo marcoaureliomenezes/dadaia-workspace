@@ -1,15 +1,12 @@
-"""WS-5 / T-24-09 — the release-definition workflow runs the §6.1 sequence on fragments.
+"""WS-5 / T-24-09 — release-definition workflow-specific behavior beyond the shared suite.
 
-Proves the keystone behaviours:
-
-- the sequence assembles each model step's prompt from its **fragment bundle** (the
-  fragment id appears in the emitted prompt; the generic ``"Run the {label} step"``
-  suffix is gone for this workflow);
-- **Python owns the gates** — a REJECTED review handoff BLOCKS advancement and stops the
-  sequence (it never advances on model say-so), and the terminal Python
-  ``definition_commit_gate`` advances the release to IMPLEMENTATION only when every gate
-  passed;
-- injected context is recorded per step in the run record (T-24-08 seam).
+The shared e2e-completion / exact-consumption / block-on-missing / no-resolver behaviors are
+covered generically for this workflow in ``test_fragment_workflow_bodies.py``. This file keeps
+only what is release-definition-specific: **Python owns the gates** — a REJECTED review
+handoff BLOCKS advancement and stops the sequence (it never advances on model say-so), the
+terminal Python ``definition_commit_gate`` never runs, and the release never reaches
+IMPLEMENTATION. Prompt-substring assertions on fragment content are owned by
+``test_fragment_gate_goldens.py`` (byte-identical golden captures), not repeated here.
 """
 
 from __future__ import annotations
@@ -119,43 +116,6 @@ def _workflow(
     )
 
 
-def test_full_sequence_completes_and_advances_to_implementation(tmp_path: Path) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
-
-    result = wf.run("rd-1")
-
-    assert result.completed is True
-    assert result.final_phase is LifecyclePhase.IMPLEMENTATION
-    # Every §6.1 step ran, ending on the Python commit gate.
-    assert [s.label for s in result.steps] == [s.label for s in _SEQUENCE]
-    assert result.steps[-1].label == "definition_commit_gate"
-    assert result.steps[-1].is_gate is True
-    assert result.steps[-1].accepted is True
-
-
-def test_emitted_prompt_carries_fragment_content_not_generic_suffix(tmp_path: Path) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
-
-    result = wf.run("rd-2")
-
-    scope_step = next(s for s in result.steps if s.label == "release_scope")
-    assert scope_step.prompt_text is not None
-    # Fragment-sourced content is present...
-    assert "release_definition.release_scope" in scope_step.prompt_text
-    assert "fragment:" in scope_step.prompt_text
-    # ...and the generic suffix is gone for this workflow.
-    assert "Run the release_scope step" not in scope_step.prompt_text
-    assert "Run the release-define step" not in scope_step.prompt_text
-    # The coherent contract (v0.1.32 / D-1): the single transport schema is the worker's
-    # emit target via the `schema` field; the fragment's domain schema is NOT surfaced as a
-    # competing schema-to-emit in the "## Required output" section.
-    required = scope_step.prompt_text[scope_step.prompt_text.index("## Required output") :]
-    assert "agent-run-result-v1" in required
-    assert "release-scope-handoff-v1" not in required
-
-
 def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     store = _MemoryRunStore()
 
@@ -187,19 +147,3 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     assert result.steps[-1].accepted is False
     # The release never advanced to IMPLEMENTATION.
     assert result.final_phase is not LifecyclePhase.IMPLEMENTATION
-
-
-def test_injected_context_recorded_per_step(tmp_path: Path) -> None:
-    store = _MemoryRunStore()
-    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
-
-    wf.run("rd-4")
-
-    run = store.load("rd-4")
-    assert run is not None
-    recorded_steps = {entry.step for entry in run.injected_context}
-    # Each model step recorded its fragment ids + resolved refs.
-    assert "release_scope" in recorded_steps
-    assert "spec_create" in recorded_steps
-    scope_entry = next(e for e in run.injected_context if e.step == "release_scope")
-    assert "release_definition.release_scope" in scope_entry.fragment_ids

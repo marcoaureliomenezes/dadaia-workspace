@@ -32,28 +32,30 @@ def _old_report(workspace: Path) -> Path:
     return report
 
 
-def test_reports_cleanup_dry_run_json_is_non_mutating(tmp_path: Path, monkeypatch) -> None:
+def test_reports_cleanup_dry_run_then_delete_expired_and_status_counters(
+    tmp_path: Path, monkeypatch
+) -> None:
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
     report = _old_report(tmp_path)
 
-    result = _runner.invoke(app, ["reports", "cleanup", "--dry-run", "--json"])
+    status_before = _runner.invoke(app, ["reports", "status", "--json"])
+    assert status_before.exit_code == 0, status_before.output
+    status_payload = json.loads(status_before.output)
+    assert status_payload["report_count"] == 1
+    assert status_payload["stale_report_count"] == 1
+    assert status_payload["important_report_count"] == 0
+    assert status_payload["malformed_state"] is False
 
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["dry_run"] is True
-    assert payload["candidate_count"] == 1
-    assert payload["deleted_count"] == 0
+    dry_run = _runner.invoke(app, ["reports", "cleanup", "--dry-run", "--json"])
+    assert dry_run.exit_code == 0, dry_run.output
+    dry_payload = json.loads(dry_run.output)
+    assert dry_payload["dry_run"] is True
+    assert dry_payload["candidate_count"] == 1
+    assert dry_payload["deleted_count"] == 0
     assert report.exists()
 
-
-def test_reports_cleanup_deletes_expired_report(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    report = _old_report(tmp_path)
-
     result = _runner.invoke(app, ["reports", "cleanup", "--json"])
-
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["dry_run"] is False
@@ -96,22 +98,15 @@ def test_reports_mark_important_rejects_parent_traversal(
     assert "parent traversal" in result.output
 
 
-def test_reports_cleanup_rejects_invalid_duration(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["reports", "cleanup", "--older-than", "bad", "--json"])
-
-    assert result.exit_code == 2
-    assert "duration must use h or d suffix" in result.output
-
-
-def test_reports_cleanup_rejects_non_positive_duration(
-    tmp_path: Path,
-    monkeypatch,
+def test_reports_cleanup_rejects_invalid_or_non_positive_duration(
+    tmp_path: Path, monkeypatch
 ) -> None:
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
+
+    invalid = _runner.invoke(app, ["reports", "cleanup", "--older-than", "bad", "--json"])
+    assert invalid.exit_code == 2
+    assert "duration must use h or d suffix" in invalid.output
 
     zero = _runner.invoke(app, ["reports", "cleanup", "--older-than", "0h"])
     negative = _runner.invoke(app, ["reports", "cleanup", "--older-than", "-1h"])
@@ -120,21 +115,3 @@ def test_reports_cleanup_rejects_non_positive_duration(
     assert "greater than zero" in zero.output
     assert negative.exit_code == 2
     assert "greater than zero" in negative.output
-
-
-def test_reports_status_json_exposes_retention_counters(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    _old_report(tmp_path)
-
-    result = _runner.invoke(app, ["reports", "status", "--json"])
-
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["report_count"] == 1
-    assert payload["stale_report_count"] == 1
-    assert payload["important_report_count"] == 0
-    assert payload["malformed_state"] is False

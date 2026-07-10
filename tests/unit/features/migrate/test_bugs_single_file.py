@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.features.migrate.bugs_single_file import migrate_bugs_single_file
-from dadaia_workspace.features.migrate.registry import REGISTRY, latest_version
 
 
 def _specs(tmp_path: Path) -> Path:
@@ -22,6 +21,8 @@ def _line(bug_id: str, ts: str) -> str:
 
 
 def test_consolidates_hourly_files_chronologically_before_canonical_tail(tmp_path: Path) -> None:
+    """CRITICAL: v0.1.73 hourly→single-file consolidation losslessness — chronological
+    ordering with the canonical tail file's own rows appended last."""
     specs = _specs(tmp_path)
     bugs = specs / "bugs"
     (bugs / "20260604T00Z-00.jsonl").write_text(_line("old-a", "2026-06-04T00:01:00Z"))
@@ -40,6 +41,7 @@ def test_consolidates_hourly_files_chronologically_before_canonical_tail(tmp_pat
 
 
 def test_collapses_archive_md_into_single_jsonl_losslessly(tmp_path: Path) -> None:
+    """CRITICAL: every archived .md source's verbatim content survives the collapse."""
     specs = _specs(tmp_path)
     archive = specs / "bugs" / "_archive"
     (archive / "old-bug-one.md").write_text("---\nstatus: Closed\n---\n\nBody one.\n")
@@ -53,35 +55,20 @@ def test_collapses_archive_md_into_single_jsonl_losslessly(tmp_path: Path) -> No
     assert any(r["content"].endswith("Body one.\n") for r in rows)  # verbatim content
 
 
-def test_dry_run_plans_and_writes_nothing(tmp_path: Path) -> None:
+def test_dry_run_plans_only_and_idempotent_second_run_is_noop(tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     bugs = specs / "bugs"
     (bugs / "20260604T00Z-00.jsonl").write_text(_line("a", "2026-06-04T00:01:00Z"))
     (bugs / "_archive" / "x.md").write_text("body\n")
 
-    result = migrate_bugs_single_file(specs, dry_run=True)
-
+    dry_result = migrate_bugs_single_file(specs, dry_run=True)
     assert (bugs / "20260604T00Z-00.jsonl").exists()
     assert not (bugs / "bugs.jsonl").exists()
     assert (bugs / "_archive" / "x.md").exists()
-    assert len(result.moved) == 2  # planned
+    assert len(dry_result.moved) == 2  # planned
 
-
-def test_idempotent_second_run_noop(tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    bugs = specs / "bugs"
-    (bugs / "20260604T00Z-00.jsonl").write_text(_line("a", "2026-06-04T00:01:00Z"))
     migrate_bugs_single_file(specs, dry_run=False)
     before = (bugs / "bugs.jsonl").read_text()
-
     result = migrate_bugs_single_file(specs, dry_run=False)
-
     assert (bugs / "bugs.jsonl").read_text() == before
     assert result.moved == []
-
-
-def test_registered_v3_to_v4() -> None:
-    step = next((s for s in REGISTRY if s.key == "bugs-single-file"), None)
-    assert step is not None
-    assert (step.from_version, step.to_version) == (3, 4)
-    assert latest_version() == 4

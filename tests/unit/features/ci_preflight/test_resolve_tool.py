@@ -17,6 +17,8 @@ from __future__ import annotations
 import stat
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.ci_preflight.service import (
     _resolve_tool,
     checks_for,
@@ -31,23 +33,107 @@ def _make_exe(directory: Path, name: str) -> Path:
     return exe
 
 
-def test_resolve_tool_prefers_venv_sibling_of_python(tmp_path: Path) -> None:
-    """A tool that sits beside the interpreter wins over every other source."""
+# ---------------------------------------------------------------------------
+# Resolution precedence: venv sibling > DADAIA_BIN > poetry fallback — 1 param
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("build", "tool", "expected_source"),
+    [
+        pytest.param("venv-wins-over-dadaia-bin", "ruff", "venv", id="venv-sibling-wins"),
+        pytest.param("dadaia-bin-only", "mypy", "dadaia-bin", id="fallback-to-dadaia-bin"),
+        pytest.param("neither", "pytest", "poetry", id="poetry-fallback-when-missing-everywhere"),
+        pytest.param(
+            "no-dadaia-bin-set", "ruff", "poetry", id="poetry-fallback-when-dadaia-bin-unset"
+        ),
+        pytest.param(
+            "dir-named-like-tool", "ruff", "poetry", id="dir-named-like-tool-not-executable"
+        ),
+    ],
+)
+def test_resolve_tool_precedence(
+    tmp_path: Path, build: str, tool: str, expected_source: str
+) -> None:
     venv_bin = tmp_path / "venv" / "bin"
     python = _make_exe(venv_bin, "python")
+    dadaia_bin_dir = tmp_path / "dadaia" / "bin"
+
+    if build == "venv-wins-over-dadaia-bin":
+        expected = _make_exe(venv_bin, tool)
+        _make_exe(dadaia_bin_dir, tool)
+        _make_exe(dadaia_bin_dir, "dadaia")
+        argv = _resolve_tool(
+            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
+        )
+        assert argv == (str(expected),)
+    elif build == "dadaia-bin-only":
+        _make_exe(dadaia_bin_dir, "dadaia")
+        expected = _make_exe(dadaia_bin_dir, tool)
+        argv = _resolve_tool(
+            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
+        )
+        assert argv == (str(expected),)
+    elif build == "neither":
+        _make_exe(dadaia_bin_dir, "dadaia")
+        argv = _resolve_tool(
+            tool, python_executable=str(python), dadaia_bin=str(dadaia_bin_dir / "dadaia")
+        )
+        assert argv == ("poetry", "run", tool)
+    elif build == "no-dadaia-bin-set":
+        argv = _resolve_tool(tool, python_executable=str(python), dadaia_bin=None)
+        assert argv == ("poetry", "run", tool)
+    elif build == "dir-named-like-tool":
+        (venv_bin / tool).mkdir()  # a *directory* named like the tool, not an executable
+        argv = _resolve_tool(tool, python_executable=str(python), dadaia_bin=None)
+        assert argv == ("poetry", "run", tool)
+
+
+def test_resolve_tool_never_calls_shutil_which_and_wires_all_checks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Hard guard: resolution must not consult the ambient PATH via shutil.which, AND
+    every one of the five checks resolves through it (never hardcoded 'poetry')."""
+    import dadaia_workspace.features.ci_preflight.service as svc
+
+    sentinel_called = False
+
+    def _boom(*_a: object, **_k: object) -> str | None:
+        nonlocal sentinel_called
+        sentinel_called = True
+        return "/usr/bin/ruff"
+
+    monkeypatch.setattr(svc.shutil, "which", _boom, raising=True)  # type: ignore[attr-defined]
+
+    venv_bin = tmp_path / "venv" / "bin"
+    _make_exe(venv_bin, "python")
+    _resolve_tool("ruff", python_executable=str(venv_bin / "python"), dadaia_bin=None)
+    assert sentinel_called is False
+
     ruff = _make_exe(venv_bin, "ruff")
+    mypy = _make_exe(venv_bin, "mypy")
+    pytest_exe = _make_exe(venv_bin, "pytest")
+    python = venv_bin / "python"
 
-    # DADAIA_BIN also has a ruff, but the venv sibling must win.
-    dadaia_bin = tmp_path / "dadaia" / "bin"
-    _make_exe(dadaia_bin, "ruff")
-    _make_exe(dadaia_bin, "dadaia")
+    full = checks_for(quick=False, python_executable=str(python), dadaia_bin=None)
+    quick = checks_for(quick=True, python_executable=str(python), dadaia_bin=None)
 
-    argv = _resolve_tool(
-        "ruff",
-        python_executable=str(python),
-        dadaia_bin=str(dadaia_bin / "dadaia"),
-    )
-    assert argv == (str(ruff),)
+    by_name = {c.name: c.argv for c in full}
+    assert by_name["ruff format --check"][0] == str(ruff)
+    assert by_name["ruff check"][0] == str(ruff)
+    assert by_name["mypy --strict"][0] == str(mypy)
+    assert by_name["pytest"][0] == str(pytest_exe)
+
+    quick_by_name = {c.name: c.argv for c in quick}
+    assert quick_by_name["pytest (no e2e)"][0] == str(pytest_exe)
+
+    for c in (*full, *quick):
+        assert c.argv[0] != "poetry", c.name
+
+
+# ---------------------------------------------------------------------------
+# Named regressions — kept verbatim
+# ---------------------------------------------------------------------------
 
 
 def test_resolve_tool_sibling_of_python_symlink_not_its_target(tmp_path: Path) -> None:
@@ -65,115 +151,6 @@ def test_resolve_tool_sibling_of_python_symlink_not_its_target(tmp_path: Path) -
 
     argv = _resolve_tool("ruff", python_executable=str(python_link), dadaia_bin=None)
     assert argv == (str(ruff),)
-
-
-def test_resolve_tool_falls_back_to_dadaia_bin_when_no_venv_sibling(tmp_path: Path) -> None:
-    """No sibling beside python → resolve from the DADAIA_BIN-derived bin dir."""
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")  # python only; no mypy beside it
-
-    dadaia_bin_dir = tmp_path / "dadaia" / "bin"
-    _make_exe(dadaia_bin_dir, "dadaia")
-    mypy = _make_exe(dadaia_bin_dir, "mypy")
-
-    argv = _resolve_tool(
-        "mypy",
-        python_executable=str(python),
-        dadaia_bin=str(dadaia_bin_dir / "dadaia"),
-    )
-    assert argv == (str(mypy),)
-
-
-def test_resolve_tool_poetry_fallback_when_missing_everywhere(tmp_path: Path) -> None:
-    """Tool absent from venv AND DADAIA_BIN → poetry-run fallback (fail-closed at run time)."""
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-    dadaia_bin_dir = tmp_path / "dadaia" / "bin"
-    _make_exe(dadaia_bin_dir, "dadaia")
-
-    argv = _resolve_tool(
-        "pytest",
-        python_executable=str(python),
-        dadaia_bin=str(dadaia_bin_dir / "dadaia"),
-    )
-    assert argv == ("poetry", "run", "pytest")
-
-
-def test_resolve_tool_poetry_fallback_when_dadaia_bin_unset(tmp_path: Path) -> None:
-    """DADAIA_BIN unset and no venv sibling → poetry fallback (no PATH probing)."""
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-
-    argv = _resolve_tool("ruff", python_executable=str(python), dadaia_bin=None)
-    assert argv == ("poetry", "run", "ruff")
-
-
-def test_resolve_tool_never_calls_shutil_which(monkeypatch, tmp_path: Path) -> None:
-    """Hard guard: resolution must not consult the ambient PATH via shutil.which."""
-    import dadaia_workspace.features.ci_preflight.service as svc
-
-    sentinel_called = False
-
-    def _boom(*_a: object, **_k: object) -> str | None:
-        nonlocal sentinel_called
-        sentinel_called = True
-        return "/usr/bin/ruff"
-
-    monkeypatch.setattr(svc.shutil, "which", _boom, raising=True)
-
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-    _resolve_tool("ruff", python_executable=str(python), dadaia_bin=None)
-
-    assert sentinel_called is False
-
-
-def test_resolve_tool_dir_named_like_tool_is_not_treated_as_executable(tmp_path: Path) -> None:
-    """A directory matching the tool name must not satisfy resolution — fall through."""
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-    (venv_bin / "ruff").mkdir()  # a *directory* named ruff, not an executable file
-
-    argv = _resolve_tool("ruff", python_executable=str(python), dadaia_bin=None)
-    assert argv == ("poetry", "run", "ruff")
-
-
-def test_all_five_checks_built_through_resolve_tool(tmp_path: Path) -> None:
-    """Every check argv must start with the resolved-venv prefix, never bare ('poetry').
-
-    With a fully populated venv the five tool prefixes resolve to the sibling
-    executables; the bug B2 condition (every argv hardcoded to 'poetry') is gone.
-    """
-    venv_bin = tmp_path / "venv" / "bin"
-    _make_exe(venv_bin, "python")
-    ruff = _make_exe(venv_bin, "ruff")
-    mypy = _make_exe(venv_bin, "mypy")
-    pytest_exe = _make_exe(venv_bin, "pytest")
-    python = venv_bin / "python"
-
-    full = checks_for(
-        quick=False,
-        python_executable=str(python),
-        dadaia_bin=None,
-    )
-    quick = checks_for(
-        quick=True,
-        python_executable=str(python),
-        dadaia_bin=None,
-    )
-
-    by_name = {c.name: c.argv for c in full}
-    assert by_name["ruff format --check"][0] == str(ruff)
-    assert by_name["ruff check"][0] == str(ruff)
-    assert by_name["mypy --strict"][0] == str(mypy)
-    assert by_name["pytest"][0] == str(pytest_exe)
-
-    quick_by_name = {c.name: c.argv for c in quick}
-    assert quick_by_name["pytest (no e2e)"][0] == str(pytest_exe)
-
-    # No check argv begins with the bare 'poetry' literal when tools resolve.
-    for c in (*full, *quick):
-        assert c.argv[0] != "poetry", c.name
 
 
 def test_preflight_works_with_poetry_off_path(tmp_path: Path) -> None:

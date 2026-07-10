@@ -177,49 +177,44 @@ def test_additive_takes_no_lease_at_either_location(
 
 
 @pytest.mark.parametrize("location", ["root", "in_repo"], ids=["root", "in_repo"])
-def test_memory_definition_allow(location: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("case", "phase", "rel_path_fn"),
+    [
+        pytest.param(
+            "memory-definition",
+            "DEFINITION",
+            lambda location: _rel_path("memory", location, _DEFAULT_SLUG),
+            id="memory-definition-allow",
+        ),
+        pytest.param(
+            "memory-closure",
+            "CLOSURE",
+            lambda location: _rel_path("memory", location, _DEFAULT_SLUG),
+            id="memory-closure-allow",
+        ),
+        pytest.param(
+            "audits-additive",
+            "SPEC",
+            lambda location: (
+                "specs/audits/2026-01-01T000000Z-abc12345/audit.md"
+                if location == "root"
+                else f"repos/{_DEFAULT_SLUG}/specs/audits/2026-01-01T000000Z-abc12345/audit.md"
+            ),
+            id="audits-path-additive-allow",
+        ),
+    ],
+)
+def test_memory_phase_and_audits_allow_matrix(  # type: ignore[no-untyped-def]
+    case: str, phase: str, rel_path_fn, location: str, tmp_path: Path
+) -> None:
+    """MEMORY ALLOWs in DEFINITION/CLOSURE phase (both locations); T-016-13 AC-14 +
+    FR-R1-01: specs/audits/** is ADDITIVE — always ALLOW, root or in-repo, with
+    collision-safe naming (specs/audits/<UTC>-<session_id_8chars>/) and no lease check."""
     decision, _msg = evaluate(
         tmp_path,
-        _rel_path("memory", location, _DEFAULT_SLUG),
+        rel_path_fn(location),
         ctx=CTX,
-        phase="DEFINITION",
-        session_id="mine",
-        release="v0.2.0",
-        mode="IMPLEMENTATION",
-        clock=fixed(BASE),
-    )
-    assert decision == Decision.ALLOW
-
-
-@pytest.mark.parametrize("location", ["root", "in_repo"], ids=["root", "in_repo"])
-def test_memory_closure_allow(location: str, tmp_path: Path) -> None:
-    decision, _msg = evaluate(
-        tmp_path,
-        _rel_path("memory", location, _DEFAULT_SLUG),
-        ctx=CTX,
-        phase="CLOSURE",
-        session_id="mine",
-        release="v0.2.0",
-        mode="IMPLEMENTATION",
-        clock=fixed(BASE),
-    )
-    assert decision == Decision.ALLOW
-
-
-@pytest.mark.parametrize("location", ["root", "in_repo"], ids=["root", "in_repo"])
-def test_audits_path_additive_allow(location: str, tmp_path: Path) -> None:
-    """T-016-13 AC-14 + FR-R1-01: specs/audits/** is ADDITIVE — always ALLOW, root or in-repo.
-
-    Audit dirs use collision-safe naming: specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
-    The gate never requires a lease check for audit writes, at the workspace root or in-repo.
-    """
-    audit_rel = "specs/audits/2026-01-01T000000Z-abc12345/audit.md"
-    rel_path = audit_rel if location == "root" else f"repos/{_DEFAULT_SLUG}/{audit_rel}"
-    decision, _msg = evaluate(
-        tmp_path,
-        rel_path,
-        ctx=CTX,
-        phase="SPEC",
+        phase=phase,
         session_id="mine",
         release="v0.2.0",
         mode="IMPLEMENTATION",

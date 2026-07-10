@@ -86,7 +86,11 @@ def _doctor(tmp_path: Path) -> list:
     )
 
 
-def test_loop_closes_zero_bl_stale_after_writer_and_removal(tmp_path: Path) -> None:
+def test_loop_closes_zero_bl_stale_then_artificially_retained_flags_stale(
+    tmp_path: Path,
+) -> None:
+    """Writer -> removal -> zero BL-STALE, then the artificially-retained variant
+    (re-plant, skip removal) -> BL-STALE fires for the left-behind slug."""
     backlog, archive_root, registry = _plant(tmp_path)
 
     # release-definition: write the ledger keyed on the VERIFIED shipped anchor set.
@@ -123,20 +127,22 @@ def test_loop_closes_zero_bl_stale_after_writer_and_removal(tmp_path: Path) -> N
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert stale == [], [f.to_dict() for f in stale]
 
-
-def test_retained_consumed_slug_flags_bl_stale(tmp_path: Path) -> None:
-    backlog, archive_root, registry = _plant(tmp_path)
+    # Artificially-retained variant: re-plant into a fresh root, consume but skip removal.
+    retained_root = tmp_path / "retained-case"
+    retained_backlog, retained_archive_root, retained_registry = _plant(retained_root)
 
     consume_at_release_definition(
-        backlog_dir=backlog,
-        archive_root=archive_root,
+        backlog_dir=retained_backlog,
+        archive_root=retained_archive_root,
         release_id="v0.1.26",
         shipped_anchors={_REF_SHIP},
-        registry=registry,
+        registry=retained_registry,
     )
     # Deliberately DO NOT run removal — the consumed slug is artificially left behind.
-    assert (backlog / "done-item.md").exists()
+    assert (retained_backlog / "done-item.md").exists()
 
-    findings = _doctor(tmp_path)
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "done-item" for f in stale), [f.to_dict() for f in findings]
+    retained_findings = _doctor(retained_root)
+    retained_stale = [f for f in retained_findings if f.code is BacklogDoctorCode.BL_STALE]
+    assert any(f.slug == "done-item" for f in retained_stale), [
+        f.to_dict() for f in retained_findings
+    ]

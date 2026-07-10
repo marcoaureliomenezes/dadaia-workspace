@@ -1,4 +1,8 @@
-"""Unit tests for ServerRegistryService."""
+"""Unit tests for ServerRegistryService.
+
+Port-collision prevention rows preserved (dev-server-registry law): the live-pid
+conflict raise is kept standalone below.
+"""
 
 import pytest
 
@@ -30,24 +34,9 @@ def _entry(port: int = 3000, project: str = "my-frontend", pid: int | None = Non
 # ------------------------------------------------------------------ register
 
 
-def test_register_saves_entry() -> None:
-    store = FakeServerRegistryStore()
-    svc = _svc(store)
-    svc.register(port=3000, project="my-frontend")
-    assert store.get(3000) is not None
-    assert store.get(3000).project == "my-frontend"  # type: ignore[union-attr]
-
-
-def test_register_sets_url_default() -> None:
-    store = FakeServerRegistryStore()
-    svc = _svc(store)
-    svc.register(port=3000, project="my-frontend")
-    entry = store.get(3000)
-    assert entry is not None
-    assert entry.url == "http://localhost:3000"
-
-
 def test_register_conflict_raises_port_conflict_error() -> None:
+    """The dev-server-registry law: registering an occupied port with a live holder
+    must never succeed — kept standalone (never merged with the overwrite cases)."""
     store = FakeServerRegistryStore()
     probe = FakeProcessProbe()
     probe._alive_pids.add(99)
@@ -57,193 +46,168 @@ def test_register_conflict_raises_port_conflict_error() -> None:
         svc.register(port=3000, project="my-frontend-wave6")
 
 
-def test_register_same_project_same_port_is_idempotent() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    svc.register(port=3000, project="my-frontend")  # must not raise
-    assert store.count() == 1
+def test_register_saves_entry_idempotent_stale_and_ttl_expired_overwrite() -> None:
+    default_store = FakeServerRegistryStore()
+    default_svc = _svc(default_store)
+    default_svc.register(port=3000, project="my-frontend")
+    default_entry = default_store.get(3000)
+    assert default_entry is not None
+    assert default_entry.project == "my-frontend"
+    assert default_entry.url == "http://localhost:3000"
 
+    # Same project, same port ⇒ idempotent no-op.
+    idem_store = FakeServerRegistryStore()
+    idem_probe = FakeProcessProbe()
+    idem_probe._alive_pids.add(99)
+    idem_store.save(_entry(3000, "my-frontend", pid=99))
+    idem_svc = _svc(idem_store, idem_probe)
+    idem_svc.register(port=3000, project="my-frontend")  # must not raise
+    assert idem_store.count() == 1
 
-def test_register_stale_entry_can_be_overwritten() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    # pid=99 is NOT in alive_pids → stale
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    svc.register(port=3000, project="my-frontend-wave6")
-    assert store.get(3000).project == "my-frontend-wave6"  # type: ignore[union-attr]
+    # pid=99 is NOT in alive_pids → stale ⇒ overwritable.
+    stale_store = FakeServerRegistryStore()
+    stale_probe = FakeProcessProbe()
+    stale_store.save(_entry(3000, "my-frontend", pid=99))
+    stale_svc = _svc(stale_store, stale_probe)
+    stale_svc.register(port=3000, project="my-frontend-wave6")
+    stale_entry = stale_store.get(3000)
+    assert stale_entry is not None and stale_entry.project == "my-frontend-wave6"
 
-
-def test_register_expired_ttl_entry_can_be_overwritten() -> None:
-    store = FakeServerRegistryStore()
+    # Expired TTL entry ⇒ overwritable.
+    ttl_store = FakeServerRegistryStore()
     expired = PortEntry(
         port=3000,
         project="my-frontend",
         reserved_at="2020-01-01T00:00:00Z",
         expires_at="2020-01-01T08:00:00Z",  # expired
     )
-    store.save(expired)
-    svc = _svc(store)
-    svc.register(port=3000, project="my-frontend-wave6")
-    assert store.get(3000).project == "my-frontend-wave6"  # type: ignore[union-attr]
+    ttl_store.save(expired)
+    ttl_svc = _svc(ttl_store)
+    ttl_svc.register(port=3000, project="my-frontend-wave6")
+    ttl_entry = ttl_store.get(3000)
+    assert ttl_entry is not None and ttl_entry.project == "my-frontend-wave6"
 
 
 # ------------------------------------------------------------------ release
 
 
-def test_release_removes_entry() -> None:
+def test_release_removes_release_all_and_raises_on_wrong_project_or_missing_port() -> None:
     store = FakeServerRegistryStore()
     store.save(_entry(3000, "my-frontend"))
     svc = _svc(store)
     svc.release(port=3000)
     assert store.get(3000) is None
 
+    all_store = FakeServerRegistryStore()
+    all_store.save(_entry(3000, "my-frontend"))
+    all_store.save(_entry(3001, "my-frontend"))
+    all_store.save(_entry(3002, "other"))
+    all_svc = _svc(all_store)
+    all_svc.release_all(project="my-frontend")
+    assert all_store.get(3000) is None
+    assert all_store.get(3001) is None
+    assert all_store.get(3002) is not None
 
-def test_release_with_wrong_project_raises() -> None:
-    store = FakeServerRegistryStore()
-    store.save(_entry(3000, "my-frontend"))
-    svc = _svc(store)
+    wrong_store = FakeServerRegistryStore()
+    wrong_store.save(_entry(3000, "my-frontend"))
+    wrong_svc = _svc(wrong_store)
     with pytest.raises(PortConflictError, match="my-frontend"):
-        svc.release(port=3000, project="my-frontend-wave6")
+        wrong_svc.release(port=3000, project="my-frontend-wave6")
 
-
-def test_release_nonexistent_port_raises() -> None:
-    svc = _svc()
+    empty_svc = _svc()
     with pytest.raises(PortNotRegisteredError):
-        svc.release(port=9999)
-
-
-def test_release_all_for_project() -> None:
-    store = FakeServerRegistryStore()
-    store.save(_entry(3000, "my-frontend"))
-    store.save(_entry(3001, "my-frontend"))
-    store.save(_entry(3002, "other"))
-    svc = _svc(store)
-    svc.release_all(project="my-frontend")
-    assert store.get(3000) is None
-    assert store.get(3001) is None
-    assert store.get(3002) is not None
+        empty_svc.release(port=9999)
 
 
 # ------------------------------------------------------------------ list_entries
 
 
-def test_list_entries_returns_with_status() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    result = svc.list_entries()
-    assert len(result) == 1
-    entry, status = result[0]
+def test_list_entries_table() -> None:
+    active_store = FakeServerRegistryStore()
+    active_probe = FakeProcessProbe()
+    active_probe._alive_pids.add(99)
+    active_store.save(_entry(3000, "my-frontend", pid=99))
+    active_result = _svc(active_store, active_probe).list_entries()
+    assert len(active_result) == 1
+    entry, status = active_result[0]
     assert entry.port == 3000
     assert status == PortStatus.ACTIVE
 
+    stale_store = FakeServerRegistryStore()
+    stale_probe = FakeProcessProbe()  # pid=99 NOT in alive_pids
+    stale_store.save(_entry(3000, "my-frontend", pid=99))
+    _, stale_status = _svc(stale_store, stale_probe).list_entries()[0]
+    assert stale_status == PortStatus.STALE
 
-def test_list_entries_marks_dead_pid_as_stale() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()  # pid=99 NOT in alive_pids
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    result = svc.list_entries()
-    _, status = result[0]
-    assert status == PortStatus.STALE
-
-
-def test_list_entries_empty_registry() -> None:
     assert _svc().list_entries() == []
 
-
-def test_list_entries_filter_by_project() -> None:
-    store = FakeServerRegistryStore()
-    store.save(_entry(3000, "my-frontend"))
-    store.save(_entry(3001, "my-service"))
-    svc = _svc(store)
-    result = svc.list_entries(project="my-frontend")
-    assert len(result) == 1
-    assert result[0][0].project == "my-frontend"
+    filter_store = FakeServerRegistryStore()
+    filter_store.save(_entry(3000, "my-frontend"))
+    filter_store.save(_entry(3001, "my-service"))
+    filtered = _svc(filter_store).list_entries(project="my-frontend")
+    assert len(filtered) == 1
+    assert filtered[0][0].project == "my-frontend"
 
 
 # ------------------------------------------------------------------ clean
 
 
-def test_clean_removes_stale_pid_entries() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()  # pid=99 dead
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    removed = svc.clean()
-    assert len(removed) == 1
-    assert removed[0].port == 3000
-    assert store.get(3000) is None
+def test_clean_table() -> None:
+    dead_store = FakeServerRegistryStore()
+    dead_probe = FakeProcessProbe()  # pid=99 dead
+    dead_store.save(_entry(3000, "my-frontend", pid=99))
+    removed_dead = _svc(dead_store, dead_probe).clean()
+    assert len(removed_dead) == 1
+    assert removed_dead[0].port == 3000
+    assert dead_store.get(3000) is None
 
-
-def test_clean_removes_expired_ttl_entries() -> None:
-    store = FakeServerRegistryStore()
+    ttl_store = FakeServerRegistryStore()
     expired = PortEntry(
         port=3000,
         project="my-frontend",
         reserved_at="2020-01-01T00:00:00Z",
         expires_at="2020-01-01T08:00:00Z",
     )
-    store.save(expired)
-    svc = _svc(store)
-    removed = svc.clean()
-    assert len(removed) == 1
+    ttl_store.save(expired)
+    removed_ttl = _svc(ttl_store).clean()
+    assert len(removed_ttl) == 1
 
+    dry_store = FakeServerRegistryStore()
+    dry_probe = FakeProcessProbe()
+    dry_store.save(_entry(3000, "my-frontend", pid=99))
+    dry_removed = _svc(dry_store, dry_probe).clean(dry_run=True)
+    assert len(dry_removed) == 1
+    assert dry_store.get(3000) is not None  # not actually removed
 
-def test_clean_dry_run_does_not_modify_store() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    removed = svc.clean(dry_run=True)
-    assert len(removed) == 1
-    assert store.get(3000) is not None  # not actually removed
-
-
-def test_clean_keeps_alive_entries() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    store.save(_entry(3000, "my-frontend", pid=99))
-    svc = _svc(store, probe)
-    removed = svc.clean()
-    assert removed == []
-    assert store.get(3000) is not None
+    alive_store = FakeServerRegistryStore()
+    alive_probe = FakeProcessProbe()
+    alive_probe._alive_pids.add(99)
+    alive_store.save(_entry(3000, "my-frontend", pid=99))
+    alive_removed = _svc(alive_store, alive_probe).clean()
+    assert alive_removed == []
+    assert alive_store.get(3000) is not None
 
 
 # ------------------------------------------------------------------ next_port
 
 
-def test_next_port_returns_base_hash_port_when_free() -> None:
-    svc = _svc()
-    port, is_base = svc.next_port("my-service")
-    assert port == 3073  # md5("my-service") base port
-    assert is_base is True
+def test_next_port_table() -> None:
+    base_port, base_is_base = _svc().next_port("my-service")
+    assert base_port == 3073  # md5("my-service") base port
+    assert base_is_base is True
 
+    existing_store = FakeServerRegistryStore()
+    existing_probe = FakeProcessProbe()
+    existing_probe._alive_pids.add(99)
+    existing_store.save(_entry(3073, "my-service", pid=99))
+    existing_port, existing_is_base = _svc(existing_store, existing_probe).next_port("my-service")
+    assert existing_port == 3073
+    assert existing_is_base is True
 
-def test_next_port_returns_existing_if_already_registered() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    store.save(_entry(3073, "my-service", pid=99))
-    svc = _svc(store, probe)
-    port, is_base = svc.next_port("my-service")
-    assert port == 3073
-    assert is_base is True
-
-
-def test_next_port_increments_when_base_occupied_by_other() -> None:
-    store = FakeServerRegistryStore()
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    # Occupy my-service base port (3073) with a different project
-    store.save(
+    occupied_store = FakeServerRegistryStore()
+    occupied_probe = FakeProcessProbe()
+    occupied_probe._alive_pids.add(99)
+    occupied_store.save(
         PortEntry(
             port=3073,
             project="other",
@@ -252,15 +216,10 @@ def test_next_port_increments_when_base_occupied_by_other() -> None:
             pid=99,
         )
     )
-    svc = _svc(store, probe)
-    port, is_base = svc.next_port("my-service")
-    assert port != 3073
-    assert port >= 3000
-    assert port <= 3999
-    assert is_base is False
+    inc_port, inc_is_base = _svc(occupied_store, occupied_probe).next_port("my-service")
+    assert inc_port != 3073
+    assert 3000 <= inc_port <= 3999
+    assert inc_is_base is False
 
-
-def test_next_port_respects_custom_range() -> None:
-    svc = _svc()
-    port, _ = svc.next_port("my-service", min_port=4000, max_port=4099)
-    assert 4000 <= port <= 4099
+    custom_port, _ = _svc().next_port("my-service", min_port=4000, max_port=4099)
+    assert 4000 <= custom_port <= 4099

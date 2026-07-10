@@ -17,6 +17,7 @@ from dadaia_workspace.features.backlog.doctor import (
     Severity,
     run_backlog_doctor,
 )
+from dadaia_workspace.features.spec_artifacts.new_artifacts import backlog_new
 
 pytestmark = pytest.mark.integration
 
@@ -57,21 +58,6 @@ def _run(specs: Path, src: Path) -> list:
         archive_root=specs / "_archive",
         cli_anchors=frozenset(),
     )
-
-
-# ── clean tree passes (acceptance §3.7.4) ───────────────────────────────────────
-
-
-def test_clean_tree_has_no_findings(tmp_path: Path) -> None:
-    specs, src = _build_specs(tmp_path)
-    _write_item(specs, "clean-one", _VALID_INTENT_WIDGET)
-    _write_item(
-        specs,
-        "clean-two",
-        "intents:\n  - subject: { kind: code, ref: pkg/m.py#Gadget }\n    change: tweak Gadget\n",
-    )
-    findings = _run(specs, src)
-    assert findings == [], [f.to_dict() for f in findings]
 
 
 # ── one parameterized matrix over the four BL-* checks (SPEC §3.8 #8) ─────────────
@@ -120,31 +106,74 @@ def _plant_stale(specs: Path, src: Path) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("planter", "expected_code"),
-    [
+def test_clean_tree_matrix_each_violation_flagged_stale_noop_and_fresh_stub_status_gate(
+    tmp_path: Path,
+) -> None:
+    """One fn: clean-tree zero findings + parametrized BL-SCHEMA/DUP/CONFLICT/STALE
+    planters (each ERRORs) + stale-noop-without-ledger (never a false ERROR, §3.7.6).
+
+    Plus (own workspace, v0.1.55 FR5): a fresh ``dadaia backlog new`` stub (status:
+    idea, no intents, no catalog.json) is doctor-clean: zero BL-SCHEMA errors. AC-7(e):
+    the SAME stub flipped to ``status: candidate`` FIRES BL-SCHEMA (a candidate
+    carrying no intents is not exempt) — proving the gate is status-gated, not a
+    blanket exemption.
+    """
+    specs, src = _build_specs(tmp_path)
+    _write_item(specs, "clean-one", _VALID_INTENT_WIDGET)
+    _write_item(
+        specs,
+        "clean-two",
+        "intents:\n  - subject: { kind: code, ref: pkg/m.py#Gadget }\n    change: tweak Gadget\n",
+    )
+    findings = _run(specs, src)
+    assert findings == [], [f.to_dict() for f in findings]
+
+    for planter, expected_code in [
         (_plant_schema, BacklogDoctorCode.BL_SCHEMA),
         (_plant_dup, BacklogDoctorCode.BL_DUP),
         (_plant_conflict, BacklogDoctorCode.BL_CONFLICT),
         (_plant_stale, BacklogDoctorCode.BL_STALE),
-    ],
-)
-def test_each_violation_is_flagged(
-    tmp_path: Path,
-    planter: object,
-    expected_code: BacklogDoctorCode,
-) -> None:
-    specs, src = _build_specs(tmp_path)
-    planter(specs, src)  # type: ignore[operator]
-    findings = _run(specs, src)
-    codes = {f.code for f in findings}
-    assert expected_code in codes, [f.to_dict() for f in findings]
-    assert all(f.severity is Severity.ERROR for f in findings if f.code is expected_code)
+    ]:
+        case_specs, case_src = _build_specs(tmp_path / f"case-{expected_code.value}")
+        planter(case_specs, case_src)  # type: ignore[operator]
+        case_findings = _run(case_specs, case_src)
+        codes = {f.code for f in case_findings}
+        assert expected_code in codes, [f.to_dict() for f in case_findings]
+        assert all(f.severity is Severity.ERROR for f in case_findings if f.code is expected_code)
 
+    noop_specs, noop_src = _build_specs(tmp_path / "no-ledger-case")
+    _write_item(noop_specs, "live-feature", _VALID_INTENT_WIDGET)
+    noop_findings = _run(noop_specs, noop_src)
+    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in noop_findings)
 
-def test_stale_noop_when_no_ledger(tmp_path: Path) -> None:
-    """BL-STALE is a no-op (never a false ERROR) when no archived ledger exists (§3.7.6)."""
-    specs, src = _build_specs(tmp_path)
-    _write_item(specs, "live-feature", _VALID_INTENT_WIDGET)
-    findings = _run(specs, src)
-    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings)
+    # Fresh-stub status gate: no catalog.json, real backlog_new + real doctor engine.
+    fresh_specs = tmp_path / "fresh-stub-case" / "specs"
+    fresh_specs.mkdir(parents=True)
+    fresh_src = tmp_path / "fresh-stub-case" / "src"
+    fresh_src.mkdir()
+
+    def _run_fresh_doctor() -> list:
+        return run_backlog_doctor(
+            specs_dir=fresh_specs,
+            source_root=fresh_src,
+            catalog_path=fresh_specs / "memory" / "product" / "catalog.json",  # absent
+            alias_map_path=fresh_specs / "no-aliases.txt",  # absent → tolerated
+            archive_root=fresh_specs / "_archive",  # absent → BL-STALE no-op
+            cli_anchors=frozenset(),
+        )
+
+    result = backlog_new(fresh_specs, "my-fresh-idea")
+    assert result.path.is_file()
+
+    fresh_findings = _run_fresh_doctor()
+    fresh_schema = [f for f in fresh_findings if f.code is BacklogDoctorCode.BL_SCHEMA]
+    assert fresh_schema == [], [f.to_dict() for f in fresh_schema]
+
+    text = result.path.read_text(encoding="utf-8")
+    assert "status: idea" in text
+    result.path.write_text(text.replace("status: idea", "status: candidate"), encoding="utf-8")
+
+    fresh_schema2 = [f for f in _run_fresh_doctor() if f.code is BacklogDoctorCode.BL_SCHEMA]
+    assert fresh_schema2, (
+        "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"
+    )

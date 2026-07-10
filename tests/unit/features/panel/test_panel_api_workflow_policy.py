@@ -4,6 +4,14 @@ These exercise the real view callables against the real governed catalog + built
 profile registry, a real :class:`JsonWorkflowModelPolicyStore` rooted in ``tmp_path``,
 and a real run store. The resolver factory binds the real resolver — the panel reads the
 SAME governed source the CLI reads (no second model table).
+
+Five survivors, one per real decision:
+  1. Catalog default==effective + overlay override + broken-overlay error-fallback row.
+  2. Harness dimension (default harness, pi override flag + auto-profile).
+  3. Detail 200/404/400-bad-id.
+  4. Profiles registry + full pi model set incl. kimi label.
+  5. Policy GET missing-empty/persisted/invalid-409 + lifecycle-runs snapshot verbatim +
+     filters + step-ledger metadata-only (no payload body leak) + ledger filters.
 """
 
 from __future__ import annotations
@@ -11,6 +19,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
     LifecyclePhase,
@@ -40,9 +50,11 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
 )
 
+pytestmark = pytest.mark.unit
+
 
 def _workspace(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia").mkdir()
+    (tmp_path / ".dadaia").mkdir(parents=True)
     return tmp_path
 
 
@@ -71,171 +83,139 @@ def _decode(result: tuple[int, str, bytes]) -> tuple[int, dict]:  # type: ignore
 
 
 # ---------------------------------------------------------------------------
-# GET /api/workflow-catalog
+# 1. Catalog default==effective + overlay override + broken-overlay error row
 # ---------------------------------------------------------------------------
 
 
-def test_catalog_lists_governed_workflows_with_default_and_effective(tmp_path: Path) -> None:
-    store = _store(tmp_path)
+def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
 
-    status, payload = _decode(view(qs={}))
-
-    assert status == 200
-    ids = {w["workflow_id"] for w in payload["workflows"]}
+    # (a) No overlay: effective == default, nothing overridden.
+    store_a = _store(tmp_path / "a")
+    view_a = render_api_workflow_catalog(catalog, _resolver_factory(store_a))
+    status_a, payload_a = _decode(view_a(qs={}))
+    assert status_a == 200
+    ids = {w["workflow_id"] for w in payload_a["workflows"]}
     assert "implementation" in ids
-    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
-    step = impl["steps"][0]
-    # With no overlay, effective == default and nothing is overridden.
-    assert step["default_profile"] == step["effective_profile"]
-    assert step["is_overridden"] is False
-    assert step["source"] == PolicySource.LIBRARY_DEFAULT.value
+    impl_a = next(w for w in payload_a["workflows"] if w["workflow_id"] == "implementation")
+    step_a = impl_a["steps"][0]
+    assert step_a["default_profile"] == step_a["effective_profile"]
+    assert step_a["is_overridden"] is False
+    assert step_a["source"] == PolicySource.LIBRARY_DEFAULT.value
 
-
-def test_catalog_reflects_overlay_override_as_effective(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    # Override implementation.implement to the codex deep profile.
-    store.save(
+    # (b) Overlay override: effective diverges from default and is flagged.
+    store_b = _store(tmp_path / "b")
+    store_b.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={
-                "default": {"implementation": {"implement": "codex-review-deep"}},
-            },
+            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
         )
     )
-    catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
+    view_b = render_api_workflow_catalog(catalog, _resolver_factory(store_b))
+    _status_b, payload_b = _decode(view_b(qs={}))
+    impl_b = next(w for w in payload_b["workflows"] if w["workflow_id"] == "implementation")
+    implement_b = next(s for s in impl_b["steps"] if s["step"] == "implement")
+    assert implement_b["effective_profile"] == "codex-review-deep"
+    assert implement_b["is_overridden"] is True
+    assert implement_b["source"] == PolicySource.DEFAULT_OVERLAY.value
 
-    _status, payload = _decode(view(qs={}))
-
-    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
-    implement = next(s for s in impl["steps"] if s["step"] == "implement")
-    assert implement["effective_profile"] == "codex-review-deep"
-    assert implement["is_overridden"] is True
-    assert implement["source"] == PolicySource.DEFAULT_OVERLAY.value
+    # (c) Broken overlay (unknown step) → per-workflow error, but harness fields still present.
+    store_c = _store(tmp_path / "c")
+    store_c.save(
+        WorkflowModelPolicyOverlay(
+            policy_id="default",
+            contexts={"default": {"implementation": {"no_such_step": "codex-review-deep"}}},
+        )
+    )
+    view_c = render_api_workflow_catalog(catalog, _resolver_factory(store_c))
+    _status_c, payload_c = _decode(view_c(qs={}))
+    impl_c = next(w for w in payload_c["workflows"] if w["workflow_id"] == "implementation")
+    assert "error" in impl_c
+    step_c = impl_c["steps"][0]
+    assert step_c["default_harness"] == "codex"
+    assert step_c["harness"] == "codex"
+    assert step_c["harness_overridden"] is False
 
 
 # ---------------------------------------------------------------------------
-# GET /api/workflow-catalog — harness dimension (T-29-C-01)
+# 2. Harness dimension: default harness + pi override flag + auto-profile
 # ---------------------------------------------------------------------------
 
 
-def test_catalog_row_carries_default_harness_and_unflagged_when_codex(tmp_path: Path) -> None:
-    """With no overlay, every row carries the catalog default harness and no harness flag."""
-    store = _store(tmp_path)
+def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
 
-    _status, payload = _decode(view(qs={}))
+    # Default: catalog default harness, no override flag, per-harness default profiles exposed.
+    store_default = _store(tmp_path / "default")
+    view_default = render_api_workflow_catalog(catalog, _resolver_factory(store_default))
+    _status, payload_default = _decode(view_default(qs={}))
+    impl_default = next(
+        w for w in payload_default["workflows"] if w["workflow_id"] == "implementation"
+    )
+    step_default = impl_default["steps"][0]
+    assert step_default["default_harness"] == "codex"
+    assert step_default["harness"] == "codex"
+    assert step_default["harness_overridden"] is False
+    assert step_default["default_profiles"]["codex"] == "codex-implementation-standard"
+    assert step_default["default_profiles"]["pi"] == "pi-implementation-standard"
 
-    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
-    step = impl["steps"][0]
-    assert step["default_harness"] == "codex"
-    assert step["harness"] == "codex"
-    assert step["harness_overridden"] is False
-    # T-29-C-02: the per-harness default profiles are exposed for the panel auto-profile —
-    # the same map the resolver uses, so a harness toggle picks the resolver's choice.
-    assert step["default_profiles"]["codex"] == "codex-implementation-standard"
-    assert step["default_profiles"]["pi"] == "pi-implementation-standard"
-
-
-def test_catalog_row_flags_harness_override_from_overlay(tmp_path: Path) -> None:
-    """An overlay step ``harness: pi`` makes the row resolve pi + sets the harness flag."""
-    store = _store(tmp_path)
-    store.save(
+    # Override: overlay `harness: pi` resolves pi + auto-selects the pi default profile.
+    store_pi = _store(tmp_path / "pi")
+    store_pi.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
             contexts={"default": {"implementation": {}}},
             step_harness_overlay={"default": {"implementation": {"implement": "pi"}}},
         )
     )
-    catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
-
-    _status, payload = _decode(view(qs={}))
-
-    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
-    implement = next(s for s in impl["steps"] if s["step"] == "implement")
-    # The catalog default harness stays codex; the effective harness is pi + flagged.
-    assert implement["default_harness"] == "codex"
-    assert implement["harness"] == "pi"
-    assert implement["harness_overridden"] is True
-    # Auto-profile-on-harness-override: the PI default profile is selected, also flagged.
-    assert implement["effective_profile"] == "pi-implementation-standard"
-    assert implement["is_overridden"] is True
-
-
-def test_catalog_error_fallback_row_carries_harness_fields(tmp_path: Path) -> None:
-    """A broken overlay still surfaces default_harness + harness_overridden=False per row."""
-    store = _store(tmp_path)
-    # An overlay naming an unknown step makes resolve() raise → the per-workflow error path.
-    store.save(
-        WorkflowModelPolicyOverlay(
-            policy_id="default",
-            contexts={"default": {"implementation": {"no_such_step": "codex-review-deep"}}},
-        )
-    )
-    catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog(catalog, _resolver_factory(store))
-
-    _status, payload = _decode(view(qs={}))
-
-    impl = next(w for w in payload["workflows"] if w["workflow_id"] == "implementation")
-    assert "error" in impl
-    step = impl["steps"][0]
-    assert step["default_harness"] == "codex"
-    assert step["harness"] == "codex"
-    assert step["harness_overridden"] is False
+    view_pi = render_api_workflow_catalog(catalog, _resolver_factory(store_pi))
+    _status_pi, payload_pi = _decode(view_pi(qs={}))
+    impl_pi = next(w for w in payload_pi["workflows"] if w["workflow_id"] == "implementation")
+    implement_pi = next(s for s in impl_pi["steps"] if s["step"] == "implement")
+    assert implement_pi["default_harness"] == "codex"
+    assert implement_pi["harness"] == "pi"
+    assert implement_pi["harness_overridden"] is True
+    assert implement_pi["effective_profile"] == "pi-implementation-standard"
+    assert implement_pi["is_overridden"] is True
 
 
 # ---------------------------------------------------------------------------
-# GET /api/workflow-catalog/<id>
+# 3. Detail 200/404/400-bad-id
 # ---------------------------------------------------------------------------
 
 
-def test_catalog_detail_returns_one_workflow(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("workflow_id", "expected_status", "expected_error"),
+    [
+        pytest.param("implementation", 200, None, id="detail-known-workflow-200"),
+        pytest.param("nope", 404, "not_found", id="detail-unknown-workflow-404"),
+        pytest.param("../etc", 400, "invalid_workflow_id", id="detail-traversal-id-400"),
+    ],
+)
+def test_catalog_detail(
+    tmp_path: Path, workflow_id: str, expected_status: int, expected_error: str | None
+) -> None:
     store = _store(tmp_path)
     catalog = governed_workflow_catalog()
     view = render_api_workflow_catalog_detail(catalog, _resolver_factory(store))
 
-    status, payload = _decode(view(workflow_id="implementation", qs={}))
+    status, payload = _decode(view(workflow_id=workflow_id, qs={}))
 
-    assert status == 200
-    assert payload["workflow_id"] == "implementation"
-    assert len(payload["steps"]) > 0
-
-
-def test_catalog_detail_unknown_is_404(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog_detail(catalog, _resolver_factory(store))
-
-    status, payload = _decode(view(workflow_id="nope", qs={}))
-
-    assert status == 404
-    assert payload["error"] == "not_found"
-
-
-def test_catalog_detail_rejects_bad_id(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    catalog = governed_workflow_catalog()
-    view = render_api_workflow_catalog_detail(catalog, _resolver_factory(store))
-
-    status, payload = _decode(view(workflow_id="../etc", qs={}))
-
-    assert status == 400
-    assert payload["error"] == "invalid_workflow_id"
+    assert status == expected_status
+    if expected_status == 200:
+        assert payload["workflow_id"] == "implementation"
+        assert len(payload["steps"]) > 0
+    else:
+        assert payload["error"] == expected_error
 
 
 # ---------------------------------------------------------------------------
-# GET /api/workflow-model-profiles
+# 4. Profiles registry + full pi model set incl. kimi label
 # ---------------------------------------------------------------------------
 
 
-def test_profiles_lists_builtin_registry() -> None:
+def test_profiles_registry_and_pi_model_choices() -> None:
     view = render_api_workflow_model_profiles()
-
     status, payload = _decode(view())
 
     assert status == 200
@@ -243,26 +223,11 @@ def test_profiles_lists_builtin_registry() -> None:
     assert "codex-implementation-standard" in ids
     assert "pi-reasoning-high" in ids
 
-
-def test_profiles_surface_full_pi_model_choices_incl_openrouter_kimi() -> None:
-    """T-45-06: the profiles endpoint carries the full per-harness allowed model set.
-
-    The pi harness surfaces the complete ``known_layer2_model_ids()`` catalog including the
-    curated OpenRouter id — value ``moonshotai/kimi-k2.5:high`` (effort suffix NOT
-    stripped; v0.1.66 FR3 corrected the id from the invalid ``kimi-2.7``), labelled
-    "OpenRouter — moonshotai/kimi-k2.5 (high)".
-    """
-    view = render_api_workflow_model_profiles()
-    status, payload = _decode(view())
-    assert status == 200
-
     choices = payload["model_choices"]
     assert "pi" in choices and "codex" in choices
 
     pi_values = [c["value"] for c in choices["pi"]]
-    # The exact effort-suffixed value is present and un-stripped.
     assert "moonshotai/kimi-k2.5:high" in pi_values
-    # The full model_choices('pi') set is surfaced (no narrowing).
     assert set(pi_values) == {
         "gpt-5.5:high",
         "gpt-5.5:low",
@@ -273,62 +238,14 @@ def test_profiles_surface_full_pi_model_choices_incl_openrouter_kimi() -> None:
     kimi = next(c for c in choices["pi"] if c["value"] == "moonshotai/kimi-k2.5:high")
     assert kimi["label"] == "OpenRouter — moonshotai/kimi-k2.5 (high)"
 
-    # A registry (non-OpenRouter) id is labelled without the OpenRouter prefix.
     gpt = next(c for c in choices["pi"] if c["value"] == "gpt-5.5:high")
     assert gpt["label"] == "gpt-5.5 (high)"
-    # codex does not carry the OpenRouter kimi option.
     assert "moonshotai/kimi-k2.5:high" not in [c["value"] for c in choices["codex"]]
 
 
 # ---------------------------------------------------------------------------
-# GET /api/workflow-model-policy
-# ---------------------------------------------------------------------------
-
-
-def test_policy_get_missing_returns_empty_default_not_error(tmp_path: Path) -> None:
-    # missing != invalid: a missing overlay file returns the empty default at 200.
-    store = _store(tmp_path)
-    view = render_api_workflow_model_policy(store)
-
-    status, payload = _decode(view(qs={}))
-
-    assert status == 200
-    assert payload["exists"] is False
-    assert payload["policy"]["contexts"]["default"]["workflows"] == {}
-
-
-def test_policy_get_returns_persisted_overlay(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    store.save(
-        WorkflowModelPolicyOverlay(
-            policy_id="default",
-            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
-        )
-    )
-    view = render_api_workflow_model_policy(store)
-
-    status, payload = _decode(view(qs={}))
-
-    assert status == 200
-    assert payload["exists"] is True
-    steps = payload["policy"]["contexts"]["default"]["workflows"]["implementation"]["steps"]
-    assert steps["implement"] == "codex-review-deep"
-
-
-def test_policy_get_invalid_file_returns_409(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text("{not json", encoding="utf-8")
-    view = render_api_workflow_model_policy(store)
-
-    status, payload = _decode(view(qs={}))
-
-    assert status == 409
-    assert payload["error"] == "invalid_policy"
-
-
-# ---------------------------------------------------------------------------
-# GET /api/lifecycle-runs  (AC-7: reads the persisted snapshot, never re-resolves)
+# 5. Policy GET states + lifecycle-runs snapshot/filters + step-ledger
+#    metadata-only + ledger filters
 # ---------------------------------------------------------------------------
 
 
@@ -362,40 +279,6 @@ def _run_with_snapshot(
     )
 
 
-def test_lifecycle_runs_reads_persisted_snapshot_verbatim(tmp_path: Path) -> None:
-    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
-    run_store.save(_run_with_snapshot("run-1", profile="codex-implementation-standard"))
-    view = render_api_lifecycle_runs(run_store)
-
-    status, payload = _decode(view(qs={}))
-
-    assert status == 200
-    assert len(payload["runs"]) == 1
-    snap = payload["runs"][0]["workflow_policy"]
-    assert snap["steps"][0]["model_profile"] == "codex-implementation-standard"
-
-
-def test_lifecycle_runs_filters_by_workflow_and_context(tmp_path: Path) -> None:
-    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
-    run_store.save(_run_with_snapshot("run-a", profile="codex-review-deep"))
-    run_store.save(
-        _run_with_snapshot("run-b", profile="codex-review-deep", workflow_id="release_definition")
-    )
-    view = render_api_lifecycle_runs(run_store)
-
-    status, payload = _decode(view(qs={"workflow": ["implementation"]}))
-
-    assert status == 200
-    assert [r["run_id"] for r in payload["runs"]] == ["run-a"]
-
-    status2, payload2 = _decode(view(qs={"context": ["other-ctx"]}))
-    assert status2 == 200
-    assert payload2["runs"] == []
-
-
-# --- workflow-step ledger API (T-30-D-08 / minimal run-ledger exposure) ------------
-
-
 def _run_with_ledger(run_id: str = "led-1") -> LifecycleRun:
     from dadaia_workspace.core.models.workflow_handoff import (
         WorkflowStepLedger,
@@ -424,37 +307,81 @@ def _run_with_ledger(run_id: str = "led-1") -> LifecycleRun:
     )
 
 
-def test_workflow_step_ledger_returns_metadata_only(tmp_path: Path) -> None:
-    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
-    run_store.save(_run_with_ledger("led-1"))
-    view = render_api_workflow_step_ledger(run_store)
+def test_policy_state_and_runs_and_ledger(tmp_path: Path) -> None:
+    # (a) Policy GET: missing overlay -> empty default at 200 (missing != invalid).
+    store = _store(tmp_path)
+    view_policy = render_api_workflow_model_policy(store)
+    status_missing, payload_missing = _decode(view_policy(qs={}))
+    assert status_missing == 200
+    assert payload_missing["exists"] is False
+    assert payload_missing["policy"]["contexts"]["default"]["workflows"] == {}
 
-    status, payload = _decode(view(qs={}))
+    # (b) Policy GET: persisted overlay round-trips verbatim.
+    store.save(
+        WorkflowModelPolicyOverlay(
+            policy_id="default",
+            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
+        )
+    )
+    status_persisted, payload_persisted = _decode(view_policy(qs={}))
+    assert status_persisted == 200
+    assert payload_persisted["exists"] is True
+    steps = payload_persisted["policy"]["contexts"]["default"]["workflows"]["implementation"][
+        "steps"
+    ]
+    assert steps["implement"] == "codex-review-deep"
 
-    assert status == 200
-    assert len(payload["runs"]) == 1
-    steps = payload["runs"][0]["workflow_steps"]
-    assert len(steps) == 1
-    record = steps[0]
-    # Metadata only: addressable key, ref, hash, declared consumers — NO payload body.
+    # (c) Policy GET: invalid JSON on disk -> 409.
+    store_bad = _store(tmp_path / "bad")
+    store_bad.path.parent.mkdir(parents=True, exist_ok=True)
+    store_bad.path.write_text("{not json", encoding="utf-8")
+    view_bad = render_api_workflow_model_policy(store_bad)
+    status_bad, payload_bad = _decode(view_bad(qs={}))
+    assert status_bad == 409
+    assert payload_bad["error"] == "invalid_policy"
+
+    # (d) Lifecycle-runs: persisted snapshot is read verbatim, never re-resolved.
+    run_store = JsonLifecycleRunStore(_workspace(tmp_path / "runs"))
+    run_store.save(_run_with_snapshot("run-1", profile="codex-implementation-standard"))
+    view_runs = render_api_lifecycle_runs(run_store)
+    status_runs, payload_runs = _decode(view_runs(qs={}))
+    assert status_runs == 200
+    assert len(payload_runs["runs"]) == 1
+    snap = payload_runs["runs"][0]["workflow_policy"]
+    assert snap["steps"][0]["model_profile"] == "codex-implementation-standard"
+
+    # (e) Lifecycle-runs: filters by workflow and context.
+    run_store.save(
+        _run_with_snapshot("run-b", profile="codex-review-deep", workflow_id="release_definition")
+    )
+    status_wf, payload_wf = _decode(view_runs(qs={"workflow": ["implementation"]}))
+    assert status_wf == 200
+    assert [r["run_id"] for r in payload_wf["runs"]] == ["run-1"]
+    status_ctx, payload_ctx = _decode(view_runs(qs={"context": ["other-ctx"]}))
+    assert status_ctx == 200
+    assert payload_ctx["runs"] == []
+
+    # (f) Step ledger: metadata-only exposure — NO payload body leak.
+    ledger_store = JsonLifecycleRunStore(_workspace(tmp_path / "ledger"))
+    ledger_store.save(_run_with_ledger("led-1"))
+    view_ledger = render_api_workflow_step_ledger(ledger_store)
+    status_ledger, payload_ledger = _decode(view_ledger(qs={}))
+    assert status_ledger == 200
+    assert len(payload_ledger["runs"]) == 1
+    ledger_steps = payload_ledger["runs"][0]["workflow_steps"]
+    assert len(ledger_steps) == 1
+    record = ledger_steps[0]
     assert record["producer_step"] == "release_scope"
     assert record["payload_ref"].endswith(".step-payload.json")
     assert record["content_hash"] == "a" * 64
     assert "payload" not in record
-    # The serialised JSON carries no payload-body key anywhere.
-    assert '"payload"' not in json.dumps(payload)
+    assert '"payload"' not in json.dumps(payload_ledger)
 
-
-def test_workflow_step_ledger_filters_by_run_and_context(tmp_path: Path) -> None:
-    run_store = JsonLifecycleRunStore(_workspace(tmp_path))
-    run_store.save(_run_with_ledger("led-a"))
-    run_store.save(_run_with_ledger("led-b"))
-    view = render_api_workflow_step_ledger(run_store)
-
-    status, payload = _decode(view(qs={"run": ["led-a"]}))
-    assert status == 200
-    assert [r["run_id"] for r in payload["runs"]] == ["led-a"]
-
-    status2, payload2 = _decode(view(qs={"context": ["other-ctx"]}))
-    assert status2 == 200
-    assert payload2["runs"] == []
+    # (g) Step ledger: filters by run and context.
+    ledger_store.save(_run_with_ledger("led-b"))
+    status_run_filter, payload_run_filter = _decode(view_ledger(qs={"run": ["led-1"]}))
+    assert status_run_filter == 200
+    assert [r["run_id"] for r in payload_run_filter["runs"]] == ["led-1"]
+    status_ledger_ctx, payload_ledger_ctx = _decode(view_ledger(qs={"context": ["other-ctx"]}))
+    assert status_ledger_ctx == 200
+    assert payload_ledger_ctx["runs"] == []

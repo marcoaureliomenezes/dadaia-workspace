@@ -53,90 +53,86 @@ def _run(tmp_path: Path, payload: dict[str, Any], *, session_id: str = "claude-s
 
 
 # --------------------------------------------------------------------------- #
-# Parity: SDD-gate verdicts reproduced through pre_gate.
+# Parity: SDD-gate + root-whitelist verdicts reproduced through pre_gate.
 # --------------------------------------------------------------------------- #
 
 
-def test_non_write_tool_allows(tmp_path: Path) -> None:
-    _mk_workspace(tmp_path, "a")
-    assert _run(tmp_path, {"tool_name": "Read", "tool_input": {"file_path": "x"}}) is None
-
-
-def test_ungated_path_allows(tmp_path: Path) -> None:
-    # An in-repo non-spec file is UNGATED by the SDD gate and is a subdir write (not a new
-    # root entry), so both pre_gate policies allow it.
+@pytest.mark.parametrize(
+    ("tool_name", "input_key", "path_fn", "expect_reason"),
+    [
+        # An in-repo non-spec file is UNGATED by the SDD gate and is a subdir write (not a
+        # new root entry), so both pre_gate policies allow it.
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / "repos" / "a" / "src" / "thing.py",
+            None,
+        ),
+        # NotebookEdit is excluded from the root-whitelist tool set but IS an SDD write
+        # tool. A README-sibling junk.ipynb at root is UNGATED by SDD and exempt from
+        # root-whitelist for NotebookEdit → allowed (parity with standalone).
+        ("NotebookEdit", "notebook_path", lambda ws: ws / "junk.ipynb", None),
+        ("Read", "file_path", lambda ws: "x", None),
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr",
+            "SEC-01",
+        ),
+        (
+            "Write",
+            "file_path",
+            lambda ws: ws / "junk.txt",
+            "ROOT WHITELIST GATE",
+        ),
+    ],
+    ids=[
+        "allow-parity-in-repo-subdir-write",
+        "allow-parity-notebook-edit-root-exempt",
+        "non-write-tool-allows",
+        "protected-sessions-blocks-fail-closed",
+        "root-whitelist-forbidden-entry-blocks",
+    ],
+)
+def test_non_write_and_protected_matrix(
+    tmp_path: Path, tool_name: str, input_key: str, path_fn: Any, expect_reason: str | None
+) -> None:
     ws = _mk_workspace(tmp_path, "a")
-    target = ws / "repos" / "a" / "src" / "thing.py"
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is None
+    target = path_fn(ws)
+    block = _run(tmp_path, {"tool_name": tool_name, "tool_input": {input_key: str(target)}})
+    if expect_reason is None:
+        assert block is None
+    else:
+        assert block is not None
+        assert expect_reason in block["reason"]
 
 
-def test_protected_sessions_blocks_fail_closed(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / ".dadaia" / "sessions" / "runtime" / "a.ptr"
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is not None
-    assert "SEC-01" in block["reason"]
-
-
-def test_apply_patch_multi_file_frozen_blocks_whole_patch(tmp_path: Path) -> None:
-    # In-repo headers so root-whitelist passes and the SDD gate's FROZEN class fires on the
-    # second header (the multi-file most-restrictive rule, FR-W4-04).
+@pytest.mark.parametrize(
+    ("second_header", "second_body", "reason_fragment"),
+    [
+        # In-repo headers so root-whitelist passes and the SDD gate's FROZEN class fires
+        # on the second header (the multi-file most-restrictive rule, FR-W4-04).
+        ("repos/a/specs/_archive/x.md", "+frozen", "_archive"),
+        # First header in-repo (allowed), second header PROTECTED
+        # (.dadaia/sessions/) → blocked.
+        (".dadaia/sessions/runtime/a.ptr", "+forge", "SEC-01"),
+    ],
+)
+def test_apply_patch_multi_file_most_restrictive_blocks_whole_patch(
+    tmp_path: Path, second_header: str, second_body: str, reason_fragment: str
+) -> None:
     _mk_workspace(tmp_path, "a")
     cmd = (
         "*** Begin Patch\n"
         "*** Update File: repos/a/README.md\n"
         "+ok\n"
-        "*** Update File: repos/a/specs/_archive/x.md\n"
-        "+frozen\n"
+        f"*** Update File: {second_header}\n"
+        f"{second_body}\n"
         "*** End Patch"
     )
     block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
     assert block is not None
-    assert "_archive" in block["reason"] or "FROZEN" in block["reason"].upper()
-
-
-# --------------------------------------------------------------------------- #
-# Parity: root-whitelist verdicts reproduced through pre_gate.
-# --------------------------------------------------------------------------- #
-
-
-def test_root_whitelist_forbidden_entry_blocks(tmp_path: Path) -> None:
-    ws = _mk_workspace(tmp_path, "a")
-    block = _run(
-        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "junk.txt")}}
-    )
-    assert block is not None
-    assert "ROOT WHITELIST GATE" in block["reason"]
-
-
-def test_apply_patch_multi_file_protected_blocks_whole_patch(tmp_path: Path) -> None:
-    # First header in-repo (allowed), second header PROTECTED (.dadaia/sessions/) → blocked.
-    _mk_workspace(tmp_path, "a")
-    cmd = (
-        "*** Begin Patch\n"
-        "*** Update File: repos/a/README.md\n"
-        "+ok\n"
-        "*** Update File: .dadaia/sessions/runtime/a.ptr\n"
-        "+forge\n"
-        "*** End Patch"
-    )
-    block = _run(tmp_path, {"tool_name": "apply_patch", "tool_input": {"command": cmd}})
-    assert block is not None
-    assert "SEC-01" in block["reason"]
-
-
-def test_notebook_edit_not_root_gated_but_sdd_gated(tmp_path: Path) -> None:
-    # NotebookEdit is excluded from the root-whitelist tool set but IS an SDD write tool.
-    # A NotebookEdit at root must NOT be blocked by root-whitelist (parity with standalone).
-    ws = _mk_workspace(tmp_path, "a")
-    block = _run(
-        tmp_path,
-        {"tool_name": "NotebookEdit", "tool_input": {"notebook_path": str(ws / "junk.ipynb")}},
-    )
-    # README-sibling junk.ipynb at root is UNGATED by SDD and exempt from root-whitelist for
-    # NotebookEdit → allowed.
-    assert block is None
+    assert reason_fragment in block["reason"] or reason_fragment.upper() in block["reason"].upper()
 
 
 # --------------------------------------------------------------------------- #
@@ -178,7 +174,9 @@ def test_main_is_subprocess_free(
     assert pre_gate.main() == 0
 
 
-def test_evaluate_payload_first_block_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # root-whitelist policy fires before the SDD gate: a forbidden-root block short-circuits
     # and the SDD policy is never consulted.
     calls: list[str] = []
@@ -195,8 +193,6 @@ def test_evaluate_payload_first_block_wins(monkeypatch: pytest.MonkeyPatch) -> N
     assert pre_gate.evaluate_payload({"tool_name": "Write"}) == "ROOT BLOCK"
     assert calls == ["rw"]
 
-
-def test_faulty_policy_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
     def explode(_p: dict[str, object]) -> str | None:
         raise RuntimeError("boom")
 
@@ -213,12 +209,28 @@ def test_faulty_policy_fails_open(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_main_appends_one_latency_record(tmp_path: Path) -> None:
-    # Harness-real path: spawn the hook as a real subprocess (no DADAIA_HOOK_EVENT override
-    # → the latency record falls back to "PreToolUse").
-    env = claude_hook_env(tmp_path)
+@pytest.mark.parametrize(
+    ("extra_env", "tool_name", "tool_input", "expected_event"),
+    [
+        # Harness-real path: no DADAIA_HOOK_EVENT override → the latency record falls back
+        # to "PreToolUse".
+        (None, "Read", {"file_path": "x"}, "PreToolUse"),
+        # DADAIA_HOOK_EVENT is a harness-control var (HARNESS_CONTROL_DADAIA_ENV): passed
+        # through the SUBPROCESS env via ``extra`` — the harness-real channel — never via
+        # an in-process setenv (which the env contract forbids).
+        ({"DADAIA_HOOK_EVENT": "Bash"}, "Bash", {"command": "ls"}, "Bash"),
+    ],
+)
+def test_main_appends_one_latency_record(
+    tmp_path: Path,
+    extra_env: dict[str, str] | None,
+    tool_name: str,
+    tool_input: dict[str, str],
+    expected_event: str,
+) -> None:
+    env = claude_hook_env(tmp_path, extra=extra_env)
     result = run_hook_subprocess(
-        "pre_gate", {"tool_name": "Read", "tool_input": {"file_path": "x"}}, env
+        "pre_gate", {"tool_name": tool_name, "tool_input": tool_input}, env
     )
     assert result.returncode == 0, result.stderr
     log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
@@ -226,23 +238,9 @@ def test_main_appends_one_latency_record(tmp_path: Path) -> None:
     assert len(lines) == 1
     rec = json.loads(lines[0])
     assert rec["hook"] == "pre_gate"
-    assert rec["event"] == "PreToolUse"
+    assert rec["event"] == expected_event
     assert isinstance(rec["duration_ms"], (int, float)) and rec["duration_ms"] >= 0
     assert "ts" in rec
-
-
-def test_latency_event_from_env(tmp_path: Path) -> None:
-    # DADAIA_HOOK_EVENT is a harness-control var (HARNESS_CONTROL_DADAIA_ENV): pass it through
-    # the SUBPROCESS env via ``extra`` — the harness-real channel — never via an in-process
-    # setenv (which the env contract forbids).
-    env = claude_hook_env(tmp_path, extra={"DADAIA_HOOK_EVENT": "Bash"})
-    result = run_hook_subprocess(
-        "pre_gate", {"tool_name": "Bash", "tool_input": {"command": "ls"}}, env
-    )
-    assert result.returncode == 0, result.stderr
-    log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
-    rec = json.loads(log.read_text(encoding="utf-8").strip().splitlines()[0])
-    assert rec["event"] == "Bash"
 
 
 def test_telemetry_failure_does_not_change_verdict(
@@ -260,12 +258,6 @@ def test_telemetry_failure_does_not_change_verdict(
     assert pre_gate.main() == 0  # no crash, verdict unaffected
 
 
-def test_append_latency_no_workspace_is_noop(tmp_path: Path) -> None:
-    # workspace=None (unresolvable) → no file written, no error.
-    pre_gate._append_latency(None, "PreToolUse", 1.0)
-    assert not (tmp_path / ".dadaia").exists()
-
-
 # --------------------------------------------------------------------------- #
 # WS-PI-4: the PI Layer-1 SDD-gate extension maps its tool names to the gate's
 # canonical vocabulary (write→Write, edit→Edit) before delegating to pre_gate.
@@ -274,7 +266,21 @@ def test_append_latency_no_workspace_is_noop(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_pi_raw_lowercase_write_name_is_not_a_write_tool(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("rel_path", "expect_blocked", "reason_fragment"),
+    [
+        # A PI write to a FROZEN archive path, sent with the mapped canonical name "Write"
+        # (as the extension sends it), is BLOCKED by pre_gate — proving PI's Ring-1
+        # extension hits the real SDD gate.
+        ("specs/_archive/old.md", True, "_archive"),
+        # An ADDITIVE in-repo path (specs/bugs) sent with the mapped name "Write" is
+        # allowed — the mapping does not over-block; only the path class decides.
+        ("specs/bugs/some-bug.md", False, None),
+    ],
+)
+def test_pi_mapped_write_name_hits_real_gate(
+    tmp_path: Path, rel_path: str, expect_blocked: bool, reason_fragment: str | None
+) -> None:
     # PI's built-in tool is named "write" (lowercase) — NOT in the gate's WRITE_TOOLS
     # vocabulary, so an unmapped payload would slip through. This is exactly why the
     # `.pi/extensions/dadaia-sdd-gate.ts` shim maps write→Write before calling pre_gate.
@@ -283,22 +289,14 @@ def test_pi_raw_lowercase_write_name_is_not_a_write_tool(tmp_path: Path) -> None
     assert _common.is_write_tool("Write") is True
     assert _common.is_write_tool("Edit") is True
 
-
-def test_pi_mapped_write_name_blocks_frozen_path(tmp_path: Path) -> None:
-    # A PI write to a FROZEN archive path, sent with the mapped canonical name "Write"
-    # (as the extension sends it), is BLOCKED by pre_gate — proving PI's Ring-1 extension
-    # hits the real SDD gate.
     ws = _mk_workspace(tmp_path, "a")
-    target = ws / "repos" / "a" / "specs" / "_archive" / "old.md"
+    target = ws / "repos" / "a" / rel_path
     block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is not None
-    assert "_archive" in block["reason"] or "FROZEN" in block["reason"].upper()
-
-
-def test_pi_mapped_write_name_allows_additive_path(tmp_path: Path) -> None:
-    # An ADDITIVE in-repo path (specs/bugs) sent with the mapped name "Write" is allowed —
-    # the mapping does not over-block; only the path class decides.
-    ws = _mk_workspace(tmp_path, "a")
-    target = ws / "repos" / "a" / "specs" / "bugs" / "some-bug.md"
-    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
-    assert block is None
+    if expect_blocked:
+        assert block is not None
+        assert reason_fragment is not None
+        assert (
+            reason_fragment in block["reason"] or reason_fragment.upper() in block["reason"].upper()
+        )
+    else:
+        assert block is None

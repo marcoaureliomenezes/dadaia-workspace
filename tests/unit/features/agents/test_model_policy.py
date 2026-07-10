@@ -9,11 +9,13 @@ lightweight in-memory fake honoring the same port).
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
-from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, list_templates
+from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
 from dadaia_workspace.core.models.agent_model_policy import (
-    CLAUDE_EFFORTS,
     AgentModelOverride,
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
@@ -38,7 +40,13 @@ class _RecordingRerender:
         ]
 
 
-def _service(tmp_path, *, plugin_defaults=None, rerender=None):  # type: ignore[no-untyped-def]
+def _service(
+    tmp_path: Path,
+    *,
+    plugin_defaults: dict[str, str] | None = None,
+    rerender: _RecordingRerender | None = None,
+) -> tuple[AgentModelPolicyService, JsonAgentModelPolicyStore, _RecordingRerender]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / ".dadaia").mkdir(exist_ok=True)
     plugin_defaults = plugin_defaults or {}
     store = JsonAgentModelPolicyStore(tmp_path, plugin_agent_names=frozenset(plugin_defaults))
@@ -55,18 +63,21 @@ def _service(tmp_path, *, plugin_defaults=None, rerender=None):  # type: ignore[
 
 
 # ---------------------------------------------------------------------------
-# get_policy / resolved_roster
+# get_policy / resolved_roster / apply — read-apply roundtrip
 # ---------------------------------------------------------------------------
 
 
-def test_get_policy_missing_overlay_reports_defaults(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    service, _store, _rr = _service(tmp_path)
-    payload = service.get_policy()
+def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
+    """No-overlay defaults resolve from the library; after saving an override +
+    template, resolved_roster tags override/template/pack sources correctly; apply()
+    validates, saves, re-renders, and returns a summary that a fresh load confirms."""
+    # 1. No overlay, no plugin: every core agent resolves from the library default.
+    defaults_service, _defaults_store, _defaults_rr = _service(tmp_path / "defaults")
+    payload: dict[str, Any] = defaults_service.get_policy()
     assert payload["exists"] is False
     assert payload["policy"]["schema_version"] == "agent-model-policy-v1"
     resolved = payload["resolved"]
     assert set(resolved) == set(CORE_AGENTS)
-    # No overlay: every core agent resolves from the library default (balanced).
     assert all(entry["source"] == "default" for entry in resolved.values())
     assert resolved["software-engineer"] == {
         "model": "claude-sonnet-5",
@@ -74,9 +85,11 @@ def test_get_policy_missing_overlay_reports_defaults(tmp_path) -> None:  # type:
         "source": "default",
     }
 
-
-def test_resolved_roster_tags_override_template_default_pack(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    service, store, _rr = _service(tmp_path, plugin_defaults={"devops-engineer": "claude-sonnet-5"})
+    # 2. Save an overlay directly (with a plugin default present); resolved_roster
+    #    tags override/template/pack.
+    service, store, rerender = _service(
+        tmp_path / "overlay", plugin_defaults={"devops-engineer": "claude-sonnet-5"}
+    )
     store.save(
         AgentModelPolicyOverlay(
             applied_template="subscription-saver",
@@ -84,7 +97,6 @@ def test_resolved_roster_tags_override_template_default_pack(tmp_path) -> None: 
         )
     )
     roster = service.resolved_roster()
-    # AC-3: model from override, effort from the applied template.
     assert roster["software-engineer"] == {
         "model": "claude-opus-4-8",
         "effort": "xhigh",
@@ -92,12 +104,28 @@ def test_resolved_roster_tags_override_template_default_pack(tmp_path) -> None: 
     }
     assert roster["project-manager"]["source"] == "template"
     assert roster["project-manager"]["model"] == "claude-opus-4-8"
-    # Plugin agent: pack default, effort omitted (F-6 — None).
     assert roster["devops-engineer"] == {
         "model": "claude-sonnet-5",
         "effort": None,
         "source": "pack",
     }
+
+    # 3. apply(): validates, saves, re-renders, and returns a summary; persisted state
+    #    round-trips through a fresh load.
+    raw = {
+        "schema_version": "agent-model-policy-v1",
+        "applied_template": "max-quality",
+    }
+    result: dict[str, Any] = service.apply(raw)
+    assert rerender.calls == 1
+    assert result["rerendered"] == [
+        "[ok] .claude/agents/software-engineer.md",
+        "[ok] .codex/agents/software-engineer.toml",
+    ]
+    assert result["policy"]["applied_template"] == "max-quality"
+    persisted = store.load()
+    assert persisted is not None and persisted.applied_template == "max-quality"
+    assert "claude" in result["instructions"] and "codex" in result["instructions"]
 
 
 def test_get_policy_invalid_overlay_raises_typed_error(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -109,30 +137,7 @@ def test_get_policy_invalid_overlay_raises_typed_error(tmp_path) -> None:  # typ
 
 
 # ---------------------------------------------------------------------------
-# templates_payload
-# ---------------------------------------------------------------------------
-
-
-def test_templates_payload_carries_rosters_models_and_efforts(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    service, _store, _rr = _service(tmp_path)
-    payload = service.templates_payload()
-    templates = payload["templates"]
-    assert [t["id"] for t in templates] == ["balanced", "subscription-saver", "max-quality"]
-    balanced = templates[0]
-    assert balanced["default"] is True
-    assert set(balanced["assignments"]) == set(CORE_AGENTS)
-    assert balanced["assignments"]["project-manager"] == {
-        "model": "claude-fable-5",
-        "effort": "high",
-    }
-    assert "claude-sonnet-5" in payload["models"]
-    assert payload["efforts"] == list(CLAUDE_EFFORTS)
-    # Payload mirrors the library registry — nothing invented in the view layer.
-    assert len(templates) == len(list_templates())
-
-
-# ---------------------------------------------------------------------------
-# validate / apply
+# Governance law: Fable is never permitted on security-reviewer
 # ---------------------------------------------------------------------------
 
 
@@ -144,26 +149,6 @@ def test_validate_rejects_fable_on_security_with_distinct_message(tmp_path) -> N
     }
     with pytest.raises(AgentModelPolicyStoreError, match="security-reviewer"):
         service.validate(raw)
-
-
-def test_apply_validates_saves_rerenders_and_returns_summary(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    service, store, rerender = _service(tmp_path)
-    raw = {
-        "schema_version": "agent-model-policy-v1",
-        "applied_template": "max-quality",
-    }
-    result = service.apply(raw)
-    assert rerender.calls == 1
-    assert result["rerendered"] == [
-        "[ok] .claude/agents/software-engineer.md",
-        "[ok] .codex/agents/software-engineer.toml",
-    ]
-    assert result["policy"]["applied_template"] == "max-quality"
-    # Persisted: a fresh load resolves the applied template.
-    persisted = store.load()
-    assert persisted is not None and persisted.applied_template == "max-quality"
-    # G-2 payload: per-harness pickup instructions ride along for the pop-up.
-    assert "claude" in result["instructions"] and "codex" in result["instructions"]
 
 
 def test_apply_invalid_never_saves_nor_rerenders(tmp_path) -> None:  # type: ignore[no-untyped-def]

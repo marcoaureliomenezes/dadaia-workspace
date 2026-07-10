@@ -53,7 +53,7 @@ def _write_payload(target: Path) -> dict[str, object]:
     return {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
 
 
-def test_read_bound_in_repo_mutating_blocks_and_writes_no_lease(tmp_path: Path) -> None:
+def test_read_bound_mutating_blocks_additive_allows_both_non_acquiring(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     sid = "claude-read-session"
     # Bind-equivalent: persist the READ session record the gate reads (no env var anywhere).
@@ -76,19 +76,13 @@ def test_read_bound_in_repo_mutating_blocks_and_writes_no_lease(tmp_path: Path) 
     # Non-acquiring: the gate must NOT have created or modified the lease record.
     assert not _lock_path(ws).exists()
 
-
-def test_read_bound_in_repo_additive_allows(tmp_path: Path) -> None:
-    ws = _make_workspace(tmp_path)
-    sid = "claude-read-session"
-    session_identity.write_session(ws, sid, {"session_id": sid, "mode": "READ"})
-
-    target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-bug.md"
-    env = claude_hook_env(ws, session_id=sid)
-    result = run_hook_subprocess("sdd_gate", _write_payload(target), env)
-
-    assert result.returncode == 0
-    assert result.block_envelope() is None, f"ADDITIVE write must ALLOW; stdout={result.stdout!r}"
-    # ADDITIVE never touches the lease either.
+    # Same READ-bound session, ADDITIVE target -> ALLOW, still no lease touched.
+    additive_target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-bug.md"
+    result_additive = run_hook_subprocess("sdd_gate", _write_payload(additive_target), env)
+    assert result_additive.returncode == 0
+    assert result_additive.block_envelope() is None, (
+        f"ADDITIVE write must ALLOW; stdout={result_additive.stdout!r}"
+    )
     assert not _lock_path(ws).exists()
 
 
@@ -122,7 +116,9 @@ def _bind_read_incumbent(ws: Path, bind_sid: str) -> None:
     session_identity.set_incumbent(ws, _SLUG, bind_sid)
 
 
-def test_cross_sid_read_bind_blocks_mutating_via_incumbent(tmp_path: Path) -> None:
+def test_cross_sid_read_bind_blocks_mutating_and_allows_additive_via_incumbent(
+    tmp_path: Path,
+) -> None:
     # The operator's `bind --mode read` minted a sid the running harness never reports. A
     # DIFFERENT harness sid performs a MUTATING write under the real hook: it must resolve
     # READ through the context incumbent pointer ⇒ BLOCK, no lease written. This is the
@@ -147,16 +143,12 @@ def test_cross_sid_read_bind_blocks_mutating_via_incumbent(tmp_path: Path) -> No
     # Non-acquiring: no lease record created by the blocked write.
     assert not _lock_path(ws).exists()
 
-
-def test_cross_sid_read_bind_allows_additive_via_incumbent(tmp_path: Path) -> None:
     # Same cross-sid read-bind, but an ADDITIVE write ⇒ ALLOW (FR-R4-03), still no lease.
-    ws = _make_workspace(tmp_path)
-    _bind_read_incumbent(ws, "sess_operatorbind")
+    additive_target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-by-other.md"
+    result_additive = run_hook_subprocess("sdd_gate", _write_payload(additive_target), env)
 
-    target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-by-other.md"
-    env = claude_hook_env(ws, session_id="claude-harness-other")
-    result = run_hook_subprocess("sdd_gate", _write_payload(target), env)
-
-    assert result.returncode == 0
-    assert result.block_envelope() is None, f"ADDITIVE must ALLOW; stdout={result.stdout!r}"
+    assert result_additive.returncode == 0
+    assert result_additive.block_envelope() is None, (
+        f"ADDITIVE must ALLOW; stdout={result_additive.stdout!r}"
+    )
     assert not _lock_path(ws).exists()

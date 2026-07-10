@@ -153,58 +153,44 @@ def _build_fixture_specs(tmp_path: Path) -> Path:
 
 
 def test_build_memory_bootstrap_is_byte_identical_golden(tmp_path: Path) -> None:
-    """AC-7 core lock: ``_build_memory`` output equals the frozen golden byte-for-byte."""
+    """AC-7 core lock: ``_build_memory`` output equals the frozen golden byte-for-byte.
+
+    The golden IS the mutation-sanity check: appending any atom (constitution /
+    architecture / quality-assurance), leaking ``summary``/``rank``/``tags``, or
+    changing a header/join fails this byte-equality directly. The following asserts
+    are folded in as redundant, human-readable guards alongside the byte lock — their
+    intent stays explicit in source even though the golden alone already proves it.
+    """
     specs = _build_fixture_specs(tmp_path)
     built = ctx_inject._build_memory(specs)
     assert built == _EXPECTED_BOOTSTRAP
 
-
-def test_bootstrap_excludes_self_pull_only_atoms(tmp_path: Path) -> None:
-    """Ruling A: constitution / architecture / quality-assurance never reach the L1 bootstrap.
-
-    A redundant, human-readable guard alongside the byte golden: the AC-10(f) mutation
-    (append any of these atoms) fails here too, and the intent is explicit in source.
-    """
-    specs = _build_fixture_specs(tmp_path)
-    built = ctx_inject._build_memory(specs)
+    # Ruling A: constitution / architecture / quality-assurance never reach the L1
+    # bootstrap (self-pull-only).
     for sentinel in (
         "SENTINEL_CONSTITUTION_BODY",
         "SENTINEL_ARCHITECTURE_BODY",
         "SENTINEL_QA_BODY",
     ):
         assert sentinel not in built
-    # Only the two digest sections appear, framed by the fixed markers.
     assert "=== workspace memory (tech + catalog) ===" in built
     assert built.rstrip("\n").endswith("=== end memory bootstrap ===")
 
-
-def test_bootstrap_drops_heavy_and_rank_catalog_fields(tmp_path: Path) -> None:
-    """The digest strips ``summary`` / ``rank`` / ``tags`` — only the lean 4 fields survive."""
-    specs = _build_fixture_specs(tmp_path)
-    built = ctx_inject._build_memory(specs)
+    # The digest strips summary / rank / tags — only the lean 4 fields survive.
     assert _HEAVY_SUMMARY not in built
     assert '"summary"' not in built
     assert '"rank"' not in built
     assert '"tags"' not in built
-    # The lean fields the digest preserves are present.
     assert '"slug": "agent-comms"' in built
     assert '"path": "specs/memory/product/agents/agent-comms.md"' in built
 
-
-def test_bootstrap_carries_no_host_path(tmp_path: Path) -> None:
-    """Platform-invariance (v0.1.55): the host ``specs_dir`` path never leaks into output.
-
-    The golden is built purely from fixture file CONTENT, so the ``tmp_path`` sandbox
-    path (an absolute, OS-specific host path) must not appear anywhere in the bootstrap.
-    """
-    specs = _build_fixture_specs(tmp_path)
-    built = ctx_inject._build_memory(specs)
+    # Platform-invariance (v0.1.55): the host `specs_dir` path never leaks into output.
+    # The golden is built purely from fixture file CONTENT, so the tmp_path sandbox path
+    # (an absolute, OS-specific host path) must not appear anywhere in the bootstrap.
     assert str(tmp_path) not in built
     assert str(specs) not in built
 
-
-def test_bootstrap_empty_when_no_memory_dir(tmp_path: Path) -> None:
-    """No ``memory/`` dir ⇒ empty bootstrap (the guard clause), unchanged under FR4."""
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    assert ctx_inject._build_memory(specs) == ""
+    # No `memory/` dir ⇒ empty bootstrap (the guard clause), unchanged under FR4.
+    empty_specs = tmp_path / "empty-specs"
+    empty_specs.mkdir()
+    assert ctx_inject._build_memory(empty_specs) == ""

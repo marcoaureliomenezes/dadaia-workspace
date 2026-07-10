@@ -7,7 +7,8 @@ directly:
 1. A lifecycle step prompt is composed entirely from the Python dynamic selector
    (``ContextSelector`` + ``LifecyclePromptBuilder``) — the fragment body + the
    selector-resolved dynamic context are present — WITHOUT ever invoking ``ctx_inject`` and
-   WITHOUT any ctx-inject sentinel existing on disk.
+   WITHOUT any ctx-inject sentinel existing on disk, and WITHOUT the hook's bootstrap banner
+   leaking into the prompt.
 2. The hook's session-bootstrap memory is dehydrated: a large ``tech-stack.md`` is reduced to
    a bounded digest (it is no longer dumped verbatim), while a small one is unchanged and the
    catalog stays the lean tldr-digest. ``bind/session`` safety + the lean generic preflight
@@ -93,7 +94,13 @@ def _audit_workflow(tmp_path: Path) -> AuditWorkflow:
 # --- A30: the lifecycle step prompt is fully composed from the dynamic selector ----------
 
 
-def test_lifecycle_prompt_composed_from_selector_without_ctx_inject(tmp_path: Path) -> None:
+def test_lifecycle_prompt_selector_composed_with_no_ctx_inject_side_effect(
+    tmp_path: Path,
+) -> None:
+    """Three facets of one no-side-effect property: the composed prompt carries the fragment
+    body + selector-resolved dynamic context (proving the source is ``ContextSelector``, not
+    ctx-inject), running the workflow creates no ctx-inject sentinel on disk, and no step
+    prompt carries the hook's bootstrap banner."""
     _workspace(tmp_path)
     wf = _audit_workflow(tmp_path)
 
@@ -109,13 +116,6 @@ def test_lifecycle_prompt_composed_from_selector_without_ctx_inject(tmp_path: Pa
     # context came from ContextSelector, not from any ctx-inject session-bootstrap side effect.
     assert "SELECTOR-MARKER-OPEN-BUG" in prompt
 
-
-def test_no_ctx_inject_sentinel_created_by_running_a_lifecycle_workflow(tmp_path: Path) -> None:
-    """The lifecycle prompt path never touches the ctx-inject sentinel (no side effect)."""
-    _workspace(tmp_path)
-    wf = _audit_workflow(tmp_path)
-    wf.run("a30-side")
-
     tmp_dir = tmp_path / ".dadaia" / "tmp"
     sentinels = (
         [p for p in tmp_dir.iterdir() if p.name.startswith(_SENTINEL_PREFIX)]
@@ -123,13 +123,6 @@ def test_no_ctx_inject_sentinel_created_by_running_a_lifecycle_workflow(tmp_path
         else []
     )
     assert sentinels == [], "running a lifecycle workflow must not create a ctx-inject sentinel"
-
-
-def test_lifecycle_prompt_does_not_carry_ctx_inject_bootstrap_banner(tmp_path: Path) -> None:
-    """The hook's '=== workspace memory ===' bootstrap banner never leaks into a step prompt."""
-    _workspace(tmp_path)
-    wf = _audit_workflow(tmp_path)
-    result = wf.run("a30-banner")
 
     for step in result.steps:
         if step.prompt_text is not None:
@@ -140,7 +133,9 @@ def test_lifecycle_prompt_does_not_carry_ctx_inject_bootstrap_banner(tmp_path: P
 # --- WS-C dehydration: the session bootstrap reduces a large tech-stack to a digest -------
 
 
-def test_large_tech_stack_is_dehydrated_to_a_bounded_digest() -> None:
+def test_tech_stack_digest_bounded_for_large_verbatim_for_small_and_used_by_build_memory(
+    tmp_path: Path,
+) -> None:
     big = "# tech-stack\n\n" + "\n".join(f"- dependency-{i} pinned" for i in range(200))
     digest = ctx_inject._digest_tech_stack(big)  # noqa: SLF001 — white-box digest assertion.
     # Strictly smaller than the source, and carries the self-pull pointer.
@@ -151,21 +146,16 @@ def test_large_tech_stack_is_dehydrated_to_a_bounded_digest() -> None:
     # A deep line is dropped (genuinely bounded, not the full body).
     assert "dependency-199 pinned" not in digest
 
-
-def test_small_tech_stack_is_emitted_verbatim() -> None:
     small = "# tech\nPython 3.12\nNode 20\n"
-    digest = ctx_inject._digest_tech_stack(small)  # noqa: SLF001
-    assert "Python 3.12" in digest
-    assert "Node 20" in digest
+    small_digest = ctx_inject._digest_tech_stack(small)  # noqa: SLF001
+    assert "Python 3.12" in small_digest
+    assert "Node 20" in small_digest
     # No truncation pointer for a small atom.
-    assert "self-pull" not in digest
+    assert "self-pull" not in small_digest
 
-
-def test_build_memory_uses_the_tech_stack_digest_not_the_full_body(tmp_path: Path) -> None:
     specs = tmp_path / "repos" / _CONTEXT / "specs"
     mem = specs / "memory" / "product"
     mem.mkdir(parents=True)
-    big = "# tech-stack\n\n" + "\n".join(f"- dependency-{i} pinned" for i in range(200))
     (specs / "memory" / "tech-stack.md").write_text(big, encoding="utf-8")
     (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 

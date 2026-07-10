@@ -164,22 +164,29 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
 # ---------------------------------------------------------------------------
 
 
-def test_pi_pipeline_accepts_schema_version_and_singular_artifact_result(
+def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC2(repro) — bug: lifecycle-agent-run-result-extraction-too-strict.
+    """AC2(repro) + AC2(repro-negative), merged: two invocations sharing
+    ``_patch_pi_runner``.
 
-    A faked pi worker emits a result object keyed ``schema_version`` (not
-    ``schema``) with a singular ``artifact.path`` (not an ``artifact_refs``
-    list) — both real, tolerable shapes per FR2. On current (buggy) code
-    ``classify_result_payload`` only recognizes ``schema`` and
-    ``normalize_artifact_refs`` only reads ``artifact_refs``, so the payload is
-    rejected entirely and the pipeline blocks at ``implement`` with "agent
-    result missing artifact evidence". After the fix the step must ACCEPT (the
-    verdict gate does not apply — ``implement`` is a create step, not review).
+    (1) bug lifecycle-agent-run-result-extraction-too-strict: a faked pi worker emits a
+    result object keyed ``schema_version`` (not ``schema``) with a singular
+    ``artifact.path`` (not an ``artifact_refs`` list) — both real, tolerable shapes per
+    FR2. On current (buggy) code ``classify_result_payload`` only recognizes ``schema``
+    and ``normalize_artifact_refs`` only reads ``artifact_refs``, so the payload is
+    rejected entirely and the pipeline blocks at ``implement`` with "agent result
+    missing artifact evidence". After the fix the step must ACCEPT (the verdict gate
+    does not apply — ``implement`` is a create step, not review).
+
+    (2) the no-op-worker invariant survives the FR2 widening: a faked pi worker emits
+    ONLY prose — no JSON result object at all. ``extract_result_payload`` still returns
+    ``None``, so ``artifact_refs`` stays empty and the pipeline still BLOCKs at
+    ``implement`` with the EXACT generic "agent result missing artifact evidence"
+    reason.
     """
-    calls: list[object] = []
+    accept_calls: list[object] = []
     worker_payload = json.dumps(
         {
             "schema_version": "agent-run-result-v1",
@@ -192,8 +199,8 @@ def test_pi_pipeline_accepts_schema_version_and_singular_artifact_result(
         }
     )
 
-    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        calls.append(args)
+    def fake_pi_run_accept(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        accept_calls.append(args)
         return _subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -201,13 +208,13 @@ def test_pi_pipeline_accepts_schema_version_and_singular_artifact_result(
             stderr="",
         )
 
-    _patch_pi_runner(monkeypatch, fake_pi_run)
+    _patch_pi_runner(monkeypatch, fake_pi_run_accept)
     _stub_git_diff(monkeypatch)
 
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    accept_workspace = _init_workspace(tmp_path / "accept-case")
+    monkeypatch.chdir(accept_workspace)
 
-    result = _runner.invoke(
+    accept_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -226,32 +233,17 @@ def test_pi_pipeline_accepts_schema_version_and_singular_artifact_result(
     # The implement step ACCEPTS on this fix, so the pipeline advances into review_qa
     # (also faked pi) before blocking there — at least one call proves the fake, not
     # the real binary, drove the implement step; the exact-once assertion used by the
-    # other (blocking-at-first-step) tests in this file does not apply here.
-    assert len(calls) >= 1, "the faked pi subprocess seam must have been invoked"
-    payload = json.loads(result.output)
-    assert payload["steps"][0]["label"] == "implement"
-    assert payload["steps"][0]["runtime"] == "pi_headless"
-    assert payload["steps"][0]["accepted"] is True, payload
+    # negative case below does not apply here.
+    assert len(accept_calls) >= 1, "the faked pi subprocess seam must have been invoked"
+    accept_payload = json.loads(accept_result.output)
+    assert accept_payload["steps"][0]["label"] == "implement"
+    assert accept_payload["steps"][0]["runtime"] == "pi_headless"
+    assert accept_payload["steps"][0]["accepted"] is True, accept_payload
 
+    negative_calls: list[object] = []
 
-def test_pi_pipeline_still_blocks_on_genuine_noop_worker(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """AC2(repro-negative) — the no-op-worker invariant survives the FR2 widening.
-
-    A faked pi worker emits ONLY prose — no JSON result object at all. This must
-    PASS on current code (baseline proof the invariant already holds) AND continue
-    to PASS after the fix: `extract_result_payload` still returns ``None``, so
-    `artifact_refs` stays empty and the pipeline still BLOCKs at `implement` with
-    the EXACT generic "agent result missing artifact evidence" reason. Driven
-    through the real CLI so the proof covers the actual executed path, not just
-    the unit-level classifier.
-    """
-    calls: list[object] = []
-
-    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        calls.append(args)
+    def fake_pi_run_negative(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+        negative_calls.append(args)
         return _subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -259,13 +251,13 @@ def test_pi_pipeline_still_blocks_on_genuine_noop_worker(
             stderr="",
         )
 
-    _patch_pi_runner(monkeypatch, fake_pi_run)
+    _patch_pi_runner(monkeypatch, fake_pi_run_negative)
     _stub_git_diff(monkeypatch)
 
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
+    negative_workspace = _init_workspace(tmp_path / "negative-case")
+    monkeypatch.chdir(negative_workspace)
 
-    result = _runner.invoke(
+    negative_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -281,14 +273,14 @@ def test_pi_pipeline_still_blocks_on_genuine_noop_worker(
         ],
     )
 
-    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
-    assert result.exit_code == 3, result.output
-    payload = json.loads(result.output)
-    assert payload["status"] == "BLOCKED"
-    assert payload["completed"] is False
-    assert payload["steps"][0]["label"] == "implement"
-    assert payload["steps"][0]["accepted"] is False
-    assert payload["blocked"]["reason"] == "agent result missing artifact evidence"
+    assert len(negative_calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
+    assert negative_result.exit_code == 3, negative_result.output
+    negative_payload = json.loads(negative_result.output)
+    assert negative_payload["status"] == "BLOCKED"
+    assert negative_payload["completed"] is False
+    assert negative_payload["steps"][0]["label"] == "implement"
+    assert negative_payload["steps"][0]["accepted"] is False
+    assert negative_payload["blocked"]["reason"] == "agent result missing artifact evidence"
 
 
 # ---------------------------------------------------------------------------

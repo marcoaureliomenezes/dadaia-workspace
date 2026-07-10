@@ -78,80 +78,62 @@ def _make_service(
     )
 
 
-def test_state_dir_restriction_routes_through_injected_setter(tmp_path: pathlib.Path) -> None:
-    setter = _RecordingSetter()
-    state_dir = tmp_path / "state"
-    _make_service(state_dir=state_dir, workspace_root=tmp_path, permission_setter=setter)
-
-    assert setter.dir_calls == [(state_dir, 0o700)]
-    assert setter.file_calls == []
-
-
-def test_setter_platform_security_error_degrades_with_info(
-    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+def test_state_dir_and_db_file_routing_matrix(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
+    # (a) state-dir restriction routes through the injected setter.
+    setter_a = _RecordingSetter()
+    state_dir_a = tmp_path / "a" / "state"
+    _make_service(state_dir=state_dir_a, workspace_root=tmp_path / "a", permission_setter=setter_a)
+    assert setter_a.dir_calls == [(state_dir_a, 0o700)]
+    assert setter_a.file_calls == []
+
+    # (b) a PlatformSecurityError from the setter degrades with an INFO log, never raises.
     with caplog.at_level(logging.INFO, logger=service_mod.logger.name):
-        # Construction must NOT raise even though the setter fails (Tier-2 degrade).
         _make_service(
-            state_dir=tmp_path / "state",
-            workspace_root=tmp_path,
+            state_dir=tmp_path / "b" / "state",
+            workspace_root=tmp_path / "b",
             permission_setter=_RaisingSetter(),
         )
     messages = [r.getMessage() for r in caplog.records]
     assert any("degraded mode" in m and "directory" in m for m in messages), messages
 
-
-def test_no_setter_posix_present_uses_direct_chmod(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+    # (c) no setter injected + POSIX present -> falls back to direct os.chmod.
     monkeypatch.setattr(service_mod, "PLATFORM", Capabilities.detect("linux"))
-    chmod_calls: list[tuple[Any, int]] = []
-    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls.append((p, m)))
+    chmod_calls_c: list[tuple[Any, int]] = []
+    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls_c.append((p, m)))
+    state_dir_c = tmp_path / "c" / "state"
+    _make_service(state_dir=state_dir_c, workspace_root=tmp_path / "c", permission_setter=None)
+    assert chmod_calls_c == [(state_dir_c, 0o700)]
 
-    state_dir = tmp_path / "state"
-    _make_service(state_dir=state_dir, workspace_root=tmp_path, permission_setter=None)
-
-    assert chmod_calls == [(state_dir, 0o700)]
-
-
-def test_no_setter_posix_absent_skips_direct_chmod(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Windows-shaped capability: has_posix_chmod is False, so os.chmod (a silent no-op on
-    # Windows) must be SKIPPED rather than giving false confidence (CWE-732).
+    # (d) no setter injected + POSIX absent (Windows-shaped) -> chmod SKIPPED (CWE-732).
     monkeypatch.setattr(service_mod, "PLATFORM", Capabilities.detect("win32"))
-    chmod_calls: list[tuple[Any, int]] = []
-    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls.append((p, m)))
-
-    _make_service(state_dir=tmp_path / "state", workspace_root=tmp_path, permission_setter=None)
-
-    assert chmod_calls == []
-
-
-def test_db_file_path_routes_file_restriction_through_setter(tmp_path: pathlib.Path) -> None:
-    setter = _RecordingSetter()
-    svc = _make_service(
-        state_dir=tmp_path / "state", workspace_root=tmp_path, permission_setter=setter
+    chmod_calls_d: list[tuple[Any, int]] = []
+    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls_d.append((p, m)))
+    _make_service(
+        state_dir=tmp_path / "d" / "state", workspace_root=tmp_path / "d", permission_setter=None
     )
-    setter.dir_calls.clear()  # discard the construction-time state-dir call
+    assert chmod_calls_d == []
 
-    db_file = tmp_path / "telemetry.db"
-    svc._restrict_owner_only(db_file, is_dir=False)
+    # (e) db-file path routes file restriction through the setter (not dir restriction).
+    setter_e = _RecordingSetter()
+    svc_e = _make_service(
+        state_dir=tmp_path / "e" / "state",
+        workspace_root=tmp_path / "e",
+        permission_setter=setter_e,
+    )
+    setter_e.dir_calls.clear()  # discard the construction-time state-dir call
+    db_file_e = tmp_path / "e" / "telemetry.db"
+    svc_e._restrict_owner_only(db_file_e, is_dir=False)  # noqa: SLF001
+    assert setter_e.file_calls == [(db_file_e, 0o600)]
+    assert setter_e.dir_calls == []
 
-    assert setter.file_calls == [(db_file, 0o600)]
-    assert setter.dir_calls == []
-
-
-def test_db_file_path_posix_absent_skips_chmod(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    svc = _make_service(
-        state_dir=tmp_path / "state", workspace_root=tmp_path, permission_setter=None
+    # (f) db-file path with no setter + POSIX absent -> chmod skipped too.
+    svc_f = _make_service(
+        state_dir=tmp_path / "f" / "state", workspace_root=tmp_path / "f", permission_setter=None
     )
     monkeypatch.setattr(service_mod, "PLATFORM", Capabilities.detect("win32"))
-    chmod_calls: list[tuple[Any, int]] = []
-    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls.append((p, m)))
-
-    svc._restrict_owner_only(tmp_path / "telemetry.db", is_dir=False)
-
-    assert chmod_calls == []
+    chmod_calls_f: list[tuple[Any, int]] = []
+    monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls_f.append((p, m)))
+    svc_f._restrict_owner_only(tmp_path / "f" / "telemetry.db", is_dir=False)  # noqa: SLF001
+    assert chmod_calls_f == []

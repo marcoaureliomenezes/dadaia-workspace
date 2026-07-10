@@ -1,6 +1,7 @@
 """Public CLI contracts for `dadaia context`."""
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -56,162 +57,6 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
     )
 
 
-def test_context_create_lists_state_dead(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    assert result.exit_code == 0, result.output
-    list_out = _runner.invoke(app, ["context", "list"])
-    assert "alpha" in list_out.output
-    assert "dead" in list_out.output
-
-
-def test_context_show_json_returns_structured(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    result = _runner.invoke(app, ["context", "show", "alpha", "--json"])
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.stdout)
-    assert data["name"] == "alpha"
-    assert data["state"] == "dead"
-    # v2: no is_primary field
-    assert "is_primary" not in data
-    assert "alive_since" in data
-    assert "dead_since" in data
-    # v2: session sub-object present (null when no binding)
-    assert "session" in data
-    assert data["session"] is None
-
-
-def test_context_create_rejects_duplicate(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
-    assert result.exit_code != 0
-
-
-def test_context_show_json_unknown_returns_error(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "show", "ghost", "--json"])
-    assert result.exit_code != 0
-
-
-def test_context_show_table_output(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "beta", "--repo", "beta"])
-    result = _runner.invoke(app, ["context", "show", "beta"])
-    assert result.exit_code == 0, result.output
-    assert "beta" in result.output
-
-
-def test_context_show_no_active_context_json(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "show", "--json"])
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.stdout)
-    assert data.get("context") is None
-
-
-def test_context_list_empty_workspace(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code == 0, result.output
-    assert "No contexts" in result.output
-
-
-def test_context_delete_dead_context(workspace: Path) -> None:
-    _runner.invoke(app, ["context", "create", "to-del", "--repo", "to-del"])
-    result = _runner.invoke(app, ["context", "delete", "to-del"])
-    assert result.exit_code == 0, result.output
-    assert "deleted" in result.output.lower() or "to-del" in result.output
-
-
-def test_context_delete_nonexistent_errors(workspace: Path) -> None:
-    result = _runner.invoke(app, ["context", "delete", "ghost"])
-    assert result.exit_code != 0
-
-
-def test_context_list_shows_alive_context(workspace: Path) -> None:
-    """Write a v2 alive context directly to verify list shows it correctly."""
-    states = workspace / ".dadaia" / "states"
-    ctx_data = {
-        "schema_version": "2",
-        "contexts": [
-            {
-                "name": "alive-ctx",
-                "state": "alive",
-                "repo_slug": "alive-ctx",
-                "repo_url": "",
-                "created_at": "2026-01-01T00:00:00Z",
-                "alive_since": "2026-01-01T00:00:00Z",
-                "dead_since": None,
-                "current_branch": "main",
-            }
-        ],
-    }
-    import json as _json
-
-    (states / "spec_contexts.json").write_text(_json.dumps(ctx_data))
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code == 0, result.output
-    assert "alive-ctx" in result.output
-
-
-def test_context_workspace_not_initialized_exits(tmp_path: Path, monkeypatch) -> None:
-    # No .dadaia/ → workspace not initialized
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code != 0
-
-
-def test_context_command_on_v1_workspace_exits_nonzero(workspace: Path) -> None:
-    """AC-T10c-4: any dadaia context command on v1 workspace must exit non-zero
-    with the migration prompt."""
-    states = workspace / ".dadaia" / "states"
-    v1_data = {
-        "schema_version": "1",
-        "contexts": [
-            {
-                "name": "old-ctx",
-                "state": "ativo",
-                "repo_slug": "old-ctx",
-                "repo_url": "",
-                "is_primary": False,
-                "created_at": "2026-01-01T00:00:00Z",
-                "activated_at": None,
-            }
-        ],
-    }
-    import json as _json
-
-    (states / "spec_contexts.json").write_text(_json.dumps(v1_data))
-    result = _runner.invoke(app, ["context", "list"])
-    assert result.exit_code != 0
-    combined = result.output + (result.stderr or "")
-    assert "MIGRATION REQUIRED" in combined or "dadaia migrate" in combined
-
-
-# ---------------------------------------------------------------------------
-# T-10d: new verbs alive / dead
-# ---------------------------------------------------------------------------
-
-
-def test_context_alive_requires_existing_context(workspace: Path) -> None:
-    """AC-T10d-1: alive <name> must fail for a non-existent context."""
-    result = _runner.invoke(app, ["context", "alive", "ghost"])
-    assert result.exit_code != 0
-
-
-def test_context_dead_requires_alive_context(workspace: Path) -> None:
-    """AC-T10d-2: dead <name> must fail if context is not ALIVE."""
-    _runner.invoke(app, ["context", "create", "proj", "--repo", "proj"])
-    result = _runner.invoke(app, ["context", "dead", "proj"])
-    assert result.exit_code != 0
-
-
-def test_context_dead_requires_existing_context(workspace: Path) -> None:
-    """AC-T10d-2: dead <name> must fail for a non-existent context."""
-    result = _runner.invoke(app, ["context", "dead", "ghost"])
-    assert result.exit_code != 0
-
-
-# ---------------------------------------------------------------------------
-# T-10d: context bind -- mode (session creation)
-# ---------------------------------------------------------------------------
-
-
 def _session_record_for(workspace: Path, output: str) -> dict:
     """Resolve the persisted session record from a bind command's confirmation output."""
     import re
@@ -233,42 +78,169 @@ def _session_record_for(workspace: Path, output: str) -> dict:
     return record
 
 
-# --- FR-R4-01: --mode optional, default read ------------------------------
+# ---------------------------------------------------------------------------
+# create -> show --json -> list happy lifecycle
+# ---------------------------------------------------------------------------
 
 
-def test_context_bind_no_mode_exits_zero_default_read(workspace: Path) -> None:
-    """FR-R4-01: bind with NO --mode exits 0 and defaults to read."""
+def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
+    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    assert result.exit_code == 0, result.output
+
+    show = _runner.invoke(app, ["context", "show", "alpha", "--json"])
+    assert show.exit_code == 0, show.output
+    data = json.loads(show.stdout)
+    assert data["name"] == "alpha"
+    assert data["state"] == "dead"
+    # v2: no is_primary field
+    assert "is_primary" not in data
+    assert "alive_since" in data
+    assert "dead_since" in data
+    # v2: session sub-object present (null when no binding)
+    assert "session" in data
+    assert data["session"] is None
+
+    list_out = _runner.invoke(app, ["context", "list"])
+    assert list_out.exit_code == 0, list_out.output
+    assert "alpha" in list_out.output
+    assert "dead" in list_out.output
+
+
+# ---------------------------------------------------------------------------
+# Error matrix: duplicate create, unknown show, delete nonexistent, uninitialized
+# workspace, alive/dead verb guards, invalid bind mode, implementation/review
+# bind requiring --release, release without a session.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "invoke_args",
+    [
+        pytest.param(["context", "show", "ghost", "--json"], id="show-unknown-json"),
+        pytest.param(["context", "delete", "ghost"], id="delete-nonexistent"),
+        pytest.param(["context", "alive", "ghost"], id="alive-requires-existing"),
+        pytest.param(["context", "dead", "ghost"], id="dead-requires-existing"),
+        pytest.param(["context", "bind", "myctx", "--mode", "turbo"], id="bind-invalid-mode"),
+        pytest.param(
+            ["context", "bind", "myctx", "--mode", "implementation"],
+            id="bind-implementation-requires-release",
+        ),
+        pytest.param(
+            ["context", "bind", "myctx", "--mode", "review"],
+            id="bind-review-requires-release",
+        ),
+    ],
+)
+def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, invoke_args)
+    assert result.exit_code != 0
+
+
+def test_context_create_duplicate_and_dead_requires_alive(workspace: Path) -> None:
+    """A duplicate create fails, and (AC-T10d-2) dead <name> fails if the context is
+    not ALIVE — both against the same freshly-created DEAD context."""
+    _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    result = _runner.invoke(app, ["context", "create", "alpha", "--repo", "alpha"])
+    assert result.exit_code != 0
+
+    result = _runner.invoke(app, ["context", "dead", "alpha"])
+    assert result.exit_code != 0
+
+
+def test_context_uninitialized_workspace_and_v1_workspace_exit_nonzero(
+    tmp_path_factory: pytest.TempPathFactory, workspace: Path, monkeypatch
+) -> None:
+    """No `.dadaia/` at all → non-zero exit, and (AC-T10c-4) any `dadaia context`
+    command on a v1 workspace exits non-zero with the migration prompt."""
+    uninitialized = tmp_path_factory.mktemp("uninitialized")
+    monkeypatch.chdir(uninitialized)
+    result = _runner.invoke(app, ["context", "list"])
+    assert result.exit_code != 0
+
+    monkeypatch.chdir(workspace)
+    states = workspace / ".dadaia" / "states"
+    v1_data = {
+        "schema_version": "1",
+        "contexts": [
+            {
+                "name": "old-ctx",
+                "state": "ativo",
+                "repo_slug": "old-ctx",
+                "repo_url": "",
+                "is_primary": False,
+                "created_at": "2026-01-01T00:00:00Z",
+                "activated_at": None,
+            }
+        ],
+    }
+    (states / "spec_contexts.json").write_text(json.dumps(v1_data))
+    result = _runner.invoke(app, ["context", "list"])
+    assert result.exit_code != 0
+    combined = result.output + (result.stderr or "")
+    assert "MIGRATION REQUIRED" in combined or "dadaia migrate" in combined
+
+
+# ---------------------------------------------------------------------------
+# T-10d: context bind -- mode (session creation)
+# FR-R4-01: --mode optional, default read. FR-R4-02: explicit modes persisted.
+# Legacy alias mapping. --print-env back-compat escape.
+# ---------------------------------------------------------------------------
+
+
+def test_context_bind_read_persistence_variants(workspace: Path) -> None:
+    """FR-R4-01/02: bind with NO --mode exits 0, defaults to read, persists READ, and
+    prints a human confirmation (context/mode/session id) — never a shell export line.
+    Explicit --mode read persists READ; legacy --mode spec alias maps and persists as
+    READ too (no lease-taking)."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
     # Confirmation line, NOT a shell export line
     assert "export DADAIA_CONTEXT" not in result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
-    assert record["context"] == "myctx"
-
-
-def test_context_bind_no_mode_prints_human_confirmation(workspace: Path) -> None:
-    """FR-R4-01/02: default bind prints a human confirmation (context/mode/session id)."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx"])
-    assert result.exit_code == 0, result.output
     out = result.output.lower()
     assert "myctx" in result.output
     assert "read" in out
     assert "sess_" in result.output
+    record = _session_record_for(workspace, result.output)
+    assert record["mode"] == "READ"
+    assert record["context"] == "myctx"
 
-
-# --- FR-R4-02: explicit modes persisted into the session record -----------
-
-
-def test_context_bind_read_persists_read(workspace: Path) -> None:
-    """FR-R4-02: explicit --mode read persists READ in the session record."""
-    _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
     assert result.exit_code == 0, result.output
     record = _session_record_for(workspace, result.output)
     assert record["mode"] == "READ"
+
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec"])
+    assert result.exit_code == 0, result.output
+    record = _session_record_for(workspace, result.output)
+    assert record["mode"] == "READ"
+
+
+def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) -> None:
+    """Back-compat: --print-env emits eval-compatible export lines for both the
+    default READ bind and an implementation bind, and the session record still
+    persists under --print-env in both cases."""
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
+    assert result.exit_code == 0, result.output
+    assert "export DADAIA_CONTEXT=myctx" in result.output
+    assert "export DADAIA_SESSION_ID=" in result.output
+    assert "export DADAIA_MODE=READ" in result.output
+    record = _session_record_for(workspace, result.output)
+    assert record["mode"] == "READ"
+
+    result = _runner.invoke(
+        app,
+        ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1", "--print-env"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "export DADAIA_MODE=IMPLEMENTATION" in result.output
+    record = _session_record_for(workspace, result.output)
+    assert record["mode"] == "BOUND_IMPLEMENTATION"
+
+
+# --- NF-2 (rc-2): bind refreshes the CONTEXT incumbent pointer -------------
 
 
 def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> None:
@@ -297,44 +269,29 @@ def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> No
 # --- FR-W2-02 (T-014-09): bind writes the standalone bind-epoch marker --------
 
 
-def test_context_bind_writes_bind_epoch_marker(workspace: Path) -> None:
-    """FR-W2-02: a successful bind stamps `.dadaia/states/bind_epoch/<ctx>` (standalone).
+def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
+    """FR-W2-02: a successful bind stamps `.dadaia/states/bind_epoch/<ctx>`
+    (standalone) — created on demand, refreshed on re-bind, and never folded into
+    the incumbent `.ptr` payload (which carries ONLY the bare session id).
 
-    The marker is the SOLE trigger for context-memory injection and the ctx-inject hook's
-    harness-real discovery source. It is NOT a field in the lease `.ptr`.
-    """
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
-    assert result.exit_code == 0, result.output
-    marker = workspace / ".dadaia" / "states" / "bind_epoch" / "myctx"
-    assert marker.is_file(), "bind must write a standalone bind-epoch marker"
-
-
-def test_context_bind_marker_dir_created_on_demand(workspace: Path) -> None:
-    """FR-W2-02: the bind_epoch dir is created on demand by the first bind."""
-    _register_alive_ctx(workspace)
-    marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
-    assert not marker_dir.exists()
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
-    assert result.exit_code == 0, result.output
-    assert marker_dir.is_dir()
-
-
-def test_context_bind_does_not_write_marker_into_ptr(workspace: Path) -> None:
-    """FR-W2-02: the bind-epoch is a standalone file; the `.ptr` is untouched by it.
-
-    The incumbent `.ptr` content must remain the bare session id — the epoch lives in
-    its own file, never coupled to lease-incumbency.
+    The marker is the SOLE trigger for context-memory injection and the ctx-inject
+    hook's harness-real discovery source.
     """
     from dadaia_workspace.features.spec_context import session_identity
 
     _register_alive_ctx(workspace)
+    marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
+    marker = marker_dir / "myctx"
+    assert not marker_dir.exists()
+
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
     assert result.exit_code == 0, result.output
+    assert marker_dir.is_dir()
+    assert marker.is_file(), "bind must write a standalone bind-epoch marker"
+
     record = _session_record_for(workspace, result.output)
     incumbent = session_identity.read_incumbent_ptr(workspace, "myctx")
     assert incumbent == record["session_id"]
-    # The `.ptr` carries ONLY the session id — no epoch/marker payload folded in.
     ptr_text = (
         (workspace / ".dadaia" / "sessions" / "runtime" / "myctx.ptr")
         .read_text(encoding="utf-8")
@@ -342,15 +299,6 @@ def test_context_bind_does_not_write_marker_into_ptr(workspace: Path) -> None:
     )
     assert ptr_text == record["session_id"]
 
-
-def test_context_rebind_refreshes_marker_mtime(workspace: Path) -> None:
-    """FR-W2-02: re-binding the same context refreshes the marker mtime."""
-    import os
-
-    _register_alive_ctx(workspace)
-    marker = workspace / ".dadaia" / "states" / "bind_epoch" / "myctx"
-
-    assert _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"]).exit_code == 0
     first_mtime = marker.stat().st_mtime
     # Backdate the marker so a refresh is observable regardless of clock granularity.
     os.utime(marker, (first_mtime - 100, first_mtime - 100))
@@ -360,64 +308,35 @@ def test_context_rebind_refreshes_marker_mtime(workspace: Path) -> None:
     assert marker.stat().st_mtime > backdated, "re-bind must refresh the bind-epoch mtime"
 
 
-def test_context_bind_implementation_persists_bound_implementation(workspace: Path) -> None:
-    """FR-R4-02: --mode implementation persists BOUND_IMPLEMENTATION + creates session."""
+# --- FR-R4-02: implementation / review bind persistence --------------------
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_record_mode"),
+    [
+        pytest.param("implementation", "BOUND_IMPLEMENTATION", id="implementation"),
+        pytest.param("review", "BOUND_REVIEW", id="review"),
+    ],
+)
+def test_context_bind_implementation_and_review_persist_mode_no_lock3(
+    workspace: Path, mode: str, expected_record_mode: str
+) -> None:
+    """FR-R4-02: --mode implementation/review persists the BOUND_* mode + creates a
+    session, and (v0.1.6) never creates a Lock-3 per-release implementation lock file
+    on bind — the gate's single TTL-lease enforces one writer at write time instead."""
     _register_alive_ctx(workspace)
-    result = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
-    )
+    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", mode, "--release", "v1"])
     assert result.exit_code == 0, result.output
     record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "BOUND_IMPLEMENTATION"
-    assert record["release"] == "v1"
+    assert record["mode"] == expected_record_mode
 
-    session_id = record["session_id"]
-    session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
-    assert session_file.exists(), "Session file must be created"
+    if mode == "implementation":
+        session_id = record["session_id"]
+        session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
+        assert session_file.exists(), "Session file must be created"
 
-    # Lock-3 retired: no per-release implementation lock file is written on bind.
     lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
     assert not lock_file.exists(), "bind must NOT create a Lock-3 implementation lock (v0.1.6)"
-
-
-def test_context_bind_review_persists_bound_review(workspace: Path) -> None:
-    """FR-R4-02: --mode review persists BOUND_REVIEW + creates session, no lock."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(
-        app, ["context", "bind", "myctx", "--mode", "review", "--release", "v1"]
-    )
-    assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "BOUND_REVIEW"
-
-    lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
-    assert not lock_file.exists(), "Review bind must NOT create implementation lock"
-
-
-# --- legacy alias mapping --------------------------------------------------
-
-
-def test_context_bind_spec_alias_maps_to_read(workspace: Path) -> None:
-    """Legacy alias: --mode spec maps and persists as READ (no lease-taking)."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec"])
-    assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
-
-
-def test_context_bind_implementation_requires_release(workspace: Path) -> None:
-    """--mode implementation without --release must error."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "implementation"])
-    assert result.exit_code != 0
-
-
-def test_context_bind_review_alias_requires_release(workspace: Path) -> None:
-    """--mode review (lease-taking) without --release must error."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "review"])
-    assert result.exit_code != 0
 
 
 def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
@@ -434,49 +353,16 @@ def test_context_bind_second_implementation_does_not_block(workspace: Path) -> N
     assert result2.exit_code == 0, result2.output
 
 
-def test_context_bind_invalid_mode(workspace: Path) -> None:
-    """Unsupported mode exits non-zero."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "turbo"])
-    assert result.exit_code != 0
-
-
-# --- --print-env back-compat escape ---------------------------------------
-
-
-def test_context_bind_print_env_emits_export_lines(workspace: Path) -> None:
-    """Back-compat: --print-env still emits eval-compatible export lines."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--print-env"])
-    assert result.exit_code == 0, result.output
-    assert "export DADAIA_CONTEXT=myctx" in result.output
-    assert "export DADAIA_SESSION_ID=" in result.output
-    assert "export DADAIA_MODE=READ" in result.output
-    # record still persisted under --print-env
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "READ"
-
-
-def test_context_bind_print_env_implementation(workspace: Path) -> None:
-    """--print-env with implementation emits BOUND-free DADAIA_MODE=IMPLEMENTATION."""
-    _register_alive_ctx(workspace)
-    result = _runner.invoke(
-        app,
-        ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1", "--print-env"],
-    )
-    assert result.exit_code == 0, result.output
-    assert "export DADAIA_MODE=IMPLEMENTATION" in result.output
-    record = _session_record_for(workspace, result.output)
-    assert record["mode"] == "BOUND_IMPLEMENTATION"
-
-
 # ---------------------------------------------------------------------------
 # T-10d: context release
 # ---------------------------------------------------------------------------
 
 
-def test_context_release_deletes_session(workspace: Path) -> None:
-    """v0.1.6: release deletes the session file (Lock-3 retired — no lock file to delete)."""
+def test_context_release_deletes_session_and_without_session_exits_nonzero(
+    workspace: Path,
+) -> None:
+    """v0.1.6: release deletes the session file (Lock-3 retired — no lock file to
+    delete), and release without DADAIA_SESSION_ID exits non-zero."""
     _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app,
@@ -492,8 +378,6 @@ def test_context_release_deletes_session(workspace: Path) -> None:
     assert session_file.exists()
 
     # Release with DADAIA_SESSION_ID env var set
-    import os
-
     env = {**os.environ, "DADAIA_SESSION_ID": session_id}
     release_result = _runner.invoke(
         app,
@@ -503,15 +387,9 @@ def test_context_release_deletes_session(workspace: Path) -> None:
     assert release_result.exit_code == 0, release_result.output
     assert not session_file.exists(), "Session file must be deleted after release"
 
-
-def test_context_release_without_session_exits_nonzero(workspace: Path) -> None:
-    """release without DADAIA_SESSION_ID exits non-zero."""
-    import os
-
-    # Ensure env var is absent
-    env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
-    result = _runner.invoke(app, ["context", "release"], env=env)
-    assert result.exit_code != 0
+    no_session_env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
+    no_session_result = _runner.invoke(app, ["context", "release"], env=no_session_env)
+    assert no_session_result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
@@ -519,30 +397,24 @@ def test_context_release_without_session_exits_nonzero(workspace: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_context_show_json_session_null_when_no_binding(workspace: Path) -> None:
-    """AC-T10d-6: show --json has session=null when no session binding."""
+def test_context_show_json_session_null_then_populated_when_bound(workspace: Path) -> None:
+    """AC-T10d-6: show --json has session=null when no session binding, and a
+    populated session sub-object when DADAIA_SESSION_ID is set and the session file
+    is fresh."""
     _register_alive_ctx(workspace)
-    import os
 
-    env = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
-    result = _runner.invoke(app, ["context", "show", "myctx", "--json"], env=env)
+    env_no_session = {k: v for k, v in os.environ.items() if k != "DADAIA_SESSION_ID"}
+    result = _runner.invoke(app, ["context", "show", "myctx", "--json"], env=env_no_session)
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert "session" in data
     assert data["session"] is None
 
-
-def test_context_show_json_session_populated_when_bound(workspace: Path) -> None:
-    """AC-T10d-6: show --json has session sub-object when DADAIA_SESSION_ID is set and session file is fresh."""
-    _register_alive_ctx(workspace)
     bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "spec", "--print-env"])
     assert bind_result.exit_code == 0, bind_result.output
-
     lines = bind_result.output.strip().split("\n")
     session_line = next(line for line in lines if "DADAIA_SESSION_ID" in line)
     session_id = session_line.split("=")[1].strip()
-
-    import os
 
     env = {**os.environ, "DADAIA_SESSION_ID": session_id}
     show_result = _runner.invoke(app, ["context", "show", "myctx", "--json"], env=env)

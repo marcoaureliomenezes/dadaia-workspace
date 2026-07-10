@@ -245,9 +245,16 @@ def _pytest_check(
     turning the pre-push gate into a load-dependent flake
     (bug ``prepush-gate-blocked-by-loadsensitive-perf-test-wallclock-bound``). Performance
     tests remain runnable directly and in any perf-specific CI selection.
+
+    v0.1.75 FR3 (speed wiring): ``-n auto`` runs the suite under ``pytest-xdist``,
+    parallelizing across CPU cores. Randomization (``pytest-randomly``, always active)
+    stays safe under xdist because each worker gets its own randomized order seeded
+    from the same run seed — no test may depend on execution order or on running
+    in-process with any other test (workspace isolation is enforced by ``conftest.py``
+    fixtures, never shared global state).
     """
     pytest = _resolve_tool("pytest", python_executable=python_executable, dadaia_bin=dadaia_bin)
-    base = (*pytest, "-q", "-p", "no:cacheprovider", "--ignore=tests/performance")
+    base = (*pytest, "-q", "-p", "no:cacheprovider", "--ignore=tests/performance", "-n", "auto")
     if quick:
         return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
     return Check("pytest", base)

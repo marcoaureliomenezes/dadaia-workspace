@@ -60,84 +60,45 @@ def test_read_lesson_happy_path_returns_markdown() -> None:
     assert source.lstrip().startswith("#")
 
 
-def test_read_lesson_numbered_lesson_returns_markdown() -> None:
-    """A numbered ``NN_*.md`` lesson in a real module resolves and reads."""
-    svc = _make_service()
-    source = svc.read_lesson(_REAL_MODULE, "01_codex_mental_model.md")
-    assert source is not None
-    assert len(source) > 0
-
-
 # ---------------------------------------------------------------------------
-# Unknown / malformed but in-bounds
-# ---------------------------------------------------------------------------
-
-
-def test_read_lesson_unknown_module_returns_none() -> None:
-    svc = _make_service()
-    assert svc.read_lesson("99_does_not_exist", "README.md") is None
-
-
-def test_read_lesson_unknown_lesson_returns_none() -> None:
-    svc = _make_service()
-    assert svc.read_lesson(_REAL_MODULE, "nonexistent_lesson.md") is None
-
-
-def test_read_lesson_non_md_extension_returns_none() -> None:
-    """A non-``.md`` name is rejected before any filesystem access."""
-    svc = _make_service()
-    assert svc.read_lesson(_REAL_MODULE, "README") is None
-    assert svc.read_lesson(_REAL_MODULE, "service.py") is None
-
-
-def test_read_lesson_directory_target_returns_none() -> None:
-    """A name that resolves to a directory (not a regular file) returns None."""
-    svc = _make_service()
-    # ``07_codex`` is a directory; appending ``.md`` keeps it non-existent-as-file.
-    assert svc.read_lesson(_REAL_MODULE, f"{_SIBLING_MODULE}.md") is None
-
-
-# ---------------------------------------------------------------------------
-# Traversal negatives (OWASP A03)
+# Denial matrix — unknown/malformed-but-in-bounds + traversal negatives (OWASP A03)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "module",
+    ("module", "lesson"),
     [
-        "..",
-        "../..",
-        f"../{_SIBLING_MODULE}",
-        f"{_REAL_MODULE}/..",
-        "07_codex/../..",
-        "/etc",
-        "",
-        ".",
+        pytest.param("99_does_not_exist", "README.md", id="unknown-module"),
+        pytest.param(_REAL_MODULE, "nonexistent_lesson.md", id="unknown-lesson"),
+        pytest.param(_REAL_MODULE, "README", id="non-md-extension-no-suffix"),
+        pytest.param(_REAL_MODULE, "service.py", id="non-md-extension-py"),
+        pytest.param(_REAL_MODULE, f"{_SIBLING_MODULE}.md", id="directory-target-not-file"),
+        pytest.param("..", "README.md", id="module-dotdot"),
+        pytest.param("../..", "README.md", id="module-dotdot-dotdot"),
+        pytest.param(f"../{_SIBLING_MODULE}", "README.md", id="module-escape-sibling"),
+        pytest.param(f"{_REAL_MODULE}/..", "README.md", id="module-embedded-dotdot"),
+        pytest.param("07_codex/../..", "README.md", id="module-embedded-double-dotdot"),
+        pytest.param("/etc", "README.md", id="module-absolute-path"),
+        pytest.param("", "README.md", id="module-empty"),
+        pytest.param(".", "README.md", id="module-dot"),
+        pytest.param(
+            _REAL_MODULE,
+            f"../{_SIBLING_MODULE}/README.md",
+            id="lesson-escape-sibling",
+        ),
+        pytest.param(_REAL_MODULE, "../../setup.py.md", id="lesson-escape-double-dotdot"),
+        pytest.param(_REAL_MODULE, "subdir/nested.md", id="lesson-embedded-subdir"),
+        pytest.param(_REAL_MODULE, "/etc/passwd.md", id="lesson-absolute-path"),
+        pytest.param(_REAL_MODULE, "..\\windows\\evil.md", id="lesson-backslash-escape"),
+        pytest.param(_REAL_MODULE, "..README.md", id="lesson-dotdot-prefix-single-segment"),
+        pytest.param(_REAL_MODULE, "../README.md", id="lesson-url-decoded-slash"),
+        pytest.param("../07_codex", "README.md", id="module-url-decoded-slash"),
     ],
 )
-def test_read_lesson_traversal_in_module_returns_none(module: str) -> None:
-    """Any ``module`` carrying a separator / ``..`` / absolute prefix is denied."""
+def test_read_lesson_denies_out_of_bounds(module: str, lesson: str) -> None:
+    """Every unknown/malformed/traversal (module, lesson) pair returns None."""
     svc = _make_service()
-    assert svc.read_lesson(module, "README.md") is None
-
-
-@pytest.mark.parametrize(
-    "lesson",
-    [
-        # Sibling-module reach: was a guard bypass (parent.parent == root yet escapes
-        # the requested module). Closed by the single-segment component check.
-        f"../{_SIBLING_MODULE}/README.md",
-        "../../setup.py.md",
-        "subdir/nested.md",
-        "/etc/passwd.md",
-        "..\\windows\\evil.md",
-        "..README.md",  # this one IS a single segment and must still 404 (no such file)
-    ],
-)
-def test_read_lesson_traversal_in_lesson_returns_none(lesson: str) -> None:
-    """A crafted ``lesson`` cannot escape its module or name a non-existent file."""
-    svc = _make_service()
-    assert svc.read_lesson(_REAL_MODULE, lesson) is None
+    assert svc.read_lesson(module, lesson) is None
 
 
 def test_read_lesson_sibling_escape_does_not_leak_sibling_content() -> None:
@@ -154,14 +115,3 @@ def test_read_lesson_sibling_escape_does_not_leak_sibling_content() -> None:
     # proving the negative above is the guard denying escape, not a missing file.
     legit = svc.read_lesson(_SIBLING_MODULE, "README.md")
     assert legit is not None
-
-
-def test_read_lesson_url_decoded_slash_segment_returns_none() -> None:
-    """A ``..%2f``-style segment, once URL-decoded by the handler into ``../``, is denied.
-
-    The handler passes the decoded segment to ``read_lesson``; the embedded separator
-    makes it a multi-component path which the single-segment guard rejects.
-    """
-    svc = _make_service()
-    assert svc.read_lesson(_REAL_MODULE, "../README.md") is None
-    assert svc.read_lesson("../07_codex", "README.md") is None

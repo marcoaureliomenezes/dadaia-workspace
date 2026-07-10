@@ -39,34 +39,35 @@ def _profile_path(root: Path) -> Path:
     return root / ".dadaia" / "states" / "harness_profile.json"
 
 
-def test_init_persists_the_selected_harness_set(service: WorkspaceService, tmp_path: Path) -> None:
+def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
+    service: WorkspaceService, tmp_path: Path
+) -> None:
+    # persists the selected harness set.
     service.init(tmp_path, skip_assets=True, harnesses=("codex",))
-
     data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
     assert data == {"schema_version": "1", "harnesses": ["codex"]}
 
-
-def test_persisted_profile_round_trips_through_the_adapter(
-    service: WorkspaceService, tmp_path: Path
-) -> None:
-    """The inline init write and the infra adapter agree on shape (no fork)."""
-    service.init(tmp_path, skip_assets=True, harnesses=("claude", "pi"))
-
-    states_dir = tmp_path / ".dadaia" / "states"
+    # the inline init write and the infra adapter agree on shape (no fork).
+    service.init(
+        tmp_path.parent / (tmp_path.name + "-roundtrip"),
+        skip_assets=True,
+        harnesses=("claude", "pi"),
+    )
+    states_dir = tmp_path.parent / (tmp_path.name + "-roundtrip") / ".dadaia" / "states"
     profile = JsonHarnessProfileStore().read(states_dir)
     assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "pi"))
 
-
-def test_default_harness_set_persists_all_four(service: WorkspaceService, tmp_path: Path) -> None:
-    """Omitting *harnesses* persists the full L1 roster (default all-four)."""
-    service.init(tmp_path, skip_assets=True)
-
-    data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
-    assert data["harnesses"] == list(L1_ENTRY_HARNESSES)
+    # omitting *harnesses* persists the full L1 roster (default all-four).
+    default_root = tmp_path.parent / (tmp_path.name + "-default")
+    service.init(default_root, skip_assets=True)
+    default_data = json.loads(_profile_path(default_root).read_text(encoding="utf-8"))
+    assert default_data["harnesses"] == list(L1_ENTRY_HARNESSES)
 
 
-def test_reinit_same_set_is_idempotent(service: WorkspaceService, tmp_path: Path) -> None:
-    """Re-running init with the same set does not rewrite the profile file."""
+def test_idempotent_reinit_and_absent_profile_reads_none(
+    service: WorkspaceService, tmp_path: Path
+) -> None:
+    # re-running init with the same set does not rewrite the profile file.
     service.init(tmp_path, skip_assets=True, harnesses=("codex",))
     path = _profile_path(tmp_path)
     first_mtime = path.stat().st_mtime_ns
@@ -75,13 +76,11 @@ def test_reinit_same_set_is_idempotent(service: WorkspaceService, tmp_path: Path
     service.init(tmp_path, skip_assets=True, harnesses=("codex",))
 
     assert path.read_bytes() == first_bytes
-    # Idempotent write skips the atomic replace entirely — mtime is untouched.
     assert path.stat().st_mtime_ns == first_mtime
 
-
-def test_absent_profile_reads_as_none(tmp_path: Path) -> None:
-    """A pre-v0.1.58 workspace (no profile file) reads as None ⇒ all-four convention."""
-    states_dir = tmp_path / ".dadaia" / "states"
+    # a pre-v0.1.58 workspace (no profile file) reads as None ⇒ all-four convention.
+    absent_root = tmp_path.parent / (tmp_path.name + "-absent")
+    states_dir = absent_root / ".dadaia" / "states"
     states_dir.mkdir(parents=True)
     assert JsonHarnessProfileStore().read(states_dir) is None
 
@@ -89,7 +88,10 @@ def test_absent_profile_reads_as_none(tmp_path: Path) -> None:
 def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
     service: WorkspaceService, tmp_path: Path
 ) -> None:
-    """A claude re-init leaves exactly one ctx-inject hook entry (no second registration)."""
+    """A claude re-init leaves exactly one ctx-inject hook entry (no second registration).
+
+    Kept named — this proved a real drift-bug class (duplicate hook registration on
+    repeated init)."""
     service.init(tmp_path, skip_assets=True, harnesses=("claude",))
     service.init(tmp_path, skip_assets=True, harnesses=("claude",))
 

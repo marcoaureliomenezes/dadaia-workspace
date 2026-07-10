@@ -262,6 +262,18 @@ def test_bcd_install_chain_and_core_reinstall_precedence(
     assert raw == {"schema_version": "1", "plugins": ["frontend-design"]}
     assert _cli(monkeypatch, ws, "public", "doctor").exit_code == 0
 
+    # (f/QA-5) double plugin install — ledger idempotency (byte-unchanged).
+    ledger_path = ws / ".dadaia" / "states" / "installed_plugins.json"
+    ledger_before_repeat = ledger_path.read_bytes()
+    repeat = _cli(monkeypatch, ws, "plugin", "install", "frontend-design")
+    assert repeat.exit_code == 0, repeat.output
+    assert "already installed" in repeat.output, repeat.output
+    assert ledger_path.read_bytes() == ledger_before_repeat, (
+        "re-install mutated installed_plugins.json"
+    )
+    assert _ledger_plugins(ws) == ("frontend-design",)
+    _assert_real_pack_body(ws, "frontend-engineer")
+
     # (c) plugin install devops → devops-engineer real; ledger accumulates the pack.
     assert _cli(monkeypatch, ws, "plugin", "install", "devops").exit_code == 0
     _assert_real_pack_body(ws, "devops-engineer")
@@ -301,7 +313,7 @@ def _install_with_registered_consumers(
     return ws, result
 
 
-def test_e_install_registered_hand_authored_consumer_survives_byte_identical(
+def test_e_install_survives_and_doctor_exits_zero_for_hand_authored_consumer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     game_before = _HAND_AUTHORED
@@ -324,12 +336,6 @@ def test_e_install_registered_hand_authored_consumer_survives_byte_identical(
     assert _sha(stale_agents) == _sha(ws / ".dadaia" / "agentic" / "data" / "AGENTS.md")
     assert "[updated]" in squashed and "repos/stale/AGENTS.md" in squashed, result.output
 
-
-def test_e_public_doctor_exits_zero_for_hand_authored_consumer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws, _ = _install_with_registered_consumers(tmp_path, monkeypatch)
-
     # DOCTOR side (Ruling 16, CRITICAL): BOTH paired lines for the hand-authored consumer are
     # [foreign] and `dadaia public doctor` EXITS 0 — a hand-authored consumer repo is NOT a
     # perpetual drift. Doctor lines are written to stderr AND stdout; CliRunner merges them.
@@ -341,29 +347,6 @@ def test_e_public_doctor_exits_zero_for_hand_authored_consumer(
         "`dadaia public doctor` must EXIT 0 for a registered hand-authored consumer repo "
         f"(Ruling 16). Output:\n{out}"
     )
-
-
-# ---------------------------------------------------------------------------
-# (f/QA-5) double plugin install — ledger idempotency (byte-unchanged)
-# ---------------------------------------------------------------------------
-
-
-def test_f_double_install_frontend_design_ledger_idempotent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = _init(tmp_path / "ws", "all")
-    ledger_path = ws / ".dadaia" / "states" / "installed_plugins.json"
-
-    assert _cli(monkeypatch, ws, "plugin", "install", "frontend-design").exit_code == 0
-    first = ledger_path.read_bytes()
-
-    result = _cli(monkeypatch, ws, "plugin", "install", "frontend-design")
-    assert result.exit_code == 0, result.output
-    assert "already installed" in result.output, result.output
-
-    assert ledger_path.read_bytes() == first, "re-install mutated installed_plugins.json"
-    assert _ledger_plugins(ws) == ("frontend-design",)
-    _assert_real_pack_body(ws, "frontend-engineer")
 
 
 # ---------------------------------------------------------------------------

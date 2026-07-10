@@ -59,10 +59,14 @@ def _report(specs: Path) -> None:
     assert r.exit_code == 0, r.output
 
 
-def test_resolved_without_evidence_is_refused(tmp_path: Path) -> None:
+def test_resolution_evidence_gate(tmp_path: Path) -> None:
+    """One parametrized fn: no-evidence -> refused + nothing written; short evidence ->
+    refused; valid evidence -> lands in the event. Shares one ``_report`` setup."""
     specs = _specs(tmp_path)
     _report(specs)
-    r = _runner.invoke(
+
+    # No evidence: refused, nothing written.
+    no_evidence = _runner.invoke(
         app,
         [
             "bugs",
@@ -79,49 +83,13 @@ def test_resolved_without_evidence_is_refused(tmp_path: Path) -> None:
             str(specs),
         ],
     )
-    assert r.exit_code != 0, r.output
-    assert "resolution-evidence" in r.output
-    # nothing written
+    assert no_evidence.exit_code != 0, no_evidence.output
+    assert "resolution-evidence" in no_evidence.output
     text = "".join(p.read_text() for p in (specs / "bugs").glob("*.jsonl"))
     assert '"resolved"' not in text
 
-
-def test_resolved_with_evidence_lands_in_event(tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _report(specs)
-    r = _runner.invoke(
-        app,
-        [
-            "bugs",
-            "append",
-            "--bug-id",
-            "law-test",
-            "--event",
-            "resolved",
-            "--reported-by",
-            "t",
-            "--release",
-            "v9.9.9",
-            "--resolution-evidence",
-            "Replayed the reporter's exact command on their tree; all named surfaces covered.",
-            "--specs-dir",
-            str(specs),
-        ],
-    )
-    assert r.exit_code == 0, r.output
-    lines = [
-        json.loads(ln)
-        for p in (specs / "bugs").glob("*.jsonl")
-        for ln in p.read_text().splitlines()
-    ]
-    resolved = next(e for e in lines if e["event"] == "resolved")
-    assert resolved["evidence"].startswith("Replayed the reporter's")
-
-
-def test_short_evidence_is_refused(tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _report(specs)
-    r = _runner.invoke(
+    # Short evidence: refused.
+    short_evidence = _runner.invoke(
         app,
         [
             "bugs",
@@ -140,4 +108,33 @@ def test_short_evidence_is_refused(tmp_path: Path) -> None:
             str(specs),
         ],
     )
-    assert r.exit_code != 0, r.output
+    assert short_evidence.exit_code != 0, short_evidence.output
+
+    # Valid evidence: lands in the event.
+    valid_evidence = _runner.invoke(
+        app,
+        [
+            "bugs",
+            "append",
+            "--bug-id",
+            "law-test",
+            "--event",
+            "resolved",
+            "--reported-by",
+            "t",
+            "--release",
+            "v9.9.9",
+            "--resolution-evidence",
+            "Replayed the reporter's exact command on their tree; all named surfaces covered.",
+            "--specs-dir",
+            str(specs),
+        ],
+    )
+    assert valid_evidence.exit_code == 0, valid_evidence.output
+    lines = [
+        json.loads(ln)
+        for p in (specs / "bugs").glob("*.jsonl")
+        for ln in p.read_text().splitlines()
+    ]
+    resolved = next(e for e in lines if e["event"] == "resolved")
+    assert resolved["evidence"].startswith("Replayed the reporter's")

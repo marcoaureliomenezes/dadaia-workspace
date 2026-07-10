@@ -8,6 +8,7 @@ which runs on all platforms.
 from __future__ import annotations
 
 import sys
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -46,7 +47,7 @@ def _own_uid_provider() -> str:
     return _SS_OUTPUT
 
 
-def _patch_uid_check_all_ours():
+def _patch_uid_check_all_ours() -> Any:
     """Stub `_pid_belongs_to_current_user` to True for every pid in the sample."""
     return patch(
         "dadaia_workspace.features.server_registry.scan._pid_belongs_to_current_user",
@@ -54,7 +55,7 @@ def _patch_uid_check_all_ours():
     )
 
 
-def _patch_read_proc(cmdline: str = "fake-cmd", cwd: str = "/tmp/fake"):
+def _patch_read_proc(cmdline: str = "fake-cmd", cwd: str = "/tmp/fake") -> list[Any]:
     return [
         patch(
             "dadaia_workspace.features.server_registry.scan._read_cmdline",
@@ -67,48 +68,9 @@ def _patch_read_proc(cmdline: str = "fake-cmd", cwd: str = "/tmp/fake"):
     ]
 
 
-def test_scan_returns_empty_when_ss_unavailable() -> None:
-    """If the output provider returns None (e.g. ss not found), scan returns []."""
-    result = scan_unregistered_listeners([], _output_provider=lambda: None)
-    assert result == []
-
-
-def test_scan_skips_ports_below_1024() -> None:
-    """Port 631 (CUPS) is in the sample. Must be skipped."""
-    with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners([], _output_provider=_own_uid_provider)
-    assert all(r.port >= 1024 for r in result)
-
-
-def test_scan_skips_registered_ports() -> None:
-    """Port 4999 in the sample is in the registry — must be filtered out."""
-    with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners(
-            [_entry(4999, "panel")],
-            _output_provider=_own_uid_provider,
-        )
-    assert 4999 not in [r.port for r in result]
-
-
-def test_scan_marks_lan_exposed_for_0_0_0_0_bind() -> None:
-    """Port 4000 binds 0.0.0.0 → lan_exposed=True. Port 8122 binds 127.0.0.1 → False."""
-    with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners([], _output_provider=_own_uid_provider)
-    by_port = {r.port: r for r in result}
-    assert by_port[4000].lan_exposed is True
-    assert by_port[4000].bind == "0.0.0.0"
-    assert by_port[8122].lan_exposed is False
-    assert by_port[8122].bind == "127.0.0.1"
-
-
-def test_scan_marks_lan_exposed_for_ipv6_wildcard() -> None:
-    """``[::]`` IPv6 wildcard means listening on all interfaces — also LAN-exposed."""
-    with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners([], _output_provider=_own_uid_provider)
-    ipv6 = next((r for r in result if r.port == 34139), None)
-    assert ipv6 is not None
-    assert ipv6.bind == "::"
-    assert ipv6.lan_exposed is True
+# ---------------------------------------------------------------------------
+# Kept: other-user pid filtering — privilege boundary
+# ---------------------------------------------------------------------------
 
 
 def test_scan_filters_listeners_owned_by_other_users() -> None:
@@ -133,58 +95,103 @@ def test_scan_filters_listeners_owned_by_other_users() -> None:
     assert all(r.pid is None for r in result)
 
 
-def test_scan_skips_pidless_listeners() -> None:
-    """Listeners without an attributable pid (NFS, Docker swarm, kernel
-    sockets) are filtered out — they're noise for the operator and not
-    actionable from the panel."""
+# ---------------------------------------------------------------------------
+# Filter/skip matrix over the realistic ss sample + degrade-on-bad-input — 1 param
+# ---------------------------------------------------------------------------
+
+
+def _scan_sample() -> list[Any]:
     with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners([], _output_provider=_own_uid_provider)
-    # Port 3968 in the sample has no pid → must be absent from result
-    assert 3968 not in [r.port for r in result]
-    # All survivors must have a pid
-    assert all(r.pid is not None for r in result)
-
-
-def test_scan_result_is_sorted_by_port() -> None:
-    with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        result = scan_unregistered_listeners([], _output_provider=_own_uid_provider)
-    ports = [r.port for r in result]
-    assert ports == sorted(ports)
-
-
-def test_scan_handles_empty_ss_output() -> None:
-    result = scan_unregistered_listeners([], _output_provider=lambda: "")
-    assert result == []
-
-
-def test_scan_handles_header_only_ss_output() -> None:
-    header = "State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\n"
-    result = scan_unregistered_listeners([], _output_provider=lambda: header)
-    assert result == []
-
-
-def test_scan_handles_malformed_lines_gracefully() -> None:
-    """Lines that don't match the expected ss format are skipped silently."""
-    bad = "this is not a valid ss line\nLISTEN abc def ghi\n"
-    result = scan_unregistered_listeners([], _output_provider=lambda: bad)
-    assert result == []
+        return scan_unregistered_listeners(
+            [_entry(4999, "panel")], _output_provider=_own_uid_provider
+        )
 
 
 @pytest.mark.parametrize(
-    ("bind", "expected_lan"),
+    ("case", "run", "assertion"),
     [
-        ("127.0.0.1", False),
-        ("0.0.0.0", True),
-        ("::", True),
-        ("::1", False),
-        ("192.168.1.5", False),  # specific IP, not wildcard
+        pytest.param(
+            "skips-ports-below-1024",
+            _scan_sample,
+            lambda result: all(r.port >= 1024 for r in result),
+            id="skips-ports-below-1024",
+        ),
+        pytest.param(
+            "skips-registered-ports",
+            _scan_sample,
+            lambda result: 4999 not in [r.port for r in result],
+            id="skips-registered-ports",
+        ),
+        pytest.param(
+            "skips-pidless-listeners",
+            _scan_sample,
+            lambda result: (
+                3968 not in [r.port for r in result] and all(r.pid is not None for r in result)
+            ),
+            id="skips-pidless-listeners",
+        ),
+        pytest.param(
+            "result-sorted-by-port",
+            _scan_sample,
+            lambda result: [r.port for r in result] == sorted(r.port for r in result),
+            id="result-sorted-by-port",
+        ),
+        pytest.param(
+            "empty-ss-output",
+            lambda: scan_unregistered_listeners([], _output_provider=lambda: ""),
+            lambda result: result == [],
+            id="empty-ss-output-degrades-to-empty",
+        ),
+        pytest.param(
+            "header-only-ss-output",
+            lambda: scan_unregistered_listeners(
+                [],
+                _output_provider=lambda: (
+                    "State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\n"
+                ),
+            ),
+            lambda result: result == [],
+            id="header-only-ss-output-degrades-to-empty",
+        ),
+        pytest.param(
+            "malformed-lines-skipped",
+            lambda: scan_unregistered_listeners(
+                [], _output_provider=lambda: "this is not a valid ss line\nLISTEN abc def ghi\n"
+            ),
+            lambda result: result == [],
+            id="malformed-lines-skipped",
+        ),
     ],
 )
-def test_lan_exposed_classification(bind: str, expected_lan: bool) -> None:
+def test_scan_filter_and_degrade_matrix(case: str, run, assertion) -> None:  # type: ignore[no-untyped-def]
+    result = run()
+    assert assertion(result)
+
+
+# ---------------------------------------------------------------------------
+# LAN-exposed bind classification — 1 param (incl. 0.0.0.0/[::] from the realistic sample)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("bind", "port", "expected_lan"),
+    [
+        ("127.0.0.1", 9000, False),
+        ("0.0.0.0", 9000, True),
+        ("::", 9000, True),
+        ("::1", 9000, False),
+        ("192.168.1.5", 9000, False),  # specific IP, not wildcard
+        ("0.0.0.0", 4000, True),  # from the realistic sample
+        ("127.0.0.1", 8122, False),  # from the realistic sample
+        ("::", 34139, True),  # IPv6 wildcard, from the realistic sample
+    ],
+)
+def test_lan_exposed_classification(bind: str, port: int, expected_lan: bool) -> None:
     """LAN-exposed = bind in {'0.0.0.0', '::'} only. Specific IPs (even non-loopback)
     are not flagged because the user explicitly chose them."""
-    fake = f'LISTEN 0  5  {bind}:9000  0.0.0.0:*  users:(("x",pid=42,fd=1))\n'
+    fake = f'LISTEN 0  5  {bind}:{port}  0.0.0.0:*  users:(("x",pid=42,fd=1))\n'
     with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
         result = scan_unregistered_listeners([], _output_provider=lambda: fake)
     assert len(result) == 1
+    assert result[0].bind == bind
     assert result[0].lan_exposed is expected_lan

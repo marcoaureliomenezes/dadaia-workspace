@@ -170,11 +170,20 @@ def _init_workspace(path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def test_panel_renders_all_sections(tmp_path: Path) -> None:
-    """Panel serves HTML with 3 section markers and valid JSON on /api endpoints.
+def test_panel_renders_sections_credentialless_and_no_token_banner(tmp_path: Path) -> None:
+    """One panel spawn, all HTTP-level acceptance asserts:
 
-    Acceptance: AC-1 (specs doctor gate satisfied by green test run),
-    AC-2 (3 sections render in the index page).
+    AC-1/AC-2: index page renders 3 section markers (Servers, Memories, Workflows)
+    and /api/panel-status + /api/contexts respond with valid, shaped JSON.
+
+    No-auth loopback contract (operator decision 2026-06-11 — supersedes the
+    T-010-21 R7c 401 pin and the T-011-13 launch-token binding contract): every
+    panel surface serves 200 credential-less (no token, no cookie, no Authorization
+    header), and a foreign Host header is refused 403 by the DNS-rebinding allowlist
+    (NOT auth).
+
+    Startup banner contract: the ready output is a plain URL — no `?launch=`, no
+    token, no cookie hint — replacing the retired launch-token binding contract.
     """
     _init_workspace(tmp_path)
     port = _find_free_port()
@@ -222,37 +231,7 @@ def test_panel_renders_all_sections(tmp_path: Path) -> None:
             assert "contexts" in contexts_data, "/api/contexts response missing 'contexts' key"
             assert isinstance(contexts_data["contexts"], list), "'contexts' must be a list"
 
-        # --- SIGINT teardown ---
-        proc.send_signal(signal.SIGINT)
-        rc = proc.wait(timeout=5)
-        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
-    finally:
-        _kill_proc(proc)
-
-
-# ---------------------------------------------------------------------------
-# No-auth loopback contract (operator decision 2026-06-11) — supersedes the
-# T-010-21 R7c 401 pin and the T-011-13 launch-token binding contract: the
-# panel is a loopback-only local tool; the loopback bind plus the Host-header
-# allowlist (DNS-rebinding guard) are the entire boundary.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
-def test_credentialless_loopback_request_to_api_is_200(tmp_path: Path) -> None:
-    """A credential-less 127.0.0.1 request to every panel surface serves 200.
-
-    No token, no cookie, no Authorization header — the no-auth contract.
-    A request with a foreign Host header is refused (403) by the
-    DNS-rebinding allowlist.
-    """
-    _init_workspace(tmp_path)
-    port = _find_free_port()
-    proc = _spawn_panel(port, cwd=tmp_path)
-
-    try:
-        _wait_for_ready(proc, port)
-
+        # --- credential-less across every surface ---
         for path in ("/", "/health", "/api/panel-status", "/api/contexts"):
             with _get(f"http://127.0.0.1:{port}{path}") as resp:
                 assert resp.status == 200, f"{path} must serve 200 credential-less"
@@ -266,35 +245,7 @@ def test_credentialless_loopback_request_to_api_is_200(tmp_path: Path) -> None:
         except urllib.error.HTTPError as exc:
             assert exc.code == 403, f"Expected 403 for foreign Host, got {exc.code}"
 
-        proc.send_signal(signal.SIGINT)
-        rc = proc.wait(timeout=5)
-        assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"
-    finally:
-        _kill_proc(proc)
-
-
-# ---------------------------------------------------------------------------
-# Startup banner contract (no-auth world)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.slow(reason="spawns the panel CLI subprocess end-to-end")
-def test_startup_banner_has_no_token_or_launch_url(tmp_path: Path) -> None:
-    """The startup output is a plain URL — no `?launch=`, no token, no cookie hint.
-
-    Replaces the retired launch-token binding contract (panel auth removed by
-    operator decision 2026-06-11).
-    """
-    _init_workspace(tmp_path)
-    port = _find_free_port()
-    proc = _spawn_panel(port, cwd=tmp_path)
-
-    try:
-        _wait_for_ready(proc, port)
-        # The banner already arrived; the API serves with zero credentials.
-        with _get(f"http://127.0.0.1:{port}/api/panel-status") as resp:
-            assert resp.status == 200
-
+        # --- SIGINT teardown ---
         proc.send_signal(signal.SIGINT)
         rc = proc.wait(timeout=5)
         assert rc == 0, f"Expected exit 0 after SIGINT, got {rc}"

@@ -48,50 +48,53 @@ def _seed_context(
         )
 
 
-def test_next_json_is_parseable(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _seed_context(tmp_path, handoffs={"qa-engineer": _RELEASE})
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+def test_next_json_text_all_completed_no_active_release_and_plan_without_owners(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """--json is parseable with the correct next/pending agents; the text form prints
+    the same next agent; once every agent has a handoff, next_agent is None. Plus the
+    exit-3 error paths: no active release, and a PLAN with no declared owners."""
+    json_ws = tmp_path / "json-case"
+    _init_workspace(json_ws)
+    _seed_context(json_ws, handoffs={"qa-engineer": _RELEASE})
+    monkeypatch.chdir(json_ws)
+    json_result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
+    assert json_result.exit_code == 0, json_result.output
+    payload = json.loads(json_result.output)
     assert payload["next_agent"] == "devops-engineer"
     assert payload["release_id"] == _RELEASE
     assert payload["completed_agents"] == ["qa-engineer"]
     assert payload["pending_agents"] == ["devops-engineer"]
 
+    text_ws = tmp_path / "text-case"
+    _init_workspace(text_ws)
+    _seed_context(text_ws)
+    monkeypatch.chdir(text_ws)
+    text_result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
+    assert text_result.exit_code == 0, text_result.output
+    assert "Next expected agent: qa-engineer" in text_result.output
 
-def test_next_text_output(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _seed_context(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
-    assert result.exit_code == 0, result.output
-    assert "Next expected agent: qa-engineer" in result.output
+    completed_ws = tmp_path / "completed-case"
+    _init_workspace(completed_ws)
+    _seed_context(completed_ws, handoffs={"qa-engineer": _RELEASE, "devops-engineer": _RELEASE})
+    monkeypatch.chdir(completed_ws)
+    completed_result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
+    assert completed_result.exit_code == 0, completed_result.output
+    completed_payload = json.loads(completed_result.output)
+    assert completed_payload["next_agent"] is None
+    assert completed_payload["pending_agents"] == []
 
+    # Exit-3 error paths: no active release, and a PLAN with no declared owners.
+    no_release_ws = tmp_path / "no-release-case"
+    _init_workspace(no_release_ws)
+    _seed_context(no_release_ws, active="release: none\nphase: DISCOVERY\n")
+    monkeypatch.chdir(no_release_ws)
+    no_release_result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
+    assert no_release_result.exit_code == 3
 
-def test_next_all_completed(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _seed_context(tmp_path, handoffs={"qa-engineer": _RELEASE, "devops-engineer": _RELEASE})
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["next_agent"] is None
-    assert payload["pending_agents"] == []
-
-
-def test_next_no_active_release_exits_3(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _seed_context(tmp_path, active="release: none\nphase: DISCOVERY\n")
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
-    assert result.exit_code == 3
-
-
-def test_next_plan_without_owners_exits_3(tmp_path: Path, monkeypatch) -> None:
-    _init_workspace(tmp_path)
-    _seed_context(tmp_path, plan="# PLAN\n\nNothing here.\n")
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
-    assert result.exit_code == 3
+    no_owners_ws = tmp_path / "no-owners-case"
+    _init_workspace(no_owners_ws)
+    _seed_context(no_owners_ws, plan="# PLAN\n\nNothing here.\n")
+    monkeypatch.chdir(no_owners_ws)
+    no_owners_result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
+    assert no_owners_result.exit_code == 3

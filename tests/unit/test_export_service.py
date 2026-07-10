@@ -1,4 +1,7 @@
-"""Unit tests for ExportService."""
+"""Unit tests for ExportService.
+
+`.env` exclusion is a privacy guard — kept standalone below.
+"""
 
 from pathlib import Path
 
@@ -28,13 +31,8 @@ def _service(workspace: Path) -> tuple[ExportService, FakeContextStore, FakeGitC
     return svc, store, git
 
 
-def test_resolve_includes_skips_missing_paths(tmp_path: Path) -> None:
-    svc, _, _ = _service(tmp_path)
-    includes = svc.resolve_includes(ExportOptions(exclude_mnt=True))
-    assert includes == []
-
-
 def test_resolve_includes_drops_dotenv_files(tmp_path: Path) -> None:
+    """PRIVACY: `.env` files must never enter the export include set."""
     svc, _, _ = _service(tmp_path)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
@@ -46,8 +44,8 @@ def test_resolve_includes_drops_dotenv_files(tmp_path: Path) -> None:
     assert all(not arc.endswith(".env") for arc in arcs)
 
 
-def test_build_manifest_records_branch(tmp_path: Path) -> None:
-    svc, store, _ = _service(tmp_path)
+def test_build_manifest_records_branch_and_refresh_updates_it(tmp_path: Path) -> None:
+    svc, store, git = _service(tmp_path)
     store.save(_ctx("alpha", branch="main"))
     store.save(_ctx("beta", branch="dev"))
 
@@ -57,10 +55,6 @@ def test_build_manifest_records_branch(tmp_path: Path) -> None:
     alpha = next(c for c in manifest.contexts if c["name"] == "alpha")
     assert alpha["current_branch"] == "main"
 
-
-def test_refresh_branches_updates_current_branch(tmp_path: Path) -> None:
-    svc, store, git = _service(tmp_path)
-    store.save(_ctx("alpha"))
     repo_path = tmp_path / "repos" / "alpha"
     repo_path.mkdir(parents=True)
     git.checkout(repo_path, "feature/test")
@@ -72,28 +66,13 @@ def test_refresh_branches_updates_current_branch(tmp_path: Path) -> None:
     assert updated.current_branch == "feature/test"
 
 
-def test_create_archive_includes_manifest(tmp_path: Path) -> None:
+def test_resolve_includes_skips_missing_run_and_archive_include_manifest(
+    tmp_path: Path,
+) -> None:
     svc, store, _ = _service(tmp_path)
-    store.save(_ctx("alpha"))
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
-    out = tmp_path / "out"
-    out.mkdir()
+    includes = svc.resolve_includes(ExportOptions(exclude_mnt=True))
+    assert includes == []
 
-    options = ExportOptions(exclude_mnt=True)
-    includes = svc.resolve_includes(options)
-    manifest = svc.build_manifest(includes, options)
-    archive = svc.create_archive(includes, manifest, out)
-
-    import tarfile
-
-    with tarfile.open(archive, "r:gz") as tar:
-        names = tar.getnames()
-        assert "export-manifest.json" in names
-
-
-def test_run_returns_archive_path(tmp_path: Path) -> None:
-    svc, store, _ = _service(tmp_path)
     store.save(_ctx("alpha"))
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
@@ -104,3 +83,16 @@ def test_run_returns_archive_path(tmp_path: Path) -> None:
     assert result.path is not None
     assert result.path.exists()
     assert result.path.suffix == ".gz"
+
+    out2 = tmp_path / "out"
+    out2.mkdir()
+    options = ExportOptions(exclude_mnt=True)
+    includes2 = svc.resolve_includes(options)
+    manifest = svc.build_manifest(includes2, options)
+    archive = svc.create_archive(includes2, manifest, out2)
+
+    import tarfile
+
+    with tarfile.open(archive, "r:gz") as tar:
+        names = tar.getnames()
+        assert "export-manifest.json" in names

@@ -35,21 +35,17 @@ def test_fragment_loads_with_expected_schema(frag_id: str, schema: str) -> None:
     assert fragment.body.strip(), "fragment body must be non-empty"
 
 
-def test_backlog_definition_dir_has_exactly_the_four_fragments() -> None:
+def test_backlog_definition_dir_shape_readme_removed_and_pure_python_steps_absent() -> None:
     loader = FragmentLoader()
+
     fragments = loader.list_fragments("backlog_definition")
     assert {f.id for f in fragments} == set(_EXPECTED)
 
-
-def test_readme_stub_removed() -> None:
-    loader = FragmentLoader()
     readme = loader.root / "backlog_definition" / "_README.md"
     assert not readme.exists()
 
-
-def test_pure_python_steps_have_no_fragment() -> None:
-    """subject_bind / reconcile_decision / backlog_review_gate must not exist as fragments."""
-    loader = FragmentLoader()
+    # subject_bind / reconcile_decision / backlog_review_gate must not exist as
+    # fragments — they are pure Python steps.
     for absent in (
         "backlog_definition.subject_bind",
         "backlog_definition.reconcile_decision",

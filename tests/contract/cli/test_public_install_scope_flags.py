@@ -79,65 +79,24 @@ def test_cli_install_both_flags_mutually_exclusive(
     assert "mutually exclusive" in result.output.lower() or "Error" in result.output
 
 
-def test_cli_install_repos_only_flag_exits_zero(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["public", "install", "--repos-only"])
-
-    assert result.exit_code == 0, result.output
-
-
-def test_cli_install_workspace_only_flag_exits_zero(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["public", "install", "--workspace-only"])
-
-    assert result.exit_code == 0, result.output
-
-
-def test_cli_install_no_flags_writes_workspace_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _init_workspace(tmp_path)
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["public", "install"])
-
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / "AGENTS.md").exists()
-
-
-def test_cli_install_workspace_only_writes_root_only(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _init_workspace(tmp_path)
-    consumer = _add_marker_consumer(tmp_path, "some-consumer")
-    monkeypatch.chdir(tmp_path)
-
-    result = _runner.invoke(app, ["public", "install", "--workspace-only", "--force"])
-
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / "AGENTS.md").exists()
-    assert not (consumer / "AGENTS.md").exists()
-
-
-def test_cli_install_repos_only_writes_consumer_only(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("scope", ["workspace-only", "repos-only"])
+def test_cli_install_scope_flag_writes_only_its_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
 ) -> None:
     _init_workspace(tmp_path)
     root_agents = tmp_path / "AGENTS.md"
-    root_agents.unlink(missing_ok=True)
+    if scope == "repos-only":
+        root_agents.unlink(missing_ok=True)
     consumer = _add_marker_consumer(tmp_path, "some-consumer")
     monkeypatch.chdir(tmp_path)
 
-    result = _runner.invoke(app, ["public", "install", "--repos-only", "--force"])
+    flag = f"--{scope}"
+    result = _runner.invoke(app, ["public", "install", flag, "--force"])
 
     assert result.exit_code == 0, result.output
-    assert not root_agents.exists()
-    assert (consumer / "AGENTS.md").exists()
+    if scope == "workspace-only":
+        assert root_agents.exists()
+        assert not (consumer / "AGENTS.md").exists()
+    else:
+        assert not root_agents.exists()
+        assert (consumer / "AGENTS.md").exists()

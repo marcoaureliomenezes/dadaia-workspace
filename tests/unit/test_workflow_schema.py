@@ -52,42 +52,7 @@ def test_loads_valid_workflow(tmp_path: Path) -> None:
     assert workflows[0].stages[1].needs == ("discover",)
 
 
-def test_missing_name_rejected(tmp_path: Path) -> None:
-    _write(tmp_path, "demo.workflow.md", _VALID.replace("name: demo", 'name: ""'))
-    store = MarkdownWorkflowStore(tmp_path)
-    with pytest.raises(WorkflowSchemaError):
-        store.list()
-
-
-def test_filename_must_match_name(tmp_path: Path) -> None:
-    _write(tmp_path, "other.workflow.md", _VALID)
-    store = MarkdownWorkflowStore(tmp_path)
-    with pytest.raises(WorkflowSchemaError):
-        store.list()
-
-
-def test_unknown_agent_rejected(tmp_path: Path) -> None:
-    _write(tmp_path, "demo.workflow.md", _VALID)
-    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer"])
-    with pytest.raises(WorkflowSchemaError):
-        store.list()
-
-
-def test_cycle_rejected(tmp_path: Path) -> None:
-    cyclic = _VALID.replace(
-        "  - id: discover\n    agent: product-engineer\n    expected_output:\n      path: out/{run_id}/discover.md",
-        "  - id: discover\n    agent: product-engineer\n    needs: [review]\n    expected_output:\n      path: out/{run_id}/discover.md",
-    )
-    _write(tmp_path, "demo.workflow.md", cyclic)
-    store = MarkdownWorkflowStore(
-        tmp_path, agent_catalog=["product-engineer", "software-architect"]
-    )
-    with pytest.raises(WorkflowCycleError):
-        store.list()
-
-
-def test_parallel_group_member_with_internal_dep_rejected(tmp_path: Path) -> None:
-    text = """---
+_PARALLEL_INTERNAL_DEP = """---
 name: pg
 description: ""
 version: 0.1.0
@@ -104,19 +69,47 @@ stages:
     expected_output: {path: out/b.md}
 ---
 """
-    _write(tmp_path, "pg.workflow.md", text)
-    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer"])
+
+
+@pytest.mark.parametrize(
+    ("name", "filename", "content", "agent_catalog"),
+    [
+        ("missing_name", "demo.workflow.md", _VALID.replace("name: demo", 'name: ""'), None),
+        ("filename_mismatches_name", "other.workflow.md", _VALID, None),
+        (
+            "unknown_agent",
+            "demo.workflow.md",
+            _VALID,
+            ["product-engineer"],  # missing software-architect
+        ),
+        (
+            "parallel_group_member_with_internal_dep",
+            "pg.workflow.md",
+            _PARALLEL_INTERNAL_DEP,
+            ["product-engineer"],
+        ),
+    ],
+)
+def test_schema_rejection_table(
+    tmp_path: Path, name: str, filename: str, content: str, agent_catalog: list[str] | None
+) -> None:
+    _write(tmp_path, filename, content)
+    store = MarkdownWorkflowStore(tmp_path, agent_catalog=agent_catalog)
     with pytest.raises(WorkflowSchemaError):
         store.list()
 
 
-def test_get_unknown_workflow_raises(tmp_path: Path) -> None:
-    _write(tmp_path, "demo.workflow.md", _VALID)
+def test_cycle_rejected(tmp_path: Path) -> None:
+    cyclic = _VALID.replace(
+        "  - id: discover\n    agent: product-engineer\n    expected_output:\n      path: out/{run_id}/discover.md",
+        "  - id: discover\n    agent: product-engineer\n    needs: [review]\n    expected_output:\n      path: out/{run_id}/discover.md",
+    )
+    _write(tmp_path, "demo.workflow.md", cyclic)
     store = MarkdownWorkflowStore(
         tmp_path, agent_catalog=["product-engineer", "software-architect"]
     )
-    with pytest.raises(WorkflowNotFoundError):
-        store.get("ghost")
+    with pytest.raises(WorkflowCycleError):
+        store.list()
 
 
 _VALID_PLACEHOLDER = """---
@@ -145,24 +138,30 @@ stages:
 """
 
 
-def test_agent_placeholder_resolved_from_inputs(tmp_path: Path) -> None:
-    """Stage 'agent' may use {{<input_name>}} when the input is declared."""
-    _write(tmp_path, "param.workflow.md", _VALID_PLACEHOLDER)
-    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer", "software-engineer"])
-    workflows = store.list()
+def test_agent_placeholder_resolved_and_unknown_input_rejected(tmp_path: Path) -> None:
+    """Stage 'agent' may use {{<input_name>}} when the input is declared, and a
+    placeholder pointing at an undeclared name must fail validation."""
+    ok_dir = tmp_path / "ok"
+    ok_dir.mkdir()
+    _write(ok_dir, "param.workflow.md", _VALID_PLACEHOLDER)
+    ok_store = MarkdownWorkflowStore(
+        ok_dir, agent_catalog=["product-engineer", "software-engineer"]
+    )
+    workflows = ok_store.list()
     assert len(workflows) == 1
     impl_stage = next(s for s in workflows[0].stages if s.id == "implement")
     # The placeholder is stored verbatim — the orchestrator resolves it at run time.
     assert impl_stage.agent == "{{implementer_agent}}"
 
-
-def test_agent_placeholder_referencing_unknown_input_rejected(tmp_path: Path) -> None:
-    """Placeholder pointing at a name not declared under 'inputs' must fail validation."""
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
     broken = _VALID_PLACEHOLDER.replace("{{implementer_agent}}", "{{unknown_param}}")
-    _write(tmp_path, "param.workflow.md", broken)
-    store = MarkdownWorkflowStore(tmp_path, agent_catalog=["product-engineer", "software-engineer"])
+    _write(bad_dir, "param.workflow.md", broken)
+    bad_store = MarkdownWorkflowStore(
+        bad_dir, agent_catalog=["product-engineer", "software-engineer"]
+    )
     with pytest.raises(WorkflowSchemaError):
-        store.list()
+        bad_store.list()
 
 
 _PUBLIC_ROOT = Path(__file__).parents[2] / "dadaia_workspace" / "public"
@@ -225,20 +224,29 @@ def test_public_workflows_load_against_public_agent_catalog() -> None:
     assert set(workflows) == expected_names
 
 
-def test_public_audit_and_review_workflows_preserve_parallel_groups(tmp_path: Path) -> None:
-    """Parallel-group schema is preserved when a workflow declares parallel stages.
-
-    The canonical public workflows (audit-fanout, release-ship) are linear after the
-    v0.1.9 surface reduction. This test validates the parallel_group feature through a
-    synthetic fixture decoupled from any specific shipped workflow name.
-    """
-    wf_file = tmp_path / "synthetic-parallel-schema-test.workflow.md"
-    wf_file.write_text(_SYNTHETIC_PARALLEL_WORKFLOW, encoding="utf-8")
+def test_unknown_workflow_get_raises_and_synthetic_parallel_groups_preserved(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "demo.workflow.md", _VALID)
     store = MarkdownWorkflowStore(
-        tmp_path,
+        tmp_path, agent_catalog=["product-engineer", "software-architect"]
+    )
+    with pytest.raises(WorkflowNotFoundError):
+        store.get("ghost")
+
+    # Parallel-group schema is preserved when a workflow declares parallel stages. The
+    # canonical public workflows (audit-fanout, release-ship) are linear after the
+    # v0.1.9 surface reduction — this validates the parallel_group feature through a
+    # synthetic fixture decoupled from any specific shipped workflow name.
+    parallel_dir = tmp_path / "parallel"
+    parallel_dir.mkdir()
+    wf_file = parallel_dir / "synthetic-parallel-schema-test.workflow.md"
+    wf_file.write_text(_SYNTHETIC_PARALLEL_WORKFLOW, encoding="utf-8")
+    parallel_store = MarkdownWorkflowStore(
+        parallel_dir,
         agent_catalog=["qa-engineer", "code-reviewer", "security-reviewer", "project-manager"],
     )
-    workflows = {w.name: w for w in store.list()}
+    workflows = {w.name: w for w in parallel_store.list()}
     wf = workflows["synthetic-parallel-schema-test"]
     parallel_stages = [s for s in wf.stages if s.parallel_group == "review_batch"]
     assert len(parallel_stages) == 3, (

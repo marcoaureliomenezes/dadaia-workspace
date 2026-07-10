@@ -1,4 +1,8 @@
-"""WS-1 — LifecyclePhaseWorkflow drives one step end-to-end on a selectable harness."""
+"""WS-1 — LifecyclePhaseWorkflow drives one step end-to-end on a selectable harness.
+
+CRITICAL: review-only gating at the single-step seam (review REJECTED blocks; create passes
+verdict-less).
+"""
 
 from __future__ import annotations
 
@@ -53,7 +57,11 @@ def _scope(
     )
 
 
-def test_phase_workflow_accepts_on_approved_verdict_and_persists_run() -> None:
+def test_phase_workflow_accepts_approved_blocks_no_verdict_passes_create_verdictless() -> None:
+    """Three facets of one seam, parametrized: an APPROVED review-phase step accepts +
+    persists at the accepted phase; a factory-FAKE run with no verdict field BLOCKs (and is
+    still persisted for resume/audit); a create-phase step with a valid payload passes
+    regardless of the (absent) verdict."""
     approved = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="qa approved",
@@ -61,10 +69,7 @@ def test_phase_workflow_accepts_on_approved_verdict_and_persists_run() -> None:
         structured_output={"verdict": "APPROVED", "task_group": "review-qa"},
     )
     store = _MemoryRunStore()
-    workflow = LifecyclePhaseWorkflow(
-        runtime=FakeAgentRuntime(result=approved),
-        run_store=store,
-    )
+    workflow = LifecyclePhaseWorkflow(runtime=FakeAgentRuntime(result=approved), run_store=store)
 
     result = workflow.run(
         run_id="run-qa-1",
@@ -78,30 +83,47 @@ def test_phase_workflow_accepts_on_approved_verdict_and_persists_run() -> None:
     assert result.phase is LifecyclePhase.QA_REVIEW
     assert result.runtime_kind is AgentRuntimeKind.FAKE
     assert result.blocked is None
-    # The run record was persisted at its accepted phase (resumable).
     assert store.saved["run-qa-1"].phase is LifecyclePhase.QA_REVIEW
 
-
-def test_phase_workflow_blocks_when_factory_fake_gives_no_verdict() -> None:
-    store = _MemoryRunStore()
-    workflow = LifecyclePhaseWorkflow(
+    store2 = _MemoryRunStore()
+    workflow2 = LifecyclePhaseWorkflow(
         runtime=build_agent_runtime(AgentRuntimeKind.FAKE),
-        run_store=store,
+        run_store=store2,
     )
-
-    result = workflow.run(
+    result2 = workflow2.run(
         run_id="run-qa-2",
         command="review-qa",
         from_phase=LifecyclePhase.IMPLEMENTATION,
         target_phase=LifecyclePhase.QA_REVIEW,
         scope=_scope(),
     )
+    assert result2.accepted is False
+    assert result2.blocked is not None
+    assert "APPROVED verdict" in result2.blocked.reason
+    assert "run-qa-2" in store2.saved
 
-    assert result.accepted is False
-    assert result.blocked is not None
-    assert "APPROVED verdict" in result.blocked.reason
-    # Even a blocked run is persisted for resume/audit.
-    assert "run-qa-2" in store.saved
+    # v0.1.31 / T-31-A-06: a create-phase step is NOT verdict-gated — a valid payload
+    # (artifact_refs) + in-scope paths passes regardless of the (absent) verdict.
+    no_verdict = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="implementation produced evidence",
+        artifact_refs=(".dadaia/handoff/dadaia-workspace/impl.handoff.json",),
+        structured_output={"task_group": "implement"},
+    )
+    store3 = _MemoryRunStore()
+    workflow3 = LifecyclePhaseWorkflow(
+        runtime=FakeAgentRuntime(result=no_verdict), run_store=store3
+    )
+    result3 = workflow3.run(
+        run_id="run-impl-create",
+        command="implement",
+        from_phase=LifecyclePhase.RELEASE_DEFINITION,
+        target_phase=LifecyclePhase.IMPLEMENTATION,
+        scope=_scope(role="software-engineer", task_id="implement", prompt="implement the task"),
+    )
+    assert result3.accepted is True
+    assert result3.blocked is None
+    assert result3.phase is LifecyclePhase.IMPLEMENTATION
 
 
 def test_phase_workflow_review_phase_step_gates_on_verdict() -> None:
@@ -127,31 +149,6 @@ def test_phase_workflow_review_phase_step_gates_on_verdict() -> None:
     assert result.accepted is False
     assert result.blocked is not None
     assert "APPROVED verdict" in result.blocked.reason
-
-
-def test_phase_workflow_create_phase_step_passes_without_verdict() -> None:
-    # v0.1.31 / T-31-A-06: a step targeting a non-review (create) phase is NOT verdict-gated
-    # — a valid payload (artifact_refs) + in-scope paths passes regardless of the verdict.
-    no_verdict = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="implementation produced evidence",
-        artifact_refs=(".dadaia/handoff/dadaia-workspace/impl.handoff.json",),
-        structured_output={"task_group": "implement"},
-    )
-    store = _MemoryRunStore()
-    workflow = LifecyclePhaseWorkflow(runtime=FakeAgentRuntime(result=no_verdict), run_store=store)
-
-    result = workflow.run(
-        run_id="run-impl-create",
-        command="implement",
-        from_phase=LifecyclePhase.RELEASE_DEFINITION,
-        target_phase=LifecyclePhase.IMPLEMENTATION,
-        scope=_scope(role="software-engineer", task_id="implement", prompt="implement the task"),
-    )
-
-    assert result.accepted is True
-    assert result.blocked is None
-    assert result.phase is LifecyclePhase.IMPLEMENTATION
 
 
 def test_phase_workflow_persists_policy_snapshot_and_threads_resolved_model() -> None:

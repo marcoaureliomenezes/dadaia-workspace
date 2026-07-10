@@ -4,6 +4,14 @@ Covers D-3 (``--step-model`` profile ids only), ``--show-policy``, the read-only
 ``workflow policy show`` / ``workflow profiles list`` verbs, and LAW-1 harness rejection
 (``claude`` / ``opencode`` are not Layer-2 workers).
 
+Merged per plan-integration.md (18 -> 4): (1) profiles list + harness filter; (2) policy
+show table-driven (implementation/closure/audit/research/bug_report + unknown->reject);
+(3) workflow doctor (clean / invalid JSON WMP-STATE / bad override WMP-OVERLAY); (4)
+rejection matrix (raw model, unknown profile, harness mismatch, pi+codex conflict,
+claude/opencode LAW1) — THE canonical D-3/LAW1 rejection owner; all other files' dupes
+are deleted against it. Show-policy positive paths (pi per-step, step-harness) fold into
+``test_pipeline_harness_governance_e2e.py``.
+
 CLI rejection assertions are **terminal-width-independent**: Typer/Rich wraps the error
 box at an env-dependent width and inserts box glyphs + line breaks mid-message, which
 breaks naive substring asserts in CI. :func:`_norm` strips ANSI escapes and box-drawing
@@ -42,11 +50,11 @@ def _init_states(path: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Read-only inspection verbs
+# (1) profiles list + harness filter
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_profiles_list_json() -> None:
+def test_workflow_profiles_list_and_harness_filter() -> None:
     result = _runner.invoke(app, ["lifecycle", "workflow", "profiles", "list", "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
@@ -56,29 +64,55 @@ def test_workflow_profiles_list_json() -> None:
     # No Layer-1 / claude profiles.
     assert all(not p["model_id"].startswith("claude-") for p in payload["profiles"])
 
-
-def test_workflow_profiles_list_filtered_by_harness() -> None:
-    result = _runner.invoke(
+    filtered_result = _runner.invoke(
         app, ["lifecycle", "workflow", "profiles", "list", "--harness", "pi", "--json"]
     )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["profiles"]
-    assert all(p["harness"] == "pi" for p in payload["profiles"])
+    assert filtered_result.exit_code == 0, filtered_result.output
+    filtered_payload = json.loads(filtered_result.output)
+    assert filtered_payload["profiles"]
+    assert all(p["harness"] == "pi" for p in filtered_payload["profiles"])
 
 
-def test_workflow_policy_show_json(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+# ---------------------------------------------------------------------------
+# (2) policy show — table-driven (implementation/closure/audit/research/bug_report +
+# unknown -> reject)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("workflow_id", "expected_steps"),
+    [
+        ("implementation", {"implement": ("codex-implementation-standard", "library-default")}),
+        ("closure", {"close": (None, None)}),
+        ("audit", {}),
+        ("research", {}),
+        ("bug_report", {}),
+    ],
+)
+def test_workflow_policy_show_resolves_known_workflows(
+    workflow_id: str,
+    expected_steps: dict[str, tuple[str | None, str | None]],
+    tmp_path: Path,
+    monkeypatch,  # noqa: ANN001
+) -> None:
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app, ["lifecycle", "workflow", "policy", "show", "implementation", "--json"]
-    )
+    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", workflow_id, "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["workflow_id"] == "implementation"
+    assert payload["workflow_id"] == workflow_id
     steps = {s["step"]: s for s in payload["steps"]}
-    assert steps["implement"]["model_profile"] == "codex-implementation-standard"
-    assert steps["implement"]["source"] == "library-default"
+    assert payload["steps"], "resolved policy carries no governed steps"
+
+    for step_label, (expected_profile, expected_source) in expected_steps.items():
+        assert step_label in steps, f"{step_label} missing from resolved policy for {workflow_id}"
+        if expected_profile is not None:
+            assert steps[step_label]["model_profile"] == expected_profile
+        if expected_source is not None:
+            assert steps[step_label]["source"] == expected_source
+        # Every governed step carries a resolved model profile on a real Layer-2 harness.
+        assert steps[step_label]["model_profile"]
+        assert steps[step_label]["harness"] in {"codex", "pi"}
 
 
 def test_workflow_policy_show_unknown_workflow_rejected(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -89,69 +123,31 @@ def test_workflow_policy_show_unknown_workflow_rejected(tmp_path: Path, monkeypa
     assert "unknown workflow" in _norm(result.output)
 
 
-def test_workflow_policy_show_closure_resolves(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """T-29-B-03 (AC-7): the completed catalog makes `policy show closure` resolvable."""
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", "closure", "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["workflow_id"] == "closure"
-    steps = {s["step"]: s for s in payload["steps"]}
-    assert "close" in steps, "closure's real close worker step is not in the resolved policy"
-    # The generic close step resolves a governed model profile on the default harness.
-    assert steps["close"]["model_profile"]
-    assert steps["close"]["harness"] in {"codex", "pi"}
-
-
-@pytest.mark.parametrize("name", ["audit", "research", "bug_report"])
-def test_workflow_policy_show_wave_e_body_resolves(name: str, tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """T-30-E-04: audit/research/bug_report ship real bodies — `policy show` resolves them.
-
-    They left the deferred set in v0.1.30 Wave E, so the governed catalog now carries their
-    model steps and `policy show` succeeds (was: rejected as an unknown/deferred workflow).
-    """
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(app, ["lifecycle", "workflow", "policy", "show", name, "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["workflow_id"] == name
-    assert payload["steps"], "resolved policy carries no governed steps"
-
-
 # ---------------------------------------------------------------------------
-# workflow doctor (T-28-D-02 — WMP-* governance invariants)
+# (3) workflow doctor (T-28-D-02 — WMP-* governance invariants): clean / invalid
+# JSON (WMP-STATE) / bad override (WMP-OVERLAY)
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_doctor_clean_tree_passes(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_workflow_doctor_clean_invalid_json_and_bad_overlay(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
-    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    errors = [f for f in payload["findings"] if f["severity"] == "error"]
+
+    clean_result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    assert clean_result.exit_code == 0, clean_result.output
+    clean_payload = json.loads(clean_result.output)
+    errors = [f for f in clean_payload["findings"] if f["severity"] == "error"]
     assert errors == [], errors
 
-
-def test_workflow_doctor_invalid_overlay_fails_actionably(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
     overlay = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
     overlay.write_text("{ not valid json", encoding="utf-8")
-    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    invalid_json_result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
     # Invalid state file is an ERROR → exit non-zero, but never a crash (clean JSON out).
-    assert result.exit_code != 0, result.output
-    payload = json.loads(result.output)
-    codes = {f["code"] for f in payload["findings"]}
+    assert invalid_json_result.exit_code != 0, invalid_json_result.output
+    invalid_json_payload = json.loads(invalid_json_result.output)
+    codes = {f["code"] for f in invalid_json_payload["findings"]}
     assert "WMP-STATE" in codes
 
-
-def test_workflow_doctor_bad_overlay_override_fails(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    overlay = workspace / ".dadaia" / "states" / "workflow_model_policy.json"
     overlay.write_text(
         json.dumps(
             {
@@ -166,206 +162,75 @@ def test_workflow_doctor_bad_overlay_override_fails(tmp_path: Path, monkeypatch)
         ),
         encoding="utf-8",
     )
-    result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
-    assert result.exit_code != 0, result.output
-    payload = json.loads(result.output)
-    assert "WMP-OVERLAY" in {f["code"] for f in payload["findings"]}
+    bad_overlay_result = _runner.invoke(app, ["lifecycle", "workflow", "doctor", "--json"])
+    assert bad_overlay_result.exit_code != 0, bad_overlay_result.output
+    bad_overlay_payload = json.loads(bad_overlay_result.output)
+    assert "WMP-OVERLAY" in {f["code"] for f in bad_overlay_payload["findings"]}
 
 
 # ---------------------------------------------------------------------------
-# pipeline --step-model (D-3: profile ids only) + --show-policy
+# (4) THE canonical D-3/LAW1 rejection matrix — raw model, unknown profile, harness
+# mismatch, pi+codex step-model conflict, claude/opencode LAW1. All other files'
+# copies of these rejections are deleted against this single owner.
 # ---------------------------------------------------------------------------
 
 
-def test_pipeline_show_policy_json(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_rejection_matrix_d3_and_law1(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     workspace = _init_states(tmp_path)
     monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.28",
-            "--harness",
-            "fake",
-            "--step-model",
-            "implement=codex-review-deep",
-            "--show-policy",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    steps = {s["step"]: s for s in payload["steps"]}
-    assert steps["implement"]["model_profile"] == "codex-review-deep"
-    assert steps["implement"]["source"] == "cli"
 
+    def _pipeline(args: list[str]):  # type: ignore[no-untyped-def]
+        return _runner.invoke(
+            app,
+            [
+                "lifecycle",
+                "pipeline",
+                "--skip-preflight",
+                "--release-id",
+                "v0.1.28",
+                *args,
+                "--show-policy",
+            ],
+        )
 
-def test_pipeline_harness_pi_show_policy_resolves_pi(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    # v0.1.29 / T-29-A-07 — --harness pi threads into the governed resolver: every step's
-    # snapshot resolves harness=pi with the PI default profile auto-selected.
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.29",
-            "--harness",
-            "pi",
-            "--show-policy",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    steps = {s["step"]: s for s in payload["steps"]}
-    assert steps["implement"]["harness"] == "pi"
-    assert steps["implement"]["model_profile"] == "pi-implementation-standard"
-    assert steps["review_qa"]["harness"] == "pi"
-    assert steps["review_qa"]["model_profile"] == "pi-reasoning-high"
+    # D-3: a raw <id>:<effort> model string is rejected — profile ids only.
+    raw_result = _pipeline(["--step-model", "implement=gpt-5.5:high"])
+    assert raw_result.exit_code != 0
+    raw_text = _norm(raw_result.output)
+    assert "profile id" in raw_text
+    assert "not a raw model string" in raw_text
 
+    # D-3: an unknown profile id is rejected.
+    unknown_result = _pipeline(["--step-model", "implement=no-such-profile"])
+    assert unknown_result.exit_code != 0
+    assert "unknown model profile" in _norm(unknown_result.output)
 
-def test_pipeline_harness_pi_with_codex_step_model_rejected(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # D-3: a profile whose harness mismatches the step's resolved harness is rejected.
+    mismatch_result = _pipeline(["--step-model", "implement=pi-reasoning-high"])
+    assert mismatch_result.exit_code != 0
+    assert "harness" in _norm(mismatch_result.output).lower()
+
     # --harness pi + a codex --step-model is a clean rejection (effective-harness conflict).
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.29",
-            "--harness",
-            "pi",
-            "--step-model",
-            "implement=codex-implementation-standard",
-            "--show-policy",
-        ],
+    conflict_result = _pipeline(
+        ["--harness", "pi", "--step-model", "implement=codex-implementation-standard"]
     )
-    assert result.exit_code != 0
-    text = _norm(result.output).lower()
-    assert "harness" in text
-    assert "pi" in text
+    assert conflict_result.exit_code != 0
+    conflict_text = _norm(conflict_result.output).lower()
+    assert "harness" in conflict_text
+    assert "pi" in conflict_text
 
-
-def test_pipeline_step_harness_pi_only_that_step(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.29",
-            "--step-harness",
-            "implement=pi",
-            "--show-policy",
-            "--json",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    steps = {s["step"]: s for s in json.loads(result.output)["steps"]}
-    assert steps["implement"]["harness"] == "pi"
-    assert steps["review_qa"]["harness"] == "codex"
-
-
-def test_pipeline_step_model_rejects_raw_model_string(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.28",
-            "--step-model",
-            "implement=gpt-5.5:high",  # raw <id>:<effort> — must be rejected (D-3)
-            "--show-policy",
-        ],
-    )
-    assert result.exit_code != 0
-    text = _norm(result.output)
-    assert "profile id" in text
-    assert "not a raw model string" in text
-
-
-def test_pipeline_step_model_rejects_unknown_profile(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.28",
-            "--step-model",
-            "implement=no-such-profile",
-            "--show-policy",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "unknown model profile" in _norm(result.output)
-
-
-def test_pipeline_step_model_rejects_harness_mismatch(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    # implement resolves to codex; a pi profile mismatches the step harness.
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "v0.1.28",
-            "--step-model",
-            "implement=pi-reasoning-high",
-            "--show-policy",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "harness" in _norm(result.output).lower()
-
-
-# ---------------------------------------------------------------------------
-# LAW 1 — claude / opencode rejected as Layer-2 harnesses
-# ---------------------------------------------------------------------------
-
-
-def test_pipeline_rejects_claude_harness(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
+    # LAW 1: claude is not a Layer-2 workflow harness.
+    claude_result = _runner.invoke(
         app,
         ["lifecycle", "pipeline", "--release-id", "v0.1.28", "--harness", "claude"],
     )
-    assert result.exit_code != 0
-    text = _norm(result.output)
-    assert "not a Layer-2 workflow harness" in text
+    assert claude_result.exit_code != 0
+    assert "not a Layer-2 workflow harness" in _norm(claude_result.output)
 
-
-def test_pipeline_rejects_opencode_harness(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    workspace = _init_states(tmp_path)
-    monkeypatch.chdir(workspace)
-    result = _runner.invoke(
+    # LAW 1: opencode is not a Layer-2 workflow harness.
+    opencode_result = _runner.invoke(
         app,
         ["lifecycle", "pipeline", "--release-id", "v0.1.28", "--harness", "opencode"],
     )
-    assert result.exit_code != 0
-    text = _norm(result.output)
-    assert "not a Layer-2 workflow harness" in text
+    assert opencode_result.exit_code != 0
+    assert "not a Layer-2 workflow harness" in _norm(opencode_result.output)

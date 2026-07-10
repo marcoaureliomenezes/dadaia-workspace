@@ -235,8 +235,6 @@ class TestDadaiaEnvSetenvContract:
             "claude_hook_env()/codex_hook_env() + run_hook_subprocess(), or to explicit "
             f"function params / a monkeypatched reader. Offending file -> count: {current}"
         )
-
-    def test_context_var_is_allowlisted(self) -> None:
         assert "DADAIA_CONTEXT" in ALLOWLISTED_DADAIA_ENV
 
 

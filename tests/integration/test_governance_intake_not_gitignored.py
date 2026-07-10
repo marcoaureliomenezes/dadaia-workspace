@@ -7,6 +7,8 @@ no negation, so new ``remote-bugs/*.md`` intake reports are silently
 git-ignored. This is an executed-path repo-hygiene test: it writes real probe
 files under the repo's working tree and asks the real ``git`` binary via
 ``git check-ignore`` whether they are ignored, then cleans them up.
+
+Merged per plan-integration.md into one parametrized fn over the 4 probe paths.
 """
 
 from __future__ import annotations
@@ -53,41 +55,14 @@ def probe_paths() -> list[Path]:
         path.unlink(missing_ok=True)
 
 
-def test_bugs_intake_probe_not_ignored(probe_paths: list[Path]) -> None:
-    """Control: specs/bugs/*.md is already opted back in — must not be ignored."""
-    relative = probe_paths[0].relative_to(_REPO_ROOT).as_posix()
-    assert not _is_ignored(_REPO_ROOT, relative), (
-        f"{relative} is unexpectedly git-ignored (control regression)"
-    )
-
-
-def test_backlog_top_level_probe_not_ignored(probe_paths: list[Path]) -> None:
-    """Control: specs/backlog/*.md is already opted back in — must not be ignored."""
-    relative = probe_paths[1].relative_to(_REPO_ROOT).as_posix()
-    assert not _is_ignored(_REPO_ROOT, relative), (
-        f"{relative} is unexpectedly git-ignored (control regression)"
-    )
-
-
-def test_remote_bugs_intake_probe_not_ignored(probe_paths: list[Path]) -> None:
-    """FR2 subject: specs/backlog/remote-bugs/*.md must not be git-ignored.
-
-    RED today: /specs/backlog/* (line 134) excludes the remote-bugs/ subtree
-    with no negation, so this probe IS ignored on current code.
-    """
-    relative = probe_paths[2].relative_to(_REPO_ROOT).as_posix()
-    assert not _is_ignored(_REPO_ROOT, relative), (
-        f"{relative} is git-ignored — the remote-bugs/ intake subtree has no negation in .gitignore"
-    )
-
-
-def test_remote_bugs_archive_probe_not_ignored(probe_paths: list[Path]) -> None:
-    """FR2 subject: specs/backlog/remote-bugs/_archive/*.md must not be git-ignored.
-
-    RED today: same root cause as the remote-bugs/ probe above.
-    """
-    relative = probe_paths[3].relative_to(_REPO_ROOT).as_posix()
-    assert not _is_ignored(_REPO_ROOT, relative), (
-        f"{relative} is git-ignored — the remote-bugs/_archive/ intake subtree "
-        "has no negation in .gitignore"
-    )
+@pytest.mark.parametrize(
+    "index",
+    [0, 1, 2, 3],
+    ids=["bugs-control", "backlog-top-control", "remote-bugs-fr2", "remote-bugs-archive-fr2"],
+)
+def test_governance_intake_probe_not_ignored(probe_paths: list[Path], index: int) -> None:
+    """Controls (bugs/, backlog top-level) must not be ignored (regression guard); FR2
+    subjects (remote-bugs/ and remote-bugs/_archive/) must not be ignored either — the
+    /specs/backlog/* gitignore line must carry a negation for the remote-bugs/ subtree."""
+    relative = probe_paths[index].relative_to(_REPO_ROOT).as_posix()
+    assert not _is_ignored(_REPO_ROOT, relative), f"{relative} is unexpectedly git-ignored"

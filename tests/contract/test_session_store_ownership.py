@@ -81,55 +81,45 @@ def _iter_py_files(root: Path):  # type: ignore[no-untyped-def]
             yield path
 
 
-def test_pointer_namespace_has_no_residue_outside_owner() -> None:
-    """FR-R3-01: only session_identity may construct sessions/runtime/*.ptr (0 residue)."""
-    repo = _repo_root()
-    failures: list[str] = []
-    for path in _iter_py_files(repo / ACTIVE_PRODUCT_ROOT):
-        relpath = path.relative_to(repo).as_posix()
-        if relpath == OWNER_RELPATH:
-            continue
-        text = path.read_text(encoding="utf-8")
-        for idiom in POINTER_IDIOMS:
-            if idiom in text:
-                failures.append(f"{relpath}: constructs pointer-namespace path ({idiom!r})")
-    assert failures == [], f"pointer-namespace residue must be 0 outside the owner: {failures}"
-
-
-def test_session_record_open_is_owner_or_allowlisted() -> None:
-    """FR-R3-01: session-record paths are built only by the owner or an allowlisted consumer."""
+def test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only() -> None:
+    """FR-R3-01: only session_identity may construct sessions/runtime/*.ptr (0 residue
+    outside the owner), and session-record paths are built only by the owner or an
+    allowlisted consumer."""
     repo = _repo_root()
     allowed = {c.relpath for c in ALLOWED_RECORD_CONSUMERS}
-    failures: list[str] = []
+    pointer_failures: list[str] = []
+    record_failures: list[str] = []
     for path in _iter_py_files(repo / ACTIVE_PRODUCT_ROOT):
         relpath = path.relative_to(repo).as_posix()
-        if relpath == OWNER_RELPATH or relpath in allowed:
-            continue
         text = path.read_text(encoding="utf-8")
-        for idiom in RECORD_IDIOMS:
-            if idiom in text:
-                failures.append(f"{relpath}: constructs session-record path ({idiom!r})")
-    assert failures == [], f"unexpected session-record opener (not owner/allowlisted): {failures}"
+        if relpath != OWNER_RELPATH:
+            for idiom in POINTER_IDIOMS:
+                if idiom in text:
+                    pointer_failures.append(
+                        f"{relpath}: constructs pointer-namespace path ({idiom!r})"
+                    )
+        if relpath != OWNER_RELPATH and relpath not in allowed:
+            for idiom in RECORD_IDIOMS:
+                if idiom in text:
+                    record_failures.append(f"{relpath}: constructs session-record path ({idiom!r})")
+    assert pointer_failures == [], (
+        f"pointer-namespace residue must be 0 outside the owner: {pointer_failures}"
+    )
+    assert record_failures == [], (
+        f"unexpected session-record opener (not owner/allowlisted): {record_failures}"
+    )
 
 
-def test_allowlisted_record_consumers_exist_and_are_documented() -> None:
-    """The allowlist must point at real files with a non-empty disposition."""
+def test_owner_and_allowlist_are_grounded_closed_and_minimal() -> None:
+    """The owner module exists, the allowlist points at real documented files, and the
+    allowlist is exactly the one not-migrated reader (NF-3/rc-2 migrated
+    ``hooks/sdd_post_gate.py`` to ``session_identity``; only the core-layer reader,
+    which cannot import the features owner under constitution §6, remains)."""
     repo = _repo_root()
+    assert (repo / OWNER_RELPATH).exists()
     for consumer in ALLOWED_RECORD_CONSUMERS:
         assert (repo / consumer.relpath).exists(), consumer.relpath
         assert consumer.disposition.strip(), consumer.relpath
-
-
-def test_owner_module_exists() -> None:
-    assert (_repo_root() / OWNER_RELPATH).exists()
-
-
-def test_allowlist_is_closed_and_minimal() -> None:
-    """Guard against silent growth: the allowlist is exactly the one not-migrated reader.
-
-    NF-3 (rc-2) migrated ``hooks/sdd_post_gate.py`` to ``session_identity``; only the
-    core-layer reader (which cannot import the features owner under constitution §6) remains.
-    """
     relpaths = {c.relpath for c in ALLOWED_RECORD_CONSUMERS}
     assert relpaths == {
         "dadaia_workspace/core/specs_resolver.py",

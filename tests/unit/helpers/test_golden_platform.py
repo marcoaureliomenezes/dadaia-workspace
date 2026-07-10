@@ -4,6 +4,8 @@ Each consolidated function is exercised against the KNOWN leak fixtures that mot
 it (the v0.1.58 three-round saga + the v0.1.57 Rich-width law) — these tests are the
 mutation-sanity net for the 13-site adoption (AC-9 (a)/(b) were sabotage-verified
 against this file).
+
+Golden-regen-guard rows protect integration-owned goldens from silent rewrite.
 """
 
 from __future__ import annotations
@@ -31,23 +33,37 @@ pytestmark = pytest.mark.unit
 # ---------------------------------------------------------------------------
 
 
-def test_norm_path_line_scrubs_workspace_root_and_sep(tmp_path: Path) -> None:
-    line = f"[ok] installed {tmp_path}{chr(92)}agents{chr(92)}x.md"
-    out = norm_path_line(line, tmp_path)
-    assert out == "[ok] installed <WS>/agents/x.md"
-
-
-def test_norm_path_line_scrubs_posix_form(tmp_path: Path) -> None:
-    line = f"[ok] installed {tmp_path.as_posix()}/agents/x.md"
-    assert norm_path_line(line, tmp_path) == "[ok] installed <WS>/agents/x.md"
-
-
-def test_norm_path_line_canonicalizes_denylist_marker_variant(tmp_path: Path) -> None:
-    """Host-state leak: the fresh-checkout (CI) baseline variant → the bare marker."""
-    ci_variant = "[ok] public-privacy (baseline structural scan, no operator denylist)"
-    assert norm_path_line(ci_variant, tmp_path) == "[ok] public-privacy"
-    # The bare (operator-denylist-present) form is a fixed point.
-    assert norm_path_line("[ok] public-privacy", tmp_path) == "[ok] public-privacy"
+@pytest.mark.parametrize(
+    ("name", "line_fn", "expected"),
+    [
+        (
+            "windows_sep",
+            lambda tp: f"[ok] installed {tp}{chr(92)}agents{chr(92)}x.md",
+            "[ok] installed <WS>/agents/x.md",
+        ),
+        (
+            "posix_form",
+            lambda tp: f"[ok] installed {tp.as_posix()}/agents/x.md",
+            "[ok] installed <WS>/agents/x.md",
+        ),
+        (
+            # Host-state leak: the fresh-checkout (CI) baseline variant → the bare
+            # marker.
+            "ci_baseline_variant",
+            lambda tp: "[ok] public-privacy (baseline structural scan, no operator denylist)",
+            "[ok] public-privacy",
+        ),
+        (
+            # The bare (operator-denylist-present) form is a fixed point.
+            "already_canonical_fixed_point",
+            lambda tp: "[ok] public-privacy",
+            "[ok] public-privacy",
+        ),
+    ],
+)
+def test_norm_path_line_table(tmp_path: Path, name: str, line_fn: object, expected: str) -> None:
+    line = line_fn(tmp_path)  # type: ignore[operator]
+    assert norm_path_line(line, tmp_path) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -57,31 +73,37 @@ def test_norm_path_line_canonicalizes_denylist_marker_variant(tmp_path: Path) ->
 _DCX9_CANON = "[error] codex hook wrapper probe failed .dadaia/hooks/pre_gate.sh (D-CX-9)"
 
 
-def test_canon_env_line_linux_phrasing() -> None:
-    linux = (
-        "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: exited 127 "
-        "missing executable /usr/bin/python (D-CX-9)"
-    )
-    assert canon_env_line(linux) == _DCX9_CANON
-
-
-def test_canon_env_line_windows_phrasing() -> None:
-    windows = (
-        "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: launch failed "
-        "[WinError 193] %1 is not a valid Win32 application (D-CX-9)"
-    )
-    assert canon_env_line(windows) == _DCX9_CANON
-
-
-def test_canon_env_line_both_os_phrasings_converge() -> None:
-    """The two OS phrasings of the SAME probe failure become one canonical line."""
-    linux = "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: exited 127 (D-CX-9)"
-    windows = "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: [WinError 193] (D-CX-9)"
-    assert canon_env_line(linux) == canon_env_line(windows) == _DCX9_CANON
-
-
-def test_canon_env_line_leaves_unrelated_lines_alone() -> None:
-    assert canon_env_line("[ok] stage:agents/x.md") == "[ok] stage:agents/x.md"
+@pytest.mark.parametrize(
+    ("name", "raw", "expected"),
+    [
+        (
+            "linux_phrasing",
+            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: exited 127 "
+            "missing executable /usr/bin/python (D-CX-9)",
+            _DCX9_CANON,
+        ),
+        (
+            "windows_phrasing",
+            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: launch failed "
+            "[WinError 193] %1 is not a valid Win32 application (D-CX-9)",
+            _DCX9_CANON,
+        ),
+        (
+            "unrelated_line_untouched",
+            "[ok] stage:agents/x.md",
+            "[ok] stage:agents/x.md",
+        ),
+    ],
+)
+def test_canon_env_line_table(name: str, raw: str, expected: str) -> None:
+    assert canon_env_line(raw) == expected
+    if name == "linux_phrasing":
+        # The two OS phrasings of the SAME probe failure become one canonical line.
+        windows = (
+            "[error] codex hook wrapper probe .dadaia/hooks/pre_gate.sh: "
+            "[WinError 193] %1 is not a valid Win32 application (D-CX-9)"
+        )
+        assert canon_env_line(raw) == canon_env_line(windows) == _DCX9_CANON
 
 
 # ---------------------------------------------------------------------------
@@ -89,16 +111,14 @@ def test_canon_env_line_leaves_unrelated_lines_alone() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_sort_line_lists_locks_a_sorted_multiset() -> None:
-    """Order-insensitive AND count-preserving (a dropped duplicate must still differ)."""
+def test_sort_line_lists_locks_sorted_multiset_recurses_and_leaves_mixed_untouched() -> None:
+    # Order-insensitive AND count-preserving (a dropped duplicate must still differ).
     windows_order = ["pi/extensions/gate.ts", "pi/SYSTEM.md", "pi/SYSTEM.md"]
     linux_order = ["pi/SYSTEM.md", "pi/extensions/gate.ts", "pi/SYSTEM.md"]
     assert sort_line_lists(windows_order) == sort_line_lists(linux_order)
     # Count-preserving: losing one duplicate changes the multiset.
     assert sort_line_lists(windows_order) != sort_line_lists(windows_order[:-1])
 
-
-def test_sort_line_lists_recurses_dicts_and_canonicalizes_probe_text() -> None:
     obj = {
         "doctor": [
             "[error] codex hook wrapper probe .dadaia/hooks/w.sh: exited 127 (D-CX-9)",
@@ -117,8 +137,6 @@ def test_sort_line_lists_recurses_dicts_and_canonicalizes_probe_text() -> None:
         "scalar": 3,
     }
 
-
-def test_sort_line_lists_leaves_mixed_lists_untouched() -> None:
     mixed = ["b", 1, "a"]
     assert sort_line_lists(mixed) == mixed
 
@@ -153,28 +171,37 @@ def test_is_env_doctor_line() -> None:
 
 
 # ---------------------------------------------------------------------------
-# assert_golden — compare / deliberate-regen mechanism
+# assert_golden — compare / deliberate-regen mechanism. Golden-regen-guard rows
+# protect integration-owned goldens from silent rewrite.
 # ---------------------------------------------------------------------------
 
 
-def test_assert_golden_passes_on_multiset_equal_capture(tmp_path: Path) -> None:
-    golden = tmp_path / "g.json"
-    golden.write_text(json.dumps({"k": ["a", "b"]}, indent=2) + "\n", encoding="utf-8")
-    assert_golden(golden, {"k": ["b", "a"]}, "fixture")  # order-insensitive
+def test_assert_golden_pass_fail_and_custom_message(tmp_path: Path) -> None:
+    pass_golden = tmp_path / "g_pass.json"
+    pass_golden.write_text(json.dumps({"k": ["a", "b"]}, indent=2) + "\n", encoding="utf-8")
+    assert_golden(pass_golden, {"k": ["b", "a"]}, "fixture")  # order-insensitive
 
-
-def test_assert_golden_fails_on_divergence_with_consumer_message(tmp_path: Path) -> None:
-    golden = tmp_path / "g.json"
-    golden.write_text(json.dumps({"k": ["a"]}, indent=2) + "\n", encoding="utf-8")
+    fail_golden = tmp_path / "g_fail.json"
+    fail_golden.write_text(json.dumps({"k": ["a"]}, indent=2) + "\n", encoding="utf-8")
     with pytest.raises(AssertionError, match="never the golden"):
-        assert_golden(golden, {"k": ["a", "z"]}, "fixture")
+        assert_golden(fail_golden, {"k": ["a", "z"]}, "fixture")
+
+    custom_golden = tmp_path / "g_custom.json"
+    custom_golden.write_text(json.dumps(["a"], indent=2) + "\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="golden \\(b\\)'s territory"):
+        assert_golden(custom_golden, ["z"], "fixture", message="that is golden (b)'s territory")
 
 
-def test_assert_golden_custom_message(tmp_path: Path) -> None:
+def test_assert_golden_never_regenerates_without_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The e2e reproduction site must never rewrite the integration-owned golden."""
     golden = tmp_path / "g.json"
     golden.write_text(json.dumps(["a"], indent=2) + "\n", encoding="utf-8")
-    with pytest.raises(AssertionError, match="golden \\(b\\)'s territory"):
-        assert_golden(golden, ["z"], "fixture", message="that is golden (b)'s territory")
+    monkeypatch.setenv("UPDATE_INSTALL_GOLDENS", "1")
+    with pytest.raises(AssertionError):
+        assert_golden(golden, ["z"], "fixture", update_env=None)
+    assert json.loads(golden.read_text(encoding="utf-8")) == ["a"]  # untouched
 
 
 def test_assert_golden_regenerates_only_under_env_flag(
@@ -186,18 +213,6 @@ def test_assert_golden_regenerates_only_under_env_flag(
         assert_golden(golden, {"k": ["b", "a"]}, "fixture", update_env="MY_UPDATE_FLAG")
     written = json.loads(golden.read_text(encoding="utf-8"))
     assert written == {"k": ["a", "b"]}  # sorted at write
-
-
-def test_assert_golden_update_env_none_never_regenerates(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The e2e reproduction site must never rewrite the integration-owned golden."""
-    golden = tmp_path / "g.json"
-    golden.write_text(json.dumps(["a"], indent=2) + "\n", encoding="utf-8")
-    monkeypatch.setenv("UPDATE_INSTALL_GOLDENS", "1")
-    with pytest.raises(AssertionError):
-        assert_golden(golden, ["z"], "fixture", update_env=None)
-    assert json.loads(golden.read_text(encoding="utf-8")) == ["a"]  # untouched
 
 
 # ---------------------------------------------------------------------------
@@ -217,14 +232,8 @@ def test_norm_stderr_collapses_rich_box_wrapped_output() -> None:
     assert "No such option: --model" in out
     assert "\x1b[" not in out
     assert "│" not in out and "╭" not in out
-
-
-def test_norm_stderr_default_variant_bytes() -> None:
-    """The 7-site variant: box chars → space, ``\\s+`` → single space (no strip)."""
+    # The 7-site variant: box chars → space, ``\s+`` → single space (no strip).
     assert norm_stderr("│ a  b │") == " a b "
-
-
-def test_norm_stderr_wide_glyphs_variant_bytes() -> None:
-    """The policy-CLI variant: wide glyph range incl. smart quotes, stripped."""
+    # The policy-CLI variant: wide glyph range incl. smart quotes, stripped.
     assert norm_stderr("│ ‘a’  “b” │", wide_glyphs=True) == "a b"
     assert "No such option: --model" in norm_stderr(_BOXED, wide_glyphs=True)

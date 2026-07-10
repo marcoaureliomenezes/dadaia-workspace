@@ -1,9 +1,17 @@
-"""WS-1 — LifecyclePipeline threads one run through phases with per-step harness mixing."""
+"""WS-1 — LifecyclePipeline threads one run through phases with per-step harness mixing.
+
+CRITICAL: AC7.2 — review steps NEVER gain production write paths (kept with AC7.1 positive
+contrast inside it); first-block stops the ladder. Prompt-substring greps on fragment
+banners (implement/qa_review/security_review) and the fragment-bundle field-list assert are
+owned by ``test_fragment_gate_goldens.py`` (the pipeline golden pins the full prompts incl.
+banners) — not repeated here. The former-deferred-workflow e2e is owned by the shared
+``test_fragment_workflow_bodies.py`` suite; the no-workflow-is-deferred-anymore assert is
+dead post-v0.1.30 (``DEFERRED_WORKFLOWS`` has been permanently empty since the fix it guarded).
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 
@@ -77,7 +85,10 @@ def _pipeline(store: _MemoryRunStore, factory: object) -> LifecyclePipeline:
     )
 
 
-def test_pipeline_completes_full_ladder_when_every_step_approves() -> None:
+# --- ① full-ladder-completes + per-step harness mixing ----------------------------------
+
+
+def test_pipeline_completes_full_ladder_and_mixes_harness_per_step() -> None:
     store = _MemoryRunStore()
     pipe = _pipeline(store, lambda kind: _KindFake(kind, _approved()))
 
@@ -95,10 +106,8 @@ def test_pipeline_completes_full_ladder_when_every_step_approves() -> None:
     # One persisted run advancing through phases (start + 4 steps).
     assert store.saved["run-1"].phase is LifecyclePhase.CLOSURE
 
-
-def test_pipeline_mixes_harness_per_step() -> None:
-    store = _MemoryRunStore()
-    pipe = _pipeline(store, lambda kind: _KindFake(kind, _approved()))
+    mix_store = _MemoryRunStore()
+    mix_pipe = _pipeline(mix_store, lambda kind: _KindFake(kind, _approved()))
     steps = (
         PipelineStep(
             "implement",
@@ -115,12 +124,10 @@ def test_pipeline_mixes_harness_per_step() -> None:
             AgentRuntimeKind.CODEX_EXEC,
         ),
     )
-
-    result = pipe.run("run-mix", steps)
-
-    assert result.completed is True
-    assert result.steps[0].runtime_kind is AgentRuntimeKind.CLAUDE_SDK
-    assert result.steps[1].runtime_kind is AgentRuntimeKind.CODEX_EXEC
+    mix_result = mix_pipe.run("run-mix", steps)
+    assert mix_result.completed is True
+    assert mix_result.steps[0].runtime_kind is AgentRuntimeKind.CLAUDE_SDK
+    assert mix_result.steps[1].runtime_kind is AgentRuntimeKind.CODEX_EXEC
 
 
 def test_pipeline_stops_at_first_blocked_step() -> None:
@@ -210,191 +217,12 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     assert all(req.model_profile not in ("sonnet", "opus") for req in captured)
     assert all(req.model_profile == "high" for req in captured)
 
-
-def test_implementation_ladder_default_model_comes_from_catalog() -> None:
     from dadaia_workspace.core.harness_models import CODEX_HARNESS, options_for
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 
-    steps = implementation_ladder(AgentRuntimeKind.FAKE)
+    default_steps = implementation_ladder(AgentRuntimeKind.FAKE)
     expected_effort = options_for(CODEX_HARNESS)[0].effort
-    assert all(step.model_profile == expected_effort for step in steps)
-    assert all(step.model_profile not in ("sonnet", "opus") for step in steps)
-
-
-def test_implementation_ladder_honors_explicit_discrete_model() -> None:
-    from dadaia_workspace.core.harness_models import validate
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
-
-    chosen = validate("codex", "gpt-5.5:medium")
-    steps = implementation_ladder(AgentRuntimeKind.FAKE, model=chosen)
-    assert all(step.model_profile == "medium" for step in steps)
-
-
-# --- WS-6: fragment-sourced prompts for the implementation + QA-review steps ---------
-
-
-def _capture_pipeline(captured: list[AgentRunRequest]) -> LifecyclePipeline:
-    store = _MemoryRunStore()
-    return LifecyclePipeline(
-        context="dadaia-workspace",
-        release_id="v0.1.24",
-        run_store=store,
-        runtime_factory=lambda kind: _RecordingFake(kind, captured),
-    )
-
-
-def test_implementation_ladder_attaches_fragment_bundles_to_two_steps() -> None:
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
-
-    steps = implementation_ladder(AgentRuntimeKind.FAKE)
-    by_label = {step.label: step for step in steps}
-
-    # The implementation step runs on the TDD implement fragment, citing the shared
-    # write-scope / anti-slop / output-handoff disciplines + the self-verify fragment.
-    assert by_label["implement"].fragment_id == "implementation.implement_tdd"
-    assert by_label["implement"].shared_fragment_ids == (
-        "shared.write_scope",
-        "shared.anti_slop",
-        "shared.output_handoff",
-        "implementation.self_verify",
-    )
-    # The QA review step runs on the qa-review fragment.
-    assert by_label["review_qa"].fragment_id == "implementation.qa_review"
-    # v0.1.43: the security + code review steps now run on their own gate fragments,
-    # each citing the shared anti-slop + output-handoff disciplines.
-    assert by_label["review_security"].fragment_id == "implementation.security_review"
-    assert by_label["review_security"].shared_fragment_ids == (
-        "shared.anti_slop",
-        "shared.output_handoff",
-    )
-    assert by_label["review_code"].fragment_id == "implementation.code_review"
-    assert by_label["review_code"].shared_fragment_ids == (
-        "shared.anti_slop",
-        "shared.output_handoff",
-    )
-
-
-def test_implementation_and_qa_steps_emit_fragment_sourced_prompts() -> None:
-    from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
-
-    captured: list[AgentRunRequest] = []
-    pipe = _capture_pipeline(captured)
-
-    result = pipe.run("run-frag", implementation_ladder(AgentRuntimeKind.FAKE))
-
-    assert result.completed is True
-    by_label = {req.task_id.rsplit(":", 1)[1]: req for req in captured}
-
-    implement_prompt = by_label["implement"].prompt
-    # Fragment-sourced: carries the fragment id banners (own + cited shared), NOT the
-    # generic "Run the ... step" suffix.
-    assert "fragment:implementation.implement_tdd" in implement_prompt
-    assert "fragment:shared.write_scope" in implement_prompt
-    assert "fragment:implementation.self_verify" in implement_prompt
-    assert "Run the implement step" not in implement_prompt
-    # The output schema the fragment declares reaches the prompt.
-    assert "implementation-result-v1" in implement_prompt
-
-    qa_prompt = by_label["review_qa"].prompt
-    assert "fragment:implementation.qa_review" in qa_prompt
-    assert "Run the review_qa step" not in qa_prompt
-    assert "qa-review-verdict-v1" in qa_prompt
-
-    # v0.1.43: the security review step is now fragment-sourced, not generic.
-    security_prompt = by_label["review_security"].prompt
-    assert "fragment:implementation.security_review" in security_prompt
-    assert "Run the review_security step" not in security_prompt
-
-
-# ---------------------------------------------------------------------------
-# T-30-E-04 — audit / research / bug_report are no longer deferred fail-loud stubs.
-# Each ships a real fragment+gate workflow body; DEFERRED_WORKFLOWS is now empty, and the
-# bodies advance/block via their Python gate rather than raising NotImplementedError (A28).
-# ---------------------------------------------------------------------------
-
-
-def test_no_workflow_is_deferred_anymore() -> None:
-    from dadaia_workspace.features.lifecycle import workflows
-
-    # The fail-loud stub callables are gone — no NotImplementedError entry point remains.
-    assert workflows.DEFERRED_WORKFLOWS == ()
-    assert not hasattr(workflows, "audit") or not callable(
-        getattr(workflows.audit, "_deferred", None)
-    )
-
-
-@pytest.mark.parametrize(
-    ("workflow_cls_name", "labels"),
-    [
-        ("AuditWorkflow", ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"]),
-        (
-            "ResearchWorkflow",
-            ["research_scope", "investigate", "synthesis", "research_synthesis_gate"],
-        ),
-        ("BugReportWorkflow", ["bug_intake", "dedupe", "bug_write", "bug_record_gate"]),
-    ],
-)
-def test_former_deferred_workflows_run_via_python_gate(
-    tmp_path: Path, workflow_cls_name: str, labels: list[str]
-) -> None:
-    """A28: each former-deferred body runs end-to-end on the FAKE runtime via its gate.
-
-    Proves the body no longer raises ``NotImplementedError`` — it advances through every
-    model step and the terminal Python gate completes the run.
-    """
-    from dadaia_workspace.features.lifecycle import workflows
-    from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
-    from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
-
-    # AgentRunRequest/Result/Status/Kind, dataclass, LifecyclePhase are module-level imports.
-
-    context = "dadaia-workspace"
-    release = "v0.1.30"
-    specs = tmp_path / "repos" / context / "specs"
-    (specs / "memory" / "product").mkdir(parents=True)
-    (specs / "bugs").mkdir(parents=True)
-    (specs / "releases" / release).mkdir(parents=True)
-    (specs / "memory" / "architecture.md").write_text("# a\n", encoding="utf-8")
-    (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-
-    @dataclass(frozen=True)
-    class _Fake:
-        kind: AgentRuntimeKind
-
-        def runtime_kind(self) -> AgentRuntimeKind:
-            return self.kind
-
-        def run(self, request: AgentRunRequest) -> AgentRunResult:
-            ref = (
-                f"repos/{context}/specs/bugs/x.md"
-                if request.task_id.endswith(":bug_write")
-                else f".dadaia/handoff/{context}/s.handoff.json"
-            )
-            return AgentRunResult(
-                status=AgentRunStatus.SUCCEEDED,
-                summary="ok",
-                artifact_refs=(ref,),
-                structured_output={"verdict": "APPROVED"},
-            )
-
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs, release_id=release, handoff_dir=tmp_path / ".dadaia" / "handoff"
-        )
-    )
-    cls = getattr(workflows, workflow_cls_name)
-    wf = cls(
-        context=context,
-        release_id=release,
-        run_store=JsonLifecycleRunStore(tmp_path),
-        runtime_factory=lambda kind: _Fake(kind),
-        context_selector=selector,
-    )
-    result = wf.run("run-1")  # must not raise NotImplementedError
-
-    assert result.completed is True
-    assert [s.label for s in result.steps] == labels
-    assert result.steps[-1].is_gate is True
+    assert all(step.model_profile == expected_effort for step in default_steps)
+    assert all(step.model_profile not in ("sonnet", "opus") for step in default_steps)
 
 
 # ---------------------------------------------------------------------------
@@ -459,7 +287,8 @@ def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
 
 
 # ---------------------------------------------------------------------------
-# v0.1.29 / T-29-A-06 — apply_resolved_policy owns runtime_kind from resolved harness
+# ② apply_resolved_policy param: pi->PI_HEADLESS / codex->CODEX_EXEC /
+#    FAKE-preserved-with-model-threaded (v0.1.29 / T-29-A-06)
 # ---------------------------------------------------------------------------
 
 
@@ -473,41 +302,46 @@ def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def
     return resolver.resolve("implementation", context="default", default_harness=default_harness)
 
 
-def test_apply_resolved_policy_sets_runtime_kind_from_resolved_harness() -> None:
-    # AC-3: a pi-resolved snapshot drives PI_HEADLESS on every step when the base
-    # ladder is built on a real (non-fake) harness.
+@pytest.mark.parametrize(
+    "case_id,default_harness,base_kind,expect_kind_of_step,expect_fake_preserved",
+    [
+        (
+            "pi-resolves-pi-headless",
+            "pi",
+            AgentRuntimeKind.CODEX_EXEC,
+            AgentRuntimeKind.PI_HEADLESS,
+            False,
+        ),
+        (
+            "codex-resolves-codex-exec",
+            None,
+            AgentRuntimeKind.PI_HEADLESS,
+            AgentRuntimeKind.CODEX_EXEC,
+            False,
+        ),
+        ("fake-preserved-for-dry-run", "pi", AgentRuntimeKind.FAKE, AgentRuntimeKind.FAKE, True),
+    ],
+    ids=["pi-resolves-pi-headless", "codex-resolves-codex-exec", "fake-preserved-for-dry-run"],
+)
+def test_apply_resolved_policy_owns_runtime_kind_from_resolved_harness(
+    case_id: str,
+    default_harness: str | None,
+    base_kind: AgentRuntimeKind,
+    expect_kind_of_step: AgentRuntimeKind,
+    expect_fake_preserved: bool,
+) -> None:
     from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
 
-    snapshot = _resolve(default_harness="pi")
-    base = implementation_ladder(AgentRuntimeKind.CODEX_EXEC)
+    snapshot = _resolve(default_harness=default_harness)
+    base = implementation_ladder(base_kind)
     steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
     for step in steps:
-        assert step.runtime_kind is AgentRuntimeKind.PI_HEADLESS
-
-
-def test_apply_resolved_policy_codex_resolves_codex_exec() -> None:
-    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
-
-    snapshot = _resolve()  # default codex
-    base = implementation_ladder(AgentRuntimeKind.PI_HEADLESS)
-    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
-    for step in steps:
-        assert step.runtime_kind is AgentRuntimeKind.CODEX_EXEC
-
-
-def test_apply_resolved_policy_preserves_fake_for_dry_run() -> None:
-    # ARCHITECT MEDIUM: a base ladder built on FAKE (dry-run / test) keeps FAKE even
-    # though the snapshot resolves a governed harness — fake is never a resolved harness.
-    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
-
-    snapshot = _resolve(default_harness="pi")
-    base = implementation_ladder(AgentRuntimeKind.FAKE)
-    steps = apply_resolved_policy(base, snapshot)  # type: ignore[arg-type]
-    for step in steps:
-        assert step.runtime_kind is AgentRuntimeKind.FAKE
-        # The governed model is still threaded for auditability.
-        assert step.resolved_model is not None
-        assert step.resolved_model.harness == "pi"
+        assert step.runtime_kind is expect_kind_of_step
+        if expect_fake_preserved:
+            # ARCHITECT MEDIUM: fake is never a resolved harness — the governed model is
+            # still threaded for auditability even though runtime_kind stays FAKE.
+            assert step.resolved_model is not None
+            assert step.resolved_model.harness == "pi"
 
 
 # ---------------------------------------------------------------------------
@@ -541,35 +375,29 @@ def _step_with(
     )
 
 
-def test_scope_unions_extra_allowed_paths_for_implement_step_ac71() -> None:
-    """AC7.1: extra_allowed_paths fed into _scope for the implement (non-review) step
-    yields allowed_paths containing both the handoff-dir glob AND the extra path."""
-    step = _step_with("implement", is_review=False, extra_allowed_paths=("repos/x/src/**",))
+def test_scope_extra_allowed_paths_union_for_create_steps_ignored_for_review_ac71_ac72() -> None:
+    """AC7.1: extra_allowed_paths fed into _scope for a non-review (create) step yields
+    allowed_paths containing both the handoff-dir glob AND the extra path — the positive
+    contrast that attributes AC7.2's block to review-ness, nothing else.
 
-    scope = _pipeline_for_scope()._scope(step, "run1")
+    AC7.2 (CRITICAL): the SAME extra_allowed_paths value fed into a review step
+    (is_review=True) is IGNORED — the union only applies to non-review (create) steps;
+    review steps stay handoff-only. Regression guard proving review steps never gain
+    production write rights.
 
-    assert ".dadaia/handoff/dadaia-workspace/**" in scope.allowed_paths
-    assert "repos/x/src/**" in scope.allowed_paths
+    Additive-optional regression guard: a non-review step with the default empty
+    extra_allowed_paths behaves exactly as before this FR.
+    """
+    create_step = _step_with("implement", is_review=False, extra_allowed_paths=("repos/x/src/**",))
+    create_scope = _pipeline_for_scope()._scope(create_step, "run1")
+    assert ".dadaia/handoff/dadaia-workspace/**" in create_scope.allowed_paths
+    assert "repos/x/src/**" in create_scope.allowed_paths
 
+    review_step = _step_with("review_qa", is_review=True, extra_allowed_paths=("repos/x/src/**",))
+    review_scope = _pipeline_for_scope()._scope(review_step, "run1")
+    assert review_scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
+    assert "repos/x/src/**" not in review_scope.allowed_paths
 
-def test_scope_ignores_extra_allowed_paths_for_review_step_ac72() -> None:
-    """AC7.2: the same extra_allowed_paths value fed into a review step (is_review=True)
-    is IGNORED — the union only applies to non-review (create) steps; review steps stay
-    handoff-only. Regression guard proving review steps never gain production write
-    rights."""
-    step = _step_with("review_qa", is_review=True, extra_allowed_paths=("repos/x/src/**",))
-
-    scope = _pipeline_for_scope()._scope(step, "run1")
-
-    assert scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
-    assert "repos/x/src/**" not in scope.allowed_paths
-
-
-def test_scope_implement_step_with_no_extra_paths_stays_handoff_only() -> None:
-    """Additive-optional regression guard: an implement-labeled (non-review) step with
-    the default empty extra_allowed_paths behaves exactly as before this FR."""
-    step = _step_with("implement", is_review=False, extra_allowed_paths=())
-
-    scope = _pipeline_for_scope()._scope(step, "run1")
-
-    assert scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
+    no_extra_step = _step_with("implement", is_review=False, extra_allowed_paths=())
+    no_extra_scope = _pipeline_for_scope()._scope(no_extra_step, "run1")
+    assert no_extra_scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)

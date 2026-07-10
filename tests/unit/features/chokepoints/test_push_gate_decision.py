@@ -2,7 +2,7 @@
 
 Synthetic handoff files + synthetic stdin ref lines. The predicate keys ONLY on the
 stdin ``local_sha`` (never ``git rev-parse HEAD``) and on ``metrics.commit_sha`` (the
-single canonical field, no ``scope`` fallback).
+single canonical field, no ``scope`` fallback) — per-sha re-key law.
 """
 
 from __future__ import annotations
@@ -10,8 +10,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.service import parse_push_refs
+from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -47,8 +49,13 @@ def _handoff(
     (ctx_dir / f"{name}.handoff.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _refs(*lines: str) -> list:
+def _refs(*lines: str) -> list[PushRef]:
     return parse_push_refs("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
+# Kept: per-sha verdict keying — the CRITICAL invariant
+# ---------------------------------------------------------------------------
 
 
 def test_approved_pushed_sha_passes(tmp_path: Path) -> None:
@@ -58,79 +65,104 @@ def test_approved_pushed_sha_passes(tmp_path: Path) -> None:
 
 
 def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
-    # APPROVE exists but for a different (older) sha than the one being pushed.
+    """An APPROVE for a different (older) sha than the one being pushed never passes —
+    stale approvals do not carry forward across commits (per-sha re-key law)."""
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_B)
     d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not d.allowed
     assert _SHA_A[:12] in d.message
 
 
-def test_no_approve_blocks_and_lists_what_was_found(tmp_path: Path) -> None:
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert not d.allowed
-    assert "no security-reviewer APPROVE found" in d.message
+# ---------------------------------------------------------------------------
+# Pass-without-verdict cases (deletion / tag / empty stdin / malformed sibling
+# handoff skipped while a good approve still passes) — 1 param
+# ---------------------------------------------------------------------------
 
 
-def test_rejected_verdict_does_not_count(tmp_path: Path) -> None:
-    _handoff(tmp_path, "sec-reject", verdict="REJECTED", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert not d.allowed
-
-
-def test_non_security_agent_does_not_count(tmp_path: Path) -> None:
-    _handoff(tmp_path, "qa-approve", agent="qa-engineer", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert not d.allowed
-
-
-def test_scope_field_is_not_a_fallback(tmp_path: Path) -> None:
-    # commit_sha absent from metrics; scope carries the sha — must NOT satisfy the gate.
-    _handoff(tmp_path, "sec-scope", commit_sha=None, scope=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert not d.allowed
-
-
-def test_branch_deletion_passes_without_verdict(tmp_path: Path) -> None:
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"))
-    assert d.allowed
-
-
-def test_tag_push_passes_without_verdict(tmp_path: Path) -> None:
-    d = push_gate_decision(tmp_path, _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"))
-    assert d.allowed
-
-
-def test_multiple_refs_all_must_be_covered(tmp_path: Path) -> None:
-    _handoff(tmp_path, "sec-a", commit_sha=_SHA_A)
-    # SHA_B has no approve ⇒ block even though SHA_A is covered.
-    d = push_gate_decision(
-        tmp_path,
-        _refs(
+@pytest.mark.parametrize(
+    ("ref_line", "setup"),
+    [
+        pytest.param(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}", None, id="branch-deletion"),
+        pytest.param(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}", None, id="tag-push"),
+        pytest.param("", None, id="empty-stdin-no-refs"),
+        pytest.param(
             f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",
-            f"refs/heads/feature {_SHA_B} refs/heads/feature {_ZERO}",
+            "malformed_sibling",
+            id="malformed-handoff-skipped-good-approve-still-passes",
         ),
-    )
-    assert not d.allowed
-    assert _SHA_B[:12] in d.message
-
-
-def test_empty_stdin_no_refs_passes(tmp_path: Path) -> None:
-    d = push_gate_decision(tmp_path, _refs(""))
+    ],
+)
+def test_passes_without_verdict(tmp_path: Path, ref_line: str, setup: str | None) -> None:
+    if setup == "malformed_sibling":
+        ctx_dir = tmp_path / "demo-ctx"
+        ctx_dir.mkdir(parents=True)
+        (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
+        _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
+    d = push_gate_decision(tmp_path, _refs(ref_line))
     assert d.allowed
 
 
-def test_predicate_never_consults_head(tmp_path: Path) -> None:
-    # A handoff approving a sha that is NOT in the stdin refs must not let an unrelated
-    # pushed sha through. This asserts the gate keys on stdin lines, not the repo HEAD.
-    _handoff(tmp_path, "sec-head", commit_sha="c" * 40)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
+# ---------------------------------------------------------------------------
+# Non-counting verdicts / block matrix — 1 param
+# ---------------------------------------------------------------------------
+
+
+_MAIN_ONLY = (f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",)
+_MAIN_PLUS_FEATURE = (
+    f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",
+    f"refs/heads/feature {_SHA_B} refs/heads/feature {_ZERO}",
+)
+
+
+@pytest.mark.parametrize(
+    ("setup", "ref_lines", "expect_message_contains"),
+    [
+        pytest.param(
+            lambda tp: None,
+            _MAIN_ONLY,
+            "no security-reviewer APPROVE found",
+            id="no-approve-at-all",
+        ),
+        pytest.param(
+            lambda tp: _handoff(tp, "sec-reject", verdict="REJECTED", commit_sha=_SHA_A),
+            _MAIN_ONLY,
+            None,
+            id="rejected-verdict-does-not-count",
+        ),
+        pytest.param(
+            lambda tp: _handoff(tp, "qa-approve", agent="qa-engineer", commit_sha=_SHA_A),
+            _MAIN_ONLY,
+            None,
+            id="non-security-agent-does-not-count",
+        ),
+        pytest.param(
+            lambda tp: _handoff(tp, "sec-scope", commit_sha=None, scope=_SHA_A),
+            _MAIN_ONLY,
+            None,
+            id="scope-field-is-not-a-fallback-for-commit-sha",
+        ),
+        pytest.param(
+            lambda tp: _handoff(tp, "sec-head", commit_sha="c" * 40),
+            _MAIN_ONLY,
+            None,
+            id="approve-for-unrelated-sha-does-not-satisfy-pushed-sha",
+        ),
+        pytest.param(
+            lambda tp: _handoff(tp, "sec-a", commit_sha=_SHA_A),
+            _MAIN_PLUS_FEATURE,
+            _SHA_B[:12],
+            id="multiple-refs-all-must-be-covered",
+        ),
+    ],
+)
+def test_non_counting_verdicts_block_matrix(
+    tmp_path: Path,
+    setup: object,
+    ref_lines: tuple[str, ...],
+    expect_message_contains: str | None,
+) -> None:
+    setup(tmp_path)  # type: ignore[operator]
+    d = push_gate_decision(tmp_path, _refs(*ref_lines))
     assert not d.allowed
-
-
-def test_malformed_handoff_skipped(tmp_path: Path) -> None:
-    ctx_dir = tmp_path / "demo-ctx"
-    ctx_dir.mkdir(parents=True)
-    (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
-    _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
-    assert d.allowed
+    if expect_message_contains is not None:
+        assert expect_message_contains in d.message

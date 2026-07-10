@@ -1,4 +1,10 @@
-"""Unit tests for SpecContextService current ALIVE/DEAD behavior."""
+"""Unit tests for SpecContextService current ALIVE/DEAD behavior.
+
+CRIT: dead() blocked by a live lease (ContextLockedError), the untracked-review-gate
+refusals, and the secret/private-IP/.pem redaction blocks are the no-steal + redaction
+half of the workspace's security law — kept standalone/param, never weakened. The secret
+value must NEVER be echoed back in a DeadSecretFoundError message.
+"""
 
 from __future__ import annotations
 
@@ -55,15 +61,14 @@ def service(
 # ------------------------------------------------------------------ create
 
 
-def test_create_stores_context(service: SpecContextService, store: FakeContextStore) -> None:
+def test_create_stores_context_and_rejects_duplicate(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
     ctx = service.create("proj", "my-repo", "https://github.com/org/my-repo")
     assert store.get("proj") is not None
     assert ctx.state == ContextState.DEAD
     assert ctx.repo_slug == "my-repo"
 
-
-def test_create_duplicate_raises(service: SpecContextService) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
     with pytest.raises(ContextAlreadyExistsError):
         service.create("proj", "other", "https://github.com/org/other")
 
@@ -71,46 +76,33 @@ def test_create_duplicate_raises(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ alive (T-10b)
 
 
-def test_alive_clones_if_absent(
+def test_alive_clone_behavior_state_and_not_found(
     service: SpecContextService, git: FakeGitClient, workspace_root: Path
 ) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    assert len(git.cloned) == 1
-    assert git.cloned[0][0] == "https://github.com/org/my-repo"
 
-
-def test_alive_no_clone_if_repo_present(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    (workspace_root / "repos" / "my-repo").mkdir(parents=True)
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    assert len(git.cloned) == 0
-
-
-def test_alive_sets_alive_state(service: SpecContextService) -> None:
-    """AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    # AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null; it
+    # clones since the repo dir is absent.
     ctx = service.alive("proj")
     assert ctx.state == ContextState.ALIVE
     assert ctx.alive_since is not None
     assert ctx.dead_since is None
+    assert len(git.cloned) == 1
+    assert git.cloned[0][0] == "https://github.com/org/my-repo"
 
+    # AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error, no
+    # re-clone since the repo now exists).
+    ctx2 = service.alive("proj")
+    assert ctx2.state == ContextState.ALIVE
+    assert len(git.cloned) == 1
 
-def test_alive_idempotent_on_already_alive(
-    service: SpecContextService, workspace_root: Path
-) -> None:
-    """AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error)."""
-    (workspace_root / "repos" / "my-repo").mkdir(parents=True)
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    # second call must not raise
-    ctx = service.alive("proj")
-    assert ctx.state == ContextState.ALIVE
+    # No clone at all when the repo dir is already present before the first alive().
+    other_svc = service
+    (workspace_root / "repos" / "other-repo").mkdir(parents=True)
+    other_svc.create("other", "other-repo", "https://github.com/org/other-repo")
+    other_svc.alive("other")
+    assert len(git.cloned) == 1  # unchanged — no new clone for "other"
 
-
-def test_alive_not_found_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
         service.alive("ghost")
 
@@ -118,27 +110,31 @@ def test_alive_not_found_raises(service: SpecContextService) -> None:
 # ------------------------------------------------------------------ dead (T-10b)
 
 
-def test_dead_removes_repo_and_marks_dead(
+def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
     service: SpecContextService, workspace_root: Path, git: FakeGitClient
 ) -> None:
-    """AC-T10b-2: dead() sets state=DEAD, dead_since=<now>."""
+    """AC-T10b-2: dead() sets state=DEAD, dead_since=<now>, syncs the dirty tracked
+    tree, and pushes when a remote is present — the normal end-to-end flow, and its
+    clean-tree-unchanged regression (no untracked ⇒ gate is a no-op)."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     assert repo.exists()
+    git._dirty.add(repo)
+    git._has_remote.add(repo)
+
     ctx = service.dead("proj")
+
     assert not repo.exists()
     assert ctx.state == ContextState.DEAD
     assert ctx.dead_since is not None
+    assert repo in git.committed  # tracked-dirty auto-synced (FR-R7)
+    assert repo in git.pushed
 
-
-def test_dead_state_error_when_not_alive(service: SpecContextService) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    # Calling dead() again (already DEAD, not ALIVE) is a state error.
     with pytest.raises(ContextStateError):
         service.dead("proj")
 
-
-def test_dead_not_found_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
         service.dead("ghost")
 
@@ -149,7 +145,8 @@ def test_dead_raises_context_locked_when_impl_lock_held(
     """v0.1.6: dead() when a LIVE TTL-lease record exists raises ContextLockedError.
 
     The four-store lock model is retired; a live single-record lease
-    (.dadaia/states/ctx_locks/<ctx>.lock.json, fresh heartbeat) is the guard.
+    (.dadaia/states/ctx_locks/<ctx>.lock.json, fresh heartbeat) is the guard. CRIT
+    no-steal: a live lease must block dead() unconditionally.
     """
     from datetime import UTC
     from datetime import datetime as _datetime
@@ -177,28 +174,6 @@ def test_dead_raises_context_locked_when_impl_lock_held(
 
     with pytest.raises(ContextLockedError):
         service.dead("proj")
-
-
-def test_dead_syncs_dirty_repo(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._dirty.add(repo)
-    service.dead("proj")
-    assert repo in git.committed
-
-
-def test_dead_pushes_when_remote_present(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    service.dead("proj")
-    assert repo in git.pushed
 
 
 # ------------------------------------------------------ dead() review gate (F-5 / AC-R7-01)
@@ -252,73 +227,65 @@ def test_dead_with_commit_and_clean_untracked_passes(
     assert not repo.exists()
 
 
-def test_dead_with_commit_blocks_on_planted_secret(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
+@pytest.mark.parametrize(
+    ("name", "filename", "write_fn", "expect_secret_absent"),
+    [
+        (
+            # AC-R7-01: --commit + a planted secret in an untracked file ⇒ block the
+            # push. The value is never echoed back in the exception message.
+            "planted_secret",
+            "config.env",
+            lambda repo: (repo / "config.env").write_text(
+                "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n"
+            ),
+            "AKIAIOSFODNN7EXAMPLE",
+        ),
+        (
+            # A planted private IP / internal hostname also blocks --commit push.
+            "planted_private_ip",
+            "hosts.txt",
+            lambda repo: (repo / "hosts.txt").write_text(
+                "db host: 10.4.2.17 (db-primary.internal)\n"
+            ),
+            None,
+        ),
+        (
+            # R-2 (v0.1.10 rc-2 sec LOW): a private-key file (.pem) in the untracked
+            # push set is a finding by its *suffix alone* — the binary-suffix family
+            # was skipped by the old text-only scan. dead() --commit must block
+            # regardless of byte content.
+            "pem_suffix_binary",
+            "server.pem",
+            lambda repo: (repo / "server.pem").write_bytes(b"\x00\x01\x02opaque-key-bytes\xff\xfe"),
+            None,
+        ),
+    ],
+)
+def test_dead_with_commit_blocks_on_redacted_findings(
+    service: SpecContextService,
+    git: FakeGitClient,
+    workspace_root: Path,
+    name: str,
+    filename: str,
+    write_fn: object,
+    expect_secret_absent: str | None,
 ) -> None:
-    """AC-R7-01: --commit + a planted secret in an untracked file ⇒ block the push."""
     from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
 
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     git._has_remote.add(repo)
-    secret_value = "AKIAIOSFODNN7EXAMPLE"
-    (repo / "config.env").write_text(f"AWS_ACCESS_KEY_ID={secret_value}\n")
-    git._untracked[repo] = ["config.env"]
+    write_fn(repo)  # type: ignore[operator]
+    git._untracked[repo] = [filename]
 
     with pytest.raises(DeadSecretFoundError) as exc:
         service.dead("proj", commit=True)
 
-    # File named, secret value redacted (never echoed back).
-    assert "config.env" in str(exc.value)
-    assert secret_value not in str(exc.value)
+    assert filename in str(exc.value)
+    if expect_secret_absent is not None:
+        assert expect_secret_absent not in str(exc.value)
     # Nothing pushed/committed; repo untouched.
-    assert repo not in git.pushed
-    assert repo not in git.committed
-    assert repo.exists()
-    assert service.show("proj").state == ContextState.ALIVE
-
-
-def test_dead_with_commit_blocks_on_planted_private_ip(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    """AC-R7-01: a planted private IP / internal hostname also blocks --commit push."""
-    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
-
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    (repo / "hosts.txt").write_text("db host: 10.4.2.17 (db-primary.internal)\n")
-    git._untracked[repo] = ["hosts.txt"]
-
-    with pytest.raises(DeadSecretFoundError):
-        service.dead("proj", commit=True)
-
-    assert repo not in git.pushed
-    assert repo.exists()
-
-
-def test_dead_with_commit_blocks_on_untracked_pem_key_file(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    """R-2 (v0.1.10 rc-2 sec LOW): a private-key file (.pem) in the untracked push
-    set is a finding by its *suffix alone* — the binary-suffix family was skipped by
-    the old text-only scan. dead() --commit must block regardless of byte content."""
-    from dadaia_workspace.features.spec_context.service import DeadSecretFoundError
-
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    # Non-PEM-formatted bytes: caught purely by the .pem suffix, not by content.
-    (repo / "server.pem").write_bytes(b"\x00\x01\x02opaque-key-bytes\xff\xfe")
-    git._untracked[repo] = ["server.pem"]
-
-    with pytest.raises(DeadSecretFoundError) as exc:
-        service.dead("proj", commit=True)
-
-    assert "server.pem" in str(exc.value)
     assert repo not in git.pushed
     assert repo not in git.committed
     assert repo.exists()
@@ -347,41 +314,20 @@ def test_scan_flags_key_suffixes_and_skips_other_binary(tmp_path: Path) -> None:
     assert _scan_file_for_secrets(blob) == []
 
 
-def test_dead_clean_tree_unchanged_no_untracked(
-    service: SpecContextService, git: FakeGitClient, workspace_root: Path
-) -> None:
-    """AC-R7-01 regression: a clean tree (no untracked) ⇒ dead() behaves as before."""
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.alive("proj")
-    repo = workspace_root / "repos" / "my-repo"
-    git._has_remote.add(repo)
-    git._dirty.add(repo)
-    # No untracked files registered → gate is a no-op.
-
-    ctx = service.dead("proj")  # no --commit needed
-
-    assert ctx.state == ContextState.DEAD
-    assert repo in git.committed  # tracked-dirty still auto-synced (FR-R7)
-    assert repo in git.pushed
-    assert not repo.exists()
-
-
 # ------------------------------------------------------------------ delete
 
 
-def test_delete_removes_dead_context(service: SpecContextService, store: FakeContextStore) -> None:
-    service.create("proj", "my-repo", "https://github.com/org/my-repo")
-    service.delete("proj")
-    assert store.get("proj") is None
-
-
-def test_delete_not_found_raises(service: SpecContextService) -> None:
+def test_delete_removes_dead_context_not_found_and_alive_raises(
+    service: SpecContextService, store: FakeContextStore, workspace_root: Path
+) -> None:
     with pytest.raises(ContextNotFoundError):
         service.delete("ghost")
 
-
-def test_delete_alive_context_raises(service: SpecContextService, workspace_root: Path) -> None:
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
     with pytest.raises(ContextStateError):
         service.delete("proj")
+
+    service.create("proj2", "my-repo2", "https://github.com/org/my-repo2")
+    service.delete("proj2")
+    assert store.get("proj2") is None

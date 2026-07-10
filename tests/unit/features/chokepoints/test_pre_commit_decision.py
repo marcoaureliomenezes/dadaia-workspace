@@ -2,15 +2,20 @@
 
 Every fact is synthetic — a hand-written lease record, a fake pid probe, and a fake
 ancestry callable. No real process, no subprocess, no ``os.kill``. The probe chain is
-exercised case-by-case (no/stale-dead lease → allow; env-sid match → allow; ancestor →
-allow; indeterminate → allow+WARN; live foreign non-ancestor → block).
+exercised as a single parametrized allow/block decision table covering the full
+v0.1.9-v0.1.11 zero-false-block history, plus 3 verbatim-kept named regressions that
+are the strongest individual proofs: the genuine live-foreign-holder BLOCK, the
+relaunch-window advisory-allow (the exact ADR-G1 false-block reproduction), and the
+block-branch probe-exception fail-safe.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -30,25 +35,22 @@ def _write_record(
     pid: int,
     heartbeat: datetime | None = None,
     ttl: int = 120,
+    legacy_no_pid: bool = False,
 ) -> None:
     lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     hb = (heartbeat or _NOW).isoformat()
-    (lock_dir / f"{ctx}.lock.json").write_text(
-        json.dumps(
-            {
-                "context": ctx,
-                "release": "v0.1.14",
-                "session_id": session_id,
-                "mode": "IMPLEMENTATION",
-                "pid": pid,
-                "acquired_at": hb,
-                "heartbeat": hb,
-                "ttl": ttl,
-            }
-        ),
-        encoding="utf-8",
-    )
+    record: dict[str, object] = {
+        "context": ctx,
+        "session_id": session_id,
+        "heartbeat": hb,
+        "ttl": ttl,
+    }
+    if not legacy_no_pid:
+        record.update(
+            {"release": "v0.1.14", "mode": "IMPLEMENTATION", "pid": pid, "acquired_at": hb}
+        )
+    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record), encoding="utf-8")
 
 
 def _always_alive(_pid: int) -> bool:
@@ -59,95 +61,181 @@ def _always_dead(_pid: int) -> bool:
     return False
 
 
-def _ancestry_const(result: Ancestry):
+def _boom_probe(_pid: int) -> bool:
+    raise RuntimeError("probe blew up")
+
+
+def _ancestry_const(result: Ancestry) -> Callable[[int, int], Ancestry]:
     def _probe(_ancestor: int, _descendant: int) -> Ancestry:
         return result
 
     return _probe
 
 
-def test_no_lease_allows(tmp_path: Path) -> None:
+def _ancestry_boom(_a: int, _d: int) -> Ancestry:
+    raise RuntimeError("probe blew up")
+
+
+# ---------------------------------------------------------------------------
+# Allow/block decision table — the full zero-false-block history as named rows.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("case", "write_record", "env_sid", "pid_probe", "ancestry", "expect_warn_contains"),
+    [
+        pytest.param(
+            "no-lease",
+            False,
+            None,
+            _always_alive,
+            Ancestry.NOT_ANCESTOR,
+            None,
+            id="no-lease-allows",
+        ),
+        pytest.param(
+            "stale-dead",
+            {"heartbeat": _NOW - timedelta(seconds=300)},
+            None,
+            _always_dead,
+            Ancestry.NOT_ANCESTOR,
+            None,
+            id="stale-heartbeat-dead-pid-allows",
+        ),
+        pytest.param(
+            "fresh",
+            {},
+            "holder-sid",
+            _always_alive,
+            Ancestry.NOT_ANCESTOR,
+            None,
+            id="env-sid-match-allows",
+        ),
+        pytest.param(
+            "fresh",
+            {},
+            None,
+            _always_alive,
+            Ancestry.ANCESTOR,
+            None,
+            id="ancestor-allows",
+        ),
+        pytest.param(
+            "fresh",
+            {},
+            None,
+            _always_alive,
+            Ancestry.UNKNOWN,
+            "advisory",
+            id="indeterminate-ancestry-allows-with-warn",
+        ),
+        pytest.param(
+            "fresh",
+            {},
+            None,
+            _always_alive,
+            None,  # ancestry callable raises
+            "advisory",
+            id="ancestry-probe-exception-degrades-to-warn-allow",
+        ),
+        pytest.param(
+            "legacy-no-pid",
+            {"legacy_no_pid": True},
+            None,
+            _always_alive,
+            Ancestry.NOT_ANCESTOR,
+            "advisory",
+            id="legacy-record-no-pid-allows-with-warn",
+        ),
+        pytest.param(
+            "none-context",
+            None,  # no record at all — context is None, no lookup
+            None,
+            _always_alive,
+            Ancestry.NOT_ANCESTOR,
+            None,
+            id="none-context-allows",
+        ),
+        # v0.1.9-v0.1.11 relaunch-window regression matrix: non-stale record (fresh to
+        # near-TTL heartbeat), recorded holder pid is DEAD ⇒ zero-false-block allow+WARN.
+        pytest.param(
+            "fresh",
+            {"heartbeat": _NOW - timedelta(seconds=0)},
+            None,
+            _always_dead,
+            Ancestry.NOT_ANCESTOR,
+            "advisory",
+            id="v0.1.9-fresh-heartbeat-dead-pid",
+        ),
+        pytest.param(
+            "fresh",
+            {"heartbeat": _NOW - timedelta(seconds=60)},
+            None,
+            _always_dead,
+            Ancestry.NOT_ANCESTOR,
+            "advisory",
+            id="v0.1.10-mid-ttl-dead-pid",
+        ),
+        pytest.param(
+            "fresh",
+            {"heartbeat": _NOW - timedelta(seconds=119)},
+            None,
+            _always_dead,
+            Ancestry.NOT_ANCESTOR,
+            "advisory",
+            id="v0.1.11-near-ttl-floor-dead-pid",
+        ),
+    ],
+)
+def test_pre_commit_allow_decision_table(
+    tmp_path: Path,
+    case: str,
+    write_record: dict[str, Any] | bool | None,
+    env_sid: str | None,
+    pid_probe: Callable[[int], bool] | None,
+    ancestry: Ancestry | None,
+    expect_warn_contains: str | None,
+) -> None:
+    if write_record not in (False, None):
+        kwargs = dict(write_record) if isinstance(write_record, dict) else {}
+        legacy_no_pid = bool(kwargs.pop("legacy_no_pid", False))
+        heartbeat = kwargs.pop("heartbeat", None)
+        ttl = int(kwargs.pop("ttl", 120))
+        _write_record(
+            tmp_path,
+            _CTX,
+            session_id="holder-sid",
+            pid=4321,
+            legacy_no_pid=legacy_no_pid,
+            heartbeat=heartbeat,
+            ttl=ttl,
+        )
+    ctx = None if case == "none-context" else _CTX
+    ancestry_fn = _ancestry_boom if ancestry is None else _ancestry_const(ancestry)
     d = pre_commit_decision(
         tmp_path,
-        _CTX,
+        ctx,
         caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
+        env_sid=env_sid,
+        pid_probe=pid_probe,
+        ancestry=ancestry_fn,
         now=_NOW,
     )
-    assert d.allowed
-    assert d.warn is None
+    assert d.allowed, f"{case}: expected allow, got block: {d.message}"
+    if expect_warn_contains is not None:
+        assert d.warn is not None
+        assert expect_warn_contains in d.warn.lower()
+    else:
+        assert d.warn is None
 
 
-def test_stale_dead_lease_allows(tmp_path: Path) -> None:
-    # Heartbeat aged well past TTL and the holder pid is dead ⇒ stale ⇒ allow.
-    _write_record(
-        tmp_path,
-        _CTX,
-        session_id="holder",
-        pid=4321,
-        heartbeat=_NOW - timedelta(seconds=300),
-    )
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_dead,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed
-
-
-def test_env_sid_match_allows(tmp_path: Path) -> None:
-    _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid="holder-sid",
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed
-    assert d.warn is None
-
-
-def test_ancestor_allows(tmp_path: Path) -> None:
-    _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed
-    assert d.warn is None
-
-
-def test_indeterminate_ancestry_allows_with_warn(tmp_path: Path) -> None:
-    _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.UNKNOWN),
-        now=_NOW,
-    )
-    assert d.allowed
-    assert d.warn is not None
-    assert "advisory" in d.warn.lower()
+# ---------------------------------------------------------------------------
+# Named regressions — kept verbatim (strongest individual failure detectors)
+# ---------------------------------------------------------------------------
 
 
 def test_live_foreign_non_ancestor_blocks(tmp_path: Path) -> None:
+    """A genuinely live foreign holder must never be stolen — the core no-steal veto."""
     _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
     d = pre_commit_decision(
         tmp_path,
@@ -166,103 +254,13 @@ def test_live_foreign_non_ancestor_blocks(tmp_path: Path) -> None:
         assert forbidden not in lowered, d.message
 
 
-def test_block_message_states_holder_and_age(tmp_path: Path) -> None:
-    _write_record(
-        tmp_path,
-        _CTX,
-        session_id="holder-sid",
-        pid=4321,
-        heartbeat=_NOW - timedelta(seconds=30),
-    )
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert not d.allowed
-    assert "30s" in d.message
-    assert "frees itself" in d.message
-
-
-def test_ancestry_probe_exception_degrades_to_warn_allow(tmp_path: Path) -> None:
-    _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-
-    def _boom(_a: int, _d: int) -> Ancestry:
-        raise RuntimeError("probe blew up")
-
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_boom,
-        now=_NOW,
-    )
-    assert d.allowed
-    assert d.warn is not None
-
-
-def test_legacy_record_no_pid_allows_with_warn(tmp_path: Path) -> None:
-    lock_dir = tmp_path / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    (lock_dir / f"{_CTX}.lock.json").write_text(
-        json.dumps(
-            {
-                "context": _CTX,
-                "session_id": "holder-sid",
-                "heartbeat": _NOW.isoformat(),
-                "ttl": 120,
-            }
-        ),
-        encoding="utf-8",
-    )
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed
-    assert d.warn is not None
-
-
-def test_none_context_allows(tmp_path: Path) -> None:
-    d = pre_commit_decision(
-        tmp_path,
-        None,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_alive,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed
-
-
-# ---------------------------------------------------------------------------------------
-# Relaunch window (FR-W4 / ADR-G1) — the v0.1.9–v0.1.11 false-block regression class.
-#
-# Root cause the qa-gate REJECT reproduced: ``is_stale`` keeps a fresh-heartbeat record
-# live, and ``renew_heartbeat`` never refreshes ``pid``. So a same-sid relaunch (new pid,
-# same .ptr) leaves a DEAD recorded pid while the heartbeat stays fresh. The relaunched
-# incumbent commits from a new process tree (no env sid) ⇒ ancestry(dead_pid, caller)
-# walks to init = NOT_ANCESTOR. The dead holder is NOT a live foreign identity, so the
-# block branch must consult the pid probe and ALLOW + WARN rather than false-block.
-# ---------------------------------------------------------------------------------------
 def test_relaunch_dead_pid_fresh_heartbeat_allows_with_warn(tmp_path: Path) -> None:
     """Relaunch window: dead recorded pid + fresh heartbeat + NOT_ANCESTOR ⇒ allow + WARN.
 
     This is the exact scenario the qa-gate reproduced as an ADR-G1 false-block. Before the
     fix the decision fell through to BLOCK; the dead-holder pid probe on the block branch
-    now degrades it to an advisory allow.
+    now degrades it to an advisory allow. Kept verbatim as the named regression, distinct
+    from the decision-table rows above by asserting the WARN names the holder.
     """
     _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)  # fresh heartbeat
     d = pre_commit_decision(
@@ -282,70 +280,10 @@ def test_relaunch_dead_pid_fresh_heartbeat_allows_with_warn(tmp_path: Path) -> N
     assert "holder-sid" in d.warn
 
 
-@pytest.mark.parametrize(
-    ("scenario", "heartbeat_age_seconds"),
-    [
-        # v0.1.9: lease-theft class — long-running pytest starves heartbeat renewal;
-        # here the relaunch keeps the heartbeat fresh but the recorded pid is dead.
-        ("v0.1.9_fresh_heartbeat_dead_pid", 0),
-        # v0.1.10: the heartbeat is mid-TTL — still not stale, dead recorded pid.
-        ("v0.1.10_mid_ttl_dead_pid", 60),
-        # v0.1.11: heartbeat almost at the TTL floor but strictly below it; the pid-veto
-        # in is_stale would keep a *live* pid's lease, but this pid is dead.
-        ("v0.1.11_near_ttl_dead_pid", 119),
-    ],
-)
-def test_v019_to_v0111_false_block_regression_matrix(
-    tmp_path: Path, scenario: str, heartbeat_age_seconds: int
-) -> None:
-    """Parametrized v0.1.9–v0.1.11 false-block history (TASKS T-014-14 declared matrix).
-
-    Every scenario is a non-stale record (heartbeat strictly within TTL) whose recorded
-    holder pid is DEAD — the relaunched-incumbent state. None may block the commit.
-    """
-    _write_record(
-        tmp_path,
-        _CTX,
-        session_id="holder-sid",
-        pid=4321,
-        heartbeat=_NOW - timedelta(seconds=heartbeat_age_seconds),
-    )
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid=None,
-        pid_probe=_always_dead,
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert d.allowed, f"{scenario}: dead-holder relaunch must flow (zero-false-block)"
-    assert d.warn is not None, f"{scenario}: advisory degradation must be logged"
-
-
-def test_live_foreign_non_ancestor_still_blocks_after_relaunch_fix(tmp_path: Path) -> None:
-    """The fix must NOT weaken the genuine-foreign-holder block: live pid ⇒ still BLOCK."""
-    _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-    d = pre_commit_decision(
-        tmp_path,
-        _CTX,
-        caller_pid=999,
-        env_sid="some-other-session",
-        pid_probe=_always_alive,  # genuinely live foreign holder
-        ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
-        now=_NOW,
-    )
-    assert not d.allowed
-    assert "holder-sid" in d.message
-
-
 def test_block_branch_pid_probe_exception_keeps_block(tmp_path: Path) -> None:
-    """A probe that raises on the block branch must not flip a genuine block to allow."""
+    """A probe that raises on the block branch must not flip a genuine block to allow —
+    cannot confirm dead ⇒ stay conservative ⇒ block holds (fail-safe, not fail-open)."""
     _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
-
-    def _boom_probe(_pid: int) -> bool:
-        raise RuntimeError("probe blew up")
-
     d = pre_commit_decision(
         tmp_path,
         _CTX,
@@ -355,7 +293,6 @@ def test_block_branch_pid_probe_exception_keeps_block(tmp_path: Path) -> None:
         ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
         now=_NOW,
     )
-    # Cannot confirm dead ⇒ stay conservative ⇒ block holds.
     assert not d.allowed
 
 

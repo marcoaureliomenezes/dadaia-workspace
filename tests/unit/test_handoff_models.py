@@ -1,6 +1,8 @@
-"""Unit tests for dadaia_workspace.core.models.handoff — HandoffDocument dataclasses."""
+"""Unit tests for dadaia_workspace.core.models.handoff — HandoffDocument dataclasses.
 
-import dataclasses
+Frozen-instance immutability is covered by the shared param sweep in
+``tests/unit/core/models/test_workflow_execution.py::test_all_models_are_frozen``.
+"""
 
 import pytest
 
@@ -10,10 +12,6 @@ from dadaia_workspace.core.models.handoff import (
     HandoffDocument,
     Severity,
 )
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 MINIMAL_DATA: dict[str, object] = {
     "schema_version": "handoff-v1",
@@ -51,75 +49,45 @@ FULL_DATA: dict[str, object] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Test 1 — minimal required-only parses correctly
-# ---------------------------------------------------------------------------
-
-
-def test_handoff_document_from_dict_minimal() -> None:
-    doc = HandoffDocument.from_dict(MINIMAL_DATA)
-
-    assert doc.schema_version == "handoff-v1"
-    assert doc.agent == "software-engineer"
-    assert doc.context == "dadaia-workspace"
-    assert doc.produced_at == "2026-05-16T23:29:05Z"
-    assert isinstance(doc.artifact, ArtifactRef)
-    assert doc.artifact.type == ArtifactType.report
+def test_handoff_document_from_dict_minimal_full_and_next_handoff_optional() -> None:
+    minimal = HandoffDocument.from_dict(MINIMAL_DATA)
+    assert minimal.schema_version == "handoff-v1"
+    assert minimal.agent == "software-engineer"
+    assert minimal.context == "dadaia-workspace"
+    assert minimal.produced_at == "2026-05-16T23:29:05Z"
+    assert isinstance(minimal.artifact, ArtifactRef)
+    assert minimal.artifact.type == ArtifactType.report
     assert (
-        doc.artifact.path
+        minimal.artifact.path
         == ".dadaia/reports/dadaia-workspace/software-engineer/2026-05-16T232905Z.html"
     )
     assert (
-        doc.artifact.content_hash
+        minimal.artifact.content_hash
         == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
-    # Optional fields default
-    assert doc.release_id is None
-    assert doc.findings == ()
-    assert doc.decisions_required == ()
-    assert doc.next_handoff is None
+    # Optional fields default; next_handoff defaults to None absent the key.
+    assert minimal.release_id is None
+    assert minimal.findings == ()
+    assert minimal.decisions_required == ()
+    assert minimal.next_handoff is None
+
+    full = HandoffDocument.from_dict(FULL_DATA)
+    assert full.release_id == "agent-comms-v1"
+    assert len(full.findings) == 2
+    assert full.findings[0].severity == Severity.HIGH
+    assert full.findings[0].message == "Validator does not support oneOf."
+    assert full.findings[1].severity == Severity.LOW
+    assert len(full.decisions_required) == 1
+    assert full.decisions_required[0] == "Operator must confirm flip of ACTIVE.md."
+    assert full.next_handoff is not None
+    assert full.next_handoff.agent == "product-engineer"
+    assert full.next_handoff.context == "dadaia-workspace"
+    assert full.next_handoff.expected_artifact_type == ArtifactType.spec
 
 
-# ---------------------------------------------------------------------------
-# Test 2 — full parse with all optional fields
-# ---------------------------------------------------------------------------
-
-
-def test_handoff_document_from_dict_full() -> None:
-    doc = HandoffDocument.from_dict(FULL_DATA)
-
-    assert doc.release_id == "agent-comms-v1"
-    assert len(doc.findings) == 2
-    assert doc.findings[0].severity == Severity.HIGH
-    assert doc.findings[0].message == "Validator does not support oneOf."
-    assert doc.findings[1].severity == Severity.LOW
-    assert len(doc.decisions_required) == 1
-    assert doc.decisions_required[0] == "Operator must confirm flip of ACTIVE.md."
-    assert doc.next_handoff is not None
-    assert doc.next_handoff.agent == "product-engineer"
-    assert doc.next_handoff.context == "dadaia-workspace"
-    assert doc.next_handoff.expected_artifact_type == ArtifactType.spec
-
-
-# ---------------------------------------------------------------------------
-# Test 3 — dataclass is frozen (assigning raises FrozenInstanceError)
-# ---------------------------------------------------------------------------
-
-
-def test_handoff_document_frozen() -> None:
-    doc = HandoffDocument.from_dict(MINIMAL_DATA)
-
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        doc.agent = "other-agent"  # type: ignore[misc]
-
-
-# ---------------------------------------------------------------------------
-# Test 4 — ArtifactType round-trips (from_dict then .artifact.type enum)
-# ---------------------------------------------------------------------------
-
-
-def test_artifact_ref_type_stored() -> None:
-    for type_value, expected_enum in [
+@pytest.mark.parametrize(
+    ("type_value", "expected_enum"),
+    [
         ("report", ArtifactType.report),
         ("spec", ArtifactType.spec),
         ("plan", ArtifactType.plan),
@@ -127,39 +95,28 @@ def test_artifact_ref_type_stored() -> None:
         ("closure", ArtifactType.closure),
         ("memory", ArtifactType.memory),
         ("other", ArtifactType.other),
-    ]:
-        data = {**MINIMAL_DATA, "artifact": {**MINIMAL_DATA["artifact"], "type": type_value}}  # type: ignore[arg-type]
-        doc = HandoffDocument.from_dict(data)
-        assert doc.artifact.type == expected_enum
+    ],
+)
+def test_artifact_ref_type_stored(type_value: str, expected_enum: ArtifactType) -> None:
+    data = {**MINIMAL_DATA, "artifact": {**MINIMAL_DATA["artifact"], "type": type_value}}  # type: ignore[arg-type]
+    doc = HandoffDocument.from_dict(data)
+    assert doc.artifact.type == expected_enum
 
 
-# ---------------------------------------------------------------------------
-# Test 5 — Severity round-trips
-# ---------------------------------------------------------------------------
-
-
-def test_finding_severity_stored() -> None:
-    for sev_value, expected_enum in [
+@pytest.mark.parametrize(
+    ("sev_value", "expected_enum"),
+    [
         ("CRITICAL", Severity.CRITICAL),
         ("HIGH", Severity.HIGH),
         ("MEDIUM", Severity.MEDIUM),
         ("LOW", Severity.LOW),
         ("INFO", Severity.INFO),
-    ]:
-        data = {
-            **MINIMAL_DATA,
-            "findings": [{"severity": sev_value, "message": "test msg"}],
-        }
-        doc = HandoffDocument.from_dict(data)
-        assert doc.findings[0].severity == expected_enum
-
-
-# ---------------------------------------------------------------------------
-# Test 6 — next_handoff optional defaults to None
-# ---------------------------------------------------------------------------
-
-
-def test_next_handoff_optional_none() -> None:
-    doc = HandoffDocument.from_dict(MINIMAL_DATA)
-
-    assert doc.next_handoff is None
+    ],
+)
+def test_finding_severity_stored(sev_value: str, expected_enum: Severity) -> None:
+    data = {
+        **MINIMAL_DATA,
+        "findings": [{"severity": sev_value, "message": "test msg"}],
+    }
+    doc = HandoffDocument.from_dict(data)
+    assert doc.findings[0].severity == expected_enum

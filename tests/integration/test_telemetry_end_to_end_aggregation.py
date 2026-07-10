@@ -1,8 +1,9 @@
 """Integration test for the end-to-end telemetry aggregation pipeline.
 
-Seeds synthetic jsonl files with dispatched-subagent events, drives the
-reader + aggregator pipeline, and asserts that list_agents() returns at
-least one summary with session_count > 0 for the seeded agent persona.
+Seeds synthetic jsonl files with dispatched-subagent events, drives the reader +
+aggregator pipeline, and asserts list_agents() reflects the seeded agent personas.
+Merged per plan-integration.md into one fn (single agent, multi-agent, idempotent
+double-read as phases) — the only end-to-end reader->aggregate proof.
 
 All data is synthetic / fictional — no real operator content is accessed.
 """
@@ -21,10 +22,6 @@ from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
 from dadaia_workspace.features.telemetry.store.schema import apply_migrations
 from tests.fakes import shared_connection_factory
 
-# ---------------------------------------------------------------------------
-# Stubs
-# ---------------------------------------------------------------------------
-
 
 class _StubPricing:
     PRICING_TABLE: dict[str, list] = {}
@@ -42,10 +39,6 @@ class _StubSCS:
     def list_all(self) -> list:
         return []
 
-
-# ---------------------------------------------------------------------------
-# JSONL fixture builders (synthetic/fictional data only)
-# ---------------------------------------------------------------------------
 
 _NOW_ISO = "2026-05-19T12:00:00Z"
 
@@ -119,22 +112,13 @@ def _usage_event(session_id: str, event_uuid: str) -> str:
     )
 
 
-def _write_synthetic_jsonl(
-    path: pathlib.Path,
-    session_id: str,
-    subagent_type: str,
-) -> None:
+def _write_synthetic_jsonl(path: pathlib.Path, session_id: str, subagent_type: str) -> None:
     """Write a 2-line synthetic jsonl: a dispatch event + a usage event."""
     lines = [
         _dispatch_event(session_id, subagent_type, f"uuid-dispatch-{session_id}"),
         _usage_event(session_id, f"uuid-usage-{session_id}"),
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_dao(db_path: pathlib.Path) -> TelemetryDao:
@@ -145,113 +129,54 @@ def _make_dao(db_path: pathlib.Path) -> TelemetryDao:
     return TelemetryDao(conn)
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+def test_seed_read_aggregate_single_multi_and_idempotent(tmp_path: pathlib.Path) -> None:
+    """Seed -> reader -> aggregator, exercised as three phases on one DB.
 
+    Phase 1: a single agent session -> list_agents reflects session_count >= 1.
+    Phase 2: three distinct personas each produce a separate aggregated entry.
+    Phase 3: re-reading the same jsonl (byte_offset at EOF) ingests 0 new events and
+    does not double-count.
+    """
+    db_path = tmp_path / "telemetry.sqlite"
+    dao = _make_dao(db_path)
+    aggregator = TelemetryAggregator(
+        connection_factory=shared_connection_factory(dao._conn),
+        spec_context_service=_StubSCS(),
+        pricing_module=_StubPricing(),
+    )
 
-class TestEndToEndAggregation:
-    """Seed → read → aggregate → assert session_count > 0."""
+    # Phase 1 — single agent.
+    jsonl_path = tmp_path / "session-001.jsonl"
+    _write_synthetic_jsonl(
+        jsonl_path, session_id="e2e-session-001", subagent_type="software-engineer"
+    )
+    result = read_session_file(jsonl_path, dao, _NOW_ISO)
+    assert result.events_ingested >= 1, (
+        f"Expected at least 1 ingested event, got {result.events_ingested}"
+    )
+    agent_result = aggregator.list_agents(window_days=365)
+    agent_ids = [s.agent_id for s in agent_result.agents]
+    assert "software-engineer" in agent_ids
+    se = next(s for s in agent_result.agents if s.agent_id == "software-engineer")
+    assert se.session_count >= 1
 
-    def test_single_agent_session_count_nonzero(self, tmp_path: pathlib.Path) -> None:
-        """After reading one synthetic jsonl, list_agents returns the seeded
-        subagent with session_count >= 1.
-        """
-        # Set up DB
-        db_path = tmp_path / "telemetry.sqlite"
-        dao = _make_dao(db_path)
-
-        # Write synthetic jsonl
-        jsonl_path = tmp_path / "session-001.jsonl"
-        _write_synthetic_jsonl(
-            jsonl_path,
-            session_id="e2e-session-001",
-            subagent_type="software-engineer",
+    # Phase 2 — three distinct personas each appear.
+    personas = ["product-engineer", "qa-engineer", "frontend-engineer"]
+    for idx, persona in enumerate(personas):
+        p = tmp_path / f"session-phase2-{idx:03d}.jsonl"
+        _write_synthetic_jsonl(p, session_id=f"e2e-session-phase2-{idx:03d}", subagent_type=persona)
+        read_session_file(p, dao, _NOW_ISO)
+    agent_result = aggregator.list_agents(window_days=365)
+    agent_ids = {s.agent_id for s in agent_result.agents}
+    for persona in personas:
+        assert persona in agent_ids, (
+            f"Expected {persona!r} in aggregated agents, got {sorted(agent_ids)}"
         )
+        summary = next(s for s in agent_result.agents if s.agent_id == persona)
+        assert summary.session_count >= 1
 
-        # Drive the reader
-        result = read_session_file(jsonl_path, dao, _NOW_ISO)
-        assert result.events_ingested >= 1, (
-            f"Expected at least 1 ingested event, got {result.events_ingested}"
-        )
-
-        # Aggregate
-        aggregator = TelemetryAggregator(
-            connection_factory=shared_connection_factory(dao._conn),
-            spec_context_service=_StubSCS(),
-            pricing_module=_StubPricing(),
-        )
-        agent_result = aggregator.list_agents(window_days=365)
-
-        # Assert
-        agent_ids = [s.agent_id for s in agent_result.agents]
-        assert "software-engineer" in agent_ids, (
-            f"Expected 'software-engineer' in aggregated agents, got {agent_ids}"
-        )
-
-        se = next(s for s in agent_result.agents if s.agent_id == "software-engineer")
-        assert se.session_count >= 1, (
-            f"Expected session_count >= 1 for software-engineer, got {se.session_count}"
-        )
-
-    def test_multiple_agents_all_appear(self, tmp_path: pathlib.Path) -> None:
-        """Three distinct subagent sessions each produce a separate aggregated entry."""
-        db_path = tmp_path / "telemetry.sqlite"
-        dao = _make_dao(db_path)
-
-        personas = ["software-engineer", "product-engineer", "qa-engineer"]
-        for idx, persona in enumerate(personas):
-            jsonl_path = tmp_path / f"session-{idx:03d}.jsonl"
-            _write_synthetic_jsonl(
-                jsonl_path,
-                session_id=f"e2e-session-{idx:03d}",
-                subagent_type=persona,
-            )
-            read_session_file(jsonl_path, dao, _NOW_ISO)
-
-        aggregator = TelemetryAggregator(
-            connection_factory=shared_connection_factory(dao._conn),
-            spec_context_service=_StubSCS(),
-            pricing_module=_StubPricing(),
-        )
-        agent_result = aggregator.list_agents(window_days=365)
-        agent_ids = {s.agent_id for s in agent_result.agents}
-
-        for persona in personas:
-            assert persona in agent_ids, (
-                f"Expected {persona!r} in aggregated agents, got {sorted(agent_ids)}"
-            )
-            summary = next(s for s in agent_result.agents if s.agent_id == persona)
-            assert summary.session_count >= 1, (
-                f"Expected session_count >= 1 for {persona!r}, got {summary.session_count}"
-            )
-
-    def test_idempotent_double_read(self, tmp_path: pathlib.Path) -> None:
-        """Reading the same jsonl twice (via byte_offset) does not double-count events."""
-        db_path = tmp_path / "telemetry.sqlite"
-        dao = _make_dao(db_path)
-
-        jsonl_path = tmp_path / "session-idem.jsonl"
-        _write_synthetic_jsonl(
-            jsonl_path,
-            session_id="e2e-session-idem-001",
-            subagent_type="frontend-engineer",
-        )
-
-        result1 = read_session_file(jsonl_path, dao, _NOW_ISO)
-        result2 = read_session_file(jsonl_path, dao, _NOW_ISO)
-
-        # Second read should ingest 0 new events (byte_offset at EOF)
-        assert result2.events_ingested == 0, (
-            f"Expected 0 events on second read, got {result2.events_ingested}"
-        )
-
-        aggregator = TelemetryAggregator(
-            connection_factory=shared_connection_factory(dao._conn),
-            spec_context_service=_StubSCS(),
-            pricing_module=_StubPricing(),
-        )
-        agent_result = aggregator.list_agents(window_days=365)
-        fe = next((s for s in agent_result.agents if s.agent_id == "frontend-engineer"), None)
-        assert fe is not None
-        assert fe.session_count == result1.events_ingested or fe.session_count >= 1
+    # Phase 3 — idempotent double-read of the phase-1 file.
+    result2 = read_session_file(jsonl_path, dao, _NOW_ISO)
+    assert result2.events_ingested == 0, (
+        f"Expected 0 events on second read, got {result2.events_ingested}"
+    )

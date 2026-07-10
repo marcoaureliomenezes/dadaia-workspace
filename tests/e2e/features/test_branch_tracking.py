@@ -61,11 +61,22 @@ def workspace_with_active_repo(tmp_path: Path) -> tuple[Path, Path, JsonContextS
     return workspace, repo_path, store
 
 
-def test_export_refreshes_current_branch_before_archive(
+def test_export_refreshes_persists_branch_lists_in_manifest_and_excludes_lib_only_dirs(
     workspace_with_active_repo: tuple[Path, Path, JsonContextStore], tmp_path: Path
 ) -> None:
-    """T80 (part 1): export reads HEAD branch and persists in spec_contexts.json."""
+    """T80: export reads HEAD branch, persists it in spec_contexts.json (part 1), and
+    the archive's export-manifest.json records it too (part 2) — one export run.
+    T81: the same artifact must not include .dadaia/scripts/, .dadaia/agentic/,
+    .dadaia/src/ (lib-only dirs trimmed from the export)."""
     workspace, repo, store = workspace_with_active_repo
+    # Create the lib-only dirs that must be trimmed.
+    (workspace / ".dadaia" / "scripts").mkdir(parents=True)
+    (workspace / ".dadaia" / "scripts" / "ctx-inject.sh").write_text("#!/bin/sh")
+    (workspace / ".dadaia" / "agentic").mkdir(parents=True)
+    (workspace / ".dadaia" / "agentic" / "manifest.json").write_text("{}")
+    (workspace / ".dadaia" / "src").mkdir(parents=True)
+    (workspace / ".dadaia" / "src" / "repos.xlsx").write_text("placeholder")
+
     svc = ExportService(
         context_store=store,
         git_client=GitSubprocessClient(),
@@ -80,55 +91,16 @@ def test_export_refreshes_current_branch_before_archive(
     assert persisted is not None
     assert persisted.current_branch == "feature/test"
 
-
-def test_export_manifest_lists_current_branch_per_context(
-    workspace_with_active_repo: tuple[Path, Path, JsonContextStore], tmp_path: Path
-) -> None:
-    """T80 (part 2): the archive's export-manifest.json records branch."""
-    workspace, _, store = workspace_with_active_repo
-    svc = ExportService(
-        context_store=store,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace,
-    )
-    out = tmp_path / "dist"
-    svc.run(ExportOptions(output=out, exclude_mnt=True))
-
     archive = next(out.glob("workspace-*.tar.gz"))
     with tarfile.open(archive, "r:gz") as tar:
         member = tar.getmember("export-manifest.json")
         f = tar.extractfile(member)
         assert f is not None
         manifest = json.loads(f.read())
+        names = tar.getnames()
 
     alpha = next(c for c in manifest["contexts"] if c["name"] == "alpha")
     assert alpha["current_branch"] == "feature/test"
-
-
-def test_export_artifact_excludes_lib_only_dirs(
-    workspace_with_active_repo: tuple[Path, Path, JsonContextStore], tmp_path: Path
-) -> None:
-    """T81: artifact must not include .dadaia/scripts/, .dadaia/agentic/, .dadaia/src/."""
-    workspace, _, store = workspace_with_active_repo
-    # Create the lib-only dirs that must be trimmed
-    (workspace / ".dadaia" / "scripts").mkdir(parents=True)
-    (workspace / ".dadaia" / "scripts" / "ctx-inject.sh").write_text("#!/bin/sh")
-    (workspace / ".dadaia" / "agentic").mkdir(parents=True)
-    (workspace / ".dadaia" / "agentic" / "manifest.json").write_text("{}")
-    (workspace / ".dadaia" / "src").mkdir(parents=True)
-    (workspace / ".dadaia" / "src" / "repos.xlsx").write_text("placeholder")
-
-    svc = ExportService(
-        context_store=store,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace,
-    )
-    out = tmp_path / "dist"
-    svc.run(ExportOptions(output=out, exclude_mnt=True))
-
-    archive = next(out.glob("workspace-*.tar.gz"))
-    with tarfile.open(archive, "r:gz") as tar:
-        names = tar.getnames()
 
     for forbidden in (".dadaia/scripts", ".dadaia/agentic", ".dadaia/src"):
         leaks = [n for n in names if n.startswith(forbidden)]

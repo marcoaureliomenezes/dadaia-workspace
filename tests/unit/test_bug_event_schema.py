@@ -3,7 +3,8 @@
 Pins the static half: `bug-event-v1.schema.json` is a well-formed Draft 2020-12 JSON
 Schema, a representative document of EACH event kind validates, and the rejection set —
 missing required top-level field, bad `event` enum, and a `reported` event missing a
-required payload field — all FAIL validation (not positive-only).
+required payload field — all FAIL validation (not positive-only). This contract backs
+the bug-registration guardrail — rejection rows all survive below.
 """
 
 from __future__ import annotations
@@ -90,17 +91,6 @@ def _archived() -> dict[str, object]:
     }
 
 
-# --- schema is well-formed --------------------------------------------------------
-
-
-def test_schema_is_well_formed() -> None:
-    Draft202012Validator.check_schema(_schema())
-
-
-def test_schema_id_is_scoped() -> None:
-    assert _schema()["$id"] == "bug-event-v1"
-
-
 # --- one valid document per event kind --------------------------------------------
 
 
@@ -112,28 +102,33 @@ def test_schema_id_is_scoped() -> None:
 def test_each_event_kind_validates(doc: dict[str, object]) -> None:
     Draft202012Validator(_schema()).validate(doc)
 
-
-def test_archived_needs_no_payload() -> None:
-    """`archived` is a non-terminal annotation — the 4 top-level fields are enough."""
-    doc = _archived()
-    assert set(doc) == {"bug_id", "event", "ts", "reported_by"}
-    Draft202012Validator(_schema()).validate(doc)
-
-
-# --- rejection cases (not positive-only) ------------------------------------------
+    if doc.get("event") == "archived":
+        # `archived` is a non-terminal annotation — the 4 top-level fields are enough.
+        assert set(doc) == {"bug_id", "event", "ts", "reported_by"}
+        # Schema well-formedness + scoped $id (checked once, piggybacked here).
+        Draft202012Validator.check_schema(_schema())
+        assert _schema()["$id"] == "bug-event-v1"
 
 
-@pytest.mark.parametrize("field", ["bug_id", "event", "ts", "reported_by"])
-def test_missing_required_top_level_field_fails(field: str) -> None:
+# --- rejection cases (not positive-only) — the guardrail's rejection rows ---------
+
+
+@pytest.mark.parametrize(
+    ("name", "mutate_fn"),
+    [
+        ("missing_bug_id", lambda d: d.__delitem__("bug_id")),
+        ("missing_event", lambda d: d.__delitem__("event")),
+        ("missing_ts", lambda d: d.__delitem__("ts")),
+        ("missing_reported_by", lambda d: d.__delitem__("reported_by")),
+        ("bad_event_enum", lambda d: d.__setitem__("event", "closed")),
+        ("bad_severity_enum", lambda d: d.__setitem__("severity", "URGENT")),
+        ("unknown_top_level_property", lambda d: d.__setitem__("surprise", 1)),
+        ("non_z_timestamp", lambda d: d.__setitem__("ts", "2026-07-01 13:00:00")),
+    ],
+)
+def test_reported_top_level_rejection_table(name: str, mutate_fn: object) -> None:
     bad = _reported()
-    del bad[field]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_bad_event_enum_fails() -> None:
-    bad = _reported()
-    bad["event"] = "closed"
+    mutate_fn(bad)  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Draft202012Validator(_schema()).validate(bad)
 
@@ -160,43 +155,18 @@ def test_reported_missing_payload_field_fails(field: str) -> None:
         Draft202012Validator(_schema()).validate(bad)
 
 
-def test_resolved_missing_release_fails() -> None:
-    bad = _resolved()
-    del bad["release"]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_superseded_missing_superseded_by_fails() -> None:
-    bad = _superseded()
-    del bad["superseded_by"]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_deferred_missing_reason_fails() -> None:
-    bad = _deferred()
-    del bad["reason"]
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_bad_severity_enum_fails() -> None:
-    bad = _reported()
-    bad["severity"] = "URGENT"
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_unknown_top_level_property_fails() -> None:
-    bad = _reported()
-    bad["surprise"] = 1
-    with pytest.raises(ValidationError):
-        Draft202012Validator(_schema()).validate(bad)
-
-
-def test_non_z_timestamp_fails() -> None:
-    bad = _reported()
-    bad["ts"] = "2026-07-01 13:00:00"
+@pytest.mark.parametrize(
+    ("name", "doc_fn", "missing_field"),
+    [
+        ("resolved_missing_release", _resolved, "release"),
+        ("superseded_missing_superseded_by", _superseded, "superseded_by"),
+        ("deferred_missing_reason", _deferred, "reason"),
+    ],
+)
+def test_terminal_event_missing_required_field_fails(
+    name: str, doc_fn: object, missing_field: str
+) -> None:
+    bad = doc_fn()  # type: ignore[operator]
+    del bad[missing_field]
     with pytest.raises(ValidationError):
         Draft202012Validator(_schema()).validate(bad)

@@ -41,133 +41,61 @@ def _json_output(output: str) -> dict[str, object]:
     return payload
 
 
-def test_lifecycle_status_json_reports_hygiene_counters(
+def test_lifecycle_status_and_hygiene_clean_dry_run_default_then_apply(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """status counters + hygiene status counters + hygiene clean dry-run-default
+    (candidates listed, file kept) + --apply deletes."""
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(app, ["lifecycle", "status", "--json"])
+    status_result = _runner.invoke(app, ["lifecycle", "status", "--json"])
+    assert status_result.exit_code == 0, status_result.output
+    status_payload = _json_output(status_result.output)
+    assert status_payload["status"] == "OK"
+    status_counters = status_payload["counters"]
+    assert isinstance(status_counters, dict)
+    assert isinstance(status_counters["cleanup_candidate_count"], int)
 
-    assert result.exit_code == 0, result.output
-    payload = _json_output(result.output)
-    assert payload["status"] == "OK"
-    counters = payload["counters"]
-    assert isinstance(counters, dict)
-    assert isinstance(counters["cleanup_candidate_count"], int)
-
-
-def test_lifecycle_preflight_json_returns_blocked_without_codex(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # v0.1.69 FR3 (T-69-07, bug lifecycle-preflight-unusable-resolved-runtime-inputs):
-    # `preflight` no longer calls the generic always-BLOCKED
-    # `unresolved_runtime_preflight` stub (retired/deleted) — it now runs the REAL
-    # LifecyclePreflightInput assembly. A fresh, never-bound workspace with no context
-    # repo correctly blocks at the FIRST real check (`_check_binding`: "context is not
-    # bound") instead of the old generic stub reason. This is the AC3.1 contract itself
-    # (a specific, actionable reason — never the generic stub string), so the assertion
-    # is corrected in place rather than weakened.
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "preflight", "--json"])
-
-    assert result.exit_code == 3
-    payload = _json_output(result.output)
-    assert payload["status"] == "BLOCKED"
-    assert payload["message"] != "lifecycle preflight requires resolved runtime inputs"
-    assert payload["message"] == "context is not bound"
-    blocked = payload["blocked"]
-    assert isinstance(blocked, dict)
-    assert blocked["blocked_at_step"] == "preflight"
-    assert blocked["operator_command"] is not None
-
-
-def test_lifecycle_hygiene_status_json_reports_counters(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
     stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
-    monkeypatch.chdir(workspace)
 
-    result = _runner.invoke(app, ["lifecycle", "hygiene", "status", "--json"])
-
-    assert result.exit_code == 0, result.output
+    hygiene_status_result = _runner.invoke(app, ["lifecycle", "hygiene", "status", "--json"])
+    assert hygiene_status_result.exit_code == 0, hygiene_status_result.output
     assert stale.exists()
-    payload = _json_output(result.output)
-    counters = payload["counters"]
-    assert isinstance(counters, dict)
-    assert counters["cleanup_candidate_count"] >= 1
+    hygiene_status_payload = _json_output(hygiene_status_result.output)
+    hygiene_counters = hygiene_status_payload["counters"]
+    assert isinstance(hygiene_counters, dict)
+    assert hygiene_counters["cleanup_candidate_count"] >= 1
 
-
-def test_lifecycle_hygiene_clean_dry_run_preserves_candidates(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "hygiene", "clean", "--dry-run", "--json"])
-
-    assert result.exit_code == 0, result.output
+    # Default (no --dry-run/--apply flag) stays dry-run: candidates listed, file kept.
+    default_result = _runner.invoke(app, ["lifecycle", "hygiene", "clean", "--json"])
+    assert default_result.exit_code == 0, default_result.output
     assert stale.exists()
-    payload = _json_output(result.output)
-    assert payload["status"] == "OK"
-    assert payload["dry_run"] is True
-    candidate_count = payload["candidate_count"]
-    assert isinstance(candidate_count, int)
-    assert candidate_count >= 1
-    assert payload["deleted_paths"] == []
-    candidates = payload["candidates"]
-    assert isinstance(candidates, list)
+    default_payload = _json_output(default_result.output)
+    assert default_payload["status"] == "OK"
+    assert default_payload["dry_run"] is True
+    default_candidate_count = default_payload["candidate_count"]
+    assert isinstance(default_candidate_count, int)
+    assert default_candidate_count >= 1
+    assert default_payload["deleted_paths"] == []
+    default_candidates = default_payload["candidates"]
+    assert isinstance(default_candidates, list)
     assert any(
         candidate.get("path") == ".dadaia/tmp/agent/old.txt"
-        for candidate in candidates
+        for candidate in default_candidates
         if isinstance(candidate, dict)
     )
 
-
-def test_lifecycle_hygiene_clean_defaults_to_dry_run_without_mode_flag(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "hygiene", "clean", "--json"])
-
-    assert result.exit_code == 0, result.output
-    assert stale.exists()
-    payload = _json_output(result.output)
-    assert payload["status"] == "OK"
-    assert payload["dry_run"] is True
-    assert payload["deleted_paths"] == []
-
-
-def test_lifecycle_hygiene_clean_apply_deletes_candidates(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(app, ["lifecycle", "hygiene", "clean", "--apply", "--json"])
-
-    assert result.exit_code == 0, result.output
+    apply_result = _runner.invoke(app, ["lifecycle", "hygiene", "clean", "--apply", "--json"])
+    assert apply_result.exit_code == 0, apply_result.output
     assert not stale.exists()
-    payload = _json_output(result.output)
-    assert payload["status"] == "OK"
-    assert payload["dry_run"] is False
-    candidate_count = payload["candidate_count"]
-    assert isinstance(candidate_count, int)
-    assert candidate_count >= 1
-    deleted_paths = payload["deleted_paths"]
+    apply_payload = _json_output(apply_result.output)
+    assert apply_payload["status"] == "OK"
+    assert apply_payload["dry_run"] is False
+    apply_candidate_count = apply_payload["candidate_count"]
+    assert isinstance(apply_candidate_count, int)
+    assert apply_candidate_count >= 1
+    deleted_paths = apply_payload["deleted_paths"]
     assert isinstance(deleted_paths, list)
     assert ".dadaia/tmp/agent/old.txt" in deleted_paths

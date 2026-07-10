@@ -26,33 +26,40 @@ from dadaia_workspace.features.backlog.subject_registry import Registry, build_r
 # ── T-1: parse_consumes_line ──────────────────────────────────────────────────────
 
 
-def test_parse_present_single_slug() -> None:
-    spec = "# SPEC\n\n**Status:** Aprovado\n**Consumes:** my-feature\n\nbody\n"
-    assert parse_consumes_line(spec) == ("my-feature",)
-
-
-def test_parse_multi_slug_comma_separated_ordered() -> None:
-    spec = "**Consumes:** alpha, beta, gamma\n"
-    assert parse_consumes_line(spec) == ("alpha", "beta", "gamma")
-
-
-def test_parse_dedups_preserving_first_order() -> None:
-    spec = "**Consumes:** alpha, beta, alpha, gamma, beta\n"
-    assert parse_consumes_line(spec) == ("alpha", "beta", "gamma")
-
-
-def test_parse_strips_trailing_md_and_whitespace() -> None:
-    spec = "**Consumes:**   foo.md ,  bar.md  \n"
-    assert parse_consumes_line(spec) == ("foo", "bar")
-
-
-def test_parse_absent_line_returns_empty() -> None:
-    assert parse_consumes_line("# SPEC\n\n**Status:** Aprovado\n\nbody only\n") == ()
-
-
-def test_parse_empty_consumes_line_returns_empty() -> None:
-    assert parse_consumes_line("**Consumes:**\n") == ()
-    assert parse_consumes_line("**Consumes:**    \n") == ()
+@pytest.mark.parametrize(
+    ("spec", "expected"),
+    [
+        pytest.param(
+            "# SPEC\n\n**Status:** Aprovado\n**Consumes:** my-feature\n\nbody\n",
+            ("my-feature",),
+            id="present-single-slug",
+        ),
+        pytest.param(
+            "**Consumes:** alpha, beta, gamma\n",
+            ("alpha", "beta", "gamma"),
+            id="multi-slug-comma-separated-ordered",
+        ),
+        pytest.param(
+            "**Consumes:** alpha, beta, alpha, gamma, beta\n",
+            ("alpha", "beta", "gamma"),
+            id="dedups-preserving-first-order",
+        ),
+        pytest.param(
+            "**Consumes:**   foo.md ,  bar.md  \n",
+            ("foo", "bar"),
+            id="strips-trailing-md-and-whitespace",
+        ),
+        pytest.param(
+            "# SPEC\n\n**Status:** Aprovado\n\nbody only\n",
+            (),
+            id="absent-line-returns-empty",
+        ),
+        pytest.param("**Consumes:**\n", (), id="empty-consumes-line-returns-empty"),
+        pytest.param("**Consumes:**    \n", (), id="whitespace-only-consumes-line-returns-empty"),
+    ],
+)
+def test_parse_consumes_line_matrix(spec: str, expected: tuple[str, ...]) -> None:
+    assert parse_consumes_line(spec) == expected
 
 
 # ── T-2/T-3/T-4: shipped_anchors_for ───────────────────────────────────────────────
@@ -104,35 +111,32 @@ intents:
     return backlog, registry
 
 
-def test_shipped_anchors_single_slug(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("slugs", "expected"),
+    [
+        pytest.param(("item-a",), frozenset({_REF_A}), id="single-slug"),
+        pytest.param(("item-a", "item-b"), frozenset({_REF_A, _REF_B}), id="union-of-two-slugs"),
+        pytest.param((), frozenset(), id="empty-slugs-returns-empty"),
+    ],
+)
+def test_shipped_anchors_for_matrix(
+    tmp_path: Path, slugs: tuple[str, ...], expected: frozenset[str]
+) -> None:
     backlog, registry = _plant(tmp_path)
-    assert shipped_anchors_for(("item-a",), backlog_dir=backlog, registry=registry) == frozenset(
-        {_REF_A}
-    )
+    assert shipped_anchors_for(slugs, backlog_dir=backlog, registry=registry) == expected
 
 
-def test_shipped_anchors_union_of_two_slugs(tmp_path: Path) -> None:
-    backlog, registry = _plant(tmp_path)
-    assert shipped_anchors_for(
-        ("item-a", "item-b"), backlog_dir=backlog, registry=registry
-    ) == frozenset({_REF_A, _REF_B})
-
-
-def test_shipped_anchors_empty_slugs_returns_empty(tmp_path: Path) -> None:
-    backlog, registry = _plant(tmp_path)
-    assert shipped_anchors_for((), backlog_dir=backlog, registry=registry) == frozenset()
-
-
-def test_unknown_slug_fails_loud(tmp_path: Path) -> None:
+def test_unknown_slug_unresolved_intent_and_zero_intents_all_fail_loud(
+    tmp_path: Path,
+) -> None:
+    """T-3/T-4: an unknown slug, an item whose intent's subject does not resolve
+    against the registry, and an item with zero intents all raise
+    ``ConsumesBindError`` naming the offending slug/ref — never a partial set."""
     backlog, registry = _plant(tmp_path)
     with pytest.raises(ConsumesBindError) as exc:
         shipped_anchors_for(("does-not-exist",), backlog_dir=backlog, registry=registry)
     assert "does-not-exist" in str(exc.value)
 
-
-def test_slug_with_unresolved_intent_fails_loud(tmp_path: Path) -> None:
-    backlog, registry = _plant(tmp_path)
-    # An item whose intent's subject does not resolve against the registry.
     bad = """\
 ---
 name: bad-item
@@ -151,9 +155,6 @@ intents:
     assert "bad-item" in msg
     assert "pkg/ghost.py#nonexistent" in msg
 
-
-def test_slug_with_zero_intents_fails_loud(tmp_path: Path) -> None:
-    backlog, registry = _plant(tmp_path)
     empty = """\
 ---
 name: empty-item

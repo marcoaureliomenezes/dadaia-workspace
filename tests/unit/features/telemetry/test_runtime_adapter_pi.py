@@ -1,9 +1,10 @@
 """Unit tests for PiRuntimeAdapter + the "pi" ADAPTER_REGISTRY entry (T-30-B-04).
 
 WS-PI-6 acceptance A10/A12:
-- get_adapter("pi") returns a PiRuntimeAdapter.
+- get_adapter("pi") returns a PiRuntimeAdapter, registered under ADAPTER_REGISTRY["pi"],
+  and satisfies the RuntimeAdapter protocol.
 - The adapter classifies liveness from ~/.pi/agent/sessions/<slug>/*.jsonl mtime
-  (active/idle/ended) and degrades to "idle" on IO failure.
+  (active/idle/ended) and degrades to "idle"/"ended" on IO failure / absence.
 - Cost posture: cumulative_cost_usd=None, cost_known=False (never faked).
 
 Liveness uses only file mtime (metadata) — T1: no session content is read. Tests
@@ -15,6 +16,8 @@ from __future__ import annotations
 import os
 import pathlib
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from dadaia_workspace.features.telemetry.aggregator import runtimes as rt
 from dadaia_workspace.features.telemetry.aggregator.models import (
@@ -82,61 +85,67 @@ def _seed_session_file(
     return f
 
 
-class TestRegistry:
-    def test_get_adapter_pi_returns_pi_adapter(self) -> None:
-        """A10: get_adapter("pi") returns a PiRuntimeAdapter."""
-        adapter = get_adapter("pi")
-        assert isinstance(adapter, PiRuntimeAdapter)
-
-    def test_pi_adapter_satisfies_protocol(self) -> None:
-        assert isinstance(PiRuntimeAdapter(), RuntimeAdapter)
-
-    def test_registry_has_pi_key(self) -> None:
-        assert "pi" in rt.ADAPTER_REGISTRY
-
-
-class TestCostPosture:
-    def test_enrich_row_cost_unknown(self) -> None:
-        out = PiRuntimeAdapter().enrich_row(_make_row())
-        assert out.cumulative_cost_usd is None
-        assert out.cost_known is False
-
-    def test_enrich_detail_cost_unknown(self) -> None:
-        out = PiRuntimeAdapter().enrich_detail(_make_detail())
-        assert out.cumulative_cost_usd is None
-        assert out.cost_known is False
-
-
-class TestLiveness:
-    def test_active_recent_mtime(self, tmp_path: pathlib.Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-        monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
-        _seed_session_file(tmp_path, "--home-marco-workspace-dadaia--", _SESSION_ID, 1)
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "active"
-
-    def test_idle_mid_mtime(self, tmp_path: pathlib.Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-        monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
-        _seed_session_file(tmp_path, "--slug--", _SESSION_ID, 30)
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "idle"
-
-    def test_ended_old_mtime(self, tmp_path: pathlib.Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-        monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
-        _seed_session_file(tmp_path, "--slug--", _SESSION_ID, 120)
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "ended"
-
-    def test_ended_when_file_absent(self, tmp_path: pathlib.Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
-        monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
-        # No file seeded for this session id.
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "ended"
-
-    def test_ended_when_sessions_dir_absent(self, tmp_path: pathlib.Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize(
+    ("case", "setup", "expected"),
+    [
+        pytest.param(
+            "active-recent-mtime",
+            lambda tp: _seed_session_file(tp, "--home-marco-workspace-dadaia--", _SESSION_ID, 1),
+            "active",
+            id="active-recent-mtime",
+        ),
+        pytest.param(
+            "idle-mid-mtime",
+            lambda tp: _seed_session_file(tp, "--slug--", _SESSION_ID, 30),
+            "idle",
+            id="idle-mid-mtime",
+        ),
+        pytest.param(
+            "ended-old-mtime",
+            lambda tp: _seed_session_file(tp, "--slug--", _SESSION_ID, 120),
+            "ended",
+            id="ended-old-mtime",
+        ),
+        pytest.param("ended-file-absent", lambda tp: None, "ended", id="ended-when-file-absent"),
+        pytest.param(
+            "ended-sessions-dir-absent",
+            None,  # handled specially below (points _PI_SESSIONS_DIR at a nonexistent dir)
+            "ended",
+            id="ended-when-sessions-dir-absent",
+        ),
+    ],
+)
+def test_liveness_mtime_thresholds(  # type: ignore[no-untyped-def]
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, case: str, setup, expected: str
+) -> None:
+    if case == "ended-sessions-dir-absent":
         monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path / "nope")
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "ended"
-
-    def test_resolution_matches_by_session_id_suffix(
-        self, tmp_path: pathlib.Path, monkeypatch
-    ) -> None:  # type: ignore[no-untyped-def]
-        """The file is resolved by stem ending with the session id, across slug dirs."""
+    else:
         monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
-        _seed_session_file(tmp_path, "--other--", "unrelated-uuid", 1)
-        _seed_session_file(tmp_path, "--target--", _SESSION_ID, 1)
-        assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "active"
+        setup(tmp_path)
+    assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == expected
+
+
+def test_liveness_resolution_matches_by_session_id_suffix(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The file is resolved by stem ending with the session id, across slug dirs
+    (A10: registered under ADAPTER_REGISTRY["pi"], protocol-conformant, and never
+    fakes a cost — cumulative_cost_usd=None, cost_known=False on enrich)."""
+    monkeypatch.setattr(rt, "_PI_SESSIONS_DIR", tmp_path)
+    _seed_session_file(tmp_path, "--other--", "unrelated-uuid", 1)
+    _seed_session_file(tmp_path, "--target--", _SESSION_ID, 1)
+    assert PiRuntimeAdapter().liveness(_SESSION_ID, "/x") == "active"
+
+    adapter = get_adapter("pi")
+    assert isinstance(adapter, PiRuntimeAdapter)
+    assert isinstance(adapter, RuntimeAdapter)
+    assert "pi" in rt.ADAPTER_REGISTRY
+
+    row_out = PiRuntimeAdapter().enrich_row(_make_row())
+    assert row_out.cumulative_cost_usd is None
+    assert row_out.cost_known is False
+
+    detail_out = PiRuntimeAdapter().enrich_detail(_make_detail())
+    assert detail_out.cumulative_cost_usd is None
+    assert detail_out.cost_known is False

@@ -15,6 +15,12 @@ preflight (``[no bound context]`` + dispatcher preflight + ALIVE list) with NO c
 memory. Context memory is injected only when a context is RESOLVED through the chain:
 ``DADAIA_CONTEXT`` env → self-keyed session record → newest bind-epoch marker newer than
 the sentinel. A pre-existing marker never binds a fresh session.
+
+CRIT: bind-driven injection + cross-session context-steal prevention (pid/ancestry
+attribution). Injection-without-bind and steal-via-newer-foreign-marker negatives survive
+verbatim below. The sentinel filename byte-parity test is DELETED — the digest-GC tests
+(test_ctx_inject_digest.py) construct the same ``ctx-inject-fired-<sid>`` names and would
+break on a rename, so the filename contract is already pinned implicitly.
 """
 
 from __future__ import annotations
@@ -23,6 +29,9 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from dadaia_workspace.features.spec_context import session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
@@ -138,36 +147,85 @@ def _run(
     return result.stdout
 
 
-# --- FR-W2-01: unbound session ⇒ generic preflight, NO context memory ---------
+# --- FR-W2-01: unbound / no-context ⇒ generic preflight, NO context memory ----
 
 
-def test_unbound_session_emits_generic_preflight_no_memory(tmp_path: Path) -> None:
-    _ws(tmp_path)
-    out = _run(tmp_path, "s1")
-    assert "[no bound context]" in out
-    assert "dispatcher preflight" in out
-    # NO context memory whatsoever.
-    assert "end memory bootstrap" not in out
-    assert "Python 3.12" not in out
+def _setup_unbound_session_no_memory(tp: Path) -> None:
+    _ws(tp)
 
 
-def test_unbound_session_lists_alive_contexts(tmp_path: Path) -> None:
-    _ws(tmp_path, slug="alpha")
-    _add_context(tmp_path, "beta")
-    out = _run(tmp_path, "s-list")
-    assert "ALIVE contexts" in out
-    assert "- alpha" in out
-    assert "- beta" in out
+def _setup_unbound_session_lists_alive_contexts(tp: Path) -> None:
+    _ws(tp, slug="alpha")
+    _add_context(tp, "beta")
 
 
-def test_preexisting_marker_does_not_bind_fresh_session(tmp_path: Path) -> None:
-    # STALE-MARKER NEGATIVE (architect MEDIUM): a marker that predates the (absent) sentinel
-    # must NOT inject memory into a fresh session — only generic preflight.
-    _ws(tmp_path)
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=time.time() - 500)
-    out = _run(tmp_path, "fresh")
-    assert "[no bound context]" in out
-    assert "end memory bootstrap" not in out
+def _setup_no_alive_context_still_generic(tp: Path) -> None:
+    (tp / ".dadaia" / "states").mkdir(parents=True)
+    (tp / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"repo_slug": "x", "state": "dead"}]}),
+        encoding="utf-8",
+    )
+
+
+def _assert_unbound_no_memory(out: str) -> bool:
+    return (
+        "[no bound context]" in out
+        and "dispatcher preflight" in out
+        and "end memory bootstrap" not in out
+        and "Python 3.12" not in out
+    )
+
+
+def _assert_lists_alive_contexts(out: str) -> bool:
+    return "ALIVE contexts" in out and "- alpha" in out and "- beta" in out
+
+
+def _assert_no_alive_context_still_generic(out: str) -> bool:
+    return "[no bound context]" in out and "end memory bootstrap" not in out
+
+
+def _setup_preexisting_marker(tp: Path) -> None:
+    # STALE-MARKER NEGATIVE (architect MEDIUM): a marker that predates the (absent)
+    # sentinel must NOT inject memory into a fresh session.
+    _ws(tp)
+    _stamp_bind_epoch(tp, "ctx", mtime=time.time() - 500)
+
+
+@pytest.mark.parametrize(
+    ("name", "setup_fn", "session_id", "assert_fn"),
+    [
+        (
+            "unbound_session_no_memory",
+            _setup_unbound_session_no_memory,
+            "s1",
+            _assert_unbound_no_memory,
+        ),
+        (
+            "unbound_session_lists_alive_contexts",
+            _setup_unbound_session_lists_alive_contexts,
+            "s-list",
+            _assert_lists_alive_contexts,
+        ),
+        (
+            "no_alive_context_still_generic",
+            _setup_no_alive_context_still_generic,
+            "s",
+            _assert_no_alive_context_still_generic,
+        ),
+        (
+            "preexisting_marker_does_not_bind_fresh_session",
+            _setup_preexisting_marker,
+            "fresh",
+            _assert_unbound_no_memory,
+        ),
+    ],
+)
+def test_no_bind_generic_preflight_table(
+    tmp_path: Path, name: str, setup_fn: Any, session_id: str, assert_fn: Any
+) -> None:
+    setup_fn(tmp_path)
+    out = _run(tmp_path, session_id)
+    assert assert_fn(out)
 
 
 # --- FR-W2-01 priority-2: self-keyed session record (bound context) wins ------
@@ -210,7 +268,9 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
 # --- FR-W2-02: bind-epoch marker drives re-injection -------------------------
 
 
-def test_bind_marker_newer_than_sentinel_injects_memory(tmp_path: Path) -> None:
+def test_bind_marker_newer_than_sentinel_injects_memory_then_rebind_and_repeat_prompt(
+    tmp_path: Path,
+) -> None:
     _ws(tmp_path)
     # First prompt: unbound ⇒ generic, stamps the sentinel.
     first = _run(tmp_path, "sess", harness_pid=_PID_A)
@@ -224,64 +284,59 @@ def test_bind_marker_newer_than_sentinel_injects_memory(tmp_path: Path) -> None:
     assert "end memory bootstrap" in second
     assert "Python 3.12" in second
 
-
-def test_rebind_to_other_context_reinjects(tmp_path: Path) -> None:
-    # W1-7 acceptance (c): a same-pid re-bind to ANOTHER context re-injects. Both markers are
-    # attributed to the same harness pid (_PID_A), so both qualify for this session.
-    _ws(tmp_path, slug="alpha")
-    _add_context(tmp_path, "beta")
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-rb"
+    # W1-7 acceptance (c): a same-pid re-bind to ANOTHER context re-injects, and a repeat
+    # prompt with no new marker stays silent.
+    ws2 = tmp_path.parent / (tmp_path.name + "-rebind")
+    _ws(ws2, slug="alpha")
+    _add_context(ws2, "beta")
+    sentinel2 = ws2 / ".dadaia" / "tmp" / "ctx-inject-fired-rb"
     # First prompt establishes the sentinel (a marker qualifies only against an EXISTING one).
-    _run(tmp_path, "rb", harness_pid=_PID_A)
+    _run(ws2, "rb", harness_pid=_PID_A)
     # Bind alpha newer than the sentinel, attributed to this session ⇒ inject alpha.
-    _stamp_bind_epoch(tmp_path, "alpha", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
-    out_a = _run(tmp_path, "rb", harness_pid=_PID_A)
+    _stamp_bind_epoch(ws2, "alpha", mtime=sentinel2.stat().st_mtime + 5, pid=_PID_A)
+    out_a = _run(ws2, "rb", harness_pid=_PID_A)
     assert "[alpha]" in out_a
     # Re-bind beta with a still-newer marker, same harness pid ⇒ re-inject beta.
-    _stamp_bind_epoch(tmp_path, "beta", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
-    out_b = _run(tmp_path, "rb", harness_pid=_PID_A)
+    _stamp_bind_epoch(ws2, "beta", mtime=sentinel2.stat().st_mtime + 5, pid=_PID_A)
+    out_b = _run(ws2, "rb", harness_pid=_PID_A)
     assert "[beta]" in out_b
     assert "Node 20" in out_b
-
-
-def test_repeat_prompt_same_context_is_silent(tmp_path: Path) -> None:
-    _ws(tmp_path)
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-quiet"
-    # Establish the sentinel, then bind ctx newer than it, attributed to this session.
-    _run(tmp_path, "quiet", harness_pid=_PID_A)
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
-    first = _run(tmp_path, "quiet", harness_pid=_PID_A)
-    assert "[ctx]" in first
     # A repeat prompt with NO newer marker ⇒ silent.
-    second = _run(tmp_path, "quiet", harness_pid=_PID_A)
-    assert second == ""
+    out_repeat = _run(ws2, "rb", harness_pid=_PID_A)
+    assert out_repeat == ""
 
 
 # --- W1-7 (T-47-16): bind-epoch session attribution ---------------------------
 
 
-def test_legacy_empty_marker_never_injects_context(tmp_path: Path) -> None:
-    """A legacy EMPTY (un-attributed) bind-epoch marker is never honored for injection.
-
-    Pre-W1-7 markers carry no harness pid (empty file). Such a marker is unattributable, so
-    the hook ignores it and stays on generic preflight — NEVER injecting a context. This
-    keeps backward compatibility with old markers while closing the cross-session steal, and
-    tolerates the empty content without crashing.
-    """
-    _ws(tmp_path)
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-legacy"
-    # Establish the sentinel (generic preflight).
-    first = _run(tmp_path, "legacy", harness_pid=_PID_A)
-    assert "[no bound context]" in first
-    # A legacy EMPTY marker newer than the sentinel is unattributable ⇒ ignored: no context.
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)  # pid=None
-    out = _run(tmp_path, "legacy", harness_pid=_PID_A)
-    assert "[ctx]" not in out
-    assert "end memory bootstrap" not in out
-
-
-def test_marker_ancestry_chain_membership_injects(tmp_path: Path) -> None:
-    """W1-8 (v0.1.47): the hook harness pid deep in a marker's ancestry chain still injects.
+@pytest.mark.parametrize(
+    ("session", "chain", "legacy_empty", "expect_inject"),
+    [
+        pytest.param("chain", [555001, _PID_A, 700000], False, True, id="membership-injects"),
+        pytest.param("dj", [555002, _PID_B, 700001], False, False, id="disjoint-pid-never-injects"),
+        pytest.param(
+            # Pre-W1-7 markers carry no harness pid (empty file). Such a marker is
+            # unattributable, so the hook ignores it and stays on generic preflight —
+            # NEVER injecting a context. Backward compatibility with old markers while
+            # closing the cross-session steal; tolerates empty content without crashing.
+            "legacy",
+            None,
+            True,
+            False,
+            id="legacy-empty-marker-never-injects",
+        ),
+    ],
+)
+def test_marker_ancestry_chain_matrix(
+    tmp_path: Path,
+    session: str,
+    chain: list[int] | None,
+    legacy_empty: bool,
+    expect_inject: bool,
+) -> None:
+    """W1-8 (v0.1.47): the hook harness pid deep in a marker's ancestry chain still injects;
+    a chain that does NOT contain this session's harness pid is never honored; a legacy
+    EMPTY (un-attributed) marker is never honored either.
 
     The marker records the bind process's chain [ephemeral shell, harness, …]. The ephemeral
     bind shell (first entry) has since died, but this session's hook resolves the SAME
@@ -289,37 +344,21 @@ def test_marker_ancestry_chain_membership_injects(tmp_path: Path) -> None:
     injected. This is the exact ephemeral-shell case the single-pid-equality design missed.
     """
     _ws(tmp_path)
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-chain"
-    _run(tmp_path, "chain", harness_pid=_PID_A)  # establish the sentinel (generic preflight)
-    # Chain: [dead ephemeral shell, harness == _PID_A (2nd entry), grandparent]. The hook's
-    # harness pid is NOT the first entry — it must still match via membership.
-    _stamp_bind_epoch(
-        tmp_path,
-        "ctx",
-        mtime=sentinel.stat().st_mtime + 5,
-        chain=[555001, _PID_A, 700000],
-    )
-    out = _run(tmp_path, "chain", harness_pid=_PID_A)
-    assert "[ctx]" in out
-    assert "end memory bootstrap" in out
-    assert "Python 3.12" in out
-
-
-def test_marker_ancestry_chain_disjoint_pid_never_injects(tmp_path: Path) -> None:
-    """A chain that does NOT contain this session's harness pid is never honored."""
-    _ws(tmp_path)
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-dj"
-    _run(tmp_path, "dj", harness_pid=_PID_A)
-    # Chain belongs entirely to another session (no _PID_A anywhere) ⇒ ignored.
-    _stamp_bind_epoch(
-        tmp_path,
-        "ctx",
-        mtime=sentinel.stat().st_mtime + 5,
-        chain=[555002, _PID_B, 700001],
-    )
-    out = _run(tmp_path, "dj", harness_pid=_PID_A)
-    assert "[ctx]" not in out
-    assert "end memory bootstrap" not in out
+    sentinel = tmp_path / ".dadaia" / "tmp" / f"ctx-inject-fired-{session}"
+    first = _run(tmp_path, session, harness_pid=_PID_A)  # establish the sentinel (generic)
+    if legacy_empty:
+        assert "[no bound context]" in first
+        _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)  # pid=None
+    else:
+        _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, chain=chain)
+    out = _run(tmp_path, session, harness_pid=_PID_A)
+    if expect_inject:
+        assert "[ctx]" in out
+        assert "end memory bootstrap" in out
+        assert "Python 3.12" in out
+    else:
+        assert "[ctx]" not in out
+        assert "end memory bootstrap" not in out
 
 
 def test_two_session_marker_attribution_never_steals(tmp_path: Path) -> None:
@@ -355,42 +394,32 @@ def test_two_session_marker_attribution_never_steals(tmp_path: Path) -> None:
     assert "[alpha]" not in out_y
 
 
-def test_sentinel_path_byte_identical_to_shell(tmp_path: Path) -> None:
-    _ws(tmp_path)
-    _run(tmp_path, "abc123")
-    expected = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-abc123"
-    assert expected.exists()
-
-
 # --- output-contract envelopes (unchanged contract, generic-preflight payload) ---
 
 
-def test_codex_json_envelope(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("name", "extra", "session_id", "expect_event"),
+    [
+        (
+            "codex_json_envelope",
+            {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
+            "s2",
+            "SessionStart",
+        ),
+        (
+            "json_output_default_event",
+            {"DADAIA_HOOK_OUTPUT": "json"},
+            "s3",
+            "UserPromptSubmit",
+        ),
+    ],
+)
+def test_output_contract_envelopes(
+    tmp_path: Path, name: str, extra: dict[str, str], session_id: str, expect_event: str
+) -> None:
     _ws(tmp_path)
-    out = _run(
-        tmp_path,
-        "s2",
-        extra={"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
-    )
+    out = _run(tmp_path, session_id, extra=extra)
     env = json.loads(out)
-    assert env["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]
-
-
-def test_json_output_default_event(tmp_path: Path) -> None:
-    _ws(tmp_path)
-    out = _run(tmp_path, "s3", extra={"DADAIA_HOOK_OUTPUT": "json"})
-    env = json.loads(out)
-    assert env["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-
-
-def test_no_alive_context_emits_generic_preflight(tmp_path: Path) -> None:
-    # No ALIVE context: still generic preflight (no memory, no ALIVE list), never crash.
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "x", "state": "dead"}]}), encoding="utf-8"
-    )
-    out = _run(tmp_path, "s")
-    assert "[no bound context]" in out
-    assert "end memory bootstrap" not in out
+    assert env["hookSpecificOutput"]["hookEventName"] == expect_event
+    if name == "codex_json_envelope":
+        assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]

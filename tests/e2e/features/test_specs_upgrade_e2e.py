@@ -84,8 +84,11 @@ def _seed_below_canonical_tree(root: Path) -> Path:
     return specs
 
 
-def test_upgrade_then_init_reaches_doctor_green(tmp_path: Path) -> None:
-    """AC-2 scenario 1: version-0 tree → upgrade → init → doctor 0 errors."""
+def test_upgrade_then_init_reaches_doctor_green_and_at_target_rerun_is_a_no_op(
+    tmp_path: Path,
+) -> None:
+    """AC-2 scenario 1: version-0 tree → upgrade → init → doctor 0 errors.
+    AC-2 scenario 2: rerunning upgrade at canonical version makes no new backup."""
     specs = _seed_below_canonical_tree(tmp_path)
 
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--yes")
@@ -112,14 +115,6 @@ def test_upgrade_then_init_reaches_doctor_green(tmp_path: Path) -> None:
     doctor = _cli(tmp_path, "specs", "doctor", "--specs-dir", str(specs))
     assert doctor.returncode == 0, doctor.stderr or doctor.stdout
     assert "0 error(s)" in doctor.stdout, doctor.stdout
-
-
-def test_upgrade_at_target_is_a_no_op(tmp_path: Path) -> None:
-    """AC-2 scenario 2: rerunning upgrade at canonical version makes no new backup."""
-    specs = _seed_below_canonical_tree(tmp_path)
-
-    first = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--yes")
-    assert first.returncode == 0, first.stderr or first.stdout
 
     def _backups() -> set[Path]:
         return set((specs / "specs_bkp").glob("*")) | set((specs.parent / "specs_bkp").glob("*"))

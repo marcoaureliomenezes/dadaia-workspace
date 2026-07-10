@@ -94,56 +94,42 @@ def _skill_json_examples() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_roster_completeness_core_agents() -> None:
-    on_disk = {f"agents/{p.name}" for p in (_PUBLIC / "agents").glob("*.md")}
-    assert on_disk == set(_CORE_AGENT_BODIES) | _PLUGIN_STUBS, (
+def test_roster_completeness_and_sixteen_surface_v12_self_pull_adoption() -> None:
+    """Roster completeness (core + plugin agent bodies) backs the 16-surface
+    enumeration, and every one of the 16 surfaces — 14 whole files + the emitter
+    skill's 2 JSON examples — carries both the handoff-v1.2 and self_pull tokens."""
+    on_disk_core = {f"agents/{p.name}" for p in (_PUBLIC / "agents").glob("*.md")}
+    assert on_disk_core == set(_CORE_AGENT_BODIES) | _PLUGIN_STUBS, (
         "public/agents/*.md roster drifted — update the 16-surface enumeration: "
-        f"{sorted(on_disk.symmetric_difference(set(_CORE_AGENT_BODIES) | _PLUGIN_STUBS))}"
+        f"{sorted(on_disk_core.symmetric_difference(set(_CORE_AGENT_BODIES) | _PLUGIN_STUBS))}"
     )
-
-
-def test_roster_completeness_plugin_agents() -> None:
-    on_disk = {
+    on_disk_plugin = {
         p.relative_to(_PUBLIC).as_posix() for p in (_PUBLIC / "plugins").glob("*/agents/*.md")
     }
-    assert on_disk == set(_PLUGIN_AGENT_BODIES), (
+    assert on_disk_plugin == set(_PLUGIN_AGENT_BODIES), (
         "public/plugins/*/agents/*.md roster drifted — update the 16-surface "
-        f"enumeration: {sorted(on_disk.symmetric_difference(set(_PLUGIN_AGENT_BODIES)))}"
+        f"enumeration: {sorted(on_disk_plugin.symmetric_difference(set(_PLUGIN_AGENT_BODIES)))}"
     )
 
-
-def test_roster_is_sixteen_surfaces() -> None:
     examples = _skill_json_examples()
     assert len(examples) == 2, (
         f"the emitter skill must carry exactly TWO JSON examples, found {len(examples)}"
     )
     assert len(_FILE_SURFACES) + len(examples) == 16
 
+    for surface in _FILE_SURFACES:
+        text = _read(surface)
+        missing = [t for t in (_TOKEN_V12, _TOKEN_SELF_PULL) if t not in text]
+        assert not missing, (
+            f"surface {surface} lacks the emission-instruction token(s) {missing} — "
+            "every FR4 surface must instruct handoff-v1.2 emission with self_pull.refs "
+            "(the atoms actually self-pulled/read; never an unread atom)"
+        )
 
-# ---------------------------------------------------------------------------
-# The 16/16 adoption contract.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("surface", _FILE_SURFACES)
-def test_surface_carries_v12_and_self_pull_instruction(surface: str) -> None:
-    text = _read(surface)
-    missing = [t for t in (_TOKEN_V12, _TOKEN_SELF_PULL) if t not in text]
-    assert not missing, (
-        f"surface {surface} lacks the emission-instruction token(s) {missing} — "
-        "every FR4 surface must instruct handoff-v1.2 emission with self_pull.refs "
-        "(the atoms actually self-pulled/read; never an unread atom)"
-    )
-
-
-@pytest.mark.parametrize("index", [0, 1], ids=["example-handoff-only", "example-with-report"])
-def test_emitter_skill_example_carries_v12_and_self_pull(index: int) -> None:
-    examples = _skill_json_examples()
-    assert len(examples) == 2, "emitter skill must carry exactly two JSON examples"
-    example = examples[index]
-    missing = [t for t in (_TOKEN_V12, _TOKEN_SELF_PULL) if t not in example]
-    assert not missing, (
-        f"dadaia-handoff-emitter SKILL.md example #{index + 1} lacks token(s) "
-        f"{missing} — both examples must model schema_version handoff-v1.2 with a "
-        "self_pull.refs block"
-    )
+    for index, example in enumerate(examples):
+        missing = [t for t in (_TOKEN_V12, _TOKEN_SELF_PULL) if t not in example]
+        assert not missing, (
+            f"dadaia-handoff-emitter SKILL.md example #{index + 1} lacks token(s) "
+            f"{missing} — both examples must model schema_version handoff-v1.2 with a "
+            "self_pull.refs block"
+        )

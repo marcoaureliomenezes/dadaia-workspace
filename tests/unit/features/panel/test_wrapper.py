@@ -1,8 +1,20 @@
-"""Unit contracts for the memory wrapper view."""
+"""Unit contracts for the memory wrapper view.
+
+Two survivors:
+  1. iframe src correct + nested path + sandbox attr + tokens/memory CSS links
+     + prepaint, merged into one.
+  2. slug + path HTML-escaping — param (XSS).
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
+
+pytestmark = pytest.mark.unit
 
 
 def _render(slug: str, path: str) -> str:
@@ -14,86 +26,62 @@ def _render(slug: str, path: str) -> str:
     return body.decode("utf-8")
 
 
-def test_wrapper_back_link_present() -> None:
-    """Back-bar must contain 'Voltar ao Painel' text."""
+# ---------------------------------------------------------------------------
+# 1. iframe src + nested path + sandbox + tokens/memory css + prepaint
+# ---------------------------------------------------------------------------
+
+
+def test_wrapper_iframe_sandbox_css_links_and_prepaint() -> None:
     html = _render("dadaia-workspace", "architecture.html")
+
     assert "Voltar ao Painel" in html
-
-
-def test_wrapper_back_link_href_root() -> None:
-    """Back link href must be '/'."""
-    html = _render("dadaia-workspace", "architecture.html")
     assert 'href="/"' in html
-
-
-def test_wrapper_iframe_src() -> None:
-    """iframe src must be /memory/<slug>/<path>."""
-    html = _render("dadaia-workspace", "architecture.html")
     assert 'src="/memory/dadaia-workspace/architecture.html"' in html
-
-
-def test_wrapper_iframe_nested_path() -> None:
-    """iframe src must work for nested paths like product/index.html."""
-    html = _render("dadaia-workspace", "product/index.html")
-    assert 'src="/memory/dadaia-workspace/product/index.html"' in html
-
-
-def test_wrapper_slug_escaped() -> None:
-    """R3-A: slug with special HTML chars must be escaped in output."""
-    html = _render("<script>alert(1)</script>", "file.html")
-    assert "<script>alert(1)</script>" not in html
-    assert "&lt;script&gt;" in html
-
-
-def test_wrapper_path_escaped() -> None:
-    """R3-A: path with special HTML chars must be escaped in output."""
-    html = _render("safe-slug", "<img src=x onerror=alert(1)>.html")
-    assert "<img src=x onerror=alert(1)>" not in html
-    assert "&lt;img" in html
-
-
-def test_wrapper_returns_correct_tuple() -> None:
-    """View must return (int, str, bytes) triple."""
-    view = render_memory_wrapper(Path("/workspace"))
-    result = view(slug="s", path="f.html")
-    assert isinstance(result, tuple)
-    assert len(result) == 3
-    status, ct, body = result
-    assert isinstance(status, int)
-    assert isinstance(ct, str)
-    assert isinstance(body, bytes)
-
-
-def test_wrapper_contains_iframe_tag() -> None:
-    """HTML must contain an iframe element."""
-    html = _render("slug", "path.html")
     assert "<iframe" in html
     assert "sandbox" in html
 
+    assert "var(--color-accent" in html
+    assert "var(--color-surface" in html
+    assert "var(--color-border" in html
+    assert "/static/tokens.css" in html
+    assert "/static/memory.css" in html
 
-def test_wrapper_uses_color_tokens() -> None:
-    """Wrapper CSS must reference shared color tokens."""
-    rendered = _render("dadaia-workspace", "architecture.html")
-    assert "var(--color-accent" in rendered
-    assert "var(--color-surface" in rendered
-    assert "var(--color-border" in rendered
+    assert "localStorage" in html
+    assert "dadaia-panel-theme" in html
+    assert "dataset.theme" in html
 
-
-def test_wrapper_links_tokens_css() -> None:
-    """Wrapper must link /static/tokens.css so theme palettes are available."""
-    rendered = _render("dadaia-workspace", "architecture.html")
-    assert "/static/tokens.css" in rendered
-
-
-def test_wrapper_links_memory_css() -> None:
-    """Wrapper must link /static/memory.css for panel visual identity."""
-    rendered = _render("dadaia-workspace", "architecture.html")
-    assert "/static/memory.css" in rendered
+    # Nested paths render the iframe src correctly too.
+    nested_html = _render("dadaia-workspace", "product/index.html")
+    assert 'src="/memory/dadaia-workspace/product/index.html"' in nested_html
 
 
-def test_wrapper_prepaint_theme_script() -> None:
-    """Wrapper must apply stored theme before first contentful paint."""
-    rendered = _render("dadaia-workspace", "architecture.html")
-    assert "localStorage" in rendered
-    assert "dadaia-panel-theme" in rendered
-    assert "dataset.theme" in rendered
+# ---------------------------------------------------------------------------
+# 2. slug + path HTML-escaping (XSS)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("slug", "path", "forbidden", "escaped_needle"),
+    [
+        pytest.param(
+            "<script>alert(1)</script>",
+            "file.html",
+            "<script>alert(1)</script>",
+            "&lt;script&gt;",
+            id="slug-escaped",
+        ),
+        pytest.param(
+            "safe-slug",
+            "<img src=x onerror=alert(1)>.html",
+            "<img src=x onerror=alert(1)>",
+            "&lt;img",
+            id="path-escaped",
+        ),
+    ],
+)
+def test_slug_and_path_are_html_escaped(
+    slug: str, path: str, forbidden: str, escaped_needle: str
+) -> None:
+    html = _render(slug, path)
+    assert forbidden not in html
+    assert escaped_needle in html

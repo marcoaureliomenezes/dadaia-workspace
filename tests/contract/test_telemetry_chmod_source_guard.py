@@ -82,7 +82,10 @@ def _scan() -> _ChmodGuardVisitor:
     return visitor
 
 
-def test_every_os_chmod_is_posix_guarded() -> None:
+def test_every_os_chmod_is_posix_guarded_and_at_least_one_exists() -> None:
+    """Every os.chmod() call is enclosed by an `if PLATFORM.has_posix_chmod:` guard,
+    and the module still performs at least one guarded chmod (guards against a
+    vacuous pass where the guard contract is trivially satisfied by absence)."""
     visitor = _scan()
     assert visitor.unguarded == [], (
         "bare os.chmod() outside an `if PLATFORM.has_posix_chmod:` guard in "
@@ -90,11 +93,6 @@ def test_every_os_chmod_is_posix_guarded() -> None:
         "silent no-op (CWE-732); route through the injected FilePermissionSetter or guard "
         "the direct call."
     )
-
-
-def test_service_actually_hardens_permissions_somewhere() -> None:
-    """Guard against a vacuous pass: the module must still perform a guarded chmod."""
-    visitor = _scan()
     assert visitor.total >= 1, (
         "no os.chmod call found in telemetry/service.py — the permission-hardening fallback "
         "must still exist (guarded), otherwise the guard contract is vacuously satisfied"

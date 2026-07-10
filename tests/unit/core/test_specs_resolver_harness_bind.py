@@ -15,6 +15,12 @@ These tests model the non-descendant case DETERMINISTICALLY — a bind-epoch mar
 ``[A1, A2]`` resolved with a disjoint ``ancestry_pids`` frozenset ``{B1, B2}`` — with **no
 spawned processes**: they seed the marker, seed the harness-keyed session record, and set the
 harness env directly.
+
+CRIT-adjacent: a stale/inherited harness id resolving a foreign bound context would route
+writes to the wrong repo. The two-markers-disjoint-chains no-cross-attribution row is folded
+into ``test_specs_resolver.py``'s none-table (ambiguous/disjoint attribution coverage); the
+descendant-still-resolves case is a duplicate of ``test_specs_resolver.py``'s e2e ancestry
+row and is not re-asserted here.
 """
 
 from __future__ import annotations
@@ -24,7 +30,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-import typer
 
 from dadaia_workspace.core import specs_resolver
 
@@ -100,7 +105,8 @@ def test_disjoint_ancestry_resolves_via_live_harness_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """(i) GREEN: disjoint ancestry (marker unattributable) + a LIVE harness-keyed session
-    record ⇒ the bound context resolves via the harness channel.
+    record ⇒ the bound context resolves via the harness channel — the codex non-descendant
+    fix.
 
     RED pre-fix: with no harness channel the disjoint ancestry falls through to BadParameter.
     """
@@ -114,59 +120,20 @@ def test_disjoint_ancestry_resolves_via_live_harness_record(
     assert resolved == (ws / "repos" / "proj" / "specs").resolve()
 
 
-def test_session_context_reads_harness_record_when_no_dadaia_session_id(
+# --- (iv) stale / inherited / absent harness id must NOT resolve ------------------
+
+
+def test_stale_and_absent_harness_record_never_resolve(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The channel lives in ``_session_context``: it returns the bound context of the live
-    harness-keyed record (drives the SAME channel the fix wires — not a slope test)."""
-    ws = _mk_ws(tmp_path, slug="proj")
-    _write_harness_record(ws, _HARNESS_ID, "proj", age_seconds=0)
-    monkeypatch.setenv("CODEX_SESSION_ID", _HARNESS_ID)
-    assert specs_resolver._session_context(ws) == "proj"
+    """(iv) A STALE (heartbeat-old) harness-keyed record must NOT resolve — an
+    inherited/stale harness id can never cross-attribute to a foreign bound context.
+    Falls through to the actionable BadParameter (never a blind first-ALIVE fallback).
+    Absorbs the absent-record case: a harness id whose session record does not exist
+    (never bound) is likewise unresolvable.
+    """
+    import typer
 
-
-# --- (ii) concurrent multi-session safety — never cross-attribute -----------------
-
-
-def test_two_markers_disjoint_chains_never_cross_attribute(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """(ii) Two bind-epoch markers with disjoint chains; the ancestry matches EXACTLY one ⇒
-    that one resolves and the other is never cross-attributed (concurrent-session safety)."""
-    ws = _mk_ws(tmp_path, slug="ctxa")
-    (ws / "repos" / "ctxb" / "specs").mkdir(parents=True)
-    _stamp_marker(ws, "ctxa", [90001, 90002])
-    _stamp_marker(ws, "ctxb", [91001, 91002])
-    # Ancestry shares a pid with ctxa's chain ONLY.
-    assert specs_resolver._persisted_bind_context(ws, frozenset({12345, 90002})) == "ctxa"
-    # Ancestry disjoint from both ⇒ neither is attributed (no blind fallback).
-    assert specs_resolver._persisted_bind_context(ws, frozenset({999, 998})) is None
-
-
-# --- (iii) descendant / same-shell case still resolves (ancestry path unchanged) --
-
-
-def test_descendant_ancestry_still_resolves_via_marker(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """(iii) A descendant (ancestry sharing a pid with the marker chain) still resolves via the
-    unchanged ancestry-membership path — no harness record needed."""
-    ws = _mk_ws(tmp_path, slug="proj")
-    _stamp_marker(ws, "proj", [70001, 70002, 70003])
-    monkeypatch.chdir(ws)
-    resolved = specs_resolver.resolve_specs_dir(None, ancestry_pids=frozenset({999, 70002}))
-    assert resolved == (ws / "repos" / "proj" / "specs").resolve()
-
-
-# --- (iv) stale / inherited harness id must NOT resolve to a foreign context ------
-
-
-def test_stale_harness_record_does_not_resolve(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """(iv) A STALE (heartbeat-old) harness-keyed record must NOT resolve — an inherited/stale
-    harness id can never cross-attribute to a foreign bound context. Falls through to the
-    actionable BadParameter (never a blind first-ALIVE fallback)."""
     ws = _mk_ws(tmp_path, slug="proj")
     _stamp_marker(ws, "proj", _MARKER_CHAIN)  # disjoint from the resolving ancestry below
     # Heartbeat far older than the TTL ⇒ the staleness guard rejects it.
@@ -178,12 +145,7 @@ def test_stale_harness_record_does_not_resolve(
     with pytest.raises(typer.BadParameter):
         specs_resolver.resolve_specs_dir(None, ancestry_pids=_DISJOINT_ANCESTRY)
 
-
-def test_absent_harness_record_does_not_resolve(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A harness id whose session record does not exist (never bound) ⇒ no resolution."""
-    ws = _mk_ws(tmp_path, slug="proj")
+    # A harness id whose session record does not exist at all (never bound).
     monkeypatch.setenv("CODEX_SESSION_ID", "codex-never-bound")
     assert specs_resolver._session_context(ws) is None
 

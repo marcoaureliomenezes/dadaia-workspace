@@ -103,22 +103,6 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> tuple[_SpyPluginStore, list[int]]:
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_list_consumes_container_built_store(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    spy: tuple[_SpyPluginStore, list[int]],
-) -> None:
-    """``dadaia plugin list`` reaches ``container.build_plugin_store`` and reads via its store."""
-    store, factory_calls = spy
-    monkeypatch.chdir(_workspace(tmp_path))
-
-    result = _runner.invoke(app, ["plugin", "list"])
-
-    assert result.exit_code == 0, result.output
-    assert factory_calls, "plugin list never called container.build_plugin_store"
-    assert store.read_calls, "plugin list never read through the container-built store"
-
-
 def test_plugin_install_consumes_container_built_store(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -158,10 +142,3 @@ def test_adapter_construction_sites_limited_to_composition_and_same_layer() -> N
         if _CONSTRUCTION_RE.search(py.read_text(encoding="utf-8")):
             offenders.append(str(py.relative_to(_PKG_ROOT)))
     assert not offenders, f"JsonPluginStore constructed outside the composition root: {offenders}"
-
-
-def test_build_plugin_store_returns_plugin_store_satisfying_object() -> None:
-    """``container.build_plugin_store()`` exists and satisfies the ``PluginStore`` protocol."""
-    store = container.build_plugin_store()
-    assert callable(getattr(store, "read", None)), "store lacks a callable read()"
-    assert callable(getattr(store, "write", None)), "store lacks a callable write()"

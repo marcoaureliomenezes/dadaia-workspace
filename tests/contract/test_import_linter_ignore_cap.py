@@ -108,8 +108,11 @@ def _ignore_edges_by_contract() -> dict[str, list[str]]:
     return edges
 
 
-def test_ignore_edge_count_does_not_exceed_recorded_cap() -> None:
-    """The total ignored-import edge count must not grow past the recorded cap."""
+def test_ignore_edge_cap_family_breakdown_and_sanctioned_sources() -> None:
+    """The total ignored-import edge count must equal the recorded cap exactly (never
+    silently grow past it, never drift stale below it), the per-family breakdown must
+    match the recorded shape, and every ignored edge must originate in its family's
+    sanctioned source layer."""
     by_contract = _ignore_edges_by_contract()
     total = sum(len(v) for v in by_contract.values())
     breakdown = ", ".join(f"{sec.split(':')[-1]}={len(v)}" for sec, v in by_contract.items())
@@ -120,47 +123,25 @@ def test_ignore_edge_count_does_not_exceed_recorded_cap() -> None:
         "requires a documented rationale comment on the edge in setup.cfg AND a bump of "
         "_RECORDED_IGNORE_EDGE_CAP in this test, both in the SAME commit."
     )
-
-
-def test_recorded_cap_is_not_stale_above_reality() -> None:
-    """The recorded cap must equal the live total so a removed edge is re-pinned lower.
-
-    This catches the *lowering* direction: if a DI cleanup deletes an ignored edge but the
-    author forgets to lower ``_RECORDED_IGNORE_EDGE_CAP``, the cap would drift above reality
-    and silently re-admit a future exception. The cap must track the true count exactly.
-
-    Counts across ALL contract sections (``_ignore_edges_by_contract`` iterates every
-    ``importlinter:contract:*`` section), so the v0.1.54 FR3 ``features-no-cross-feature``
-    ignores are included in the total.
-    """
-    total = sum(len(v) for v in _ignore_edges_by_contract().values())
     assert total == _RECORDED_IGNORE_EDGE_CAP, (
         f"_RECORDED_IGNORE_EDGE_CAP={_RECORDED_IGNORE_EDGE_CAP} but setup.cfg has {total} "
         "ignored edges. If you removed an edge, LOWER the cap in this test to re-pin it "
-        "(good — ratchet down). If you added one, see the cap-growth test's message."
+        "(good — ratchet down). If you added one, see the cap-growth message above."
     )
 
-
-def test_ignore_edge_count_matches_recorded_per_family_breakdown() -> None:
-    """Each contract family's ignored-edge count must equal its recorded per-family cap.
-
-    The grand-total cap alone would not catch a silent shift *between* families (e.g. a
-    dropped ``features-no-infrastructure`` DI edge quietly re-spent as a new
-    ``features-no-cross-feature`` erosion at the same total). Pinning each family separately
-    makes the exact v0.1.54 W3 shape falsifiable: features-no-infrastructure = 9,
-    features-no-subprocess = 4, features-no-cross-feature = 13.
-    """
-    by_family = {
-        section.split(":")[-1]: len(edges) for section, edges in _ignore_edges_by_contract().items()
-    }
+    by_family = {section.split(":")[-1]: len(edges) for section, edges in by_contract.items()}
     assert by_family == _RECORDED_PER_FAMILY_CAP, (
         f"per-family ignore breakdown {by_family} != recorded {_RECORDED_PER_FAMILY_CAP}. "
         "Each family's suppressed-edge count is pinned; adjust the setup.cfg ignores AND "
         "_RECORDED_PER_FAMILY_CAP together in the same commit."
     )
 
+    _assert_every_ignored_edge_is_a_features_layering_exception(by_contract)
 
-def test_every_ignored_edge_is_a_features_layering_exception() -> None:
+
+def _assert_every_ignored_edge_is_a_features_layering_exception(
+    by_contract: dict[str, list[str]],
+) -> None:
     """Every ignored edge must originate in its family's sanctioned source layer.
 
     The layering law's sanctioned exceptions come in three kinds now:
@@ -178,7 +159,7 @@ def test_every_ignored_edge_is_a_features_layering_exception() -> None:
         "cli-no-infrastructure": "dadaia_workspace.cli",
     }
     offenders: list[str] = []
-    for section, section_edges in _ignore_edges_by_contract().items():
+    for section, section_edges in by_contract.items():
         family = section.split(":")[-1]
         sanctioned = _SANCTIONED_SOURCE_BY_FAMILY.get(family, "dadaia_workspace.features")
         for edge in section_edges:

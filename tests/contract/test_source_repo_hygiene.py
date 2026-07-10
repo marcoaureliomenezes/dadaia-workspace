@@ -17,8 +17,10 @@ def _is_ignored(path: str) -> bool:
     return result.returncode == 0
 
 
-def test_sdd_release_gate_artifacts_are_not_gitignored() -> None:
-    """The SDD gate cannot depend on local-only files hidden from git."""
+def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() -> None:
+    """The SDD gate cannot depend on local-only files hidden from git (canonical
+    lifecycle artifacts are opted back in), while only canonical content is opted in —
+    non-canonical specs content stays hidden by the privacy backstop."""
     visible_paths = [
         "specs/releases/ACTIVE.md",
         "specs/releases/v9.9.9/SPEC.md",
@@ -40,14 +42,9 @@ def test_sdd_release_gate_artifacts_are_not_gitignored() -> None:
         "specs/backlog/some-entry.md",
         "specs/backlog/_archive/some-consumed-entry.md",
     ]
-
     ignored = [path for path in visible_paths if _is_ignored(path)]
-
     assert ignored == []
 
-
-def test_noncanonical_specs_content_stays_gitignored() -> None:
-    """Only canonical lifecycle artifacts are opted back into version control."""
     ignored_paths = [
         # Backlog opt-in is Markdown-only (v0.1.49 FR1): non-md content and the
         # _archive/.gitkeep placeholder stay hidden by the privacy backstop.
@@ -58,7 +55,5 @@ def test_noncanonical_specs_content_stays_gitignored() -> None:
         "specs/releases/v9.9.9/tmp/debug.json",
         "specs/_archive/releases/v9.9.8/local-notes.md",
     ]
-
     not_ignored = [path for path in ignored_paths if not _is_ignored(path)]
-
     assert not_ignored == []

@@ -8,15 +8,19 @@ pid, written by `dadaia context bind`) — must RENEW (third identity rung), nev
 Bare pid equality is NOT enough: fixtures and eval flows legitimately model
 foreign holders with the current process pid and no session record; those keep
 blocking (the frozen TOCTOU/no-steal contracts).
+
+CRITICAL no-steal: foreign-live-pid remains a named blocked row.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import LockHeldError
 from dadaia_workspace.features.spec_context import lease
 
 pytestmark = pytest.mark.unit
@@ -50,8 +54,9 @@ def _acquire(workspace: Path, session_id: str, *, pid: int = _PID) -> tuple[str,
     )
 
 
-def test_rotated_sid_same_pid_with_lineage_renews(tmp_path: Path) -> None:
-    """Same live harness pid + rotated sid + session-record lineage ⇒ RENEW (F-1)."""
+def test_rotated_sid_same_pid_with_lineage_renews_and_reindexes(tmp_path: Path) -> None:
+    """Same live harness pid + rotated sid + session-record lineage ⇒ RENEW (F-1),
+    leaving no dangling by-session index entry for the replaced sid."""
     _seed_session_record(tmp_path, "sess_old", pid=_PID)
     status1, _ = _acquire(tmp_path, "sess_old")
     assert status1 == "ACQUIRED"
@@ -61,40 +66,48 @@ def test_rotated_sid_same_pid_with_lineage_renews(tmp_path: Path) -> None:
     assert rec2["session_id"] == "sess_new"
     assert rec2["pid"] == _PID
 
-
-def test_self_recognition_reindexes_the_new_sid(tmp_path: Path) -> None:
-    """The self-recognition RENEW leaves no dangling by-session entry."""
-    _seed_session_record(tmp_path, "sess_old", pid=_PID)
-    _acquire(tmp_path, "sess_old")
-    _acquire(tmp_path, "sess_new")
-
     index_dir = tmp_path / ".dadaia" / "states" / "ctx_locks" / "by-session"
     assert (index_dir / "sess_new.json").exists()
     assert not (index_dir / "sess_old.json").exists()
 
 
-def test_same_pid_without_session_record_still_blocked(tmp_path: Path) -> None:
-    """No lineage evidence ⇒ no self-recognition — the frozen foreign contract."""
-    _acquire(tmp_path, "sess_a")  # no session record seeded
-
-    with pytest.raises(lease.LockHeldError):
-        _acquire(tmp_path, "sess_b")
+def _setup_no_session_record(ws: Path) -> None:
+    _acquire(ws, "sess_a")  # no session record seeded
 
 
-def test_same_pid_with_mismatched_record_pid_still_blocked(tmp_path: Path) -> None:
-    """A session record with a DIFFERENT pid is not lineage evidence."""
-    _seed_session_record(tmp_path, "sess_a", pid=9999)
-    _acquire(tmp_path, "sess_a")
-
-    with pytest.raises(lease.LockHeldError):
-        _acquire(tmp_path, "sess_b")
+def _setup_mismatched_record_pid(ws: Path) -> None:
+    _seed_session_record(ws, "sess_a", pid=9999)
+    _acquire(ws, "sess_a")
 
 
-def test_foreign_live_pid_still_blocked(tmp_path: Path) -> None:
-    """No-steal guard: a DIFFERENT live pid is never recognized as self."""
-    _seed_session_record(tmp_path, "sess_a", pid=1111)
-    status1, _ = _acquire(tmp_path, "sess_a", pid=1111)
-    assert status1 == "ACQUIRED"
+def _setup_foreign_live_pid(ws: Path) -> None:
+    _seed_session_record(ws, "sess_a", pid=1111)
+    _acquire(ws, "sess_a", pid=1111)
 
-    with pytest.raises(lease.LockHeldError):
-        _acquire(tmp_path, "sess_b", pid=2222)
+
+@pytest.mark.parametrize(
+    ("setup", "acquire_pid"),
+    [
+        pytest.param(
+            _setup_no_session_record,
+            2222,
+            id="same-pid-no-session-record-still-blocked",
+        ),
+        pytest.param(
+            _setup_mismatched_record_pid,
+            2222,
+            id="same-pid-mismatched-record-pid-still-blocked",
+        ),
+        pytest.param(
+            _setup_foreign_live_pid,
+            2222,
+            id="foreign-live-pid-still-blocked",
+        ),
+    ],
+)
+def test_blocked_variants(tmp_path: Path, setup: Callable[[Path], None], acquire_pid: int) -> None:
+    """No lineage evidence, mismatched record pid, or a genuinely different live pid —
+    none of these are self-recognized; the frozen foreign-holder contract holds."""
+    setup(tmp_path)
+    with pytest.raises(LockHeldError):
+        _acquire(tmp_path, "sess_b", pid=acquire_pid)

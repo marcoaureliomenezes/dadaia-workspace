@@ -1,17 +1,13 @@
 """Integration tests for the panel's telemetry API endpoints (T-AM-15).
 
 Spins up ThreadingHTTPServer on port 0 (random free port) with a stub
-TelemetryService that returns canned fixtures.  Uses urllib.request only
+TelemetryService that returns canned fixtures. Uses urllib.request only
 (stdlib; no requests).
 
-Tests are sequenced around the three endpoints:
-    GET /api/agents           — 401 without token, 200 with token
-    GET /api/workflows        — same
-    GET /api/agents/{id}/sessions — same
-    Privacy T1: no forbidden fields in any payload
-    Query string forwarding: ?window_days=N
-    Security headers: CSP on HTML, nosniff on JSON
-    404 body: lists known endpoints
+Merged per plan-integration.md (14 -> 2 kept CRITICAL): (1) endpoints-200 (no-auth
+contract) + window_days forwarding + 404-body-lists-endpoints; (2) CSP-on-HTML +
+nosniff-on-JSON. The T1 recursive forbidden-field privacy scan walking all three
+payloads is kept as its own CRITICAL fn (no content/prompt/thinking leak).
 """
 
 from __future__ import annotations
@@ -25,9 +21,6 @@ from typing import Any
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Canned fixtures (minimal, shape-correct)
-# ---------------------------------------------------------------------------
 from dadaia_workspace.features.telemetry.aggregator.models import (
     AgentListResult,
     AgentSummary,
@@ -107,11 +100,6 @@ _CANNED_SESSIONS: list[RecentSession] = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Stub TelemetryService
-# ---------------------------------------------------------------------------
-
-
 class StubTelemetryService:
     """Minimal TelemetryService stub returning canned fixtures.
 
@@ -146,19 +134,9 @@ class StubTelemetryService:
         return _CANNED_SESSIONS
 
 
-# ---------------------------------------------------------------------------
-# Server fixture
-# ---------------------------------------------------------------------------
-
-
 def _build_server(token: str, stub_telemetry: StubTelemetryService):
     """Build a ThreadingHTTPServer on port 0 with the panel handler."""
     from dadaia_workspace.features.panel.handler import make_handler_class
-
-    # Minimal stub views for existing routes.
-
-    # We only need stub callables for the existing routes; the new telemetry
-    # routes are added by make_handler_class receiving telemetry view keys.
 
     def _stub_view(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "text/html; charset=utf-8", b"<html>ok</html>")
@@ -166,18 +144,15 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "application/json", b"{}")
 
-    # /api/workflows is a bearer-only canonical-source view. The integration
-    # test injects a minimal conforming payload for existing 200+shape assertions.
     def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
         import datetime as _dt
-        import json as _json
 
         payload = {
             "generated_at": _dt.datetime.now(tz=_dt.UTC).isoformat(),
             "source_hint": ".dadaia/agentic/workflows/",
             "workflows": [],
         }
-        return (200, "application/json; charset=utf-8", _json.dumps(payload).encode("utf-8"))
+        return (200, "application/json; charset=utf-8", json.dumps(payload).encode("utf-8"))
 
     stub_views = {
         "index": _stub_view,
@@ -199,7 +174,6 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
 def panel_server():
     """Start panel in a background thread; yield (base_url, token, stub_telemetry)."""
     stub_tel = StubTelemetryService()
-    # Use a fixed token for tests.
     test_token = "test-token-abc123"
 
     server = _build_server(test_token, stub_tel)
@@ -214,18 +188,8 @@ def panel_server():
     server.shutdown()
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes]:
-    """GET url, return (status, lowercase-keyed headers, body).
-
-    Headers are normalised to lowercase keys so callers can look up with e.g.
-    ``headers.get("x-content-type-options")`` regardless of server casing.
-    Handles 401 without raising.
-    """
+    """GET url, return (status, lowercase-keyed headers, body)."""
     req = urllib.request.Request(url)
     if token:
         req.add_header("Authorization", f"Bearer {token}")
@@ -238,77 +202,60 @@ def _get(url: str, token: str | None = None) -> tuple[int, dict[str, str], bytes
         return exc.code, headers, exc.read()
 
 
-# ---------------------------------------------------------------------------
-# T-AM-15 tests
-# ---------------------------------------------------------------------------
+def test_endpoints_no_auth_window_days_forwarding_404_body_and_security_headers(
+    panel_server,
+) -> None:
+    """No-auth contract (credential-less 200) + window_days forwarding + 404 body lists
+    endpoints + CSP-on-HTML / nosniff-on-JSON security headers."""
+    base, token, stub = panel_server
+
+    # No-auth: every telemetry endpoint serves credential-less.
+    status, _, body = _get(f"{base}/api/agents")
+    assert status == 200
+    data = json.loads(body)
+    assert "agents" in data
+    assert "generated_at" in data
+
+    status, _, _ = _get(f"{base}/api/workflows")
+    assert status == 200
+
+    status, _, body = _get(f"{base}/api/workflows", token=token)
+    assert status == 200
+    data = json.loads(body)
+    assert "workflows" in data
+    assert "generated_at" in data
+
+    status, _, body = _get(f"{base}/api/agents/foo/sessions")
+    assert status == 200
+    data = json.loads(body)
+    assert "sessions" in data
+    assert isinstance(data["sessions"], list)
+
+    # ?window_days=N forwarded to the telemetry service.
+    status, _, _ = _get(f"{base}/api/agents?window_days=30", token=token)
+    assert status == 200
+    assert stub.last_list_agents_kwargs.get("window_days") == 30
+
+    # 404 body lists known endpoints.
+    status, _, body = _get(f"{base}/api/unknown")
+    assert status == 404
+    body_text = body.decode("utf-8", errors="replace")
+    assert "/api/agents" in body_text
+    assert "/api/workflows" in body_text
+
+    # Security headers: CSP on HTML, nosniff on JSON.
+    status, headers, _ = _get(f"{base}/")
+    assert status == 200
+    assert "content-security-policy" in {k.lower() for k in headers}
+
+    status, headers, _ = _get(f"{base}/api/agents", token=token)
+    assert status == 200
+    assert headers.get("x-content-type-options", "").lower() == "nosniff"
 
 
-class TestAgentsEndpoint:
-    def test_agents_endpoint_200_without_token(self, panel_server) -> None:
-        """GET /api/agents without Authorization header → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents")
-        assert status == 200
+class TestPrivacyT1ForbiddenFieldScan:
+    """CRITICAL: recursive forbidden-field scan over all three telemetry payloads."""
 
-    def test_agents_endpoint_200_with_token(self, panel_server) -> None:
-        """GET /api/agents with Bearer token → 200, valid JSON."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents", token=token)
-        assert status == 200
-        data = json.loads(body)
-        assert "agents" in data
-        assert "generated_at" in data
-
-    def test_agents_nosniff_header(self, panel_server) -> None:
-        """GET /api/agents response has X-Content-Type-Options: nosniff."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents", token=token)
-        assert status == 200
-        assert headers.get("x-content-type-options", "").lower() == "nosniff"
-
-    def test_query_string_parsing_window_days(self, panel_server) -> None:
-        """GET /api/agents?window_days=30 passes window_days=30 to telemetry service."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents?window_days=30", token=token)
-        assert status == 200
-        assert stub.last_list_agents_kwargs.get("window_days") == 30
-
-
-class TestWorkflowsEndpoint:
-    def test_workflows_endpoint_200_without_token(self, panel_server) -> None:
-        """GET /api/workflows without Authorization header → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/workflows")
-        assert status == 200
-
-    def test_workflows_endpoint_200_with_token(self, panel_server) -> None:
-        """GET /api/workflows with Bearer token → 200, valid JSON."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/workflows", token=token)
-        assert status == 200
-        data = json.loads(body)
-        assert "workflows" in data
-        assert "generated_at" in data
-
-
-class TestAgentSessionsEndpoint:
-    def test_agent_sessions_endpoint(self, panel_server) -> None:
-        """GET /api/agents/foo/sessions with token → 200, body has 'sessions' key."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents/foo/sessions", token=token)
-        assert status == 200
-        data = json.loads(body)
-        assert "sessions" in data
-        assert isinstance(data["sessions"], list)
-
-    def test_agent_sessions_200_without_token(self, panel_server) -> None:
-        """GET /api/agents/foo/sessions without token → 200 (no-auth contract (operator decision 2026-06-11): credential-less serves)."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents/foo/sessions")
-        assert status == 200
-
-
-class TestPrivacyAndSecurity:
     _FORBIDDEN_FIELDS = {
         "content",
         "text",
@@ -320,7 +267,6 @@ class TestPrivacyAndSecurity:
     }
 
     def _check_no_forbidden_fields(self, data: Any, path: str = "") -> None:
-        """Recursively assert no forbidden field names appear in the payload."""
         if isinstance(data, dict):
             for key in data:
                 assert key not in self._FORBIDDEN_FIELDS, (
@@ -331,53 +277,17 @@ class TestPrivacyAndSecurity:
             for i, item in enumerate(data):
                 self._check_no_forbidden_fields(item, f"{path}[{i}]")
 
-    def test_no_forbidden_fields_in_agents_payload(self, panel_server) -> None:
-        """T1: /api/agents response must not contain content/prompt/thinking/etc."""
+    def test_no_forbidden_fields_in_all_three_payloads(self, panel_server) -> None:
         base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents", token=token)
+
+        status, _, body = _get(f"{base}/api/agents", token=token)
         assert status == 200
-        data = json.loads(body)
-        self._check_no_forbidden_fields(data, "/api/agents")
+        self._check_no_forbidden_fields(json.loads(body), "/api/agents")
 
-    def test_no_forbidden_fields_in_workflows_payload(self, panel_server) -> None:
-        """T1: /api/workflows response must not contain forbidden fields."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/workflows", token=token)
+        status, _, body = _get(f"{base}/api/workflows", token=token)
         assert status == 200
-        data = json.loads(body)
-        self._check_no_forbidden_fields(data, "/api/workflows")
+        self._check_no_forbidden_fields(json.loads(body), "/api/workflows")
 
-    def test_no_forbidden_fields_in_sessions_payload(self, panel_server) -> None:
-        """T1: /api/agents/{id}/sessions must not contain forbidden fields."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents/foo/sessions", token=token)
+        status, _, body = _get(f"{base}/api/agents/foo/sessions", token=token)
         assert status == 200
-        data = json.loads(body)
-        self._check_no_forbidden_fields(data, "/api/agents/foo/sessions")
-
-    def test_csp_header_on_html(self, panel_server) -> None:
-        """GET / → response has Content-Security-Policy header."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/")
-        assert status == 200
-        assert "content-security-policy" in {k.lower() for k in headers}
-
-    def test_nosniff_on_json(self, panel_server) -> None:
-        """GET /api/agents → response has X-Content-Type-Options: nosniff."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/agents", token=token)
-        assert status == 200
-        assert headers.get("x-content-type-options", "").lower() == "nosniff"
-
-
-class Test404:
-    def test_404_body_mentions_endpoints(self, panel_server) -> None:
-        """GET /api/unknown → 404, body mentions /api/agents and /api/workflows."""
-        base, token, stub = panel_server
-        status, headers, body = _get(f"{base}/api/unknown")
-        assert status == 404
-        body_text = body.decode("utf-8", errors="replace")
-        assert "/api/agents" in body_text, (
-            "404 body must list /api/agents so callers know endpoint exists"
-        )
-        assert "/api/workflows" in body_text, "404 body must list /api/workflows"
+        self._check_no_forbidden_fields(json.loads(body), "/api/agents/foo/sessions")

@@ -9,7 +9,9 @@ TTL-expired-but-still-running foreign holder is not taken over via the side door
     steal:   TTL-expired record + alive recorded pid    -> exit 1 (LIVE, refuse)
     steal:   TTL-expired record + dead recorded pid      -> exit 0 (STOLEN)
 
-The probe is monkeypatched at its builder so the verdict is deterministic.
+The probe is monkeypatched at its builder so the verdict is deterministic. (The unit
+decisions themselves live in test_lease_pid_liveness.py — this file proves only that
+the CLI wiring threads the same probe through.)
 """
 
 from __future__ import annotations
@@ -49,57 +51,54 @@ def _patch_probe(monkeypatch: pytest.MonkeyPatch, ws: Path, *, alive: bool) -> N
     monkeypatch.setattr(lease, "_main_pid_probe", lambda: lambda _pid: alive)
 
 
-def test_main_acquire_yields_when_pid_alive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("argv", "alive", "expect_rc", "expect_session_id"),
+    [
+        pytest.param(
+            ["acquire", CTX, "newsess", "v0.1.11", "IMPLEMENTATION"],
+            True,
+            1,
+            "dead-holder",
+            id="acquire-yields-when-pid-alive",
+        ),
+        pytest.param(
+            ["acquire", CTX, "newsess", "v0.1.11", "IMPLEMENTATION"],
+            False,
+            0,
+            "newsess",
+            id="acquire-takes-over-when-pid-dead",
+        ),
+        pytest.param(
+            ["steal", CTX, "thief"],
+            True,
+            1,
+            "dead-holder",
+            id="steal-refuses-when-pid-alive",
+        ),
+        pytest.param(
+            ["steal", CTX, "thief"],
+            False,
+            0,
+            "thief",
+            id="steal-succeeds-when-pid-dead",
+        ),
+    ],
+)
+def test_main_threads_pid_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    argv: list[str],
+    alive: bool,
+    expect_rc: int,
+    expect_session_id: str,
 ) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     _seed_stale_record(ws, pid=4242)
-    _patch_probe(monkeypatch, ws, alive=True)
+    _patch_probe(monkeypatch, ws, alive=alive)
 
-    rc = lease._main(["acquire", CTX, "newsess", "v0.1.11", "IMPLEMENTATION"])
+    rc = lease._main(argv)
 
-    assert rc == 1
+    assert rc == expect_rc
     stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] == "dead-holder"
-
-
-def test_main_acquire_takes_over_when_pid_dead(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _seed_stale_record(ws, pid=4242)
-    _patch_probe(monkeypatch, ws, alive=False)
-
-    rc = lease._main(["acquire", CTX, "newsess", "v0.1.11", "IMPLEMENTATION"])
-
-    assert rc == 0
-    stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] == "newsess"
-
-
-def test_main_steal_refuses_when_pid_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _seed_stale_record(ws, pid=4242)
-    _patch_probe(monkeypatch, ws, alive=True)
-
-    rc = lease._main(["steal", CTX, "thief"])
-
-    assert rc == 1
-    stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] == "dead-holder"
-
-
-def test_main_steal_succeeds_when_pid_dead(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _seed_stale_record(ws, pid=4242)
-    _patch_probe(monkeypatch, ws, alive=False)
-
-    rc = lease._main(["steal", CTX, "thief"])
-
-    assert rc == 0
-    stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] == "thief"
+    assert stored["session_id"] == expect_session_id

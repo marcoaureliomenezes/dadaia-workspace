@@ -32,45 +32,31 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 
 # ---------------------------------------------------------------------------
-# FR2 — built-in templates
+# G-1 hard constraint: Fable is NEVER assigned to security-reviewer — kept standalone
+# (model-governance security constraint, not merged with other template shape checks).
 # ---------------------------------------------------------------------------
 
 
-def test_exactly_three_templates_with_expected_ids() -> None:
+def test_no_template_assigns_fable_to_security_reviewer() -> None:
+    for template in list_templates():
+        assert template.assignments["security-reviewer"].model != "claude-fable-5", template.id
+
+
+# ---------------------------------------------------------------------------
+# FR2 — built-in templates: ids/default, 9-core coverage, registry+vocab validity.
+# ---------------------------------------------------------------------------
+
+
+def test_template_ids_default_and_balanced_roster_golden() -> None:
     assert [t.id for t in list_templates()] == [
         "balanced",
         "subscription-saver",
         "max-quality",
     ]
-
-
-def test_balanced_is_the_default_template() -> None:
     assert default_template().id == "balanced"
     defaults = [t for t in list_templates() if t.default]
     assert len(defaults) == 1 and defaults[0].id == "balanced"
 
-
-def test_every_template_covers_exactly_the_nine_core_agents() -> None:
-    for template in list_templates():
-        assert set(template.assignments) == set(CORE_AGENTS), template.id
-        assert len(template.assignments) == 9
-
-
-def test_every_template_model_is_registry_known_and_effort_in_vocab() -> None:
-    known = registry_by_claude_id()
-    for template in list_templates():
-        for agent, assignment in template.assignments.items():
-            assert assignment.model in known, f"{template.id}:{agent}"
-            assert assignment.effort in CLAUDE_EFFORTS, f"{template.id}:{agent}"
-
-
-def test_no_template_assigns_fable_to_security_reviewer() -> None:
-    """G-1 hard constraint: Fable is NEVER assigned to security-reviewer."""
-    for template in list_templates():
-        assert template.assignments["security-reviewer"].model != "claude-fable-5", template.id
-
-
-def test_balanced_roster_matches_fr2_table() -> None:
     balanced = default_template()
     expected = {
         "project-manager": ("claude-fable-5", "high"),
@@ -84,6 +70,16 @@ def test_balanced_roster_matches_fr2_table() -> None:
         "qa-engineer": ("claude-sonnet-5", "high"),
     }
     assert {a: (v.model, v.effort) for a, v in balanced.assignments.items()} == expected
+
+
+def test_every_template_covers_nine_core_agents_with_registry_known_effort_vocab() -> None:
+    known = registry_by_claude_id()
+    for template in list_templates():
+        assert set(template.assignments) == set(CORE_AGENTS), template.id
+        assert len(template.assignments) == 9
+        for agent, assignment in template.assignments.items():
+            assert assignment.model in known, f"{template.id}:{agent}"
+            assert assignment.effort in CLAUDE_EFFORTS, f"{template.id}:{agent}"
 
 
 # ---------------------------------------------------------------------------
@@ -102,48 +98,68 @@ def _template_with(agent: str, model: str, effort: str, **kwargs: object) -> Age
     )
 
 
-def test_assert_fails_on_unknown_model() -> None:
-    bad = _template_with("qa-engineer", "claude-unknown-9-9", "high")
-    with pytest.raises(ValueError, match="claude-unknown-9-9"):
-        _assert_templates_resolve((bad,))
+@pytest.mark.parametrize(
+    ("name", "build_fn", "match"),
+    [
+        (
+            "unknown_model",
+            lambda: (_template_with("qa-engineer", "claude-unknown-9-9", "high"),),
+            "claude-unknown-9-9",
+        ),
+        (
+            "invalid_effort",
+            lambda: (_template_with("qa-engineer", "claude-sonnet-5", "turbo"),),
+            "turbo",
+        ),
+        (
+            # The import-time assert retains the fable-on-security synthetic case
+            # (a model-governance security constraint check, separate from G-1's
+            # standalone live-registry sweep above).
+            "fable_on_security_reviewer",
+            lambda: (_template_with("security-reviewer", "claude-fable-5", "high"),),
+            "security-reviewer",
+        ),
+        (
+            "incomplete_coverage",
+            lambda: (
+                AgentModelTemplate(
+                    id="partial",
+                    label="x",
+                    default=True,
+                    assignments={
+                        k: v
+                        for k, v in default_template().assignments.items()
+                        if k != "qa-engineer"
+                    },
+                ),
+            ),
+            "qa-engineer",
+        ),
+        ("duplicate_template_id", lambda: (default_template(), default_template()), "duplicate"),
+        (
+            "balanced_default_missing",
+            lambda: (
+                AgentModelTemplate(
+                    id="other",
+                    label="x",
+                    default=True,
+                    assignments=dict(default_template().assignments),
+                ),
+            ),
+            "balanced",
+        ),
+    ],
+)
+def test_assert_templates_resolve_rejects_malformed(
+    name: str, build_fn: object, match: str
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        _assert_templates_resolve(build_fn())  # type: ignore[operator]
 
-
-def test_assert_fails_on_invalid_effort() -> None:
-    bad = _template_with("qa-engineer", "claude-sonnet-5", "turbo")
-    with pytest.raises(ValueError, match="turbo"):
-        _assert_templates_resolve((bad,))
-
-
-def test_assert_fails_on_fable_on_security_reviewer() -> None:
-    bad = _template_with("security-reviewer", "claude-fable-5", "high")
-    with pytest.raises(ValueError, match="security-reviewer"):
-        _assert_templates_resolve((bad,))
-
-
-def test_assert_fails_on_incomplete_coverage() -> None:
-    partial = dict(default_template().assignments)
-    partial.pop("qa-engineer")
-    bad = AgentModelTemplate(id="partial", label="x", default=True, assignments=partial)
-    with pytest.raises(ValueError, match="qa-engineer"):
-        _assert_templates_resolve((bad,))
-
-
-def test_assert_fails_on_duplicate_template_id() -> None:
-    t = default_template()
-    with pytest.raises(ValueError, match="duplicate"):
-        _assert_templates_resolve((t, t))
-
-
-def test_assert_fails_when_balanced_default_missing() -> None:
-    only = AgentModelTemplate(
-        id="other", label="x", default=True, assignments=dict(default_template().assignments)
-    )
-    with pytest.raises(ValueError, match="balanced"):
-        _assert_templates_resolve((only,))
-
-
-def test_live_built_in_passes_the_assert() -> None:
-    _assert_templates_resolve(_BUILT_IN)  # must not raise
+    if name == "duplicate_template_id":
+        # Companion positive proof: the live built-in roster passes the same
+        # assert cleanly (must not raise).
+        _assert_templates_resolve(_BUILT_IN)
 
 
 # ---------------------------------------------------------------------------
@@ -164,109 +180,129 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_no_overlay_resolves_balanced_with_source_default() -> None:
-    resolved = resolve_agent_model("software-engineer", None)
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-sonnet-5",
-        "xhigh",
-        "default",
-    )
+@pytest.mark.parametrize(
+    ("name", "agent", "overlay_fn", "pack_default", "expected"),
+    [
+        (
+            "no_overlay_resolves_balanced_default",
+            "software-engineer",
+            lambda: None,
+            None,
+            ("claude-sonnet-5", "xhigh", "default"),
+        ),
+        (
+            "applied_template_resolves_source_template",
+            "project-manager",
+            lambda: AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={}),
+            None,
+            ("claude-opus-4-8", "high", "template"),
+        ),
+        (
+            # AC-3: template subscription-saver + override {SE: model=opus-4-8} →
+            # SE = opus-4-8 (override model) / xhigh (template effort), source=override.
+            "per_field_override_merges_with_applied_template",
+            "software-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template="subscription-saver",
+                overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
+            ),
+            None,
+            ("claude-opus-4-8", "xhigh", "override"),
+        ),
+        (
+            "effort_only_override_keeps_template_model",
+            "qa-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template=None,
+                overrides={"qa-engineer": AgentModelOverride(effort="max")},
+            ),
+            None,
+            ("claude-sonnet-5", "max", "override"),
+        ),
+        (
+            "full_override_beats_template",
+            "ai-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template="max-quality",
+                overrides={
+                    "ai-engineer": AgentModelOverride(
+                        model="claude-haiku-4-5-20251001", effort="low"
+                    )
+                },
+            ),
+            None,
+            ("claude-haiku-4-5-20251001", "low", "override"),
+        ),
+        (
+            # F-6 asymmetry: pack default with no override → model only; effort is None.
+            "plugin_pack_default_without_override_resolves_model_only",
+            "frontend-engineer",
+            lambda: None,
+            "claude-sonnet-5",
+            ("claude-sonnet-5", None, "pack"),
+        ),
+        (
+            "plugin_override_beats_pack_default",
+            "frontend-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template=None,
+                overrides={
+                    "frontend-engineer": AgentModelOverride(model="claude-opus-4-8", effort="high")
+                },
+            ),
+            "claude-sonnet-5",
+            ("claude-opus-4-8", "high", "override"),
+        ),
+        (
+            "plugin_effort_only_override_keeps_pack_model",
+            "frontend-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template=None,
+                overrides={"frontend-engineer": AgentModelOverride(effort="medium")},
+            ),
+            "claude-sonnet-5",
+            ("claude-sonnet-5", "medium", "override"),
+        ),
+        (
+            # AC-3: an unrelated agent keeps the applied template when only ONE
+            # other agent in the overlay is overridden.
+            "ac3_other_agents_keep_applied_template_when_only_one_overridden",
+            "qa-engineer",
+            lambda: AgentModelPolicyOverlay(
+                applied_template="subscription-saver",
+                overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
+            ),
+            None,
+            ("claude-sonnet-5", "high", "template"),
+        ),
+    ],
+)
+def test_resolve_agent_model_precedence_table(
+    name: str,
+    agent: str,
+    overlay_fn: object,
+    pack_default: str | None,
+    expected: tuple[str, str | None, str],
+) -> None:
+    overlay = overlay_fn()  # type: ignore[operator]
+    resolved = resolve_agent_model(agent, overlay, pack_default=pack_default)
+    assert (resolved.model, resolved.effort, resolved.source) == expected
 
 
-def test_applied_template_resolves_with_source_template() -> None:
-    overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
-    resolved = resolve_agent_model("project-manager", overlay)
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-opus-4-8",
-        "high",
-        "template",
-    )
-
-
-def test_ac3_per_field_override_merges_with_applied_template() -> None:
-    """AC-3: template subscription-saver + override {SE: model=opus-4-8} →
-    SE = opus-4-8 (override model) / xhigh (template effort), source=override."""
-    overlay = AgentModelPolicyOverlay(
-        applied_template="subscription-saver",
-        overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
-    )
-    resolved = resolve_agent_model("software-engineer", overlay)
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-opus-4-8",
-        "xhigh",
-        "override",
-    )
-    # All other agents keep the applied template's values.
-    other = resolve_agent_model("qa-engineer", overlay)
-    assert (other.model, other.effort, other.source) == ("claude-sonnet-5", "high", "template")
-
-
-def test_effort_only_override_keeps_template_model() -> None:
-    overlay = AgentModelPolicyOverlay(
-        applied_template=None,
-        overrides={"qa-engineer": AgentModelOverride(effort="max")},
-    )
-    resolved = resolve_agent_model("qa-engineer", overlay)
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-sonnet-5",
-        "max",
-        "override",
-    )
-
-
-def test_full_override_beats_template() -> None:
-    overlay = AgentModelPolicyOverlay(
-        applied_template="max-quality",
-        overrides={
-            "ai-engineer": AgentModelOverride(model="claude-haiku-4-5-20251001", effort="low")
-        },
-    )
-    resolved = resolve_agent_model("ai-engineer", overlay)
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-haiku-4-5-20251001",
-        "low",
-        "override",
-    )
-
-
-def test_plugin_pack_default_without_override_resolves_model_only() -> None:
-    """F-6 asymmetry: pack default with no override → model only; effort is None."""
-    resolved = resolve_agent_model("frontend-engineer", None, pack_default="claude-sonnet-5")
-    assert (resolved.model, resolved.effort, resolved.source) == ("claude-sonnet-5", None, "pack")
-
-
-def test_plugin_override_beats_pack_default() -> None:
-    overlay = AgentModelPolicyOverlay(
-        applied_template=None,
-        overrides={"frontend-engineer": AgentModelOverride(model="claude-opus-4-8", effort="high")},
-    )
-    resolved = resolve_agent_model("frontend-engineer", overlay, pack_default="claude-sonnet-5")
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-opus-4-8",
-        "high",
-        "override",
-    )
-
-
-def test_plugin_effort_only_override_keeps_pack_model() -> None:
-    overlay = AgentModelPolicyOverlay(
-        applied_template=None,
-        overrides={"frontend-engineer": AgentModelOverride(effort="medium")},
-    )
-    resolved = resolve_agent_model("frontend-engineer", overlay, pack_default="claude-sonnet-5")
-    assert (resolved.model, resolved.effort, resolved.source) == (
-        "claude-sonnet-5",
-        "medium",
-        "override",
-    )
-
-
-def test_unknown_agent_without_pack_default_raises() -> None:
-    with pytest.raises(ValueError, match="unknown agent"):
-        resolve_agent_model("not-an-agent", None)
-
-
-def test_unknown_applied_template_raises() -> None:
-    overlay = AgentModelPolicyOverlay(applied_template="nope", overrides={})
-    with pytest.raises(ValueError, match="nope"):
-        resolve_agent_model("qa-engineer", overlay)
+@pytest.mark.parametrize(
+    ("name", "agent", "overlay_fn", "match"),
+    [
+        ("unknown_agent_without_pack_default", "not-an-agent", lambda: None, "unknown agent"),
+        (
+            "unknown_applied_template",
+            "qa-engineer",
+            lambda: AgentModelPolicyOverlay(applied_template="nope", overrides={}),
+            "nope",
+        ),
+    ],
+)
+def test_resolve_agent_model_rejects_unknown(
+    name: str, agent: str, overlay_fn: object, match: str
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        resolve_agent_model(agent, overlay_fn())  # type: ignore[operator]

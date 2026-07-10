@@ -57,79 +57,6 @@ def test_strips_agent_tier_from_real_consumer_atom(tmp_path: Path) -> None:
     assert len(result.moved) == 1
 
 
-def test_dry_run_plans_but_writes_nothing(tmp_path: Path) -> None:
-    original = _REAL_ATOM.read_text(encoding="utf-8")
-    specs = _specs(tmp_path, ("product/s3-delivery.md", original))
-
-    result = migrate_agent_tier_frontmatter(specs, dry_run=True)
-
-    assert (specs / "memory" / "product" / "s3-delivery.md").read_text(encoding="utf-8") == original
-    assert result.dry_run is True
-    assert len(result.moved) == 1  # planned
-
-
-def test_idempotent_second_run_is_noop(tmp_path: Path) -> None:
-    specs = _specs(tmp_path, ("product/s3-delivery.md", _REAL_ATOM.read_text(encoding="utf-8")))
-    migrate_agent_tier_frontmatter(specs, dry_run=False)
-    after_first = (specs / "memory" / "product" / "s3-delivery.md").read_text(encoding="utf-8")
-
-    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
-
-    assert (specs / "memory" / "product" / "s3-delivery.md").read_text(
-        encoding="utf-8"
-    ) == after_first
-    assert result.moved == []
-
-
-def test_agent_tier_only_in_frontmatter_is_touched_not_body(tmp_path: Path) -> None:
-    """A body line mentioning ``agent_tier:`` (prose/docs) is NEVER touched — only the
-    frontmatter block's top-level key is stripped."""
-    body = (
-        "---\n"
-        "slug: doc-mention\n"
-        "title: Doc\n"
-        "agent_tier: self-pull\n"
-        "---\n"
-        "\n"
-        "Frontmatter carries `name`, `agent_tier`, `token_estimate` historically.\n"
-        "agent_tier: this-is-prose-not-frontmatter\n"
-    )
-    specs = _specs(tmp_path, ("doc-mention.md", body))
-
-    migrate_agent_tier_frontmatter(specs, dry_run=False)
-
-    migrated = (specs / "memory" / "doc-mention.md").read_text(encoding="utf-8")
-    assert "agent_tier: self-pull" not in migrated
-    assert "agent_tier: this-is-prose-not-frontmatter" in migrated
-    assert "`agent_tier`" in migrated  # prose untouched
-
-
-def test_file_without_frontmatter_is_skipped(tmp_path: Path) -> None:
-    body = "> AGENTS doc, no frontmatter.\n\nagent_tier mentioned in prose only.\n"
-    specs = _specs(tmp_path, ("AGENTS.md", body))
-
-    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
-
-    assert (specs / "memory" / "AGENTS.md").read_text(encoding="utf-8") == body
-    assert result.moved == []
-
-
-def test_missing_memory_dir_is_graceful(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
-    assert result.moved == []
-    assert result.skipped  # notes nothing-to-migrate
-
-
-def test_registered_in_chain_v2_to_v3() -> None:
-    """The step must be registered 2→3 so ``specs upgrade`` walks consumers to it."""
-    step = next((s for s in REGISTRY if s.key == "agent-tier-frontmatter"), None)
-    assert step is not None, "agent-tier-frontmatter step not registered"
-    assert (step.from_version, step.to_version) == (2, 3)
-    assert latest_version() >= 3  # v0.1.73 added bugs-single-file (3→4)
-
-
 def test_unterminated_frontmatter_completes_linearly(tmp_path: Path) -> None:
     """v0.1.73 FR4 (bug ``migrate-agent-tier-frontmatter-redos-on-unterminated-block``,
     security review of v0.1.72): a malformed atom — opening ``---`` fence + a long
@@ -147,3 +74,46 @@ def test_unterminated_frontmatter_completes_linearly(tmp_path: Path) -> None:
     assert elapsed < 2.0, f"frontmatter scan took {elapsed:.1f}s — super-linear backtracking"
     assert result.moved == []  # malformed file untouched
     assert (specs / "memory" / "malformed.md").read_text(encoding="utf-8") == malformed
+
+
+def test_dry_run_idempotent_no_frontmatter_missing_dir_and_registered(tmp_path: Path) -> None:
+    real_body = _REAL_ATOM.read_text(encoding="utf-8")
+
+    # dry-run plans but writes nothing.
+    dry_specs = _specs(tmp_path / "dry", ("product/s3-delivery.md", real_body))
+    dry_result = migrate_agent_tier_frontmatter(dry_specs, dry_run=True)
+    assert (dry_specs / "memory" / "product" / "s3-delivery.md").read_text(
+        encoding="utf-8"
+    ) == real_body
+    assert dry_result.dry_run is True
+    assert len(dry_result.moved) == 1  # planned
+
+    # second run is idempotent (no-op).
+    idem_specs = _specs(tmp_path / "idem", ("product/s3-delivery.md", real_body))
+    migrate_agent_tier_frontmatter(idem_specs, dry_run=False)
+    after_first = (idem_specs / "memory" / "product" / "s3-delivery.md").read_text(encoding="utf-8")
+    second = migrate_agent_tier_frontmatter(idem_specs, dry_run=False)
+    assert (idem_specs / "memory" / "product" / "s3-delivery.md").read_text(
+        encoding="utf-8"
+    ) == after_first
+    assert second.moved == []
+
+    # a file with no frontmatter at all is skipped, untouched.
+    no_fm_body = "> AGENTS doc, no frontmatter.\n\nagent_tier mentioned in prose only.\n"
+    no_fm_specs = _specs(tmp_path / "no-fm", ("AGENTS.md", no_fm_body))
+    no_fm_result = migrate_agent_tier_frontmatter(no_fm_specs, dry_run=False)
+    assert (no_fm_specs / "memory" / "AGENTS.md").read_text(encoding="utf-8") == no_fm_body
+    assert no_fm_result.moved == []
+
+    # a missing memory/ dir degrades gracefully.
+    empty_specs = tmp_path / "empty" / "specs"
+    empty_specs.mkdir(parents=True)
+    empty_result = migrate_agent_tier_frontmatter(empty_specs, dry_run=False)
+    assert empty_result.moved == []
+    assert empty_result.skipped  # notes nothing-to-migrate
+
+    # the step is registered in the chain 2→3 so `specs upgrade` walks consumers to it.
+    step = next((s for s in REGISTRY if s.key == "agent-tier-frontmatter"), None)
+    assert step is not None, "agent-tier-frontmatter step not registered"
+    assert (step.from_version, step.to_version) == (2, 3)
+    assert latest_version() >= 3  # v0.1.73 added bugs-single-file (3→4)

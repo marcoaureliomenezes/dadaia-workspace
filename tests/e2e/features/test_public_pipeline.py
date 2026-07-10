@@ -199,7 +199,9 @@ def _inject_synthetic_parallel_workflow(workspace: Path) -> None:
 
 
 class TestStage:
-    def test_stage_creates_all_expected_dirs(self, tmp_path: Path) -> None:
+    def test_stage_dirs_manifest_agents_and_skills(self, tmp_path: Path) -> None:
+        """One staged workspace, every stage-time invariant: dirs+manifest schema+
+        exact agent roster (no stale)+skill roster, in a single check pass."""
         workspace = tmp_path / "ws"
         _manager().stage(workspace)
 
@@ -207,11 +209,7 @@ class TestStage:
         for subdir in ("agents", "skills", "rules", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
 
-    def test_stage_manifest_schema_is_valid(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        manifest_path = workspace / ".dadaia" / "agentic" / "manifest.json"
+        manifest_path = agentic / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -223,44 +221,23 @@ class TestStage:
             assert "sha256" in asset, f"asset missing 'sha256': {asset}"
             assert "type" in asset, f"asset missing 'type': {asset}"
 
-    def test_stage_manifest_lists_exactly_expected_agents(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        manifest = json.loads(
-            (workspace / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
-        )
         staged = {
             Path(a["path"]).stem
             for a in manifest["assets"]
             if a["type"] == "agents" and a["path"].endswith(".md")
         }
-
         assert staged == EXPECTED_AGENTS, (
             f"Staged agents mismatch.\n  Expected: {sorted(EXPECTED_AGENTS)}\n  Got: {sorted(staged)}"
         )
 
-    def test_stage_manifest_has_no_stale_agents(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        manifest = json.loads(
-            (workspace / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
-        )
         all_paths = {a["path"] for a in manifest["assets"]}
-
         for stale in STALE_AGENTS:
             assert f"agents/{stale}.md" not in all_paths, (
                 f"Stale agent '{stale}.md' found in manifest — must be deleted from canonical source"
             )
 
-    def test_stage_creates_all_expected_skills(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        skills_dir = workspace / ".dadaia" / "agentic" / "skills"
+        skills_dir = agentic / "skills"
         staged_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-
         assert staged_skills == EXPECTED_SKILLS, (
             f"Staged skills mismatch.\n"
             f"  Missing: {sorted(EXPECTED_SKILLS - staged_skills)}\n"
@@ -274,7 +251,7 @@ class TestStage:
 
 
 class TestInstallAll:
-    def test_install_all_populates_claude_agents(self, tmp_path: Path) -> None:
+    def test_install_all_populates_claude_agents_skills_no_stale(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         _staged_install(workspace)
 
@@ -284,14 +261,11 @@ class TestInstallAll:
             f"  Missing: {sorted(EXPECTED_AGENTS - claude_agents)}\n"
             f"  Extra:   {sorted(claude_agents - EXPECTED_AGENTS)}"
         )
-
-    def test_install_all_populates_universal_skills(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
+        stale_found = claude_agents & STALE_AGENTS
+        assert not stale_found, f"Stale agents found in .claude/agents/: {sorted(stale_found)}"
 
         skills_dir = workspace / ".agents" / "skills"
         installed_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-
         assert installed_skills == EXPECTED_SKILLS, (
             f".agents/skills/ mismatch.\n"
             f"  Missing: {sorted(EXPECTED_SKILLS - installed_skills)}\n"
@@ -309,14 +283,6 @@ class TestInstallAll:
         )
         assert not (workspace / ".codex" / "rules" / "workspace-protocol.md").exists()
 
-    def test_install_no_stale_agents_in_claude(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        claude_agents = _runtime_agents(workspace / ".claude" / "agents")
-        stale_found = claude_agents & STALE_AGENTS
-        assert not stale_found, f"Stale agents found in .claude/agents/: {sorted(stale_found)}"
-
 
 # ---------------------------------------------------------------------------
 # TestContentConsistency — validates agent file content at staging and install time
@@ -324,15 +290,29 @@ class TestInstallAll:
 
 
 class TestContentConsistency:
-    def test_staged_agents_have_required_frontmatter(self, tmp_path: Path) -> None:
+    def test_agent_frontmatter_skill_refs_tools_and_skill_md_presence(self, tmp_path: Path) -> None:
+        """One staged + installed workspace, every content-consistency invariant in a
+        single pass: staged agent frontmatter (required fields present, model/effort
+        absent — FR1), staged agent skill references all resolve to a real skill,
+        installed Claude agents retain `tools:`, and every staged skill dir has a
+        SKILL.md. Also folds the retired `us7_skill_file_exists` content asserts
+        (`dadaia server list/next/register/release` mentioned in the dev-server-registry
+        skill) since skill presence is already pinned by EXPECTED_SKILLS."""
         workspace = tmp_path / "ws"
-        _manager().stage(workspace)
+        _staged_install(workspace)
 
         agents_dir = workspace / ".dadaia" / "agentic" / "agents"
+        skills_dir = workspace / ".dadaia" / "agentic" / "skills"
         for agent_file in sorted(agents_dir.glob("*.md")):
             content = agent_file.read_text(encoding="utf-8")
             # Plugin stubs (plugin: true) intentionally omit model/tools — skip them.
             if _is_plugin_stub(content):
+                for skill in _parse_skills_list(content):
+                    skill_md = skills_dir / skill / "SKILL.md"
+                    assert skill_md.exists(), (
+                        f"Agent '{agent_file.name}' references skill '{skill}' "
+                        f"but '{skill_md.relative_to(workspace)}' does not exist"
+                    )
                 continue
             keys = _parse_frontmatter_keys(content)
             missing = _REQUIRED_FRONTMATTER - keys
@@ -347,16 +327,6 @@ class TestContentConsistency:
             assert "effort" not in keys, (
                 f"Agent '{agent_file.name}' stages a hardcoded 'effort:' (FR1 violation)"
             )
-
-    def test_staged_agent_skill_references_are_all_valid(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        agents_dir = workspace / ".dadaia" / "agentic" / "agents"
-        skills_dir = workspace / ".dadaia" / "agentic" / "skills"
-
-        for agent_file in sorted(agents_dir.glob("*.md")):
-            content = agent_file.read_text(encoding="utf-8")
             for skill in _parse_skills_list(content):
                 skill_md = skills_dir / skill / "SKILL.md"
                 assert skill_md.exists(), (
@@ -364,12 +334,8 @@ class TestContentConsistency:
                     f"but '{skill_md.relative_to(workspace)}' does not exist"
                 )
 
-    def test_claude_agents_retain_tools_array(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-
-        agents_dir = workspace / ".claude" / "agents"
-        for agent_file in sorted(agents_dir.glob("*.md")):
+        claude_agents_dir = workspace / ".claude" / "agents"
+        for agent_file in sorted(claude_agents_dir.glob("*.md")):
             content = agent_file.read_text(encoding="utf-8")
             # Plugin stubs (plugin: true) intentionally omit tools — skip them.
             if _is_plugin_stub(content):
@@ -379,16 +345,23 @@ class TestContentConsistency:
                 "Claude projection must retain it"
             )
 
-    def test_all_skill_dirs_have_skill_md(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _manager().stage(workspace)
-
-        skills_dir = workspace / ".dadaia" / "agentic" / "skills"
         for skill_dir in sorted(skills_dir.iterdir()):
             if skill_dir.is_dir():
                 assert (skill_dir / "SKILL.md").exists(), (
                     f"Skill directory '{skill_dir.name}' has no SKILL.md"
                 )
+        dev_server_skill = (skills_dir / "dev-server-registry" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        for cmd in (
+            "dadaia server list",
+            "dadaia server next",
+            "dadaia server register",
+            "dadaia server release",
+        ):
+            assert cmd in dev_server_skill, (
+                f"dev-server-registry SKILL.md missing content assert for {cmd!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -407,38 +380,38 @@ class TestDoctor:
         failures = [line for line in report if line.startswith(("[drift]", "[missing]"))]
         assert not failures, "Doctor reported failures after clean install:\n" + "\n".join(failures)
 
-    def test_doctor_detects_drift_after_runtime_modification(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("mutation", ["drift", "missing"], ids=["drift", "missing"])
+    def test_doctor_detects_drift_and_missing_after_runtime_mutation(
+        self, tmp_path: Path, mutation: str
+    ) -> None:
         workspace = tmp_path / "ws"
         mgr = _manager()
         mgr.install(workspace, target="all", force=True)
 
-        # Introduce drift in a Claude agent file
-        target = workspace / ".claude" / "agents" / "software-engineer.md"
-        target.write_text(target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8")
-
-        report = mgr.doctor(workspace)
-
-        drift_lines = [line for line in report if "[drift]" in line and "software-engineer" in line]
-        assert drift_lines, (
-            "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
-            "Full report:\n" + "\n".join(report)
-        )
-
-    def test_doctor_detects_missing_after_runtime_deletion(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        mgr = _manager()
-        mgr.install(workspace, target="all", force=True)
-
-        target = workspace / ".claude" / "agents" / "qa-engineer.md"
-        target.unlink()
-
-        report = mgr.doctor(workspace)
-
-        missing_lines = [line for line in report if "[missing]" in line and "qa-engineer" in line]
-        assert missing_lines, (
-            "Doctor did not detect missing .claude/agents/qa-engineer.md.\n"
-            "Full report:\n" + "\n".join(report)
-        )
+        if mutation == "drift":
+            target = workspace / ".claude" / "agents" / "software-engineer.md"
+            target.write_text(
+                target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
+            )
+            report = mgr.doctor(workspace)
+            drift_lines = [
+                line for line in report if "[drift]" in line and "software-engineer" in line
+            ]
+            assert drift_lines, (
+                "Doctor did not detect drift in .claude/agents/software-engineer.md.\n"
+                "Full report:\n" + "\n".join(report)
+            )
+        else:
+            target = workspace / ".claude" / "agents" / "qa-engineer.md"
+            target.unlink()
+            report = mgr.doctor(workspace)
+            missing_lines = [
+                line for line in report if "[missing]" in line and "qa-engineer" in line
+            ]
+            assert missing_lines, (
+                "Doctor did not detect missing .claude/agents/qa-engineer.md.\n"
+                "Full report:\n" + "\n".join(report)
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -453,7 +426,7 @@ EXPECTED_WORKFLOWS = {
 
 
 class TestWorkflows:
-    def test_stage_includes_all_workflow_files(self, tmp_path: Path) -> None:
+    def test_stage_and_install_project_workflows_to_every_runtime(self, tmp_path: Path) -> None:
         workspace = tmp_path / "ws"
         _manager().stage(workspace)
         workflows_dir = workspace / ".dadaia" / "agentic" / "workflows"
@@ -461,8 +434,6 @@ class TestWorkflows:
         staged = {p.stem.removesuffix(".workflow") for p in workflows_dir.glob("*.workflow.md")}
         assert staged == EXPECTED_WORKFLOWS
 
-    def test_install_all_projects_workflows_to_every_runtime(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
         _staged_install(workspace)
         # Codex receives workflows as reference documents; it does not execute them.
         for runtime in (".agents", ".claude", ".codex"):
@@ -470,14 +441,15 @@ class TestWorkflows:
                 projected = workspace / runtime / "workflows" / f"{stem}.workflow.md"
                 assert projected.exists(), f"workflow not projected to {projected}"
 
-    def test_doctor_reports_reference_only_for_codex_when_parallel_group(
+    def test_doctor_classifies_parallel_and_serial_workflows_and_schema_validates(
         self, tmp_path: Path
     ) -> None:
-        """Doctor emits [reference-only] for codex regardless of parallel_group.
-
-        Same synthetic-parallel fixture as the [partial] test. Codex always gets
-        [reference-only] for any workflow — it has no workflow executor.
-        """
+        """Doctor emits [reference-only] for codex regardless of parallel_group (same
+        synthetic-parallel fixture as the [partial] case — codex always gets
+        [reference-only] for any workflow, it has no workflow executor); a canonical
+        serial workflow (audit-fanout, no parallel_group) gets claude [ok] + codex
+        [reference-only]; and `dadaia public stage` aborts if any workflow fails
+        schema validation — re-staging idempotently must keep working."""
         workspace = tmp_path / "ws"
         _staged_install(workspace)
 
@@ -495,10 +467,6 @@ class TestWorkflows:
             "Full report:\n" + "\n".join(report)
         )
 
-    def test_doctor_reports_ok_for_serial_workflow(self, tmp_path: Path) -> None:
-        workspace = tmp_path / "ws"
-        _staged_install(workspace)
-        report = _manager().doctor(workspace)
         # audit-fanout is a canonical serial workflow (no parallel_group) shipped by v0.1.9+.
         # claude should be [ok]; codex emits [reference-only].
         ok_lines = [
@@ -507,7 +475,6 @@ class TestWorkflows:
             if line.startswith("[ok]") and "audit-fanout" in line and ":workflows/" in line
         ]
         assert any("claude" in line for line in ok_lines)
-        # Codex check: [reference-only] because workflows are installed reference docs.
         ref_lines = [
             line
             for line in report
@@ -515,9 +482,6 @@ class TestWorkflows:
         ]
         assert ref_lines, "Doctor did not emit [reference-only] for codex:audit-fanout"
 
-    def test_seed_workflows_pass_schema_validation(self, tmp_path: Path) -> None:
-        """`dadaia public stage` aborts if any workflow fails schema validation."""
-        workspace = tmp_path / "ws"
         # Should not raise — seed workflows are valid by contract.
         _manager().stage(workspace)
         # Re-staging idempotently must keep working.

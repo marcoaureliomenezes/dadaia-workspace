@@ -196,127 +196,11 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
 
 
 # ---------------------------------------------------------------------------
-# v0.1.64 FR3 (AC-3) — entry-harness auto-default on the multi-step pipeline.
-# ---------------------------------------------------------------------------
-
-
-def test_pipeline_defaults_fake_silently_with_no_entry_signal(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """No --harness + no entry signal ⇒ the pipeline runs fake with NO echo."""
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "multiharness-engine-v0116",
-            "--run-id",
-            "pipe-auto-fake",
-            "--json",
-        ],
-    )
-
-    # v0.1.72 FR5: the plain default fake carries the driving APPROVED+evidence result,
-    # so the auto-defaulted fake pipeline now COMPLETES (was: blocked at implement).
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
-    assert payload["status"] == "OK"
-    assert payload["steps"][0]["runtime"] == "fake"
-    assert "[harness] auto-default:" not in result.stderr
-
-
-def test_pipeline_auto_defaults_pi_from_entry_pin_with_loud_echo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """DADAIA_ENTRY_HARNESS=pi (simulated PI entry session) + no --harness ⇒ the
-    pipeline's first step runs on the real PI adapter path (injected stream — no
-    binary, no credits) and the loud FR3 echo rides stderr, keeping --json pure.
-
-    v0.1.67 FR2 (T-67-06, hardening migration): moved from the broken
-    ``monkeypatch.setattr(".pi_runtime.subprocess.run", ...)`` pattern to the same
-    constructor-injection pattern used by T-67-05, with a ``calls`` call-recorder
-    added. Existing assertions (runtime + stderr echo text) are preserved unchanged.
-    """
-    import subprocess as _subprocess
-
-    from dadaia_workspace import container
-    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
-
-    events = [
-        {"type": "message_start"},
-        {
-            "type": "message_end",
-            "message": {"role": "assistant", "content": "pipeline step via injected pi stream"},
-        },
-    ]
-    stdout = "\n".join(json.dumps(event) for event in events) + "\n"
-
-    calls: list[object] = []
-
-    def fake_pi_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        calls.append(args)
-        return _subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
-
-    monkeypatch.setattr(
-        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
-        lambda self, path: (),
-    )
-
-    real_build_agent_runtime = container.build_agent_runtime
-
-    def patched_build_agent_runtime(
-        kind: object, *, cwd: Path | None = None, model: object = None
-    ) -> object:
-        from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
-
-        if kind is AgentRuntimeKind.PI_HEADLESS:
-            run_dir = cwd or Path.cwd()
-            pi_config = PiHeadlessConfig(cwd=run_dir)
-            return PiHeadlessAdapter(
-                pi_config, runner=fake_pi_run, environ={}, git=GitSubprocessClient()
-            )
-        return real_build_agent_runtime(kind, cwd=cwd, model=model)
-
-    monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "multiharness-engine-v0116",
-            "--run-id",
-            "pipe-auto-pi",
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 3, result.output
-    payload = json.loads(result.stdout)
-    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
-    assert payload["steps"][0]["runtime"] == "pi_headless"
-    assert (
-        "[harness] auto-default: pi (from entry session; pass --harness to override)"
-        in result.stderr
-    )
-    # result.output is the COMBINED stream (Click 8.2+); stdout stays pure JSON.
-    assert "[harness]" not in result.stdout
-
-
-# ---------------------------------------------------------------------------
 # v0.1.66 Wave A — FR3/FR4/FR5 executed-path reproductions (T-66-01..T-66-03).
+#
+# Pipeline-specific entry-harness auto-default coverage is dropped here: the
+# resolver + loud-echo mechanism is shared code and is already proven by the
+# single-step verb's auto-default matrix (test_lifecycle_cli.py).
 # ---------------------------------------------------------------------------
 
 
@@ -466,205 +350,134 @@ def _patch_build_agent_runtime_for_codex(
     monkeypatch.setattr(container, "build_agent_runtime", patched_build_agent_runtime)
 
 
-def test_codex_pipeline_untrusted_dir_no_longer_blocks_on_trust_error(
+def test_codex_pipeline_trust_flag_and_sandbox_override_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-66-02 (FR4, AC4(repro)): the real codex argv must carry
-    ``--skip-git-repo-check`` alongside ``--ignore-user-config``, so a governed worker
-    running in a directory codex does not auto-trust never fails codex's own trust
-    check.
-
-    Drives the real CLI (``--harness codex``), the real ``LifecyclePipeline``/gate
-    chain, and the real ``CodexExecAdapter._command``/``.run()``. Only
-    ``subprocess.run`` is faked (constructor-injected — see
-    ``_patch_build_agent_runtime_for_codex``): the fake inspects the REAL captured argv
-    and returns codex's real trust-error stderr whenever ``--skip-git-repo-check`` is
-    absent, exactly reproducing the user-hit failure mode on current code.
-    """
-    import subprocess as _subprocess
-
-    captured: dict[str, list[str]] = {}
-
-    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        assert isinstance(args, list)
-        captured["argv"] = args
-        if "--skip-git-repo-check" not in args:
-            return _subprocess.CompletedProcess(
-                args=args,
-                returncode=1,
-                stdout="",
-                stderr="Not inside a trusted directory and --skip-git-repo-check was "
-                "not specified.",
-            )
-        # Fulfil the --output-last-message contract so a trusted run "succeeds" cleanly.
-        output_path = Path(args[args.index("--output-last-message") + 1])
-        output_path.write_text(
-            json.dumps({"summary": "codex exec completed via injected runner"}),
-            encoding="utf-8",
-        )
-        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-
-    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
-    monkeypatch.setattr(
-        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
-        lambda self, path: (),
-    )
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "multiharness-engine-v0116",
-            "--run-id",
-            "pipe-codex-trust",
-            "--harness",
-            "codex",
-            "--json",
-        ],
-    )
-
-    argv = captured["argv"]
-    # AC4(repro): on current code the argv omits --skip-git-repo-check, so the fake
-    # returns the real trust error and the pipeline blocks with that reason.
-    assert "--skip-git-repo-check" in argv, (
-        f"expected '--skip-git-repo-check' in the real codex argv, got {argv!r} — the "
-        f"fake returned codex's trust error because the flag was absent"
-    )
-    # The step must not have blocked on the trust error once the flag reaches argv.
-    payload = json.loads(result.output)
-    reason = (payload.get("blocked") or {}).get("reason", "")
-    assert "trusted directory" not in reason, (
-        f"pipeline still blocked on the codex trust error: {reason!r} (argv={argv!r})"
-    )
-
-
-def test_codex_pipeline_sandbox_override_avoids_container_bwrap_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """T-66-03 (FR5, AC5(repro)): ``DADAIA_CODEX_SANDBOX=workspace-write`` must reach the
-    real ``--sandbox`` argv, so a governed worker running inside a constrained container
-    (no ``bwrap`` loopback network capability) never fails codex's own sandbox setup on
-    the compiled-in ``read-only`` default.
+    """T-66-02/T-66-03 (FR4/FR5, AC4/AC5(repro)) + AC5.2 regression guard, merged: the
+    real codex argv carries ``--skip-git-repo-check`` (so a governed worker running in
+    a directory codex does not auto-trust never fails codex's own trust check);
+    ``DADAIA_CODEX_SANDBOX=workspace-write`` reaches the real ``--sandbox`` argv (so a
+    constrained container never fails codex's own sandbox setup on the compiled-in
+    ``read-only`` default); and with no env override, the real argv still carries the
+    compiled-in ``--sandbox read-only`` default.
 
     Drives the real CLI (``--harness codex``), the real ``LifecyclePipeline``/gate
     chain, and the real ``CodexExecAdapter._command``/``.run()``/``CodexExecConfig``
     construction (the single choke point that resolves the env override — architect
     finding MEDIUM-1). Only ``subprocess.run`` is faked (constructor-injected — see
-    ``_patch_build_agent_runtime_for_codex``): the fake inspects the REAL captured argv
-    and returns the real bwrap-failure stderr whenever ``--sandbox`` is ``read-only``,
-    exactly reproducing the user-hit container failure mode on current code.
+    ``_patch_build_agent_runtime_for_codex``, shared across all three invocations): the
+    fake inspects the REAL captured argv and returns codex's real trust-error /
+    bwrap-failure stderr whenever the relevant flag is absent/wrong, exactly
+    reproducing the user-hit failure modes on current code.
     """
     import subprocess as _subprocess
 
-    captured: dict[str, list[str]] = {}
-
-    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        assert isinstance(args, list)
-        captured["argv"] = args
-        sandbox_value = args[args.index("--sandbox") + 1] if "--sandbox" in args else None
-        if sandbox_value == "read-only":
-            return _subprocess.CompletedProcess(
-                args=args,
-                returncode=1,
-                stdout="",
-                stderr="bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+    def _fake_codex_run_factory(
+        captured: dict[str, list[str]],
+        *,
+        reject_missing_skip_git_check: bool = False,
+        reject_sandbox_read_only: bool = False,
+    ):  # type: ignore[no-untyped-def]
+        def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
+            assert isinstance(args, list)
+            captured["argv"] = args
+            if reject_missing_skip_git_check and "--skip-git-repo-check" not in args:
+                return _subprocess.CompletedProcess(
+                    args=args,
+                    returncode=1,
+                    stdout="",
+                    stderr="Not inside a trusted directory and --skip-git-repo-check was "
+                    "not specified.",
+                )
+            if reject_sandbox_read_only:
+                sandbox_value = args[args.index("--sandbox") + 1] if "--sandbox" in args else None
+                if sandbox_value == "read-only":
+                    return _subprocess.CompletedProcess(
+                        args=args,
+                        returncode=1,
+                        stdout="",
+                        stderr="bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+                    )
+            output_path = Path(args[args.index("--output-last-message") + 1])
+            output_path.write_text(
+                json.dumps({"summary": "codex exec completed via injected runner"}),
+                encoding="utf-8",
             )
-        output_path = Path(args[args.index("--output-last-message") + 1])
-        output_path.write_text(
-            json.dumps({"summary": "codex exec completed via injected runner"}),
-            encoding="utf-8",
-        )
-        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+            return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
-    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
+        return fake_codex_run
+
+    def _run_pipeline(workspace: Path, run_id: str):  # type: ignore[no-untyped-def]
+        monkeypatch.chdir(workspace)
+        return _runner.invoke(
+            app,
+            [
+                "lifecycle",
+                "pipeline",
+                "--skip-preflight",
+                "--release-id",
+                "multiharness-engine-v0116",
+                "--run-id",
+                run_id,
+                "--harness",
+                "codex",
+                "--json",
+            ],
+        )
+
     monkeypatch.setattr(
         "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
         lambda self, path: (),
+    )
+
+    # (1) trust flag: AC4(repro).
+    trust_captured: dict[str, list[str]] = {}
+    _patch_build_agent_runtime_for_codex(
+        monkeypatch,
+        _fake_codex_run_factory(trust_captured, reject_missing_skip_git_check=True),
+    )
+    trust_ws = _init_workspace(tmp_path / "trust-case")
+    trust_result = _run_pipeline(trust_ws, "pipe-codex-trust")
+    trust_argv = trust_captured["argv"]
+    assert "--skip-git-repo-check" in trust_argv, (
+        f"expected '--skip-git-repo-check' in the real codex argv, got {trust_argv!r} — the "
+        f"fake returned codex's trust error because the flag was absent"
+    )
+    trust_payload = json.loads(trust_result.output)
+    trust_reason = (trust_payload.get("blocked") or {}).get("reason", "")
+    assert "trusted directory" not in trust_reason, (
+        f"pipeline still blocked on the codex trust error: {trust_reason!r} (argv={trust_argv!r})"
+    )
+
+    # (2) sandbox override: AC5(repro).
+    sandbox_captured: dict[str, list[str]] = {}
+    _patch_build_agent_runtime_for_codex(
+        monkeypatch,
+        _fake_codex_run_factory(sandbox_captured, reject_sandbox_read_only=True),
     )
     monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "workspace-write")
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "multiharness-engine-v0116",
-            "--run-id",
-            "pipe-codex-sandbox",
-            "--harness",
-            "codex",
-            "--json",
-        ],
-    )
-
-    argv = captured["argv"]
-    # AC5(repro): on current code nothing reads DADAIA_CODEX_SANDBOX, so the argv still
-    # carries read-only, the fake returns the real bwrap failure, and the pipeline
-    # blocks on it.
-    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "workspace-write"], (
-        f"expected '--sandbox workspace-write' in the real codex argv, got {argv!r} — "
+    sandbox_ws = _init_workspace(tmp_path / "sandbox-override-case")
+    sandbox_result = _run_pipeline(sandbox_ws, "pipe-codex-sandbox")
+    sandbox_argv = sandbox_captured["argv"]
+    assert sandbox_argv[sandbox_argv.index("--sandbox") :][:2] == [
+        "--sandbox",
+        "workspace-write",
+    ], (
+        f"expected '--sandbox workspace-write' in the real codex argv, got {sandbox_argv!r} — "
         f"the fake returned the bwrap failure because the env override never reached argv"
     )
-    payload = json.loads(result.output)
-    reason = (payload.get("blocked") or {}).get("reason", "")
-    assert "bwrap" not in reason, (
-        f"pipeline still blocked on the container bwrap failure: {reason!r} (argv={argv!r})"
+    sandbox_payload = json.loads(sandbox_result.output)
+    sandbox_reason = (sandbox_payload.get("blocked") or {}).get("reason", "")
+    assert "bwrap" not in sandbox_reason, (
+        f"pipeline still blocked on the container bwrap failure: "
+        f"{sandbox_reason!r} (argv={sandbox_argv!r})"
     )
 
-
-def test_codex_pipeline_sandbox_default_stays_read_only_when_env_unset(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """AC5.2 regression guard, executed-path: with no env override, the real argv still
-    carries the compiled-in `--sandbox read-only` default — no behavior change for the
-    already-correct unset case."""
-    import subprocess as _subprocess
-
-    captured: dict[str, list[str]] = {}
-
-    def fake_codex_run(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
-        assert isinstance(args, list)
-        captured["argv"] = args
-        output_path = Path(args[args.index("--output-last-message") + 1])
-        output_path.write_text(json.dumps({"summary": "codex exec completed"}), encoding="utf-8")
-        return _subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-
-    _patch_build_agent_runtime_for_codex(monkeypatch, fake_codex_run)
-    monkeypatch.setattr(
-        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.diff_name_only",
-        lambda self, path: (),
-    )
+    # (3) sandbox default: AC5.2 regression guard.
+    default_captured: dict[str, list[str]] = {}
+    _patch_build_agent_runtime_for_codex(monkeypatch, _fake_codex_run_factory(default_captured))
     monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "pipeline",
-            "--skip-preflight",
-            "--release-id",
-            "multiharness-engine-v0116",
-            "--run-id",
-            "pipe-codex-sandbox-default",
-            "--harness",
-            "codex",
-            "--json",
-        ],
-    )
-
-    argv = captured["argv"]
-    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "read-only"]
+    default_ws = _init_workspace(tmp_path / "sandbox-default-case")
+    _run_pipeline(default_ws, "pipe-codex-sandbox-default")
+    default_argv = default_captured["argv"]
+    assert default_argv[default_argv.index("--sandbox") :][:2] == ["--sandbox", "read-only"]

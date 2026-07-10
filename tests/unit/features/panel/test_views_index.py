@@ -1,4 +1,18 @@
-"""Unit contracts for the panel index view."""
+"""Unit contracts for the panel index view — real decisions only.
+
+Tablist/tabpanel/section/static-link/card structural presence is owned by
+``test_index_dom_contract.py`` (the e2e-selector presence lock). The
+panel-JS credential-free contract is owned by ``test_no_auth_contract.py``/
+``test_no_bearer_in_url.py``. The empty-state and CSS-registration smoke
+checks were deleted as low-value duplicates of the DOM-contract fixture.
+
+Two survivors:
+  1. Operator-controlled field escaping (project/context_name/branch) — XSS.
+  2. Card contract: chip href always ``.md`` (never ``.html``) + 5-chip order +
+     context render order, merged into one.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -9,42 +23,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
-# ---------------------------------------------------------------------------
-# JS / CSS assembly helpers
-# ---------------------------------------------------------------------------
-_JS_DIR = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "dadaia_workspace"
-    / "features"
-    / "panel"
-    / "views"
-    / "assets"
-    / "js"
-)
-
-
-def _build_panel_js() -> str:
-    # v0.1.45: the Agentic tab was removed; agents.js/workflows.js/kanban.js were
-    # deleted. The workflows-tab pickers live in workflow_policy.js.
-    return (
-        (_JS_DIR / "core.js").read_text(encoding="utf-8")
-        + "\n"
-        + (_JS_DIR / "workflow_policy.js").read_text(encoding="utf-8")
-    )
-
-
-def _build_panel_css() -> str:
-    from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
-    from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
-    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-    from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
-
-    return TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
-
-
-# ---------------------------------------------------------------------------
-# Fakes (same pattern as test_service.py)
-# ---------------------------------------------------------------------------
+pytestmark = pytest.mark.unit
 
 
 class FakeServerRegistryService:
@@ -71,6 +50,7 @@ def _make_context(
     name: str,
     repo_slug: str,
     state: ContextState = ContextState.ALIVE,
+    current_branch: str | None = "main",
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
@@ -80,7 +60,7 @@ def _make_context(
         created_at="2026-01-01T00:00:00+00:00",
         alive_since="2026-01-01T00:00:00+00:00" if state == ContextState.ALIVE else None,
         dead_since=None if state == ContextState.ALIVE else "2026-01-01T00:00:00+00:00",
-        current_branch="main",
+        current_branch=current_branch,
     )
 
 
@@ -118,19 +98,6 @@ def _render(service: PanelService) -> str:
     return body.decode("utf-8")
 
 
-def test_index_returns_bytes() -> None:
-    """View must return (int, str, bytes) tuple."""
-    service = _build_service()
-    view = render_index(service)
-    result = view()
-    assert isinstance(result, tuple)
-    assert len(result) == 3
-    status, ct, body = result
-    assert isinstance(status, int)
-    assert isinstance(ct, str)
-    assert isinstance(body, bytes)
-
-
 def _tag_fragment(html: str, marker: str, close_tag: str) -> str:
     start = html.find(marker)
     assert start >= 0, f"Missing marker: {marker}"
@@ -139,176 +106,9 @@ def _tag_fragment(html: str, marker: str, close_tag: str) -> str:
     return html[start:end]
 
 
-def _section_fragment(html: str, section_id: str) -> str:
-    return _tag_fragment(html, f'id="{section_id}"', "</section>")
-
-
-def _button_fragment(html: str, tab_id: str) -> str:
-    id_pos = html.find(f'id="{tab_id}"')
-    assert id_pos >= 0, f"Missing tab: {tab_id}"
-    start = html.rfind("<button", 0, id_pos)
-    assert start >= 0, f"Missing button start for tab: {tab_id}"
-    end = html.find("</button>", id_pos)
-    assert end >= 0, f"Missing button close for tab: {tab_id}"
-    return html[start:end]
-
-
-@pytest.mark.parametrize(
-    ("section_id", "visible_text"),
-    [
-        ("section-servers", ">Servers<"),
-        ("section-memories", ">Projects<"),
-        ("section-sessions", "sessions-dashboard"),
-        ("section-reports", "reports-list"),
-        ("section-academy", "academy-content"),
-    ],
-)
-def test_index_renders_panel_sections(section_id: str, visible_text: str) -> None:
-    """The index shell must render every top-level panel section.
-
-    v0.1.45: the Agentic tab (section-ops — agents/personas/legacy-workflows/kanban)
-    was removed entirely; only the first-class Workflows tab remains for workflow
-    governance.
-    """
-    html = _render(_build_service())
-    assert f'id="{section_id}"' in html
-    assert visible_text in html
-
-
-def test_index_tablist_contract() -> None:
-    """The nav must expose the current tab order and active default tab.
-
-    v0.1.45: the "Agentic" tab (tab-ops) was removed entirely per operator directive.
-    v0.1.65 (FR8): the Sub-agents tab was added beside Workflows. The nav is now
-    7 tabs: Projects, Workflows, Sub-agents, Sessions, Reports, Academy, Servers.
-    """
-    html = _render(_build_service())
-    expected = [
-        ("tab-memories", "Projects"),
-        ("tab-workflows", "Workflows"),
-        ("tab-subagents", "Sub-agents"),
-        ("tab-sessions", "Sessions"),
-        ("tab-reports", "Reports"),
-        ("tab-academy", "Academy"),
-        ("tab-servers", "Servers"),
-    ]
-
-    assert 'role="tablist"' in html
-    assert html.count('role="tab"') == len(expected)
-    assert [html.find(f'id="{tab_id}"') for tab_id, _ in expected] == sorted(
-        html.find(f'id="{tab_id}"') for tab_id, _ in expected
-    )
-    for tab_id, label in expected:
-        button = _button_fragment(html, tab_id)
-        assert 'role="tab"' in button
-        assert label in button
-
-    memories_button = _button_fragment(html, "tab-memories")
-    servers_button = _button_fragment(html, "tab-servers")
-    assert "active" in memories_button
-    assert 'aria-selected="true"' in memories_button
-    assert 'aria-label="Projects"' in memories_button
-    assert 'aria-selected="false"' in servers_button
-
-    # The Agentic tab and its former standalone siblings are gone.
-    assert 'id="tab-ops"' not in html
-    assert 'id="tab-agents"' not in html
-    assert 'id="tab-kanban"' not in html
-    assert 'id="tab-workflows"' in html
-
-
-@pytest.mark.parametrize(
-    ("section_id", "tab_id"),
-    [
-        ("section-memories", "tab-memories"),
-        ("section-workflows", "tab-workflows"),
-        ("section-subagents", "tab-subagents"),
-        ("section-sessions", "tab-sessions"),
-        ("section-reports", "tab-reports"),
-        ("section-academy", "tab-academy"),
-        ("section-servers", "tab-servers"),
-    ],
-)
-def test_index_tabpanel_contract(section_id: str, tab_id: str) -> None:
-    """Every top-level section must be connected to its tab for keyboard and screen-reader users.
-
-    v0.1.45: the Agentic tab was removed. v0.1.65 (FR8) added the Sub-agents tab,
-    leaving 7 tabpanels.
-    """
-    html = _render(_build_service())
-    section = _section_fragment(html, section_id)
-    assert 'role="tabpanel"' in section
-    assert 'tabindex="0"' in section
-    assert f'aria-labelledby="{tab_id}"' in section
-    assert html.count('role="tabpanel"') == 7
-
-
-def test_panel_js_keyboard_nav_and_credential_free_fetch_contract() -> None:
-    """The assembled panel JS supports tab keyboard nav and credential-free API calls.
-
-    Panel auth removed by operator decision 2026-06-11 — the JS sends NO
-    credential.  ``authedFetch`` is kept as a thin alias of ``fetch`` (so call
-    sites do not churn) and core.js purges any stale ``panel_token`` left in
-    localStorage by an older build.  The former assertions on ``Authorization`` /
-    ``Bearer`` / ``history.replaceState`` (launch-URL cleanup) were DELETED with
-    that change; the no-auth contract is pinned in test_no_auth_contract.py.
-    """
-    panel_js = _build_panel_js()
-    for expected in [
-        "ArrowRight",
-        "ArrowLeft",
-        "Home",
-        "End",
-        "keydown",
-        "panel_token",  # core.js purges the stale credential key from localStorage
-        "localStorage",
-        "authedFetch",  # kept as a thin alias of fetch — adds no credential header
-    ]:
-        assert expected in panel_js
-
-    # Negative pins: the JS must NOT build or send a credential any more.  The
-    # words "Authorization"/"Bearer" survive ONLY inside an explanatory comment;
-    # we pin against the dead *code* patterns that actually constructed a header.
-    assert "setRequestHeader" not in panel_js, "panel JS must not set request headers"
-    assert "'Bearer '" not in panel_js, "panel JS must not build a 'Bearer ' header value"
-    assert "Authorization:" not in panel_js, "panel JS must not emit an Authorization header"
-    # authedFetch must be a pass-through to fetch (no credential injection).
-    assert "return fetch(url" in panel_js, "authedFetch must be a thin alias of fetch"
-
-
-@pytest.mark.parametrize(
-    "asset",
-    [
-        "tokens.css",
-        "structure.css",
-        "projects.css",
-        "workflows.css",
-        "workflow-policy.css",
-        "sessions.css",
-        "academy.css",
-        "reports.css",
-        "runtime.js",
-        "themes.js",
-        "core.js",
-        "workflow-policy.js",
-        "sessions.js",
-        "academy.js",
-        "reports.js",
-    ],
-)
-def test_index_links_registered_static_assets(asset: str) -> None:
-    """The HTML shell must load the static assets required by the panel."""
-    html = _render(_build_service())
-    assert f"/static/{asset}" in html
-
-
-def test_index_context_order_preserved() -> None:
-    """Contexts with the same primary status render in service order."""
-    first = _make_context("First", "first-slug")
-    second = _make_context("Second", "second-slug")
-    html = _render(_build_service(contexts=[first, second]))
-
-    assert html.find("first-slug") < html.find("second-slug")
+# ---------------------------------------------------------------------------
+# 1. Operator-controlled field escaping (XSS)
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("field", ["project", "context_name", "branch"])
@@ -336,51 +136,28 @@ def test_index_escapes_operator_controlled_fields(field: str) -> None:
     assert "&lt;script&gt;" in html
 
 
-def test_index_empty_servers_shows_empty_state() -> None:
-    """When registry is empty, empty-state hint must be present."""
-    html = _render(_build_service(entries=[], contexts=[]))
-    assert "Nenhum servidor rodando" in html
+# ---------------------------------------------------------------------------
+# 2. Card contract: chip href .md-never-.html + 5-chip order + context order
+# ---------------------------------------------------------------------------
 
 
-def test_projects_section_contract() -> None:
-    """The projects section must expose count, description, cards, and memory chips."""
-    ctx1 = _make_context("Workspace 1", "ws-1")
-    ctx2 = _make_context("Workspace 2", "ws-2")
-    html = _render(_build_service(contexts=[ctx1, ctx2]))
-    section = _section_fragment(html, "section-memories")
+def test_card_contract_chip_hrefs_order_and_context_order() -> None:
+    first = _make_context("First", "first-slug")
+    second = _make_context("Second", "second-slug")
+    html = _render(_build_service(contexts=[first, second]))
 
-    assert "<h2>Projects</h2>" in section
-    assert 'class="projects-count-badge"' in section
-    assert "2 projects" in section
-    assert 'class="section-desc"' in section
-    assert "<summary>About this section</summary>" in section
-    assert "Active Spec Context Projects" in section
-    assert "card-primary-badge" not in section
-    assert 'class="context-card primary"' not in section
+    # Contexts with the same primary status render in service order.
+    assert html.find("first-slug") < html.find("second-slug")
 
-
-def test_project_card_contract() -> None:
-    """A project card must render stable zones, metadata, session slot, and memory links."""
-    html = _render(_build_service(contexts=[_make_context("My Workspace", "my-workspace")]))
     card = _tag_fragment(html, 'class="context-card"', "</article>")
-
     for expected in [
-        'class="card-zone-a"',
-        'class="card-name"',
-        'class="card-zone-b"',
-        'class="card-meta-row"',
-        "repo:",
-        "branch:",
-        'class="card-zone-c"',
-        'data-slug="my-workspace"',
-        'aria-live="polite"',
-        'class="card-zone-d card-chips"',
+        'data-slug="first-slug"',
         'class="memory-chip"',
-        'href="/memory-view/my-workspace/constitution.md"',
-        'href="/memory-view/my-workspace/architecture.md"',
-        'href="/memory-view/my-workspace/tech-stack.md"',
-        'href="/memory-view/my-workspace/quality-assurance.md"',
-        'href="/memory-view/my-workspace/product/index.md"',
+        'href="/memory-view/first-slug/constitution.md"',
+        'href="/memory-view/first-slug/architecture.md"',
+        'href="/memory-view/first-slug/tech-stack.md"',
+        'href="/memory-view/first-slug/quality-assurance.md"',
+        'href="/memory-view/first-slug/product/index.md"',
         ">Constitution<",
         ">Architecture<",
         ">Tech Stack<",
@@ -389,8 +166,6 @@ def test_project_card_contract() -> None:
     ]:
         assert expected in card
 
-    assert card.find('class="card-zone-b"') < card.find('class="card-zone-c"')
-    assert card.find('class="card-zone-c"') < card.find('class="card-zone-d')
     # Five-chip contract (operator demand 2026-06-11): Constitution leads, then
     # Architecture / Tech Stack / Quality / Product.
     order = [
@@ -402,41 +177,7 @@ def test_project_card_contract() -> None:
     ]
     assert order == sorted(order) and -1 not in order
 
-    # T-016-P03 regression guard: chip hrefs must use .md, never .html
-    assert 'href="/memory-view/my-workspace/architecture.html"' not in card
-    assert 'href="/memory-view/my-workspace/tech-stack.html"' not in card
-    assert 'href="/memory-view/my-workspace/product/index.html"' not in card
-
-
-def test_projects_css_contract() -> None:
-    """Project card CSS and tokens must stay registered for static serving."""
-    from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-    from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
-    from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-    from dadaia_workspace.features.panel.views.static import render_static
-
-    for expected in [
-        ".context-card",
-        "border-left",
-        ".memory-chip",
-        ".card-zone-a",
-        ".card-zone-b",
-        ".card-zone-c",
-        ".card-zone-d",
-        ".card-name",
-        ".card-meta-row",
-        ".session-row",
-        "--color-chip-memory-bg",
-        "--color-session-bg",
-        "--color-accent",
-    ]:
-        assert expected in PROJECTS_CSS or expected in TOKENS_CSS
-
-    assert "@media" in STRUCTURE_CSS
-    assert "768px" in STRUCTURE_CSS
-    assert "Spec Contexts" in STRUCTURE_CSS
-
-    status, ct, body = render_static()(name="projects.css")
-    assert status == 200
-    assert ct == "text/css; charset=utf-8"
-    assert len(body) > 0
+    # T-016-P03 regression guard: chip hrefs must use .md, never .html.
+    assert 'href="/memory-view/first-slug/architecture.html"' not in card
+    assert 'href="/memory-view/first-slug/tech-stack.html"' not in card
+    assert 'href="/memory-view/first-slug/product/index.html"' not in card

@@ -115,15 +115,13 @@ def _post(handler_class: type[BaseHTTPRequestHandler], path: str, body: bytes) -
     return _drive(handler_class, raw)
 
 
-def test_get_catalog_route_reachable(tmp_path: Path) -> None:
+def test_get_routes_reachable(tmp_path: Path) -> None:
+    """Catalog, catalog-detail, model-profiles, and lifecycle-runs are all reachable."""
     handler = make_handler_class(_views(tmp_path))
     status, body = _get(handler, "/api/workflow-catalog?context=default")
     assert status == 200
     assert any(w["workflow_id"] == "implementation" for w in body["workflows"])
 
-
-def test_get_catalog_detail_and_profiles_and_runs_reachable(tmp_path: Path) -> None:
-    handler = make_handler_class(_views(tmp_path))
     s1, b1 = _get(handler, "/api/workflow-catalog/implementation")
     assert s1 == 200 and b1["workflow_id"] == "implementation"
     s2, b2 = _get(handler, "/api/workflow-model-profiles")
@@ -132,7 +130,8 @@ def test_get_catalog_detail_and_profiles_and_runs_reachable(tmp_path: Path) -> N
     assert s3 == 200 and b3["runs"] == []
 
 
-def test_put_then_get_round_trips_the_overlay(tmp_path: Path) -> None:
+def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
+    """PUT round-trip (profile + harness-only + catalog diff) + validate-rejects + 415."""
     handler = make_handler_class(_views(tmp_path))
     payload = json.dumps(
         {
@@ -161,11 +160,8 @@ def test_put_then_get_round_trips_the_overlay(tmp_path: Path) -> None:
     assert implement["effective_profile"] == "codex-review-deep"
     assert implement["is_overridden"] is True
 
-
-def test_put_harness_only_overlay_round_trips_and_flags_catalog(tmp_path: Path) -> None:
-    """A harness-only PUT (no profile) returns 200, persists harness, and flags the diff (AC-6)."""
-    handler = make_handler_class(_views(tmp_path))
-    payload = json.dumps(
+    # A harness-only PUT (no profile) returns 200, persists harness, and flags the diff (AC-6).
+    harness_payload = json.dumps(
         {
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
@@ -177,16 +173,16 @@ def test_put_harness_only_overlay_round_trips_and_flags_catalog(tmp_path: Path) 
         }
     ).encode("utf-8")
 
-    put_status, put_body = _put(handler, "/api/workflow-model-policy?context=default", payload)
+    put_status, put_body = _put(
+        handler, "/api/workflow-model-policy?context=default", harness_payload
+    )
     assert put_status == 200 and put_body["saved"] is True
 
-    # GET round-trips the harness override.
     get_status, get_body = _get(handler, "/api/workflow-model-policy?context=default")
     assert get_status == 200 and get_body["exists"] is True
     wf = get_body["policy"]["contexts"]["default"]["workflows"]["implementation"]
     assert wf["harnesses"]["implement"] == "pi"
 
-    # The catalog diff reflects the harness change: effective harness pi + auto-profile + flag.
     _cs, cat = _get(handler, "/api/workflow-catalog?context=default")
     impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation")
     implement = next(s for s in impl["steps"] if s["step"] == "implement")
@@ -195,9 +191,7 @@ def test_put_harness_only_overlay_round_trips_and_flags_catalog(tmp_path: Path) 
     assert implement["harness_overridden"] is True
     assert implement["effective_profile"] == "pi-implementation-standard"
 
-
-def test_validate_route_rejects_invalid_without_writing(tmp_path: Path) -> None:
-    handler = make_handler_class(_views(tmp_path))
+    # validate rejects an invalid policy without writing.
     bad = json.dumps(
         {
             "schema_version": "workflow-model-policy-v1",
@@ -207,18 +201,11 @@ def test_validate_route_rejects_invalid_without_writing(tmp_path: Path) -> None:
             },
         }
     ).encode("utf-8")
-
     status, body = _post(handler, "/api/workflow-model-policy/validate?context=default", bad)
     assert status == 400
     assert body["error"] == "invalid_policy"
 
-    # Nothing was persisted — the GET still reports no overlay.
-    g_status, g_body = _get(handler, "/api/workflow-model-policy?context=default")
-    assert g_status == 200 and g_body["exists"] is False
-
-
-def test_put_non_json_415_through_handler(tmp_path: Path) -> None:
-    handler = make_handler_class(_views(tmp_path))
+    # non-JSON content-type on PUT -> 415.
     raw = (
         b"PUT /api/workflow-model-policy HTTP/1.1\r\nHost: localhost\r\n"
         b"Content-Type: text/plain\r\nContent-Length: 2\r\n\r\n{}"

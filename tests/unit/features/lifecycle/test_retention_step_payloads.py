@@ -10,6 +10,9 @@ data plane under ``.dadaia/runs/lifecycle/<run_id>/steps/``:
   payloads past the consumed TTL are reclaimed; promoted / not-yet-consumed survive.
 - promoted / current-release evidence survives even when consumed.
 
+CRITICAL: destructive-safety contract for the step-payload data plane — every spare-rule
+survives as its own case.
+
 Hermetic: a ``.dadaia`` skeleton under ``tmp_path``, fixed clock, injected protector set.
 """
 
@@ -60,26 +63,14 @@ def _sweep(
 # --- live-run safety --------------------------------------------------------------
 
 
-def test_preserves_live_run_step_payloads(tmp_path: Path) -> None:
-    """A live run's step payloads are NEVER reclaimed, even when past TTL."""
-    ref = _step_payload(
-        tmp_path, "live-run", "qa-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
-    )
-    # The live-claim set claims the run's steps dir (what the container injects for a
-    # non-terminal run).
-    live = frozenset({".dadaia/runs/lifecycle/live-run/steps"})
-
-    result = _sweep(tmp_path, live=live, reclaim_allow=frozenset({ref})).sweep(apply=True)
-
-    assert (tmp_path / ref).is_file(), "live-run step payload must survive"
-    assert ref not in set(result.reclaimed_paths)
-
-
 # --- consumed_all past TTL is reclaimed; others survive ---------------------------
 
 
-def test_reclaims_consumed_all_past_ttl(tmp_path: Path) -> None:
-    """Only consumed_all delete-after-consumed payloads past TTL are reclaimed."""
+def test_reclaims_consumed_all_past_ttl_not_consumed_sibling_protected(tmp_path: Path) -> None:
+    """Only consumed_all delete-after-consumed payloads past TTL are reclaimed; a
+    not-yet-consumed sibling in the same run is protected, and the now-empty steps/ dir is
+    pruned after reclaim (idempotency / no rediscovery). A live run's step payloads are
+    NEVER reclaimed, even when past TTL."""
     eligible = _step_payload(
         tmp_path, "done-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
     )
@@ -94,56 +85,69 @@ def test_reclaims_consumed_all_past_ttl(tmp_path: Path) -> None:
     assert eligible in set(result.reclaimed_paths)
     assert not_consumed not in set(result.reclaimed_paths)
 
+    live_ws = tmp_path / "live-ws"
+    ref = _step_payload(
+        live_ws, "live-run", "qa-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
+    )
+    # The live-claim set claims the run's steps dir (what the container injects for a
+    # non-terminal run).
+    live = frozenset({".dadaia/runs/lifecycle/live-run/steps"})
 
-def test_promoted_evidence_survives_even_when_eligible_by_ttl(tmp_path: Path) -> None:
-    """A promote-to-evidence payload is never in the allow set ⇒ never reclaimed."""
+    live_result = _sweep(live_ws, live=live, reclaim_allow=frozenset({ref})).sweep(apply=True)
+
+    assert (live_ws / ref).is_file(), "live-run step payload must survive"
+    assert ref not in set(live_result.reclaimed_paths)
+
+
+# --- ① promoted-evidence + within-TTL spared --------------------------------------
+
+
+def test_promoted_evidence_and_within_ttl_payload_are_spared(tmp_path: Path) -> None:
+    """A promote-to-evidence payload is never in the allow set ⇒ never reclaimed, and even
+    an allow-listed payload within TTL is spared (TTL still gates)."""
     promoted = _step_payload(
         tmp_path, "done-run", "qa-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
     )
     # Empty allow set models "nothing is cleanup-eligible" (e.g. all promoted / unconsumed).
-    result = _sweep(tmp_path, reclaim_allow=frozenset()).sweep(apply=True)
-
+    promoted_result = _sweep(tmp_path, reclaim_allow=frozenset()).sweep(apply=True)
     assert (tmp_path / promoted).is_file(), "promoted evidence survives"
-    assert promoted not in set(result.reclaimed_paths)
+    assert promoted not in set(promoted_result.reclaimed_paths)
+
+    fresh = _step_payload(
+        tmp_path / "within-ttl", "done-run", "spec-attempt-0", age=dt.timedelta(seconds=10)
+    )
+    fresh_result = _sweep(tmp_path / "within-ttl", reclaim_allow=frozenset({fresh})).sweep(
+        apply=True
+    )
+    assert (tmp_path / "within-ttl" / fresh).is_file(), (
+        "within-TTL payload survives despite being eligible"
+    )
+    assert fresh not in set(fresh_result.reclaimed_paths)
 
 
-def test_within_ttl_consumed_payload_is_not_reclaimed(tmp_path: Path) -> None:
-    """Even an allow-listed payload within TTL is spared (TTL still gates)."""
-    fresh = _step_payload(tmp_path, "done-run", "spec-attempt-0", age=dt.timedelta(seconds=10))
-    result = _sweep(tmp_path, reclaim_allow=frozenset({fresh})).sweep(apply=True)
-
-    assert (tmp_path / fresh).is_file(), "within-TTL payload survives despite being eligible"
-    assert fresh not in set(result.reclaimed_paths)
+# --- ② dry-run default reports-without-deleting + back-compat no-protector TTL ---------
 
 
-def test_dry_run_reports_eligible_but_deletes_nothing(tmp_path: Path) -> None:
+def test_dry_run_default_reports_without_deleting_and_no_protector_ttl_back_compat(
+    tmp_path: Path,
+) -> None:
     eligible = _step_payload(
         tmp_path, "done-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
     )
-    result = _sweep(tmp_path, reclaim_allow=frozenset({eligible})).sweep()  # default dry-run
+    dry_run_result = _sweep(
+        tmp_path, reclaim_allow=frozenset({eligible})
+    ).sweep()  # default dry-run
 
-    assert result.applied is False
+    assert dry_run_result.applied is False
     assert (tmp_path / eligible).is_file()
-    assert eligible in set(result.reclaimed_paths)
+    assert eligible in set(dry_run_result.reclaimed_paths)
 
-
-def test_empty_run_dir_pruned_after_reclaim(tmp_path: Path) -> None:
-    eligible = _step_payload(
-        tmp_path, "done-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
-    )
-    _sweep(tmp_path, reclaim_allow=frozenset({eligible})).sweep(apply=True)
-
-    # The now-empty steps/ and run dir are pruned (idempotency / no rediscovery).
-    assert not (tmp_path / ".dadaia/runs/lifecycle/done-run/steps").exists()
-
-
-def test_back_compat_no_protector_keeps_ttl_behavior(tmp_path: Path) -> None:
-    """With no step-payload protector wired, runs-zone TTL behavior is unchanged."""
+    # With no step-payload protector wired, runs-zone TTL behavior is unchanged (legacy).
+    legacy_root = tmp_path / "legacy"
     ref = _step_payload(
-        tmp_path, "old-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
+        legacy_root, "old-run", "spec-attempt-0", age=dt.timedelta(seconds=_TMP_TTL + 99)
     )
-    result = _sweep(tmp_path, reclaim_allow=None).sweep(apply=True)
+    legacy_result = _sweep(legacy_root, reclaim_allow=None).sweep(apply=True)
 
-    # Legacy behavior: past-TTL runs entry reclaimed by mtime TTL alone.
-    assert not (tmp_path / ref).is_file()
-    assert any("old-run" in p for p in result.reclaimed_paths)
+    assert not (legacy_root / ref).is_file()
+    assert any("old-run" in p for p in legacy_result.reclaimed_paths)

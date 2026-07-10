@@ -5,11 +5,11 @@ On Linux/macOS (non-Windows):
   - These tests verify the import-guard behavior (tests run on Linux).
 
 On Windows:
-  - The full behavior tests run (acquire, is_locked, release, re-entrant
-    acquire is not a silent no-op, msvcrt-absent → PlatformCapabilityError).
+  - The full behavior test runs (acquire, is_locked, release, re-entrant
+    acquire is not a silent no-op, workspace-lock acquire end-to-end).
 
-Behavior tests that require a Windows runner are marked with
-``skipif != win32`` — they PASS ON A WINDOWS RUNNER but skip on Linux/macOS.
+The behavior test that requires a Windows runner is marked with
+``skipif != win32`` — it PASSES ON A WINDOWS RUNNER but skips on Linux/macOS.
 """
 
 from __future__ import annotations
@@ -20,11 +20,6 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import PlatformCapabilityError
-
-
-# ---------------------------------------------------------------------------
-# Import guard — must raise PlatformCapabilityError on non-Windows
-# ---------------------------------------------------------------------------
 
 
 def test_import_guard_on_non_windows() -> None:
@@ -41,75 +36,35 @@ def test_import_guard_on_non_windows() -> None:
     assert exc_info.value.platform == sys.platform
 
 
-# ---------------------------------------------------------------------------
-# Windows behavior tests — PASS ON A WINDOWS RUNNER, skip on Linux/macOS
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.skipif(
     sys.platform != "win32",
     reason="Windows file-lock behavior tests require a Windows runner",
 )
-def test_windows_lock_acquire_and_release(tmp_path: Path) -> None:
-    """WindowsFileLock: acquire → is_locked True → release → is_locked False."""
-    from dadaia_workspace.infrastructure.file_lock_windows import WindowsFileLock
+def test_windows_lock_acquire_release_noop_and_workspace_lock(tmp_path: Path) -> None:
+    """WindowsFileLock: acquire → is_locked True → release → is_locked False; a
+    re-entrant acquire is never a silent no-op (raises OSError); and
+    WindowsWorkspaceLock.acquire works end-to-end as a context manager."""
+    from dadaia_workspace.infrastructure.file_lock_windows import (
+        WindowsFileLock,
+        WindowsWorkspaceLock,
+    )
 
     lock = WindowsFileLock()
     lock_path = tmp_path / "test.lock"
 
     fd = lock._lock_file(lock_path)
     assert lock.is_locked(lock_path) is True
+
+    # Re-entrant acquire should fail with OSError (not silently succeed).
+    with pytest.raises(OSError):
+        fd2 = lock._lock_file(lock_path)
+        lock._unlock_file(fd2)
+
     lock._unlock_file(fd)
     # After release, should no longer be locked.
     assert lock.is_locked(lock_path) is False
 
-
-@pytest.mark.skipif(
-    sys.platform != "win32",
-    reason="Windows file-lock behavior tests require a Windows runner",
-)
-def test_windows_lock_not_silent_noop(tmp_path: Path) -> None:
-    """WindowsFileLock.acquire() never silently no-ops — a second acquire raises."""
-    from dadaia_workspace.infrastructure.file_lock_windows import WindowsFileLock
-
-    lock = WindowsFileLock()
-    lock_path = tmp_path / "test.lock"
-
-    fd1 = lock._lock_file(lock_path)
-    try:
-        # Re-entrant acquire should fail with OSError (not silently succeed).
-        with pytest.raises(OSError):
-            fd2 = lock._lock_file(lock_path)
-            lock._unlock_file(fd2)
-    finally:
-        lock._unlock_file(fd1)
-
-
-@pytest.mark.skipif(
-    sys.platform != "win32",
-    reason="Windows file-lock behavior tests require a Windows runner",
-)
-def test_windows_workspace_lock_acquire(tmp_path: Path) -> None:
-    """WindowsWorkspaceLock.acquire context manager works end-to-end."""
-    from dadaia_workspace.infrastructure.file_lock_windows import WindowsWorkspaceLock
-
-    lock = WindowsWorkspaceLock()
-    with lock.acquire(tmp_path):
-        lock_path = tmp_path / ".dadaia" / "states" / ".ws_lock"
-        assert lock_path.exists()
-
-
-@pytest.mark.skipif(
-    sys.platform != "win32",
-    reason="msvcrt-absent test requires Windows runner",
-)
-def test_msvcrt_absent_raises_platform_capability_error() -> None:
-    """If msvcrt is unavailable, the module raises PlatformCapabilityError.
-
-    The guard is at module import time; this test documents that the error
-    is never a silent no-op — a missing ``msvcrt`` must fail loudly.
-    """
-    pytest.skip(
-        "msvcrt-absent guard fires at module import time. "
-        "Behavior: PlatformCapabilityError is raised — never a silent no-op."
-    )
+    ws_lock = WindowsWorkspaceLock()
+    with ws_lock.acquire(tmp_path):
+        ws_lock_path = tmp_path / ".dadaia" / "states" / ".ws_lock"
+        assert ws_lock_path.exists()

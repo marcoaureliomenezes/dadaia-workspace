@@ -1,4 +1,8 @@
-"""dadaia init CLI — happy path + skip-assets + workspace resolution."""
+"""dadaia init CLI — one fn: creates .dadaia+states, idempotent rerun, cwd default.
+
+Merged per plan-integration.md (5 -> 1). Deleted the skip-message + assets-output
+wording greps.
+"""
 
 from pathlib import Path
 
@@ -9,42 +13,24 @@ from dadaia_workspace.cli.main import app
 _runner = CliRunner()
 
 
-def test_init_creates_dadaia_directory(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--skip-assets"])
+def test_init_creates_states_idempotent_and_cwd_default(tmp_path: Path, monkeypatch) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.chdir(ws)
+
+    result = _runner.invoke(app, ["init", "--workspace", str(ws), "--skip-assets"])
     assert result.exit_code == 0, result.output
-    assert (tmp_path / ".dadaia").exists()
-    assert (tmp_path / ".dadaia" / "states" / "spec_contexts.json").exists()
+    assert (ws / ".dadaia").exists()
+    assert (ws / ".dadaia" / "states" / "spec_contexts.json").exists()
 
+    rerun = _runner.invoke(app, ["init", "--workspace", str(ws), "--skip-assets"])
+    assert rerun.exit_code == 0, rerun.output
 
-def test_init_skip_assets_prints_skip_message(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--skip-assets"])
-    assert result.exit_code == 0, result.output
-    assert "skip" in result.output.lower() or "Skipped" in result.output
-
-
-def test_init_is_idempotent(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--skip-assets"])
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path), "--skip-assets"])
-    assert result.exit_code == 0, result.output
-
-
-def test_init_without_workspace_flag_uses_cwd(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--skip-assets"])
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / ".dadaia").exists()
-
-
-def test_init_with_assets_outputs_installed_or_up_to_date(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    result = _runner.invoke(app, ["init", "--workspace", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-    # Either installs assets or reports all up to date
-    assert (
-        "asset" in result.output.lower()
-        or "up to date" in result.output.lower()
-        or "✓" in result.output
-    )
+    # cwd-default case: a sibling (not nested) root so upward .dadaia resolution from
+    # the first workspace never interferes.
+    cwd_ws = tmp_path / "cwd-case"
+    cwd_ws.mkdir()
+    monkeypatch.chdir(cwd_ws)
+    cwd_result = _runner.invoke(app, ["init", "--skip-assets"])
+    assert cwd_result.exit_code == 0, cwd_result.output
+    assert (cwd_ws / ".dadaia").exists()

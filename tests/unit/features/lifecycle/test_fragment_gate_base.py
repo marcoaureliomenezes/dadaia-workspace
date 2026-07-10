@@ -271,31 +271,36 @@ def _defs(module_name: str) -> str:
     return (_WORKFLOWS_DIR / f"{module_name}.py").read_text(encoding="utf-8")
 
 
-def test_shared_gate_members_defined_once_in_base() -> None:
-    """No handoff-ledger body redefines a shared gate/assembly member (grep evidence)."""
+def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
+    """Grep evidence that the FR1 dedup landed and stayed landed:
+
+    * the base defines every shared gate/assembly member + ``_scope``;
+    * no handoff-ledger body (release_definition/audit/research/bug_report) redefines a
+      shared gate/assembly member — except bug_report, which overrides ONLY ``_scope``
+      (its ADDITIVE bug_write special-case);
+    * backlog_definition mixes in the assembly helpers via ``_FragmentAssemblyMixin`` with
+      no local copy of any of them;
+    * every body keeps its module-global ``_SEQUENCE`` (Q3) — the guardrail suites import it.
+    """
     base = _defs("_fragment_gate")
     for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS, "_scope"):
         assert f"def {member}(" in base, f"base must define {member}"
+
     for body in ("release_definition", "audit", "research", "bug_report"):
         src = _defs(body)
         for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS):
             assert f"def {member}(" not in src, f"{body} still defines shared member {member}"
-    # bug_report overrides ONLY _scope (its ADDITIVE bug_write special-case); the others don't.
     assert "def _scope(" in _defs("bug_report")
     for body in ("release_definition", "audit", "research"):
         assert "def _scope(" not in _defs(body), f"{body} must not redefine _scope"
 
-
-def test_backlog_uses_assembly_mixin_no_local_copies() -> None:
-    """backlog_definition mixes in the assembly helpers — no local copy of any of them."""
-    src = _defs("backlog_definition")
-    assert "_FragmentAssemblyMixin" in src, "backlog must mix in _FragmentAssemblyMixin"
+    backlog_src = _defs("backlog_definition")
+    assert "_FragmentAssemblyMixin" in backlog_src, "backlog must mix in _FragmentAssemblyMixin"
     for member in (*_ASSEMBLY_MEMBERS, "_scope"):
-        assert f"def {member}(" not in src, f"backlog still defines assembly member {member}"
+        assert f"def {member}(" not in backlog_src, (
+            f"backlog still defines assembly member {member}"
+        )
 
-
-def test_module_global_sequence_survives_by_name() -> None:
-    """(Q3) each body keeps its module-global ``_SEQUENCE`` — the guardrail suites import it."""
     for module in (release_definition, audit, research, bug_report, backlog_definition):
         assert hasattr(module, "_SEQUENCE"), (
             f"{module.__name__} dropped its module-global _SEQUENCE"

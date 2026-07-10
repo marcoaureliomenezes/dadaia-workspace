@@ -1,8 +1,8 @@
-"""Unit tests for pure hygiene core models."""
+"""Unit tests for pure hygiene core models.
 
-import dataclasses
-
-import pytest
+Frozen-dataclass immutability for SlopPolicy is covered by the SHARED param sweep in
+``tests/unit/core/models/test_workflow_execution.py::test_all_models_are_frozen``.
+"""
 
 from dadaia_workspace.core.models.hygiene import (
     HygieneCandidate,
@@ -28,7 +28,7 @@ def test_slop_policy_defaults_match_release_ttl_law() -> None:
     )
 
 
-def test_slop_policy_round_trips_to_primitive_dict() -> None:
+def test_hygiene_models_round_trip_to_primitive_dict() -> None:
     policy = SlopPolicy(
         reports_ttl_seconds=7200,
         handoff_ttl_seconds=3600,
@@ -36,7 +36,6 @@ def test_slop_policy_round_trips_to_primitive_dict() -> None:
         safe_zones=(HygieneZone.REPORTS, HygieneZone.TMP),
         durable_top_level_dirs=("reports", "tmp", "states"),
     )
-
     data = policy.to_dict()
     assert data == {
         "reports_ttl_seconds": 7200,
@@ -47,8 +46,6 @@ def test_slop_policy_round_trips_to_primitive_dict() -> None:
     }
     assert SlopPolicy.from_dict(data) == policy
 
-
-def test_hygiene_candidate_round_trips_protection_metadata() -> None:
     candidate = HygieneCandidate(
         path=".dadaia/reports/dadaia-workspace/report.html",
         zone=HygieneZone.REPORTS,
@@ -58,9 +55,8 @@ def test_hygiene_candidate_round_trips_protection_metadata() -> None:
         protected=True,
         protection_kind=HygieneProtectionKind.CURRENT_RELEASE_EVIDENCE,
     )
-
-    data = candidate.to_dict()
-    assert data == {
+    cand_data = candidate.to_dict()
+    assert cand_data == {
         "path": ".dadaia/reports/dadaia-workspace/report.html",
         "zone": "reports",
         "kind": "expired_report",
@@ -69,10 +65,8 @@ def test_hygiene_candidate_round_trips_protection_metadata() -> None:
         "protected": True,
         "protection_kind": "current_release_evidence",
     }
-    assert HygieneCandidate.from_dict(data) == candidate
+    assert HygieneCandidate.from_dict(cand_data) == candidate
 
-
-def test_hygiene_counters_round_trip_all_required_counts() -> None:
     counters = HygieneCounters(
         zone_totals={HygieneZone.REPORTS: 122, HygieneZone.HANDOFF: 295, HygieneZone.TMP: 437724},
         expired_totals={HygieneZone.REPORTS: 121, HygieneZone.HANDOFF: 294},
@@ -83,15 +77,12 @@ def test_hygiene_counters_round_trip_all_required_counts() -> None:
         protected_residual_count=3,
         scan_elapsed_ms=250,
     )
+    counters_data = counters.to_dict()
+    assert counters_data["zone_totals"] == {"reports": 122, "handoff": 295, "tmp": 437724}
+    assert counters_data["expired_totals"] == {"reports": 121, "handoff": 294}
+    assert counters_data["unknown_top_level_dirs"] == ["imgs", "references"]
+    assert HygieneCounters.from_dict(counters_data) == counters
 
-    data = counters.to_dict()
-    assert data["zone_totals"] == {"reports": 122, "handoff": 295, "tmp": 437724}
-    assert data["expired_totals"] == {"reports": 121, "handoff": 294}
-    assert data["unknown_top_level_dirs"] == ["imgs", "references"]
-    assert HygieneCounters.from_dict(data) == counters
-
-
-def test_hygiene_snapshot_round_trips_baseline_shape() -> None:
     snapshot = HygieneSnapshot(
         schema_version="hygiene-snapshot-v1",
         timestamp="2026-06-18T04:30:00Z",
@@ -110,17 +101,9 @@ def test_hygiene_snapshot_round_trips_baseline_shape() -> None:
             ),
         ),
     )
-
-    data = snapshot.to_dict()
-    assert data["schema_version"] == "hygiene-snapshot-v1"
-    assert data["policy"]["reports_ttl_seconds"] == 172800
-    assert data["counters"]["cleanup_candidate_count"] == 1
-    assert data["candidates"][0]["kind"] == "expired_tmp"
-    assert HygieneSnapshot.from_dict(data) == snapshot
-
-
-def test_hygiene_models_are_frozen() -> None:
-    policy = SlopPolicy()
-
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        policy.tmp_ttl_seconds = 10  # type: ignore[misc]
+    snap_data = snapshot.to_dict()
+    assert snap_data["schema_version"] == "hygiene-snapshot-v1"
+    assert snap_data["policy"]["reports_ttl_seconds"] == 172800
+    assert snap_data["counters"]["cleanup_candidate_count"] == 1
+    assert snap_data["candidates"][0]["kind"] == "expired_tmp"
+    assert HygieneSnapshot.from_dict(snap_data) == snapshot

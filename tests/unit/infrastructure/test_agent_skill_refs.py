@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
 
 _AGENT_TEMPLATE = """---
@@ -52,67 +54,63 @@ def _public_tree(tmp_path: Path) -> Path:
     return public
 
 
-class TestCoreAgentSweepUnchanged:
-    """Fate ledger: the pre-existing core-agent behavior survives the additive sweep."""
+@pytest.mark.parametrize(
+    ("skills", "expect_drift"),
+    [
+        pytest.param(["core-skill", "ghost"], True, id="bogus-ref-reported"),
+        pytest.param(["pack-a-skill"], True, id="does-not-resolve-against-pack-skills-global"),
+    ],
+)
+def test_core_agent_sweep(tmp_path: Path, skills: list[str], expect_drift: bool) -> None:
+    public = _public_tree(tmp_path)
+    _mk_agent(public / "agents" / "core-agent.md", "core-agent", skills)
+    out = check_agent_skill_refs(public)
+    if expect_drift:
+        assert len(out) == 1
+        assert out[0].startswith("[drift] agent:core-agent:")
+    else:
+        assert out == []
 
-    def test_core_agent_bogus_ref_still_reported(self, tmp_path: Path) -> None:
-        public = _public_tree(tmp_path)
-        _mk_agent(public / "agents" / "core-agent.md", "core-agent", ["core-skill", "ghost"])
-        out = check_agent_skill_refs(public)
+    if skills == ["core-skill", "ghost"]:
+        # RED-first message shape (D-CX-SKILLS) — verbatim string kept once.
         assert out == [
             "[drift] agent:core-agent: frontmatter references "
             "non-existent skill 'ghost' (D-CX-SKILLS)"
         ]
 
-    def test_core_agent_does_not_resolve_against_pack_skills(self, tmp_path: Path) -> None:
-        """Core agents resolve against public/skills/ ONLY — pack skills are not global."""
-        public = _public_tree(tmp_path)
-        _mk_agent(public / "agents" / "core-agent.md", "core-agent", ["pack-a-skill"])
-        out = check_agent_skill_refs(public)
-        assert len(out) == 1 and out[0].startswith("[drift] agent:core-agent:")
 
-
-class TestPluginAwareSweep:
-    """AC-7: pack-agent refs resolve against public/skills/ ∪ the pack's own skills/."""
-
-    def test_bogus_pack_agent_ref_yields_drift_line(self, tmp_path: Path) -> None:
-        """RED-first (read fact 6): pre-fix this produced ZERO report lines."""
-        public = _public_tree(tmp_path)
-        _mk_agent(
-            public / "plugins" / "pack-a" / "agents" / "pack-agent.md",
-            "pack-agent",
+@pytest.mark.parametrize(
+    ("skills", "expected"),
+    [
+        pytest.param(
             ["pack-a-skill", "no-such-skill"],
-        )
-        out = check_agent_skill_refs(public)
-        drift = [r for r in out if r.startswith("[drift]")]
-        assert drift == [
-            "[drift] plugin-agent:pack-a/pack-agent: frontmatter references "
-            "non-existent skill 'no-such-skill' (D-CX-SKILLS)"
-        ]
+            [
+                "[drift] plugin-agent:pack-a/pack-agent: frontmatter references "
+                "non-existent skill 'no-such-skill' (D-CX-SKILLS)"
+            ],
+            id="bogus-pack-agent-ref-yields-drift-line",
+        ),
+        pytest.param(["core-skill", "pack-a-skill"], [], id="resolves-union-core-and-own-pack"),
+        pytest.param(
+            ["pack-b-skill"], "foreign-pack-not-resolved", id="foreign-pack-skill-not-resolved"
+        ),
+    ],
+)
+def test_pack_agent_sweep(tmp_path: Path, skills: list[str], expected: list[str] | str) -> None:
+    public = _public_tree(tmp_path)
+    _mk_agent(public / "plugins" / "pack-a" / "agents" / "pack-agent.md", "pack-agent", skills)
+    out = check_agent_skill_refs(public)
+    drift = [r for r in out if r.startswith("[drift]")]
+    if expected == "foreign-pack-not-resolved":
+        assert len(drift) == 1
+        assert drift[0].startswith("[drift] plugin-agent:pack-a/pack-agent:")
+        assert "'pack-b-skill'" in drift[0]
+    else:
+        assert drift == expected
 
-    def test_pack_agent_resolves_union_of_core_and_own_pack(self, tmp_path: Path) -> None:
-        public = _public_tree(tmp_path)
-        _mk_agent(
-            public / "plugins" / "pack-a" / "agents" / "pack-agent.md",
-            "pack-agent",
-            ["core-skill", "pack-a-skill"],
-        )
-        assert check_agent_skill_refs(public) == []
 
-    def test_pack_agent_does_not_resolve_foreign_pack_skill(self, tmp_path: Path) -> None:
-        public = _public_tree(tmp_path)
-        _mk_agent(
-            public / "plugins" / "pack-a" / "agents" / "pack-agent.md",
-            "pack-agent",
-            ["pack-b-skill"],
-        )
-        out = check_agent_skill_refs(public)
-        assert len(out) == 1
-        assert out[0].startswith("[drift] plugin-agent:pack-a/pack-agent:")
-        assert "'pack-b-skill'" in out[0]
-
-    def test_no_plugins_dir_is_a_noop(self, tmp_path: Path) -> None:
-        public = tmp_path / "public"
-        _mk_skill(public / "skills", "core-skill")
-        _mk_agent(public / "agents" / "core-agent.md", "core-agent", ["core-skill"])
-        assert check_agent_skill_refs(public) == []
+def test_no_plugins_dir_is_a_noop(tmp_path: Path) -> None:
+    public = tmp_path / "public"
+    _mk_skill(public / "skills", "core-skill")
+    _mk_agent(public / "agents" / "core-agent.md", "core-agent", ["core-skill"])
+    assert check_agent_skill_refs(public) == []

@@ -47,9 +47,22 @@ def _gate_schema_reasons(doc: dict[str, object]) -> list[str]:
     return reasons
 
 
-def test_ac5_blocked_push_v12_roundtrip(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ac5_v12_roundtrip_blocked_push_report_workflow_and_zero_refs_fallback(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Three invocations sharing one workspace, each ``reports validate --strict`` clean:
+
+    1. ``blocked_push_preflight`` with duplicate injected refs -> handoff-v1.2 with
+       deduped self_pull.refs.
+    2. ``LifecycleReportWorkflow.run`` with injected refs -> handoff-v1.2.
+    3. ADR-5: zero refs + unmapped 'lifecycle' agent -> honest v1.1 fallback (never a
+       fabricated self_pull) that still validates.
+    """
+    monkeypatch.chdir(workspace)
+
+    # 1. blocked_push_preflight — duplicate refs dedup into self_pull.refs.
     refs = ("specs/memory/architecture.md", "specs/memory/architecture.md")
-    result = LifecyclePreflightService().blocked_push_preflight(
+    result1 = LifecyclePreflightService().blocked_push_preflight(
         context="dadaia-workspace",
         release_id="v0.1.62",
         commit_sha="abc123",
@@ -57,56 +70,43 @@ def test_ac5_blocked_push_v12_roundtrip(workspace: Path, monkeypatch: pytest.Mon
         run_id="push-run",
         injected_refs=refs,
     )
-    handoff_path = workspace / result.handoff.path
-    doc = json.loads(handoff_path.read_text(encoding="utf-8"))
-    assert doc["schema_version"] == "handoff-v1.2"
-    assert doc["self_pull"] == {"refs": ["specs/memory/architecture.md"]}
-    assert _gate_schema_reasons(doc) == []
-    validation = container.build_reports_validation_service(workspace).validate_file(handoff_path)
-    assert validation.valid is True
+    handoff_path1 = workspace / result1.handoff.path
+    doc1 = json.loads(handoff_path1.read_text(encoding="utf-8"))
+    assert doc1["schema_version"] == "handoff-v1.2"
+    assert doc1["self_pull"] == {"refs": ["specs/memory/architecture.md"]}
+    assert _gate_schema_reasons(doc1) == []
+    validation1 = container.build_reports_validation_service(workspace).validate_file(handoff_path1)
+    assert validation1.valid is True
+    cli1 = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path1)])
+    assert cli1.exit_code == 0, cli1.output
 
-    monkeypatch.chdir(workspace)
-    cli = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path)])
-    assert cli.exit_code == 0, cli.output
-
-
-def test_ac5_report_workflow_v12_roundtrip(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    result = container.build_lifecycle_report_workflow(workspace).run(
+    # 2. LifecycleReportWorkflow.run — v1.2 with injected refs.
+    result2 = container.build_lifecycle_report_workflow(workspace).run(
         context="dadaia-workspace",
         release_id="v0.1.62",
         run_id="report-run",
         injected_refs=("specs/memory/architecture.md",),
     )
-    handoff_path = workspace / result.handoff.path
-    doc = json.loads(handoff_path.read_text(encoding="utf-8"))
-    assert doc["schema_version"] == "handoff-v1.2"
-    assert doc["self_pull"] == {"refs": ["specs/memory/architecture.md"]}
-    assert _gate_schema_reasons(doc) == []
-    assert result.validation.valid is True
+    handoff_path2 = workspace / result2.handoff.path
+    doc2 = json.loads(handoff_path2.read_text(encoding="utf-8"))
+    assert doc2["schema_version"] == "handoff-v1.2"
+    assert doc2["self_pull"] == {"refs": ["specs/memory/architecture.md"]}
+    assert _gate_schema_reasons(doc2) == []
+    assert result2.validation.valid is True
+    cli2 = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path2)])
+    assert cli2.exit_code == 0, cli2.output
 
-    monkeypatch.chdir(workspace)
-    cli = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path)])
-    assert cli.exit_code == 0, cli.output
-
-
-def test_ac5_zero_refs_falls_back_to_honest_v11(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """ADR-5: zero refs + unmapped 'lifecycle' agent → honest v1.1 that validates."""
-    result = container.build_lifecycle_report_workflow(workspace).run(
+    # 3. ADR-5 zero-refs honest v1.1 fallback.
+    result3 = container.build_lifecycle_report_workflow(workspace).run(
         context="dadaia-workspace",
         release_id="v0.1.62",
         run_id="report-run-zero",
     )
-    handoff_path = workspace / result.handoff.path
-    doc = json.loads(handoff_path.read_text(encoding="utf-8"))
-    assert doc["schema_version"] == "handoff-v1.1"
-    assert "self_pull" not in doc
-    assert _gate_schema_reasons(doc) == []
-    assert result.validation.valid is True
-
-    monkeypatch.chdir(workspace)
-    cli = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path)])
-    assert cli.exit_code == 0, cli.output
+    handoff_path3 = workspace / result3.handoff.path
+    doc3 = json.loads(handoff_path3.read_text(encoding="utf-8"))
+    assert doc3["schema_version"] == "handoff-v1.1"
+    assert "self_pull" not in doc3
+    assert _gate_schema_reasons(doc3) == []
+    assert result3.validation.valid is True
+    cli3 = _runner.invoke(app, ["reports", "validate", "--strict", str(handoff_path3)])
+    assert cli3.exit_code == 0, cli3.output

@@ -44,27 +44,17 @@ def _classifiers() -> list[str]:
     return result
 
 
-def test_os_classifiers_cover_linux_macos_windows() -> None:
-    """pyproject.toml must declare the three supported OS classifiers.
-
-    These match the hard-gated CI matrix (Linux + macOS + Windows) after the
-    0.1.8 rc-2 graduation. The test fails if any is absent.
-    """
+def test_os_classifiers_cover_linux_macos_windows_and_exclude_os_independent() -> None:
+    """pyproject.toml must declare the three supported OS classifiers (matching the
+    hard-gated CI matrix after 0.1.8 rc-2 graduation) and must NOT carry the
+    over-broad ``OS Independent`` classifier (which would dishonestly imply every OS
+    works without evidence)."""
     classifiers = _classifiers()
     for target in _REQUIRED_OS_CLASSIFIERS:
         assert target in classifiers, (
             f"Missing classifier '{target}' in pyproject.toml. Found: {classifiers!r}. "
             "pyproject.toml must declare every OS whose CI legs are hard-gated green."
         )
-
-
-def test_os_independent_classifier_is_absent() -> None:
-    """The over-broad ``OS Independent`` classifier must NOT be present.
-
-    We advertise the three specific, CI-verified OSes instead of claiming the
-    package runs everywhere unconditionally.
-    """
-    classifiers = _classifiers()
     over_broad = "Operating System :: OS Independent"
     assert over_broad not in classifiers, (
         f"Found over-broad classifier '{over_broad}' in pyproject.toml. "

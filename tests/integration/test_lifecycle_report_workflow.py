@@ -49,10 +49,14 @@ def _artifact_path(payload: dict[str, object], key: str) -> str:
     return path
 
 
-def test_lifecycle_report_command_writes_report_handoff_and_snapshots(
+def test_lifecycle_report_writes_artifacts_dry_run_apply_cleanup_and_escapes_html(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Default run: writes report+handoff+snapshots, dry-run cleanup (candidate kept).
+    --apply-cleanup: same artifact shape, but the stale candidate is actually deleted.
+    Plus (own workspace): CLI-controlled fields (release-id) are HTML-escaped in the
+    generated report — never raw-injected."""
     workspace = _init_workspace(tmp_path)
     stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
     monkeypatch.chdir(workspace)
@@ -84,16 +88,8 @@ def test_lifecycle_report_command_writes_report_handoff_and_snapshots(
         assert path.startswith(".dadaia/")
         assert (workspace / path).is_file()
 
-
-def test_lifecycle_report_apply_cleanup_deletes_old_candidates_but_keeps_fresh_artifacts(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    stale = _write_old(workspace / ".dadaia" / "tmp" / "agent" / "old.txt")
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
+    # --apply-cleanup deletes the same stale candidate; artifacts still land.
+    apply_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -109,22 +105,19 @@ def test_lifecycle_report_apply_cleanup_deletes_old_candidates_but_keeps_fresh_a
         ],
     )
 
-    assert result.exit_code == 0, result.output
-    payload = _payload(result.output)
-    assert payload["cleanup_dry_run"] is False
+    assert apply_result.exit_code == 0, apply_result.output
+    apply_payload = _payload(apply_result.output)
+    assert apply_payload["cleanup_dry_run"] is False
     assert not stale.exists()
     for key in ("report", "handoff", "baseline_snapshot", "final_snapshot"):
-        assert (workspace / _artifact_path(payload, key)).is_file()
+        assert (workspace / _artifact_path(apply_payload, key)).is_file()
 
+    # CLI-controlled fields (release-id) are HTML-escaped in the generated report.
+    xss_workspace = tmp_path.parent / (tmp_path.name + "-xss")
+    _init_workspace(xss_workspace)
+    monkeypatch.chdir(xss_workspace)
 
-def test_lifecycle_report_escapes_cli_controlled_html_fields(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    result = _runner.invoke(
+    xss_result = _runner.invoke(
         app,
         [
             "lifecycle",
@@ -139,8 +132,10 @@ def test_lifecycle_report_escapes_cli_controlled_html_fields(
         ],
     )
 
-    assert result.exit_code == 0, result.output
-    payload = _payload(result.output)
-    report_html = (workspace / _artifact_path(payload, "report")).read_text(encoding="utf-8")
+    assert xss_result.exit_code == 0, xss_result.output
+    xss_payload = _payload(xss_result.output)
+    report_html = (xss_workspace / _artifact_path(xss_payload, "report")).read_text(
+        encoding="utf-8"
+    )
     assert "<script>alert(1)</script>" not in report_html
     assert "v0.1.15&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in report_html

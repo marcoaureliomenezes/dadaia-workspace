@@ -47,83 +47,71 @@ def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
     return venv_bin
 
 
-def test_preflight_passes_with_poetry_off_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "stub_exit_code", [0, 1, None], ids=["pass", "failure-report", "missing-tool-fails-closed"]
+)
+def test_preflight_resolved_tool_pass_and_failure_report_with_poetry_off_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stub_exit_code: int | None
 ) -> None:
-    venv_bin = _fake_venv(tmp_path, exit_code=0)
-
-    # Wipe PATH so poetry (and any host tool) cannot leak in. The resolved argv
-    # carry ABSOLUTE paths to the stub executables, so they run regardless.
+    """With poetry wiped off PATH: a passing stub venv resolves every tool to an
+    ABSOLUTE fake-venv sibling path with zero poetry references and all checks pass;
+    a failing stub venv reports the first resolved tool's non-zero exit as a failed
+    check (fail-fast stops there) — no poetry fallback in either case. A tool absent
+    from venv AND DADAIA_BIN AND PATH falls back to poetry and fails closed (127,
+    clean 'command not found', no traceback — the v0.1.10 fail-closed contract)."""
     monkeypatch.setenv("PATH", "")
     monkeypatch.delenv("DADAIA_BIN", raising=False)
 
-    checks = checks_for(
-        quick=True,
-        python_executable=str(venv_bin / "python"),
-        dadaia_bin=None,
-    )
+    if stub_exit_code is None:
+        venv_bin = tmp_path / "barevenv" / "bin"
+        _stub_exe(venv_bin, "python")  # python only; no ruff/mypy/pytest siblings
 
-    # No argv references poetry — every tool resolved to the fake-venv sibling.
-    for c in checks:
-        assert "poetry" not in c.argv, f"{c.name}: {c.argv}"
-        assert c.argv[0].startswith(str(venv_bin)), f"{c.name}: {c.argv}"
+        checks = checks_for(
+            quick=True,
+            python_executable=str(venv_bin / "python"),
+            dadaia_bin=None,
+        )
+        # ruff/mypy/pytest fall back to ("poetry", "run", ...) since no sibling exists.
+        # lint-imports (FR4) is a REQUIRED tool: instead of a poetry fallback it FAILS
+        # CLOSED to an actionable command naming the missing binary + poetry group
+        # (architect A10).
+        non_required = [c for c in checks if c.name != "lint-imports"]
+        assert all(c.argv[0] == "poetry" for c in non_required), [c.argv for c in checks]
+        lint_imports = next(c for c in checks if c.name == "lint-imports")
+        assert lint_imports.argv[0] != "poetry", lint_imports.argv
+        assert "poetry install --with dev" in " ".join(lint_imports.argv), lint_imports.argv
 
-    results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
+        results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
+        assert not all_passed(results)
+        # fail-fast stops at the first check (ruff format --check → poetry fallback → 127).
+        assert results[0].exit_code == 127
+        assert "command not found" in results[0].output
+        return
 
-    assert all_passed(results), [(r.name, r.exit_code, r.output) for r in results if not r.passed]
-    assert len(results) == len(checks)
-
-
-def test_preflight_reports_failure_from_resolved_tool(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A resolved tool that exits non-zero is reported as a failed check (no poetry)."""
-    venv_bin = _fake_venv(tmp_path, exit_code=1)
-    monkeypatch.setenv("PATH", "")
-    monkeypatch.delenv("DADAIA_BIN", raising=False)
-
-    checks = checks_for(
-        quick=True,
-        python_executable=str(venv_bin / "python"),
-        dadaia_bin=None,
-    )
-    results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
-
-    assert not all_passed(results)
-    # First check (ruff format --check) fails → fail-fast stops there.
-    assert results[0].passed is False
-    assert results[0].exit_code == 1
-
-
-def test_missing_tool_everywhere_fails_closed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Tool absent from venv AND DADAIA_BIN AND PATH → poetry fallback fails closed (127).
-
-    Preserves the v0.1.10 fail-closed contract: no traceback, a clean
-    'command not found' message, exit 127.
-    """
-    venv_bin = tmp_path / "barevenv" / "bin"
-    _stub_exe(venv_bin, "python")  # python only; no ruff/mypy/pytest siblings
-    monkeypatch.setenv("PATH", "")  # poetry not reachable either
-    monkeypatch.delenv("DADAIA_BIN", raising=False)
+    venv_bin = _fake_venv(tmp_path, exit_code=stub_exit_code)
 
     checks = checks_for(
         quick=True,
         python_executable=str(venv_bin / "python"),
         dadaia_bin=None,
     )
-    # ruff/mypy/pytest fall back to ("poetry", "run", ...) since no sibling exists.
-    # lint-imports (FR4) is a REQUIRED tool: instead of a poetry fallback it FAILS CLOSED
-    # to an actionable command naming the missing binary + poetry group (architect A10).
-    non_required = [c for c in checks if c.name != "lint-imports"]
-    assert all(c.argv[0] == "poetry" for c in non_required), [c.argv for c in checks]
-    lint_imports = next(c for c in checks if c.name == "lint-imports")
-    assert lint_imports.argv[0] != "poetry", lint_imports.argv
-    assert "poetry install --with dev" in " ".join(lint_imports.argv), lint_imports.argv
 
-    results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
-    assert not all_passed(results)
-    # fail-fast stops at the first check (ruff format --check → poetry fallback → 127).
-    assert results[0].exit_code == 127
-    assert "command not found" in results[0].output
+    if stub_exit_code == 0:
+        # No argv references poetry — every tool resolved to the fake-venv sibling.
+        for c in checks:
+            assert "poetry" not in c.argv, f"{c.name}: {c.argv}"
+            assert c.argv[0].startswith(str(venv_bin)), f"{c.name}: {c.argv}"
+
+        results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
+
+        assert all_passed(results), [
+            (r.name, r.exit_code, r.output) for r in results if not r.passed
+        ]
+        assert len(results) == len(checks)
+    else:
+        results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
+
+        assert not all_passed(results)
+        # First check (ruff format --check) fails → fail-fast stops there.
+        assert results[0].passed is False
+        assert results[0].exit_code == 1

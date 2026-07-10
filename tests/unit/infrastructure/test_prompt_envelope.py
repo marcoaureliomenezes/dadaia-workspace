@@ -4,10 +4,10 @@ Two guarantees:
 
 * **byte-stability (R5)** — a persona-LESS request produces the EXACT byte sequence the
   envelope produced before the persona field existed (the 9-field, indent=2, sort_keys
-  payload);
+  payload). This byte-stability lock is the transport contract for every L2 worker.
 * **operative directive** — a present persona is emitted wrapped in a directive that
   instructs the worker to ACT PER the mandate (the preamble), not merely as the bare
-  mandate body.
+  mandate body, and the serialization stays sorted/indented and reproducible.
 """
 
 from __future__ import annotations
@@ -56,11 +56,9 @@ def test_persona_less_envelope_is_byte_identical_to_pre_v0144() -> None:
         indent=2,
         sort_keys=True,
     )
-    assert build_prompt_envelope(_request(persona=None)) == expected
-
-
-def test_persona_less_envelope_omits_the_persona_key() -> None:
-    payload = json.loads(build_prompt_envelope(_request(persona=None)))
+    raw = build_prompt_envelope(_request(persona=None))
+    assert raw == expected
+    payload = json.loads(raw)
     assert "persona" not in payload
     assert set(payload) == {
         "role",
@@ -75,9 +73,10 @@ def test_persona_less_envelope_omits_the_persona_key() -> None:
     }
 
 
-def test_present_persona_is_emitted_as_operative_directive() -> None:
+def test_present_persona_is_emitted_as_operative_directive_and_stays_serialization_stable() -> None:
     mandate = "You are acting as the product-engineer. Author the SPEC delta."
-    payload = json.loads(build_prompt_envelope(_request(persona=mandate)))
+    raw = build_prompt_envelope(_request(persona=mandate))
+    payload = json.loads(raw)
     assert "persona" in payload
     directive = payload["persona"]
     # The DIRECTIVE text — the "act per the mandate" instruction — must be present, not just
@@ -88,11 +87,6 @@ def test_present_persona_is_emitted_as_operative_directive() -> None:
     # The mandate body is still carried, after the directive preamble.
     assert mandate in directive
     assert directive.index("OPERATIVE DIRECTIVE") < directive.index(mandate)
-
-
-def test_present_persona_keeps_sorted_indented_serialization() -> None:
-    mandate = "Act as the role."
-    raw = build_prompt_envelope(_request(persona=mandate))
-    # sort_keys=True → "persona" sorts after the other p* keys deterministically; re-dumping
-    # the parsed payload with the same options reproduces the bytes.
-    assert raw == json.dumps(json.loads(raw), indent=2, sort_keys=True)
+    # sort_keys=True → "persona" sorts deterministically; re-dumping the parsed payload with
+    # the same options reproduces the bytes.
+    assert raw == json.dumps(payload, indent=2, sort_keys=True)

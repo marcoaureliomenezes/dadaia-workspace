@@ -52,21 +52,7 @@ def _reset_operator_profiles() -> None:
     model_profiles.clear_operator_profiles()
 
 
-def test_default_first_no_store_is_built_in_only() -> None:
-    # L3: nothing loaded → exactly the built-in set.
-    ids = {p.id for p in model_profiles.list_profiles()}
-    assert "pi-operator-fast" not in ids
-    assert "codex-implementation-standard" in ids
-
-
-def test_empty_store_loads_nothing() -> None:
-    model_profiles.load_operator_profiles(_FakeStore(()))
-    ids = {p.id for p in model_profiles.list_profiles()}
-    assert "codex-implementation-standard" in ids
-    assert all(p.source == "built-in" for p in model_profiles.list_profiles())
-
-
-def test_operator_profile_is_selectable() -> None:
+def test_operator_profile_selectable_with_provenance_and_builtins_kept() -> None:
     model_profiles.load_operator_profiles(_FakeStore((_operator_profile(),)))
     resolved = model_profiles.resolve("pi-operator-fast")
     assert resolved.harness == "pi"
@@ -76,26 +62,38 @@ def test_operator_profile_is_selectable() -> None:
     assert "codex-implementation-standard" in {p.id for p in model_profiles.list_profiles()}
 
 
-def test_unknown_profile_still_fail_closed() -> None:
-    model_profiles.load_operator_profiles(_FakeStore((_operator_profile(),)))
-    with pytest.raises(UnknownProfileError):
-        model_profiles.resolve("does-not-exist")
+# --- ① default-first: no-store == empty-store == built-in-only byte-identical -----------
 
 
-def test_operator_id_colliding_with_builtin_rejected() -> None:
+def test_default_first_no_store_equals_empty_store_equals_built_in_only() -> None:
+    # L3: nothing loaded → exactly the built-in set.
+    no_store_ids = {p.id for p in model_profiles.list_profiles()}
+    assert "pi-operator-fast" not in no_store_ids
+    assert "codex-implementation-standard" in no_store_ids
+
+    model_profiles.load_operator_profiles(_FakeStore(()))
+    empty_store_ids = {p.id for p in model_profiles.list_profiles()}
+    assert empty_store_ids == no_store_ids
+    assert all(p.source == "built-in" for p in model_profiles.list_profiles())
+
+
+# --- ② governance rejects param + unknown fail-closed + load-replaces-not-accumulates ----
+
+
+def test_governance_rejects_collision_unresolvable_unknown_fail_closed_and_replaces() -> None:
     collide = _operator_profile(profile_id="pi-implementation-standard")
     with pytest.raises(ValueError) as exc:
         model_profiles.load_operator_profiles(_FakeStore((collide,)))
     assert "collide" in str(exc.value).lower() or "built-in" in str(exc.value).lower()
 
-
-def test_operator_profile_unresolvable_model_rejected() -> None:
     bad = _operator_profile(model_id="gpt-does-not-exist")
     with pytest.raises(ValueError):
         model_profiles.load_operator_profiles(_FakeStore((bad,)))
 
+    model_profiles.load_operator_profiles(_FakeStore((_operator_profile(),)))
+    with pytest.raises(UnknownProfileError):
+        model_profiles.resolve("does-not-exist")
 
-def test_load_is_idempotent_and_replaces() -> None:
     model_profiles.load_operator_profiles(_FakeStore((_operator_profile("pi-a"),)))
     assert "pi-a" in {p.id for p in model_profiles.list_profiles()}
     model_profiles.load_operator_profiles(_FakeStore((_operator_profile("pi-b"),)))

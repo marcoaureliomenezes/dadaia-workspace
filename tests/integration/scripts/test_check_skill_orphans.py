@@ -46,12 +46,11 @@ def _run_script(tmp_path: Path) -> subprocess.CompletedProcess:
     )
 
 
-def test_orphan_detected(tmp_path: Path) -> None:
-    """Script exits 1 and prints only the orphan skill name to stderr."""
-    _seed_workspace(tmp_path, agent_skills=["__wired_skill"])
-
-    result = _run_script(tmp_path)
-
+def test_orphan_detected_then_wired_exits_clean(tmp_path: Path) -> None:
+    """Two subprocess runs: orphan present -> exit 1 naming it; wired -> exit 0 silent."""
+    orphan_ws = tmp_path / "orphan-case"
+    _seed_workspace(orphan_ws, agent_skills=["__wired_skill"])
+    result = _run_script(orphan_ws)
     assert result.returncode == 1, (
         f"Expected exit code 1 (orphan found), got {result.returncode}.\n"
         f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
@@ -63,20 +62,16 @@ def test_orphan_detected(tmp_path: Path) -> None:
         f"'__wired_skill' should NOT appear in stderr (it is wired).\nstderr: {result.stderr!r}"
     )
 
-
-def test_all_wired_exits_clean(tmp_path: Path) -> None:
-    """Script exits 0 with no output when every skill is referenced."""
-    _seed_workspace(tmp_path, agent_skills=["__wired_skill", "__orphan_skill"])
-
-    result = _run_script(tmp_path)
-
-    assert result.returncode == 0, (
-        f"Expected exit code 0 (no orphans), got {result.returncode}.\n"
-        f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    wired_ws = tmp_path / "wired-case"
+    _seed_workspace(wired_ws, agent_skills=["__wired_skill", "__orphan_skill"])
+    result2 = _run_script(wired_ws)
+    assert result2.returncode == 0, (
+        f"Expected exit code 0 (no orphans), got {result2.returncode}.\n"
+        f"stdout: {result2.stdout!r}\nstderr: {result2.stderr!r}"
     )
-    assert result.stderr.strip() == "", (
-        f"Expected empty stderr on clean run.\nstderr: {result.stderr!r}"
+    assert result2.stderr.strip() == "", (
+        f"Expected empty stderr on clean run.\nstderr: {result2.stderr!r}"
     )
-    assert result.stdout.strip() == "", (
-        f"Expected empty stdout on clean run.\nstderr: {result.stdout!r}"
+    assert result2.stdout.strip() == "", (
+        f"Expected empty stdout on clean run.\nstderr: {result2.stdout!r}"
     )

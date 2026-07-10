@@ -48,178 +48,87 @@ def _make_partial_dadaia(parent: Path, name: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — sub-repo with .dadaia/ but no states/ is skipped; real root is found
+# resolve_workspace_root — SUCCESS paths.
 # ---------------------------------------------------------------------------
 
 
-def test_walks_past_partial_dadaia_to_real_workspace(tmp_path: Path) -> None:
-    """cwd inside a sub-repo that has .dadaia/ but no states/ must be skipped.
-
-    The resolver should climb up and find the real workspace root that has
-    .dadaia/states/spec_contexts.json.
-    """
-    # Workspace root (proper)
+def test_resolve_workspace_root_success_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # (1) cwd inside a sub-repo that has .dadaia/ but no states/ must be skipped; the
+    # resolver climbs up and finds the real workspace root.
     workspace_root = _make_full_workspace(tmp_path / "workspace")
-
-    # Sub-repo: has .dadaia/ but no states/
     sub_repo = _make_partial_dadaia(workspace_root / "repos", "sample-consumer")
-    # A file deep inside the sub-repo
     deep = sub_repo / "src" / "module"
     deep.mkdir(parents=True)
+    assert resolve_workspace_root(deep) == workspace_root
 
-    result = resolve_workspace_root(deep)
+    # (2) cwd IS the workspace root → return it immediately.
+    assert resolve_workspace_root(workspace_root) == workspace_root
 
-    assert result == workspace_root
+    # (5) No cwd arg → defaults to Path.cwd().
+    monkeypatch.chdir(workspace_root)
+    assert resolve_workspace_root() == workspace_root
+
+    # (6) The returned path is always absolute.
+    assert resolve_workspace_root(workspace_root).is_absolute()
+
+    # Backward-compat: a properly initialized workspace resolves the same from a
+    # nested dir the old .dadaia/-presence logic would also have found.
+    nested = workspace_root / "tools" / "scripts"
+    nested.mkdir(parents=True)
+    assert resolve_workspace_root(nested) == workspace_root
 
 
 # ---------------------------------------------------------------------------
-# Test 2 — cwd at workspace root itself
+# resolve_workspace_root — FAILURE paths.
 # ---------------------------------------------------------------------------
 
 
-def test_returns_workspace_root_when_cwd_is_root(tmp_path: Path) -> None:
-    """When cwd IS the workspace root, return it immediately."""
-    workspace_root = _make_full_workspace(tmp_path / "workspace")
-
-    result = resolve_workspace_root(workspace_root)
-
-    assert result == workspace_root
-
-
-# ---------------------------------------------------------------------------
-# Test 3 — cwd outside any workspace tree raises WorkspaceNotInitializedError
-# ---------------------------------------------------------------------------
-
-
-def test_raises_when_no_workspace_found(tmp_path: Path) -> None:
-    """A path with no .dadaia/states/spec_contexts.json anywhere raises the error."""
+def test_resolve_workspace_root_failure_table(tmp_path: Path) -> None:
+    # (3) A path with no .dadaia/states/spec_contexts.json anywhere raises, and the
+    # message mentions the inspected cwd.
     orphan_dir = tmp_path / "nowhere" / "deep" / "path"
     orphan_dir.mkdir(parents=True)
-
     with pytest.raises(WorkspaceNotInitializedError) as exc_info:
         resolve_workspace_root(orphan_dir)
-
-    # Error message must mention the cwd that was inspected
     assert str(orphan_dir) in str(exc_info.value)
 
-
-# ---------------------------------------------------------------------------
-# Test 4 — .dadaia/states/ exists but spec_contexts.json is absent → raises
-# ---------------------------------------------------------------------------
-
-
-def test_raises_when_spec_contexts_json_missing(tmp_path: Path) -> None:
-    """Having .dadaia/states/ but no spec_contexts.json inside is NOT a valid workspace."""
+    # (4) Having .dadaia/states/ but no spec_contexts.json inside is NOT a valid
+    # workspace.
     workspace_candidate = tmp_path / "partial"
     states_dir = workspace_candidate / ".dadaia" / "states"
     states_dir.mkdir(parents=True)
-    # Deliberately do NOT create spec_contexts.json
-
     with pytest.raises(WorkspaceNotInitializedError):
         resolve_workspace_root(workspace_candidate)
 
-
-# ---------------------------------------------------------------------------
-# Test 5 — no cwd arg → uses Path.cwd() default (monkeypatching os.getcwd)
-# ---------------------------------------------------------------------------
-
-
-def test_uses_cwd_when_no_arg_given(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """When called with no argument, resolver should default to Path.cwd()."""
-    workspace_root = _make_full_workspace(tmp_path / "workspace")
-
-    # Monkeypatch os.getcwd to simulate running from within the workspace root
-    monkeypatch.chdir(workspace_root)
-
-    result = resolve_workspace_root()
-
-    assert result == workspace_root
-
-
-# ---------------------------------------------------------------------------
-# Test 6 — result is always absolute
-# ---------------------------------------------------------------------------
-
-
-def test_returns_absolute_path(tmp_path: Path) -> None:
-    """The returned path must be absolute regardless of how cwd is expressed."""
-    workspace_root = _make_full_workspace(tmp_path / "workspace")
-
-    result = resolve_workspace_root(workspace_root)
-
-    assert result.is_absolute()
-
-
-# ---------------------------------------------------------------------------
-# Test 7 (bonus) — backward-compat: workspace already resolved correctly stays same
-# ---------------------------------------------------------------------------
-
-
-def test_backward_compat_correctly_resolved_workspace(tmp_path: Path) -> None:
-    """A workspace that was correctly resolved by the old logic returns the same path.
-
-    The old logic returned the first directory containing .dadaia/.
-    Our new logic requires .dadaia/states/spec_contexts.json.
-    For a properly initialized workspace, both point to the same root.
-    """
-    workspace_root = _make_full_workspace(tmp_path / "myworkspace")
-    # cwd is a nested dir inside the workspace
-    nested = workspace_root / "tools" / "scripts"
-    nested.mkdir(parents=True)
-
-    result = resolve_workspace_root(nested)
-
-    assert result == workspace_root
-
-
-# ---------------------------------------------------------------------------
-# Test 8 — error message includes skipped candidates
-# ---------------------------------------------------------------------------
-
-
-def test_error_message_mentions_skipped_candidates(tmp_path: Path) -> None:
-    """When sub-repos with partial .dadaia/ are skipped, they appear in error message."""
-    # Build a tree: orphan_root/repos/sub-repo/.dadaia (no states)
-    # orphan_root itself has no .dadaia at all
+    # The error message lists skipped partial-.dadaia candidates.
     orphan_root = tmp_path / "orphan"
     sub_repo = _make_partial_dadaia(orphan_root / "repos", "some-subrepo")
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
-
-    with pytest.raises(WorkspaceNotInitializedError) as exc_info:
+    with pytest.raises(WorkspaceNotInitializedError) as exc_info2:
         resolve_workspace_root(deep)
-
-    msg = str(exc_info.value)
-    # The skipped candidate (sub_repo) should be mentioned
-    assert str(sub_repo) in msg
+    assert str(sub_repo) in str(exc_info2.value)
 
 
 # ---------------------------------------------------------------------------
-# Tests for resolve_workspace_root_for_init (T-25)
+# resolve_workspace_root_for_init (T-25) — sentinel present/absent.
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_workspace_root_for_init_finds_sentinel(tmp_path: Path) -> None:
-    """T-25a: when .dadaia/states/spec_contexts.json is present, return its parent dir."""
+def test_resolve_workspace_root_for_init_sentinel_and_fallback(tmp_path: Path) -> None:
+    # T-25a: when .dadaia/states/spec_contexts.json is present, return its parent dir.
     workspace_root = _make_full_workspace(tmp_path / "workspace")
-    # Start from a nested dir inside the workspace
     nested = workspace_root / "repos" / "sub"
     nested.mkdir(parents=True)
+    assert resolve_workspace_root_for_init(nested) == workspace_root
 
-    result = resolve_workspace_root_for_init(nested)
-
-    assert result == workspace_root
-
-
-def test_resolve_workspace_root_for_init_fallback_to_cwd(tmp_path: Path) -> None:
-    """T-25b: when no sentinel is found, return the given cwd path without raising."""
+    # T-25b: when no sentinel is found, return the given cwd path without raising —
+    # the safe fallback for first-time init.
     orphan = tmp_path / "no-workspace" / "somewhere"
     orphan.mkdir(parents=True)
-
-    # Must NOT raise — safe fallback for first-time init
-    result = resolve_workspace_root_for_init(orphan)
-
-    assert result == orphan
+    assert resolve_workspace_root_for_init(orphan) == orphan
 
 
 # ---------------------------------------------------------------------------
@@ -227,63 +136,37 @@ def test_resolve_workspace_root_for_init_fallback_to_cwd(tmp_path: Path) -> None
 # ---------------------------------------------------------------------------
 
 
-def test_explicit_workspace_is_authoritative_when_inside_existing_workspace(
-    tmp_path: Path,
-) -> None:
+def test_explicit_workspace_is_authoritative(tmp_path: Path) -> None:
     """T-016-Z01: init --workspace <dir> from inside an existing workspace must target <dir>.
 
     Bug: resolve_workspace_root_for_init used to walk UP to the ancestor
     workspace when cwd was inside one, ignoring the explicit --workspace path.
-    Fix: an explicit path is returned directly — no ancestor-walk.
+    Fix: an explicit path is returned directly — no ancestor-walk, regardless of
+    whether the target dir exists yet (init is allowed to initialize a directory
+    that doesn't exist yet).
     """
-    # Set up an existing workspace at tmp_path/existing_ws
+    # Set up an existing workspace at tmp_path/existing_ws.
     existing_ws = _make_full_workspace(tmp_path / "existing_ws")
-
-    # Simulate CWD inside the existing workspace (e.g. its .dadaia/tmp subdirectory)
+    # Simulate CWD inside the existing workspace (e.g. its .dadaia/tmp subdirectory).
     cwd_inside_ws = existing_ws / ".dadaia" / "tmp" / "agent-session"
     cwd_inside_ws.mkdir(parents=True)
 
-    # The explicit --workspace target (a fresh, uninitialized dir)
+    # The explicit --workspace target (a fresh, uninitialized dir).
     fresh_target = tmp_path / "freshws"
     fresh_target.mkdir(parents=True)
-
-    # When called with an explicit workspace path, it must return that path —
-    # not walk up and find the ancestor workspace.
     result = resolve_workspace_root_for_init(fresh_target, explicit=True)
-
     assert result == fresh_target.resolve()
-    # Sanity: the ancestor workspace is NOT what we got back
+    # Sanity: the ancestor workspace is NOT what we got back.
     assert result != existing_ws
 
-
-def test_explicit_workspace_with_nonexistent_dir(tmp_path: Path) -> None:
-    """T-016-Z01: explicit workspace path that does not yet exist is returned as-is.
-
-    dadaia init must be allowed to initialize a directory that doesn't exist yet.
-    """
+    # A target path that does not yet exist is returned as-is.
     nonexistent = tmp_path / "brand_new_workspace"
-    # Do NOT create it — init is allowed to receive a path that will be created
+    assert resolve_workspace_root_for_init(nonexistent, explicit=True) == nonexistent.resolve()
 
-    result = resolve_workspace_root_for_init(nonexistent, explicit=True)
-
-    assert result == nonexistent.resolve()
-
-
-def test_non_explicit_workspace_still_walks_ancestor(tmp_path: Path) -> None:
-    """T-016-Z01 backward compat: without explicit=True, ancestor-walk is preserved.
-
-    When init is invoked with no --workspace flag (cwd defaults to Path.cwd()),
-    the resolver still walks up to find an initialized workspace root.
-    """
-    # Existing workspace at tmp_path/workspace
-    workspace_root = _make_full_workspace(tmp_path / "workspace")
-
-    # Nested sub-repo (partial .dadaia, no sentinel)
-    sub_repo = _make_partial_dadaia(workspace_root / "repos", "my-service")
+    # Backward compat: without explicit=True, ancestor-walk is preserved — a nested
+    # sub-repo with partial .dadaia (no sentinel) still walks up to find the proper
+    # workspace.
+    sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
-
-    # Without explicit=True, still walks up to find the proper workspace
-    result = resolve_workspace_root_for_init(deep, explicit=False)
-
-    assert result == workspace_root
+    assert resolve_workspace_root_for_init(deep, explicit=False) == existing_ws

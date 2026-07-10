@@ -1,4 +1,4 @@
-"""Declarative role→atom map + phase threading + single-sourced injection (v0.1.57 FR2 / W2).
+"""Declarative role->atom map + phase threading + single-sourced injection (v0.1.57 FR2 / W2).
 
 Covers:
 
@@ -17,6 +17,9 @@ Covers:
   every one of the 5 container builders; absent + malformed ``ACTIVE.md`` degrade to ``None``.
 * **single-sourced (A1)** — the map DATA + resolve-and-inject LOGIC live in ``role_atoms.py``
   only; all three surfaces consume :func:`inject_role_atoms`, never a copy.
+
+The RED-anchor (unwired pipeline has NO grounding) preserves the production-inert-regression
+detector.
 """
 
 from __future__ import annotations
@@ -157,44 +160,6 @@ def _refs_for(run: LifecycleRun, step_label: str) -> tuple[str, ...]:
     raise AssertionError(f"no injected_context entry for step {step_label!r}")
 
 
-# ---------------------------------------------------------------------------
-# role_atoms unit — resolve + inject fail-open behaviour
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_role_atoms_reads_mapped_atom(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    atoms = resolve_role_atoms("qa-engineer", specs)
-    assert len(atoms) == 1
-    role_name, ref, content = atoms[0]
-    assert role_name == "qa-engineer"
-    assert ref == _QA_REF
-    assert "FIXTURE QA BODY." in content
-
-
-def test_resolve_role_atoms_multi_role_comma_split(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    atoms = resolve_role_atoms("qa-engineer, software-architect", specs)
-    assert [ref for _, ref, _ in atoms] == [_QA_REF, _ARCH_REF]
-
-
-def test_resolve_role_atoms_unmapped_role_yields_nothing(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    assert resolve_role_atoms("security-reviewer", specs) == ()
-    assert resolve_role_atoms("python", specs) == ()
-
-
-def test_resolve_role_atoms_missing_atom_file_fails_open(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    (specs / "memory" / "quality-assurance.md").unlink()
-    # qa-engineer maps to the now-absent file → no injection, no crash.
-    assert resolve_role_atoms("qa-engineer", specs) == ()
-
-
-def test_resolve_role_atoms_none_specs_dir_yields_nothing() -> None:
-    assert resolve_role_atoms("qa-engineer", None) == ()
-
-
 def _bare_run() -> LifecycleRun:
     return LifecycleRun(
         run_id="r",
@@ -207,13 +172,41 @@ def _bare_run() -> LifecycleRun:
     )
 
 
-def test_inject_role_atoms_appends_block_and_records_ref(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# ① resolve/inject unit param + single-sourced inspect-guard
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_and_inject_role_atoms_unit_matrix(tmp_path: Path) -> None:
+    """mapped / multi-role / unmapped / missing-file / None-specs fail-open for
+    ``resolve_role_atoms``; append / noop-unmapped / merge-into-existing for
+    ``inject_role_atoms``."""
     specs = _seed_specs(tmp_path)
+
+    mapped = resolve_role_atoms("qa-engineer", specs)
+    assert len(mapped) == 1
+    role_name, ref, content = mapped[0]
+    assert role_name == "qa-engineer"
+    assert ref == _QA_REF
+    assert "FIXTURE QA BODY." in content
+
+    multi = resolve_role_atoms("qa-engineer, software-architect", specs)
+    assert [r for _, r, _ in multi] == [_QA_REF, _ARCH_REF]
+
+    assert resolve_role_atoms("security-reviewer", specs) == ()
+    assert resolve_role_atoms("python", specs) == ()
+
+    (specs / "memory" / "quality-assurance.md").unlink()
+    # qa-engineer maps to the now-absent file → no injection, no crash.
+    assert resolve_role_atoms("qa-engineer", specs) == ()
+    assert resolve_role_atoms("qa-engineer", None) == ()
+
+    resolvable_specs = _seed_specs(tmp_path / "resolvable")
     run, prompt = inject_role_atoms(
         run=_bare_run(),
         step_label="s",
         role="qa-engineer",
-        specs_dir=specs,
+        specs_dir=resolvable_specs,
         prompt="BASE PROMPT",
     )
     assert prompt.startswith("BASE PROMPT")
@@ -221,18 +214,12 @@ def test_inject_role_atoms_appends_block_and_records_ref(tmp_path: Path) -> None
     assert "FIXTURE QA BODY." in prompt
     assert _refs_for(run, "s") == (_QA_REF,)
 
-
-def test_inject_role_atoms_noop_when_unmapped(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    run, prompt = inject_role_atoms(
-        run=_bare_run(), step_label="s", role="python", specs_dir=specs, prompt="P"
+    noop_run, noop_prompt = inject_role_atoms(
+        run=_bare_run(), step_label="s", role="python", specs_dir=resolvable_specs, prompt="P"
     )
-    assert prompt == "P"
-    assert run.injected_context == ()
+    assert noop_prompt == "P"
+    assert noop_run.injected_context == ()
 
-
-def test_inject_role_atoms_merges_into_existing_entry(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
     base = _bare_run()
     seeded = LifecycleRun(  # entry already present (e.g. selector audit) — refs must merge
         **{
@@ -242,13 +229,40 @@ def test_inject_role_atoms_merges_into_existing_entry(tmp_path: Path) -> None:
             ),
         }
     )
-    run, _ = inject_role_atoms(
-        run=seeded, step_label="s", role="qa-engineer", specs_dir=specs, prompt="P"
+    merged_run, _ = inject_role_atoms(
+        run=seeded, step_label="s", role="qa-engineer", specs_dir=resolvable_specs, prompt="P"
     )
-    assert len(run.injected_context) == 1
-    entry = run.injected_context[0]
+    assert len(merged_run.injected_context) == 1
+    entry = merged_run.injected_context[0]
     assert entry.fragment_ids == ("frag",)  # preserved
     assert entry.refs == ("existing-ref", _QA_REF)  # merged
+
+    # single-sourced (A1) — the map + inject logic live in role_atoms.py only.
+    surfaces = (_fragment_gate, pipeline_mod, phase_workflow_mod)
+    for mod in surfaces:
+        src = inspect.getsource(mod)
+        assert "inject_role_atoms" in src, f"{mod.__name__} does not consume inject_role_atoms"
+        assert "ROLE_ATOM_MAP" not in src, (
+            f"{mod.__name__} re-declares the map (not single-sourced)"
+        )
+    assert "ROLE_ATOM_MAP" in inspect.getsource(role_atoms)
+    assert set(ROLE_ATOM_MAP) == {"software-architect", "qa-engineer", "product-engineer"}
+
+    # AC-4 unit-level: _active_phase fixture/absent/malformed (the builder-level threading
+    # matrix below reuses this same producer per builder).
+    fixture_specs = _seed_specs(tmp_path / "phase-fixture", active_phase="IMPLEMENTATION")
+    assert container._active_phase(fixture_specs) == "IMPLEMENTATION"
+
+    absent_specs = _seed_specs(tmp_path / "phase-absent", active_phase=None)  # no ACTIVE.md
+    assert not (absent_specs / "releases" / "ACTIVE.md").exists()
+    assert container._active_phase(absent_specs) is None
+
+    malformed_specs = _seed_specs(tmp_path / "phase-malformed", active_phase=None)
+    # malformed: a body with neither a release: nor a phase: line.
+    (malformed_specs / "releases" / "ACTIVE.md").write_text(
+        "garbage: not-a-pointer\n", encoding="utf-8"
+    )
+    assert container._active_phase(malformed_specs) is None
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +298,7 @@ def test_ac3_base_records_and_injects_each_mapped_role(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-3 — the selector-less pipeline review_qa step (RED-first: absent without the map)
+# ② AC-3 — the selector-less pipeline review_qa step + RED-anchor (absent without the map)
 # ---------------------------------------------------------------------------
 
 
@@ -301,7 +315,7 @@ def _pipeline(tmp_path: Path, specs: Path | None) -> tuple[LifecyclePipeline, _R
     return pipe, fake
 
 
-def test_ac3_pipeline_review_qa_grounding(tmp_path: Path) -> None:
+def test_ac3_pipeline_review_qa_grounding_and_red_anchor_when_unwired(tmp_path: Path) -> None:
     specs = _seed_specs(tmp_path)
     pipe, fake = _pipeline(tmp_path, specs)
     assert pipe.run("pl", implementation_ladder(AgentRuntimeKind.FAKE)).completed is True
@@ -313,26 +327,23 @@ def test_ac3_pipeline_review_qa_grounding(tmp_path: Path) -> None:
     # an unmapped step (implement → software-engineer) is NOT grounded.
     assert "FIXTURE QA BODY." not in fake.request_for("implement").prompt
 
-
-def test_ac3_pipeline_review_qa_absent_without_map(tmp_path: Path) -> None:
-    """RED-anchor: with the pipeline un-wired (no specs_dir) the QA atom is absent.
-
-    This pins the pre-map / production-inert state the FR2 map fixes: an un-wired pipeline is
-    exactly the selector-less production path before this release, and its ``review_qa`` prompt
-    carries no ``quality-assurance.md`` grounding.
-    """
-    _seed_specs(tmp_path)
-    pipe, fake = _pipeline(tmp_path, None)  # no specs_dir → map inert
-    assert pipe.run("pl0", implementation_ladder(AgentRuntimeKind.FAKE)).completed is True
-    assert "FIXTURE QA BODY." not in fake.request_for("review_qa").prompt
+    # RED-anchor: with the pipeline un-wired (no specs_dir) the QA atom is absent. This pins
+    # the pre-map / production-inert state the FR2 map fixes: an un-wired pipeline is exactly
+    # the selector-less production path before this release, and its ``review_qa`` prompt
+    # carries no ``quality-assurance.md`` grounding.
+    unwired_pipe, unwired_fake = _pipeline(tmp_path, None)  # no specs_dir → map inert
+    assert unwired_pipe.run("pl0", implementation_ladder(AgentRuntimeKind.FAKE)).completed is True
+    assert "FIXTURE QA BODY." not in unwired_fake.request_for("review_qa").prompt
 
 
 # ---------------------------------------------------------------------------
-# AC-3 — the single-step phase workflow path
+# ③ AC-3 — the single-step phase workflow path + production builders wire REAL specs_dir
 # ---------------------------------------------------------------------------
 
 
-def test_ac3_phase_workflow_grounding(tmp_path: Path) -> None:
+def test_ac3_phase_workflow_grounding_and_production_builders_wire_real_specs_dir(
+    tmp_path: Path,
+) -> None:
     specs = _seed_specs(tmp_path)
     fake = _RecordingFake()
     wf = LifecyclePhaseWorkflow(
@@ -361,47 +372,20 @@ def test_ac3_phase_workflow_grounding(tmp_path: Path) -> None:
     assert "FIXTURE QA BODY." in fake.received_requests[0].prompt
     assert _QA_REF in _refs_for(_run_from_store(tmp_path, "pw"), "review_qa")
 
-
-# ---------------------------------------------------------------------------
-# AC-3 (A1) — the PRODUCTION builders wire the resolver with a REAL specs_dir
-# ---------------------------------------------------------------------------
-
-
-def test_ac3_a1_production_pipeline_builder_wires_real_specs_dir(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
+    # AC-3 (A1) — the PRODUCTION builders wire the resolver with a REAL specs_dir.
     pipe = container.build_lifecycle_pipeline(tmp_path, context=_CONTEXT, release_id=_RELEASE)
-    # constructed object carries the REAL specs tree (not a fixture / None).
     assert pipe._specs_dir == specs
 
-
-def test_ac3_a1_production_phase_workflow_builder_wires_real_resolver(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path)
-    wf = container.build_lifecycle_phase_workflow(tmp_path, runtime_kind=AgentRuntimeKind.FAKE)
-    assert wf._specs_dir_resolver is not None
-    assert wf._specs_dir_resolver(_CONTEXT) == specs
+    phase_wf = container.build_lifecycle_phase_workflow(
+        tmp_path, runtime_kind=AgentRuntimeKind.FAKE
+    )
+    assert phase_wf._specs_dir_resolver is not None
+    assert phase_wf._specs_dir_resolver(_CONTEXT) == specs
 
 
 # ---------------------------------------------------------------------------
-# AC-4 — phase threading into SpecContext (via _active_phase + the 5 builders)
+# ④ AC-4 — phase threading param: _active_phase fixture/absent/malformed x 5 builders
 # ---------------------------------------------------------------------------
-
-
-def test_ac4_active_phase_reads_fixture(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path, active_phase="IMPLEMENTATION")
-    assert container._active_phase(specs) == "IMPLEMENTATION"
-
-
-def test_ac4_active_phase_absent_is_none(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path, active_phase=None)  # no ACTIVE.md written
-    assert not (specs / "releases" / "ACTIVE.md").exists()
-    assert container._active_phase(specs) is None
-
-
-def test_ac4_active_phase_malformed_is_none(tmp_path: Path) -> None:
-    specs = _seed_specs(tmp_path, active_phase=None)
-    # malformed: a body with neither a release: nor a phase: line.
-    (specs / "releases" / "ACTIVE.md").write_text("garbage: not-a-pointer\n", encoding="utf-8")
-    assert container._active_phase(specs) is None
 
 
 _BUILDERS = (
@@ -414,36 +398,17 @@ _BUILDERS = (
 
 
 @pytest.mark.parametrize("builder_name", _BUILDERS)
-def test_ac4_each_builder_threads_phase_into_spec_context(
+def test_each_builder_threads_phase_present_and_fails_open_when_absent(
     tmp_path: Path, builder_name: str
 ) -> None:
-    _seed_specs(tmp_path, active_phase="IMPLEMENTATION")
     builder = getattr(container, builder_name)
-    wf = builder(tmp_path, context=_CONTEXT, release_id=_RELEASE)
-    assert wf._selector.spec_context.phase == "IMPLEMENTATION"
 
+    present_root = tmp_path / "present"
+    _seed_specs(present_root, active_phase="IMPLEMENTATION")
+    present_wf = builder(present_root, context=_CONTEXT, release_id=_RELEASE)
+    assert present_wf._selector.spec_context.phase == "IMPLEMENTATION"
 
-@pytest.mark.parametrize("builder_name", _BUILDERS)
-def test_ac4_each_builder_fail_open_when_active_absent(tmp_path: Path, builder_name: str) -> None:
-    _seed_specs(tmp_path, active_phase=None)  # no ACTIVE.md → phase must be None
-    builder = getattr(container, builder_name)
-    wf = builder(tmp_path, context=_CONTEXT, release_id=_RELEASE)
-    assert wf._selector.spec_context.phase is None
-
-
-# ---------------------------------------------------------------------------
-# single-sourced (A1) — the map + inject logic live in role_atoms.py only
-# ---------------------------------------------------------------------------
-
-
-def test_inject_helper_is_single_sourced_across_three_surfaces() -> None:
-    surfaces = (_fragment_gate, pipeline_mod, phase_workflow_mod)
-    for mod in surfaces:
-        src = inspect.getsource(mod)
-        assert "inject_role_atoms" in src, f"{mod.__name__} does not consume inject_role_atoms"
-        # the map DATA must NOT be copy-pasted into a consuming surface (single-sourced).
-        assert "ROLE_ATOM_MAP" not in src, (
-            f"{mod.__name__} re-declares the map (not single-sourced)"
-        )
-    assert "ROLE_ATOM_MAP" in inspect.getsource(role_atoms)
-    assert set(ROLE_ATOM_MAP) == {"software-architect", "qa-engineer", "product-engineer"}
+    absent_root = tmp_path / "absent"
+    _seed_specs(absent_root, active_phase=None)  # no ACTIVE.md → phase must be None
+    absent_wf = builder(absent_root, context=_CONTEXT, release_id=_RELEASE)
+    assert absent_wf._selector.spec_context.phase is None

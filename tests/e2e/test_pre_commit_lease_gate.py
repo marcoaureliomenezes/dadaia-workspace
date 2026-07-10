@@ -144,11 +144,34 @@ def _stop_holder(proc: subprocess.Popen[str], stop: Path) -> None:
         proc.wait(timeout=_EXIT_DEADLINE)
 
 
-def test_no_lease_commit_flows(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "variant",
+    ["no-lease", "holder-env-sid", "g6-zero-handoffs"],
+    ids=["no-lease-flows", "holder-env-sid-flows", "g6-zero-handoffs-flows"],
+)
+def test_allow_path_variants_flow(tmp_path: Path, variant: str) -> None:
+    """Three allow-path variants, one repo fixture per case: (1) no lease at all —
+    ADDITIVE-equivalent, zero-false-block; (2) commit FROM the holder session (env sid
+    matches) flows even though a live lease exists; (3) G6 — the holder commits with
+    ZERO security handoffs on disk and still flows, proving the pre-commit gate
+    consults the lease only, never a review verdict."""
     workspace = tmp_path
     repo = _init_repo(workspace, _SLUG)
-    result = _commit(repo, _hook_env(workspace, session_id=None), "no-lease")
-    assert result.returncode == 0, result.stdout + result.stderr
+
+    if variant == "no-lease":
+        result = _commit(repo, _hook_env(workspace, session_id=None), "no-lease")
+        assert result.returncode == 0, result.stdout + result.stderr
+        return
+
+    holder_proc, holder_pid, stop = _start_holder(tmp_path)
+    try:
+        _write_lease(workspace, _SLUG, sid="holder-A", pid=holder_pid)
+        if variant == "g6-zero-handoffs":
+            assert not (workspace / ".dadaia" / "handoff").exists()
+        result = _commit(repo, _hook_env(workspace, session_id="holder-A"), variant)
+        assert result.returncode == 0, result.stdout + result.stderr
+    finally:
+        _stop_holder(holder_proc, stop)
 
 
 def test_live_foreign_lease_blocks_non_holder_commit(tmp_path: Path) -> None:
@@ -164,36 +187,6 @@ def test_live_foreign_lease_blocks_non_holder_commit(tmp_path: Path) -> None:
         assert "foreign-holder" in out, out
         for forbidden in ("rebind", "relaunch", "lock steal"):
             assert forbidden not in out.lower(), out
-    finally:
-        _stop_holder(holder_proc, stop)
-
-
-def test_holder_env_sid_commit_flows(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo = _init_repo(workspace, _SLUG)
-    holder_proc, holder_pid, stop = _start_holder(tmp_path)
-    try:
-        _write_lease(workspace, _SLUG, sid="holder-A", pid=holder_pid)
-        # Commit FROM the holder session (env sid matches) ⇒ flows even though a live lease.
-        result = _commit(repo, _hook_env(workspace, session_id="holder-A"), "holder-flows")
-        assert result.returncode == 0, result.stdout + result.stderr
-    finally:
-        _stop_holder(holder_proc, stop)
-
-
-def test_g6_holder_commits_with_zero_security_handoffs(tmp_path: Path) -> None:
-    """G6: the holder commits while NO security handoff exists → still flows.
-
-    Proves the pre-commit gate consults the lease ONLY, never a review verdict.
-    """
-    workspace = tmp_path
-    repo = _init_repo(workspace, _SLUG)
-    holder_proc, holder_pid, stop = _start_holder(tmp_path)
-    try:
-        _write_lease(workspace, _SLUG, sid="holder-A", pid=holder_pid)
-        assert not (workspace / ".dadaia" / "handoff").exists()
-        result = _commit(repo, _hook_env(workspace, session_id="holder-A"), "g6-no-verdict")
-        assert result.returncode == 0, result.stdout + result.stderr
     finally:
         _stop_holder(holder_proc, stop)
 

@@ -24,8 +24,9 @@ pytestmark = pytest.mark.contract
 _CONTENT = "line-one\nline-two\nline-three\n"
 
 
-def test_generated_bytes_are_lf_exact(tmp_path: Path) -> None:
-    """write_generated leaves on-disk bytes == content.encode('utf-8') (no CRLF translation)."""
+def test_generated_bytes_are_lf_exact_and_second_write_skips(tmp_path: Path) -> None:
+    """write_generated leaves on-disk bytes == content.encode('utf-8') (no CRLF
+    translation), and a second write of identical content is a no-op (skip)."""
     dst = tmp_path / "settings.json"
     write_generated(dst, _CONTENT, force=False, installed=[])
 
@@ -34,13 +35,7 @@ def test_generated_bytes_are_lf_exact(tmp_path: Path) -> None:
     assert dst.read_bytes() == _CONTENT.encode("utf-8")
     assert b"\r\n" not in dst.read_bytes()
 
-
-def test_second_write_of_identical_content_skips(tmp_path: Path) -> None:
-    """A second write of identical content is a no-op (skip), not a rewrite."""
-    dst = tmp_path / "config.toml"
-    write_generated(dst, _CONTENT, force=False, installed=[])
     mtime_before = dst.stat().st_mtime_ns
-
     second: list[str] = []
     write_generated(dst, _CONTENT, force=False, installed=second)
 

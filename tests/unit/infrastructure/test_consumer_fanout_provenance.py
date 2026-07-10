@@ -13,6 +13,10 @@ Three-way install classification for a consumer AGENTS.md:
 
 The fixture consumer is REGISTERED in ``spec_contexts.json`` (schema-v2 via ``_write_registry``,
 QA-4) so the fan-out actually reaches it — otherwise AC-11(g) could not go RED.
+
+This is the provenance-ladder AUTHORITY file — the four survivors below cover the
+three-way install classification AND the paired doctor status for each classification
+(doctor [ok]/[drift] cases fold in as extra asserts rather than separate tests).
 """
 
 from __future__ import annotations
@@ -82,13 +86,10 @@ def _public_doctor_would_exit_nonzero(lines: list[str]) -> bool:
     return any(ln.startswith("[missing]") or ln.startswith("[drift]") for ln in lines)
 
 
-# ---------------------------------------------------------------------------
-# Install classification (three-way)
-# ---------------------------------------------------------------------------
-
-
 def test_hand_authored_consumer_agents_survives_untouched(tmp_path: Path) -> None:
-    """AC-14 / AC-11(g): a registered hand-authored consumer AGENTS.md is NEVER overwritten."""
+    """AC-14 / AC-11(g): a registered hand-authored consumer AGENTS.md is NEVER
+    overwritten — not on a plain pass, not under force=True, and its CLAUDE.md
+    sibling (whether absent or itself foreign) is never clobbered either."""
     src = _source(tmp_path)
     repo = _consumer(tmp_path)
     (repo / "AGENTS.md").write_text(_HAND_AUTHORED, encoding="utf-8")
@@ -103,24 +104,30 @@ def test_hand_authored_consumer_agents_survives_untouched(tmp_path: Path) -> Non
     )
     assert not any(e.startswith("[updated]") for e in installed), installed
 
-
-def test_hand_authored_survives_even_under_force(tmp_path: Path) -> None:
-    """force=True must NOT override the provenance gate — foreign stays foreign."""
-    src = _source(tmp_path)
-    repo = _consumer(tmp_path)
-    (repo / "AGENTS.md").write_text(_HAND_AUTHORED, encoding="utf-8")
-
+    # force=True must NOT override the provenance gate — foreign stays foreign.
     _install_workspace_guardrail_pair(src, tmp_path, force=True)
-
     assert (repo / "AGENTS.md").read_text(encoding="utf-8") == _HAND_AUTHORED
+
+    # A foreign (non-stub) CLAUDE.md beside a foreign AGENTS.md is also [foreign], untouched.
+    foreign_claude = "# hand-authored CLAUDE\n"
+    (repo / "CLAUDE.md").write_text(foreign_claude, encoding="utf-8")
+    installed2: list[str] = []
+    _install_workspace_guardrail_pair(src, tmp_path, force=True, installed=installed2)
+    assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == foreign_claude
+    assert any(e.startswith("[foreign]") and str(repo / "CLAUDE.md") in e for e in installed2)
 
 
 def test_stale_canonical_consumer_is_restored_with_updated_line(tmp_path: Path) -> None:
-    """A banner-bearing (lib-owned) stale copy is restored to canonical + [updated]."""
+    """A banner-bearing (lib-owned) stale copy is restored to canonical + [updated];
+    the pre-restore doctor read on the same fixture is [drift]."""
     src = _source(tmp_path)
     repo = _consumer(tmp_path)
     # Stale canonical: carries the banner but an older body.
     (repo / "AGENTS.md").write_text(_CANONICAL_AGENTS_BANNER + "\n# OLD body\n", encoding="utf-8")
+    (repo / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
+
+    pre_lines = _doctor_guardrail_pair(src, tmp_path)
+    assert "[drift] repos/game:AGENTS.md" in pre_lines, pre_lines
 
     installed: list[str] = []
     _install_workspace_guardrail_pair(src, tmp_path, force=False, installed=installed)
@@ -135,7 +142,8 @@ def test_stale_canonical_consumer_is_restored_with_updated_line(tmp_path: Path) 
 
 
 def test_absent_consumer_agents_is_created(tmp_path: Path) -> None:
-    """Absent consumer AGENTS.md → create + [ok] (an empty slot has nothing to clobber)."""
+    """Absent consumer AGENTS.md → create + [ok] (an empty slot has nothing to
+    clobber); the post-install doctor pair reads both lines [ok]."""
     src = _source(tmp_path)
     repo = _consumer(tmp_path)  # no AGENTS.md written
 
@@ -146,25 +154,9 @@ def test_absent_consumer_agents_is_created(tmp_path: Path) -> None:
     assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
     assert any(e.startswith("[ok]") and str(repo / "AGENTS.md") in e for e in installed), installed
 
-
-def test_foreign_claude_md_left_untouched_when_agents_foreign(tmp_path: Path) -> None:
-    """A foreign (non-stub) CLAUDE.md beside a foreign AGENTS.md is [foreign], untouched."""
-    src = _source(tmp_path)
-    repo = _consumer(tmp_path)
-    (repo / "AGENTS.md").write_text(_HAND_AUTHORED, encoding="utf-8")
-    foreign_claude = "# hand-authored CLAUDE\n"
-    (repo / "CLAUDE.md").write_text(foreign_claude, encoding="utf-8")
-
-    installed: list[str] = []
-    _install_workspace_guardrail_pair(src, tmp_path, force=True, installed=installed)
-
-    assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == foreign_claude
-    assert any(e.startswith("[foreign]") and str(repo / "CLAUDE.md") in e for e in installed)
-
-
-# ---------------------------------------------------------------------------
-# Doctor — provenance-aware ON THE PAIR (Ruling 16) → public doctor EXITS 0
-# ---------------------------------------------------------------------------
+    lines = _doctor_guardrail_pair(src, tmp_path)
+    assert "[ok] repos/game:AGENTS.md" in lines, lines
+    assert "[ok] repos/game:CLAUDE.md" in lines, lines
 
 
 def test_doctor_pair_foreign_for_hand_authored_repo_exits_zero(tmp_path: Path) -> None:
@@ -191,27 +183,3 @@ def test_doctor_pair_foreign_for_hand_authored_repo_exits_zero(tmp_path: Path) -
     assert not _public_doctor_would_exit_nonzero(lines), (
         f"public doctor must EXIT 0 for a hand-authored consumer repo. lines: {lines}"
     )
-
-
-def test_doctor_pair_ok_for_fresh_canonical_consumer(tmp_path: Path) -> None:
-    """A freshly-installed (bannered) consumer → both lines [ok]."""
-    src = _source(tmp_path)
-    _consumer(tmp_path)
-    _install_workspace_guardrail_pair(src, tmp_path, force=True)
-
-    lines = _doctor_guardrail_pair(src, tmp_path)
-
-    assert "[ok] repos/game:AGENTS.md" in lines, lines
-    assert "[ok] repos/game:CLAUDE.md" in lines, lines
-
-
-def test_doctor_flags_drift_for_stale_canonical_consumer(tmp_path: Path) -> None:
-    """A banner-bearing but out-of-date consumer copy is [drift] (needs restore)."""
-    src = _source(tmp_path)
-    repo = _consumer(tmp_path)
-    (repo / "AGENTS.md").write_text(_CANONICAL_AGENTS_BANNER + "\n# OLD body\n", encoding="utf-8")
-    (repo / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
-
-    lines = _doctor_guardrail_pair(src, tmp_path)
-
-    assert "[drift] repos/game:AGENTS.md" in lines, lines

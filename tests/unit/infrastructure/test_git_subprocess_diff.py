@@ -28,37 +28,23 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=path, capture_output=True)
 
 
-def test_diff_name_only_clean_repo_returns_empty(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    assert GitSubprocessClient().diff_name_only(repo) == ()
+def test_diff_name_only_clean_and_dirty_repo(tmp_path: Path) -> None:
+    """Clean repo -> empty tuple; a repo with tracked+untracked changes reports both,
+    deduped and deterministically ordered."""
+    clean_repo = tmp_path / "clean-repo"
+    _init_repo(clean_repo)
+    clean_changed = GitSubprocessClient().diff_name_only(clean_repo)
+    assert clean_changed == ()
+    assert isinstance(clean_changed, tuple)
 
+    dirty_repo = tmp_path / "dirty-repo"
+    _init_repo(dirty_repo)
+    (dirty_repo / "tracked.py").write_text("modified\n")
+    (dirty_repo / "another.txt").write_text("x\n")
 
-def test_diff_name_only_reports_tracked_modification(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "tracked.py").write_text("modified\n")
-
-    changed = GitSubprocessClient().diff_name_only(repo)
+    changed = GitSubprocessClient().diff_name_only(dirty_repo)
     assert "tracked.py" in changed
-
-
-def test_diff_name_only_reports_untracked_file(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "new_file.py").write_text("brand new\n")
-
-    changed = GitSubprocessClient().diff_name_only(repo)
-    assert "new_file.py" in changed
-
-
-def test_diff_name_only_returns_tuple_of_str(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    _init_repo(repo)
-    (repo / "tracked.py").write_text("changed\n")
-    (repo / "another.txt").write_text("x\n")
-
-    changed = GitSubprocessClient().diff_name_only(repo)
+    assert "another.txt" in changed
     assert isinstance(changed, tuple)
     assert all(isinstance(item, str) for item in changed)
     # No duplicates and deterministically ordered.

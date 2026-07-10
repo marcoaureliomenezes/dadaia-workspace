@@ -7,6 +7,8 @@ its own anchor source file.
 
 All roots (source_root, catalog_path, alias_map_path, specs_dir) are injected — never cwd
 (SPEC §3.8 #6).
+
+UNRESOLVED-halts rows are preserved per kind (fail-closed binding).
 """
 
 from __future__ import annotations
@@ -133,144 +135,133 @@ def _build(tree: dict[str, Path]) -> object:
 # ── code kind (AST) ─────────────────────────────────────────────────────────────
 
 
-def test_code_anchor_resolves_class(fixture_tree: dict[str, Path]) -> None:
+@pytest.mark.parametrize(
+    ("ref", "expected_status"),
+    [
+        ("pkg/sample.py#WidgetFactory", BindStatus.RESOLVED),
+        ("pkg/sample.py#make_widget", BindStatus.RESOLVED),
+        ("pkg/sample.py#WIDGET_CONST", BindStatus.RESOLVED),
+        ("pkg/sample.py#NoSuchSymbol", BindStatus.UNRESOLVED),
+        ("pkg/ghost.py#Widget", BindStatus.UNRESOLVED),
+    ],
+)
+def test_code_anchor_table(
+    fixture_tree: dict[str, Path], ref: str, expected_status: BindStatus
+) -> None:
     reg = _build(fixture_tree)
-    result = reg.bind("pkg/sample.py#WidgetFactory", SubjectKind.CODE)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor is not None
-    assert result.anchor.id == "pkg/sample.py#WidgetFactory"
+    result = reg.bind(ref, SubjectKind.CODE)
+    assert result.status is expected_status
+    if expected_status is BindStatus.RESOLVED:
+        assert result.anchor is not None
+        assert result.anchor.id == ref
+    elif "NoSuchSymbol" in ref:
+        assert "NoSuchSymbol" in result.message  # actionable: names the ref
 
 
-def test_code_anchor_resolves_function_and_const(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    assert reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
-    assert reg.bind("pkg/sample.py#WIDGET_CONST", SubjectKind.CODE).status is BindStatus.RESOLVED
+# ── cli kind (Typer app tree) + catalog kind ────────────────────────────────────
 
 
-def test_code_anchor_unresolved_symbol_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    result = reg.bind("pkg/sample.py#NoSuchSymbol", SubjectKind.CODE)
-    assert result.status is BindStatus.UNRESOLVED
-    assert "NoSuchSymbol" in result.message  # actionable: names the ref
-
-
-def test_code_anchor_unknown_file_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    result = reg.bind("pkg/ghost.py#Widget", SubjectKind.CODE)
-    assert result.status is BindStatus.UNRESOLVED
-
-
-# ── cli kind (Typer app tree) ───────────────────────────────────────────────────
-
-
-def test_cli_anchor_resolves_command_id(fixture_tree: dict[str, Path]) -> None:
+def test_cli_and_catalog_anchor_resolve_and_unknown_halts(fixture_tree: dict[str, Path]) -> None:
     reg = _build(fixture_tree)
     result = reg.bind("backlog doctor", SubjectKind.CLI)
     assert result.status is BindStatus.RESOLVED
     assert result.anchor is not None and result.anchor.id == "backlog doctor"
-
-
-def test_cli_anchor_unknown_command_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("backlog frobnicate", SubjectKind.CLI).status is BindStatus.UNRESOLVED
 
-
-# ── catalog kind ────────────────────────────────────────────────────────────────
-
-
-def test_catalog_slug_resolves(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("alpha-feature", SubjectKind.CATALOG).status is BindStatus.RESOLVED
-
-
-def test_catalog_unknown_slug_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("gamma-feature", SubjectKind.CATALOG).status is BindStatus.UNRESOLVED
 
 
 # ── doc kind (spec-doc ids + memory heading anchors) ────────────────────────────
 
 
-def test_doc_specdoc_id_resolves(fixture_tree: dict[str, Path]) -> None:
+def test_doc_kind_table(fixture_tree: dict[str, Path]) -> None:
     reg = _build(fixture_tree)
     assert reg.bind("SPEC-DOC-099", SubjectKind.DOC).status is BindStatus.RESOLVED
-
-
-def test_doc_heading_anchor_resolves(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert (
         reg.bind("memory/architecture.md#INV-no-fixture-drift", SubjectKind.DOC).status
         is BindStatus.RESOLVED
     )
-
-
-def test_doc_unknown_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("SPEC-DOC-12345", SubjectKind.DOC).status is BindStatus.UNRESOLVED
+
+    # panel/api — alias-map ONLY in R1.
+    # The alias map maps "the panel API" -> panel:/api/widgets.
+    result = reg.bind("the panel API", SubjectKind.PANEL)
+    assert result.status is BindStatus.RESOLVED
+    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
+    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
+    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
 
 
 # ── invariant kind ──────────────────────────────────────────────────────────────
 
 
-def test_invariant_resolves(fixture_tree: dict[str, Path]) -> None:
+def test_invariant_resolves_unknown_halts_and_never_mints_from_py_or_tests(
+    fixture_tree: dict[str, Path],
+) -> None:
     reg = _build(fixture_tree)
     assert reg.bind("INV-no-fixture-drift", SubjectKind.INVARIANT).status is BindStatus.RESOLVED
-
-
-def test_invariant_unknown_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     assert reg.bind("INV-made-up", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
 
-
-def test_invariant_in_py_docstring_does_not_resolve(fixture_tree: dict[str, Path]) -> None:
-    """FR2 (v0.1.49): ``.py`` content is not an invariant declaration surface."""
+    # FR2 (v0.1.49): `.py` content is not an invariant declaration surface (the
+    # runtime-mutating live-derivation invariant, kept as the source of truth for
+    # anchor-surface privacy — .py-docstring/tests-dir never mint anchors).
     leaky = fixture_tree["source_root"] / "pkg" / "leaky.py"
     leaky.write_text('"""Docstring example: INV-py-docstring-leak."""\n', encoding="utf-8")
-    reg = _build(fixture_tree)
-    assert reg.bind("INV-py-docstring-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
+    leaky_reg = _build(fixture_tree)
+    assert (
+        leaky_reg.bind("INV-py-docstring-leak", SubjectKind.INVARIANT).status
+        is BindStatus.UNRESOLVED
+    )
 
-
-def test_invariant_under_tests_dir_does_not_resolve(fixture_tree: dict[str, Path]) -> None:
-    """FR2 (v0.1.49): test fixtures under the source root never mint anchors."""
+    # FR2 (v0.1.49): test fixtures under the source root never mint anchors.
     tests_dir = fixture_tree["source_root"] / "tests"
     tests_dir.mkdir()
     (tests_dir / "test_leak.py").write_text("EXPECT = 'INV-test-fixture-leak'\n", encoding="utf-8")
-    reg = _build(fixture_tree)
-    assert reg.bind("INV-test-fixture-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
+    tests_reg = _build(fixture_tree)
+    assert (
+        tests_reg.bind("INV-test-fixture-leak", SubjectKind.INVARIANT).status
+        is BindStatus.UNRESOLVED
+    )
 
 
-# ── panel/api — alias-map ONLY in R1 ─────────────────────────────────────────────
+# ── alias collapses synonym to one anchor (acceptance §3.7.5), and absence tolerated ──
 
 
-def test_panel_resolves_only_via_alias(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    # The alias map maps "the panel API" -> panel:/api/widgets.
-    result = reg.bind("the panel API", SubjectKind.PANEL)
-    assert result.status is BindStatus.RESOLVED
-    assert result.anchor is not None and result.anchor.id == "panel:/api/widgets"
-
-
-def test_panel_without_alias_halts(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
-    # No auto-derivation for panel in R1; an unaliased panel ref must HALT.
-    assert reg.bind("panel:/api/never-aliased", SubjectKind.PANEL).status is BindStatus.UNRESOLVED
-
-
-# ── alias collapses synonym to one anchor (acceptance §3.7.5) ────────────────────
-
-
-def test_alias_collapses_synonym_to_canonical_anchor(fixture_tree: dict[str, Path]) -> None:
+def test_alias_collapses_synonym_and_absent_alias_map_tolerated(
+    fixture_tree: dict[str, Path], tmp_path: Path
+) -> None:
     reg = _build(fixture_tree)
     # "widget factory" is a synonym aliased to the real code anchor.
     result = reg.bind("widget factory", SubjectKind.CODE)
     assert result.status is BindStatus.RESOLVED
     assert result.anchor is not None and result.anchor.id == "pkg/sample.py#WidgetFactory"
 
+    # Absent injected roots tolerated (no crash) — code still resolves; an aliased
+    # synonym now HALTs (no alias map present).
+    absent_root = tmp_path / "absent-case"
+    source_root = absent_root / "src"
+    (source_root / "pkg").mkdir(parents=True)
+    (source_root / "pkg" / "sample.py").write_text(MINIMAL_SOURCE, encoding="utf-8")
+    catalog_path = absent_root / "catalog.json"
+    catalog_path.write_text(json.dumps(MINIMAL_CATALOG), encoding="utf-8")
+    absent_reg = build_registry(
+        source_root=source_root,
+        catalog_path=catalog_path,
+        alias_map_path=absent_root / "missing-aliases.txt",
+        specs_dir=absent_root / "missing-specs",
+        cli_anchors=derive_cli_anchors(_fixture_app()),
+    )
+    assert (
+        absent_reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
+    )
+    assert absent_reg.bind("widget factory", SubjectKind.CODE).status is BindStatus.UNRESOLVED
+
 
 # ── list_anchors (preview surface feed) ─────────────────────────────────────────
 
 
-def test_list_anchors_filters_by_kind(fixture_tree: dict[str, Path]) -> None:
+def test_list_anchors_filters_by_kind_and_all_kinds(fixture_tree: dict[str, Path]) -> None:
     reg = _build(fixture_tree)
     code_anchors = reg.list_anchors(SubjectKind.CODE)
     ids = {a.id for a in code_anchors}
@@ -279,35 +270,11 @@ def test_list_anchors_filters_by_kind(fixture_tree: dict[str, Path]) -> None:
     # No catalog anchors leak into a code listing.
     assert all(a.kind is SubjectKind.CODE for a in code_anchors)
 
-
-def test_list_anchors_all_kinds(fixture_tree: dict[str, Path]) -> None:
-    reg = _build(fixture_tree)
     all_anchors = reg.list_anchors()
     kinds = {a.kind for a in all_anchors}
     assert SubjectKind.CODE in kinds
     assert SubjectKind.CLI in kinds
     assert SubjectKind.CATALOG in kinds
-
-
-# ── absent injected roots tolerated (no crash) ──────────────────────────────────
-
-
-def test_absent_alias_map_tolerated(tmp_path: Path) -> None:
-    source_root = tmp_path / "src"
-    (source_root / "pkg").mkdir(parents=True)
-    (source_root / "pkg" / "sample.py").write_text(MINIMAL_SOURCE, encoding="utf-8")
-    catalog_path = tmp_path / "catalog.json"
-    catalog_path.write_text(json.dumps(MINIMAL_CATALOG), encoding="utf-8")
-    reg = build_registry(
-        source_root=source_root,
-        catalog_path=catalog_path,
-        alias_map_path=tmp_path / "missing-aliases.txt",
-        specs_dir=tmp_path / "missing-specs",
-        cli_anchors=derive_cli_anchors(_fixture_app()),
-    )
-    # Code still resolves; an aliased synonym now HALTs (no alias map present).
-    assert reg.bind("pkg/sample.py#make_widget", SubjectKind.CODE).status is BindStatus.RESOLVED
-    assert reg.bind("widget factory", SubjectKind.CODE).status is BindStatus.UNRESOLVED
 
 
 # ── scoped LIVE-derivation test (creates/deletes its own source file) ────────────
@@ -317,7 +284,8 @@ def test_live_derivation_reflects_source_changes(tmp_path: Path) -> None:
     """SPEC §3.7.5: the registry recomputes from live truth each run.
 
     A symbol added then removed in source changes resolution without editing any stored
-    registry file. This is the ONLY test that mutates a source file at runtime.
+    registry file. This is the ONLY test that mutates a source file at runtime — the one
+    runtime-mutating test proving live derivation, not stored state.
     """
     source_root = tmp_path / "src"
     (source_root / "pkg").mkdir(parents=True)

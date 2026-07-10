@@ -39,39 +39,39 @@ def _make_exe(directory: Path, name: str) -> Path:
     return exe
 
 
-def test_checks_for_includes_lint_imports_with_exact_ci_argv(tmp_path: Path) -> None:
-    """(a) The preflight tuple carries a `lint-imports` check equal to the CI job argv."""
+@pytest.mark.parametrize("lint_imports_present", [True, False], ids=["present", "absent"])
+def test_lint_imports_check_argv_present_vs_fail_closed_absent(
+    tmp_path: Path, lint_imports_present: bool
+) -> None:
+    """(a) present: exact CI argv, placed before pytest. (b) absent: fail-closed, not a
+    silent skip — an actionable non-zero error naming the binary + poetry group."""
     venv_bin = tmp_path / "venv" / "bin"
     python = _make_exe(venv_bin, "python")
-    lint_imports = _make_exe(venv_bin, "lint-imports")
 
-    for quick in (False, True):
-        checks = checks_for(quick=quick, python_executable=str(python), dadaia_bin=None)
-        names = [c.name for c in checks]
+    if lint_imports_present:
+        lint_imports = _make_exe(venv_bin, "lint-imports")
+        for quick in (False, True):
+            checks = checks_for(quick=quick, python_executable=str(python), dadaia_bin=None)
+            names = [c.name for c in checks]
 
-        # Present — never a silent skip.
-        assert "lint-imports" in names, names
+            # Present — never a silent skip.
+            assert "lint-imports" in names, names
 
-        # Exact CI invocation: `lint-imports --config setup.cfg --no-cache`.
-        by_name = {c.name: c.argv for c in checks}
-        assert by_name["lint-imports"] == (
-            str(lint_imports),
-            "--config",
-            "setup.cfg",
-            "--no-cache",
-        ), by_name["lint-imports"]
+            # Exact CI invocation: `lint-imports --config setup.cfg --no-cache`.
+            by_name = {c.name: c.argv for c in checks}
+            assert by_name["lint-imports"] == (
+                str(lint_imports),
+                "--config",
+                "setup.cfg",
+                "--no-cache",
+            ), by_name["lint-imports"]
 
-        # Placement: with the other lint checks, immediately before the slow pytest step.
-        assert names[-2] == "lint-imports", names
-        assert names[-1].startswith("pytest"), names
+            # Placement: with the other lint checks, immediately before the slow pytest step.
+            assert names[-2] == "lint-imports", names
+            assert names[-1].startswith("pytest"), names
+        return
 
-
-def test_lint_imports_check_fails_closed_when_binary_absent(tmp_path: Path) -> None:
-    """(b) Absent `lint-imports` → an actionable fail-closed check, not a silent skip."""
     # Fake venv with python but NO lint-imports sibling; DADAIA_BIN-derived tree unset.
-    venv_bin = tmp_path / "venv" / "bin"
-    python = _make_exe(venv_bin, "python")
-
     checks = checks_for(python_executable=str(python), dadaia_bin=None)
     by_name = {c.name: c.argv for c in checks}
 

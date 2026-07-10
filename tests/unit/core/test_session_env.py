@@ -29,54 +29,59 @@ from tests.fixtures.harness_env import ENTRY_SIGNAL_ENV_VARS, scrub_entry_signal
 _RAW_ENV_AT_COLLECTION: dict[str, str] = dict(os.environ)
 
 
-def test_no_signal_resolves_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DADAIA_ENTRY_HARNESS", raising=False)
-    monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
-    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
-    assert entry_harness() is None
+@pytest.mark.parametrize(
+    ("name", "env", "expected"),
+    [
+        ("no_signal_resolves_none", {}, None),
+        ("pin_codex_wins", {"DADAIA_ENTRY_HARNESS": "codex"}, "codex"),
+        ("pin_pi_wins", {"DADAIA_ENTRY_HARNESS": "pi"}, "pi"),
+        ("pin_uppercase_normalized", {"DADAIA_ENTRY_HARNESS": "CODEX"}, "codex"),
+        ("pin_mixed_case_normalized", {"DADAIA_ENTRY_HARNESS": "Pi"}, "pi"),
+        ("pin_whitespace_stripped", {"DADAIA_ENTRY_HARNESS": "  pi  "}, "pi"),
+        (
+            # AC-3: DADAIA_ENTRY_HARNESS=pi beats a stale CODEX_SESSION_ID (AC-9
+            # sabotage (c) — making the resolver ignore the pin — fails exactly here).
+            "pin_beats_stale_codex_session_id",
+            {"CODEX_SESSION_ID": "stale-codex-sess", "DADAIA_ENTRY_HARNESS": "pi"},
+            "pi",
+        ),
+        ("codex_session_id_resolves_codex", {"CODEX_SESSION_ID": "codex-sess-1"}, "codex"),
+        (
+            # Claude Code is Layer-1-only (LAW 1): its native session id is NEVER an
+            # entry signal, and "claude" is never returned.
+            "claude_session_only_resolves_none",
+            {"CLAUDE_CODE_SESSION_ID": "claude-sess-1"},
+            None,
+        ),
+        # A garbage/unsupported DADAIA_ENTRY_HARNESS value is ignored — resolution
+        # falls through to None (no CODEX_SESSION_ID present), never raises, never
+        # returns the garbage token.
+        ("garbage_claude", {"DADAIA_ENTRY_HARNESS": "claude"}, None),
+        ("garbage_fake", {"DADAIA_ENTRY_HARNESS": "fake"}, None),
+        ("garbage_auto", {"DADAIA_ENTRY_HARNESS": "auto"}, None),
+        ("garbage_opencode", {"DADAIA_ENTRY_HARNESS": "opencode"}, None),
+        ("garbage_digit", {"DADAIA_ENTRY_HARNESS": "1"}, None),
+        ("garbage_space", {"DADAIA_ENTRY_HARNESS": " "}, None),
+        ("garbage_empty", {"DADAIA_ENTRY_HARNESS": ""}, None),
+    ],
+)
+def test_entry_harness_precedence_table(
+    monkeypatch: pytest.MonkeyPatch, name: str, env: dict[str, str], expected: str | None
+) -> None:
+    for var in ("DADAIA_ENTRY_HARNESS", "CODEX_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+        monkeypatch.delenv(var, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert entry_harness() == expected
 
 
-@pytest.mark.parametrize("pin", ["codex", "pi", "CODEX", "Pi", "  pi  "])
-def test_pin_wins(monkeypatch: pytest.MonkeyPatch, pin: str) -> None:
-    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", pin)
-    assert entry_harness() == pin.strip().lower()
-
-
-def test_pin_beats_stale_codex_session_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    # AC-3: DADAIA_ENTRY_HARNESS=pi beats a stale CODEX_SESSION_ID (AC-9 sabotage (c)
-    # — making the resolver ignore the pin — fails exactly here).
-    monkeypatch.setenv("CODEX_SESSION_ID", "stale-codex-sess")
-    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "pi")
-    assert entry_harness() == "pi"
-    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "codex")
-    assert entry_harness() == "codex"
-
-
-def test_codex_session_id_resolves_codex(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
-    assert entry_harness() == "codex"
-
-
-def test_claude_session_only_resolves_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Claude Code is Layer-1-only (LAW 1): its native session id is NEVER an entry
-    # signal, and "claude" is never returned.
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-sess-1")
-    assert entry_harness() is None
-
-
-@pytest.mark.parametrize("garbage", ["claude", "fake", "auto", "opencode", "1", " ", ""])
-def test_garbage_pin_ignored_falls_through(monkeypatch: pytest.MonkeyPatch, garbage: str) -> None:
-    # A garbage/unsupported DADAIA_ENTRY_HARNESS value is ignored — resolution falls
-    # through to CODEX_SESSION_ID, never raises, never returns the garbage token.
-    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", garbage)
-    assert entry_harness() is None
-    monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
-    assert entry_harness() == "codex"
-
-
-def test_envelope_scrub_neutralizes_developer_codex_session(
+def test_garbage_pin_falls_through_and_envelope_scrub_neutralizes_developer_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("DADAIA_ENTRY_HARNESS", "opencode")
+    monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
+    assert entry_harness() == "codex"
+
     # AC-4 pytest half: a developer running pytest inside a codex TUI carries
     # CODEX_SESSION_ID; the shared envelope scrub must neutralize it so a defaulted
     # harness resolves fake (None here), never a real worker.
@@ -85,34 +90,24 @@ def test_envelope_scrub_neutralizes_developer_codex_session(
     assert entry_harness() is None
 
 
-def test_codex_thread_id_resolves_harness_session_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    # T-69-01 (FR1, bug codex-thread-id-bind-resolution-breaks-cli): a modern Codex tool
-    # subprocess exposes CODEX_THREAD_ID instead of CODEX_SESSION_ID. Today
-    # HARNESS_SESSION_ID_ENV_VARS omits it, so harness_session_id() returns None for a
-    # live Codex session even though a thread id is present.
+def test_codex_thread_id_resolves_session_and_entry_harness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # T-69-01 (FR1/FR1.2, bug codex-thread-id-bind-resolution-breaks-cli): a modern
+    # Codex tool subprocess exposes CODEX_THREAD_ID instead of CODEX_SESSION_ID.
+    # harness_session_id() must resolve it, and entry_harness() must recognize the
+    # session as "codex" even without CODEX_SESSION_ID.
+    monkeypatch.delenv("DADAIA_ENTRY_HARNESS", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
     monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
     monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
     assert harness_session_id() == "thread-abc123"
-
-
-def test_codex_thread_id_resolves_entry_harness_codex(monkeypatch: pytest.MonkeyPatch) -> None:
-    # T-69-01 (FR1.2): entry_harness() today checks only CODEX_SESSION_ID, so a live
-    # Codex session identified solely by CODEX_THREAD_ID is invisible to entry
-    # detection.
-    monkeypatch.delenv("DADAIA_ENTRY_HARNESS", raising=False)
-    monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
-    monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
     assert entry_harness() == "codex"
 
-
-def test_codex_session_id_preferred_over_thread_id(monkeypatch: pytest.MonkeyPatch) -> None:
     # AC1.2: when both CODEX_SESSION_ID and CODEX_THREAD_ID are present,
-    # harness_session_id() must prefer CODEX_SESSION_ID (session-id preferred when both
-    # present) — CODEX_THREAD_ID must be ordered AFTER CODEX_SESSION_ID.
-    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    # harness_session_id() must prefer CODEX_SESSION_ID (CODEX_THREAD_ID is ordered
+    # AFTER CODEX_SESSION_ID).
     monkeypatch.setenv("CODEX_SESSION_ID", "codex-sess-1")
-    monkeypatch.setenv("CODEX_THREAD_ID", "thread-abc123")
     assert harness_session_id() == "codex-sess-1"
 
 

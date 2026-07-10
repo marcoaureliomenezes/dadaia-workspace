@@ -157,23 +157,32 @@ def test_pipeline_runs_to_closure_on_fake(
     assert payload["steps"][-1]["phase"] == LifecyclePhase.CLOSURE.value
 
 
-def test_pipeline_qa_review_cannot_backtrack_to_implementation_on_fake(
+def test_pipeline_no_review_can_backtrack_to_implementation_on_fake(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """FR4 (v0.1.56) — the ``qa_review -> implementation`` backtrack edge is REMOVED.
+    """FR4 (v0.1.56) — ALL THREE ``<review> -> implementation`` backtrack edges (qa,
+    security, code) are REMOVED. Merged loop over the qa/security/code cases (was two
+    separate T-23-03-inverted fns; the qa case additionally drives a real
+    implement->qa_rework two-step run to prove the phase advance from IMPLEMENTATION
+    happens first, then the illegal backtrack is rejected).
 
-    Was T-23-03 (which asserted the backtrack IS taken); inverted here to prove it is
-    gone. A QA-review step that *targets* IMPLEMENTATION is now an illegal transition:
-    the state machine rejects it, so after the implement step (IMPLEMENTATION ->
-    QA_REVIEW) the rework step does NOT route the run back to IMPLEMENTATION — the run
-    stays in QA_REVIEW. The retained operator-driven rework path is
-    ``BLOCKED -> IMPLEMENTATION`` (resume), never a direct review backtrack. The CLI's
-    ``implementation_ladder`` never builds such a review→implementation step in
+    Was T-23-03 (which asserted these backtracks ARE taken); inverted here to prove
+    they are gone. A rework step targeting IMPLEMENTATION from any review phase is an
+    illegal transition the state machine rejects, so the run never returns to
+    IMPLEMENTATION — it stays at its review phase. The retained operator-driven rework
+    path is ``BLOCKED -> IMPLEMENTATION`` (resume), never a direct review backtrack. The
+    CLI's ``implementation_ladder`` never builds such a review->implementation step in
     production; this e2e drives the same engine with a custom rework ladder to prove the
     engine rejects it.
     """
-    # The removed edge: a non-blocked review phase can no longer return to IMPLEMENTATION.
+    ladder = implementation_ladder(AgentRuntimeKind.FAKE)
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+
+    # qa case: two-step run (implement advances IMPLEMENTATION -> QA_REVIEW first, then
+    # the rework step's illegal QA_REVIEW -> IMPLEMENTATION transition is rejected).
     assert not is_legal_transition(LifecyclePhase.QA_REVIEW, LifecyclePhase.IMPLEMENTATION)
 
     _inject_passing_fake(
@@ -184,63 +193,34 @@ def test_pipeline_qa_review_cannot_backtrack_to_implementation_on_fake(
         },
     )
 
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
-    pipeline = container.build_lifecycle_pipeline(
+    qa_pipeline = container.build_lifecycle_pipeline(
         workspace,
         context=_CONTEXT,
         release_id="multiharness-engine-v0116",
     )
-
-    ladder = implementation_ladder(AgentRuntimeKind.FAKE)
     implement_step = ladder[0]
     qa_step = ladder[1]
-    # A rework step that targets IMPLEMENTATION from QA_REVIEW — the transition the table
-    # no longer permits.
     qa_backtrack: PipelineStep = replace(
         qa_step,
         label="review_qa_rework",
         target_phase=LifecyclePhase.IMPLEMENTATION,
     )
 
-    result = pipeline.run("pipe-no-backtrack", (implement_step, qa_backtrack))
+    qa_result = qa_pipeline.run("pipe-no-backtrack", (implement_step, qa_backtrack))
 
-    labels = [step.label for step in result.steps]
+    labels = [step.label for step in qa_result.steps]
     assert labels == ["implement", "review_qa_rework"]
-    # implement advanced IMPLEMENTATION -> QA_REVIEW ...
-    assert result.steps[0].phase is LifecyclePhase.QA_REVIEW
-    # ... but the rework step's now-illegal QA_REVIEW -> IMPLEMENTATION transition is
-    # rejected by the state machine, so the run stays in QA_REVIEW and never reaches
-    # IMPLEMENTATION.
-    assert result.steps[1].phase is LifecyclePhase.QA_REVIEW
-    assert result.final_phase is LifecyclePhase.QA_REVIEW
-    assert result.final_phase is not LifecyclePhase.IMPLEMENTATION
+    assert qa_result.steps[0].phase is LifecyclePhase.QA_REVIEW
+    assert qa_result.steps[1].phase is LifecyclePhase.QA_REVIEW
+    assert qa_result.final_phase is LifecyclePhase.QA_REVIEW
+    assert qa_result.final_phase is not LifecyclePhase.IMPLEMENTATION
 
-
-def test_pipeline_security_and_code_review_cannot_backtrack_to_implementation_on_fake(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """FR4 (v0.1.56) — the ``security_review -> implementation`` and
-    ``code_review -> implementation`` backtrack edges are REMOVED too.
-
-    Was T-23-03 (which asserted these backtracks are taken); inverted here to prove they
-    are gone. A rework step targeting IMPLEMENTATION from either review phase is an
-    illegal transition the state machine rejects, so the run never returns to
-    IMPLEMENTATION — it stays at its review phase. Each is driven independently from its
-    source phase through a one-step rework ladder, so we prove all three review→
-    implementation edges the table removed are rejected."""
-    ladder = implementation_ladder(AgentRuntimeKind.FAKE)
-
-    workspace = _init_workspace(tmp_path)
-    monkeypatch.chdir(workspace)
-
+    # security + code cases: each driven independently from its source phase through a
+    # one-step rework ladder.
     for source_idx, label, review_phase in (
         (2, "review_security", LifecyclePhase.SECURITY_REVIEW),
         (3, "review_code", LifecyclePhase.CODE_REVIEW),
     ):
-        # The removed edge for this review phase.
         assert not is_legal_transition(review_phase, LifecyclePhase.IMPLEMENTATION), label
 
         review_step = ladder[source_idx]
@@ -249,7 +229,6 @@ def test_pipeline_security_and_code_review_cannot_backtrack_to_implementation_on
             label=f"{label}_rework",
             target_phase=LifecyclePhase.IMPLEMENTATION,
         )
-        # Each sub-run is a single rework step starting at the review's source phase.
         _inject_passing_fake(monkeypatch, default=_passing_result(rework.label))
         pipeline = container.build_lifecycle_pipeline(
             workspace,
@@ -258,8 +237,6 @@ def test_pipeline_security_and_code_review_cannot_backtrack_to_implementation_on
         )
         result = pipeline.run(f"pipe-no-backtrack-{label}", (rework,))
 
-        # The illegal review -> IMPLEMENTATION transition is rejected: the run stays at its
-        # review phase and never reaches IMPLEMENTATION.
         assert result.final_phase is review_phase, label
         assert result.final_phase is not LifecyclePhase.IMPLEMENTATION, label
         assert result.steps[0].phase is review_phase, label

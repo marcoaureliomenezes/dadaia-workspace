@@ -37,58 +37,83 @@ def _good_entry(port: int = 3000, project: str = "demo") -> dict:
     }
 
 
-def test_invalid_json_returns_empty_registry_and_logs_warning(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize(
+    ("case", "expected_ports", "expected_log_token"),
+    [
+        pytest.param(
+            "invalid-json", [], "registry_file_malformed", id="invalid-json-returns-empty-registry"
+        ),
+        pytest.param(
+            "missing-required-key",
+            [3000, 3002],
+            "registry_entry_malformed",
+            id="missing-required-key-skips-entry-keeps-valid-ones",
+        ),
+        pytest.param(
+            "wrong-type-for-port", [3500], "port_not_int", id="wrong-type-for-port-skips-entry"
+        ),
+        pytest.param("root-not-dict", [], "wrong_root_type", id="root-not-dict-returns-empty"),
+        pytest.param(
+            "missing-entries-list",
+            [],
+            "missing_entries_list",
+            id="missing-entries-list-returns-empty",
+        ),
+        pytest.param("entry-not-a-dict", [3000], None, id="entry-not-a-dict-is-skipped"),
+    ],
+)
+def test_malformed_registry_input_matrix(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    case: str,
+    expected_ports: list[int],
+    expected_log_token: str | None,
 ) -> None:
+    """The store never raises on malformed input; one bad entry never blanks the
+    whole registry (skip-one-keep-rest), and every skip is logged."""
     states = _states_dir(tmp_path)
-    (states / "server_registry.json").write_text("{not valid json")
+
+    if case == "invalid-json":
+        text = "{not valid json"
+    elif case == "missing-required-key":
+        bad = _good_entry(port=3001)
+        del bad["expires_at"]
+        raw = {
+            "version": "1",
+            "range": {"min_port": 3000, "max_port": 3999},
+            "entries": [_good_entry(port=3000), bad, _good_entry(port=3002)],
+        }
+        text = json.dumps(raw)
+    elif case == "wrong-type-for-port":
+        bad = _good_entry()
+        bad["port"] = "3000"  # string instead of int
+        raw = {
+            "version": "1",
+            "range": {"min_port": 3000, "max_port": 3999},
+            "entries": [bad, _good_entry(port=3500)],
+        }
+        text = json.dumps(raw)
+    elif case == "root-not-dict":
+        text = "[1, 2, 3]"
+    elif case == "missing-entries-list":
+        text = '{"version": "1"}'
+    else:  # entry-not-a-dict
+        raw = {
+            "version": "1",
+            "range": {"min_port": 3000, "max_port": 3999},
+            "entries": ["not a dict", 42, _good_entry(port=3000)],
+        }
+        text = json.dumps(raw)
+
+    (states / "server_registry.json").write_text(text)
 
     store = JsonServerRegistryStore(states)
     with caplog.at_level(logging.WARNING):
         entries = store.list_all()
 
-    assert entries == []
-    assert any("registry_file_malformed" in rec.message for rec in caplog.records)
-
-
-def test_missing_required_key_skips_entry_keeps_valid_ones(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    states = _states_dir(tmp_path)
-    bad = _good_entry(port=3001)
-    del bad["expires_at"]
-    raw = {
-        "version": "1",
-        "range": {"min_port": 3000, "max_port": 3999},
-        "entries": [_good_entry(port=3000), bad, _good_entry(port=3002)],
-    }
-    (states / "server_registry.json").write_text(json.dumps(raw))
-
-    store = JsonServerRegistryStore(states)
-    with caplog.at_level(logging.WARNING):
-        entries = store.list_all()
-
-    assert [e.port for e in entries] == [3000, 3002]
-    assert any("registry_entry_malformed" in rec.message for rec in caplog.records)
-
-
-def test_wrong_type_for_port_skips_entry(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    states = _states_dir(tmp_path)
-    bad = _good_entry()
-    bad["port"] = "3000"  # string instead of int
-    raw = {
-        "version": "1",
-        "range": {"min_port": 3000, "max_port": 3999},
-        "entries": [bad, _good_entry(port=3500)],
-    }
-    (states / "server_registry.json").write_text(json.dumps(raw))
-
-    store = JsonServerRegistryStore(states)
-    with caplog.at_level(logging.WARNING):
-        entries = store.list_all()
-
-    assert [e.port for e in entries] == [3500]
-    assert any("port_not_int" in rec.message for rec in caplog.records)
+    assert [e.port for e in entries] == expected_ports
+    if expected_log_token is not None:
+        assert any(expected_log_token in rec.message for rec in caplog.records)
 
 
 def test_extra_unknown_key_is_accepted_forward_compat(tmp_path: Path) -> None:
@@ -109,49 +134,9 @@ def test_extra_unknown_key_is_accepted_forward_compat(tmp_path: Path) -> None:
     assert entries[0].port == 3000
 
 
-def test_root_not_dict_returns_empty(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    states = _states_dir(tmp_path)
-    (states / "server_registry.json").write_text("[1, 2, 3]")  # JSON array, not object
-
-    store = JsonServerRegistryStore(states)
-    with caplog.at_level(logging.WARNING):
-        entries = store.list_all()
-
-    assert entries == []
-    assert any("wrong_root_type" in rec.message for rec in caplog.records)
-
-
-def test_missing_entries_list_returns_empty(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    states = _states_dir(tmp_path)
-    (states / "server_registry.json").write_text('{"version": "1"}')
-
-    store = JsonServerRegistryStore(states)
-    with caplog.at_level(logging.WARNING):
-        entries = store.list_all()
-
-    assert entries == []
-    assert any("missing_entries_list" in rec.message for rec in caplog.records)
-
-
-def test_entry_is_not_a_dict_is_skipped(tmp_path: Path) -> None:
-    states = _states_dir(tmp_path)
-    raw = {
-        "version": "1",
-        "range": {"min_port": 3000, "max_port": 3999},
-        "entries": ["not a dict", 42, _good_entry(port=3000)],
-    }
-    (states / "server_registry.json").write_text(json.dumps(raw))
-
-    store = JsonServerRegistryStore(states)
-    entries = store.list_all()
-
-    assert [e.port for e in entries] == [3000]
-
-
 def test_save_after_recovery_from_corrupt_file(tmp_path: Path) -> None:
-    """After an empty-from-corrupt load, save() must still work and write a clean file."""
+    """After an empty-from-corrupt load, save() must still work and write a clean
+    file — the write path heals a corrupt registry rather than compounding it."""
     states = _states_dir(tmp_path)
     (states / "server_registry.json").write_text("garbage")
 

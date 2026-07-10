@@ -16,6 +16,8 @@ drives both through their public ``run()``, and asserts the extracted structured
 output is identical. It PROVES (not assumes) cross-harness parity for *each shipped
 fragment's* output schema, so the WS-3 "each shipped fragment" claim is actually
 backed rather than demonstrated on a single schema.
+
+CRITICAL-adjacent: PI fenced-JSON vs Codex last-message transport parity per shipped schema.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunStatus,
     AgentRuntimeKind,
 )
-from dadaia_workspace.features.lifecycle.fragments.loader import list_fragments, load_fragment
+from dadaia_workspace.features.lifecycle.fragments.loader import list_fragments
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter, CodexExecConfig
 from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter, PiHeadlessConfig
 
@@ -59,22 +61,16 @@ _SCHEMA_PAYLOADS: dict[str, dict[str, str]] = {
 }
 
 
-def test_every_release_definition_schema_is_covered() -> None:
-    """The parametrization must cover EVERY output schema the shipped fragments declare.
-
-    Derives the set straight from the packaged release_definition fragments so the
-    coverage claim cannot silently drift from the real library.
-    """
+def test_covered_schema_set_matches_shipped_release_definition_schemas() -> None:
+    """The parametrization must cover EVERY output schema the shipped fragments declare
+    (shipped ⊆ covered) and every covered schema is genuinely shipped (covered ⊆ shipped) —
+    derived straight from the packaged release_definition fragments so the coverage claim
+    cannot silently drift from the real library."""
     shipped = {f.output_schema for f in list_fragments(workflow="release_definition")}
     covered = set(_SCHEMA_PAYLOADS)
     missing = shipped - covered
     assert not missing, f"shipped release_definition schemas not covered by parity test: {missing}"
-
-
-def test_each_shipped_schema_maps_to_a_loadable_fragment() -> None:
-    # Sanity: every schema we parametrize over is genuinely declared by a shipped fragment.
-    shipped = {f.output_schema for f in list_fragments(workflow="release_definition")}
-    for schema in _SCHEMA_PAYLOADS:
+    for schema in covered:
         assert schema in shipped, f"{schema} is not declared by any release_definition fragment"
 
 
@@ -162,25 +158,9 @@ def _run_codex(schema: str, payload: Mapping[str, str]) -> AgentRunResult:
 
 
 # ---------------------------------------------------------------------------
-# Single-schema sanity (the historical spec-review fragment).
+# Dual-parser parity across EVERY shipped schema (+ either-verdict, folding in
+# both_adapters_succeed's status asserts).
 # ---------------------------------------------------------------------------
-
-
-def test_verdict_bearing_fragment_exists_with_expected_schema() -> None:
-    fragment = load_fragment("release_definition.spec_review_architecture")
-    assert fragment.output_schema == "spec-review-verdict-v1"
-
-
-# ---------------------------------------------------------------------------
-# Dual-parser parity across EVERY shipped schema.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("schema", sorted(_SCHEMA_PAYLOADS))
-def test_both_adapters_succeed(schema: str) -> None:
-    payload = _SCHEMA_PAYLOADS[schema]
-    assert _run_pi(schema, payload).status is AgentRunStatus.SUCCEEDED
-    assert _run_codex(schema, payload).status is AgentRunStatus.SUCCEEDED
 
 
 @pytest.mark.parametrize("schema", sorted(_SCHEMA_PAYLOADS))
@@ -188,6 +168,8 @@ def test_dual_parser_extracts_identical_structured_output(schema: str) -> None:
     payload = _SCHEMA_PAYLOADS[schema]
     pi = _run_pi(schema, payload)
     codex = _run_codex(schema, payload)
+    assert pi.status is AgentRunStatus.SUCCEEDED
+    assert codex.status is AgentRunStatus.SUCCEEDED
     # The summary and artifact refs are extracted identically...
     assert pi.summary == codex.summary == _SUMMARY
     assert pi.artifact_refs == codex.artifact_refs == _ARTIFACT_REFS

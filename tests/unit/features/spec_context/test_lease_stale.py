@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from dadaia_workspace.core.lock_liveness import is_stale
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
@@ -26,38 +28,51 @@ def rec(heartbeat: str, ttl: int = 1800) -> dict[str, object]:
     }
 
 
-def test_row1_none_is_stale() -> None:
-    assert is_stale(None, clock=fixed(BASE)) is True
-
-
-def test_row2_missing_fields_is_stale() -> None:
-    assert is_stale({}, clock=fixed(BASE)) is True
-
-
-def test_row3_corrupt_heartbeat_is_stale() -> None:
-    assert is_stale({"heartbeat": "not-a-date", "ttl": 1800}, clock=fixed(BASE)) is True
-
-
-def test_row4_fresh_heartbeat_not_stale() -> None:
-    hb = (BASE - timedelta(seconds=1)).isoformat()
-    assert is_stale(rec(hb), clock=fixed(BASE)) is False
-
-
-def test_row5_boundary_exact_ttl_is_stale() -> None:
-    hb = (BASE - timedelta(seconds=1800)).isoformat()
-    assert is_stale(rec(hb), clock=fixed(BASE)) is True  # boundary inclusive (>=)
-
-
-def test_row6_past_ttl_is_stale() -> None:
-    hb = (BASE - timedelta(seconds=1801)).isoformat()
-    assert is_stale(rec(hb), clock=fixed(BASE)) is True
-
-
-def test_row7_injected_clock_is_deterministic() -> None:
-    r = rec(BASE.isoformat())
-    assert is_stale(r, clock=fixed(BASE + timedelta(seconds=100))) is False
-    assert is_stale(r, clock=fixed(BASE + timedelta(seconds=2000))) is True
-
-
-def test_row8_ttl_zero_is_stale() -> None:
-    assert is_stale(rec(BASE.isoformat(), ttl=0), clock=fixed(BASE)) is True
+@pytest.mark.parametrize(
+    ("record", "clock_dt", "expected"),
+    [
+        pytest.param(None, BASE, True, id="row1-none-is-stale"),
+        pytest.param({}, BASE, True, id="row2-missing-fields-is-stale"),
+        pytest.param(
+            {"heartbeat": "not-a-date", "ttl": 1800},
+            BASE,
+            True,
+            id="row3-corrupt-heartbeat-is-stale",
+        ),
+        pytest.param(
+            rec((BASE - timedelta(seconds=1)).isoformat()),
+            BASE,
+            False,
+            id="row4-fresh-heartbeat-not-stale",
+        ),
+        pytest.param(
+            rec((BASE - timedelta(seconds=1800)).isoformat()),
+            BASE,
+            True,
+            id="row5-boundary-exact-ttl-is-stale",  # boundary inclusive (>=)
+        ),
+        pytest.param(
+            rec((BASE - timedelta(seconds=1801)).isoformat()),
+            BASE,
+            True,
+            id="row6-past-ttl-is-stale",
+        ),
+        pytest.param(
+            rec(BASE.isoformat()),
+            BASE + timedelta(seconds=100),
+            False,
+            id="row7a-injected-clock-fresh",
+        ),
+        pytest.param(
+            rec(BASE.isoformat()),
+            BASE + timedelta(seconds=2000),
+            True,
+            id="row7b-injected-clock-stale",
+        ),
+        pytest.param(rec(BASE.isoformat(), ttl=0), BASE, True, id="row8-ttl-zero-is-stale"),
+    ],
+)
+def test_is_stale_branch_table(
+    record: dict[str, object] | None, clock_dt: datetime, expected: bool
+) -> None:
+    assert is_stale(record, clock=fixed(clock_dt)) is expected

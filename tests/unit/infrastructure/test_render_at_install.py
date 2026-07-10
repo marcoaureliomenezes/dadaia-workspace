@@ -4,12 +4,12 @@ Covers:
 - ``render_claude_agent`` — the D-6 single render seam: deterministic ``model:`` then
   ``effort:`` injection as the LAST frontmatter lines; pre-existing ``model:``/``effort:``
   lines stripped (pack bodies author ``model:``); ``effort:`` OMITTED entirely when
-  unresolved (F-6 plugin asymmetry — never empty/placeholder).
-- F-3 fail-closed core codex render: ``install_codex_agents`` and
-  ``FileSystemPublicAssetManager._codex_toml_from_md`` RAISE a loud typed
+  unresolved (F-6 plugin asymmetry — never empty/placeholder); a body without frontmatter
+  raises.
+- F-3 fail-closed core codex render: ``install_codex_agents`` RAISES a loud typed
   ``PublicAssetError`` for a CORE agent supplied with neither a staged ``model:`` nor a
   resolved policy model (the silent ``claude-sonnet-4-6`` default is removed for core
-  agents; kept only for plugin bodies/stubs).
+  agents; kept only for plugin bodies/stubs, which keep working with no resolved policy).
 - D-3 clamp: the codex ``model_reasoning_effort`` derives from the RESOLVED effort via
   the fixed clamp map (``xhigh``/``max`` → ``high``).
 - F-5: ``--force`` re-RENDERS a diverged claude agent projection back to the render
@@ -29,7 +29,6 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_codex_agents,
     render_claude_agent,
 )
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 pytestmark = pytest.mark.unit
 
@@ -62,56 +61,63 @@ def _iter_files(root: Path):  # type: ignore[no-untyped-def]
     return (p for p in sorted(root.rglob("*")) if p.is_file())
 
 
-# ---------------------------------------------------------------------------
-# render_claude_agent — the D-6 seam
-# ---------------------------------------------------------------------------
-
-
-def test_render_injects_model_then_effort_as_last_frontmatter_lines() -> None:
-    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
-    rendered = render_claude_agent(_GENERIC_BODY, resolved)
-    head, fm, body = rendered.split("---\n", 2)
-    fm_lines = fm.splitlines()
-    assert fm_lines[-2] == "model: claude-sonnet-5"
-    assert fm_lines[-1] == "effort: xhigh"
-    assert body == "\n# Body\n"
-    # Deterministic: rendering twice is byte-identical.
-    assert render_claude_agent(_GENERIC_BODY, resolved) == rendered
-
-
-def test_render_omits_effort_entirely_when_unresolved_f6() -> None:
-    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort=None, source="pack")
-    rendered = render_claude_agent(_PACK_BODY, resolved)
-    assert "effort" not in rendered
-    fm = rendered.split("---\n", 2)[1]
-    assert fm.splitlines()[-1] == "model: claude-sonnet-5"
-
-
-def test_render_strips_authored_model_line_before_injection() -> None:
-    """A pack body authors ``model:``; the seam must not emit duplicates."""
-    resolved = ResolvedAgentModel(model="claude-opus-4-8", effort="high", source="override")
-    rendered = render_claude_agent(_PACK_BODY, resolved)
-    assert rendered.count("model:") == 1
-    assert "model: claude-opus-4-8" in rendered
-    assert "claude-sonnet-5" not in rendered
-
-
-def test_render_rejects_body_without_frontmatter() -> None:
-    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
-    with pytest.raises(PublicAssetError):
-        render_claude_agent("# no frontmatter\n", resolved)
-
-
-# ---------------------------------------------------------------------------
-# F-3 — fail-closed core codex render
-# ---------------------------------------------------------------------------
-
-
 def _staged_tree(tmp_path: Path, name: str, text: str) -> Path:
     agentic = tmp_path / ".dadaia" / "agentic"
     (agentic / "agents").mkdir(parents=True, exist_ok=True)
     (agentic / "agents" / f"{name}.md").write_text(text, encoding="utf-8")
     return agentic
+
+
+# ---------------------------------------------------------------------------
+# render_claude_agent — the D-6 seam
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "injects-model-then-effort-as-last-lines-deterministic",
+        "omits-effort-entirely-when-unresolved-f6",
+        "strips-authored-model-line-before-injection",
+        "rejects-body-without-frontmatter",
+    ],
+)
+def test_render_claude_agent_seam(case: str) -> None:
+    if case == "injects-model-then-effort-as-last-lines-deterministic":
+        resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
+        rendered = render_claude_agent(_GENERIC_BODY, resolved)
+        head, fm, body = rendered.split("---\n", 2)
+        fm_lines = fm.splitlines()
+        assert fm_lines[-2] == "model: claude-sonnet-5"
+        assert fm_lines[-1] == "effort: xhigh"
+        assert body == "\n# Body\n"
+        # Deterministic: rendering twice is byte-identical.
+        assert render_claude_agent(_GENERIC_BODY, resolved) == rendered
+
+    elif case == "omits-effort-entirely-when-unresolved-f6":
+        resolved = ResolvedAgentModel(model="claude-sonnet-5", effort=None, source="pack")
+        rendered = render_claude_agent(_PACK_BODY, resolved)
+        assert "effort" not in rendered
+        fm = rendered.split("---\n", 2)[1]
+        assert fm.splitlines()[-1] == "model: claude-sonnet-5"
+
+    elif case == "strips-authored-model-line-before-injection":
+        """A pack body authors ``model:``; the seam must not emit duplicates."""
+        resolved = ResolvedAgentModel(model="claude-opus-4-8", effort="high", source="override")
+        rendered = render_claude_agent(_PACK_BODY, resolved)
+        assert rendered.count("model:") == 1
+        assert "model: claude-opus-4-8" in rendered
+        assert "claude-sonnet-5" not in rendered
+
+    else:  # rejects-body-without-frontmatter
+        resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="high", source="default")
+        with pytest.raises(PublicAssetError):
+            render_claude_agent("# no frontmatter\n", resolved)
+
+
+# ---------------------------------------------------------------------------
+# F-3 — fail-closed core codex render (core agent) vs plugin body keeps working
+# ---------------------------------------------------------------------------
 
 
 def test_install_codex_agents_fails_closed_for_core_agent_without_model(
@@ -124,25 +130,13 @@ def test_install_codex_agents_fails_closed_for_core_agent_without_model(
         install_codex_agents(agentic, tmp_path, False, [], resolved_models={})
 
 
-def test_codex_toml_from_md_fails_closed_for_core_agent_without_model(
-    tmp_path: Path,
-) -> None:
-    md = tmp_path / "software-engineer.md"
-    md.write_text(_GENERIC_BODY, encoding="utf-8")
-    manager = FileSystemPublicAssetManager()
-    with pytest.raises(PublicAssetError, match="software-engineer"):
-        manager._codex_toml_from_md(md)
-
-
-def test_codex_toml_from_md_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
-    """A plugin body that authors ``model:`` keeps working with no resolved policy."""
-    md = tmp_path / "frontend-engineer.md"
-    md.write_text(_PACK_BODY, encoding="utf-8")
-    manager = FileSystemPublicAssetManager()
-    rendered = manager._codex_toml_from_md(md)
-    assert rendered is not None
-    name, toml = rendered
-    assert name == "frontend-engineer"
+def test_install_codex_agents_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
+    """A plugin body that authors ``model:`` keeps working with no resolved policy
+    (the fail-closed guard applies to CORE agents only)."""
+    agentic = _staged_tree(tmp_path, "frontend-engineer", _PACK_BODY)
+    installed: list[str] = []
+    install_codex_agents(agentic, tmp_path, False, installed, resolved_models={})
+    toml = (tmp_path / ".codex" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
     assert 'model = "gpt-5.3-codex"' in toml
 
 

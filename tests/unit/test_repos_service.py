@@ -6,7 +6,7 @@ from dadaia_workspace.features.repos.service import ReposService
 from tests.fakes import FakeExcelReader
 
 
-def test_list_known_returns_rows_from_reader(tmp_path: Path) -> None:
+def test_list_known_rows_absent_catalog_empty_and_canonical_path(tmp_path: Path) -> None:
     reader = FakeExcelReader(
         rows=[
             {"Repo Name": "alpha", "Repo URL": "https://x/alpha.git"},
@@ -18,17 +18,11 @@ def test_list_known_returns_rows_from_reader(tmp_path: Path) -> None:
     assert len(rows) == 2
     assert {r["Repo Name"] for r in rows} == {"alpha", "beta"}
 
+    empty_svc = ReposService(excel_reader=FakeExcelReader())
+    assert empty_svc.list_known(tmp_path) == []
 
-def test_list_known_returns_empty_when_catalog_absent(tmp_path: Path) -> None:
-    reader = FakeExcelReader()
-    svc = ReposService(excel_reader=reader)
-    assert svc.list_known(tmp_path) == []
-
-
-def test_list_known_reads_from_dadaia_src_path(tmp_path: Path) -> None:
-    """ReposService must read repos.xlsx from .dadaia/src/."""
+    # ReposService must read repos.xlsx from .dadaia/src/ (canonical path).
     expected_path = tmp_path / ".dadaia" / "src" / "repos.xlsx"
-
     captured_paths: list[Path] = []
 
     class CapturingReader:
@@ -36,6 +30,6 @@ def test_list_known_reads_from_dadaia_src_path(tmp_path: Path) -> None:
             captured_paths.append(file_path)
             return []
 
-    svc = ReposService(excel_reader=CapturingReader())
-    svc.list_known(tmp_path)
+    canonical_svc = ReposService(excel_reader=CapturingReader())
+    canonical_svc.list_known(tmp_path)
     assert captured_paths == [expected_path]

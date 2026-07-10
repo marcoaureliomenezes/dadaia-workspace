@@ -10,6 +10,9 @@ The probe is built from the production wiring
 (``infrastructure.process_probe_adapter.build_pid_probe``, the platform-seamed
 ``OsProcessProbe``). These tests monkeypatch that builder so the liveness verdict is
 deterministic and platform-seamed (no real ``os.kill``).
+
+CRIT: pid-veto through the CLI side door — all three verdicts survive below as
+parametrized rows.
 """
 
 from __future__ import annotations
@@ -64,52 +67,56 @@ def _patch_workspace_and_probe(monkeypatch: pytest.MonkeyPatch, ws: Path, *, ali
     monkeypatch.setattr(lock_cmd, "build_pid_probe", lambda: lambda _pid: alive)
 
 
-def test_steal_refuses_when_recorded_pid_alive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("name", "pid", "probe_alive", "expected_exit", "expect_stolen"),
+    [
+        (
+            # TTL-expired record + alive recorded pid ⇒ refuse, exit 1, holder untouched.
+            "recorded_pid_alive_refuses",
+            4242,
+            True,
+            1,
+            False,
+        ),
+        (
+            # TTL-expired record + dead recorded pid ⇒ steal, exit 0, new session written.
+            "recorded_pid_dead_steals",
+            4242,
+            False,
+            0,
+            True,
+        ),
+        (
+            # Record without a pid field ⇒ TTL rule: a stale pid-less record is
+            # stealable even though the probe reports alive (nothing to veto on).
+            "pidless_record_uses_ttl_rule",
+            None,
+            True,
+            0,
+            True,
+        ),
+    ],
+)
+def test_lock_steal_verdict_table(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    pid: int | None,
+    probe_alive: bool,
+    expected_exit: int,
+    expect_stolen: bool,
 ) -> None:
-    """TTL-expired record + alive recorded pid ⇒ refuse, exit 1, message says holder alive."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    _seed_stale_record(ws, pid=4242)
-    _patch_workspace_and_probe(monkeypatch, ws, alive=True)
+    _seed_stale_record(ws, pid=pid)
+    _patch_workspace_and_probe(monkeypatch, ws, alive=probe_alive)
 
     result = runner.invoke(lock_cmd.app, [CTX])
 
-    assert result.exit_code == 1, result.output
-    assert "alive" in result.output.lower() or "live" in result.output.lower()
-    # Record untouched — still the original holder.
+    assert result.exit_code == expected_exit, result.output
     stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] == "dead-holder"
-
-
-def test_steal_succeeds_when_recorded_pid_dead(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """TTL-expired record + dead recorded pid ⇒ steal, exit 0, new session written."""
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _seed_stale_record(ws, pid=4242)
-    _patch_workspace_and_probe(monkeypatch, ws, alive=False)
-
-    result = runner.invoke(lock_cmd.app, [CTX])
-
-    assert result.exit_code == 0, result.output
-    stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] != "dead-holder"
-
-
-def test_steal_pidless_record_uses_ttl_rule(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Record without a ``pid`` field ⇒ TTL rule: a stale pid-less record is stealable."""
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _seed_stale_record(ws, pid=None)
-    # Probe reports alive — but with no pid field there is nothing to veto on.
-    _patch_workspace_and_probe(monkeypatch, ws, alive=True)
-
-    result = runner.invoke(lock_cmd.app, [CTX])
-
-    assert result.exit_code == 0, result.output
-    stored = json.loads(lease._record_path(ws, CTX).read_text())
-    assert stored["session_id"] != "dead-holder"
+    if expect_stolen:
+        assert stored["session_id"] != "dead-holder"
+    else:
+        assert stored["session_id"] == "dead-holder"
+        assert "alive" in result.output.lower() or "live" in result.output.lower()

@@ -41,29 +41,27 @@ def _bytecode_artifacts_under_public() -> list[str]:
     return sorted(pyc + caches)
 
 
-def test_no_bytecode_committed_under_public() -> None:
-    """The canonical public asset tree carries no bytecode at rest."""
-    assert _bytecode_artifacts_under_public() == []
+def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache(
+    tmp_path: Path,
+) -> None:
+    """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
+    explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
+    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel.
 
-
-def test_pre_push_ci_gate_script_ships() -> None:
-    """`pre-push-ci-gate.sh` is present in the public/scripts/ listing.
-
-    The SINGLE explicit ship assertion for the pre-push gate script, suite-wide
-    (v0.1.51 FR3): tests that *execute* the script (e.g. the venv-probe suite) are
-    behavior tests, not ship assertions, and must not duplicate this presence check.
-    Relocated here from the retired ``test_bash_hook_residue.py``.
+    Also: the canonical public asset tree carries no bytecode at rest (precondition),
+    and executing the catalog + lint scripts must not write __pycache__ under public/.
+    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
+    under test (the call-site ``-B`` would mask a missing guard).
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
     assert "pre-push-ci-gate.sh" in listing
 
+    pyproject = _REPO_ROOT / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    exclude = data["tool"]["poetry"].get("exclude", [])
+    assert "**/__pycache__" in exclude
+    assert "**/*.pyc" in exclude
 
-def test_running_public_scripts_leaves_no_pycache(tmp_path: Path) -> None:
-    """Executing the catalog + lint scripts must not write __pycache__ under public/.
-
-    Invoked WITHOUT ``-B`` so the in-script ``sys.dont_write_bytecode`` guard is what is
-    under test (the call-site ``-B`` would mask a missing guard).
-    """
     if not _MEMORY_DIR.is_dir():
         pytest.skip("specs/memory not present in this checkout")
 
@@ -103,12 +101,3 @@ def test_running_public_scripts_leaves_no_pycache(tmp_path: Path) -> None:
 
     after = _bytecode_artifacts_under_public()
     assert after == [], f"scripts left bytecode under public/: {after}"
-
-
-def test_pyproject_excludes_bytecode_from_build() -> None:
-    """poetry-core build must exclude __pycache__/*.pyc from sdist and wheel."""
-    pyproject = _REPO_ROOT / "pyproject.toml"
-    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    exclude = data["tool"]["poetry"].get("exclude", [])
-    assert "**/__pycache__" in exclude
-    assert "**/*.pyc" in exclude

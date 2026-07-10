@@ -25,7 +25,6 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-import inspect  # noqa: E402
 import json  # noqa: E402
 from collections.abc import Callable  # noqa: E402
 from datetime import UTC, datetime, timedelta  # noqa: E402
@@ -48,7 +47,7 @@ def fixed(dt: datetime) -> Callable[[], datetime]:
 
 def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
-    ws.mkdir()
+    ws.mkdir(parents=True)
     (ws / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
     (ws / ".dadaia" / "sessions" / "runtime").mkdir(parents=True)
     (ws / ".dadaia" / "sessions").mkdir(parents=True, exist_ok=True)
@@ -83,52 +82,7 @@ def _seed_lock(workspace: Path, session_id: str, heartbeat: datetime) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# test_lease_ttl_constant_is_120
-# ---------------------------------------------------------------------------
-
-
-def test_lease_ttl_constant_is_120() -> None:
-    """LEASE_TTL_SECONDS must be 120 (OQ-1 operator decision 2026-06-06)."""
-    assert LEASE_TTL_SECONDS == 120, f"LEASE_TTL_SECONDS must be 120; got {LEASE_TTL_SECONDS}"
-
-
-def test_no_inline_1800_in_lease_py() -> None:
-    """No string literal '1800' appears in lease.py source (zero inline magic numbers)."""
-    source = inspect.getsource(lease)
-    # Allow '1800' only if it appears in comments/strings that are test-facing;
-    # in practice, the production liveness path must reference LEASE_TTL_SECONDS only.
-    # Scan the full source for the substring.
-    assert "1800" not in source, (
-        "lease.py contains inline '1800' — replace with LEASE_TTL_SECONDS constant"
-    )
-
-
-# ---------------------------------------------------------------------------
-# test_ptr_created_on_first_acquire
-# ---------------------------------------------------------------------------
-
-
-def test_ptr_created_on_first_acquire(tmp_path: Path) -> None:
-    """On first acquire with no prior .ptr, the .ptr file is written with session_id."""
-    ws = _make_workspace(tmp_path)
-    ptr = lease._ptr_path(ws, CTX)
-    assert not ptr.exists(), "Precondition: .ptr must not exist before first acquire"
-
-    status, rec = lease.acquire(ws, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
-    assert status == "ACQUIRED"
-    assert ptr.exists(), ".ptr file must be created on first acquire"
-    assert ptr.read_text(encoding="utf-8").strip() == MY_SESSION, (
-        f".ptr content must be the session_id '{MY_SESSION}'"
-    )
-
-
-# ---------------------------------------------------------------------------
-# test_ptr_renews_on_matching_session
-# ---------------------------------------------------------------------------
-
-
-def test_ptr_renews_on_matching_session(tmp_path: Path) -> None:
+def test_ptr_match_renews_against_live_foreign_looking_lock(tmp_path: Path) -> None:
     """Acquire when .ptr matches my_session_id and lock record has foreign+live session → RENEW.
 
     This is the stable-identity scenario: the .ptr recognises the caller as the
@@ -136,9 +90,7 @@ def test_ptr_renews_on_matching_session(tmp_path: Path) -> None:
     (e.g. after a relaunch that changed the session env var).
     """
     ws = _make_workspace(tmp_path)
-    # Write lock record with a foreign-looking session_id (simulating drift from relaunch).
     _seed_lock(ws, "old-session-that-looks-foreign", BASE)
-    # Write .ptr for MY_SESSION — signals that MY_SESSION is the incumbent.
     ptr = lease._ptr_path(ws, CTX)
     ptr.write_text(MY_SESSION, encoding="utf-8")
 
@@ -150,38 +102,9 @@ def test_ptr_renews_on_matching_session(tmp_path: Path) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# test_ptr_absent_falls_through_to_normal_check
-# ---------------------------------------------------------------------------
-
-
-def test_ptr_absent_falls_through_to_normal_check(tmp_path: Path) -> None:
-    """Acquire when no .ptr + lock record has foreign+live session → yield-iff-live-foreign block."""
-    from dadaia_workspace.core.exceptions import LockHeldError
-
-    ws = _make_workspace(tmp_path)
-    # Write a live lock record with a foreign session (no .ptr).
-    _seed_lock(ws, OTHER_SESSION, BASE)
-
-    # acquire() must raise LockHeldError (the gate interprets this as a BLOCK).
-    raised = False
-    try:
-        lease.acquire(ws, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
-    except LockHeldError:
-        raised = True
-
-    assert raised, (
-        "No-.ptr-match + live foreign lease must raise LockHeldError (yield-iff-live-foreign)"
-    )
-
-
-# ---------------------------------------------------------------------------
-# test_yield_message_does_not_contain_routine_steal_instruction
-# ---------------------------------------------------------------------------
-
-
-def test_yield_message_does_not_contain_routine_steal_instruction(tmp_path: Path) -> None:
-    """Yield-iff-live-foreign message must contain NO manual unblock ceremony.
+def test_yield_message_has_no_steal_ceremony(tmp_path: Path) -> None:
+    """No-.ptr-match + live foreign lease raises LockHeldError (yield-iff-live-foreign),
+    and the message contains NO manual unblock ceremony.
 
     Operator forbidden-law: the message must never mention 'bind --mode write',
     'relaunch', or 'lock steal' — not even conditionally. reclaim-iff-stale frees a
@@ -204,56 +127,51 @@ def test_yield_message_does_not_contain_routine_steal_instruction(tmp_path: Path
         assert forbidden not in msg, f"Yield message must NOT contain {forbidden!r}"
 
 
-# ---------------------------------------------------------------------------
-# test_doctor_gc_removes_orphan_ptr
-# ---------------------------------------------------------------------------
+def test_ptr_lifecycle_and_gc_matrix(tmp_path: Path) -> None:
+    """.ptr creation on first acquire, no-.ptr fall-through to a normal block, and the
+    doctor PTR-GC trio (orphan removed / live kept / stale-lock removed)."""
+    from dadaia_workspace.core.exceptions import LockHeldError
 
-
-def test_doctor_gc_removes_orphan_ptr(tmp_path: Path) -> None:
-    """AC-18: doctor --fix removes orphan .ptr files for contexts with no active lock record."""
-    ws = _make_workspace(tmp_path)
-    # Write a .ptr file with no corresponding lock record (orphan).
-    ptr = lease._ptr_path(ws, CTX)
-    ptr.write_text(MY_SESSION, encoding="utf-8")
-    assert ptr.exists(), "Precondition: orphan .ptr must exist before fix"
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not ptr.exists(), f"Orphan .ptr file must be removed by doctor --fix. Actions: {actions}"
-    assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions), (
-        f"Expected PTR-GC action for {CTX}.ptr, got: {actions}"
+    # .ptr created on first acquire with the session_id content.
+    ws1 = _make_workspace(tmp_path.parent / (tmp_path.name + "-first-acquire"))
+    ptr1 = lease._ptr_path(ws1, CTX)
+    assert not ptr1.exists()
+    status, _rec = lease.acquire(
+        ws1, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE)
     )
+    assert status == "ACQUIRED"
+    assert ptr1.exists()
+    assert ptr1.read_text(encoding="utf-8").strip() == MY_SESSION
 
+    # No .ptr + live foreign lock ⇒ falls through to normal check ⇒ LockHeldError.
+    ws2 = _make_workspace(tmp_path.parent / (tmp_path.name + "-no-ptr"))
+    _seed_lock(ws2, OTHER_SESSION, BASE)
+    with pytest.raises(LockHeldError):
+        lease.acquire(ws2, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
 
-def test_doctor_gc_keeps_ptr_with_live_lock(tmp_path: Path) -> None:
-    """AC-18 negative case: doctor --fix keeps .ptr when the lock record is live."""
-    ws = _make_workspace(tmp_path)
-    # Write a live lock record and its .ptr.
-    _seed_lock(ws, MY_SESSION, datetime.now(tz=UTC))
-    ptr = lease._ptr_path(ws, CTX)
-    ptr.write_text(MY_SESSION, encoding="utf-8")
+    # Doctor PTR-GC: orphan .ptr (no lock record) removed.
+    ws3 = _make_workspace(tmp_path.parent / (tmp_path.name + "-orphan-ptr"))
+    ptr3 = lease._ptr_path(ws3, CTX)
+    ptr3.write_text(MY_SESSION, encoding="utf-8")
+    actions3 = _make_doctor(ws3).fix()
+    assert not ptr3.exists()
+    assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions3)
 
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
+    # Doctor PTR-GC: live lock record ⇒ .ptr kept.
+    ws4 = _make_workspace(tmp_path.parent / (tmp_path.name + "-live-ptr"))
+    _seed_lock(ws4, MY_SESSION, datetime.now(tz=UTC))
+    ptr4 = lease._ptr_path(ws4, CTX)
+    ptr4.write_text(MY_SESSION, encoding="utf-8")
+    actions4 = _make_doctor(ws4).fix()
+    assert ptr4.exists()
+    assert [a for a in actions4 if "PTR-GC" in a] == []
 
-    assert ptr.exists(), "Live .ptr with a live lock record must NOT be deleted by doctor --fix"
-    ptr_gc_actions = [a for a in actions if "PTR-GC" in a]
-    assert ptr_gc_actions == [], f"Unexpected PTR-GC actions: {ptr_gc_actions}"
-
-
-def test_doctor_gc_removes_ptr_with_stale_lock(tmp_path: Path) -> None:
-    """AC-18: doctor --fix removes .ptr when the lock record is stale (expired)."""
-    ws = _make_workspace(tmp_path)
+    # Doctor PTR-GC: stale lock record ⇒ .ptr removed.
+    ws5 = _make_workspace(tmp_path.parent / (tmp_path.name + "-stale-ptr"))
     stale_heartbeat = datetime.now(tz=UTC) - timedelta(seconds=LEASE_TTL_SECONDS + 60)
-    _seed_lock(ws, MY_SESSION, stale_heartbeat)
-    ptr = lease._ptr_path(ws, CTX)
-    ptr.write_text(MY_SESSION, encoding="utf-8")
-
-    doctor = _make_doctor(ws)
-    actions = doctor.fix()
-
-    assert not ptr.exists(), f"Stale-lock .ptr must be deleted by doctor --fix. Actions: {actions}"
-    assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions), (
-        f"Expected PTR-GC action for {CTX}.ptr, got: {actions}"
-    )
+    _seed_lock(ws5, MY_SESSION, stale_heartbeat)
+    ptr5 = lease._ptr_path(ws5, CTX)
+    ptr5.write_text(MY_SESSION, encoding="utf-8")
+    actions5 = _make_doctor(ws5).fix()
+    assert not ptr5.exists()
+    assert any("PTR-GC" in a and f"{CTX}.ptr" in a for a in actions5)

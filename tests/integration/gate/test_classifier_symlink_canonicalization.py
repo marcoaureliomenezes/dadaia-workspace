@@ -40,13 +40,19 @@ def _symlink_or_skip(link: Path, target: Path) -> None:
         pytest.skip(f"symlinks unsupported on this platform: {exc}")
 
 
-def test_symlink_into_in_repo_memory_classifies_memory_not_ungated(tmp_path: Path) -> None:
+def test_symlink_into_in_repo_memory_classifies_memory_block_and_definition_allows(
+    tmp_path: Path,
+) -> None:
     """An UNGATED-named symlink pointing into ``repos/<slug>/specs/memory/`` ⇒ MEMORY block.
 
     Outside DEFINITION/CLOSURE the MEMORY class blocks the write. If canonicalization were
     skipped the symlink's own name (``notes.md`` at repo root) would classify UNGATED ⇒
     silent ALLOW — the exact bug. We assert the BLOCK envelope to prove resolve-before-
     classify.
+
+    Control (second half, DEFINITION phase): the same symlink is still MEMORY-classified
+    but ALLOWed — proving the BLOCK above is the MEMORY phase rule firing on the
+    *resolved* path, not an accidental block of the symlink itself.
     """
     slug = "dadaia-workspace"
     ws = _make_workspace(tmp_path, slug=slug, phase="SPEC")
@@ -74,30 +80,22 @@ def test_symlink_into_in_repo_memory_classifies_memory_not_ungated(tmp_path: Pat
     )
     assert "RULE A" in envelope["reason"]
 
+    # Control: DEFINITION phase, same symlink shape, different workspace.
+    ws_def = _make_workspace(tmp_path / "definition-control", slug=slug, phase="DEFINITION")
+    real_memory_def = ws_def / "repos" / slug / "specs" / "memory" / "architecture.md"
+    real_memory_def.write_text("# memory atom\n", encoding="utf-8")
+    link_def = ws_def / "repos" / slug / "notes.md"
+    _symlink_or_skip(link_def, real_memory_def)
 
-def test_symlink_into_in_repo_memory_allows_in_definition_phase(tmp_path: Path) -> None:
-    """Control: the same symlink in DEFINITION phase is MEMORY-classified but ALLOWed.
-
-    Proves the BLOCK above is the MEMORY phase rule firing on the *resolved* path, not an
-    accidental block of the symlink itself.
-    """
-    slug = "dadaia-workspace"
-    ws = _make_workspace(tmp_path, slug=slug, phase="DEFINITION")
-
-    real_memory = ws / "repos" / slug / "specs" / "memory" / "architecture.md"
-    real_memory.write_text("# memory atom\n", encoding="utf-8")
-    link = ws / "repos" / slug / "notes.md"
-    _symlink_or_skip(link, real_memory)
-
-    payload = {
+    payload_def = {
         "tool_name": "Write",
-        "tool_input": {"file_path": str(link)},
+        "tool_input": {"file_path": str(link_def)},
         "session_id": "claude-sess-symlink-def",
     }
-    result = run_hook_subprocess("sdd_gate", payload, claude_hook_env(ws))
+    result_def = run_hook_subprocess("sdd_gate", payload_def, claude_hook_env(ws_def))
 
-    assert result.returncode == 0
-    assert result.block_envelope() is None, "MEMORY write in DEFINITION phase must ALLOW"
+    assert result_def.returncode == 0
+    assert result_def.block_envelope() is None, "MEMORY write in DEFINITION phase must ALLOW"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="dir symlink perms differ on Windows CI; covered above")

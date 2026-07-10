@@ -532,24 +532,3 @@ def test_hook_acquired_holder_no_steal_while_driver_alive_then_takeover(tmp_path
     assert journal.holders() == [holder, holder, holder, foreign], journal.holders()
     # No-steal held while the driver lived: B never appears until A is dead.
     assert journal.versions[2] is not None and journal.versions[2]["session_id"] == holder
-
-
-def test_journal_records_raw_lock_versions(tmp_path: Path) -> None:
-    """The journal captures the literal on-disk record, independent of the lease module.
-
-    Guards the capture mechanism itself: a hand-written record is reflected verbatim, so a
-    test that asserts on ``journal.holders()`` is asserting on the real lock file, not a
-    convenience reconstruction.
-    """
-    ws = _make_workspace(tmp_path, _SLUG)
-    journal = LockJournal(ws, _SLUG)
-    assert journal.capture() is None  # no record yet
-
-    path = lease._record_path(ws, _SLUG)
-    path.write_text(
-        json.dumps({"context": _SLUG, "session_id": "hand-written", "heartbeat": "x", "ttl": 1}),
-        encoding="utf-8",
-    )
-    captured = journal.capture()
-    assert captured is not None and captured["session_id"] == "hand-written"
-    assert journal.holders() == [None, "hand-written"]

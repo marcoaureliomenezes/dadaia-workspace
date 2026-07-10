@@ -23,10 +23,11 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_parallel_workflows_state_codex_workflow_docs_boundary() -> None:
-    """Workflow docs must state that Codex does not auto-execute the file itself."""
+def test_codex_orchestration_wording_forbidden_and_required_phrases() -> None:
+    """Workflow docs state the Codex-does-not-auto-execute boundary, no Codex-facing
+    text promises fake deferred tools, and memory product truth distinguishes custom
+    agents from workflow docs."""
     missing: list[str] = []
-
     for path in sorted(WORKFLOWS_DIR.glob("*.workflow.md")):
         content = _text(path)
         if "parallel_group:" not in content:
@@ -36,30 +37,21 @@ def test_parallel_workflows_state_codex_workflow_docs_boundary() -> None:
             "codex" in lowered and "workflow" in lowered and "does not auto-execute" in lowered
         ):
             missing.append(path.name)
-
     assert missing == []
 
-
-def test_codex_facing_text_does_not_promise_fake_tools() -> None:
-    """Codex-facing public text must not claim fake deferred tools."""
     paths = [
         AGENT_ORCHESTRATION,
         *sorted(AGENTS_DIR.glob("*.md")),
         *sorted(WORKFLOWS_DIR.glob("*.workflow.md")),
     ]
     failures: list[str] = []
-
     for path in paths:
         content = _text(path)
         for phrase in FORBIDDEN_CODEX_PROMISES:
             if phrase in content:
                 failures.append(f"{path.relative_to(REPO_ROOT).as_posix()}: {phrase}")
-
     assert failures == []
 
-
-def test_codex_dispatcher_memory_names_custom_agent_boundary() -> None:
-    """Memory product truth must distinguish custom agents from workflow docs."""
     content = _text(AGENT_ORCHESTRATION).lower()
     assert "codex custom agents" in content
     assert "workflow markdown" in content

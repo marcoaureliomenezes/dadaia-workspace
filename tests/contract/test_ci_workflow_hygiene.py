@@ -52,8 +52,11 @@ def _workflow_files() -> list[Path]:
     return files
 
 
-def test_no_primary_context_json_in_workflows() -> None:
-    """CI-1: the legacy primary_context.json bootstrap write must be gone."""
+def test_ci_workflow_yaml_hygiene_invariants() -> None:
+    """(a) CI-1 no legacy primary_context.json write; (b) CI-2 neither workflow
+    overrides PANEL_WEB_SERVER_COMMAND; (c) CI-2 no inline bootstrap-body duplicate,
+    and the shared script exists, is executable, and carries the body exactly once."""
+    # (a)
     offenders = [
         f.name for f in _workflow_files() if "primary_context.json" in f.read_text(encoding="utf-8")
     ]
@@ -62,26 +65,18 @@ def test_no_primary_context_json_in_workflows() -> None:
         "the file is legacy v1 state; only the v1→v2 migration deleter may mention it"
     )
 
+    # (b) playwright.config.ts's own default (the hermetic run-panel-e2e-server.sh) is the
+    # sole source of truth for how the panel webServer is bootstrapped and launched; an
+    # override in either workflow YAML would be the only way the two legs could
+    # reintroduce a hand-synced-copy divergence (the CI-2 audit finding this guards).
+    for workflow in ("ci.yml", "release.yml"):
+        text = (_WORKFLOWS_DIR / workflow).read_text(encoding="utf-8")
+        assert "PANEL_WEB_SERVER_COMMAND" not in text, (
+            f"{workflow} overrides PANEL_WEB_SERVER_COMMAND — this bypasses the shared "
+            f"hermetic bootstrap ({_SCRIPT_REF}) and reopens the CI-2 divergence risk"
+        )
 
-@pytest.mark.parametrize("workflow", ["ci.yml", "release.yml"])
-def test_workflows_do_not_override_web_server_command(workflow: str) -> None:
-    """CI-2 (amended): neither e2e-panel leg overrides PANEL_WEB_SERVER_COMMAND.
-
-    playwright.config.ts's own default (the hermetic run-panel-e2e-server.sh) is the
-    sole source of truth for how the panel webServer is bootstrapped and launched; an
-    override in either workflow YAML would be the only way the two legs could
-    reintroduce a hand-synced-copy divergence (the CI-2 audit finding this contract
-    guards).
-    """
-    text = (_WORKFLOWS_DIR / workflow).read_text(encoding="utf-8")
-    assert "PANEL_WEB_SERVER_COMMAND" not in text, (
-        f"{workflow} overrides PANEL_WEB_SERVER_COMMAND — this bypasses the shared "
-        f"hermetic bootstrap ({_SCRIPT_REF}) and reopens the CI-2 divergence risk"
-    )
-
-
-def test_no_inline_bootstrap_body_duplicate() -> None:
-    """CI-2: the bootstrap body lives only in the shared script (exactly once)."""
+    # (c)
     for f in _workflow_files():
         occurrences = f.read_text(encoding="utf-8").count(_DISCRIMINATOR)
         assert occurrences == 0, (
@@ -91,11 +86,6 @@ def test_no_inline_bootstrap_body_duplicate() -> None:
     assert _BOOTSTRAP_SCRIPT.is_file(), f"{_SCRIPT_REF} is missing"
     assert _BOOTSTRAP_SCRIPT.read_text(encoding="utf-8").count(_DISCRIMINATOR) == 1
 
-
-def test_bootstrap_script_is_executable() -> None:
-    """The shared script must carry the executable bit (skipped on Windows)."""
-    if os.name == "nt":
-        pytest.skip("executable bit not meaningful on Windows")
-    assert _BOOTSTRAP_SCRIPT.is_file(), f"{_SCRIPT_REF} is missing"
-    mode = _BOOTSTRAP_SCRIPT.stat().st_mode
-    assert mode & stat.S_IXUSR, f"{_SCRIPT_REF} is not executable"
+    if os.name != "nt":
+        mode = _BOOTSTRAP_SCRIPT.stat().st_mode
+        assert mode & stat.S_IXUSR, f"{_SCRIPT_REF} is not executable"

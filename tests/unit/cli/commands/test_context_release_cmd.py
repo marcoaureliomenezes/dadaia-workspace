@@ -13,7 +13,9 @@ release into the command:
   in both the eval flow (env sid == holder sid) and the default flow (CLI sid ≠ holder
   sid, holder pid resolved dead/owned).
 * **release WITHOUT a lease** → a clean no-op (exit 0, nothing to drop).
-* **a live foreign holder** is NEVER released by context name alone (default flow).
+* **a live foreign holder** is NEVER released by context name alone (default flow) —
+  CRIT no-steal: `context release` must not release a live foreign session's lease by
+  name.
 """
 
 from __future__ import annotations
@@ -131,7 +133,10 @@ def test_release_default_flow_drops_lease_when_holder_dead(
 def test_release_default_flow_keeps_live_foreign_lease(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """CLI sid ≠ holder sid, holder ALIVE + NOT in ancestry ⇒ lease NOT released."""
+    """CLI sid ≠ holder sid, holder ALIVE + NOT in ancestry ⇒ lease NOT released.
+
+    CRIT no-steal: `context release` must not release a live foreign session's lease.
+    """
     ws = tmp_path
     holder_sid = "sess_foreign"
     cli_sid = "sess_cli02"
@@ -153,14 +158,15 @@ def test_release_default_flow_keeps_live_foreign_lease(
 
 
 # --------------------------------------------------------------------------- #
-# No-lease no-op
+# No-lease no-op / no-session-id error
 # --------------------------------------------------------------------------- #
 
 
-def test_release_without_lease_is_clean_noop(
+def test_release_without_lease_noop_and_no_session_id_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """release with a session record but no held lease ⇒ exit 0, nothing dropped."""
+    """release with a session record but no held lease ⇒ exit 0, nothing dropped; and
+    neither --session nor DADAIA_SESSION_ID ⇒ exit 1 with an actionable message."""
     ws = tmp_path
     cli_sid = "sess_cli03"
     _seed_session(ws, cli_sid, "ctxa")  # bound, but no lease acquired
@@ -174,13 +180,6 @@ def test_release_without_lease_is_clean_noop(
     assert lease.read_record(ws, "ctxa") is None
     assert not (context_cmd._sessions_dir(ws) / f"{cli_sid}.json").exists()
 
-
-def test_release_no_session_id_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Neither --session nor DADAIA_SESSION_ID ⇒ exit 1 with an actionable message."""
-    _patch_workspace(monkeypatch, tmp_path)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-
-    result = runner.invoke(context_cmd.app, ["release"])
-
-    assert result.exit_code == 1, result.output
-    assert "session" in result.output.lower()
+    no_id_result = runner.invoke(context_cmd.app, ["release"])
+    assert no_id_result.exit_code == 1, no_id_result.output
+    assert "session" in no_id_result.output.lower()

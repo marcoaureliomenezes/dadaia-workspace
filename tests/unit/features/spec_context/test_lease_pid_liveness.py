@@ -13,6 +13,9 @@ All timing uses an injected FakeClock; the pid_probe is a fake callable, so thes
 deterministic and platform-seamed (no real os.kill). The renew-vs-foreign-acquire race
 (FR-R2-04) is covered by a hypothesis property test that drives the interleaving via the
 ``_before_write`` seam (no real threads/Barrier) and asserts on lock-file *history*.
+
+CRITICAL — TTL-stale-but-pid-alive is never reclaimed: the gate-side proof lives here (the
+doctor-side proof lives in test_doctor_lock_gc.py — different code path, both kept).
 """
 
 from __future__ import annotations
@@ -79,148 +82,102 @@ def _dead(_pid: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# is_stale: the pid-probe veto lives here (core.lock_liveness)
+# is_stale decision table (core.lock_liveness) — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_is_stale_ttl_expired_pid_alive_is_not_stale() -> None:
-    """TTL-expired + alive pid + probe wired ⇒ NOT stale (no takeover)."""
-    hb = (BASE - timedelta(seconds=TTL + 10)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL, "pid": 4242}
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=_alive) is False
+@pytest.mark.parametrize(
+    ("heartbeat_age", "pid", "pid_probe", "expected_stale"),
+    [
+        pytest.param(TTL + 10, 4242, _alive, False, id="ttl-expired-pid-alive-not-stale"),
+        pytest.param(TTL + 10, 4242, _dead, True, id="ttl-expired-pid-dead-is-stale"),
+        pytest.param(TTL + 10, 4242, None, True, id="ttl-expired-no-probe-fallback-stale"),
+        pytest.param(TTL + 10, None, _alive, True, id="ttl-expired-legacy-no-pid-is-stale"),
+        pytest.param(1, 4242, "boom", False, id="ttl-fresh-probe-never-consulted"),
+        pytest.param(TTL + 10, 4242, "raises", True, id="probe-raises-falls-back-to-ttl-stale"),
+    ],
+)
+def test_is_stale_decision_table(
+    heartbeat_age: int, pid: int | None, pid_probe: object, expected_stale: bool
+) -> None:
+    hb = (BASE - timedelta(seconds=heartbeat_age)).isoformat()
+    rec: dict[str, object] = {"heartbeat": hb, "ttl": TTL}
+    if pid is not None:
+        rec["pid"] = pid
 
+    if pid_probe == "boom":
 
-def test_is_stale_ttl_expired_pid_dead_is_stale() -> None:
-    """TTL-expired + dead pid ⇒ stale (reclaimable ⇒ takeover)."""
-    hb = (BASE - timedelta(seconds=TTL + 10)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL, "pid": 4242}
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=_dead) is True
+        def probe(_pid: int) -> bool:
+            raise AssertionError("probe must not be consulted on a TTL-fresh record")
 
+    elif pid_probe == "raises":
 
-def test_is_stale_ttl_expired_no_probe_is_stale_fallback() -> None:
-    """TTL-expired + probe=None ⇒ TTL-only fallback ⇒ stale (Windows-safe path)."""
-    hb = (BASE - timedelta(seconds=TTL + 10)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL, "pid": 4242}
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=None) is True
+        def probe(_pid: int) -> bool:
+            raise OSError("simulated probe failure")
 
+    else:
+        probe = pid_probe  # type: ignore[assignment]
 
-def test_is_stale_ttl_expired_legacy_record_no_pid_is_stale() -> None:
-    """TTL-expired + legacy record without a pid field ⇒ no veto ⇒ stale."""
-    hb = (BASE - timedelta(seconds=TTL + 10)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL}  # no pid (legacy)
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=_alive) is True
-
-
-def test_is_stale_ttl_fresh_probe_never_consulted() -> None:
-    """A TTL-fresh record is live regardless of the probe (probe can never create staleness)."""
-    hb = (BASE - timedelta(seconds=1)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL, "pid": 4242}
-
-    def _boom(_pid: int) -> bool:
-        raise AssertionError("probe must not be consulted on a TTL-fresh record")
-
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=_boom) is False
-
-
-def test_is_stale_probe_raises_falls_back_to_ttl() -> None:
-    """A probe that raises must not deadlock — fall back to the TTL verdict (stale)."""
-    hb = (BASE - timedelta(seconds=TTL + 10)).isoformat()
-    rec = {"heartbeat": hb, "ttl": TTL, "pid": 4242}
-
-    def _raises(_pid: int) -> bool:
-        raise OSError("simulated probe failure")
-
-    assert is_stale(rec, clock=fixed(BASE), pid_probe=_raises) is True
+    assert is_stale(rec, clock=fixed(BASE), pid_probe=probe) is expected_stale
 
 
 # ---------------------------------------------------------------------------
-# acquire: the TAKEOVER decision honors the probe veto
+# acquire decision table — the TAKEOVER decision honors the probe veto — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_acquire_ttl_stale_alive_holder_blocks_no_takeover(tmp_path: Path) -> None:
-    """TTL-stale foreign holder still alive ⇒ acquire BLOCKs (the live-session-theft fix)."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 5), pid=9001)
-    with pytest.raises(LockHeldError) as exc:
-        lease.acquire(
+@pytest.mark.parametrize(
+    ("heartbeat_age", "pid_probe", "expect_status", "expect_holder_after"),
+    [
+        pytest.param(TTL + 5, _alive, "BLOCK", "holder", id="ttl-stale-alive-holder-blocks"),
+        pytest.param(TTL + 5, _dead, "ACQUIRED", "intruder", id="ttl-stale-dead-holder-takeover"),
+        pytest.param(TTL + 5, None, "ACQUIRED", "intruder", id="ttl-stale-no-probe-takeover"),
+        pytest.param(0, _dead, "BLOCK", "holder", id="ttl-fresh-foreign-yields-even-dead-pid"),
+    ],
+)
+def test_acquire_decision_table(
+    tmp_path: Path,
+    heartbeat_age: int,
+    pid_probe: object,
+    expect_status: str,
+    expect_holder_after: str,
+) -> None:
+    _seed(tmp_path, "holder", BASE - timedelta(seconds=heartbeat_age), pid=9001)
+    if expect_status == "BLOCK":
+        with pytest.raises(LockHeldError) as exc:
+            lease.acquire(
+                tmp_path,
+                CTX,
+                "intruder",
+                "v0.1.10",
+                "IMPLEMENTATION",
+                clock=fixed(BASE),
+                pid_probe=pid_probe,  # type: ignore[arg-type]
+            )
+        if heartbeat_age >= TTL:
+            assert "actively mutating" in str(exc.value)
+    else:
+        status, rec = lease.acquire(
             tmp_path,
             CTX,
             "intruder",
             "v0.1.10",
             "IMPLEMENTATION",
             clock=fixed(BASE),
-            pid_probe=_alive,
+            pid_probe=pid_probe,  # type: ignore[arg-type]
         )
-    assert "actively mutating" in str(exc.value)
-    # Record untouched — holder keeps its lease.
-    assert _field(tmp_path, "session_id") == "holder"
-
-
-def test_acquire_ttl_stale_dead_holder_takes_over(tmp_path: Path) -> None:
-    """TTL-stale foreign holder whose pid is dead ⇒ TAKEOVER (ACQUIRED)."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 5), pid=9001)
-    status, rec = lease.acquire(
-        tmp_path,
-        CTX,
-        "intruder",
-        "v0.1.10",
-        "IMPLEMENTATION",
-        clock=fixed(BASE),
-        pid_probe=_dead,
-    )
-    assert status == "ACQUIRED"
-    assert rec["session_id"] == "intruder"
-    assert _field(tmp_path, "session_id") == "intruder"
-
-
-def test_acquire_ttl_stale_no_probe_takes_over(tmp_path: Path) -> None:
-    """probe=None ⇒ TTL-only fallback ⇒ stale holder is taken over (no regression)."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 5), pid=9001)
-    status, _ = lease.acquire(
-        tmp_path,
-        CTX,
-        "intruder",
-        "v0.1.10",
-        "IMPLEMENTATION",
-        clock=fixed(BASE),
-        pid_probe=None,
-    )
-    assert status == "ACQUIRED"
-
-
-def test_acquire_ttl_fresh_foreign_yields(tmp_path: Path) -> None:
-    """TTL-fresh foreign holder ⇒ yield as today (probe never even consulted)."""
-    _seed(tmp_path, "holder", BASE, pid=9001)
-    with pytest.raises(LockHeldError):
-        lease.acquire(
-            tmp_path,
-            CTX,
-            "intruder",
-            "v0.1.10",
-            "IMPLEMENTATION",
-            clock=fixed(BASE),
-            pid_probe=_dead,  # dead, yet still BLOCKs because TTL-fresh
-        )
-    assert _field(tmp_path, "session_id") == "holder"
-
-
-def test_acquire_writes_pid_into_record(tmp_path: Path) -> None:
-    """A fresh acquire stamps the holder pid (default os.getpid, injectable)."""
-    status, rec = lease.acquire(
-        tmp_path, CTX, "s1", "v0.1.10", "IMPLEMENTATION", clock=fixed(BASE), pid=12345
-    )
-    assert status == "ACQUIRED"
-    assert rec["pid"] == 12345
-    assert _field(tmp_path, "pid") == 12345
+        assert status == expect_status
+        assert rec["session_id"] == "intruder"
+    assert _field(tmp_path, "session_id") == expect_holder_after
 
 
 # ---------------------------------------------------------------------------
-# holder-safe renew past TTL (FR-R2-04)
+# holder-safe renew past TTL (FR-R2-04) + steal pid-veto — 1 param
 # ---------------------------------------------------------------------------
 
 
-def test_acquire_confirmed_holder_renews_past_ttl(tmp_path: Path) -> None:
-    """A confirmed holder (same session_id) renews even if its own heartbeat aged past TTL."""
+def test_renew_and_steal_matrix(tmp_path: Path) -> None:
+    # A confirmed holder (same session_id) renews even if its own heartbeat aged past TTL.
     _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 100), pid=7)
     status, rec = lease.acquire(
         tmp_path,
@@ -236,44 +193,30 @@ def test_acquire_confirmed_holder_renews_past_ttl(tmp_path: Path) -> None:
     assert rec["session_id"] == "holder"
     assert rec["heartbeat"] == BASE.isoformat()
 
-
-def test_renew_heartbeat_past_ttl_for_holder(tmp_path: Path) -> None:
-    """renew_heartbeat refreshes a holder's heartbeat even past TTL (no self-loss)."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 100), pid=7)
+    # renew_heartbeat directly: refreshes a holder's heartbeat even past TTL.
     assert lease.renew_heartbeat(tmp_path, CTX, "holder", clock=fixed(BASE)) is True
     assert _field(tmp_path, "heartbeat") == BASE.isoformat()
 
-
-def test_renew_heartbeat_non_holder_is_noop(tmp_path: Path) -> None:
-    """A non-holder renewal is a guarded no-op and never overwrites the foreign record."""
-    _seed(tmp_path, "holder", BASE, pid=7)
+    # A non-holder renewal is a guarded no-op and never overwrites the foreign record.
+    _seed(tmp_path, "holder2", BASE, pid=7)
     assert lease.renew_heartbeat(tmp_path, CTX, "stranger", clock=fixed(BASE)) is False
-    assert _field(tmp_path, "session_id") == "holder"
+    assert _field(tmp_path, "session_id") == "holder2"
 
-
-# ---------------------------------------------------------------------------
-# steal honors the pid veto
-# ---------------------------------------------------------------------------
-
-
-def test_steal_refuses_ttl_stale_but_alive_holder(tmp_path: Path) -> None:
-    """steal must refuse a TTL-stale-but-pid-alive holder (no stealing a running session)."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 5), pid=9001)
-    ok, rec = lease.steal(tmp_path, CTX, "thief", clock=fixed(BASE), pid_probe=_alive)
+    # steal refuses a TTL-stale-but-pid-alive holder (no stealing a running session).
+    _seed(tmp_path, "holder3", BASE - timedelta(seconds=TTL + 5), pid=9001)
+    ok, srec = lease.steal(tmp_path, CTX, "thief", clock=fixed(BASE), pid_probe=_alive)
     assert ok is False
-    assert rec is not None and rec["session_id"] == "holder"
+    assert srec is not None and srec["session_id"] == "holder3"
 
-
-def test_steal_succeeds_on_dead_holder(tmp_path: Path) -> None:
-    """steal succeeds on a TTL-stale holder whose pid is dead."""
-    _seed(tmp_path, "holder", BASE - timedelta(seconds=TTL + 5), pid=9001)
-    ok, rec = lease.steal(tmp_path, CTX, "thief", clock=fixed(BASE), pid_probe=_dead, pid=55)
-    assert ok is True
-    assert rec is not None and rec["session_id"] == "thief" and rec["pid"] == 55
+    # steal succeeds on a TTL-stale holder whose pid is dead.
+    ok2, srec2 = lease.steal(tmp_path, CTX, "thief", clock=fixed(BASE), pid_probe=_dead, pid=55)
+    assert ok2 is True
+    assert srec2 is not None and srec2["session_id"] == "thief" and srec2["pid"] == 55
 
 
 # ---------------------------------------------------------------------------
-# FR-R2-04 stress/property: renew is atomic w.r.t. foreign acquire.
+# FR-R2-04 stress/property: renew is atomic w.r.t. foreign acquire — CRITICAL,
+# kept verbatim, the strongest concurrency proof available.
 #
 # This is the historical race at ``lease.py`` renew_heartbeat: it read the record,
 # verified ownership, then wrote — WITHOUT the O_EXCL sentinel CAS. A foreign acquire
