@@ -1,21 +1,20 @@
-"""CLI ``dadaia context release`` — drops held lease(s) + clears by-session index.
+"""CLI ``dadaia context release`` — drops the session's advisory presence (v0.1.76 FR2).
 
-T-014-08 / FR-W4-03 (closes ``context-release-leaves-lease-heartbeat-renewing``).
+Re-baselined from the pre-v0.1.76 lease-drop test (T-014-08 / FR-W4-03): under the
+NO-LOCKS DOCTRINE there is no lease to release anymore — ``presence`` is the sole
+concurrency-signal surface, and it is never exclusive, so there is no "live foreign
+holder" concept left to protect. These are CLI-LEVEL tests: they drive
+``context.release_cmd`` through the Typer runner end-to-end against a minimal tmp
+workspace (NO real venv built).
 
-These are CLI-LEVEL tests: they drive ``context.release_cmd`` through the Typer runner
-end-to-end against a minimal tmp workspace (NO real venv built — the workspace root is
-just a ``tmp_path`` directory with the lock/session state seeded directly on disk, the
-same fixture shape as ``test_lock_steal.py``). The predicate logic itself is covered at
-the lease level in ``test_lease_release_predicates.py``; here we assert the CLI wires the
-release into the command:
-
-* **release WITH a held lease** → lock record gone AND by-session index entry gone,
-  in both the eval flow (env sid == holder sid) and the default flow (CLI sid ≠ holder
-  sid, holder pid resolved dead/owned).
-* **release WITHOUT a lease** → a clean no-op (exit 0, nothing to drop).
-* **a live foreign holder** is NEVER released by context name alone (default flow) —
-  CRIT no-steal: `context release` must not release a live foreign session's lease by
-  name.
+* **release WITH a presence record** (harness-native id, env override, or ``--session``)
+  -> the record is deleted, the CLI session record is unlinked.
+* **release WITHOUT any presence record** -> a clean no-op (exit 0).
+* **another session's presence is UNTOUCHED** — release only ever clears the resolved
+  session's own records, never a sibling's (presence has no exclusivity to steal, but
+  release must still be scoped to "self").
+* **no resolvable session id** (no ``--session``, no env, no harness-native var) -> exit 1
+  with an actionable message.
 """
 
 from __future__ import annotations
@@ -26,26 +25,18 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace import container
 from dadaia_workspace.cli.commands import context as context_cmd
-from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import presence
 
 runner = CliRunner()
 
 
-# --------------------------------------------------------------------------- #
-# Helpers — seed a minimal workspace on disk (no venv, no install)
-# --------------------------------------------------------------------------- #
-
-
-def _seed_lease(ws: Path, ctx: str, sid: str, *, pid: int) -> None:
-    """Acquire a real lease record + by-session index entry directly via the API."""
-    lease.acquire(ws, ctx, sid, "v0.1.14", "IMPLEMENTATION", pid=pid)
+def _seed_presence(ws: Path, ctx: str, sid: str, *, pid: int = 4242) -> None:
+    presence.upsert(ws, ctx, sid, runtime="claude", pid=pid)
 
 
 def _seed_session(ws: Path, sid: str, ctx: str) -> None:
-    """Write a CLI session record naming the bound context (default-flow input)."""
+    """Write a CLI session record naming the bound context."""
     sessions_dir = context_cmd._sessions_dir(ws)
     sessions_dir.mkdir(parents=True, exist_ok=True)
     (sessions_dir / f"{sid}.json").write_text(
@@ -58,126 +49,124 @@ def _patch_workspace(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:
     monkeypatch.setattr(context_cmd, "resolve_workspace_root", lambda: ws)
 
 
-def _patch_probes(monkeypatch: pytest.MonkeyPatch, *, alive: bool, ancestry: Ancestry) -> None:
-    """Seam the default-flow ownership probes the CLI builds.
-
-    v0.1.54 FR6: ``context release`` now calls the single public
-    ``infrastructure.process_probe_adapter.build_pid_probe`` bound in the command module's
-    namespace (``context_cmd.build_pid_probe``); the ancestry probe still comes from the
-    container.
-    """
-    monkeypatch.setattr(context_cmd, "build_pid_probe", lambda: lambda _pid: alive)
-
-    class _FakeAncestry:
-        def is_ancestor(self, _holder: int, _caller: int) -> Ancestry:
-            return ancestry
-
-    monkeypatch.setattr(container, "build_process_ancestry", _FakeAncestry)
+def _clear_harness_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
 
 
 # --------------------------------------------------------------------------- #
-# Eval flow (env sid == holder sid)
+# --session override
 # --------------------------------------------------------------------------- #
 
 
-def test_release_eval_flow_drops_lease_and_clears_index(
+def test_release_with_session_flag_clears_presence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """env sid holds the lease ⇒ release drops the record AND the by-session index."""
     ws = tmp_path
-    sid = "sess_env01"
-    _seed_lease(ws, "ctxa", sid, pid=4242)
+    sid = "sess_cli01"
+    _seed_presence(ws, "ctxa", sid)
     _seed_session(ws, sid, "ctxa")
     _patch_workspace(monkeypatch, ws)
-    monkeypatch.setenv("DADAIA_SESSION_ID", sid)
+    _clear_harness_env(monkeypatch)
 
-    # Precondition: lease + index present.
-    assert lease.read_record(ws, "ctxa") is not None
-    assert lease.contexts_for_session(ws, sid) == ["ctxa"]
-
-    result = runner.invoke(context_cmd.app, ["release"])
+    result = runner.invoke(context_cmd.app, ["release", "--session", sid])
 
     assert result.exit_code == 0, result.output
-    assert "ctxa" in result.output  # the dropped lease is reported
-    assert lease.read_record(ws, "ctxa") is None
-    assert lease.contexts_for_session(ws, sid) == []
-    # Session record unlinked too.
+    assert sid in result.output
+    assert not (ws / ".dadaia" / "states" / "presence" / "ctxa" / f"{sid}.json").exists()
     assert not (context_cmd._sessions_dir(ws) / f"{sid}.json").exists()
 
 
 # --------------------------------------------------------------------------- #
-# Default flow (CLI sid ≠ holder sid)
+# DADAIA_SESSION_ID env override (eval-flow)
 # --------------------------------------------------------------------------- #
 
 
-def test_release_default_flow_drops_lease_when_holder_dead(
+def test_release_via_env_sid_clears_presence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """CLI sid ≠ holder sid, holder pid DEAD ⇒ bound-context lease released + index cleared."""
     ws = tmp_path
-    holder_sid = "sess_harness"
-    cli_sid = "sess_cli01"
-    _seed_lease(ws, "ctxa", holder_sid, pid=9999)
-    _seed_session(ws, cli_sid, "ctxa")
+    sid = "sess_env01"
+    _seed_presence(ws, "ctxa", sid)
+    _seed_session(ws, sid, "ctxa")
     _patch_workspace(monkeypatch, ws)
-    _patch_probes(monkeypatch, alive=False, ancestry=Ancestry.NOT_ANCESTOR)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    _clear_harness_env(monkeypatch)
+    monkeypatch.setenv("DADAIA_SESSION_ID", sid)
 
-    result = runner.invoke(context_cmd.app, ["release", "--session", cli_sid])
+    result = runner.invoke(context_cmd.app, ["release"])
 
     assert result.exit_code == 0, result.output
-    assert lease.read_record(ws, "ctxa") is None
-    assert lease.contexts_for_session(ws, holder_sid) == []
+    assert not (ws / ".dadaia" / "states" / "presence" / "ctxa" / f"{sid}.json").exists()
+    assert not (context_cmd._sessions_dir(ws) / f"{sid}.json").exists()
 
 
-def test_release_default_flow_keeps_live_foreign_lease(
+# --------------------------------------------------------------------------- #
+# Harness-native session id (no flag, no env override needed)
+# --------------------------------------------------------------------------- #
+
+
+def test_release_resolves_harness_native_session_id_with_no_flag(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """CLI sid ≠ holder sid, holder ALIVE + NOT in ancestry ⇒ lease NOT released.
-
-    CRIT no-steal: `context release` must not release a live foreign session's lease.
-    """
     ws = tmp_path
-    holder_sid = "sess_foreign"
-    cli_sid = "sess_cli02"
-    _seed_lease(ws, "ctxa", holder_sid, pid=9999)
-    _seed_session(ws, cli_sid, "ctxa")
+    sid = "harness-native-sid-001"
+    _seed_presence(ws, "ctxa", sid)
+    _seed_session(ws, sid, "ctxa")
     _patch_workspace(monkeypatch, ws)
-    _patch_probes(monkeypatch, alive=True, ancestry=Ancestry.NOT_ANCESTOR)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    _clear_harness_env(monkeypatch)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", sid)
 
-    result = runner.invoke(context_cmd.app, ["release", "--session", cli_sid])
+    result = runner.invoke(context_cmd.app, ["release"])
 
     assert result.exit_code == 0, result.output
-    # Live foreign holder's lease survives — only the CLI session record is unlinked.
-    rec = lease.read_record(ws, "ctxa")
-    assert rec is not None
-    assert rec["session_id"] == holder_sid
-    assert lease.contexts_for_session(ws, holder_sid) == ["ctxa"]
-    assert not (context_cmd._sessions_dir(ws) / f"{cli_sid}.json").exists()
+    assert not (ws / ".dadaia" / "states" / "presence" / "ctxa" / f"{sid}.json").exists()
 
 
 # --------------------------------------------------------------------------- #
-# No-lease no-op / no-session-id error
+# Presence for ANOTHER session is never touched (release is self-scoped).
 # --------------------------------------------------------------------------- #
 
 
-def test_release_without_lease_noop_and_no_session_id_errors(
+def test_release_never_clears_a_different_sessions_presence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """release with a session record but no held lease ⇒ exit 0, nothing dropped; and
-    neither --session nor DADAIA_SESSION_ID ⇒ exit 1 with an actionable message."""
+    ws = tmp_path
+    my_sid = "sess_cli02"
+    other_sid = "sess_other"
+    _seed_presence(ws, "ctxa", my_sid)
+    _seed_presence(ws, "ctxa", other_sid)
+    _seed_session(ws, my_sid, "ctxa")
+    _patch_workspace(monkeypatch, ws)
+    _clear_harness_env(monkeypatch)
+
+    result = runner.invoke(context_cmd.app, ["release", "--session", my_sid])
+
+    assert result.exit_code == 0, result.output
+    assert not (ws / ".dadaia" / "states" / "presence" / "ctxa" / f"{my_sid}.json").exists()
+    # The other session's presence record survives untouched.
+    assert (ws / ".dadaia" / "states" / "presence" / "ctxa" / f"{other_sid}.json").exists()
+
+
+# --------------------------------------------------------------------------- #
+# No presence / no session id
+# --------------------------------------------------------------------------- #
+
+
+def test_release_without_presence_noop_and_no_session_id_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """release with a session record but no presence recorded -> exit 0, clean no-op; and
+    neither --session nor any env/harness id resolvable -> exit 1 with an actionable message."""
     ws = tmp_path
     cli_sid = "sess_cli03"
-    _seed_session(ws, cli_sid, "ctxa")  # bound, but no lease acquired
+    _seed_session(ws, cli_sid, "ctxa")  # bound, but no presence ever recorded
     _patch_workspace(monkeypatch, ws)
-    _patch_probes(monkeypatch, alive=False, ancestry=Ancestry.NOT_ANCESTOR)
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    _clear_harness_env(monkeypatch)
 
     result = runner.invoke(context_cmd.app, ["release", "--session", cli_sid])
 
     assert result.exit_code == 0, result.output
-    assert lease.read_record(ws, "ctxa") is None
     assert not (context_cmd._sessions_dir(ws) / f"{cli_sid}.json").exists()
 
     no_id_result = runner.invoke(context_cmd.app, ["release"])

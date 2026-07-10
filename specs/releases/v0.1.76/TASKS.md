@@ -18,7 +18,7 @@
   `tests/**`
   Implement FR1/FR2(new module)/FR4; make T-1 green.
 
-- [ ] **T-3 — lease demolition + chokepoint WARN-only + CLI** — owner: software-engineer
+- [x] **T-3 — lease demolition + chokepoint WARN-only + CLI** — owner: software-engineer
   Write set: `dadaia_workspace/features/spec_context/**`,
   `dadaia_workspace/features/chokepoints/**`, `dadaia_workspace/cli/**`, `tests/**`
   Delete acquire/CAS/adopt/index/incumbent-authority/`lock steal`; `context release`

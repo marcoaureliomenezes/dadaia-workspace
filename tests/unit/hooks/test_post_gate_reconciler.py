@@ -1,12 +1,18 @@
 """Unit tests for the advisory working-tree reconciler (FR-W1-03, T-014-16).
 
 NEVER-BLOCKS contract: every branch must (1) leave exit-allow, (2) emit only advisory
-output, (3) fail open on error, (4) never mutate a lease. The git child is faked — no real
-``git status`` runs, and the throttle is asserted to short-circuit BEFORE any spawn.
+output, (3) fail open on error. The git child is faked — no real ``git status`` runs, and
+the throttle is asserted to short-circuit BEFORE any spawn.
+
+v0.1.76 T-3 re-baseline: the former "session holds the lease for its bound context ⇒
+in-lease ⇒ no flag" branch is DELETED along with the by-session index it read
+(``lease.contexts_for_session`` no longer exists) — nothing is ever "in-lease" anymore, so
+every dirty MUTATING path in a bound repo is now unconditionally flagged (see
+``sdd_post_gate._reconcile_working_tree``'s updated docstring). Criterion4 (byte-identical
+lease record) drops out with it — there is no lease record for the reconciler to touch.
 
 CRIT (NEVER-BLOCKS): the flag test below folds in criterion2 (advisory-only: the ONLY
-side effect is the RECONCILER_FLAG event) and criterion4 (byte-identical lease record —
-the reconciler never mutates the lease it observes).
+side effect is the RECONCILER_FLAG event).
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import lease, session_identity
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.hooks import _common, sdd_post_gate
 
 _SID = "session-recon"
@@ -51,35 +57,15 @@ def _flags(workspace: Path) -> list[dict[str, Any]]:
     return [e for e in _events(workspace) if e.get("event") == "RECONCILER_FLAG"]
 
 
-def test_dirty_mutating_no_lease_emits_flag_advisory_only_no_lease_mutation(
+def test_dirty_mutating_emits_flag_advisory_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     ws = _make_workspace(tmp_path)
     _bind_session(ws)
-    # A real lease record on disk for a DIFFERENT (foreign) session — must survive
-    # byte-for-byte (criterion4).
-    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    lease_path = lock_dir / f"{_CTX}.lock.json"
-    lease_path.write_text(
-        json.dumps(
-            {
-                "context": _CTX,
-                "session_id": "foreign-holder",
-                "mode": "IMPLEMENTATION",
-                "pid": 999999,
-                "heartbeat": "2026-06-12T00:00:00+00:00",
-                "ttl": 120,
-            }
-        ),
-        encoding="utf-8",
-    )
-    before = lease_path.read_bytes()
 
-    # A dirty production file (MUTATING) in the context repo, and no held lease for the
-    # bound context ⇒ the flagging branch.
+    # A dirty production file (MUTATING) in the bound context repo ⇒ the flagging branch
+    # (unconditional now — there is no lease to be "in" anymore).
     monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
-    monkeypatch.setattr(lease, "contexts_for_session", lambda ws_, sid: [])
 
     sdd_post_gate._reconcile_working_tree(ws, _SID)
 
@@ -94,18 +80,13 @@ def test_dirty_mutating_no_lease_emits_flag_advisory_only_no_lease_mutation(
     assert events[0]["event"] == "RECONCILER_FLAG"
     assert "no action taken" in events[0]["note"]
 
-    # criterion4: the lease record is byte-for-byte unchanged.
-    assert lease_path.read_bytes() == before, "reconciler must not mutate the lease record"
-
-    # Companion: the full PostToolUse main() returns 0 even on this exact out-of-lease
-    # dirty MUTATING flagging path (criterion1) — proving never-blocks holds end-to-end,
-    # not just at the pure _reconcile_working_tree layer.
+    # Companion: the full PostToolUse main() returns 0 even on this exact dirty MUTATING
+    # flagging path (criterion1) — proving never-blocks holds end-to-end, not just at the
+    # pure _reconcile_working_tree layer.
     ws2 = _make_workspace(tmp_path.parent / (tmp_path.name + "-main"))
     _bind_session(ws2)
     monkeypatch.setenv("WORKSPACE_ROOT", str(ws2))
     monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
-    # No held lease for the bound context → this is the flagging branch.
-    monkeypatch.setattr(lease, "contexts_for_session", lambda ws_, sid: [])
     monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
     monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
     assert sdd_post_gate.main() == 0
@@ -115,16 +96,6 @@ def test_dirty_mutating_no_lease_emits_flag_advisory_only_no_lease_mutation(
 @pytest.mark.parametrize(
     ("name", "setup_fn"),
     [
-        (
-            # Session holds the lease for its bound context ⇒ in-lease ⇒ no flag.
-            "held_lease",
-            lambda ws, mp: (
-                mp.setattr(
-                    sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"]
-                ),
-                mp.setattr(lease, "contexts_for_session", lambda ws_, sid: [_CTX]),
-            ),
-        ),
         (
             "clean_tree",
             lambda ws, mp: mp.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: []),

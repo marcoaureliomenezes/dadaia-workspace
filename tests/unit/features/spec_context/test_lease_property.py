@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import lease, session_identity
 from dadaia_workspace.features.spec_context.gate_policy import Decision, evaluate
 
 BASE = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
@@ -232,7 +232,7 @@ def test_ptr_residue_inert_to_gate_verdict(
     gate never reads the lease record or its ``.ptr`` at all."""
     _seed(tmp_path, seed_session_id, BASE)
     if write_ptr_for_mine:
-        ptr = lease._ptr_path(tmp_path, CTX)
+        ptr = session_identity.ptr_path(tmp_path, CTX, create=True)
         ptr.write_text("mine", encoding="utf-8")
 
     decision, _message = evaluate(

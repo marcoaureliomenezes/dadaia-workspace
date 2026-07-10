@@ -1,43 +1,21 @@
 """PostToolUse session-heartbeat hook (the canonical, cross-platform gate surface).
 
-Runs after every tool call. Its sole purpose: keep this session's lease(s) alive by
-renewing their ``heartbeat`` in the lock record(s) this session holds, and (best-effort)
-refreshing ``last_seen_at`` in the session record. It NEVER blocks a tool call; it always
-returns 0.
+Runs after every tool call. Its sole purpose (v0.1.76 FR2): renew this session's advisory
+:mod:`presence` record(s) — the ONLY concurrency signal left — and (best-effort) refresh
+``last_seen_at`` in the CLI session record. It NEVER blocks a tool call; it always returns 0.
 
-R2a (release v0.1.10, FR-R2-01/02 / AC-R2-01) — what changed vs the rc-4 parity hook
-------------------------------------------------------------------------------------
-The previous implementation gated the *entire* hook on ``DADAIA_SESSION_ID`` being set in
-the process environment::
+v0.1.76 T-3 (NO-LOCKS DOCTRINE): the old lease-heartbeat renewal (``lease.renew_heartbeat``
+over the by-session index, ``_iter_lease_contexts``/``_renew_held_leases``) is DELETED —
+nothing acquires a lease anymore (T-2 decoupled the gate from ``lease.py`` entirely; T-3
+deleted the by-session index those helpers walked), so there is no lease left to renew in
+the steady-state case. ``presence.renew`` is the sole renewal call, unconditional (no
+session-file-existence guard — a presence record renews as long as it exists, mirroring the
+prior lease renewal's "runs outside any guard" invariant).
 
-    sess_id = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
-    if not sess_id:
-        return 0
-
-That guard made the heartbeat a **permanent no-op**: no real harness (Claude Code, Codex,
-Codex) exports ``DADAIA_SESSION_ID`` to a hook subprocess (audit 2026-06-10 finding 2;
-bug ``lease-stolen…`` D2/D3). A holder running a long (>120 s) Bash call therefore never
-renewed, its lease went TTL-stale, and a concurrent session auto-TAKEOVER'd it — the
-lease-theft incident. Three corrections (FR-R2-01):
-
-1. **Session id is resolved from the stdin payload** via
-   :func:`_common.resolve_session_id` — the harness-native id var
-   (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the
-   stdin ``session_id`` field. ``DADAIA_SESSION_ID`` is honored only as an *operator
-   override* (it sits first in ``resolve_session_id``'s order). The old no-op guard is
-   gone.
-2. **The renewal context is the lease(s) this session actually holds.** We scan the lock
-   directory and renew every record whose ``session_id`` equals this sid (via
-   :func:`lease.renew_heartbeat`, which is itself holder-guarded and no-ops for a foreign
-   or stale record). We deliberately do **not** resolve the context via
-   ``DADAIA_CONTEXT`` → first-ALIVE: that path renews *whatever* context happens to be
-   first-ALIVE, which is exactly the cross-context lease-contamination bug. (first-ALIVE is
-   not used here at all; if a future need arises it must be a documented last resort, never
-   the default.)
-3. **Lease renewal runs OUTSIDE any session-file-existence guard.** A holder whose session
-   record was GC'd or never written still renews its lease as long as the lock record names
-   it. The optional session-record ``last_seen_at`` refresh is the only thing still gated on
-   the session file existing.
+Session id resolution (unchanged, FR-R2-01): via :func:`_common.resolve_session_id` — the
+harness-native id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the stdin
+``session_id`` field. ``DADAIA_SESSION_ID`` is honored only as an *operator override* (it
+sits first in ``resolve_session_id``'s order).
 
 Parity invariants preserved verbatim from the rc-4 shell hook:
 
@@ -50,7 +28,6 @@ Parity invariants preserved verbatim from the rc-4 shell hook:
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import subprocess  # noqa: S404 — see _reconcile_working_tree (documented FR-W1-03 exemption).
@@ -60,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import gate_policy, lease, presence, session_identity
+from dadaia_workspace.features.spec_context import gate_policy, presence, session_identity
 from dadaia_workspace.features.spec_context.gate_policy import PathClass
 from dadaia_workspace.hooks import _common
 
@@ -72,59 +49,6 @@ def _resolve_workspace() -> Path:
     from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
     return resolve_workspace_root()
-
-
-def _iter_lease_contexts(workspace: Path, sess_id: str) -> list[str]:
-    """Contexts this session holds — index-driven (FR-W4-02), no full lock-dir scan.
-
-    Resolution order:
-
-    1. **By-session index present** (``ctx_locks/by-session/`` dir exists): read this
-       session's entry (``by-session/<sid>.json``) and return only the contexts it names.
-       A session holding nothing has no entry → ``[]`` and the lock dir is never scanned.
-       This is the FS-op-counting acceptance: PostToolUse does not iterate the lock dir
-       when the session holds nothing.
-    2. **By-session DIR absent** (migration window — a workspace whose leases predate the
-       index): fall back to the legacy full lock-dir scan so a pre-index holder still
-       renews. ``lease.renew_heartbeat`` is holder-guarded, so scanning every record is a
-       safe (if less efficient) superset.
-
-    Returns ``[]`` (fail-soft) on any read error. Each name is fed back through ``lease``
-    (which re-validates ``[A-Za-z0-9_-]``).
-    """
-    by_session_dir = workspace / ".dadaia" / "states" / "ctx_locks" / "by-session"
-    if by_session_dir.is_dir():
-        return sorted(lease.contexts_for_session(workspace, sess_id))
-
-    # Migration fallback: no by-session index yet → full lock-dir scan.
-    lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
-    try:
-        entries = list(lock_dir.iterdir())
-    except OSError:
-        return []
-    suffix = ".lock.json"
-    return sorted(p.name[: -len(suffix)] for p in entries if p.name.endswith(suffix))
-
-
-def _renew_held_leases(workspace: Path, sess_id: str) -> int:
-    """Renew the heartbeat of every lease this session holds. Returns the count renewed.
-
-    The renewal target is resolved from the lock records this ``sess_id`` actually holds —
-    NOT from ``DADAIA_CONTEXT`` → first-ALIVE (which would re-import the cross-context
-    contamination bug). ``lease.renew_heartbeat`` is holder-guarded and stale-guarded, so a
-    foreign or expired record is a safe no-op. Each renewal is isolated: one bad record
-    never aborts the others (fail-open per FR-R2-01).
-    """
-    renewed = 0
-    for ctx in _iter_lease_contexts(workspace, sess_id):
-        try:
-            if lease.renew_heartbeat(workspace, ctx, sess_id):
-                renewed += 1
-        except (OSError, ValueError):
-            # A malformed ctx name or a transient write error on one record must not
-            # stop the others from renewing, and must never break the harness.
-            continue
-    return renewed
 
 
 def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] | None:
@@ -151,9 +75,14 @@ def _append_heartbeat_event(
     sess_id: str,
     record: dict[str, object] | None,
     *,
-    leases_renewed: int,
+    presence_renewed: int,
 ) -> None:
-    """Append a HEARTBEAT event to ``.dadaia/logs/lock-events.jsonl`` (best-effort)."""
+    """Append a HEARTBEAT event to ``.dadaia/logs/lock-events.jsonl`` (best-effort).
+
+    ``presence_renewed`` (v0.1.76 T-3, renamed from ``leases_renewed``): the count of
+    advisory presence records this session's :func:`presence.renew` refreshed — there is
+    no lease left to renew, so the field now honestly names what actually happened.
+    """
     now = datetime.now(tz=UTC).isoformat()
     rec = record or {}
     event = {
@@ -164,7 +93,7 @@ def _append_heartbeat_event(
         "session_id": sess_id,
         "runtime": rec.get("runtime", "unknown"),
         "pid": rec.get("pid", 0),
-        "leases_renewed": leases_renewed,
+        "presence_renewed": presence_renewed,
     }
     audit_path = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
     try:
@@ -287,14 +216,20 @@ def _append_reconciler_flag(workspace: Path, sess_id: str, ctx: str, count: int)
 
 
 def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
-    """Advisory reconciler pass — flags out-of-lease dirty MUTATING paths. NEVER blocks.
+    """Advisory reconciler pass — flags dirty MUTATING paths in the bound repo. NEVER blocks.
 
     Order (throttle FIRST, before any git child):
       1. throttled within the window ⇒ return (no git spawned).
-      2. session holds a lease for its bound context ⇒ no event (its dirt is in-lease).
-      3. no bound context ⇒ nothing to reconcile.
-      4. ``git status --porcelain`` of the context repo fails ⇒ no event (fail-open).
-      5. any dirty path classifies MUTATING ⇒ append RECONCILER_FLAG.
+      2. no bound context ⇒ nothing to reconcile.
+      3. ``git status --porcelain`` of the context repo fails ⇒ no event (fail-open).
+      4. any dirty path classifies MUTATING ⇒ append RECONCILER_FLAG.
+
+    v0.1.76 T-3 (NO-LOCKS DOCTRINE): the former "session holds the lease ⇒ in-lease, never
+    flag" short-circuit is DELETED along with the by-session index it read — nothing is
+    ever "in-lease" anymore (there is no lease to hold), so every dirty MUTATING path in the
+    bound repo is now advisory-flagged regardless of who is writing. This is consistent with
+    the doctrine: the reconciler was always advisory-only (never blocks), so widening its
+    trigger set is a pure signal increase, not a behavior change in severity.
 
     Every branch stamps the throttle marker on exit so the next call inside the window is a
     no-op. Any exception is swallowed by the caller's ``main`` try/except (fail-open).
@@ -306,10 +241,6 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
 
     ctx = _bound_context(workspace, sess_id)
     if ctx is None:
-        return
-
-    # A session that holds the lease for its bound context is acting in-lease — never flag it.
-    if ctx in lease.contexts_for_session(workspace, sess_id):
         return
 
     repo_root = workspace / "repos" / ctx
@@ -329,7 +260,12 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
 
 
 def main() -> int:
-    """Renew this session's lease heartbeat(s) + advisory presence. Never blocks (exit 0)."""
+    """Renew this session's advisory presence record(s). Never blocks (exit 0).
+
+    v0.1.76 T-3: ``presence.renew`` is now the sole renewal call — there is no lease left
+    to renew (the by-session index and ``lease.renew_heartbeat`` call this hook used are
+    both deleted; nothing acquires a lease anymore since T-2).
+    """
     payload = _common.read_stdin_json()
     sess_id = _common.resolve_session_id(payload)
     if not sess_id:
@@ -340,22 +276,13 @@ def main() -> int:
     except Exception:  # noqa: BLE001 — fail-open: never block a tool call
         return 0
 
+    presence_renewed = 0
     try:
-        # Lease renewal is the primary, correctness-critical job and runs OUTSIDE any
-        # session-file guard (FR-R2-01): a holder whose session record is missing still
-        # renews if the lock names it. Kept as-is for v0.1.76 T-2 (T-3 removes the lease
-        # machinery entirely); presence renewal is additive, not a replacement here.
-        leases_renewed = _renew_held_leases(workspace, sess_id)
+        presence_renewed = presence.renew(workspace, sess_id)
         record = _refresh_session_record(workspace, sess_id)
-        _append_heartbeat_event(workspace, sess_id, record, leases_renewed=leases_renewed)
+        _append_heartbeat_event(workspace, sess_id, record, presence_renewed=presence_renewed)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0
-
-    # v0.1.76 FR2: refresh every advisory presence record this session owns. Isolated
-    # from the heartbeat exit code (presence must never affect it) and
-    # ``presence.renew`` itself never raises — belt-and-suspenders here.
-    with contextlib.suppress(Exception):
-        presence.renew(workspace, sess_id)
 
     # Advisory working-tree reconciler (FR-W1-03) — strictly advisory, isolated in its own
     # try/except so a reconciler bug can never affect the heartbeat or the exit code.

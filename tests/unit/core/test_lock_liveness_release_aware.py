@@ -7,24 +7,24 @@ now-archived release. The fix threads the context's ACTIVE release into the verd
 pinned to a NON-active release is reclaimable regardless of pid, while a lease on the live
 ACTIVE release keeps the pid-veto (no false steal).
 
-These tests cover both the pure predicate and the ``lease.steal`` reclaim path, and preserve
-the legacy (``active_release is None``) behavior.
+These tests cover the pure predicate and preserve the legacy (``active_release is None``)
+behavior. The two ``lease.steal`` executed-reclaim-path tests were RETIRED in v0.1.76 T-3
+(the by-session-index/CAS acquisition machinery ``steal`` depended on is deleted along with
+the CLI ``lock steal`` verb — see the CLOSURE re-baseline list); the pure predicate below
+(``core.lock_liveness.is_stale``) is unaffected and remains the load-bearing contract, still
+consumed by ``doctor``/``doctor_coherence`` diagnostics over a residual record.
 
 CRIT: lease pid-veto vs release-aware reclaim. Both tables below keep every row — this is
-the no-steal/no-deadlock boundary. The two ``lease.steal`` execution-path tests are kept
-standalone (the executed reclaim path, not just the pure predicate).
+the no-steal/no-deadlock boundary.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import lock_liveness
-from dadaia_workspace.features.spec_context import lease
 
 _TTL = 120
 _HB = datetime(2026, 6, 30, 12, 0, 0, tzinfo=UTC)
@@ -119,50 +119,3 @@ def test_veto_holds_table(
     if active_release is not None:
         kwargs["active_release"] = active_release
     assert lock_liveness.is_stale(rec, **kwargs) is False  # type: ignore[arg-type]
-
-
-# ---------------------------------------------------------------------------
-# AC-8 — lease.steal reclaim path is release-aware (the executed reclaim path, not
-# just the pure predicate).
-# ---------------------------------------------------------------------------
-
-
-def _plant_record(workspace: Path, ctx: str, record: dict[str, object]) -> None:
-    lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-
-
-def test_steal_reclaims_archived_release_lease_with_live_pid(tmp_path: Path) -> None:
-    ctx = "dadaia-workspace"
-    _plant_record(tmp_path, ctx, _rec("v0.1.41"))
-    ok, _rec_after = lease.steal(
-        tmp_path,
-        ctx,
-        "new-session",
-        clock=_stale_clock,
-        pid_probe=_alive,
-        active_release="v0.1.43",
-        pid=99999,
-    )
-    assert ok is True
-    held = lease.read_record(tmp_path, ctx)
-    assert held is not None
-    assert held["session_id"] == "new-session"
-
-
-def test_steal_refuses_active_release_lease_with_live_pid(tmp_path: Path) -> None:
-    ctx = "dadaia-workspace"
-    _plant_record(tmp_path, ctx, _rec("v0.1.43"))
-    ok, rec_after = lease.steal(
-        tmp_path,
-        ctx,
-        "new-session",
-        clock=_stale_clock,
-        pid_probe=_alive,
-        active_release="v0.1.43",
-        pid=99999,
-    )
-    assert ok is False
-    assert rec_after is not None
-    assert rec_after["session_id"] == "holder-sess"  # untouched — no false steal

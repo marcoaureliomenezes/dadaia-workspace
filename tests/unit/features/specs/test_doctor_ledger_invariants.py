@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import lease, session_identity
+from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
@@ -194,6 +194,40 @@ def _strip_pid_from_lock_record(state_dir: Path, ctx: str) -> None:
     data = json.loads(record_path.read_text(encoding="utf-8"))
     data.pop("pid", None)
     record_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _seed_lock_record(
+    workspace: Path,
+    ctx: str,
+    session_id: str,
+    *,
+    clock: object = None,
+    pid: int = 4242,
+) -> None:
+    """Plant a raw ``<ctx>.lock.json`` — v0.1.76 T-3 successor to ``lease.acquire``.
+
+    ``lease.acquire`` is DELETED (the acquisition/CAS machinery it belonged to is gone);
+    this doctor-coherence backstop diagnoses whatever residual record exists on disk, so
+    seeding one directly (matching the schema ``acquire`` used to write) is the faithful
+    fixture successor — the coherence check itself is unaffected by how the record landed.
+    """
+    import json
+    from datetime import UTC, datetime
+
+    now = (clock() if callable(clock) else datetime.now(tz=UTC)).isoformat()
+    lock_dir = workspace / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "context": ctx,
+        "release": "rel-1",
+        "session_id": session_id,
+        "mode": "IMPLEMENTATION",
+        "pid": pid,
+        "acquired_at": now,
+        "heartbeat": now,
+        "ttl": 120,
+    }
+    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -486,11 +520,7 @@ def test_live_incoherent_lease_reports_doc_029_error_with_forgery_wording(
     state_dir = tmp_path / ".dadaia"
     ctx = "ctx-live"
 
-    lease.acquire(tmp_path, ctx, "sessLive", "rel-1", "implementation")
-    rec = lease.read_record(tmp_path, ctx)
-    assert rec is not None
-    rec["session_id"] = "sessForgedLive"
-    lease._write_record(lease._record_path(tmp_path, ctx), rec)
+    _seed_lock_record(tmp_path, ctx, "sessForgedLive")
     session_identity.set_incumbent(tmp_path, ctx, "sessOther")
     session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
 
@@ -509,17 +539,17 @@ def test_live_incoherent_lease_reports_doc_029_error_with_forgery_wording(
 def test_stale_pidless_lease_with_fresh_read_bind_warns_not_err(tmp_path: Path) -> None:
     """Named composed integration test (AC-W1-03 / bug B3 repro steps 1-4, end-to-end).
 
-    Built entirely via the PRODUCTION writers: a session acquires the lease ~36h ago
-    (heartbeat far past TTL), the record is reduced to the legacy pid-LESS shape, a new
-    session runs a READ bind (incumbent ptr + session record re-point), then doctor runs.
-    Expected: WARN (never ERR), naming the reclaim command, NO forgery wording.
+    A residual lease record ~36h old (heartbeat far past TTL) is planted directly, reduced
+    to the legacy pid-LESS shape, a new session runs a READ bind (incumbent ptr + session
+    record re-point), then doctor runs. Expected: WARN (never ERR), naming the reclaim
+    command, NO forgery wording.
     """
     specs = _make_clean_specs_tree(tmp_path)
     state_dir = tmp_path / ".dadaia"
     ctx = "consumer-ctx"
 
     stale_clock = lambda: datetime.now(tz=UTC) - timedelta(hours=36)  # noqa: E731
-    lease.acquire(tmp_path, ctx, "sessDead", "rel-1", "implementation", clock=stale_clock)
+    _seed_lock_record(tmp_path, ctx, "sessDead", clock=stale_clock)
     _strip_pid_from_lock_record(state_dir, ctx)
 
     session_identity.set_incumbent(tmp_path, ctx, "sessFreshRead")
@@ -559,17 +589,13 @@ def test_doctor_pid_probe_seam_is_composition_root_wired_not_feature_import() ->
 
 
 def test_doc029_remaining_states_matrix(tmp_path: Path) -> None:
-    """Basic incoherent (via production writers), coherent, no-op-without-state-dir,
+    """Basic incoherent (via a planted lock record), coherent, no-op-without-state-dir,
     and coherent-live states — the rest of the DOC-029 state space."""
     # Basic incoherent: lock-holder S1 vs incumbent/session S2 -> ERROR.
     specs_a = _make_clean_specs_tree(tmp_path)
     state_dir_a = tmp_path / ".dadaia"
     ctx_a = "ctx-a"
-    lease.acquire(tmp_path, ctx_a, "sessS1", "rel-1", "implementation")
-    rec_a = lease.read_record(tmp_path, ctx_a)
-    assert rec_a is not None
-    rec_a["session_id"] = "sessForged"
-    lease._write_record(lease._record_path(tmp_path, ctx_a), rec_a)
+    _seed_lock_record(tmp_path, ctx_a, "sessForged")
     session_identity.set_incumbent(tmp_path, ctx_a, "sessS2")
     session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
     issues_a = SpecsDoctor(specs_a, workspace_state_dir=state_dir_a).check()
@@ -577,12 +603,12 @@ def test_doc029_remaining_states_matrix(tmp_path: Path) -> None:
     assert doc029_a and all(i.severity == Severity.ERROR for i in doc029_a)
     assert all((i.path or "").endswith(f"{ctx_a}.lock.json") for i in doc029_a)
 
-    # Coherent via production writers -> silent.
+    # Coherent via a planted lock record -> silent.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-029coherent"))
     state_dir_b = tmp_path.parent / (tmp_path.name + "-029coherent") / ".dadaia"
     ctx_b = "ctx-b"
     ws_b = tmp_path.parent / (tmp_path.name + "-029coherent")
-    lease.acquire(ws_b, ctx_b, "sessS1", "rel-1", "implementation")
+    _seed_lock_record(ws_b, ctx_b, "sessS1")
     session_identity.write_session(ws_b, "sessS1", {"session_id": "sessS1"})
     issues_b = SpecsDoctor(specs_b, workspace_state_dir=state_dir_b).check()
     assert "SPEC-DOC-029" not in _codes(issues_b)
@@ -595,7 +621,7 @@ def test_doc029_remaining_states_matrix(tmp_path: Path) -> None:
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-029coherentlive"))
     ws_d = tmp_path.parent / (tmp_path.name + "-029coherentlive")
     ctx_d = "ctx-coherent"
-    lease.acquire(ws_d, ctx_d, "sessS1", "rel-1", "implementation")
+    _seed_lock_record(ws_d, ctx_d, "sessS1")
     session_identity.write_session(ws_d, "sessS1", {"session_id": "sessS1"})
     issues_d = SpecsDoctor(
         specs_d, workspace_state_dir=ws_d / ".dadaia", pid_probe=lambda _pid: True

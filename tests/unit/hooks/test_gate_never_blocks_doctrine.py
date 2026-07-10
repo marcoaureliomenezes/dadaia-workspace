@@ -17,22 +17,53 @@ CRITICAL-bug probe (AC1): the exact remote topology from bug
 session, adopts the lease, and the SAME harness's next write (harness-native id) used to
 self-block. Reproduced here end-to-end through the real gate subprocess: it must now
 NEVER block, on either a same- or different-mode rebind.
+
+v0.1.76 T-3 note: ``lease.acquire``/``lease.adopt_if_own_lineage`` (the production
+adoption path this probe originally drove) are DELETED along with the whole
+acquisition/CAS machinery — nothing production writes a lease record anymore. The
+CRITICAL-bug topology (a residual lease record whose ``session_id`` no longer names the
+harness-native id, following a rebind) is now seeded directly as raw JSON — exactly the
+on-disk SHAPE ``adopt_if_own_lineage`` used to produce — so the probe still proves the
+doctrine claim (the gate never reads this file at all) without depending on a deleted API.
 """
 
 from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import lease, session_identity
+from dadaia_workspace.features.spec_context import session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
 
 _BLOCK_FORBIDDEN_PATTERNS: tuple[str, ...] = ("lockhelderror", "sdd lock")
+
+
+def _seed_lock_record(ws: Path, ctx: str, session_id: str, *, pid: int) -> None:
+    """Plant a raw ``<ctx>.lock.json`` — the residual-record topology successor to the
+    deleted ``lease.acquire``/``lease.adopt_if_own_lineage`` production adoption path
+    (v0.1.76 T-3). The gate never reads this file (T-2); this only reproduces the exact
+    on-disk shape a pre-doctrine install could still carry.
+    """
+    now = datetime.now(tz=UTC).isoformat()
+    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "context": ctx,
+        "release": "rel-1",
+        "session_id": session_id,
+        "mode": "IMPLEMENTATION",
+        "pid": pid,
+        "acquired_at": now,
+        "heartbeat": now,
+        "ttl": 120,
+    }
+    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str, phase: str = "IMPLEMENTATION") -> Path:
@@ -193,10 +224,11 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
          acquires a lease at all — a residual lease record is seeded directly below to
          reproduce the exact pre-existing-lease topology the bug's transcript describes,
          e.g. a leftover from a prior release's lease machinery or a direct-API caller).
-      2. ``dadaia context bind`` mints a synthetic ``sess_<uuid>`` id and calls
-         ``lease.adopt_if_own_lineage`` (same-process pid lineage match) — the REAL
-         production adoption path, not a simulation — rewriting the lease record's
-         ``session_id`` to the synthetic id while the harness-native id stays orphaned.
+      2. A rebind's adoption mechanics (T-3: the production ``adopt_if_own_lineage`` API
+         they exercised is DELETED) are reproduced by directly seeding the record's final
+         on-disk shape — a synthetic ``sess_<uuid>`` names the lease while the
+         harness-native id stays orphaned, exactly the topology the deleted adoption path
+         used to produce.
       3. The SAME harness-native session (harness-native id, unchanged) writes again.
 
     Under the pre-T-2 lease machinery this second write's ``.ptr``/record no longer
@@ -221,26 +253,16 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
     )
     _assert_never_a_lock_block(block_1)
 
-    # Seed the residual lease record the bug's topology requires: a live record naming
-    # the harness-native session, holder pid == this test process (our own lineage) —
-    # exactly what a pre-doctrine acquire would have produced. v0.1.76's gate never
-    # writes this itself, but adopt_if_own_lineage (the real bind-CLI mechanism) still
-    # operates on whatever lease record exists on disk, so this reproduces the bug's
-    # exact adoption mechanics against a pre-existing record.
-    lease.acquire(ws, ctx, harness_sid, "rel-1", "IMPLEMENTATION", pid=my_pid)
-    rec = lease.read_record(ws, ctx)
-    assert rec is not None and rec["session_id"] == harness_sid and rec["pid"] == my_pid
-
-    # The REAL bind-adoption path: a synthetic bind-CLI session is minted and
-    # `adopt_if_own_lineage` rewrites the lease record's session_id to it because the
-    # recorded pid (my_pid) is in this test process's own ancestry (self-lineage).
+    # Seed the residual lease record the bug's topology requires, in its POST-adoption
+    # shape directly: a synthetic bind-CLI session names the lease record, orphaning the
+    # harness-native id that originally wrote it (the exact end-state the deleted
+    # ``adopt_if_own_lineage`` production path used to produce against a same-lineage pid).
     synthetic_sid = "sess_synthetic99"
     _write_session_record(ws, synthetic_sid, rebind_mode)
     session_identity.set_incumbent(ws, ctx, synthetic_sid)
-    adopted = lease.adopt_if_own_lineage(ws, ctx, synthetic_sid, ancestry_pids=frozenset({my_pid}))
-    assert adopted, "adoption fixture setup must succeed (this IS the bug's mechanism)"
-    rec_after_adopt = lease.read_record(ws, ctx)
-    assert rec_after_adopt is not None and rec_after_adopt["session_id"] == synthetic_sid
+    _seed_lock_record(ws, ctx, synthetic_sid, pid=my_pid)
+    rec_after_adopt = session_identity.read_incumbent_ptr(ws, ctx)
+    assert rec_after_adopt == synthetic_sid
 
     # The SAME harness-native session writes again — must still never block, even though
     # the lease record now names a totally different (synthetic) session.
@@ -284,14 +306,13 @@ def test_critical_bug_probe_full_cycle_no_lockhelderror_anywhere(tmp_path: Path)
     )
     outputs.append(r1.stdout + r1.stderr)
 
-    # Seed the residual lease record (see the sibling parametrized test above for why:
-    # v0.1.76's gate no longer writes one itself, but adoption still operates on
-    # whatever exists on disk — reproducing the bug's exact topology).
-    lease.acquire(ws, ctx, harness_sid, "rel-1", "IMPLEMENTATION", pid=my_pid)
+    # Seed the residual lease record in its post-adoption shape directly (see the sibling
+    # parametrized test above for why: v0.1.76 T-3 deletes ``adopt_if_own_lineage``, so the
+    # topology is reproduced as raw on-disk state rather than driven through that API).
     synthetic_sid = "sess_synthetic77"
     _write_session_record(ws, synthetic_sid, "IMPLEMENTATION")
     session_identity.set_incumbent(ws, ctx, synthetic_sid)
-    lease.adopt_if_own_lineage(ws, ctx, synthetic_sid, ancestry_pids=frozenset({my_pid}))
+    _seed_lock_record(ws, ctx, synthetic_sid, pid=my_pid)
 
     target_2 = _write_target(ws, ctx, "PLAN.md")
     env2 = claude_hook_env(ws, session_id=harness_sid)

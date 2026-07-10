@@ -400,15 +400,22 @@ class CoherenceValidator:
                 )
                 continue
             # State (b)/(c): the holder is LIVE. Only now is a three-source divergence a
-            # genuine incoherence worth flagging as possible forgery. Holder-
-            # confirmation (v0.1.50 FR2): a live holder whose by-session index entry
-            # names this ctx (same-CAS acquisition evidence) is the TRUE holder — a
-            # drifted incumbent .ptr is then drift, never a forgery ERROR.
+            # genuine incoherence worth flagging as possible forgery.
+            #
+            # v0.1.76 T-3 NOTE: the by-session index that fed "holder-confirmation"
+            # (v0.1.50 FR2 — a live holder whose same-CAS index entry names this ctx is
+            # the TRUE holder) is DELETED along with ``acquire``/``steal`` (its sole
+            # writers) — ``lease.session_holds`` is gone. This diagnostic is T-4-territory
+            # (out of T-3's write set: ``spec_context/**``, ``chokepoints/**``, ``cli/**``,
+            # ``tests/**``); repointing it to ``presence`` evidence belongs there.
+            # Conservatively defaulting to unconfirmed preserves the ERROR-on-divergence
+            # backstop (never silently drops a genuine incoherence into a false negative);
+            # it may now surface a coherence ERROR for a drifted-but-legitimate ``.ptr``
+            # where the deleted index would have suppressed it — an over-report, not an
+            # under-report, and the safer failure direction for a security backstop.
             holder = record.get("session_id") if isinstance(record, dict) else None
             lock_holder = str(holder) if holder else None
-            holder_confirmed = bool(
-                lock_holder and lease.session_holds(workspace_root, ctx, lock_holder)
-            )
+            holder_confirmed = False
             message = session_identity.coherence(
                 workspace_root, ctx, lock_holder=lock_holder, holder_confirmed=holder_confirmed
             )

@@ -1,12 +1,14 @@
-"""Unit tests for the pre-commit lease-gate decision (FR-W1-01 / DP-4).
+"""Unit tests for the pre-commit lease-gate decision (v0.1.76 FR3, WARN-only).
 
 Every fact is synthetic — a hand-written lease record, a fake pid probe, and a fake
 ancestry callable. No real process, no subprocess, no ``os.kill``. The probe chain is
-exercised as a single parametrized allow/block decision table covering the full
-v0.1.9-v0.1.11 zero-false-block history, plus 3 verbatim-kept named regressions that
-are the strongest individual proofs: the genuine live-foreign-holder BLOCK, the
-relaunch-window advisory-allow (the exact ADR-G1 false-block reproduction), and the
-block-branch probe-exception fail-safe.
+exercised as a single parametrized ALL-ALLOW decision table covering the full
+v0.1.9-v0.1.11 zero-false-block history, plus 3 verbatim-kept named regressions
+(re-baselined for the NO-LOCKS DOCTRINE, v0.1.76 CLOSURE re-baseline list): the former
+genuine live-foreign-holder BLOCK now ALLOWS with an advisory WARN naming the other
+session, the relaunch-window advisory-allow (the exact ADR-G1 false-block reproduction,
+unchanged), and the former block-branch probe-exception now ALSO allows (a probe bug can
+never block a commit under the doctrine — it degrades to an advisory at worst).
 """
 
 from __future__ import annotations
@@ -234,8 +236,12 @@ def test_pre_commit_allow_decision_table(
 # ---------------------------------------------------------------------------
 
 
-def test_live_foreign_non_ancestor_blocks(tmp_path: Path) -> None:
-    """A genuinely live foreign holder must never be stolen — the core no-steal veto."""
+def test_live_foreign_non_ancestor_allows_with_advisory(tmp_path: Path) -> None:
+    """A genuinely live foreign holder is now an ADVISORY, never a block (v0.1.76 FR3).
+
+    Re-baselined from the pre-v0.1.76 no-steal BLOCK: the NO-LOCKS DOCTRINE accepts and
+    surfaces the race instead of preventing it — commit ALLOWS, one WARN names the holder.
+    """
     _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
     d = pre_commit_decision(
         tmp_path,
@@ -246,12 +252,13 @@ def test_live_foreign_non_ancestor_blocks(tmp_path: Path) -> None:
         ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
         now=_NOW,
     )
-    assert not d.allowed
-    assert "holder-sid" in d.message
-    # Forbidden-law: the block message never instructs a manual unblock ceremony.
-    lowered = d.message.lower()
+    assert d.allowed
+    assert d.warn is not None
+    assert "holder-sid" in d.warn
+    # Forbidden-law: the advisory never instructs a manual unblock ceremony.
+    lowered = d.warn.lower()
     for forbidden in ("rebind", "relaunch", "lock steal"):
-        assert forbidden not in lowered, d.message
+        assert forbidden not in lowered, d.warn
 
 
 def test_relaunch_dead_pid_fresh_heartbeat_allows_with_warn(tmp_path: Path) -> None:
@@ -280,9 +287,10 @@ def test_relaunch_dead_pid_fresh_heartbeat_allows_with_warn(tmp_path: Path) -> N
     assert "holder-sid" in d.warn
 
 
-def test_block_branch_pid_probe_exception_keeps_block(tmp_path: Path) -> None:
-    """A probe that raises on the block branch must not flip a genuine block to allow —
-    cannot confirm dead ⇒ stay conservative ⇒ block holds (fail-safe, not fail-open)."""
+def test_advisory_branch_pid_probe_exception_still_allows(tmp_path: Path) -> None:
+    """A probe that raises on the advisory branch must never turn into a block (v0.1.76 FR3):
+    under the NO-LOCKS DOCTRINE the commit ALWAYS allows regardless of probe health — a
+    probe bug degrades the advisory detail at worst, never the allow verdict."""
     _write_record(tmp_path, _CTX, session_id="holder-sid", pid=4321)
     d = pre_commit_decision(
         tmp_path,
@@ -293,7 +301,7 @@ def test_block_branch_pid_probe_exception_keeps_block(tmp_path: Path) -> None:
         ancestry=_ancestry_const(Ancestry.NOT_ANCESTOR),
         now=_NOW,
     )
-    assert not d.allowed
+    assert d.allowed
 
 
 def test_context_slug_for_path(tmp_path: Path) -> None:
