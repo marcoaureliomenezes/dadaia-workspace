@@ -3,6 +3,7 @@ name: panel-tab-reorg-agentic-layers
 status: candidate
 opened: 2026-07-08
 owner: project-manager (curates)
+priority: P2
 source: "operator-ratified demand 2026-07-08 (panel primary-tab reorg — name the two agentic layers explicitly after v0.1.65 L1 model governance shipped; Sessions telemetry dashboard merged into the L1 tab)"
 intents:
   - subject: { kind: code, ref: "dadaia_workspace/features/panel/views/index.py#render_index" }
