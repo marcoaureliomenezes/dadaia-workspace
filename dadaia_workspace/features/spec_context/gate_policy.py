@@ -42,6 +42,9 @@ from enum import Enum
 from pathlib import Path
 
 from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
+    _append_audit_event,
+)
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -196,6 +199,41 @@ def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRec
         f"present: {names}. Races between sessions are accepted and surfaced, never "
         "blocked — no action required."
     )
+
+
+def _audit_presence(
+    workspace: Path,
+    *,
+    event: str,
+    ctx: str,
+    release: str,
+    session_id: str,
+    runtime: str,
+    pid: int,
+    fpath: str,
+    reason: str = "",
+) -> None:
+    """Append a ``PRESENCE_UPSERT``/``PRESENCE_WARN`` line to lock-events.jsonl (FR7).
+
+    Additive event names alongside the pre-existing ACQUIRED/RELEASED/BLOCKED_ATTEMPT
+    vocabulary (``locking._append_audit_event`` — the single shared audit-log writer, same
+    schema, same O_APPEND-atomic write). Best-effort: any failure is swallowed — an audit-
+    log write must never affect the gate's ALLOW/BLOCK verdict (AC-04 fail-safe contract).
+    """
+    try:
+        _append_audit_event(
+            workspace,
+            event=event,
+            context=ctx,
+            release=release,
+            session_id=session_id,
+            runtime=runtime,
+            pid=pid,
+            reason=reason,
+            fpath=fpath,
+        )
+    except Exception:  # noqa: BLE001 — audit logging must never affect the gate verdict.
+        return
 
 
 class PathClass(Enum):
@@ -365,10 +403,32 @@ def evaluate(
     try:
         if session_id and session_id != _ANON_SESSION_ID and ctx:
             presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
+            _audit_presence(
+                workspace,
+                event="PRESENCE_UPSERT",
+                ctx=ctx,
+                release=release,
+                session_id=session_id,
+                runtime=runtime,
+                pid=pid or 0,
+                fpath=rel_path,
+            )
             others = presence.others_alive(workspace, ctx, session_id)
             if others and not _advisory_throttled(workspace, session_id, ctx, now=time.time()):
                 _stamp_advisory_throttle(workspace, session_id, ctx)
-                return Decision.ALLOW, _advisory_message(ctx, rel_path, others)
+                message = _advisory_message(ctx, rel_path, others)
+                _audit_presence(
+                    workspace,
+                    event="PRESENCE_WARN",
+                    ctx=ctx,
+                    release=release,
+                    session_id=session_id,
+                    runtime=runtime,
+                    pid=pid or 0,
+                    fpath=rel_path,
+                    reason=message,
+                )
+                return Decision.ALLOW, message
     except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
         return Decision.ALLOW, ""
     return Decision.ALLOW, ""

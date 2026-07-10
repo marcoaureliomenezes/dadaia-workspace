@@ -27,7 +27,7 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
 )
@@ -262,6 +262,23 @@ def show(
                 if session_data and not _session_is_stale(session_data):
                     session_obj = session_data
             data["session"] = session_obj
+            # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
+            # context, sourced from the ONLY concurrency-signal surface post-doctrine
+            # (features/spec_context/presence.py). Distinct from "session" above (which
+            # answers "what is MY session bound to" via the incumbent-pointer display
+            # hint, FR4). ``others_alive`` with an empty self-sid excludes nothing (no
+            # real presence record is ever keyed by ""), so every live record on the
+            # context is listed.
+            data["presence"] = [
+                {
+                    "session_id": rec.session_id,
+                    "runtime": rec.runtime,
+                    "pid": rec.pid,
+                    "started_at": rec.started_at,
+                    "last_seen_at": rec.last_seen_at,
+                }
+                for rec in presence.others_alive(workspace_root, ctx.name, "")
+            ]
             print(json.dumps(data, indent=2))
         return
 
@@ -277,6 +294,13 @@ def show(
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
+
+    presence_records = presence.others_alive(resolve_workspace_root(), ctx.name, "")
+    if presence_records:
+        names = ", ".join(f"{rec.session_id} ({rec.runtime})" for rec in presence_records)
+        console.print(f"[bold]Presence:[/bold]   {names}")
+    else:
+        console.print("[bold]Presence:[/bold]   —")
 
 
 @app.command()

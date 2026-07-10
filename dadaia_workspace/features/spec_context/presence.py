@@ -43,9 +43,11 @@ from dadaia_workspace.core import kernel_tunables
 
 __all__ = [
     "PresenceRecord",
+    "StaleRecordRef",
     "clear",
     "others_alive",
     "renew",
+    "stale_records",
     "sweep",
     "upsert",
 ]
@@ -65,6 +67,14 @@ class PresenceRecord:
     pid: int | None
     started_at: str
     last_seen_at: str
+
+
+@dataclass(frozen=True)
+class StaleRecordRef:
+    """A stale-or-corrupt presence record surfaced by :func:`stale_records` (read-only)."""
+
+    context: str
+    session_id: str
 
 
 def _valid_name(name: str) -> bool:
@@ -271,11 +281,12 @@ def clear(workspace: Path, session_id: str, ctx: str | None = None) -> int:
         return 0
 
 
-def sweep(workspace: Path) -> list[str]:
-    """Workspace-wide GC of stale/corrupt presence records (doctor path).
+def stale_records(workspace: Path) -> list[StaleRecordRef]:
+    """Workspace-wide, READ-ONLY report of stale/corrupt presence records (doctor --check).
 
-    Returns the session ids removed (best-effort; never raises). A missing presence
-    root yields ``[]``.
+    Pure predicate companion to :func:`sweep` — never deletes, never raises. ``sweep``
+    reuses this exact predicate so ``check()``/``--fix`` can never disagree on what is
+    reclaimable (single source of truth). A missing presence root yields ``[]``.
     """
     try:
         root = _presence_root(workspace)
@@ -284,7 +295,7 @@ def sweep(workspace: Path) -> list[str]:
         except OSError:
             return []
         now = datetime.now(tz=UTC)
-        removed: list[str] = []
+        stale: list[StaleRecordRef] = []
         for ctx_dir in ctx_dirs:
             try:
                 entries = list(ctx_dir.iterdir())
@@ -296,9 +307,25 @@ def sweep(workspace: Path) -> list[str]:
                 sid = entry.name[: -len(".json")]
                 data = _read_json(entry)
                 if data is None or _is_stale(data, now=now):
-                    with contextlib.suppress(OSError):
-                        entry.unlink(missing_ok=True)
-                    removed.append(sid)
+                    stale.append(StaleRecordRef(context=ctx_dir.name, session_id=sid))
+        return stale
+    except Exception:  # noqa: BLE001 — doctor read-only report must never raise.
+        return []
+
+
+def sweep(workspace: Path) -> list[str]:
+    """Workspace-wide GC of stale/corrupt presence records (doctor ``--fix`` path).
+
+    Returns the session ids removed (best-effort; never raises). A missing presence
+    root yields ``[]``. Deletes exactly what :func:`stale_records` reports.
+    """
+    try:
+        removed: list[str] = []
+        for ref in stale_records(workspace):
+            path = _record_path(workspace, ref.context, ref.session_id)
+            with contextlib.suppress(OSError):
+                path.unlink(missing_ok=True)
+            removed.append(ref.session_id)
         return removed
     except Exception:  # noqa: BLE001 — doctor GC must never raise.
         return []

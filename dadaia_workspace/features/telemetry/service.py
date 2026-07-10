@@ -26,7 +26,6 @@ import logging
 import os
 import pathlib
 import sqlite3
-import sys
 import time
 from collections.abc import Callable
 from typing import Any, cast
@@ -54,18 +53,32 @@ _DEFAULT_PI_SESSIONS_DIR = pathlib.Path("~/.pi/agent/sessions").expanduser()
 def _default_refresh_lock() -> TelemetryRefreshLock:
     """Return the platform-appropriate TelemetryRefreshLock implementation.
 
-    Interim sys.platform guard.
-    # TODO: Replace with PLATFORM.has_fcntl once WS-1 lands
+    Routes via ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag,
+    v0.1.76 T-4 FR6). The ``PLATFORM`` re-import here is deliberate (shadowing the
+    module-level binding used elsewhere in this file, e.g. ``has_posix_chmod``): it keeps
+    the capability read INSIDE the function body at call time — matching
+    ``spec_context.locking``'s and ``container._select_lock_adapter``'s lazy-read pattern
+    (module-level platform reads are forbidden per SPEC §4.1) and, practically, keeps this
+    seam patchable the same way theirs are
+    (``monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", ...)``) — a
+    module-level ``from ... import PLATFORM`` binds the object at import time and would
+    NOT observe a later patch of the source module's attribute. The adapter-module
+    imports stay lazy so importing this module never triggers the Windows adapter's
+    module-level guard on Linux/macOS.
     """
-    if sys.platform == "win32":  # TODO: Replace with PLATFORM.has_fcntl once WS-1 lands
-        from dadaia_workspace.infrastructure.telemetry_lock_windows import (
-            WindowsTelemetryRefreshLock,
+    from dadaia_workspace.core.platform import PLATFORM as _platform
+
+    if _platform.has_fcntl:
+        from dadaia_workspace.infrastructure.telemetry_lock_posix import (
+            PosixTelemetryRefreshLock,
         )
 
-        return WindowsTelemetryRefreshLock()
-    from dadaia_workspace.infrastructure.telemetry_lock_posix import PosixTelemetryRefreshLock
+        return PosixTelemetryRefreshLock()
+    from dadaia_workspace.infrastructure.telemetry_lock_windows import (
+        WindowsTelemetryRefreshLock,
+    )
 
-    return PosixTelemetryRefreshLock()
+    return WindowsTelemetryRefreshLock()
 
 
 class TelemetryService:

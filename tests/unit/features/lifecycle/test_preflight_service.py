@@ -190,22 +190,6 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
             "dadaia specs doctor",
         ),
         (
-            {"lease": LeaseModeState(mode="read", holder_session_id="sess-1")},
-            "lease mode mismatch",
-            None,
-        ),
-        (
-            {
-                "lease": LeaseModeState(
-                    mode="implementation",
-                    holder_session_id="sess-2",
-                    live_foreign_holder=True,
-                )
-            },
-            "live foreign lease holder",
-            None,
-        ),
-        (
             {"hygiene": HygieneCounters(cleanup_candidate_count=1)},
             "hygiene cleanup candidates present",
             "dadaia lifecycle hygiene clean --dry-run",
@@ -241,6 +225,46 @@ def test_preflight_failures_return_typed_blocked_state(
     else:
         assert result.blocked.operator_command is not None
         assert result.blocked.operator_command.startswith(command)
+
+
+# ---------------------------------------------------------------------------
+# v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): lease mode mismatch / live foreign lease
+# holder can NEVER block a lifecycle verb — no path may block an agent or operator
+# because of another session. Both former BLOCKED rows above become presence-advisory:
+# ALLOW, with at most a warning line surfaced on the result.
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_never_blocks_on_foreign_lease_mode_mismatch() -> None:
+    result = LifecyclePreflightService().preflight(
+        _input(lease=LeaseModeState(mode="read", holder_session_id="sess-1")),
+    )
+
+    assert result.ok is True, result.blocked
+    assert result.blocked is None
+
+
+def test_preflight_never_blocks_on_live_foreign_lease_holder_but_warns() -> None:
+    result = LifecyclePreflightService().preflight(
+        _input(
+            lease=LeaseModeState(
+                mode="implementation",
+                holder_session_id="sess-2",
+                live_foreign_holder=True,
+            )
+        ),
+    )
+
+    assert result.ok is True, result.blocked
+    assert result.blocked is None
+    assert any("sess-2" in w for w in result.warnings), result.warnings
+
+
+def test_preflight_no_warning_when_no_foreign_holder() -> None:
+    result = LifecyclePreflightService().preflight(_input())
+
+    assert result.ok is True
+    assert result.warnings == ()
 
 
 def test_preflight_blocks_when_required_handoff_gate_fails() -> None:

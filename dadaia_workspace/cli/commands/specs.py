@@ -23,7 +23,6 @@ from dadaia_workspace.infrastructure.bug_reporter import (
     load_open_bugs,
     mark_bugs_in_release,
 )
-from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -49,22 +48,6 @@ def _write_active(specs_dir: Path, release: str, segment: str | None, phase: str
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return resolve_specs_dir_for_cli(specs_dir)
-
-
-def _resolve_workspace_state_dir() -> Path | None:
-    """Best-effort resolution of the workspace ``.dadaia/`` directory.
-
-    Returns the workspace-root ``.dadaia/`` (holding ``states/ctx_locks/`` +
-    ``sessions/``) so the doctor's SPEC-DOC-029 lease↔session coherence backstop can run.
-    Returns ``None`` when no workspace root resolves from the cwd (the backstop then stays
-    the documented no-op).
-    """
-    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-
-    try:
-        return resolve_workspace_root() / ".dadaia"
-    except WorkspaceNotInitializedError:
-        return None
 
 
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
@@ -136,24 +119,10 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
-    # Wire the workspace ``.dadaia/`` so the SPEC-DOC-029 lease↔session coherence backstop
-    # actually runs from the CLI (lease/session stores live at the WORKSPACE root, outside
-    # the specs tree). Best-effort: if no workspace root resolves (e.g. a bare --specs-dir
-    # in CI), the backstop stays a documented no-op.
-    workspace_state_dir = _resolve_workspace_state_dir()
-    # v0.1.50 FR2 (audit F-4): an EXPLICIT --specs-dir pointing OUTSIDE the resolved
-    # workspace is a fixture/CI run — the live workspace's lock/session state must not
-    # bleed into its verdicts. The backstop degrades to the documented no-op.
-    if specs_dir is not None and workspace_state_dir is not None:
-        ws_root = workspace_state_dir.parent.resolve()
-        if not target.resolve().is_relative_to(ws_root):
-            workspace_state_dir = None
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        workspace_state_dir=workspace_state_dir,
-        pid_probe=build_pid_probe(),
     )
     issues = doctor_svc.check()
 

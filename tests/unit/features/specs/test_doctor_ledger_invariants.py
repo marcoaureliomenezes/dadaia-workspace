@@ -1,7 +1,7 @@
-"""Unit tests for SpecsDoctor ledger invariants + identity-coherence backstop.
+"""Unit tests for SpecsDoctor ledger invariants.
 
-Release v0.1.10 / T-010-14 (R6b). Ledger invariants plus a lease<->session coherence
-backstop, each with an ERROR/WARNING code following the SPEC-DOC-NNN convention:
+Release v0.1.10 / T-010-14 (R6b). Ledger invariants, each with an ERROR/WARNING code
+following the SPEC-DOC-NNN convention:
 
 - SPEC-DOC-024 — phase<->markers coherence (ACTIVE.md phase vs TASKS markers).
 - SPEC-DOC-006 (extended) — CLOSURE-before-archive, recursive into nested archive dirs.
@@ -10,21 +10,16 @@ backstop, each with an ERROR/WARNING code following the SPEC-DOC-NNN convention:
 - SPEC-DOC-027 — naming canon ``^v\\d+\\.\\d+\\.\\d+$`` for release dirs, legacy WARN
   (ADR-9 permanent allowlist, forward-enforced).
 - SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
-- SPEC-DOC-029 — lease<->session coherence backstop, CRITICAL: the ADR-11/B3 three-state
-  triage (stale-dead WARN / live-incoherent ERROR forgery / coherent silent).
+- SPEC-DOC-029 — RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). Formerly the
+  lease<->session coherence backstop; retired along with the lease acquisition/CAS
+  authority it diagnosed forgery against. See the retirement tests below.
 - SPEC-DOC-030 — specs/audits/ naming canon.
 - SPEC-DOC-031 — consumed-backlog disposition drift.
 - SPEC-DOC-032 — bug status-token canon.
-
-CRITICAL: DOC-029's live-incoherent ERROR (forgery wording) and the composed
-stale-pidless-plus-fresh-READ-bind B3 repro are kept verbatim — the severity split
-(live-ERROR vs stale-WARN) is the operator contract this invariant exists to protect,
-and the composition-root pid-probe seam test is kept as a named architectural guard.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -87,9 +82,6 @@ None.
 ## Memory updates
 None.
 """
-
-_FORGERY_TOKEN = "forgery"
-_STALE_REMEDIATION_TOKENS = ("dadaia doctor --fix", "dadaia lock steal")
 
 _DOCTOR_MODULE_NAMES = (
     "doctor",
@@ -186,16 +178,6 @@ def _write_bug(specs: Path, slug: str, status: str, extra: str = "") -> None:
     )
 
 
-def _strip_pid_from_lock_record(state_dir: Path, ctx: str) -> None:
-    """Reduce the genuine ``<ctx>.lock.json`` to the legacy pre-``pid`` record shape."""
-    import json
-
-    record_path = state_dir / "states" / "ctx_locks" / f"{ctx}.lock.json"
-    data = json.loads(record_path.read_text(encoding="utf-8"))
-    data.pop("pid", None)
-    record_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-
 def _seed_lock_record(
     workspace: Path,
     ctx: str,
@@ -206,10 +188,9 @@ def _seed_lock_record(
 ) -> None:
     """Plant a raw ``<ctx>.lock.json`` — v0.1.76 T-3 successor to ``lease.acquire``.
 
-    ``lease.acquire`` is DELETED (the acquisition/CAS machinery it belonged to is gone);
-    this doctor-coherence backstop diagnoses whatever residual record exists on disk, so
-    seeding one directly (matching the schema ``acquire`` used to write) is the faithful
-    fixture successor — the coherence check itself is unaffected by how the record landed.
+    ``lease.acquire`` is DELETED (the acquisition/CAS machinery it belonged to is gone).
+    Used by ``test_doc029_retired_never_fires_and_seam_removed`` to prove a residual
+    record on disk never resurrects the retired SPEC-DOC-029 check.
     """
     import json
     from datetime import UTC, datetime
@@ -504,126 +485,76 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
 
 
 # ---------------------------------------------------------------------------
-# DOC-029 three-state triage — CRITICAL. Kept named: live-incoherent ERROR w/
-# forgery wording, the composed stale-pidless+fresh-READ-bind B3 repro, and the
-# composition-root pid-probe seam guard. Remaining states (basic incoherent,
-# coherent, noop-without-state-dir, coherent-live) merged into one param.
+# DOC-029 RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). The lease-record holder no
+# longer carries any acquisition/CAS authority to be "forged" against — ``lease.acquire``/
+# ``steal``/the by-session index are deleted (T-3), so a residual ``<ctx>.lock.json`` is
+# legacy/diagnostic noise, not a security-relevant divergence. Its stale-reclaim WARN
+# duplicated ``LOCK-GC`` (``features/spec_context/doctor.py``) exactly. The check, its
+# ``workspace_state_dir``/``pid_probe`` composition-root seam, and the
+# ``spec_context.{lease, session_identity}`` import edge are all retired together — the
+# simplest honest end state (never leave a no-op security check standing). Successor
+# invariant asserted below: SPEC-DOC-029 never fires, from any doctor construction.
 # ---------------------------------------------------------------------------
 
 
-def test_live_incoherent_lease_reports_doc_029_error_with_forgery_wording(
-    tmp_path: Path,
-) -> None:
-    """A LIVE lock holder whose identity genuinely diverges from the incumbent ptr /
-    session record => ERR with forgery wording (the only state where it is permitted)."""
-    specs = _make_clean_specs_tree(tmp_path)
-    state_dir = tmp_path / ".dadaia"
-    ctx = "ctx-live"
-
-    _seed_lock_record(tmp_path, ctx, "sessForgedLive")
-    session_identity.set_incumbent(tmp_path, ctx, "sessOther")
-    session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
-
-    issues = SpecsDoctor(
-        specs,
-        workspace_state_dir=state_dir,
-        pid_probe=lambda _pid: True,  # the holder is genuinely alive
-    ).check()
-    doc_029 = _by_code(issues, "SPEC-DOC-029")
-    assert doc_029, [i.to_dict() for i in issues]
-    assert all(i.severity == Severity.ERROR for i in doc_029)
-    text = " ".join(i.description for i in doc_029).lower()
-    assert _FORGERY_TOKEN in text, text
-
-
-def test_stale_pidless_lease_with_fresh_read_bind_warns_not_err(tmp_path: Path) -> None:
-    """Named composed integration test (AC-W1-03 / bug B3 repro steps 1-4, end-to-end).
-
-    A residual lease record ~36h old (heartbeat far past TTL) is planted directly, reduced
-    to the legacy pid-LESS shape, a new session runs a READ bind (incumbent ptr + session
-    record re-point), then doctor runs. Expected: WARN (never ERR), naming the reclaim
-    command, NO forgery wording.
-    """
-    specs = _make_clean_specs_tree(tmp_path)
-    state_dir = tmp_path / ".dadaia"
-    ctx = "consumer-ctx"
-
-    stale_clock = lambda: datetime.now(tz=UTC) - timedelta(hours=36)  # noqa: E731
-    _seed_lock_record(tmp_path, ctx, "sessDead", clock=stale_clock)
-    _strip_pid_from_lock_record(state_dir, ctx)
-
-    session_identity.set_incumbent(tmp_path, ctx, "sessFreshRead")
-    session_identity.write_session(
-        tmp_path, "sessFreshRead", {"session_id": "sessFreshRead", "mode": "read"}
-    )
-
-    issues = SpecsDoctor(specs, workspace_state_dir=state_dir).check()
-
-    doc_029 = _by_code(issues, "SPEC-DOC-029")
-    assert doc_029, [i.to_dict() for i in issues]
-    assert all(i.severity == Severity.WARNING for i in doc_029)
-    text = " ".join(i.description for i in doc_029)
-    assert any(tok in text for tok in _STALE_REMEDIATION_TOKENS), text
-    full_output = " ".join(i.description for i in issues)
-    assert _FORGERY_TOKEN not in full_output.lower(), full_output
-    assert all(i.severity != Severity.ERROR for i in doc_029)
-
-
-def test_doctor_pid_probe_seam_is_composition_root_wired_not_feature_import() -> None:
-    """The doctor pid-probe seam is an injected ``__init__`` parameter (composition-root
-    wired, like ``workspace_state_dir``) — ``features/specs/doctor.py`` must NOT import the
-    infrastructure process-probe adapter directly (import-linter / ADR layering law)."""
-    import importlib
+def test_doc029_retired_never_fires_and_seam_removed(tmp_path: Path) -> None:
+    """SPEC-DOC-029 is retired: the code never appears in ``check()`` output regardless
+    of any residual ``<ctx>.lock.json`` on disk, and the ``workspace_state_dir``/
+    ``pid_probe`` composition-root seam is gone from ``SpecsDoctor.__init__`` — there is
+    nothing left for it to select or inject (R-1: the coordinator no longer holds the
+    ``spec_context`` import edge via ``doctor_coherence``)."""
     import inspect
 
+    specs = _make_clean_specs_tree(tmp_path)
+
+    # A residual, genuinely-diverged lock record on disk must not resurrect SPEC-DOC-029.
+    _seed_lock_record(tmp_path, "ctx-retired", "sessForgedLive")
+    session_identity.set_incumbent(tmp_path, "ctx-retired", "sessOther")
+    session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
+
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-029" not in _codes(issues)
+
     sig = inspect.signature(SpecsDoctor.__init__)
-    assert "pid_probe" in sig.parameters, "SpecsDoctor must accept an injected pid_probe seam"
+    assert "workspace_state_dir" not in sig.parameters, (
+        "SPEC-DOC-029 retirement must remove the now-purposeless workspace_state_dir seam"
+    )
+    assert "pid_probe" not in sig.parameters, (
+        "SPEC-DOC-029 retirement must remove the now-purposeless pid_probe seam"
+    )
+
+
+def test_doctor_coherence_no_longer_imports_spec_context() -> None:
+    """R-1 cap invariant, post-retirement: ``doctor_coherence.py`` (and the coordinator)
+    must hold NO ``spec_context`` cross-feature IMPORT STATEMENT — SPEC-DOC-029 was its
+    sole reason to import ``lease``/``session_identity``. AST-based (not a source-text
+    substring match) so prose mentioning "spec_context" in docstrings/comments never
+    produces a false positive."""
+    import ast
+    import importlib
 
     for name in _DOCTOR_MODULE_NAMES:
         mod = importlib.import_module(f"dadaia_workspace.features.specs.{name}")
-        src = inspect.getsource(mod)
-        assert "process_probe_adapter" not in src, (
-            f"{mod.__name__} must not import the infrastructure process-probe adapter; "
-            "the probe is composition-root-wired via the pid_probe parameter."
-        )
-
-
-def test_doc029_remaining_states_matrix(tmp_path: Path) -> None:
-    """Basic incoherent (via a planted lock record), coherent, no-op-without-state-dir,
-    and coherent-live states — the rest of the DOC-029 state space."""
-    # Basic incoherent: lock-holder S1 vs incumbent/session S2 -> ERROR.
-    specs_a = _make_clean_specs_tree(tmp_path)
-    state_dir_a = tmp_path / ".dadaia"
-    ctx_a = "ctx-a"
-    _seed_lock_record(tmp_path, ctx_a, "sessForged")
-    session_identity.set_incumbent(tmp_path, ctx_a, "sessS2")
-    session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
-    issues_a = SpecsDoctor(specs_a, workspace_state_dir=state_dir_a).check()
-    doc029_a = _by_code(issues_a, "SPEC-DOC-029")
-    assert doc029_a and all(i.severity == Severity.ERROR for i in doc029_a)
-    assert all((i.path or "").endswith(f"{ctx_a}.lock.json") for i in doc029_a)
-
-    # Coherent via a planted lock record -> silent.
-    specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-029coherent"))
-    state_dir_b = tmp_path.parent / (tmp_path.name + "-029coherent") / ".dadaia"
-    ctx_b = "ctx-b"
-    ws_b = tmp_path.parent / (tmp_path.name + "-029coherent")
-    _seed_lock_record(ws_b, ctx_b, "sessS1")
-    session_identity.write_session(ws_b, "sessS1", {"session_id": "sessS1"})
-    issues_b = SpecsDoctor(specs_b, workspace_state_dir=state_dir_b).check()
-    assert "SPEC-DOC-029" not in _codes(issues_b)
-
-    # No-op without a workspace state dir (default construction).
-    specs_c = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-029noop"))
-    assert "SPEC-DOC-029" not in _codes(SpecsDoctor(specs_c).check())
-
-    # Coherent live lease (with a probe wired) -> silent.
-    specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-029coherentlive"))
-    ws_d = tmp_path.parent / (tmp_path.name + "-029coherentlive")
-    ctx_d = "ctx-coherent"
-    _seed_lock_record(ws_d, ctx_d, "sessS1")
-    session_identity.write_session(ws_d, "sessS1", {"session_id": "sessS1"})
-    issues_d = SpecsDoctor(
-        specs_d, workspace_state_dir=ws_d / ".dadaia", pid_probe=lambda _pid: True
-    ).check()
-    assert "SPEC-DOC-029" not in _codes(issues_d)
+        assert mod.__file__ is not None
+        tree = ast.parse(Path(mod.__file__).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert "spec_context" not in node.module, (
+                    f"{mod.__name__} must not import dadaia_workspace.features.spec_context "
+                    "(SPEC-DOC-029 retirement removed the sole reason for that edge): "
+                    f"line {node.lineno}"
+                )
+                assert "process_probe_adapter" not in node.module, (
+                    f"{mod.__name__} must not import the infrastructure process-probe "
+                    f"adapter: line {node.lineno}"
+                )
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert "spec_context" not in alias.name, (
+                        f"{mod.__name__} must not import dadaia_workspace.features."
+                        f"spec_context: line {node.lineno}"
+                    )
+                    assert "process_probe_adapter" not in alias.name, (
+                        f"{mod.__name__} must not import the infrastructure "
+                        f"process-probe adapter: line {node.lineno}"
+                    )

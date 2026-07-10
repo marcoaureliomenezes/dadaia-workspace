@@ -67,37 +67,39 @@ def _audit_log_path(workspace_root: Path) -> Path:
 def _default_workspace_lock() -> WorkspaceLock:
     """Return the platform-appropriate WorkspaceLock adapter.
 
-    Uses an in-body sys.platform check (module-level read is forbidden per SPEC §4.1).
-
-    TODO: Replace with PLATFORM.has_fcntl once PLATFORM is stable in T-018-05 callers.
+    Routes via ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag,
+    v0.1.76 T-4 FR6) — read INSIDE the function body at call time (module-level platform
+    reads are forbidden per SPEC §4.1); the import is lazy so importing this module never
+    triggers the Windows adapter's module-level guard on Linux/macOS.
     """
-    import sys  # noqa: PLC0415 — intentional lazy import per ADR-1
+    from dadaia_workspace.core.platform import PLATFORM
 
-    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_fcntl once stable
-        from dadaia_workspace.infrastructure.file_lock_windows import WindowsWorkspaceLock
+    if PLATFORM.has_fcntl:
+        from dadaia_workspace.infrastructure.file_lock_posix import PosixWorkspaceLock
 
-        return WindowsWorkspaceLock()
-    from dadaia_workspace.infrastructure.file_lock_posix import PosixWorkspaceLock
+        return PosixWorkspaceLock()
+    from dadaia_workspace.infrastructure.file_lock_windows import WindowsWorkspaceLock
 
-    return PosixWorkspaceLock()
+    return WindowsWorkspaceLock()
 
 
 def _default_context_lock() -> ContextLock:
     """Return the platform-appropriate ContextLock adapter.
 
-    Uses an in-body sys.platform check (module-level read is forbidden per SPEC §4.1).
-
-    TODO: Replace with PLATFORM.has_fcntl once PLATFORM is stable in T-018-05 callers.
+    Routes via ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag,
+    v0.1.76 T-4 FR6) — read INSIDE the function body at call time (module-level platform
+    reads are forbidden per SPEC §4.1); the import is lazy so importing this module never
+    triggers the Windows adapter's module-level guard on Linux/macOS.
     """
-    import sys  # noqa: PLC0415 — intentional lazy import per ADR-1
+    from dadaia_workspace.core.platform import PLATFORM
 
-    if sys.platform == "win32":  # TODO: replace with PLATFORM.has_fcntl once stable
-        from dadaia_workspace.infrastructure.file_lock_windows import WindowsContextLock
+    if PLATFORM.has_fcntl:
+        from dadaia_workspace.infrastructure.file_lock_posix import PosixContextLock
 
-        return WindowsContextLock()
-    from dadaia_workspace.infrastructure.file_lock_posix import PosixContextLock
+        return PosixContextLock()
+    from dadaia_workspace.infrastructure.file_lock_windows import WindowsContextLock
 
-    return PosixContextLock()
+    return WindowsContextLock()
 
 
 # ---------------------------------------------------------------------------

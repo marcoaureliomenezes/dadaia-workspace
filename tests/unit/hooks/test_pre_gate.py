@@ -300,3 +300,60 @@ def test_pi_mapped_write_name_hits_real_gate(
         )
     else:
         assert block is None
+
+
+# --------------------------------------------------------------------------- #
+# v0.1.76 T-4 (FR5): PI presence parity — the shim now sends a stable, non-anon
+# session_id on every tool_call payload; anon-session creates NO presence record.
+# --------------------------------------------------------------------------- #
+
+
+def _pi_shim_env(workspace: Path) -> dict[str, str]:
+    """A raw process env matching what PI's `spawnSync` actually gives the hook child:
+    no harness-native session var (PI exports none), no DADAIA_SESSION_ID override
+    (nothing sets it), just WORKSPACE_ROOT — the true PI-shim invocation shape."""
+    env = claude_hook_env(workspace, session_id="unused")
+    for var in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_CONTEXT"):
+        env.pop(var, None)
+    return env
+
+
+def test_pi_shim_payload_with_session_id_creates_real_presence_record(tmp_path: Path) -> None:
+    """FR5 fix: the current shim payload shape (session_id present) resolves a real,
+    non-anon presence record — the CRITICAL-bug root cause (PI anon-session
+    dual-writer) is closed."""
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "repos" / "a" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(target)},
+        "session_id": "pi-session-11111111-2222-3333-4444-555555555555",
+    }
+    result = run_hook_subprocess("pre_gate", payload, _pi_shim_env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None  # never blocks (doctrine)
+
+    presence_dir = ws / ".dadaia" / "states" / "presence" / "a"
+    records = list(presence_dir.glob("*.json")) if presence_dir.exists() else []
+    sids = {p.stem for p in records}
+    assert "pi-session-11111111-2222-3333-4444-555555555555" in sids
+    assert "anon-session" not in sids
+
+
+def test_pre_fix_payload_shape_with_no_session_id_documents_the_closed_bug(
+    tmp_path: Path,
+) -> None:
+    """Documents the pre-fix bug: a payload with NO session_id field at all (the shape
+    the shim sent before FR5) resolves to anon-session, which creates NO presence
+    record at all (FR5's anon-session guard) — the write is still allowed (never
+    blocked), but the session is invisible to presence. This is exactly the gap FR5's
+    production fix closes by never omitting session_id from now on."""
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "repos" / "a" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+    result = run_hook_subprocess("pre_gate", payload, _pi_shim_env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None  # never blocks, even in the pre-fix shape
+
+    presence_dir = ws / ".dadaia" / "states" / "presence" / "a"
+    assert not presence_dir.exists() or list(presence_dir.glob("*.json")) == []

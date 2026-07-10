@@ -42,7 +42,28 @@
 // EVERY real-worker auto-default (never silent); (3) the signal is NEVER derived from
 // telemetry (no session-file/mtime heuristics — the pin is this extension's explicit,
 // post-trust act).
+//
+// PI presence parity (v0.1.76 T-4, FR5, NO-LOCKS DOCTRINE). PI exposes NO native
+// per-session identifier anywhere in its extension surface (verified against pi v0.79.3
+// `core/extensions/types.d.ts`: neither `ExtensionContext` nor any event carries a
+// session id) — every PreToolUse invocation from this shim used to omit `session_id`
+// from the stdin payload entirely, so the Python gate's `resolve_session_id` fell
+// through to its `default="anon-session"` param on every single PI write. FR5 kills the
+// "PI anon-session dual-writer" bug at the root: this module mints ONE stable,
+// process-lifetime session id at factory load (`crypto.randomUUID()`, prefixed
+// `pi-session-`), sends it as the payload `session_id` field on every `tool_call`
+// (pre-tool) AND — this is the new wiring — on every `tool_result` (post-tool, PI's
+// genuine after-a-tool-executes event, `pi.on("tool_result", ...)`), invoking
+// `python -m dadaia_workspace.hooks.sdd_post_gate` exactly the way Claude/Codex's
+// PostToolUse hook renews presence after every tool call (`infrastructure/
+// runtime_config.py`'s `PostToolUse` wiring, match-all). `hooks/sdd_gate.py`'s
+// `anon-session` guard (FR5, `_ANON_SESSION_ID`) still applies as defense-in-depth for
+// any harness that genuinely cannot resolve an id — with this fix PI is no longer one
+// of them. The long-lived pid sent alongside is `process.pid`: PI's own process, which
+// outlives every spawned `python -m ...` child for the whole session (mirrors NF-1 in
+// the Python gate: never record an ephemeral child's own pid).
 
+import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -62,6 +83,10 @@ interface ToolCallEvent {
   toolName: string;
   input: Record<string, unknown>;
 }
+interface ToolResultEvent {
+  toolName: string;
+  input: Record<string, unknown>;
+}
 interface ExtensionContext {
   cwd: string;
 }
@@ -76,6 +101,14 @@ interface ExtensionAPI {
       event: ToolCallEvent,
       ctx: ExtensionContext,
     ) => Promise<ToolCallEventResult | void> | ToolCallEventResult | void,
+  ): void;
+  // Fired AFTER a tool executes (pi v0.79.3 `core/extensions/types.d.ts`,
+  // `ToolResultEvent` / `ExtensionAPI.on("tool_result", ...)`) — PI's genuine
+  // post-tool-execution event, the analog of Claude/Codex's PostToolUse hook. FR5 wires
+  // this to renew this session's advisory presence record after every tool call.
+  on(
+    event: "tool_result",
+    handler: (event: ToolResultEvent, ctx: ExtensionContext) => Promise<void> | void,
   ): void;
 }
 
@@ -107,6 +140,13 @@ const factory = (pi: ExtensionAPI): void => {
   if (!process.env.DADAIA_ENTRY_HARNESS) {
     process.env.DADAIA_ENTRY_HARNESS = "pi";
   }
+
+  // FR5: one stable session id for this PI process's whole lifetime — minted ONCE at
+  // factory load, never regenerated per tool call. Sanitized shape matches the Python
+  // gate's session-id allowlist (`[A-Za-z0-9_-]+`, see `core.session_env.
+  // sanitize_session_id`): `randomUUID()` output is already hyphen/hex-only.
+  const sessionId = `pi-session-${randomUUID()}`;
+
   pi.on("tool_call", (event, ctx): ToolCallEventResult | void => {
     try {
       const mapped = TOOL_NAME_MAP[event.toolName];
@@ -118,10 +158,12 @@ const factory = (pi: ExtensionAPI): void => {
       if (!ws) return; // not inside a dadaia workspace → nothing to gate
 
       const python = resolvePythonBin(ws);
-      // The same JSON stdin contract the Python gate parses (tool_name + tool_input.file_path).
+      // The same JSON stdin contract the Python gate parses (tool_name + tool_input.file_path
+      // + session_id — FR5: the stable per-process id minted above, never omitted).
       const payload = JSON.stringify({
         tool_name: mapped,
         tool_input: { file_path: filePath },
+        session_id: sessionId,
       });
       // Invoke the merged Python gate directly (no bash). Run from the workspace root so
       // the hook's workspace-resolver and relative-path handling behave identically to
@@ -145,6 +187,29 @@ const factory = (pi: ExtensionAPI): void => {
       return; // allow
     } catch {
       return; // fail-open: never block a legitimate edit by crashing
+    }
+  });
+
+  // FR5 (v0.1.76 T-4): post-tool presence renewal — the PI analog of Claude/Codex's
+  // match-all PostToolUse → sdd_post_gate wiring. Fires after EVERY tool (not just
+  // writes — mirrors the Python-side hook's own unconditional renewal), so a long
+  // read/grep/bash-only stretch still keeps this session's presence record fresh.
+  // Best-effort / fail-open by construction: `sdd_post_gate` itself never blocks (exits
+  // 0 unconditionally) and this handler never returns a result the runner could act on.
+  pi.on("tool_result", (_event, ctx): void => {
+    try {
+      const ws = findWorkspaceRoot(ctx.cwd || process.cwd());
+      if (!ws) return; // not inside a dadaia workspace → nothing to renew
+
+      const python = resolvePythonBin(ws);
+      const payload = JSON.stringify({ session_id: sessionId });
+      spawnSync(python, ["-m", "dadaia_workspace.hooks.sdd_post_gate"], {
+        cwd: ws,
+        input: payload,
+        encoding: "utf-8",
+      });
+    } catch {
+      // fail-open: a renewal failure must never surface to the tool result or the user.
     }
   });
 };

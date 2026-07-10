@@ -25,7 +25,7 @@
   presence-based; pre-commit ALLOW-always (FR3); retire no-steal descendant tests
   (record list for CLOSURE).
 
-- [ ] **T-4 — surfaces repoint + PI parity + platform seam** — owner: software-engineer
+- [x] **T-4 — surfaces repoint + PI parity + platform seam** — owner: software-engineer
   Write set: `dadaia_workspace/**`, `tests/**`
   FR5 (PI extension session id + hook guard), FR6 (PLATFORM.has_fcntl ×3), FR7
   (doctor/panel/context-show/lifecycle-preflight presence repoint).
