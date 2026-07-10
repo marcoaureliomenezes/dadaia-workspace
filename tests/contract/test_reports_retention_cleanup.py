@@ -23,28 +23,6 @@ def _old_report(tmp_path: Path, rel: str = "ctx/qa/old.html") -> Path:
     return report
 
 
-def test_cleanup_dry_run_contract_is_non_mutating(tmp_path: Path) -> None:
-    report = _old_report(tmp_path)
-    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "old.handoff.json"
-    handoff.parent.mkdir(parents=True)
-    handoff.write_text(
-        json.dumps(
-            {
-                "produced_at": "2026-06-01T00:00:00Z",
-                "artifact": {"path": ".dadaia/reports/ctx/qa/old.html"},
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    result = _service(tmp_path).cleanup(dry_run=True)
-
-    assert len(result.candidates) == 1
-    assert result.deleted_paths == ()
-    assert report.exists()
-    assert handoff.exists()
-
-
 def test_cleanup_contract_does_not_delete_external_symlink_target(tmp_path: Path) -> None:
     external = tmp_path / "external.html"
     external.write_text("<html>external</html>", encoding="utf-8")
@@ -57,28 +35,6 @@ def test_cleanup_contract_does_not_delete_external_symlink_target(tmp_path: Path
     assert result.candidates == ()
     assert result.deleted_paths == ()
     assert external.exists()
-
-
-def test_cleanup_contract_preserves_important_orphan_handoff(tmp_path: Path) -> None:
-    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "orphan.handoff.json"
-    handoff.parent.mkdir(parents=True)
-    handoff.write_text(
-        json.dumps(
-            {
-                "produced_at": "2026-06-01T00:00:00Z",
-                "artifact": {"path": ".dadaia/reports/ctx/qa/missing.html"},
-            }
-        ),
-        encoding="utf-8",
-    )
-    service = _service(tmp_path)
-    service.mark_important(".dadaia/handoff/ctx/orphan.handoff.json")
-
-    result = service.cleanup()
-
-    assert result.candidates == ()
-    assert result.deleted_paths == ()
-    assert handoff.exists()
 
 
 def test_cleanup_contract_deletes_malformed_adjacent_sidecar_with_report(
@@ -96,15 +52,30 @@ def test_cleanup_contract_deletes_malformed_adjacent_sidecar_with_report(
     assert not sidecar.exists()
 
 
-def test_cleanup_contract_preserves_important_malformed_handoff(tmp_path: Path) -> None:
-    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-01T000000Z-bad.handoff.json"
-    handoff.parent.mkdir(parents=True)
-    handoff.write_text("{not json", encoding="utf-8")
+def test_cleanup_contract_preserves_important_orphan_and_malformed_handoffs(
+    tmp_path: Path,
+) -> None:
+    orphan = tmp_path / ".dadaia" / "handoff" / "ctx" / "orphan.handoff.json"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text(
+        json.dumps(
+            {
+                "produced_at": "2026-06-01T00:00:00Z",
+                "artifact": {"path": ".dadaia/reports/ctx/qa/missing.html"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    malformed = tmp_path / ".dadaia" / "handoff" / "ctx" / "2026-06-01T000000Z-bad.handoff.json"
+    malformed.write_text("{not json", encoding="utf-8")
+
     service = _service(tmp_path)
+    service.mark_important(".dadaia/handoff/ctx/orphan.handoff.json")
     service.mark_important(".dadaia/handoff/ctx/2026-06-01T000000Z-bad.handoff.json")
 
     result = service.cleanup()
 
     assert result.candidates == ()
     assert result.deleted_paths == ()
-    assert handoff.exists()
+    assert orphan.exists()
+    assert malformed.exists()

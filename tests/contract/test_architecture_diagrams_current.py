@@ -133,73 +133,57 @@ def _live_reports_submodules() -> set[str]:
 # ------------------------------------------------------------------------------------ tests
 
 
-def test_all_architecture_diagrams_present() -> None:
-    """Each canonical diagram file exists and carries exactly one mermaid block."""
+def test_architecture_diagrams_present_and_match_live_names() -> None:
+    """Each canonical diagram exists, carries one mermaid block, and both directions
+    (forward: every live name is diagrammed; reverse: no diagrammed node is stale) hold
+    for doctor classes, panel view modules, and feature packages."""
     for path in (_DOCTOR_DIAGRAM, _PANEL_DIAGRAM, _FEATURES_DIAGRAM):
         _sole_mermaid_block(path)
 
-
-def test_doctor_diagram_matches_live_classes() -> None:
-    """SpecsDoctor coordinator + the six validator siblings — both directions."""
+    # doctor-decomposition.md: SpecsDoctor coordinator + the six validator siblings.
     mermaid = _sole_mermaid_block(_DOCTOR_DIAGRAM)
     declared = _declared_classes(mermaid)
-
     coordinator = _live_doctor_coordinator()
     validators = _live_validator_classes()
     assert validators, "introspection found no *Validator classes — imports broken?"
-
-    # Forward: every live coordinator + validator is a declared class node in the diagram.
     required = coordinator | validators
     missing = required - declared
     assert not missing, (
         f"{_DOCTOR_DIAGRAM.name} does not diagram live doctor class(es): {sorted(missing)}. "
         "Regenerate the diagram (v0.1.55 FR7 regeneration law)."
     )
-
-    # Reverse: any declared node that looks like a validator must be a live validator class.
     stale = {c for c in declared if c.endswith("Validator")} - validators
     assert not stale, (
         f"{_DOCTOR_DIAGRAM.name} diagrams stale validator node(s): {sorted(stale)} "
         "(no such live class). Fix the diagram or the code (AC-7(f) drift-guard)."
     )
 
-
-def test_panel_diagram_matches_live_view_modules() -> None:
-    """The eight per-domain api_* view modules + their render functions — both directions."""
+    # panel-views-decomposition.md: the per-domain api_* view modules + render functions.
     mermaid = _sole_mermaid_block(_PANEL_DIAGRAM)
     tokens = _tokens(mermaid)
     declared = _declared_classes(mermaid)
-
     modules = _live_api_modules()
     render_fns = _live_api_render_functions()
     assert modules, "introspection found no api_* view modules — imports broken?"
     assert render_fns, "introspection found no public render functions — imports broken?"
-
-    # Forward: every live module name + render function appears in the diagram.
     missing = (modules | render_fns) - tokens
     assert not missing, (
         f"{_PANEL_DIAGRAM.name} does not diagram live panel name(s): {sorted(missing)}. "
         "Regenerate the diagram (v0.1.55 FR7 regeneration law)."
     )
-
-    # Reverse: any declared node named like an api module must be a live api module.
     stale = {c for c in declared if c.startswith("api_")} - modules
     assert not stale, (
         f"{_PANEL_DIAGRAM.name} diagrams stale api module node(s): {sorted(stale)} "
         "(no such live module). Fix the diagram or the code (AC-7(f) drift-guard)."
     )
 
-
-def test_feature_packages_diagram_matches_live_packages() -> None:
-    """The 23 post-merge feature packages + the merged reports submodules."""
+    # feature-packages.md: the post-merge feature packages + merged reports submodules.
     mermaid = _sole_mermaid_block(_FEATURES_DIAGRAM)
     tokens = _tokens(mermaid)
-
     packages = _live_feature_packages()
     reports_submodules = _live_reports_submodules()
     assert packages, "introspection found no feature packages — imports broken?"
     assert reports_submodules, "introspection found no reports submodules — imports broken?"
-
     missing = (packages | reports_submodules) - tokens
     assert not missing, (
         f"{_FEATURES_DIAGRAM.name} does not diagram live package(s)/submodule(s): "

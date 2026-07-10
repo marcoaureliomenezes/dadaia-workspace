@@ -100,19 +100,17 @@ def _find_semver_compile_sites() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_canon_defines_release_semver_re() -> None:
+def test_release_semver_single_canon_identity_scan_and_behavior() -> None:
+    """IDENTITY: canon defines RELEASE_SEMVER_RE and every consumer resolves the SAME
+    compiled object. SCAN: no re.compile of the pattern outside the canon module.
+    BEHAVIOUR: is_release_semver accepts the canon form and rejects near-misses."""
+    import importlib
+
     canon = _canon_object()
     assert canon is not None, "core.specs_version must define RELEASE_SEMVER_RE (the canon)"
     assert getattr(canon, "pattern", None) == _SEMVER_PATTERN, (
         f"canon pattern must be {_SEMVER_PATTERN!r}, got {getattr(canon, 'pattern', None)!r}"
     )
-
-
-def test_every_consumer_reuses_the_canon_object() -> None:
-    import importlib
-
-    canon = _canon_object()
-    assert canon is not None, "core.specs_version must define RELEASE_SEMVER_RE (the canon)"
     for module_path in _CONSUMER_MODULES:
         module = importlib.import_module(module_path)
         ref = getattr(module, "RELEASE_SEMVER_RE", None)
@@ -121,26 +119,12 @@ def test_every_consumer_reuses_the_canon_object() -> None:
             f"(core.specs_version.RELEASE_SEMVER_RE), not a private copy"
         )
 
-
-# ---------------------------------------------------------------------------
-# SCAN — no re.compile of the pattern outside the canon module
-# ---------------------------------------------------------------------------
-
-
-def test_no_semver_literal_compile_outside_canon() -> None:
     offenders = _find_semver_compile_sites()
     assert offenders == [], (
         "release-SemVer pattern is re.compile()'d outside core/specs_version.py — "
         f"import RELEASE_SEMVER_RE from the canon instead. Offending sites: {offenders}"
     )
 
-
-# ---------------------------------------------------------------------------
-# BEHAVIOUR — is_release_semver accepts the canon form and rejects near-misses
-# ---------------------------------------------------------------------------
-
-
-def test_is_release_semver_accepts_and_rejects() -> None:
     from dadaia_workspace.core import specs_version
 
     is_release_semver = getattr(specs_version, "is_release_semver", None)

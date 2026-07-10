@@ -81,57 +81,30 @@ def runner() -> CliRunner:
 
 
 # ---------------------------------------------------------------------------
-# T-MCE-03-1: Successful generation
+# T-MCE-03-1: Successful generation — one run, every assert on its output
 # ---------------------------------------------------------------------------
 
 
-class TestCatalogGenerateSuccess:
-    def test_exits_zero_on_success(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert result.exit_code == 0, (
-            f"Expected exit 0, got {result.exit_code}. Output:\n{result.output}"
-        )
+def test_catalog_generate_success_shape(runner: CliRunner, tmp_path: Path) -> None:
+    required = {"rank", "slug", "title", "summary", "path", "tags", "depends_on"}
+    specs = _make_specs_dir(tmp_path)
 
-    def test_catalog_json_created(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        assert catalog_path.exists(), "catalog.json was not created"
+    result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
 
-    def test_output_mentions_catalog_path(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert "catalog.json" in result.output
+    assert result.exit_code == 0, (
+        f"Expected exit 0, got {result.exit_code}. Output:\n{result.output}"
+    )
+    assert "catalog.json" in result.output
+    assert "3" in result.output, f"Expected feature count '3' in output; got:\n{result.output}"
 
-    def test_output_is_valid_json(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
-        assert "features" in parsed
-
-    def test_generates_correct_entry_count(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
-        assert len(parsed["features"]) == 3
-
-    def test_output_mentions_feature_count(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert "3" in result.output, f"Expected feature count '3' in output; got:\n{result.output}"
-
-    def test_each_entry_has_required_fields(self, runner: CliRunner, tmp_path: Path) -> None:
-        required = {"rank", "slug", "title", "summary", "path", "tags", "depends_on"}
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
-        for entry in parsed["features"]:
-            missing = required - set(entry.keys())
-            assert not missing, f"Entry missing fields {missing}: {entry}"
+    catalog_path = specs / "memory" / "product" / "catalog.json"
+    assert catalog_path.exists(), "catalog.json was not created"
+    parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
+    assert "features" in parsed
+    assert len(parsed["features"]) == 3
+    for entry in parsed["features"]:
+        missing = required - set(entry.keys())
+        assert not missing, f"Entry missing fields {missing}: {entry}"
 
 
 # ---------------------------------------------------------------------------
@@ -139,38 +112,24 @@ class TestCatalogGenerateSuccess:
 # ---------------------------------------------------------------------------
 
 
-class TestCatalogGenerateMissingSpecsDir:
-    def test_exits_nonzero_for_nonexistent_path(self, runner: CliRunner, tmp_path: Path) -> None:
-        nonexistent = tmp_path / "does" / "not" / "exist"
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(nonexistent)])
-        assert result.exit_code != 0, (
-            f"Expected non-zero exit for missing specs_dir; got 0. Output:\n{result.output}"
-        )
+def test_catalog_generate_missing_specs_dir_errors(runner: CliRunner, tmp_path: Path) -> None:
+    nonexistent = tmp_path / "does" / "not" / "exist"
+    result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(nonexistent)])
+    assert result.exit_code != 0, (
+        f"Expected non-zero exit for missing specs_dir; got 0. Output:\n{result.output}"
+    )
+    assert result.exit_code != 0 or "error" in result.output.lower()
 
-    def test_error_output_for_nonexistent_path(self, runner: CliRunner, tmp_path: Path) -> None:
-        nonexistent = tmp_path / "does" / "not" / "exist"
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(nonexistent)])
-        # Either exit_code != 0 or error in output
-        assert result.exit_code != 0 or "error" in result.output.lower()
-
-    def test_exits_nonzero_when_product_dir_absent(self, runner: CliRunner, tmp_path: Path) -> None:
-        """memory-markdown-source-v1: catalog reads .md atoms; missing product/ → non-zero exit."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-        # Directory exists but no memory/product/ inside specs/
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert result.exit_code != 0, (
-            f"Expected non-zero exit when product/ dir is missing; got 0. Output:\n{result.output}"
-        )
-
-    def test_error_message_includes_product(self, runner: CliRunner, tmp_path: Path) -> None:
-        """memory-markdown-source-v1: error message mentions the missing product/ path."""
-        specs = tmp_path / "specs"
-        specs.mkdir()
-        result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        # Either the output mentions 'product' or exit is non-zero
-        combined = result.output + (str(result.exception) if result.exception else "")
-        assert "product" in combined.lower() or result.exit_code != 0
+    # memory-markdown-source-v1: catalog reads .md atoms; missing product/ → non-zero
+    # exit with an error message naming the missing product/ path.
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
+    assert result.exit_code != 0, (
+        f"Expected non-zero exit when product/ dir is missing; got 0. Output:\n{result.output}"
+    )
+    combined = result.output + (str(result.exception) if result.exception else "")
+    assert "product" in combined.lower() or result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
@@ -178,38 +137,25 @@ class TestCatalogGenerateMissingSpecsDir:
 # ---------------------------------------------------------------------------
 
 
-class TestCatalogGenerateIdempotent:
-    def test_second_call_overwrites_cleanly(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        # First call
-        r1 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert r1.exit_code == 0
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        first_features = json.loads(catalog_path.read_text(encoding="utf-8"))["features"]
+def test_catalog_generate_idempotent_rerun(runner: CliRunner, tmp_path: Path) -> None:
+    specs = _make_specs_dir(tmp_path)
+    catalog_path = specs / "memory" / "product" / "catalog.json"
 
-        # Second call
-        r2 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert r2.exit_code == 0
-        second_features = json.loads(catalog_path.read_text(encoding="utf-8"))["features"]
+    r1 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
+    assert r1.exit_code == 0
+    first_features = json.loads(catalog_path.read_text(encoding="utf-8"))["features"]
 
-        # Feature list must be identical (same slugs, same rank, same paths)
-        assert len(first_features) == len(second_features)
-        for f1, f2 in zip(first_features, second_features, strict=True):
-            assert f1["slug"] == f2["slug"]
-            assert f1["rank"] == f2["rank"]
-            assert f1["path"] == f2["path"]
+    r2 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
+    assert r2.exit_code == 0
+    parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
+    second_features = parsed["features"]
 
-    def test_second_call_exits_zero(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        r2 = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        assert r2.exit_code == 0
+    # Feature list must be identical (same slugs, same rank, same paths).
+    assert len(first_features) == len(second_features)
+    for f1, f2 in zip(first_features, second_features, strict=True):
+        assert f1["slug"] == f2["slug"]
+        assert f1["rank"] == f2["rank"]
+        assert f1["path"] == f2["path"]
 
-    def test_output_json_is_valid_after_overwrite(self, runner: CliRunner, tmp_path: Path) -> None:
-        specs = _make_specs_dir(tmp_path)
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
-        catalog_path = specs / "memory" / "product" / "catalog.json"
-        parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
-        assert isinstance(parsed["features"], list)
-        assert len(parsed["features"]) == 3
+    assert isinstance(parsed["features"], list)
+    assert len(parsed["features"]) == 3

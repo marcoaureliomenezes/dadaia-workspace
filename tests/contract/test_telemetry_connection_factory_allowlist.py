@@ -65,8 +65,10 @@ def _connect_sites() -> dict[str, list[int]]:
     return {path: sorted(lines) for path, lines in sites.items()}
 
 
-def test_no_sqlite3_connect_outside_factory_or_exempt_allowlist() -> None:
-    """No production ``sqlite3.connect`` outside the factory internals or exempt list."""
+def test_sqlite3_connect_routing_allowlist_and_readonly_exemption() -> None:
+    """No production ``sqlite3.connect`` outside the factory internals or exempt list;
+    the factory's own internal open exists (guards against silent removal); and the
+    exempt foreign readers open read-only URI connections (never the WAL factory)."""
     sites = _connect_sites()
     violations = {path: lines for path, lines in sites.items() if path not in _ALLOWLIST}
     assert not violations, (
@@ -74,18 +76,9 @@ def test_no_sqlite3_connect_outside_factory_or_exempt_allowlist() -> None:
         "telemetry-store connections through schema.open_connection "
         f"(read_only=True for reads):\n{violations!r}"
     )
-
-
-def test_factory_internal_site_is_present() -> None:
-    """The factory's own internal open must exist (guards against silent removal)."""
-    sites = _connect_sites()
     assert _FACTORY_INTERNAL in sites, (
         "the pragma'd factory schema.open_connection must own its internal sqlite3.connect."
     )
-
-
-def test_exempt_foreign_readers_are_read_only_uris() -> None:
-    """The exempt foreign readers open read-only URI connections (never the WAL factory)."""
     for rel in _EXEMPT_FOREIGN_READERS:
         text = (_REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "mode=ro" in text, (

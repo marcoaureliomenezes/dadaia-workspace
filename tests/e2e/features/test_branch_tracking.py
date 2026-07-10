@@ -61,10 +61,11 @@ def workspace_with_active_repo(tmp_path: Path) -> tuple[Path, Path, JsonContextS
     return workspace, repo_path, store
 
 
-def test_export_refreshes_current_branch_before_archive(
+def test_export_refreshes_and_persists_current_branch_and_lists_it_in_manifest(
     workspace_with_active_repo: tuple[Path, Path, JsonContextStore], tmp_path: Path
 ) -> None:
-    """T80 (part 1): export reads HEAD branch and persists in spec_contexts.json."""
+    """T80: export reads HEAD branch, persists it in spec_contexts.json (part 1), and
+    the archive's export-manifest.json records it too (part 2) — one export run."""
     workspace, repo, store = workspace_with_active_repo
     svc = ExportService(
         context_store=store,
@@ -79,20 +80,6 @@ def test_export_refreshes_current_branch_before_archive(
     persisted = store.get("alpha")
     assert persisted is not None
     assert persisted.current_branch == "feature/test"
-
-
-def test_export_manifest_lists_current_branch_per_context(
-    workspace_with_active_repo: tuple[Path, Path, JsonContextStore], tmp_path: Path
-) -> None:
-    """T80 (part 2): the archive's export-manifest.json records branch."""
-    workspace, _, store = workspace_with_active_repo
-    svc = ExportService(
-        context_store=store,
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace,
-    )
-    out = tmp_path / "dist"
-    svc.run(ExportOptions(output=out, exclude_mnt=True))
 
     archive = next(out.glob("workspace-*.tar.gz"))
     with tarfile.open(archive, "r:gz") as tar:

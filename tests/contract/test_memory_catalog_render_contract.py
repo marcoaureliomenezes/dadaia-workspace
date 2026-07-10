@@ -158,13 +158,9 @@ def _assert_contiguous_gfm_tables(index_md: str, renderer: str) -> int:
     return tables
 
 
-def test_lib_renderer_emits_contiguous_gfm_table(tmp_path: Path) -> None:
-    lib_index, _ = _both_indexes(tmp_path)
+def test_both_renderers_emit_contiguous_gfm_table(tmp_path: Path) -> None:
+    lib_index, script_index = _both_indexes(tmp_path)
     _assert_contiguous_gfm_tables(lib_index, "features/specs/catalog.py")
-
-
-def test_script_renderer_emits_contiguous_gfm_table(tmp_path: Path) -> None:
-    _, script_index = _both_indexes(tmp_path)
     _assert_contiguous_gfm_tables(script_index, "generate-memory-catalog.py")
 
 
@@ -173,9 +169,13 @@ def test_script_renderer_emits_contiguous_gfm_table(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_both_implementations_emit_identical_features_json(tmp_path: Path) -> None:
-    """json.dumps comparison pins values AND insertion (field) order."""
+def test_both_implementations_emit_identical_output_shape(tmp_path: Path) -> None:
+    """F-84: byte-identical features JSON (field order pinned) + same timestamp shape +
+    index.md identical modulo the re-run tool line. F-75: area matches parent dir and
+    `category` stays untouched by area derivation. One dual-renderer identity walk."""
     lib_cat, script_cat = _both_catalogs(tmp_path)
+
+    # json.dumps comparison pins values AND insertion (field) order.
     lib_features = json.dumps(lib_cat["features"], ensure_ascii=False, indent=2)
     script_features = json.dumps(script_cat["features"], ensure_ascii=False, indent=2)
     assert lib_features == script_features, (
@@ -184,14 +184,46 @@ def test_both_implementations_emit_identical_features_json(tmp_path: Path) -> No
     )
     assert lib_cat["context"] == script_cat["context"]
 
+    for name, cat in (("lib", lib_cat), ("script", script_cat)):
+        ts = cat["generated_at"]
+        assert isinstance(ts, str) and _TS_RE.fullmatch(ts), (
+            f"[{name}] generated_at must be YYYY-MM-DDTHH:MM:SSZ, got: {ts!r}"
+        )
 
-def test_neither_renderer_emits_agent_tier(tmp_path: Path) -> None:
-    """v0.1.53 FR3 'drop': agent_tier is NOT emitted by either renderer.
+    lib_index, script_index = _both_indexes(tmp_path)
+    normalized_lib = lib_index.replace("`dadaia memory catalog generate`", "`<TOOL>`")
+    normalized_script = script_index.replace("`generate-memory-catalog.py`", "`<TOOL>`")
+    assert normalized_lib == normalized_script, (
+        "index.md output diverges beyond the re-run tool name — F-84 regression"
+    )
+    for name, index_md in (("lib", lib_index), ("script", script_index)):
+        for area in ("product", "sdd", "platform"):
+            assert f"### {area}" in index_md, f"[{name}] missing '### {area}' area section"
+        # Grouping is by area, not by the single frontmatter category bucket: all fixture
+        # atoms share category=product, yet three sections must exist.
+        assert index_md.count("### ") == 3, (
+            f"[{name}] expected exactly 3 area sections, got:\n{index_md}"
+        )
 
-    The fixture atoms still CARRY ``agent_tier`` in their frontmatter (the schema retains
-    it as an optional/tolerated property until the CLOSURE strip), yet neither renderer may
-    surface it in the generated catalog — the field has zero runtime consumers.
-    """
+    expected_area = {slug: (rel_dir or "product") for rel_dir, slug in _FIXTURE_ATOMS}
+    for name, cat in (("lib", lib_cat), ("script", script_cat)):
+        features = cat["features"]
+        assert isinstance(features, list) and features
+        for feat in features:
+            assert isinstance(feat, dict)
+            assert "area" in feat, f"[{name}] entry {feat.get('slug')!r} has no 'area'"
+            assert feat["area"] == expected_area[feat["slug"]], (
+                f"[{name}] {feat['slug']!r}: area {feat['area']!r} != parent dir "
+                f"{expected_area[feat['slug']]!r}"
+            )
+            # `category` stays sourced from frontmatter, untouched by area derivation.
+            assert feat["category"] == "product"
+
+
+def test_agent_tier_dropped_and_absence_tolerated(tmp_path: Path) -> None:
+    """v0.1.53 FR3: agent_tier is NOT emitted by either renderer even though fixture
+    atoms still carry it in frontmatter ('drop'), and an atom entirely missing the
+    field still generates cleanly with byte-identical output ('tolerate')."""
     lib_cat, script_cat = _both_catalogs(tmp_path)
     for name, cat in (("lib", lib_cat), ("script", script_cat)):
         features = cat["features"]
@@ -203,13 +235,6 @@ def test_neither_renderer_emits_agent_tier(tmp_path: Path) -> None:
                 "it dropped from catalog output"
             )
 
-
-def test_both_renderers_tolerate_atom_without_agent_tier(tmp_path: Path) -> None:
-    """v0.1.53 FR3 'tolerate': an atom missing agent_tier still generates cleanly.
-
-    After the CLOSURE strip the atoms lose the field entirely; the renderers (frozen here in
-    W3) must already tolerate its absence — no required-field error, byte-identical output.
-    """
     specs = tmp_path / "no-tier" / "specs"
     product = specs / "memory" / "product"
     product.mkdir(parents=True)
@@ -218,72 +243,11 @@ def test_both_renderers_tolerate_atom_without_agent_tier(tmp_path: Path) -> None
     )
     (product / "tierless-atom.md").write_text(atom, encoding="utf-8")
 
-    lib_cat = lib_catalog_mod.generate_catalog(specs)
-    script_cat, errors = _script_mod.generate_catalog(specs / "memory", context="no-tier")
+    lib_cat2 = lib_catalog_mod.generate_catalog(specs)
+    script_cat2, errors = _script_mod.generate_catalog(specs / "memory", context="no-tier")
     assert not errors, f"standalone script rejected a tier-less atom: {errors}"
-    assert script_cat is not None
-    lib_features = json.dumps(lib_cat["features"], ensure_ascii=False, indent=2)
-    script_features = json.dumps(script_cat["features"], ensure_ascii=False, indent=2)
+    assert script_cat2 is not None
+    lib_features = json.dumps(lib_cat2["features"], ensure_ascii=False, indent=2)
+    script_features = json.dumps(script_cat2["features"], ensure_ascii=False, indent=2)
     assert lib_features == script_features
     assert "agent_tier" not in lib_features
-
-
-def test_both_implementations_emit_same_timestamp_shape(tmp_path: Path) -> None:
-    lib_cat, script_cat = _both_catalogs(tmp_path)
-    for name, cat in (("lib", lib_cat), ("script", script_cat)):
-        ts = cat["generated_at"]
-        assert isinstance(ts, str) and _TS_RE.fullmatch(ts), (
-            f"[{name}] generated_at must be YYYY-MM-DDTHH:MM:SSZ, got: {ts!r}"
-        )
-
-
-def test_index_md_identical_modulo_rerun_tool_line(tmp_path: Path) -> None:
-    """The two renderers differ ONLY on the tool named in the 're-run' line."""
-    lib_index, script_index = _both_indexes(tmp_path)
-    normalized_lib = lib_index.replace("`dadaia memory catalog generate`", "`<TOOL>`")
-    normalized_script = script_index.replace("`generate-memory-catalog.py`", "`<TOOL>`")
-    assert normalized_lib == normalized_script, (
-        "index.md output diverges beyond the re-run tool name — F-84 regression"
-    )
-
-
-# ---------------------------------------------------------------------------
-# F-75 — area derived from the parent directory; index groups by area
-# ---------------------------------------------------------------------------
-
-
-def test_every_entry_carries_area_matching_parent_dir(tmp_path: Path) -> None:
-    lib_cat, script_cat = _both_catalogs(tmp_path)
-    expected = {slug: (rel_dir or "product") for rel_dir, slug in _FIXTURE_ATOMS}
-    for name, cat in (("lib", lib_cat), ("script", script_cat)):
-        features = cat["features"]
-        assert isinstance(features, list) and features
-        for feat in features:
-            assert isinstance(feat, dict)
-            assert "area" in feat, f"[{name}] entry {feat.get('slug')!r} has no 'area'"
-            assert feat["area"] == expected[feat["slug"]], (
-                f"[{name}] {feat['slug']!r}: area {feat['area']!r} != parent dir "
-                f"{expected[feat['slug']]!r}"
-            )
-
-
-def test_index_md_groups_sections_by_area(tmp_path: Path) -> None:
-    lib_index, script_index = _both_indexes(tmp_path)
-    for name, index_md in (("lib", lib_index), ("script", script_index)):
-        for area in ("product", "sdd", "platform"):
-            assert f"### {area}" in index_md, f"[{name}] missing '### {area}' area section"
-        # Grouping is by area, not by the single frontmatter category bucket:
-        # all fixture atoms share category=product, yet three sections must exist.
-        assert index_md.count("### ") == 3, (
-            f"[{name}] expected exactly 3 area sections, got:\n{index_md}"
-        )
-
-
-def test_area_does_not_touch_category(tmp_path: Path) -> None:
-    """`category` stays sourced from frontmatter, untouched by area derivation."""
-    lib_cat, _ = _both_catalogs(tmp_path)
-    features = lib_cat["features"]
-    assert isinstance(features, list)
-    for feat in features:
-        assert isinstance(feat, dict)
-        assert feat["category"] == "product"

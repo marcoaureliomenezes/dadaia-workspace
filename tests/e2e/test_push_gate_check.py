@@ -107,30 +107,31 @@ def test_push_without_security_approve_is_blocked(tmp_path: Path) -> None:
     assert "security-reviewer APPROVE" in out, out
 
 
-def test_push_with_matching_security_approve_flows(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "variant",
+    ["matching-approve", "branch-deletion", "tag-push"],
+    ids=["approve-flows", "branch-deletion-passes", "tag-push-passes"],
+)
+def test_pass_matrix(tmp_path: Path, variant: str) -> None:
+    """(b) a matching security-reviewer APPROVE flows; (c) branch deletion (zero
+    local sha) and a tag push both pass with NO verdict on disk — never review-gated."""
     workspace = tmp_path
     repo = _init_repo(workspace, _SLUG)
-    _write_security_approve(workspace, commit_sha=_PUSHED_SHA)
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/main {_PUSHED_SHA} refs/heads/main {_ZERO}\n"
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
 
-
-def test_branch_deletion_passes_without_verdict(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo = _init_repo(workspace, _SLUG)
-    # Zero local sha = branch deletion; never review-gated, even with no handoff on disk.
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {_PUSHED_SHA}\n"
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_tag_push_passes_without_verdict(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo = _init_repo(workspace, _SLUG)
-    result = _run_push_gate(repo, workspace, f"refs/tags/v1 {_PUSHED_SHA} refs/tags/v1 {_ZERO}\n")
+    if variant == "matching-approve":
+        _write_security_approve(workspace, commit_sha=_PUSHED_SHA)
+        result = _run_push_gate(
+            repo, workspace, f"refs/heads/main {_PUSHED_SHA} refs/heads/main {_ZERO}\n"
+        )
+    elif variant == "branch-deletion":
+        # Zero local sha = branch deletion; never review-gated, even with no handoff on disk.
+        result = _run_push_gate(
+            repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {_PUSHED_SHA}\n"
+        )
+    else:
+        result = _run_push_gate(
+            repo, workspace, f"refs/tags/v1 {_PUSHED_SHA} refs/tags/v1 {_ZERO}\n"
+        )
     assert result.returncode == 0, result.stdout + result.stderr
 
 

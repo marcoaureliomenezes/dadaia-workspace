@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -42,36 +44,48 @@ def test_handoff_v1_1_accepts_current_required_contract() -> None:
     assert list(validator.validate(_valid_handoff())) == []
 
 
-def test_handoff_contract_rejects_missing_metrics() -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+def _missing_metrics() -> dict[str, object]:
     doc = _valid_handoff()
     doc.pop("metrics")
+    return doc
+
+
+def _invalid_verdict() -> dict[str, object]:
+    return {**_valid_handoff(), "verdict": "MAYBE"}
+
+
+def _traversal_path(path: str) -> dict[str, object]:
+    doc = _valid_handoff()
+    artifact = dict(doc["artifact"])  # type: ignore[arg-type]
+    artifact["path"] = path
+    doc["artifact"] = artifact
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("doc", "expected_field"),
+    [
+        pytest.param(_missing_metrics(), "metrics", id="missing-metrics"),
+        pytest.param(_invalid_verdict(), "verdict", id="invalid-verdict"),
+        pytest.param(_traversal_path("/etc/passwd"), None, id="absolute-path"),
+        pytest.param(_traversal_path("../report.html"), None, id="parent-traversal"),
+        pytest.param(
+            _traversal_path(".dadaia/reports/../states/private.json"),
+            None,
+            id="embedded-parent-traversal",
+        ),
+    ],
+)
+def test_handoff_contract_rejects_invalid_documents(
+    doc: dict[str, object], expected_field: str | None
+) -> None:
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
 
     errors = list(validator.validate(doc))
 
     assert errors
-    assert any("metrics" in error.field_path or "metrics" in error.message for error in errors)
-
-
-def test_handoff_contract_rejects_invalid_verdict() -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
-    doc = {**_valid_handoff(), "verdict": "MAYBE"}
-
-    errors = list(validator.validate(doc))
-
-    assert errors
-    assert any("verdict" in error.field_path for error in errors)
-
-
-def test_handoff_contract_rejects_absolute_and_parent_traversal_artifact_paths() -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
-
-    for path in ("/etc/passwd", "../report.html", ".dadaia/reports/../states/private.json"):
-        doc = _valid_handoff()
-        artifact = dict(doc["artifact"])  # type: ignore[arg-type]
-        artifact["path"] = path
-        doc["artifact"] = artifact
-
-        errors = list(validator.validate(doc))
-
-        assert errors, path
+    if expected_field is not None:
+        assert any(
+            expected_field in error.field_path or expected_field in error.message
+            for error in errors
+        )

@@ -43,9 +43,7 @@ def test_banner_constant_matches_public_data_agents_md() -> None:
         "the banner constant must equal the full leading blockquote block byte-for-byte.\n"
         f"  constant:\n{_CANONICAL_AGENTS_BANNER!r}\n  file block:\n{banner_block!r}"
     )
-
-
-def test_banner_constant_is_a_fixed_literal_not_empty() -> None:
-    """Guard: the constant is a non-trivial multi-line banner (not accidentally blanked)."""
+    # Subsumed non-trivial-literal guard: byte-equality above already fails loudly if the
+    # constant were accidentally blanked or truncated.
     assert _CANONICAL_AGENTS_BANNER.startswith("> **AI agent rules.**")
     assert _CANONICAL_AGENTS_BANNER.count("\n") == 4

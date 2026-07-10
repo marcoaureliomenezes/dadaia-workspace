@@ -47,13 +47,15 @@ def _fake_venv(tmp_path: Path, exit_code: int = 0) -> Path:
     return venv_bin
 
 
-def test_preflight_passes_with_poetry_off_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("stub_exit_code", [0, 1], ids=["pass", "failure-report"])
+def test_preflight_resolved_tool_pass_and_failure_report_with_poetry_off_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stub_exit_code: int
 ) -> None:
-    venv_bin = _fake_venv(tmp_path, exit_code=0)
-
-    # Wipe PATH so poetry (and any host tool) cannot leak in. The resolved argv
-    # carry ABSOLUTE paths to the stub executables, so they run regardless.
+    """With poetry wiped off PATH: a passing stub venv resolves every tool to an
+    ABSOLUTE fake-venv sibling path with zero poetry references and all checks pass;
+    a failing stub venv reports the first resolved tool's non-zero exit as a failed
+    check (fail-fast stops there) — no poetry fallback in either case."""
+    venv_bin = _fake_venv(tmp_path, exit_code=stub_exit_code)
     monkeypatch.setenv("PATH", "")
     monkeypatch.delenv("DADAIA_BIN", raising=False)
 
@@ -63,36 +65,25 @@ def test_preflight_passes_with_poetry_off_path(
         dadaia_bin=None,
     )
 
-    # No argv references poetry — every tool resolved to the fake-venv sibling.
-    for c in checks:
-        assert "poetry" not in c.argv, f"{c.name}: {c.argv}"
-        assert c.argv[0].startswith(str(venv_bin)), f"{c.name}: {c.argv}"
+    if stub_exit_code == 0:
+        # No argv references poetry — every tool resolved to the fake-venv sibling.
+        for c in checks:
+            assert "poetry" not in c.argv, f"{c.name}: {c.argv}"
+            assert c.argv[0].startswith(str(venv_bin)), f"{c.name}: {c.argv}"
 
-    results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
+        results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
 
-    assert all_passed(results), [(r.name, r.exit_code, r.output) for r in results if not r.passed]
-    assert len(results) == len(checks)
+        assert all_passed(results), [
+            (r.name, r.exit_code, r.output) for r in results if not r.passed
+        ]
+        assert len(results) == len(checks)
+    else:
+        results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
 
-
-def test_preflight_reports_failure_from_resolved_tool(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A resolved tool that exits non-zero is reported as a failed check (no poetry)."""
-    venv_bin = _fake_venv(tmp_path, exit_code=1)
-    monkeypatch.setenv("PATH", "")
-    monkeypatch.delenv("DADAIA_BIN", raising=False)
-
-    checks = checks_for(
-        quick=True,
-        python_executable=str(venv_bin / "python"),
-        dadaia_bin=None,
-    )
-    results = run_preflight(checks, subprocess_runner(tmp_path), fail_fast=True)
-
-    assert not all_passed(results)
-    # First check (ruff format --check) fails → fail-fast stops there.
-    assert results[0].passed is False
-    assert results[0].exit_code == 1
+        assert not all_passed(results)
+        # First check (ruff format --check) fails → fail-fast stops there.
+        assert results[0].passed is False
+        assert results[0].exit_code == 1
 
 
 def test_missing_tool_everywhere_fails_closed(

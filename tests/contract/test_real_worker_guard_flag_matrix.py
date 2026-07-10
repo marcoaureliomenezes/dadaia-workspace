@@ -126,39 +126,26 @@ def claude_live_flag(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
 
 
-def test_dadaia_e2e_real_worker_flag_keeps_pi_guard_quiet(
-    tmp_path: Path, e2e_real_worker_flag: None
+@pytest.mark.parametrize(
+    "flag_fixture_name",
+    ["e2e_real_worker_flag", "pi_live_flag", "codex_live_flag", "claude_live_flag"],
+    ids=[
+        "DADAIA_E2E_REAL_WORKER",
+        "DADAIA_PI_LIVE",
+        "DADAIA_CODEX_LIVE",
+        "DADAIA_CLAUDE_LIVE",
+    ],
+)
+def test_each_live_opt_in_flag_keeps_pi_and_codex_guard_quiet(
+    request: pytest.FixtureRequest, tmp_path: Path, flag_fixture_name: str
 ) -> None:
-    """AC3.3: `DADAIA_E2E_REAL_WORKER=1` — the guard never fires for PiHeadlessAdapter."""
-    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path, timeout_seconds=1))
-    _assert_guard_quiet(lambda: adapter.run(_pi_request()))  # type: ignore[arg-type]
+    """AC3.3: each of the four live-opt-in flags, set INDIVIDUALLY, keeps the guard
+    quiet for BOTH adapters. F1's specific named requirement (`DADAIA_CODEX_LIVE`) is
+    its own explicit id in this matrix, never inferred from a pi-flag pass — the union
+    predicate is flag-name-agnostic, so proving it per-flag against both adapters
+    covers every case the four separate fixtures used to prove individually."""
+    request.getfixturevalue(flag_fixture_name)
 
-
-def test_dadaia_pi_live_flag_keeps_pi_guard_quiet(tmp_path: Path, pi_live_flag: None) -> None:
-    """AC3.3: `DADAIA_PI_LIVE=1` — the guard never fires for PiHeadlessAdapter."""
-    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path, timeout_seconds=1))
-    _assert_guard_quiet(lambda: adapter.run(_pi_request()))  # type: ignore[arg-type]
-
-
-def test_dadaia_codex_live_flag_keeps_codex_guard_quiet(
-    tmp_path: Path, codex_live_flag: None
-) -> None:
-    """AC3.3 (F1's specific named requirement): `DADAIA_CODEX_LIVE=1` — the guard never
-    fires for CodexExecAdapter. This is the exact regression the architect review's F1
-    finding identified in the original single-flag guard design; it MUST be its own
-    explicit assertion, never inferred from a `DADAIA_E2E_REAL_WORKER`/`DADAIA_PI_LIVE`
-    run (a pi-flag pass proves nothing about the codex adapter's own guard branch)."""
-    adapter = CodexExecAdapter(CodexExecConfig(cwd=tmp_path, timeout_seconds=1), environ={})
-    _assert_guard_quiet(lambda: adapter.run(_codex_request()))  # type: ignore[arg-type]
-
-
-def test_dadaia_claude_live_flag_keeps_pi_and_codex_guard_quiet(
-    tmp_path: Path, claude_live_flag: None
-) -> None:
-    """AC3.3: `DADAIA_CLAUDE_LIVE=1` — the union predicate is flag-name-agnostic, so
-    setting the claude_live flag ALSO keeps the pi/codex guard quiet (the predicate
-    does not scope by which adapter is being constructed, only whether ANY of the 4
-    flags is set) — proven directly against both adapters."""
     pi_adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path, timeout_seconds=1))
     _assert_guard_quiet(lambda: pi_adapter.run(_pi_request()))  # type: ignore[arg-type]
 

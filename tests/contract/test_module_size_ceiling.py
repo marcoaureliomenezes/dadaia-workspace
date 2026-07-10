@@ -38,29 +38,27 @@ def _line_count(path: Path) -> int:
     return len(path.read_text(encoding="utf-8").splitlines())
 
 
-def test_no_doctor_module_exceeds_ceiling() -> None:
-    """Every features/specs/doctor*.py module stays under the 700-line ratchet (AC-1)."""
-    modules = sorted(_SPECS_DIR.glob("doctor*.py"))
-    assert modules, f"no doctor*.py modules found under {_SPECS_DIR}"
-    offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > _DOCTOR_CEILING}
+@pytest.mark.parametrize(
+    ("glob", "ceiling", "directory"),
+    [
+        pytest.param("doctor*.py", _DOCTOR_CEILING, _SPECS_DIR, id="doctor"),
+        pytest.param("api*.py", _API_CEILING, _PANEL_VIEWS_DIR, id="panel-api"),
+    ],
+)
+def test_no_module_exceeds_ceiling(glob: str, ceiling: int, directory: Path) -> None:
+    """Every module matching *glob* under *directory* stays under its line-count
+    ratchet (AC-1). The monolithic panel api.py must also stay deleted (FR2)."""
+    modules = sorted(directory.glob(glob))
+    assert modules, f"no {glob} modules found under {directory}"
+    if glob == "api*.py":
+        # The monolithic api.py is DELETED by FR2 — its re-appearance is a regression.
+        assert not any(p.name == "api.py" for p in modules), (
+            "features/panel/views/api.py must stay deleted (FR2 per-domain decomposition; "
+            "no facade)."
+        )
+    offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > ceiling}
     assert not offenders, (
-        f"doctor module(s) exceed the {_DOCTOR_CEILING}-line ceiling: {offenders}. "
-        "Split further and lower the ceiling, or justify the growth in the same commit "
-        "(AC-1 anti-erosion ratchet)."
-    )
-
-
-def test_no_api_module_exceeds_ceiling() -> None:
-    """Every features/panel/views/api*.py module stays under the 450-line ratchet (FR2 AC-1)."""
-    modules = sorted(_PANEL_VIEWS_DIR.glob("api*.py"))
-    assert modules, f"no api*.py modules found under {_PANEL_VIEWS_DIR}"
-    # The monolithic api.py is DELETED by FR2 — its re-appearance is itself a regression.
-    assert not any(p.name == "api.py" for p in modules), (
-        "features/panel/views/api.py must stay deleted (FR2 per-domain decomposition; no facade)."
-    )
-    offenders = {p.name: _line_count(p) for p in modules if _line_count(p) > _API_CEILING}
-    assert not offenders, (
-        f"panel api module(s) exceed the {_API_CEILING}-line ceiling: {offenders}. "
+        f"module(s) matching {glob} exceed the {ceiling}-line ceiling: {offenders}. "
         "Split further and lower the ceiling, or justify the growth in the same commit "
         "(AC-1 anti-erosion ratchet)."
     )

@@ -61,32 +61,39 @@ def _flat(path: Path) -> str:
     return " ".join(_read(path).split())
 
 
-def test_project_orchestration_defines_full_done_gate() -> None:
+def test_done_gate_terms_present_everywhere_and_old_shortcuts_never_reappear() -> None:
+    """The implementation-review-QA done gate is a single governance contract spread
+    across surfaces (orchestration skill, task-manager skill, project-manager persona,
+    implementer personas, reviewer personas) — each surface's required-term table is
+    checked here; retired pre-gate wording must never reappear on any of them."""
+    failures: list[str] = []
+
     content = _read(ORCHESTRATION_SKILL)
     missing = [term for term in REQUIRED_GATE_TERMS if term not in content]
-    assert missing == []
+    if missing:
+        failures.append(f"{ORCHESTRATION_SKILL.name}: missing {missing}")
 
-
-def test_task_manager_blocks_done_until_review_approval() -> None:
     content = _read(TASK_MANAGER_SKILL)
     flat = " ".join(content.split())
-    assert "Implementation complete is not DONE" in flat
-    assert "qa-engineer" in content
-    assert "code-reviewer" in content
-    assert "security-reviewer" in content
-    assert "it is forbidden to mark `[x]`" in flat
-    assert "open a PR" in flat
-    assert "deploy" in flat
-    assert "write `CLOSURE.md`" in flat
+    for term in (
+        "Implementation complete is not DONE",
+        "it is forbidden to mark `[x]`",
+        "open a PR",
+        "deploy",
+        "write `CLOSURE.md`",
+    ):
+        if term not in flat:
+            failures.append(f"{TASK_MANAGER_SKILL.name}: missing {term!r}")
+    for term in ("qa-engineer", "code-reviewer", "security-reviewer"):
+        if term not in content:
+            failures.append(f"{TASK_MANAGER_SKILL.name}: missing {term!r}")
 
-
-def test_project_manager_enforces_pre_and_post_implementation_gates() -> None:
     content = _read(PROJECT_MANAGER)
     # Terms present in the current project-manager persona (9-agent surface).
     # "Before TASKS approval", "owning implementer(s)", "design-specialist",
     # and "implementation-complete" are no longer part of the PM persona wording
     # after the agent-surface-reduction; the gate is enforced through the
-    # project-orchestration skill referenced below.
+    # project-orchestration skill referenced above.
     required = (
         "qa-engineer",
         "code-reviewer",
@@ -97,19 +104,17 @@ def test_project_manager_enforces_pre_and_post_implementation_gates() -> None:
         "APPROVE",
     )
     missing = [term for term in required if term not in content]
-    assert missing == []
+    if missing:
+        failures.append(f"{PROJECT_MANAGER.name}: missing {missing}")
 
-
-def test_implementer_personas_treat_completion_as_handoff() -> None:
-    failures: list[str] = []
     for filename in IMPLEMENTERS:
         path = PUBLIC / "agents" / filename
         raw = _read(path)
         # Skip plugin stubs — they carry no implementer gate wording by design.
         if "plugin: true" in raw:
             continue
-        content = _flat(path)
-        required = (
+        flat_impl = _flat(path)
+        required_impl = (
             "handoff, not task completion",
             "REQUEST_CHANGES",
             "rerun against the new commit",
@@ -120,23 +125,18 @@ def test_implementer_personas_treat_completion_as_handoff() -> None:
             "deploy",
             "close release",
         )
-        for term in required:
-            if term not in content:
+        for term in required_impl:
+            if term not in flat_impl:
                 failures.append(f"{filename}: missing {term!r}")
-        if "implementation-complete" not in content and "completed" not in content:
+        if "implementation-complete" not in flat_impl and "completed" not in flat_impl:
             failures.append(f"{filename}: missing implementation completion wording")
         for term in LEAKAGE_TERMS:
-            if term not in content:
+            if term not in flat_impl:
                 failures.append(f"{filename}: missing leakage term {term!r}")
 
-    assert failures == []
-
-
-def test_reviewer_personas_define_approve_reject_contracts() -> None:
-    failures: list[str] = []
     for filename in REVIEWERS:
         content = _read(PUBLIC / "agents" / filename)
-        required = (
+        required_rev = (
             "Approval contract",
             "APPROVE",
             "REQUEST_CHANGES",
@@ -144,30 +144,25 @@ def test_reviewer_personas_define_approve_reject_contracts() -> None:
             "paths",
             "rerun",
         )
-        for term in required:
+        for term in required_rev:
             if term not in content:
                 failures.append(f"{filename}: missing {term!r}")
 
-    assert failures == []
-
-
-def test_old_done_gate_shortcuts_do_not_reappear() -> None:
-    # Only check agent files that actually exist (plugin stubs are minimal and
-    # do not carry the forbidden wording).
+    # Only check agent files that actually exist (plugin stubs are minimal and do not
+    # carry the forbidden wording).
     agent_paths = [
         PUBLIC / "agents" / filename
         for filename in (*IMPLEMENTERS, *REVIEWERS)
         if (PUBLIC / "agents" / filename).exists()
     ]
-    paths = [
+    old_wording_paths = [
         ORCHESTRATION_SKILL,
         TASK_MANAGER_SKILL,
         PROJECT_MANAGER,
         *agent_paths,
         *sorted((PUBLIC / "workflows").glob("*.workflow.md")),
     ]
-    failures: list[str] = []
-    for path in paths:
+    for path in old_wording_paths:
         content = _read(path)
         for phrase in FORBIDDEN_OLD_DONE_WORDING:
             if phrase in content:

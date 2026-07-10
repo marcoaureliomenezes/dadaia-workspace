@@ -1,4 +1,10 @@
-"""E2E acceptance tests — Dev Server Port Registry (US-REG-001 to US-REG-007)."""
+"""E2E acceptance tests — Dev Server Port Registry (US-REG-001 to US-REG-007).
+
+US-REG-007 (skill file presence + content asserts) is folded into
+``test_public_pipeline.TestContentConsistency`` — presence is pinned by EXPECTED_SKILLS
+and the content asserts (dadaia server list/next/register/release) are folded into the
+merged content-consistency check there.
+"""
 
 from pathlib import Path
 
@@ -30,11 +36,14 @@ def _build_svc(workspace: Path, probe: FakeProcessProbe) -> ServerRegistryServic
     )
 
 
-def test_us1_agent_registers_port_before_starting_server(tmp_path: Path) -> None:
-    """US-REG-001: Reservar porta antes de subir servidor."""
+def test_us1_register_before_starting_server_and_conflict_on_occupied_port(
+    tmp_path: Path,
+) -> None:
+    """US-REG-001: reserve a port before starting a server, and a second register on
+    the same port with a live pid conflicts."""
     ws = _init_workspace(tmp_path)
     probe = FakeProcessProbe()
-    probe._alive_pids.add(11111)
+    probe._alive_pids.update([11111, 22222])
     svc = _build_svc(ws, probe)
 
     entry = svc.register(port=3000, project="my-frontend", pid=11111, description="Flask")
@@ -52,24 +61,17 @@ def test_us1_agent_registers_port_before_starting_server(tmp_path: Path) -> None
     registry_file = ws / ".dadaia" / "states" / "server_registry.json"
     assert registry_file.exists()
 
-
-def test_us1_conflict_raises_when_port_occupied(tmp_path: Path) -> None:
-    ws = _init_workspace(tmp_path)
-    probe = FakeProcessProbe()
-    probe._alive_pids.update([11111, 22222])
-    svc = _build_svc(ws, probe)
-
-    svc.register(port=3000, project="my-frontend", pid=11111)
     with pytest.raises(PortConflictError) as exc_info:
         svc.register(port=3000, project="my-frontend-wave6", pid=22222)
     assert "my-frontend" in str(exc_info.value)
-
-    entries = svc.list_entries()
-    assert len(entries) == 1
+    assert len(svc.list_entries()) == 1
 
 
-def test_us2_next_port_returns_deterministic_base(tmp_path: Path) -> None:
-    """US-REG-002: Obter próxima porta de forma determinística."""
+def test_us2_next_port_deterministic_idempotent_and_increments_on_conflict(
+    tmp_path: Path,
+) -> None:
+    """US-REG-002: next_port is deterministic on a fresh registry, idempotent once
+    registered, and increments past the base when the base port is occupied."""
     ws = _init_workspace(tmp_path)
     svc = _build_svc(ws, FakeProcessProbe())
 
@@ -77,60 +79,56 @@ def test_us2_next_port_returns_deterministic_base(tmp_path: Path) -> None:
     assert port == 3073
     assert is_base is True
 
-
-def test_us2_next_port_idempotent_when_registered(tmp_path: Path) -> None:
-    ws = _init_workspace(tmp_path)
     probe = FakeProcessProbe()
     probe._alive_pids.add(99)
-    svc = _build_svc(ws, probe)
+    svc2 = _build_svc(ws, probe)
+    svc2.register(port=3073, project="my-service", pid=99)
 
-    svc.register(port=3073, project="my-service", pid=99)
-
-    port1, _ = svc.next_port("my-service")
-    port2, _ = svc.next_port("my-service")
+    port1, _ = svc2.next_port("my-service")
+    port2, _ = svc2.next_port("my-service")
     assert port1 == port2 == 3073
 
-
-def test_us2_next_port_increments_when_base_occupied(tmp_path: Path) -> None:
-    ws = _init_workspace(tmp_path)
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(88)
-    svc = _build_svc(ws, probe)
-
-    svc.register(port=3073, project="other-project", pid=88)
-    port, is_base = svc.next_port("my-service")
-    assert port != 3073
-    assert is_base is False
+    probe2 = FakeProcessProbe()
+    probe2._alive_pids.add(88)
+    ws2 = _init_workspace(tmp_path / "ws2")
+    svc3 = _build_svc(ws2, probe2)
+    svc3.register(port=3073, project="other-project", pid=88)
+    conflicted_port, conflicted_is_base = svc3.next_port("my-service")
+    assert conflicted_port != 3073
+    assert conflicted_is_base is False
 
 
-def test_us3_list_all_registered_servers(tmp_path: Path) -> None:
-    """US-REG-003: Consultar registro completo de portas."""
+def test_us3_list_and_us5_show_project(tmp_path: Path) -> None:
+    """US-REG-003: list all registered servers (and empty). US-REG-005: show a
+    specific project's URL (and empty)."""
     ws = _init_workspace(tmp_path)
     probe = FakeProcessProbe()
     probe._alive_pids.update([1, 2, 3])
     svc = _build_svc(ws, probe)
 
+    assert svc.list_entries() == []
+    assert svc.show_project("my-api") == []
+
     svc.register(port=3000, project="my-frontend", pid=1)
     svc.register(port=3001, project="my-frontend", pid=2, description="Vite")
-    svc.register(port=3073, project="my-service", pid=3)
+    svc.register(port=3003, project="my-api", pid=3)
 
     entries = svc.list_entries()
     assert len(entries) == 3
     projects = {e.project for e, _ in entries}
-    assert projects == {"my-frontend", "my-service"}
-
+    assert projects == {"my-frontend", "my-api"}
     _, s = entries[0]
     assert s == PortStatus.ACTIVE
 
-
-def test_us3_list_empty_returns_empty_list(tmp_path: Path) -> None:
-    ws = _init_workspace(tmp_path)
-    svc = _build_svc(ws, FakeProcessProbe())
-    assert svc.list_entries() == []
+    result = svc.show_project("my-api")
+    assert len(result) == 1
+    entry, status = result[0]
+    assert entry.url == "http://localhost:3003"
+    assert status == PortStatus.ACTIVE
 
 
 def test_us4_release_port_on_shutdown(tmp_path: Path) -> None:
-    """US-REG-004: Liberar porta ao encerrar servidor."""
+    """US-REG-004: liberar porta ao encerrar servidor."""
     ws = _init_workspace(tmp_path)
     probe = FakeProcessProbe()
     probe._alive_pids.update([1, 2])
@@ -149,42 +147,8 @@ def test_us4_release_port_on_shutdown(tmp_path: Path) -> None:
         svc.release(port=3000)
 
 
-def test_us5_show_project_url(tmp_path: Path) -> None:
-    """US-REG-005: Consultar URL de projeto específico."""
-    ws = _init_workspace(tmp_path)
-    probe = FakeProcessProbe()
-    probe._alive_pids.add(99)
-    svc = _build_svc(ws, probe)
-
-    svc.register(port=3003, project="my-api", pid=99)
-    result = svc.show_project("my-api")
-
-    assert len(result) == 1
-    entry, status = result[0]
-    assert entry.url == "http://localhost:3003"
-    assert status == PortStatus.ACTIVE
-
-
-def test_us5_show_project_empty_returns_empty_list(tmp_path: Path) -> None:
-    ws = _init_workspace(tmp_path)
-    svc = _build_svc(ws, FakeProcessProbe())
-    assert svc.show_project("my-api") == []
-
-
-def test_us6_clean_removes_stale_entries(tmp_path: Path) -> None:
-    """US-REG-006: Limpar entradas obsoletas."""
-    ws = _init_workspace(tmp_path)
-    probe = FakeProcessProbe()
-    svc = _build_svc(ws, probe)
-
-    svc.register(port=3000, project="my-frontend", pid=99)
-    removed = svc.clean()
-    assert len(removed) == 1
-    assert removed[0].port == 3000
-    assert svc.list_entries() == []
-
-
-def test_us6_clean_dry_run_does_not_remove(tmp_path: Path) -> None:
+def test_us6_clean_removes_stale_entries_and_dry_run_does_not(tmp_path: Path) -> None:
+    """US-REG-006: clean removes stale entries; a dry-run leaves them in place."""
     ws = _init_workspace(tmp_path)
     probe = FakeProcessProbe()
     svc = _build_svc(ws, probe)
@@ -194,19 +158,10 @@ def test_us6_clean_dry_run_does_not_remove(tmp_path: Path) -> None:
     assert len(removed) == 1
     assert len(svc.list_entries()) == 1
 
-
-def test_us7_skill_file_exists_in_public(tmp_path: Path) -> None:
-    """US-REG-007: Skill file exists in public/skills/dev-server-registry/."""
-    import dadaia_workspace
-
-    pkg_dir = Path(dadaia_workspace.__file__).parent
-    skill_file = pkg_dir / "public" / "skills" / "dev-server-registry" / "SKILL.md"
-    assert skill_file.exists(), f"Missing: {skill_file}"
-    content = skill_file.read_text()
-    assert "dadaia server list" in content
-    assert "dadaia server next" in content
-    assert "dadaia server register" in content
-    assert "dadaia server release" in content
+    removed = svc.clean()
+    assert len(removed) == 1
+    assert removed[0].port == 3000
+    assert svc.list_entries() == []
 
 
 def test_registry_persists_across_service_restarts(tmp_path: Path) -> None:
