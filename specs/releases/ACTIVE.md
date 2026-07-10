@@ -1,18 +1,13 @@
 ---
-release: v0.1.74
-phase: IMPLEMENTATION
+release: none
+phase: none
 ---
 
-# Active release: v0.1.74 — Canonical zone docs are never hygiene waste
+# Active release: none
 
-Single-bug remediation (HIGH, reported against `45da12e5` from the operator's remote):
-`public install` restores the projected zone-doc `AGENTS.md` files with historical
-mtimes → 2 UNPROTECTED expired candidates → preflight re-blocked → `hygiene clean
---apply` deletes them → `public doctor` drifts → install restores → loop.
+v0.1.74 shipped (PR #143, `7b08beef`) and closed — archived to `specs/_archive/v0.1.74/`.
+Bug ledger: 0 open.
 
-Root cause: the hygiene zone scan has no concept of canonical zone docs / lib
-projections — mtime freshening would only re-expire in 24h; classification is the fix.
-FR1: zone-root doc files (`AGENTS.md`, `README.md`, `.gitkeep` — the documented
-scoped-rules mechanism) get `HygieneProtectionKind.CANONICAL_ZONE_DOC` in ONE insertion
-point (`_protected_paths`), inherited by cleanup, the FR3 preflight arithmetic, and the
-retention sweep. Acceptance: remote replay of the reporter's exact commands.
+Next pick (operator-mandated): `20260709-test-suite-remediation-waves` — full test-suite
+rearchitecture to 1,000–1,200 high-value tests (classification plans in
+`.dadaia/tmp/claude/20260709/test-rearch/`).
