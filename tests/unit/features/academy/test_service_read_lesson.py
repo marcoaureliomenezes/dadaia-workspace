@@ -72,9 +72,7 @@ def test_read_lesson_happy_path_returns_markdown() -> None:
         pytest.param(_REAL_MODULE, "nonexistent_lesson.md", id="unknown-lesson"),
         pytest.param(_REAL_MODULE, "README", id="non-md-extension-no-suffix"),
         pytest.param(_REAL_MODULE, "service.py", id="non-md-extension-py"),
-        pytest.param(
-            _REAL_MODULE, f"{_SIBLING_MODULE}.md", id="directory-target-not-file"
-        ),
+        pytest.param(_REAL_MODULE, f"{_SIBLING_MODULE}.md", id="directory-target-not-file"),
         pytest.param("..", "README.md", id="module-dotdot"),
         pytest.param("../..", "README.md", id="module-dotdot-dotdot"),
         pytest.param(f"../{_SIBLING_MODULE}", "README.md", id="module-escape-sibling"),
@@ -88,17 +86,11 @@ def test_read_lesson_happy_path_returns_markdown() -> None:
             f"../{_SIBLING_MODULE}/README.md",
             id="lesson-escape-sibling",
         ),
-        pytest.param(
-            _REAL_MODULE, "../../setup.py.md", id="lesson-escape-double-dotdot"
-        ),
+        pytest.param(_REAL_MODULE, "../../setup.py.md", id="lesson-escape-double-dotdot"),
         pytest.param(_REAL_MODULE, "subdir/nested.md", id="lesson-embedded-subdir"),
         pytest.param(_REAL_MODULE, "/etc/passwd.md", id="lesson-absolute-path"),
-        pytest.param(
-            _REAL_MODULE, "..\\windows\\evil.md", id="lesson-backslash-escape"
-        ),
-        pytest.param(
-            _REAL_MODULE, "..README.md", id="lesson-dotdot-prefix-single-segment"
-        ),
+        pytest.param(_REAL_MODULE, "..\\windows\\evil.md", id="lesson-backslash-escape"),
+        pytest.param(_REAL_MODULE, "..README.md", id="lesson-dotdot-prefix-single-segment"),
         pytest.param(_REAL_MODULE, "../README.md", id="lesson-url-decoded-slash"),
         pytest.param("../07_codex", "README.md", id="module-url-decoded-slash"),
     ],

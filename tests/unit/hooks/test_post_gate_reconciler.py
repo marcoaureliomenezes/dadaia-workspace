@@ -212,5 +212,3 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     sdd_post_gate._reconcile_working_tree(ws, _SID)
 
     assert len(_flags(ws)) == 2, "after the window the reconciler runs again"
-
-

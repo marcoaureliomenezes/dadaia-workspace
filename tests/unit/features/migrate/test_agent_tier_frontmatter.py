@@ -91,9 +91,7 @@ def test_dry_run_idempotent_no_frontmatter_missing_dir_and_registered(tmp_path: 
     # second run is idempotent (no-op).
     idem_specs = _specs(tmp_path / "idem", ("product/s3-delivery.md", real_body))
     migrate_agent_tier_frontmatter(idem_specs, dry_run=False)
-    after_first = (idem_specs / "memory" / "product" / "s3-delivery.md").read_text(
-        encoding="utf-8"
-    )
+    after_first = (idem_specs / "memory" / "product" / "s3-delivery.md").read_text(encoding="utf-8")
     second = migrate_agent_tier_frontmatter(idem_specs, dry_run=False)
     assert (idem_specs / "memory" / "product" / "s3-delivery.md").read_text(
         encoding="utf-8"

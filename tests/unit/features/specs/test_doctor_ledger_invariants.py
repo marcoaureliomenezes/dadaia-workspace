@@ -235,7 +235,9 @@ def test_sad_matrix(tmp_path: Path) -> None:
     assert any(i.severity == Severity.ERROR for i in doc026)
 
     # DOC-027: non-SemVer active release dir -> ERROR.
-    specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027"), release_id="my-feature-v1")
+    specs_e = _make_clean_specs_tree(
+        tmp_path.parent / (tmp_path.name + "-027"), release_id="my-feature-v1"
+    )
     doc027 = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
     assert any(i.severity == Severity.ERROR for i in doc027)
 
@@ -458,7 +460,9 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
     assert any("brand-new-non-canon-dir" in (i.path or "") for i in doc027_forward)
     assert not any("v0.1.4.6" in (i.path or "") for i in doc027_forward)
 
-    specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027live"), release_id="v0.1.4.6")
+    specs_e = _make_clean_specs_tree(
+        tmp_path.parent / (tmp_path.name + "-027live"), release_id="v0.1.4.6"
+    )
     doc027_live = _by_code(SpecsDoctor(specs_e).check(), "SPEC-DOC-027")
     assert any(i.severity == Severity.ERROR for i in doc027_live)
 

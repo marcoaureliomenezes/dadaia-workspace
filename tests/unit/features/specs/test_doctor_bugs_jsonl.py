@@ -104,7 +104,9 @@ def test_coherence_spans_multiple_files_in_chronological_order(tmp_path: Path) -
             id="double-terminal",
         ),
         pytest.param(
-            lambda bugs: (bugs / "20260701T13Z-00.jsonl").write_text("{not json\n", encoding="utf-8"),
+            lambda bugs: (bugs / "20260701T13Z-00.jsonl").write_text(
+                "{not json\n", encoding="utf-8"
+            ),
             "not valid JSON",
             id="malformed-json-line",
         ),

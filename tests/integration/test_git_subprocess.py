@@ -17,7 +17,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
-
 def _init_git_repo(path: Path, initial_commit: bool = True) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)

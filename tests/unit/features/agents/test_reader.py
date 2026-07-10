@@ -400,11 +400,13 @@ def test_get_prompt_happy_path_returns_body_without_frontmatter(
 @pytest.mark.parametrize(
     ("agent_id", "setup", "exc", "match"),
     [
-        pytest.param("INVALID_ID!", None, InvalidAgentIdError, None, id="invalid-id-uppercase-bang"),
-        pytest.param("SoftwareEngineer", None, InvalidAgentIdError, None, id="invalid-id-camelcase"),
         pytest.param(
-            "software engineer", None, InvalidAgentIdError, None, id="invalid-id-space"
+            "INVALID_ID!", None, InvalidAgentIdError, None, id="invalid-id-uppercase-bang"
         ),
+        pytest.param(
+            "SoftwareEngineer", None, InvalidAgentIdError, None, id="invalid-id-camelcase"
+        ),
+        pytest.param("software engineer", None, InvalidAgentIdError, None, id="invalid-id-space"),
         pytest.param(
             "software-engineer",
             None,

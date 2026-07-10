@@ -58,8 +58,24 @@ class _TimeoutProcessRunner:
     ("returncode", "stdout", "stderr", "expected_severity", "expect_no_issue", "message_fragment"),
     [
         pytest.param(0, "", "", None, True, None, id="clean-exit-no-issues"),
-        pytest.param(1, "frontmatter invalid", "", Severity.ERROR, False, "frontmatter invalid", id="error-exit-maps-to-error"),
-        pytest.param(2, "", "token drift", Severity.WARNING, False, "token drift", id="warning-exit-maps-to-warning"),
+        pytest.param(
+            1,
+            "frontmatter invalid",
+            "",
+            Severity.ERROR,
+            False,
+            "frontmatter invalid",
+            id="error-exit-maps-to-error",
+        ),
+        pytest.param(
+            2,
+            "",
+            "token drift",
+            Severity.WARNING,
+            False,
+            "token drift",
+            id="warning-exit-maps-to-warning",
+        ),
     ],
 )
 def test_lint1_exit_code_severity_mapping(
@@ -73,7 +89,8 @@ def test_lint1_exit_code_severity_mapping(
 ) -> None:
     specs = _make_specs_with_memory(tmp_path)
     doctor = MemoryValidator(
-        specs, process_runner=_FakeProcessRunner(returncode=returncode, stdout=stdout, stderr=stderr)
+        specs,
+        process_runner=_FakeProcessRunner(returncode=returncode, stdout=stdout, stderr=stderr),
     )
     issues = doctor.check_lint1_memory_atoms()
 
@@ -92,7 +109,9 @@ def test_lint1_timeout_and_missing_script_degrade_to_warning(
     specs = _make_specs_with_memory(tmp_path)
 
     # Timeout degrades to a WARNING, never a crash.
-    timeout_issues = MemoryValidator(specs, process_runner=_TimeoutProcessRunner()).check_lint1_memory_atoms()
+    timeout_issues = MemoryValidator(
+        specs, process_runner=_TimeoutProcessRunner()
+    ).check_lint1_memory_atoms()
     assert len(timeout_issues) == 1
     assert timeout_issues[0].code == "LINT-1"
     assert timeout_issues[0].severity == Severity.WARNING

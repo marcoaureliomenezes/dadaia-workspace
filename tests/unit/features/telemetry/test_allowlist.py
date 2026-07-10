@@ -106,9 +106,14 @@ def test_sanitizer_contract_strips_forbidden_and_never_mutates_input() -> None:
             None,
             id="missing-session-id-none",
         ),
-        pytest.param({"sessionId": "s1", "type": "assistant"}, True, None, id="missing-timestamp-none"),
         pytest.param(
-            {"sessionId": "s1", "timestamp": "2026-05-17T10:00:00.000Z"}, True, None, id="missing-type-none"
+            {"sessionId": "s1", "type": "assistant"}, True, None, id="missing-timestamp-none"
+        ),
+        pytest.param(
+            {"sessionId": "s1", "timestamp": "2026-05-17T10:00:00.000Z"},
+            True,
+            None,
+            id="missing-type-none",
         ),
         pytest.param("string", True, None, id="non-dict-string-none"),
         pytest.param(None, True, None, id="non-dict-none-value-none"),
@@ -139,9 +144,11 @@ def test_sanitizer_contract_strips_forbidden_and_never_mutates_input() -> None:
         pytest.param(
             _make_agent_name_event(),
             False,
-            lambda r: r["type"] == "agent-name"
-            and r["agentName"] == "software-engineer"
-            and "usage" not in r,
+            lambda r: (
+                r["type"] == "agent-name"
+                and r["agentName"] == "software-engineer"
+                and "usage" not in r
+            ),
             id="non-assistant-agent-name-no-usage-required",
         ),
         pytest.param(

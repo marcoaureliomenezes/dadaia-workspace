@@ -356,5 +356,3 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
         # constitution.md is gone — its marker must be absent, but architecture remains.
         assert "STATIC_CONST_MARKER_42" not in step.prompt_text
         assert _ARCH_STATIC_MARKER in step.prompt_text
-
-

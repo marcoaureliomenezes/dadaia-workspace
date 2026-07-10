@@ -110,13 +110,17 @@ def test_state_dir_and_db_file_routing_matrix(
     monkeypatch.setattr(service_mod, "PLATFORM", Capabilities.detect("win32"))
     chmod_calls_d: list[tuple[Any, int]] = []
     monkeypatch.setattr(os, "chmod", lambda p, m: chmod_calls_d.append((p, m)))
-    _make_service(state_dir=tmp_path / "d" / "state", workspace_root=tmp_path / "d", permission_setter=None)
+    _make_service(
+        state_dir=tmp_path / "d" / "state", workspace_root=tmp_path / "d", permission_setter=None
+    )
     assert chmod_calls_d == []
 
     # (e) db-file path routes file restriction through the setter (not dir restriction).
     setter_e = _RecordingSetter()
     svc_e = _make_service(
-        state_dir=tmp_path / "e" / "state", workspace_root=tmp_path / "e", permission_setter=setter_e
+        state_dir=tmp_path / "e" / "state",
+        workspace_root=tmp_path / "e",
+        permission_setter=setter_e,
     )
     setter_e.dir_calls.clear()  # discard the construction-time state-dir call
     db_file_e = tmp_path / "e" / "telemetry.db"

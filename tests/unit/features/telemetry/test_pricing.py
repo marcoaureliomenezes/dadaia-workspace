@@ -127,8 +127,20 @@ def test_known_model_historical_effective_from_windowing(monkeypatch: pytest.Mon
 @pytest.mark.parametrize(
     ("usage", "model", "when", "expected"),
     [
-        pytest.param({"input_tokens": 1_000_000}, "unknown-model-x", date(2026, 1, 1), None, id="unknown-model-none"),
-        pytest.param({"input_tokens": 0, "output_tokens": 0}, "claude-opus-4-7", date(2026, 1, 1), 0, id="zero-usage-zero-cost"),
+        pytest.param(
+            {"input_tokens": 1_000_000},
+            "unknown-model-x",
+            date(2026, 1, 1),
+            None,
+            id="unknown-model-none",
+        ),
+        pytest.param(
+            {"input_tokens": 0, "output_tokens": 0},
+            "claude-opus-4-7",
+            date(2026, 1, 1),
+            0,
+            id="zero-usage-zero-cost",
+        ),
         pytest.param({}, "claude-opus-4-7", date(2026, 1, 1), 0, id="missing-keys-default-zero"),
         pytest.param(
             {"input_tokens": -100, "output_tokens": 1_000_000},
@@ -173,7 +185,9 @@ def test_pricing_age_days_variants(monkeypatch: pytest.MonkeyPatch) -> None:
     # unknown-only -> None.
     assert pricing_age_days(["unknown-x"], when=date(2026, 1, 1)) is None
     # mixed known/unknown: unknown ignored.
-    assert pricing_age_days(["claude-opus-4-7", "totally-unknown-llm"], when=date(2025, 7, 1)) == 181
+    assert (
+        pricing_age_days(["claude-opus-4-7", "totally-unknown-llm"], when=date(2025, 7, 1)) == 181
+    )
     # all baseline models same effective_from.
     assert (
         pricing_age_days(

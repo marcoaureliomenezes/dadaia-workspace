@@ -91,14 +91,12 @@ def test_lineage_predicate_and_noop_matrix(tmp_path: Path) -> None:
     ws2 = tmp_path.parent / (tmp_path.name + "-already-ours")
     _write_lock(ws2, session_id="sess_new", pid=42424)
     assert (
-        lease.adopt_if_own_lineage(ws2, _CTX, "sess_new", ancestry_pids=frozenset({42424}))
-        is False
+        lease.adopt_if_own_lineage(ws2, _CTX, "sess_new", ancestry_pids=frozenset({42424})) is False
     )
 
     # noop: no record exists at all.
     ws3 = tmp_path.parent / (tmp_path.name + "-no-record")
     (ws3 / ".dadaia" / "states").mkdir(parents=True)
     assert (
-        lease.adopt_if_own_lineage(ws3, _CTX, "sess_new", ancestry_pids=frozenset({42424}))
-        is False
+        lease.adopt_if_own_lineage(ws3, _CTX, "sess_new", ancestry_pids=frozenset({42424})) is False
     )

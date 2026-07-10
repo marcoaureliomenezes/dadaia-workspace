@@ -100,18 +100,28 @@ _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
         ],
         # Workspace-root .dadaia/ ADDITIVE prefixes preserved (FR-R1-05).
         pytest.param(
-            "root-path", ".dadaia/reports/ctx/agent/r.html", PathClass.ADDITIVE, id="root-dadaia-reports"
+            "root-path",
+            ".dadaia/reports/ctx/agent/r.html",
+            PathClass.ADDITIVE,
+            id="root-dadaia-reports",
         ),
         pytest.param(
             "root-path", ".dadaia/handoff/ctx/h.json", PathClass.ADDITIVE, id="root-dadaia-handoff"
         ),
-        pytest.param("root-path", ".dadaia/tmp/agent/x.txt", PathClass.ADDITIVE, id="root-dadaia-tmp"),
+        pytest.param(
+            "root-path", ".dadaia/tmp/agent/x.txt", PathClass.ADDITIVE, id="root-dadaia-tmp"
+        ),
         # PROTECTED (fail-closed) + UNGATED fall-through preserved at root.
         pytest.param(
-            "root-path", ".dadaia/sessions/runtime/ctx.ptr", PathClass.PROTECTED, id="root-protected"
+            "root-path",
+            ".dadaia/sessions/runtime/ctx.ptr",
+            PathClass.PROTECTED,
+            id="root-protected",
         ),
         pytest.param("root-path", "README.md", PathClass.UNGATED, id="root-readme-ungated"),
-        pytest.param("root-path", "some/loose/path.txt", PathClass.UNGATED, id="root-loose-ungated"),
+        pytest.param(
+            "root-path", "some/loose/path.txt", PathClass.UNGATED, id="root-loose-ungated"
+        ),
         # Leading slash stripped; bare repo prefix.
         pytest.param(
             "leading-slash", ("/specs/bugs/x.md", "specs/bugs/x.md"), None, id="leading-slash-equiv"
@@ -214,7 +224,10 @@ def test_archive_prefix_boundary_and_ordering() -> None:
             id="blocks-write-into-archive",
         ),
         pytest.param(
-            "specs/bugs/20260701T00Z-00.jsonl", Decision.ALLOW, None, id="allows-write-into-live-bugs"
+            "specs/bugs/20260701T00Z-00.jsonl",
+            Decision.ALLOW,
+            None,
+            id="allows-write-into-live-bugs",
         ),
     ],
 )

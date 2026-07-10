@@ -136,7 +136,9 @@ def test_ptr_lifecycle_and_gc_matrix(tmp_path: Path) -> None:
     ws1 = _make_workspace(tmp_path.parent / (tmp_path.name + "-first-acquire"))
     ptr1 = lease._ptr_path(ws1, CTX)
     assert not ptr1.exists()
-    status, _rec = lease.acquire(ws1, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE))
+    status, _rec = lease.acquire(
+        ws1, CTX, MY_SESSION, "v0.1.6", "IMPLEMENTATION", clock=fixed(BASE)
+    )
     assert status == "ACQUIRED"
     assert ptr1.exists()
     assert ptr1.read_text(encoding="utf-8").strip() == MY_SESSION

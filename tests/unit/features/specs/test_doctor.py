@@ -490,7 +490,9 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> N
     mutate(specs)
     issues = SpecsDoctor(specs).check()
     if case == "agents-md-does-not-blanket-exempt":
-        doc_002l = [i for i in issues if i.code == "SPEC-DOC-002L" and "old-note.md" in (i.path or "")]
+        doc_002l = [
+            i for i in issues if i.code == "SPEC-DOC-002L" and "old-note.md" in (i.path or "")
+        ]
         assert doc_002l, "Expected SPEC-DOC-002L for old-note.md but got none"
         return
     matching = [i for i in issues if i.code == code]
@@ -566,7 +568,9 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     qa_md.unlink()
     issues3b = SpecsDoctor(specs3b).check()
     tree3_qa = [
-        i for i in issues3b if i.code == "TREE-3" and "quality-assurance.md" in (i.description or "")
+        i
+        for i in issues3b
+        if i.code == "TREE-3" and "quality-assurance.md" in (i.description or "")
     ]
     assert tree3_qa and tree3_qa[0].severity == Severity.WARNING and not tree3_qa[0].fixable
     spec_doc_002_qa = [
@@ -700,8 +704,7 @@ def test_doc005_plan_line_limit_cutoff_boundary(
             id="malformed-candidate-bullet",
         ),
         pytest.param(
-            "# Backlog\n\n## Hotfixes pendentes\n\n"
-            "- fix this bug (no proper format at all)\n",
+            "# Backlog\n\n## Hotfixes pendentes\n\n- fix this bug (no proper format at all)\n",
             True,
             id="malformed-hotfix-bullet",
         ),
@@ -782,9 +785,15 @@ def test_doc012_bullet_format_matrix(tmp_path: Path, body: str, expect_doc012: b
     [
         pytest.param("v1.2.3", "2026-06-01", (2026, 6, 15), False, id="semver-name-ok"),
         pytest.param(
-            "sdd-release-lifecycle-v1", "2026-05-01", (2026, 6, 15), False, id="vintage-grandfathered"
+            "sdd-release-lifecycle-v1",
+            "2026-05-01",
+            (2026, 6, 15),
+            False,
+            id="vintage-grandfathered",
         ),
-        pytest.param("bad-name", "2026-06-01", (2026, 5, 20), False, id="before-cutoff-not-checked"),
+        pytest.param(
+            "bad-name", "2026-06-01", (2026, 5, 20), False, id="before-cutoff-not-checked"
+        ),
         pytest.param(
             "my-feature-v1", "2026-06-10", (2026, 6, 15), True, id="non-semver-new-release-warns"
         ),

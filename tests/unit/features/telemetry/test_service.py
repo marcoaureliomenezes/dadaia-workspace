@@ -183,9 +183,7 @@ def test_refresh_ttl_concurrency_and_di_lock_matrix(tmp_path: pathlib.Path) -> N
     lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     try:
-        svc3, cr3, cdx3 = _make_service(
-            state_dir=state_dir, workspace_root=tmp_path / "concurrent"
-        )
+        svc3, cr3, cdx3 = _make_service(state_dir=state_dir, workspace_root=tmp_path / "concurrent")
         svc3.refresh()
         assert cr3.call_count == 0
         assert cdx3.call_count == 0

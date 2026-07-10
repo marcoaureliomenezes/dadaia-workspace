@@ -189,7 +189,10 @@ def test_hotfix_scaffold_happy_path_and_idempotent(tmp_path: Path) -> None:
         pytest.param("v0.6.0", "v0.5.0", "PATCH=0", id="rejects-patch-zero"),
         pytest.param("my-hotfix-v1", "v0.5.0", "SemVer", id="rejects-invalid-semver"),
         pytest.param(
-            "v0.5.1", "nonexistent-release-id", "does not resolve", id="rejects-invalid-patches-release"
+            "v0.5.1",
+            "nonexistent-release-id",
+            "does not resolve",
+            id="rejects-invalid-patches-release",
         ),
     ],
 )

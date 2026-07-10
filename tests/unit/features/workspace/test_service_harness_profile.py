@@ -48,7 +48,11 @@ def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
     assert data == {"schema_version": "1", "harnesses": ["codex"]}
 
     # the inline init write and the infra adapter agree on shape (no fork).
-    service.init(tmp_path.parent / (tmp_path.name + "-roundtrip"), skip_assets=True, harnesses=("claude", "pi"))
+    service.init(
+        tmp_path.parent / (tmp_path.name + "-roundtrip"),
+        skip_assets=True,
+        harnesses=("claude", "pi"),
+    )
     states_dir = tmp_path.parent / (tmp_path.name + "-roundtrip") / ".dadaia" / "states"
     profile = JsonHarnessProfileStore().read(states_dir)
     assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "pi"))

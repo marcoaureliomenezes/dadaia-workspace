@@ -174,4 +174,6 @@ def test_clean_tree_matrix_each_violation_flagged_stale_noop_and_fresh_stub_stat
     result.path.write_text(text.replace("status: idea", "status: candidate"), encoding="utf-8")
 
     fresh_schema2 = [f for f in _run_fresh_doctor() if f.code is BacklogDoctorCode.BL_SCHEMA]
-    assert fresh_schema2, "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"
+    assert fresh_schema2, (
+        "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"
+    )

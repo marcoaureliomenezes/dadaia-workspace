@@ -173,9 +173,7 @@ def test_dead_refuses_untracked_then_commit_secret_free_pushes_and_planted_secre
     # Push blocked: repo kept, remote unchanged, context still ALIVE.
     assert repo3.exists()
     assert store3.get("proj").state == ContextState.ALIVE  # type: ignore[union-attr]
-    log3 = subprocess.run(
-        ["git", "log", "--oneline"], cwd=remote3, capture_output=True, text=True
-    )
+    log3 = subprocess.run(["git", "log", "--oneline"], cwd=remote3, capture_output=True, text=True)
     assert "auto-sync before dead" not in log3.stdout
 
 

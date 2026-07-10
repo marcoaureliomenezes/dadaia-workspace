@@ -182,23 +182,27 @@ _SINGLE_STAGE = [_stage("solo", "product-engineer")]
             _SPEC_REFINEMENT_STAGES,
             7,
             None,
-            lambda layers: len(
-                {
-                    layers[s]
-                    for s in (
-                        "arch_review",
-                        "devops_review",
-                        "qa_review",
-                        "frontend_review",
-                        "backend_review",
-                    )
-                }
-            )
-            == 1,
+            lambda layers: (
+                len(
+                    {
+                        layers[s]
+                        for s in (
+                            "arch_review",
+                            "devops_review",
+                            "qa_review",
+                            "frontend_review",
+                            "backend_review",
+                        )
+                    }
+                )
+                == 1
+            ),
             id="spec-refinement-workflow",
         ),
         pytest.param("single-stage-no-edges", _SINGLE_STAGE, 1, 0, None, id="single-stage"),
-        pytest.param("cyclic-handled-gracefully", _CYCLIC_STAGES, 2, None, None, id="cyclic-stages"),
+        pytest.param(
+            "cyclic-handled-gracefully", _CYCLIC_STAGES, 2, None, None, id="cyclic-stages"
+        ),
         pytest.param("empty-stages", [], 0, 0, None, id="empty-stages"),
     ],
 )
@@ -227,7 +231,9 @@ def test_gate_and_placeholder_classes_and_required_attributes() -> None:
     svg = render_dag_svg(_PARALLEL_STAGES)
     root = _parse_svg(svg)
     gate_nodes = [
-        e for e in root.iter() if "dag-node" in e.get("class", "") and e.get("data-stage-id") == "review"
+        e
+        for e in root.iter()
+        if "dag-node" in e.get("class", "") and e.get("data-stage-id") == "review"
     ]
     assert len(gate_nodes) == 1
     assert "dag-gate" in gate_nodes[0].get("class", "")
@@ -321,7 +327,9 @@ def test_node_meta_draws_line_enriches_aria_and_is_html_escaped() -> None:
     svg_aria = render_dag_svg(_LINEAR_STAGES, meta_aria)
     root = _parse_svg(svg_aria)
     labelled = [
-        e for e in root.iter() if "dag-node" in e.get("class", "") and e.get("data-stage-id") == "step_b"
+        e
+        for e in root.iter()
+        if "dag-node" in e.get("class", "") and e.get("data-stage-id") == "step_b"
     ]
     assert labelled
     aria = labelled[0].get("aria-label", "")

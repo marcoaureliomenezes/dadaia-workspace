@@ -101,9 +101,15 @@ def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
             id="doc036-archived-audit-without-disposition",
         ),
         pytest.param(
-            "SPEC-DOC-038", _setup_doc038_single, 1, "20260701T201136Z-0bcd6c19", id="doc038-single-loose-audit"
+            "SPEC-DOC-038",
+            _setup_doc038_single,
+            1,
+            "20260701T201136Z-0bcd6c19",
+            id="doc038-single-loose-audit",
         ),
-        pytest.param("SPEC-DOC-038", _setup_doc038_multiple, 2, None, id="doc038-multiple-loose-audits"),
+        pytest.param(
+            "SPEC-DOC-038", _setup_doc038_multiple, 2, None, id="doc038-multiple-loose-audits"
+        ),
     ],
 )
 def test_sad_path_matrix(  # type: ignore[no-untyped-def]
@@ -205,7 +211,11 @@ def _silent_doc036_empty_archive(specs: Path) -> None:
             ),
             id="doc038-archived-only-audits-clean",
         ),
-        pytest.param("SPEC-DOC-038", lambda specs: specs.mkdir(parents=True), id="doc038-absent-audits-dir-clean"),
+        pytest.param(
+            "SPEC-DOC-038",
+            lambda specs: specs.mkdir(parents=True),
+            id="doc038-absent-audits-dir-clean",
+        ),
     ],
 )
 def test_silent_and_exempt_matrix(tmp_path: Path, code: str, setup) -> None:  # type: ignore[no-untyped-def]

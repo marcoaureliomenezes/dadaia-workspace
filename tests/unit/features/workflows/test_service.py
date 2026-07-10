@@ -138,9 +138,7 @@ def _write_agentic_preferred_over_claude(tmp_path: Path) -> None:
     [
         pytest.param(
             "env-var-overrides-default",
-            lambda tp, mp: (
-                mp.setenv("DADAIA_WORKFLOWS_DIR", str(_write_custom_env_dir(tp))),
-            ),
+            lambda tp, mp: (mp.setenv("DADAIA_WORKFLOWS_DIR", str(_write_custom_env_dir(tp))),),
             "simple-wf",
             None,
             id="env-var-overrides-default-dir",
@@ -253,7 +251,8 @@ def test_summary_and_detail_dto_facets(monkeypatch: pytest.MonkeyPatch, tmp_path
     # detail: unknown name -> None; no dir -> None.
     assert svc.get_detail("nonexistent-workflow") is None
     bare_svc = WorkflowsService(
-        workspace_root=tmp_path.parent / (tmp_path.name + "-bare"), store_factory=MarkdownWorkflowStore
+        workspace_root=tmp_path.parent / (tmp_path.name + "-bare"),
+        store_factory=MarkdownWorkflowStore,
     )
     assert bare_svc.get_detail("simple-wf") is None
 
@@ -313,7 +312,9 @@ def test_summary_and_detail_dto_facets(monkeypatch: pytest.MonkeyPatch, tmp_path
 # ---------------------------------------------------------------------------
 
 
-def test_cache_hit_invalidation_and_eviction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_cache_hit_invalidation_and_eviction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _cache.clear()
     monkeypatch.delenv("DADAIA_WORKFLOWS_DIR", raising=False)
     wf_dir = _make_workflows_dir(tmp_path)

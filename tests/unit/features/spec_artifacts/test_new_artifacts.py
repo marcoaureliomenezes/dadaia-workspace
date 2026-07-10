@@ -59,7 +59,9 @@ def test_accepts_semver_release_id(tmp_path: Path) -> None:
         pytest.param(release_new, "1bad-slug", r"Invalid release ID", id="release-leading-digit"),
         pytest.param(release_new, "0.1.23", r"Invalid release ID", id="release-dotted-no-v"),
         pytest.param(release_new, "v0.1", r"Invalid release ID", id="release-dotted-too-short"),
-        pytest.param(release_new, "v0.1.2.3", r"Invalid release ID", id="release-dotted-4-segments"),
+        pytest.param(
+            release_new, "v0.1.2.3", r"Invalid release ID", id="release-dotted-4-segments"
+        ),
         pytest.param(release_new, "v1.2.x", r"Invalid release ID", id="release-dotted-non-numeric"),
         pytest.param(backlog_new, "UPPERCASE SLUG", r"Invalid slug", id="backlog-uppercase"),
     ],

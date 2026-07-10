@@ -105,9 +105,7 @@ def _setup_foreign_live_pid(ws: Path) -> None:
         ),
     ],
 )
-def test_blocked_variants(
-    tmp_path: Path, setup: Callable[[Path], None], acquire_pid: int
-) -> None:
+def test_blocked_variants(tmp_path: Path, setup: Callable[[Path], None], acquire_pid: int) -> None:
     """No lineage evidence, mismatched record pid, or a genuinely different live pid —
     none of these are self-recognized; the frozen foreign-holder contract holds."""
     setup(tmp_path)

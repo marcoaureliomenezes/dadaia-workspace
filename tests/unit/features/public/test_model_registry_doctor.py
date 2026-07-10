@@ -140,5 +140,3 @@ def test_unknown_model_variants(
     plugin_reports = check_model_resolution(plugin_dir)
     assert _has_error(plugin_reports), plugin_reports
     assert any("pack-agent" in line for line in plugin_reports), plugin_reports
-
-

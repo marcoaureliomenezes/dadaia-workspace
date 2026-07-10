@@ -117,7 +117,9 @@ def test_claude_enrich_row_and_detail_never_call_compute_cost() -> None:
 @pytest.mark.parametrize(
     ("runtime", "cumulative_cost_usd", "cost_known", "expect_cost", "expect_known"),
     [
-        pytest.param("claude", 0.0065, False, pytest.approx(0.0065), True, id="claude-cost-present"),
+        pytest.param(
+            "claude", 0.0065, False, pytest.approx(0.0065), True, id="claude-cost-present"
+        ),
         pytest.param("claude", None, False, None, False, id="claude-cost-none-unknown-model"),
         pytest.param("codex", 99.99, True, None, False, id="codex-always-clears-cost"),
         pytest.param("codex", None, False, None, False, id="codex-none-stays-none"),

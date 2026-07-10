@@ -147,9 +147,7 @@ def test_escape_paths_rejected(tmp_path: Path, bad_ref_builder: str) -> None:
         ctx_dir.mkdir(exist_ok=True)
         handoff_path = ctx_dir / f"2026-06-10T000000Z-{bad_ref_builder}.handoff.json"
         ref = (
-            str(outside)
-            if bad_ref_builder == "absolute-outside"
-            else "../../../../" + outside.name
+            str(outside) if bad_ref_builder == "absolute-outside" else "../../../../" + outside.name
         )
         _write_handoff(
             handoff_path,

@@ -61,7 +61,9 @@ def _setup_non_executable(tp: Path) -> None:
 @pytest.mark.parametrize(
     ("case", "setup", "expect_finding"),
     [
-        pytest.param("healthy", lambda tp: _make_healthy_venv(tp), False, id="healthy-venv-no-finding"),
+        pytest.param(
+            "healthy", lambda tp: _make_healthy_venv(tp), False, id="healthy-venv-no-finding"
+        ),
         pytest.param("missing-dir", lambda tp: None, True, id="missing-venv-dir-triggers-finding"),
         pytest.param(
             "missing-entrypoint",

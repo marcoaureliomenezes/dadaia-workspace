@@ -102,7 +102,9 @@ def test_scan_filters_listeners_owned_by_other_users() -> None:
 
 def _scan_sample() -> list[Any]:
     with _patch_uid_check_all_ours(), _patch_read_proc()[0], _patch_read_proc()[1]:
-        return scan_unregistered_listeners([_entry(4999, "panel")], _output_provider=_own_uid_provider)
+        return scan_unregistered_listeners(
+            [_entry(4999, "panel")], _output_provider=_own_uid_provider
+        )
 
 
 @pytest.mark.parametrize(
@@ -123,8 +125,9 @@ def _scan_sample() -> list[Any]:
         pytest.param(
             "skips-pidless-listeners",
             _scan_sample,
-            lambda result: 3968 not in [r.port for r in result]
-            and all(r.pid is not None for r in result),
+            lambda result: (
+                3968 not in [r.port for r in result] and all(r.pid is not None for r in result)
+            ),
             id="skips-pidless-listeners",
         ),
         pytest.param(

@@ -106,9 +106,7 @@ def test_four_target_projection_write(tmp_path: Path) -> None:
     assert len(ok_entries) == 4, f"Expected exactly 4 '[ok]' entries, got {len(ok_entries)}."
 
 
-def test_skip_and_doctor_matrix(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Skip variants (unregistered repo, self-slug) + the doctor 4-line parity output."""
     source = tmp_path / "data" / "AGENTS.md"
     source.parent.mkdir(parents=True)

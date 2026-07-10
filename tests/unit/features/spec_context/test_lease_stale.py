@@ -34,7 +34,10 @@ def rec(heartbeat: str, ttl: int = 1800) -> dict[str, object]:
         pytest.param(None, BASE, True, id="row1-none-is-stale"),
         pytest.param({}, BASE, True, id="row2-missing-fields-is-stale"),
         pytest.param(
-            {"heartbeat": "not-a-date", "ttl": 1800}, BASE, True, id="row3-corrupt-heartbeat-is-stale"
+            {"heartbeat": "not-a-date", "ttl": 1800},
+            BASE,
+            True,
+            id="row3-corrupt-heartbeat-is-stale",
         ),
         pytest.param(
             rec((BASE - timedelta(seconds=1)).isoformat()),

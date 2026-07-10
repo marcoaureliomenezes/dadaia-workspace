@@ -88,7 +88,12 @@ def test_propagate_without_force_on_hash_mismatch(
     dst_content = b'{"old": true}\n' if write_class == "write_generated" else b"# Old content\n"
 
     dst, installed, _mtime_before = _run_install(
-        write_class, manager, tmp_path, src_content=src_content, dst_content=dst_content, force=False
+        write_class,
+        manager,
+        tmp_path,
+        src_content=src_content,
+        dst_content=dst_content,
+        force=False,
     )
     if write_class == "write_generated":
         assert dst.read_text(encoding="utf-8") == src_content.decode()
@@ -115,7 +120,9 @@ def test_noop_when_hash_matches(
     assert dst.stat().st_mtime == mtime_before, "mtime changed — unexpected write on a no-op"
     # The guardrail pair also writes a sibling CLAUDE.md stub in the same call — only
     # inspect the report line for the destination file this test actually targets.
-    relevant = [ln for ln in installed if str(dst) in ln] if write_class == "guardrail" else installed
+    relevant = (
+        [ln for ln in installed if str(dst) in ln] if write_class == "guardrail" else installed
+    )
     assert any("[skip]" in line for line in relevant), f"Expected [skip] in {relevant}"
     assert not any("[ok]" in line for line in relevant), f"Got unexpected [ok] in {relevant}"
 
@@ -130,7 +137,9 @@ def test_force_clobbers_regardless_of_hash_match(
 ) -> None:
     """T-PROP-01 AC-3/AC-3b: --force clobbers whether content differs or matches (no
     short-circuit on identical content)."""
-    src_content = b'{"staged": true}\n' if write_class == "write_generated" else b"# Staged content\n"
+    src_content = (
+        b'{"staged": true}\n' if write_class == "write_generated" else b"# Staged content\n"
+    )
     dst_content = (
         src_content
         if identical

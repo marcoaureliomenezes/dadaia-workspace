@@ -81,7 +81,9 @@ def test_basic_empty_missing_and_malformed_mid_file_matrix(tmp_path: pathlib.Pat
 
     # Empty file: no-op, no errors.
     dao_empty = _make_dao(tmp_path)
-    empty_result = read_session_file(FIXTURES_DIR / "sample_session_empty.jsonl", dao_empty, NOW_ISO)
+    empty_result = read_session_file(
+        FIXTURES_DIR / "sample_session_empty.jsonl", dao_empty, NOW_ISO
+    )
     assert empty_result.events_ingested == 0
     assert empty_result.events_skipped == 0
     assert empty_result.bytes_read == 0

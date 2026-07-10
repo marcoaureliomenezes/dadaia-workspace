@@ -313,9 +313,7 @@ def test_bind_marker_newer_than_sentinel_injects_memory_then_rebind_and_repeat_p
     ("session", "chain", "legacy_empty", "expect_inject"),
     [
         pytest.param("chain", [555001, _PID_A, 700000], False, True, id="membership-injects"),
-        pytest.param(
-            "dj", [555002, _PID_B, 700001], False, False, id="disjoint-pid-never-injects"
-        ),
+        pytest.param("dj", [555002, _PID_B, 700001], False, False, id="disjoint-pid-never-injects"),
         pytest.param(
             # Pre-W1-7 markers carry no harness pid (empty file). Such a marker is
             # unattributable, so the hook ignores it and stays on generic preflight —

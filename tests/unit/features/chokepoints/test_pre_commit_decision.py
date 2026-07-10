@@ -47,7 +47,9 @@ def _write_record(
         "ttl": ttl,
     }
     if not legacy_no_pid:
-        record.update({"release": "v0.1.14", "mode": "IMPLEMENTATION", "pid": pid, "acquired_at": hb})
+        record.update(
+            {"release": "v0.1.14", "mode": "IMPLEMENTATION", "pid": pid, "acquired_at": hb}
+        )
     (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record), encoding="utf-8")
 
 
@@ -82,7 +84,15 @@ def _ancestry_boom(_a: int, _d: int) -> Ancestry:
 @pytest.mark.parametrize(
     ("case", "write_record", "env_sid", "pid_probe", "ancestry", "expect_warn_contains"),
     [
-        pytest.param("no-lease", False, None, _always_alive, Ancestry.NOT_ANCESTOR, None, id="no-lease-allows"),
+        pytest.param(
+            "no-lease",
+            False,
+            None,
+            _always_alive,
+            Ancestry.NOT_ANCESTOR,
+            None,
+            id="no-lease-allows",
+        ),
         pytest.param(
             "stale-dead",
             {"heartbeat": _NOW - timedelta(seconds=300)},

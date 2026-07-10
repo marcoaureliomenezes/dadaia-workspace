@@ -52,7 +52,9 @@ def _make_exe(directory: Path, name: str) -> Path:
         ),
     ],
 )
-def test_resolve_tool_precedence(tmp_path: Path, build: str, tool: str, expected_source: str) -> None:
+def test_resolve_tool_precedence(
+    tmp_path: Path, build: str, tool: str, expected_source: str
+) -> None:
     venv_bin = tmp_path / "venv" / "bin"
     python = _make_exe(venv_bin, "python")
     dadaia_bin_dir = tmp_path / "dadaia" / "bin"
