@@ -383,8 +383,10 @@ def test_silent_matrix(tmp_path: Path) -> None:
 
     # DOC-032: canonical statuses (case-insensitive), README skip, absent bugs/ dir,
     # and the live-tree superseded_by fix shape -> all silent.
-    for status in ("Open", "Closed", "open", "closed", "CLOSED"):
-        specs_i = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + f"-032-{status}"))
+    for idx, status in enumerate(("Open", "Closed", "open", "closed", "CLOSED")):
+        # Dir name carries an index, not the status: case-variant statuses collide
+        # on the case-insensitive filesystems of the macOS/Windows CI runners.
+        specs_i = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + f"-032-{idx}"))
         _write_bug(specs_i, "well-formed-bug", status)
         assert "SPEC-DOC-032" not in _codes(SpecsDoctor(specs_i).check())
     specs_i2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-032readme"))

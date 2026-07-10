@@ -42,6 +42,9 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
     dest = tmp_path / "dest"
     client.clone(str(src), dest)
     assert dest.exists()
+    # CI runners have no global git identity — commits in the clone need a local one.
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=dest, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=dest, capture_output=True)
 
     # is_dirty: clean, then dirty after a modification.
     assert client.is_dirty(dest) is False

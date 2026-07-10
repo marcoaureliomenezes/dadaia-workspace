@@ -19,6 +19,7 @@ Security:
 from __future__ import annotations
 
 import collections
+import contextlib
 import json
 import pathlib
 import sqlite3
@@ -277,8 +278,10 @@ class CodexRuntimeAdapter:
         archived: int = 0
 
         # Open read-only using URI mode to avoid write-lock on the live DB.
+        # contextlib.closing: sqlite3's own context manager commits/rolls back but
+        # never closes — the leaked handle blocks tempdir deletion on Windows.
         uri = f"file:{db_path}?mode=ro"
-        with sqlite3.connect(uri, uri=True) as con:
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as con:
             row = con.execute(
                 "SELECT updated_at, archived FROM threads WHERE id = ?",
                 (session_id,),
