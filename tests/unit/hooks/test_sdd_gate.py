@@ -33,8 +33,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.exceptions import LockHeldError
-from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
+from dadaia_workspace.features.spec_context import gate_policy, presence, session_identity
 from dadaia_workspace.hooks import sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -196,11 +195,11 @@ def test_apply_patch_multi_file_most_restrictive(
         assert block is None
 
 
-def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_blocks(
+def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
     tmp_path: Path,
 ) -> None:
-    # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST acquire repos/B's
-    # lease, never repos/A's (fixes gate-cross-context-lock-contamination).
+    # PARITY (a): first-ALIVE is repos/A, but a write under repos/B MUST attribute
+    # presence to repos/B, never repos/A (fixes gate-cross-context-lock-contamination).
     ws = _mk_workspace(tmp_path, "A", "B")  # A is first-ALIVE
     target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -210,13 +209,14 @@ def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_b
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}},
         session_id="sess-1",
     )
-    assert block is None  # acquired cleanly (no foreign conflict)
-    # The lease record must be for context B, never A.
-    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
-    assert (lock_dir / "B.lock.json").exists()
-    assert not (lock_dir / "A.lock.json").exists()
+    assert block is None  # v0.1.76: never blocks on concurrency
+    # The presence record must be for context B, never A.
+    presence_root = ws / ".dadaia" / "states" / "presence"
+    assert (presence_root / "B" / "sess-1.json").exists()
+    assert not (presence_root / "A").exists()
 
-    # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open (no lease).
+    # A specs/releases/ path with no repo slug + no DADAIA_CONTEXT -> fail open (no
+    # presence target attributable).
     ws2 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-no-ctx"), "a")
     target2 = ws2 / "specs" / "releases" / "x" / "TASKS.md"
     block2 = _run(
@@ -225,10 +225,11 @@ def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_b
     )
     assert block2 is None
 
-    # PARITY: a genuine fresh foreign lease held by THIS (alive) process makes the gate
-    # BLOCK — reproduced harness-real by seeding a real lease, no monkeypatch of acquire.
+    # DOCTRINE (v0.1.76): a genuinely live foreign session's presence on the SAME
+    # context never blocks — the write ALLOWs (advisory only), reproduced harness-real
+    # by seeding a real presence record, no monkeypatch of the gate.
     ws3 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-foreign"), "B")
-    lease.acquire(ws3, "B", "owner-A", "rel-1", "implementation", pid=os.getpid())
+    presence.upsert(ws3, "B", "owner-A", runtime="claude", pid=os.getpid())
     target3 = ws3 / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
     target3.parent.mkdir(parents=True, exist_ok=True)
     block3 = _run(
@@ -236,11 +237,7 @@ def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_b
         {"tool_name": "Write", "tool_input": {"file_path": str(target3)}},
         session_id="intruder",
     )
-    assert block3 is not None
-    # The yield-iff-live-foreign message names the holder and the contended context.
-    assert "SDD LOCK" in block3["reason"]
-    assert "owner-A" in block3["reason"]
-    assert "context 'B'" in block3["reason"]
+    assert block3 is None
 
 
 # --------------------------------------------------------------------------- #
@@ -248,14 +245,8 @@ def test_path_first_context_slug_parity_no_context_fails_open_and_live_foreign_b
 # --------------------------------------------------------------------------- #
 
 
-def _evaluate_mutating(
-    tmp_path: Path,
-    *,
-    acquire: Any,
-    monkeypatch: pytest.MonkeyPatch,
-) -> tuple[gate_policy.Decision, str]:
+def _evaluate_mutating(tmp_path: Path) -> tuple[gate_policy.Decision, str]:
     ws = _mk_workspace(tmp_path, "B")
-    monkeypatch.setattr(lease, "acquire", acquire)
     return gate_policy.evaluate(
         ws,
         "repos/B/specs/releases/rel-1/TASKS.md",
@@ -267,42 +258,23 @@ def _evaluate_mutating(
     )
 
 
-@pytest.mark.parametrize(
-    ("name", "acquire_raises", "expected_decision", "reason_contains"),
-    [
-        (
-            # PARITY (b): any non-LockHeldError from the lease subsystem -> ALLOW
-            # (fail-open). Asserted at the policy layer (the fail-safe guarantee lives
-            # in gate_policy.evaluate, AC-04).
-            "fail_open_on_lease_error",
-            RuntimeError("lease subsystem exploded"),
-            gate_policy.Decision.ALLOW,
-            "",
-        ),
-        (
-            # A genuine live-foreign LockHeldError -> BLOCK with the informative yield
-            # message.
-            "live_foreign_lease_blocks",
-            LockHeldError("context 'B' is held by another live session"),
-            gate_policy.Decision.BLOCK,
-            "another live session",
-        ),
-    ],
-)
-def test_gate_policy_fail_safe_contract(
+def test_gate_policy_fail_safe_contract_presence_error_never_blocks(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    name: str,
-    acquire_raises: Exception,
-    expected_decision: gate_policy.Decision,
-    reason_contains: str,
 ) -> None:
-    def boom(*_a: object, **_k: object) -> None:
-        raise acquire_raises
+    """v0.1.76 doctrine (AC-04 successor): a MUTATING write is NEVER blocked because of
+    another session. Even if the presence subsystem itself explodes, the write ALLOWs —
+    ``presence.upsert``/``others_alive`` are internally fail-soft (see
+    ``features/spec_context/presence.py``), and ``gate_policy.evaluate`` no longer has
+    any acquisition call site that can raise a block-worthy error at all."""
 
-    decision, reason = _evaluate_mutating(tmp_path, acquire=boom, monkeypatch=monkeypatch)
-    assert decision == expected_decision
-    assert reason_contains in reason
+    def boom(*_a: object, **_k: object) -> None:
+        raise RuntimeError("presence subsystem exploded")
+
+    monkeypatch.setattr(presence, "upsert", boom)
+    monkeypatch.setattr(presence, "others_alive", boom)
+    decision, _reason = _evaluate_mutating(tmp_path)
+    assert decision == gate_policy.Decision.ALLOW
 
 
 # --------------------------------------------------------------------------- #
@@ -369,8 +341,8 @@ def test_resolve_mode_precedence(
         "session_mode",
         "target_fn",
         "expect_block",
-        "lease_forbidden",
-        "lease_expected",
+        "presence_forbidden",
+        "presence_expected",
         "reason_checks",
         "reason_lower",
     ),
@@ -384,7 +356,7 @@ def test_resolve_mode_precedence(
             False,
             ("read", "--mode implementation"),
             True,
-            id="read-mode-blocks-mutating-no-lease-written",
+            id="read-mode-blocks-mutating-no-presence-written",
         ),
         pytest.param(
             "sess-read",
@@ -410,7 +382,7 @@ def test_resolve_mode_precedence(
         ),
         pytest.param(
             # FR-R4-03 / D-3: only explicit READ blocks MUTATING. BOUND_REVIEW is
-            # lease-taking, so a free lease is acquired exactly like implementation.
+            # presence-upserting, so it ALLOWs exactly like implementation.
             "sess-rev",
             "BOUND_REVIEW",
             lambda ws: ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md",
@@ -419,11 +391,11 @@ def test_resolve_mode_precedence(
             True,
             (),
             False,
-            id="bound-review-acquires-like-implementation",
+            id="bound-review-allows-like-implementation",
         ),
         pytest.param(
-            # FR-R4-04: no bind record, no env → IMPLEMENTATION; free-lease acquire
-            # proceeds. (session_id "unbound" has no record at all — session_mode=None.)
+            # FR-R4-04: no bind record, no env → IMPLEMENTATION; the write ALLOWs.
+            # (session_id "unbound" has no record at all — session_mode=None.)
             "unbound",
             None,
             lambda ws: ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md",
@@ -432,7 +404,7 @@ def test_resolve_mode_precedence(
             True,
             (),
             False,
-            id="missing-mode-acquires-free-lease",
+            id="missing-mode-allows-write",
         ),
     ],
 )
@@ -442,17 +414,17 @@ def test_read_mode_matrix(
     session_mode: str | None,
     target_fn: Any,
     expect_block: bool,
-    lease_forbidden: bool,
-    lease_expected: bool,
+    presence_forbidden: bool,
+    presence_expected: bool,
     reason_checks: tuple[str, ...],
     reason_lower: bool,
 ) -> None:
     # FR-R4-03: READ-bound session's write outcome depends on path class. MUTATING →
-    # BLOCK (non-acquiring, no lease record, --mode implementation hint). ADDITIVE →
+    # BLOCK (non-acquiring, no presence record, --mode implementation hint). ADDITIVE →
     # ALLOW. PROTECTED stays fail-closed regardless of mode (second CRIT row for
     # PROTECTED — see test_allow_parity's protected_sessions_blocks row for the base
-    # IMPLEMENTATION case). BOUND_REVIEW and missing-mode(unbound) both acquire a free
-    # lease exactly like IMPLEMENTATION — only explicit READ blocks MUTATING.
+    # IMPLEMENTATION case). BOUND_REVIEW and missing-mode(unbound) both ALLOW exactly
+    # like IMPLEMENTATION — only explicit READ (self-scoped) blocks MUTATING.
     ws = _mk_workspace(tmp_path, "B")
     if session_mode is not None:
         _write_session_record(ws, session_id, session_mode)
@@ -470,11 +442,12 @@ def test_read_mode_matrix(
             assert check in reason
     else:
         assert block is None
-    if lease_forbidden:
-        # Non-acquiring: the gate must NOT have created the lease record.
-        assert not (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
-    if lease_expected:
-        assert (ws / ".dadaia" / "states" / "ctx_locks" / "B.lock.json").exists()
+    presence_path = ws / ".dadaia" / "states" / "presence" / "B" / f"{session_id}.json"
+    if presence_forbidden:
+        # Non-acquiring: the gate must NOT have created a presence record.
+        assert not presence_path.exists()
+    if presence_expected:
+        assert presence_path.exists()
 
 
 # --------------------------------------------------------------------------- #
@@ -515,8 +488,8 @@ def test_resolve_holder_pid(
 
     if name == "prefers_payload_harness_pid_int":
         # End-to-end companion: through the real hook subprocess, a payload-supplied
-        # harness pid is the pid stamped into the lease record (proving the gate
-        # threads the LONG-LIVED pid, not its own ephemeral child pid). Uses a
+        # harness pid is the pid stamped into the PRESENCE record (v0.1.76 — proving the
+        # gate threads the LONG-LIVED pid, not its own ephemeral child pid). Uses a
         # known-alive pid (this test process), not the synthetic 4242 above.
         ws = _mk_workspace(tmp_path, "B")
         target = ws / "repos" / "B" / "specs" / "releases" / "rel-1" / "TASKS.md"
@@ -532,102 +505,83 @@ def test_resolve_holder_pid(
             session_id="s-pid",
         )
         assert block is None
-        rec = lease.read_record(ws, "B")
-        assert rec is not None and rec["pid"] == my_pid, rec
+        rec_path = ws / ".dadaia" / "states" / "presence" / "B" / "s-pid.json"
+        rec = json.loads(rec_path.read_text(encoding="utf-8"))
+        assert rec["pid"] == my_pid, rec
 
 
 # --------------------------------------------------------------------------- #
-# White-box: NF-2/NF-4 (rc-2) — context-incumbent mode resolution + anti-downgrade
-# liveness x precedence matrix. Every anti-downgrade decision survives as a named row:
-# self-record wins over incumbent, live-holder overrides incumbent, no-holder honors
-# incumbent, dead-leftover honored (NF-4), live-divergent overrides, plain fallback.
+# White-box: v0.1.76 FR4 — mode resolution is STRICTLY SELF-SCOPED. The former
+# context-incumbent (rung 3) anti-downgrade matrix is DELETED (kills audit P1-1): a
+# foreign session's bind/incumbent pointer/lease residue can NEVER change what THIS
+# session's own mode resolves to. Every row below proves the incumbent pointer (and any
+# lease-record residue) is now INERT to _resolve_mode.
 # --------------------------------------------------------------------------- #
 
 
-def _setup_incumbent_fallback(ws: Path) -> tuple[str, str]:
-    # NF-2: a `dadaia context bind --mode read` mints a sid the harness never reports,
-    # but it refreshes the context incumbent pointer. A DIFFERENT harness sid (no self
-    # record, no env) resolves READ through the incumbent pointer → record.
-    bind_sid = "sess_bind01"
-    _write_session_record(ws, bind_sid, "READ")
-    session_identity.set_incumbent(ws, "a", bind_sid)
-    return "harness-sid-xyz", "READ"
-
-
-def _setup_self_record_wins(ws: Path) -> tuple[str, str]:
-    # Precedence: a record keyed to the harness sid wins over the incumbent pointer — a
-    # live implementation session is never downgraded by another session's read-bind.
-    read_sid = "sess_read01"
-    _write_session_record(ws, read_sid, "READ")
-    session_identity.set_incumbent(ws, "a", read_sid)
+def _setup_self_record_wins_no_incumbent_needed(ws: Path) -> tuple[str, str]:
+    # A record keyed to the harness sid resolves regardless of any incumbent pointer.
     impl_sid = "harness-impl"
     _write_session_record(ws, impl_sid, "BOUND_IMPLEMENTATION")
     return impl_sid, "BOUND_IMPLEMENTATION"
 
 
-def _setup_live_holder_overrides_incumbent(ws: Path) -> tuple[str, str]:
-    # Anti-downgrade (NF-2): a stale read-bind set the incumbent, but a DIFFERENT
-    # session then acquired the implementation lease. The live holder must not be
-    # downgraded to READ — the stale incumbent is ignored and the resolving session
-    # defaults to IMPLEMENTATION.
-    read_sid = "sess_readstale"
-    _write_session_record(ws, read_sid, "READ")
-    session_identity.set_incumbent(ws, "a", read_sid)
-    lease.acquire(ws, "a", "live-impl", "rel-1", "IMPLEMENTATION")
-    return "live-impl", "IMPLEMENTATION"
-
-
-def _setup_no_holder_honors_incumbent(ws: Path) -> tuple[str, str]:
-    # No lease holder yet ⇒ the read-bind incumbent still governs (a read session takes
-    # no lease, so absence of a holder is the normal read-bound state, not staleness).
-    bind_sid = "sess_nolease"
+def _setup_foreign_incumbent_never_imposes_read(ws: Path) -> tuple[str, str]:
+    # v0.1.76 FR4: a foreign session's READ bind sets the incumbent pointer, but a
+    # DIFFERENT harness sid (no self record) must resolve its OWN default
+    # (IMPLEMENTATION) — the incumbent rung is deleted, not merely overridden.
+    bind_sid = "sess_bind01"
     _write_session_record(ws, bind_sid, "READ")
     session_identity.set_incumbent(ws, "a", bind_sid)
-    assert not (ws / ".dadaia" / "states" / "ctx_locks" / "a.lock.json").exists()
-    return "another-harness-sid", "READ"
+    return "harness-sid-xyz", "IMPLEMENTATION"
 
 
-def _setup_dead_leftover_honored(ws: Path) -> tuple[str, str]:
-    # NF-4: the canonical review flow — an implementation session finished, leaving a
-    # TTL-stale lock record with a dead pid (nothing deletes it until takeover/GC), then
-    # the operator runs `bind --mode read`. The dead leftover's sid differs from the
-    # read-bind sid, but it is NOT live, so the incumbent READ must be honored (not
-    # silently downgraded).
+def _setup_foreign_incumbent_never_imposes_implementation(ws: Path) -> tuple[str, str]:
+    # Symmetric: a foreign IMPLEMENTATION incumbent must not upgrade a DIFFERENT
+    # session with no self record either — the default (IMPLEMENTATION) is reached
+    # independently, not "inherited" from the incumbent.
+    bind_sid = "sess_bind02"
+    _write_session_record(ws, bind_sid, "BOUND_IMPLEMENTATION")
+    session_identity.set_incumbent(ws, "a", bind_sid)
+    return "harness-other-sid", "IMPLEMENTATION"
+
+
+def _setup_dead_lease_residue_never_consulted(ws: Path) -> tuple[str, str]:
+    # A dead lease-record residue (the old anti-downgrade NF-4 scenario) is now
+    # completely inert to mode resolution: my own self record is all that matters.
     stale_hb = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
     _write_lease_record(
         ws, "a", {"session_id": "old-impl", "heartbeat": stale_hb, "ttl": 120, "pid": 0}
     )
-    bind_sid = "sess_freshread"
-    _write_session_record(ws, bind_sid, "READ")
-    session_identity.set_incumbent(ws, "a", bind_sid)
-    return "harness-reviewer", "READ"
+    my_sid = "harness-reviewer"
+    _write_session_record(ws, my_sid, "READ")
+    return my_sid, "READ"
 
 
-def _setup_live_divergent_overrides_read(ws: Path) -> tuple[str, str]:
-    # Anti-downgrade preserved: a TTL-fresh divergent holder (live) defeats the
-    # read-bind incumbent — the live implementation session is not downgraded to READ.
+def _setup_live_lease_residue_never_consulted(ws: Path) -> tuple[str, str]:
+    # A TTL-fresh lease-record residue for a DIFFERENT session is also inert — mode
+    # resolution never reads the lease record at all anymore.
     fresh_hb = datetime.now(tz=UTC).isoformat()
     _write_lease_record(
         ws, "a", {"session_id": "live-impl", "heartbeat": fresh_hb, "ttl": 120, "pid": 0}
     )
-    read_sid = "sess_staleread"
-    _write_session_record(ws, read_sid, "READ")
-    session_identity.set_incumbent(ws, "a", read_sid)
-    return "harness-other", "IMPLEMENTATION"
+    return "harness-no-self-record", "IMPLEMENTATION"
 
 
 @pytest.mark.parametrize(
     ("name", "setup_fn"),
     [
-        ("incumbent_fallback", _setup_incumbent_fallback),
-        ("self_record_wins_over_incumbent", _setup_self_record_wins),
-        ("live_holder_overrides_incumbent", _setup_live_holder_overrides_incumbent),
-        ("no_holder_honors_incumbent", _setup_no_holder_honors_incumbent),
-        ("dead_leftover_honored_nf4", _setup_dead_leftover_honored),
-        ("live_divergent_overrides_read_incumbent", _setup_live_divergent_overrides_read),
+        ("self_record_wins_no_incumbent_needed", _setup_self_record_wins_no_incumbent_needed),
+        ("foreign_incumbent_never_imposes_read", _setup_foreign_incumbent_never_imposes_read),
+        (
+            "foreign_incumbent_never_imposes_implementation",
+            _setup_foreign_incumbent_never_imposes_implementation,
+        ),
+        ("dead_lease_residue_never_consulted", _setup_dead_lease_residue_never_consulted),
+        ("live_lease_residue_never_consulted", _setup_live_lease_residue_never_consulted),
     ],
 )
-def test_resolve_mode_liveness_precedence_matrix(
+def test_resolve_mode_self_scoped_matrix(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, setup_fn: Any
 ) -> None:
     ws = _mk_workspace(tmp_path, "a")
@@ -635,30 +589,24 @@ def test_resolve_mode_liveness_precedence_matrix(
     resolving_sid, expected_mode = setup_fn(ws)
     assert sdd_gate._resolve_mode(ws, resolving_sid, "a") == expected_mode
 
-    if name == "dead_leftover_honored_nf4":
-        # End-to-end companion (NF-4): the SAME dead-leftover + fresh-READ-incumbent
-        # setup, driven through the real hook subprocess, blocks a MUTATING write
-        # (READ enforced) rather than merely resolving READ in isolation.
-        ws2 = _mk_workspace(tmp_path.parent / (tmp_path.name + "-e2e"), "a")
-        stale_hb2 = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
-        _write_lease_record(
-            ws2,
-            "a",
-            {"session_id": "old-impl", "heartbeat": stale_hb2, "ttl": 120, "pid": 0},
-        )
-        bind_sid2 = "sess_freshread2"
-        _write_session_record(ws2, bind_sid2, "READ")
-        session_identity.set_incumbent(ws2, "a", bind_sid2)
-        target2 = ws2 / "repos" / "a" / "src" / "mod.py"
-        payload2 = {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(target2), "content": "x = 1\n"},
-        }
-        env2 = claude_hook_env(ws2, session_id="harness-reviewer2")
-        env2.pop("CLAUDE_CODE_SESSION_ID", None)
-        env2.pop("DADAIA_CONTEXT", None)
-        result2 = run_hook_subprocess(
-            "sdd_gate", {**payload2, "session_id": "harness-reviewer2"}, env2
-        )
-        assert result2.returncode == 0, result2.stderr
-        assert result2.block_envelope() is not None  # READ enforced ⇒ MUTATING blocked
+
+def test_resolve_mode_foreign_read_bind_end_to_end_never_blocks_my_write(tmp_path: Path) -> None:
+    """End-to-end companion (successor to the deleted NF-4 anti-downgrade test): the SAME
+    foreign-READ-incumbent setup, driven through the real hook subprocess, ALLOWS a
+    MUTATING write from a DIFFERENT harness session — the doctrine's mode self-scope,
+    proven at the hook boundary, not just in ``_resolve_mode`` isolation."""
+    ws2 = _mk_workspace(tmp_path, "a")
+    bind_sid2 = "sess_freshread2"
+    _write_session_record(ws2, bind_sid2, "READ")
+    session_identity.set_incumbent(ws2, "a", bind_sid2)
+    target2 = ws2 / "repos" / "a" / "src" / "mod.py"
+    payload2 = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(target2), "content": "x = 1\n"},
+    }
+    env2 = claude_hook_env(ws2, session_id="harness-reviewer2")
+    env2.pop("CLAUDE_CODE_SESSION_ID", None)
+    env2.pop("DADAIA_CONTEXT", None)
+    result2 = run_hook_subprocess("sdd_gate", {**payload2, "session_id": "harness-reviewer2"}, env2)
+    assert result2.returncode == 0, result2.stderr
+    assert result2.block_envelope() is None  # doctrine: never blocked by a foreign bind

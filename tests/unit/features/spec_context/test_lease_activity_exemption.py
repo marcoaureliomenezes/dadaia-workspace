@@ -92,13 +92,18 @@ def _apply_state(workspace: Path, state: str, *, ctx: str) -> None:
 # 16 cells: (path_class, lease_state) -> expected. Phase=SPEC throughout. The verdict is
 # *location-invariant*: an in-repo ADDITIVE write is ALLOW exactly like a root one, an
 # in-repo MEMORY write BLOCKs (outside DEFINITION/CLOSURE) exactly like a root one, etc.
-# With D1 stable-identity: live_other → BLOCK (yield-iff-live-foreign, FR-P1-15); no .ptr
-# is seeded, so session "mine" sees a live foreign lease and blocks.
+#
+# v0.1.76 NO-LOCKS DOCTRINE: the lease record on disk is now COMPLETELY INERT to the
+# gate's MUTATING verdict — ``gate_policy.evaluate`` no longer reads ``ctx_locks/`` at
+# all (it upserts advisory PRESENCE instead, which never blocks). A foreign lease
+# ("live_other") therefore ALLOWs exactly like every other lease state; the seeded lease
+# record here is legacy-residue fixture data that the gate simply never looks at.
 _EXPECTED = {
     ("mutating", "absent"): Decision.ALLOW,
     ("mutating", "live_mine"): Decision.ALLOW,
-    # Foreign live lease → yield-iff-live-foreign BLOCK (D1 soul-fold, FR-P1-15).
-    ("mutating", "live_other"): Decision.BLOCK,
+    # v0.1.76: a foreign lease residue is inert — NEVER blocks (doctrine successor to the
+    # deleted yield-iff-live-foreign BLOCK, D1 soul-fold / FR-P1-15).
+    ("mutating", "live_other"): Decision.ALLOW,
     ("mutating", "expired"): Decision.ALLOW,
     ("additive", "absent"): Decision.ALLOW,
     ("additive", "live_mine"): Decision.ALLOW,

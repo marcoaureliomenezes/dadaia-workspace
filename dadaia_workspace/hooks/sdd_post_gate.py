@@ -50,6 +50,7 @@ Parity invariants preserved verbatim from the rc-4 shell hook:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess  # noqa: S404 — see _reconcile_working_tree (documented FR-W1-03 exemption).
@@ -59,7 +60,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
+from dadaia_workspace.features.spec_context import gate_policy, lease, presence, session_identity
 from dadaia_workspace.features.spec_context.gate_policy import PathClass
 from dadaia_workspace.hooks import _common
 
@@ -328,7 +329,7 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
 
 
 def main() -> int:
-    """Renew this session's lease heartbeat(s). Returns 0 always (never blocks)."""
+    """Renew this session's lease heartbeat(s) + advisory presence. Never blocks (exit 0)."""
     payload = _common.read_stdin_json()
     sess_id = _common.resolve_session_id(payload)
     if not sess_id:
@@ -342,12 +343,19 @@ def main() -> int:
     try:
         # Lease renewal is the primary, correctness-critical job and runs OUTSIDE any
         # session-file guard (FR-R2-01): a holder whose session record is missing still
-        # renews if the lock names it.
+        # renews if the lock names it. Kept as-is for v0.1.76 T-2 (T-3 removes the lease
+        # machinery entirely); presence renewal is additive, not a replacement here.
         leases_renewed = _renew_held_leases(workspace, sess_id)
         record = _refresh_session_record(workspace, sess_id)
         _append_heartbeat_event(workspace, sess_id, record, leases_renewed=leases_renewed)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0
+
+    # v0.1.76 FR2: refresh every advisory presence record this session owns. Isolated
+    # from the heartbeat exit code (presence must never affect it) and
+    # ``presence.renew`` itself never raises — belt-and-suspenders here.
+    with contextlib.suppress(Exception):
+        presence.renew(workspace, sess_id)
 
     # Advisory working-tree reconciler (FR-W1-03) — strictly advisory, isolated in its own
     # try/except so a reconciler bug can never affect the heartbeat or the exit code.

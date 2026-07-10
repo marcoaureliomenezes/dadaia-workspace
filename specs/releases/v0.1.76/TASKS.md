@@ -11,7 +11,7 @@
   mode: foreign READ bind never changes my session's mode; READ self-block kept;
   anon-session never creates presence.
 
-- [-] **T-2 — presence.py + gate rewrite + self-scoped mode** — owner: software-engineer
+- [x] **T-2 — presence.py + gate rewrite + self-scoped mode** — owner: software-engineer
   Write set: `dadaia_workspace/features/spec_context/presence.py`,
   `dadaia_workspace/features/spec_context/gate_policy.py`,
   `dadaia_workspace/hooks/sdd_gate.py`, `dadaia_workspace/hooks/sdd_post_gate.py`,

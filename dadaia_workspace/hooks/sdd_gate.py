@@ -10,12 +10,20 @@ Parity invariants preserved verbatim from the rc-4 shell gate:
 
 1. **PATH-first context slug.** The context is derived from the write-target path
    (``repos/<slug>/...``); ``DADAIA_CONTEXT`` is consulted only as an override when the
-   path is under no repo. A write under ``repos/B/...`` therefore never acquires
-   ``repos/A``'s lease (fixes gate-cross-context-lock-contamination).
+   path is under no repo. A write under ``repos/B/...`` therefore never touches
+   ``repos/A``'s presence (fixes gate-cross-context-lock-contamination).
 2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` writes are blocked
    unconditionally (SEC-01); every other class fails OPEN.
-3. **Fail-open posture.** Only a genuine live-foreign ``LockHeldError`` BLOCKs (surfaced
-   by ``gate_policy.evaluate``); any other error → ALLOW. The hook never deadlocks.
+3. **Fail-open posture.** No non-PROTECTED, non-self-READ write can BLOCK (v0.1.76
+   NO-LOCKS DOCTRINE): the gate never deadlocks, by construction — there is no
+   acquisition path left to fail into a block.
+
+v0.1.76 (NO-LOCKS DOCTRINE, SPEC ``specs/releases/v0.1.76/SPEC.md``): mode resolution
+is STRICTLY SELF-SCOPED (:func:`_resolve_mode`, FR4) — ``DADAIA_MODE`` env override →
+the session's OWN record → IMPLEMENTATION default. The former context-incumbent
+(rung 3) fallback is DELETED: a foreign session's bind can never change another
+session's resolved mode (kills audit finding P1-1). ``gate_policy.evaluate`` no longer
+acquires a lease; it upserts advisory presence.
 """
 
 from __future__ import annotations
@@ -24,35 +32,30 @@ import os
 import re
 from pathlib import Path
 
-from dadaia_workspace.core import lock_liveness
-from dadaia_workspace.features.spec_context import gate_policy, lease, session_identity
+from dadaia_workspace.features.spec_context import gate_policy, session_identity
 from dadaia_workspace.hooks import _common
-from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 _SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
 #: Default mode when neither the env override nor a session record resolves one. Missing-mode
-#: sessions stay IMPLEMENTATION-capable (free-lease acquire OK) — Decision D-3 / FR-R4-04.
+#: sessions stay IMPLEMENTATION-capable — Decision D-3 / FR-R4-04.
 _DEFAULT_MODE = "IMPLEMENTATION"
 
 
 def _resolve_holder_pid(payload: dict[str, object]) -> int:
-    """Resolve the LONG-LIVED holder pid to stamp into the lease record (WS-R2, NF-1 fix).
+    """Resolve the LONG-LIVED pid to record in the presence record (WS-R2 lineage).
 
-    The gate runs as a short-lived ``python -m dadaia_workspace.hooks.sdd_gate`` child that
-    exits milliseconds after acquiring the lease. Recording ``os.getpid()`` (this child's
-    own pid) makes the no-steal pid-veto inert: a foreign session later probes a pid that is
-    already dead, so it always reclaims — the exact lease-theft incident. We therefore record
-    a pid that **outlives the hook**:
+    The gate runs as a short-lived ``python -m dadaia_workspace.hooks.sdd_gate`` child
+    that exits milliseconds after the write. Recording ``os.getpid()`` (this child's own
+    pid) would make the recorded pid meaningless the instant the hook exits. We
+    therefore record a pid that **outlives the hook**:
 
     1. If the harness stdin payload carries an explicit harness pid (``harness_pid`` /
-       ``parent_pid`` / ``ppid``), prefer it — it names the long-lived harness process most
-       precisely. (No current harness sends one; this is forward-compatible and lets tests
-       pin a known-alive pid.)
-    2. Otherwise ``os.getppid()`` — the parent that spawned this hook child, i.e. the harness
-       process. It stays alive for the whole session, so a foreign probe sees the holder as
-       genuinely running and the no-steal veto fires while the harness is busy (even across a
-       single >120 s tool call), and only releases once the harness process truly dies.
+       ``parent_pid`` / ``ppid``), prefer it — it names the long-lived harness process
+       most precisely. (No current harness sends one; this is forward-compatible and
+       lets tests pin a known-alive pid.)
+    2. Otherwise ``os.getppid()`` — the parent that spawned this hook child, i.e. the
+       harness process. It stays alive for the whole session.
 
     A non-positive or unparseable payload pid falls back to ``os.getppid()``.
     """
@@ -102,42 +105,25 @@ def _context_slug(workspace: Path, fpath: Path) -> str:
     return _SLUG_STRIP.sub("", slug or "")
 
 
-def _resolve_mode(
-    workspace: Path,
-    session_id: str,
-    ctx: str = "",
-    pid_probe: lease.PidProbe | None = None,
-    active_release: str | None = None,
-) -> str:
-    """Resolve the session's bind mode (WS-R4 FR-R4-02/03/04 + NF-2 fix). First hit wins:
+def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
+    """Resolve the session's bind mode — STRICTLY SELF-SCOPED (v0.1.76 FR4). First hit wins:
 
     1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
        sets this; it is honored only when the operator deliberately exports it).
     2. The CLI-owned session record keyed by the **resolved harness session id**
-       (``session_identity.read_session``). A session that bound *itself* (its own harness sid
-       reached the bind CLI) is found here; this record **wins over the incumbent pointer**
-       so a live implementation session is never downgraded by another session's stale
-       read-bind on the same context.
-    3. **CONTEXT-INCUMBENT record** (NF-2 fix): the mode of the session named by the
-       context's incumbent pointer ``sessions/runtime/<ctx>.ptr`` via
-       ``session_identity.resolve_identity(ctx)``. This is the harness-real path for the
-       default ``dadaia context bind`` flow: the bind CLI mints a fresh sid the running
-       harness never reports, but it also refreshes the context incumbent pointer at bind
-       time, so the operator's bind binds the **CONTEXT**. A different harness sid in the
-       same context then resolves the bound mode through the incumbent pointer — even with no
-       env var and no self-keyed record. Empty ``ctx`` skips this step (no context to key on).
+       (``session_identity.read_session``) — this session's OWN bind, if it bound itself.
+    3. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): no env, no self record ⇒
+       presence-taking.
 
-       **Anti-downgrade guard:** the incumbent is honored only when it does NOT contradict a
-       live lease holder. If a lease record exists and its ``session_id`` differs from the
-       incumbent pointer (a different session legitimately took implementation after a stale
-       read-bind), the incumbent is treated as stale and ignored — a live implementation
-       holder is never downgraded to READ by another session's leftover read-bind.
-    4. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): no env, no self record, no incumbent
-       binding ⇒ lease-capable; may acquire a *free* lease.
+    The former rung 3 (context-incumbent pointer fallback, NF-2) is DELETED (v0.1.76
+    FR4, kills audit finding P1-1): a foreign session's ``dadaia context bind`` can
+    never change what THIS session's write resolves to. ``ctx`` is accepted for call-
+    site symmetry with the pre-doctrine signature but is no longer consulted.
 
-    Fail-soft: every lookup returns ``None`` on missing/malformed input, so mode resolution
-    never raises and never blocks the gate by accident.
+    Fail-soft: every lookup returns ``None`` on missing/malformed input, so mode
+    resolution never raises.
     """
+    del ctx  # v0.1.76 FR4: no longer consulted — mode is strictly self-scoped.
     env_mode = os.environ.get("DADAIA_MODE")
     if env_mode:
         return env_mode
@@ -146,53 +132,7 @@ def _resolve_mode(
         raw = rec.get("mode")
         if raw:
             return str(raw)
-    if ctx:
-        incumbent = session_identity.resolve_identity(workspace, ctx)
-        incumbent_sid = incumbent.get("incumbent")
-        incumbent_mode = incumbent.get("mode")
-        if (
-            incumbent_sid
-            and incumbent_mode
-            and not _incumbent_is_stale(
-                workspace, ctx, str(incumbent_sid), pid_probe, active_release
-            )
-        ):
-            return str(incumbent_mode)
     return _DEFAULT_MODE
-
-
-def _incumbent_is_stale(
-    workspace: Path,
-    ctx: str,
-    incumbent_sid: str,
-    pid_probe: lease.PidProbe | None,
-    active_release: str | None = None,
-) -> bool:
-    """True if a **live** lease record names a session OTHER than the incumbent pointer.
-
-    A read-bind sets the incumbent pointer but takes no lease. If a *different* session then
-    legitimately acquires the implementation lease and is still **live**, the live holder must
-    not be downgraded to the read-bind's mode — the incumbent is stale and ignored
-    (anti-downgrade, NF-2).
-
-    Liveness uses the canonical kernel predicate ``core.lock_liveness.is_stale`` — the same
-    TTL + pid-probe definition the MUTATING gate path uses (NF-4 fix). A *dead* leftover record
-    (TTL-stale heartbeat and dead/absent pid) — the normal residue after an implementation
-    session ends, which nothing deletes until takeover or doctor GC — does NOT defeat the
-    incumbent: a fresh ``bind --mode read`` is honored. Absence of a record (no holder yet) is
-    likewise not stale: the read-bind still governs.
-    """
-    holder = lease.read_record(workspace, ctx)
-    if holder is None:
-        return False
-    holder_sid = holder.get("session_id")
-    if not holder_sid or str(holder_sid) == incumbent_sid:
-        return False
-    # A divergent holder defeats the incumbent only when it is genuinely LIVE (TTL-fresh, or
-    # TTL-stale but its pid is still alive). A dead/TTL-stale leftover does not. ``active_release``
-    # (T-43-10): a holder pinned to a closed/archived release is semantically dead and never
-    # defeats the incumbent, regardless of its pid liveness.
-    return not lock_liveness.is_stale(holder, pid_probe=pid_probe, active_release=active_release)
 
 
 def _active_field(specs_dir: Path, field: str) -> str | None:
@@ -254,35 +194,23 @@ def _evaluate_target(
     ctx = _context_slug(workspace, fpath)
     specs_dir = workspace / "repos" / ctx / "specs" if ctx else workspace / "specs"
     phase = _active_field(specs_dir, "phase") or ""
-    # Tri-state release read (v0.1.50 FR1): a readable ACTIVE.md that says none (or
-    # an absent file) yields the legitimate "none" — release-aware reclaim applies;
-    # an UNREADABLE ACTIVE.md (I/O failure) yields veto_release=None so the pid-veto
-    # is preserved (an I/O failure never makes a live holder stealable).
     release_raw = _active_field(specs_dir, "release")
     release = release_raw or "none"
-    veto_release: str | None = None if release_raw is None else release
     session_id = _common.resolve_session_id(payload, default="anon-session")
-    # Single probe construction point (R8 dedup): the PID-liveness probe is built once here
-    # and threaded into both the incumbent-staleness check (via ``_resolve_mode``) and the
-    # final ``gate_policy.evaluate`` call below — never re-instantiated per call site.
-    pid_probe = build_pid_probe()
-    # Mode resolution order (WS-R4 + NF-2): DADAIA_MODE env override → self-keyed session
-    # record → context-incumbent record → default. Passing ``ctx`` enables the incumbent
-    # fallback so a default `dadaia context bind --mode read` (which mints a sid the harness
-    # never reports) still binds the CONTEXT and is honored without any env var.
-    # ``active_release`` (T-43-10): a lease pinned to a non-ACTIVE (closed/archived) release is
-    # treated as reclaimable in the liveness verdict. ``release`` here is ACTIVE.md's release
-    # (``"none"`` when archived), so any release-pinned stale holder on a different release is
-    # no longer a live incumbent that downgrades this session's mode.
-    mode = _resolve_mode(workspace, session_id, ctx, pid_probe, active_release=veto_release)
+    # Mode resolution order (v0.1.76 FR4, strictly self-scoped): DADAIA_MODE env
+    # override → self-keyed session record → default. No context-incumbent fallback —
+    # a foreign session's bind can never change what THIS session's write resolves to.
+    mode = _resolve_mode(workspace, session_id, ctx)
 
-    # MUTATING with no resolvable context → fail open (UNGATED, no lease), matching shell.
-    # NOTE: a READ-bound session that *does* resolve a context is still blocked below by
-    # gate_policy.evaluate (non-acquiring); the no-context fail-open only covers MUTATING
-    # writes the gate cannot attribute to any context (no slug, no DADAIA_CONTEXT).
+    # MUTATING with no resolvable context → fail open (UNGATED, no presence target),
+    # matching legacy shell behavior. NOTE: a READ-bound session that *does* resolve a
+    # context is still blocked below by gate_policy.evaluate (self-scoped, opt-in); the
+    # no-context fail-open only covers MUTATING writes the gate cannot attribute to any
+    # context (no slug, no DADAIA_CONTEXT).
     if cls == gate_policy.PathClass.MUTATING and not ctx:
         return gate_policy.Decision.ALLOW, ""
 
+    runtime = os.environ.get("DADAIA_RUNTIME") or os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     return gate_policy.evaluate(
         workspace,
         rel_path,
@@ -290,12 +218,11 @@ def _evaluate_target(
         phase=phase,
         session_id=session_id,
         release=release,
-        veto_release=veto_release,
         mode=mode,
-        pid_probe=pid_probe,
+        runtime=runtime,
         # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
-        # ephemeral hook child's own — otherwise the no-steal veto probes a dead pid.
-        holder_pid=_resolve_holder_pid(payload),
+        # ephemeral hook child's own — a presence record naming a dead pid is misleading.
+        pid=_resolve_holder_pid(payload),
     )
 
 

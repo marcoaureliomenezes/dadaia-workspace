@@ -38,7 +38,10 @@ def _presence_path(ws: Path, ctx: str, session_id: str) -> Path:
 
 
 def _read_presence(ws: Path, ctx: str, session_id: str) -> dict[str, object]:
-    return json.loads(_presence_path(ws, ctx, session_id).read_text(encoding="utf-8"))
+    data: dict[str, object] = json.loads(
+        _presence_path(ws, ctx, session_id).read_text(encoding="utf-8")
+    )
+    return data
 
 
 def _write_raw_presence(
@@ -91,7 +94,7 @@ def test_upsert_is_idempotent_and_refreshes_last_seen_at(tmp_path: Path) -> None
     # started_at is stable across re-upserts; last_seen_at is refreshed (both ISO strings —
     # equality is legal on a fast clock, so we assert monotonic non-decrease, not strict >).
     assert first["started_at"] == second["started_at"]
-    assert second["last_seen_at"] >= first["last_seen_at"]
+    assert str(second["last_seen_at"]) >= str(first["last_seen_at"])
 
 
 def test_upsert_never_raises_when_presence_dir_is_unwritable(
@@ -121,7 +124,7 @@ def test_upsert_never_raises_on_injected_write_failure(
     def _boom(*_a: object, **_k: object) -> None:
         raise OSError("simulated disk failure")
 
-    monkeypatch.setattr(presence.os, "replace", _boom)
+    monkeypatch.setattr(os, "replace", _boom)
     presence.upsert(tmp_path, _CTX, "sess-boom", runtime="claude", pid=1)  # must not raise
 
 
@@ -206,8 +209,8 @@ def test_renew_touches_heartbeat_of_owned_records_across_contexts(tmp_path: Path
 
     after_a = _read_presence(tmp_path, _CTX, "sess-1")["last_seen_at"]
     after_b = _read_presence(tmp_path, "other-ctx", "sess-1")["last_seen_at"]
-    assert after_a >= before_a
-    assert after_b >= before_b
+    assert str(after_a) >= str(before_a)
+    assert str(after_b) >= str(before_b)
 
 
 def test_renew_never_touches_foreign_records(tmp_path: Path) -> None:

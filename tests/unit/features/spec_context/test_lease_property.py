@@ -84,13 +84,15 @@ _ROWS = [
         Decision.ALLOW,
     ),
     (
-        # D1 soul-fold: foreign live lease → yield-iff-live-foreign BLOCK (FR-P1-15).
-        # No .ptr file → session "mine" sees live foreign "other" and is blocked.
+        # v0.1.76 NO-LOCKS DOCTRINE: a foreign live lease residue is now COMPLETELY INERT
+        # to the gate's verdict — evaluate() no longer reads ctx_locks/ at all. ALLOWs
+        # exactly like every other lease state (doctrine successor to the deleted
+        # yield-iff-live-foreign BLOCK, D1 soul-fold / FR-P1-15).
         "4_live_other_mutating",
         "specs/releases/v0.2.0/SPEC.md",
         "SPEC",
         lambda ws: _seed(ws, "other", BASE),
-        Decision.BLOCK,
+        Decision.ALLOW,
     ),
     # ADDITIVE rows: re-rooted (T-010-11). ALLOW at root AND in-repo, lease present or not.
     ("5_absent_additive", "specs/backlog/x.md", "SPEC", None, Decision.ALLOW),
@@ -134,16 +136,16 @@ def test_fail_safe_property(row: tuple, location: str, slug: str, tmp_path: Path
     if decision == Decision.BLOCK:
         assert message, f"row {row_id}: BLOCK must carry an actionable message"
 
-    # D1 soul-fold: a MUTATING live-other conflict BLOCKS with yield-iff-live-foreign
-    # message (FR-P1-15). The message is informative and actionable, and per the operator
-    # forbidden-law contains NO manual unblock ceremony — neither "bind --mode write",
-    # "relaunch", nor "lock steal" — because reclaim-iff-stale frees a dead holder by itself.
+    # v0.1.76 doctrine (successor to the deleted D1 soul-fold yield-iff-live-foreign
+    # BLOCK): a MUTATING live-other conflict now ALLOWs. Whatever message accompanies the
+    # ALLOW (empty, or an advisory presence line), it must NEVER contain a manual unblock
+    # ceremony — neither "bind --mode write", "relaunch", nor "lock steal" — the
+    # forbidden-law is even easier to satisfy now that there is nothing to unblock.
     if row_id == "4_live_other_mutating":
-        assert decision == Decision.BLOCK
-        assert message, "yield-iff-live-foreign BLOCK must carry an actionable message"
+        assert decision == Decision.ALLOW
         for forbidden in ("bind --mode write", "relaunch", "lock steal"):
             assert forbidden not in message, (
-                f"forbidden-law: BLOCK message must not contain {forbidden!r}"
+                f"forbidden-law: message must not contain {forbidden!r}"
             )
 
 
@@ -194,45 +196,46 @@ def test_additive_write_never_touches_any_lease(
 
 
 # ---------------------------------------------------------------------------
-# T-016-14: soul-fold property rows (D1) — stable-identity renewal + yield block
+# v0.1.76: former "D1 soul-fold" rows (T-016-14) — the .ptr incumbent-renewal machinery
+# these rows exercised lived entirely inside ``lease.acquire``, which ``gate_policy.
+# evaluate`` no longer calls at all. Both former cases (a matching .ptr "renews"; a
+# non-matching .ptr against a live foreign lock used to "yield"/BLOCK) now ALLOW
+# identically — the .ptr file, when present, is completely inert to the gate's verdict.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("case", "seed_session_id", "write_ptr_for_mine", "expected_decision"),
+    ("case", "seed_session_id", "write_ptr_for_mine"),
     [
         pytest.param(
-            "stable-identity-match-renews",
+            "stable-identity-match-still-allows",
             "old-session-id",
             True,
-            Decision.ALLOW,
-            id="stable-identity-match-live-foreign-renews",
+            id="ptr-match-live-foreign-allows",
         ),
         pytest.param(
-            "no-ptr-match-yields",
+            "no-ptr-match-still-allows",
             "genuinely-other-session",
             False,
-            Decision.BLOCK,
-            id="no-ptr-match-live-foreign-yields",
+            id="no-ptr-match-live-foreign-allows",
         ),
     ],
 )
-def test_d1_soul_fold_rows(
+def test_ptr_residue_inert_to_gate_verdict(
     tmp_path: Path,
     case: str,
     seed_session_id: str,
     write_ptr_for_mine: bool,
-    expected_decision: Decision,
 ) -> None:
-    """D1 soul-fold: a .ptr match RENEWs (ALLOW) even against a foreign-looking lock
-    record (relaunched-session scenario); the absence of a .ptr match against a live
-    foreign lock yields BLOCK with an actionable, ceremony-free message."""
+    """v0.1.76 doctrine: a ``.ptr`` incumbent-pointer residue (matching or not) is
+    completely inert to the gate's MUTATING verdict — both ALLOW identically, since the
+    gate never reads the lease record or its ``.ptr`` at all."""
     _seed(tmp_path, seed_session_id, BASE)
     if write_ptr_for_mine:
         ptr = lease._ptr_path(tmp_path, CTX)
         ptr.write_text("mine", encoding="utf-8")
 
-    decision, message = evaluate(
+    decision, _message = evaluate(
         tmp_path,
         "specs/releases/v0.2.0/SPEC.md",
         ctx=CTX,
@@ -242,29 +245,25 @@ def test_d1_soul_fold_rows(
         mode="IMPLEMENTATION",
         clock=fixed(BASE),
     )
-    assert decision == expected_decision, f"{case}: expected {expected_decision}, got {decision}"
-    if expected_decision == Decision.BLOCK:
-        assert message, "Yield block must carry an informative, actionable message"
-        assert "bind --mode write" not in message
-        assert "relaunch" not in message
+    assert decision == Decision.ALLOW, f"{case}: expected ALLOW, got {decision}"
 
 
-def test_mutating_unexpected_lease_error_fails_open(
+def test_mutating_unexpected_presence_error_fails_open(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-04 fail-safe: an unexpected lease-subsystem error must ALLOW, never raise.
-
-    The 'never fail-dead' contract must hold for direct API callers, not only the
-    shell gate. If lease.acquire raises something other than LockHeldError (e.g.
-    OSError from a corrupt/unreadable lock store), evaluate() heals-and-allows.
+    """AC-04 fail-safe successor (v0.1.76): an unexpected presence-subsystem error must
+    ALLOW, never raise. ``lease.acquire`` is no longer on the MUTATING call path at all
+    (this module's presence has replaced it) — the fail-safe property now targets the
+    presence upsert/read, the gate's ONLY concurrency-signal surface.
     """
+    from dadaia_workspace.features.spec_context import presence
 
-    def _boom(*_args: object, **_kwargs: object) -> tuple[str, dict[str, object]]:
-        raise OSError("simulated unreadable lock store")
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("simulated unreadable presence store")
 
-    monkeypatch.setattr(lease, "acquire", _boom)
+    monkeypatch.setattr(presence, "upsert", _boom)
 
-    decision, message = evaluate(
+    decision, _message = evaluate(
         tmp_path,
         "specs/releases/v0.2.0/SPEC.md",
         ctx=CTX,
@@ -275,5 +274,5 @@ def test_mutating_unexpected_lease_error_fails_open(
         clock=fixed(BASE),
     )
     assert decision == Decision.ALLOW, (
-        "Unexpected lease error must fail OPEN (heal-and-allow), never freeze the flow"
+        "Unexpected presence error must fail OPEN (heal-and-allow), never freeze the flow"
     )

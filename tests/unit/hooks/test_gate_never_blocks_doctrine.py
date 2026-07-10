@@ -133,7 +133,7 @@ def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_pat
     assert result_b.block_envelope() is None
     # The advisory line (when emitted) is stdout/stderr diagnostic text, never the block
     # envelope, and it names the other live session.
-    combined = (result_b.stdout + result_b.stderr)
+    combined = result_b.stdout + result_b.stderr
     if combined.strip():
         assert sid_a in combined
 
@@ -189,8 +189,10 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
     """Reproduces bug ``layer1-rebind-adopts-lease-to-synthetic-session-self-block``
     end-to-end, exactly as the reporter's transcript shows:
 
-      1. The harness-native session writes -> acquires the lease (pid=os.getpid(), the
-         same-process lineage the real bind CLI shares via ancestry).
+      1. The harness-native session writes -> ALLOW (v0.1.76: the gate no longer
+         acquires a lease at all — a residual lease record is seeded directly below to
+         reproduce the exact pre-existing-lease topology the bug's transcript describes,
+         e.g. a leftover from a prior release's lease machinery or a direct-API caller).
       2. ``dadaia context bind`` mints a synthetic ``sess_<uuid>`` id and calls
          ``lease.adopt_if_own_lineage`` (same-process pid lineage match) — the REAL
          production adoption path, not a simulation — rewriting the lease record's
@@ -200,7 +202,8 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
     Under the pre-T-2 lease machinery this second write's ``.ptr``/record no longer
     names the harness-native id, so it is treated as a live foreign holder and BLOCKed
     (the exact CRITICAL self-block). Under the doctrine it must NEVER block, regardless
-    of whether the rebind changed mode."""
+    of whether the rebind changed mode — because the gate no longer consults the lease
+    record for its ALLOW/BLOCK verdict at all."""
     ws = _mk_workspace(tmp_path, "dadaia-workspace")
     ctx = "dadaia-workspace"
     harness_sid = "harness-native-sid-001"
@@ -217,6 +220,14 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
         session_id=harness_sid,
     )
     _assert_never_a_lock_block(block_1)
+
+    # Seed the residual lease record the bug's topology requires: a live record naming
+    # the harness-native session, holder pid == this test process (our own lineage) —
+    # exactly what a pre-doctrine acquire would have produced. v0.1.76's gate never
+    # writes this itself, but adopt_if_own_lineage (the real bind-CLI mechanism) still
+    # operates on whatever lease record exists on disk, so this reproduces the bug's
+    # exact adoption mechanics against a pre-existing record.
+    lease.acquire(ws, ctx, harness_sid, "rel-1", "IMPLEMENTATION", pid=my_pid)
     rec = lease.read_record(ws, ctx)
     assert rec is not None and rec["session_id"] == harness_sid and rec["pid"] == my_pid
 
@@ -226,9 +237,7 @@ def test_critical_bug_probe_rebind_then_write_never_blocks(
     synthetic_sid = "sess_synthetic99"
     _write_session_record(ws, synthetic_sid, rebind_mode)
     session_identity.set_incumbent(ws, ctx, synthetic_sid)
-    adopted = lease.adopt_if_own_lineage(
-        ws, ctx, synthetic_sid, ancestry_pids=frozenset({my_pid})
-    )
+    adopted = lease.adopt_if_own_lineage(ws, ctx, synthetic_sid, ancestry_pids=frozenset({my_pid}))
     assert adopted, "adoption fixture setup must succeed (this IS the bug's mechanism)"
     rec_after_adopt = lease.read_record(ws, ctx)
     assert rec_after_adopt is not None and rec_after_adopt["session_id"] == synthetic_sid
@@ -275,6 +284,10 @@ def test_critical_bug_probe_full_cycle_no_lockhelderror_anywhere(tmp_path: Path)
     )
     outputs.append(r1.stdout + r1.stderr)
 
+    # Seed the residual lease record (see the sibling parametrized test above for why:
+    # v0.1.76's gate no longer writes one itself, but adoption still operates on
+    # whatever exists on disk — reproducing the bug's exact topology).
+    lease.acquire(ws, ctx, harness_sid, "rel-1", "IMPLEMENTATION", pid=my_pid)
     synthetic_sid = "sess_synthetic77"
     _write_session_record(ws, synthetic_sid, "IMPLEMENTATION")
     session_identity.set_incumbent(ws, ctx, synthetic_sid)
@@ -340,7 +353,7 @@ def test_my_own_read_bind_still_blocks_my_own_mutating_write(tmp_path: Path) -> 
         ws, {"tool_name": "Write", "tool_input": {"file_path": str(target)}}, session_id=my_sid
     )
     assert block is not None
-    assert "read" in block["reason"].lower()
+    assert "read" in str(block["reason"]).lower()
 
 
 def test_foreign_implementation_bind_never_changes_my_read_mode(tmp_path: Path) -> None:
@@ -363,7 +376,7 @@ def test_foreign_implementation_bind_never_changes_my_read_mode(tmp_path: Path) 
         session_id=my_read_sid,
     )
     assert block is not None
-    assert "read" in block["reason"].lower()
+    assert "read" in str(block["reason"]).lower()
 
 
 # --------------------------------------------------------------------------- #
