@@ -1,10 +1,22 @@
-"""Unit tests for the canonical memory-URL builder in views/_md_render.py.
+"""Unit tests for the canonical memory-URL builder + wikilink renderer + mermaid
+fence escaping in views/_md_render.py.
 
 T-016-P03: Single source of truth for memory URL construction.
 T-016-P04: Parameterized wikilink renderer by context slug.
+v0.1.52 FR4: mermaid fence escaping (OWASP A03 / XSS).
+
+The index-chip-href .md-not-.html regression duplicate was DELETED — owned by
+the ``test_views_index.py`` card-contract survivor.
+
+Three survivors:
+  1. URL builders: view vs raw prefix + nested path + .md never .html param.
+  2. Wikilink renderer slug parameterisation + default + no-hardcode + cache per-slug.
+  3. Mermaid fence escaping: hostile <script> + <img onerror> via block_code directly.
 """
 
 from __future__ import annotations
+
+import pytest
 
 from dadaia_workspace.features.panel.views._md_render import (
     build_renderer,
@@ -12,208 +24,145 @@ from dadaia_workspace.features.panel.views._md_render import (
     memory_view_url,
 )
 
-# ---------------------------------------------------------------------------
-# memory_view_url
-# ---------------------------------------------------------------------------
-
-
-class TestMemoryViewUrl:
-    def test_architecture_md(self) -> None:
-        """Standard architecture atom URL uses /memory-view/ and .md extension."""
-        url = memory_view_url("dadaia-workspace", "architecture.md")
-        assert url == "/memory-view/dadaia-workspace/architecture.md"
-
-    def test_tech_stack_md(self) -> None:
-        url = memory_view_url("dadaia-workspace", "tech-stack.md")
-        assert url == "/memory-view/dadaia-workspace/tech-stack.md"
-
-    def test_nested_product_index_md(self) -> None:
-        """Nested path (product/index.md) is preserved as-is."""
-        url = memory_view_url("dadaia-workspace", "product/index.md")
-        assert url == "/memory-view/dadaia-workspace/product/index.md"
-
-    def test_arbitrary_slug(self) -> None:
-        """Different context slugs produce correct URLs."""
-        url = memory_view_url("my-project", "architecture.md")
-        assert url == "/memory-view/my-project/architecture.md"
-
-    def test_no_html_extension(self) -> None:
-        """Builder never produces .html URLs for standard atoms."""
-        url = memory_view_url("dadaia-workspace", "architecture.md")
-        assert ".html" not in url
-
-    def test_returns_absolute_path(self) -> None:
-        """URL must start with '/'."""
-        url = memory_view_url("slug", "file.md")
-        assert url.startswith("/")
+pytestmark = pytest.mark.unit
 
 
 # ---------------------------------------------------------------------------
-# memory_raw_url
+# 1. URL builders: view vs raw prefix + nested path + .md never .html
 # ---------------------------------------------------------------------------
 
 
-class TestMemoryRawUrl:
-    def test_architecture_md(self) -> None:
-        url = memory_raw_url("dadaia-workspace", "architecture.md")
-        assert url == "/memory/dadaia-workspace/architecture.md"
+@pytest.mark.parametrize(
+    ("builder", "slug", "path", "expected"),
+    [
+        pytest.param(
+            memory_view_url,
+            "dadaia-workspace",
+            "architecture.md",
+            "/memory-view/dadaia-workspace/architecture.md",
+            id="view-architecture",
+        ),
+        pytest.param(
+            memory_view_url,
+            "dadaia-workspace",
+            "product/index.md",
+            "/memory-view/dadaia-workspace/product/index.md",
+            id="view-nested-path-preserved",
+        ),
+        pytest.param(
+            memory_view_url,
+            "my-project",
+            "architecture.md",
+            "/memory-view/my-project/architecture.md",
+            id="view-arbitrary-slug",
+        ),
+        pytest.param(
+            memory_raw_url,
+            "dadaia-workspace",
+            "architecture.md",
+            "/memory/dadaia-workspace/architecture.md",
+            id="raw-architecture",
+        ),
+        pytest.param(
+            memory_raw_url,
+            "dadaia-workspace",
+            "product/index.md",
+            "/memory/dadaia-workspace/product/index.md",
+            id="raw-nested-path-preserved",
+        ),
+        pytest.param(
+            memory_raw_url,
+            "other-context",
+            "architecture.md",
+            "/memory/other-context/architecture.md",
+            id="raw-arbitrary-slug",
+        ),
+    ],
+)
+def test_url_builders(builder, slug: str, path: str, expected: str) -> None:  # type: ignore[no-untyped-def]
+    url = builder(slug, path)
+    assert url == expected
+    assert url.startswith("/")
+    assert ".html" not in url
 
-    def test_tech_stack_md(self) -> None:
-        url = memory_raw_url("dadaia-workspace", "tech-stack.md")
-        assert url == "/memory/dadaia-workspace/tech-stack.md"
-
-    def test_nested_product_index_md(self) -> None:
-        url = memory_raw_url("dadaia-workspace", "product/index.md")
-        assert url == "/memory/dadaia-workspace/product/index.md"
-
-    def test_arbitrary_slug(self) -> None:
-        url = memory_raw_url("other-context", "architecture.md")
-        assert url == "/memory/other-context/architecture.md"
-
-    def test_no_html_extension(self) -> None:
-        url = memory_raw_url("dadaia-workspace", "architecture.md")
-        assert ".html" not in url
-
-    def test_returns_absolute_path(self) -> None:
-        url = memory_raw_url("slug", "file.md")
-        assert url.startswith("/")
-
-    def test_different_prefix_from_view_url(self) -> None:
-        """memory_raw_url uses /memory/ not /memory-view/."""
-        raw = memory_raw_url("slug", "file.md")
-        view = memory_view_url("slug", "file.md")
-        assert raw.startswith("/memory/")
-        assert view.startswith("/memory-view/")
-        assert raw != view
-
-
-# ---------------------------------------------------------------------------
-# Regression guard: chip hrefs in index.py use .md (not .html)
-# ---------------------------------------------------------------------------
-
-
-class TestIndexChipHrefs:
-    """Assert index.py emits .md URLs in chip hrefs (T-016-P03 regression guard)."""
-
-    def test_context_card_chips_use_md_extension(self) -> None:
-        """_render_context_card must produce .md chip hrefs, not .html."""
-        from pathlib import Path
-        from unittest.mock import MagicMock
-
-        from dadaia_workspace.features.panel.service import PanelContext, PanelService
-        from dadaia_workspace.features.panel.views.index import render_index
-
-        ctx = PanelContext(
-            name="Test Context",
-            slug="test-context",
-            repo_path=Path("/tmp/specs"),
-            status="alive",
-            branch="main",
-        )
-        service = MagicMock(spec=PanelService)
-        service.list_active_contexts.return_value = [ctx]
-        service.list_servers_grouped.return_value = []
-
-        view_fn = render_index(service)
-        status, content_type, body = view_fn()
-        html = body.decode("utf-8")
-
-        # Chip hrefs must use .md, never .html
-        assert "/memory-view/test-context/architecture.md" in html, (
-            "Architecture chip href must use .md extension"
-        )
-        assert "/memory-view/test-context/tech-stack.md" in html, (
-            "Tech Stack chip href must use .md extension"
-        )
-        assert "/memory-view/test-context/product/index.md" in html, (
-            "Product chip href must use .md extension"
-        )
-        assert "architecture.html" not in html, "No .html chip hrefs should remain"
-        assert "tech-stack.html" not in html, "No .html chip hrefs should remain"
-        assert "product/index.html" not in html, "No .html chip hrefs should remain"
+    if (slug, path) != ("dadaia-workspace", "architecture.md"):
+        return
+    # view vs raw prefix distinctness, checked once regardless of which builder ran.
+    raw = memory_raw_url("slug", "file.md")
+    view = memory_view_url("slug", "file.md")
+    assert raw.startswith("/memory/")
+    assert view.startswith("/memory-view/")
+    assert raw != view
 
 
 # ---------------------------------------------------------------------------
-# T-016-P04: Parameterized wikilink renderer
+# 2. Wikilink renderer slug parameterisation + default + no-hardcode + cache
 # ---------------------------------------------------------------------------
 
 
-class TestWikilinkRendererParamBySlug:
-    """build_renderer(slug) closes over the context slug for wikilink hrefs."""
+def test_wikilink_renderer_slug_parameterisation_default_and_cache() -> None:
+    # A non-default slug renders with the given slug's href, never hardcoded
+    # 'dadaia-workspace', and always with a .md extension.
+    md = build_renderer("my-project")
+    result: str = md("[[architecture]]")  # type: ignore[assignment]
+    assert "/memory-view/my-project/architecture.md" in result
 
-    def test_wikilink_uses_given_slug(self) -> None:
-        """Wikilink rendered in 'my-project' context → /memory-view/my-project/..."""
-        md = build_renderer("my-project")
-        result: str = md("[[architecture]]")  # type: ignore[assignment]
-        assert "/memory-view/my-project/architecture.md" in result, (
-            "Wikilink href must use the provided slug, not hardcoded 'dadaia-workspace'"
-        )
+    md_default = build_renderer()
+    result_default: str = md_default("[[tech-stack]]")  # type: ignore[assignment]
+    assert "/memory-view/dadaia-workspace/tech-stack.md" in result_default
 
-    def test_wikilink_default_slug_is_dadaia_workspace(self) -> None:
-        """Calling build_renderer() without slug defaults to 'dadaia-workspace'."""
-        md = build_renderer()
-        result: str = md("[[tech-stack]]")  # type: ignore[assignment]
-        assert "/memory-view/dadaia-workspace/tech-stack.md" in result
+    md_other = build_renderer("other-project")
+    result_other: str = md_other("[[architecture]]")  # type: ignore[assignment]
+    assert "dadaia-workspace" not in result_other
+    assert "/memory-view/other-project/architecture.md" in result_other
 
-    def test_wikilink_non_default_slug_does_not_contain_dadaia_workspace(self) -> None:
-        """A non-default slug renderer must NOT reference 'dadaia-workspace'."""
-        md = build_renderer("other-project")
-        result: str = md("[[architecture]]")  # type: ignore[assignment]
-        assert "dadaia-workspace" not in result, (
-            "Non-default context renderer must not hardcode 'dadaia-workspace'"
-        )
-        assert "/memory-view/other-project/architecture.md" in result
+    md_ext = build_renderer("some-context")
+    result_ext: str = md_ext("[[product]]")  # type: ignore[assignment]
+    assert "/memory-view/some-context/product.md" in result_ext
+    assert "product.html" not in result_ext
 
-    def test_renderer_cache_per_slug(self) -> None:
-        """build_renderer returns same instance for same slug (cache hit)."""
-        md_a = build_renderer("project-a")
-        md_b = build_renderer("project-a")
-        assert md_a is md_b, "Same slug should return the same cached renderer instance"
-
-    def test_renderer_cache_different_slugs(self) -> None:
-        """build_renderer returns different instances for different slugs."""
-        md_a = build_renderer("project-a")
-        md_b = build_renderer("project-b")
-        assert md_a is not md_b, "Different slugs must return distinct renderer instances"
-
-    def test_wikilink_md_extension_in_href(self) -> None:
-        """Wikilink href must end with .md, not .html."""
-        md = build_renderer("some-context")
-        result: str = md("[[product]]")  # type: ignore[assignment]
-        assert "/memory-view/some-context/product.md" in result
-        assert "product.html" not in result
+    # Same slug returns the same cached renderer instance; different slugs don't.
+    md_a = build_renderer("project-a")
+    md_a2 = build_renderer("project-a")
+    md_b = build_renderer("project-b")
+    assert md_a is md_a2, "Same slug should return the same cached renderer instance"
+    assert md_a is not md_b, "Different slugs must return distinct renderer instances"
 
 
 # ---------------------------------------------------------------------------
-# Mermaid fence escaping (v0.1.52 FR4 — OWASP A03 / XSS)
+# 3. Mermaid fence escaping (v0.1.52 FR4 — OWASP A03 / XSS)
 #
 # block_code emits <pre class="mermaid"> for mermaid fences. No Mermaid client
-# ships on the panel (the CSP forbids the CDN import; the dead window.mermaid.run()
-# block was removed), so the fence body must arrive HTML-ESCAPED — never as live
-# HTML. These tests exercise block_code directly via the renderer (bypassing the
-# view's outer _sanitise defence-in-depth) so they probe the escape itself: an
-# UNescaped block_code emits raw <script>/<img> and FAILS these assertions.
-# The hostile-fence test is this wave's falsifiability probe (SPEC §5 AC-7).
+# ships on the panel (the CSP forbids the CDN import), so the fence body must
+# arrive HTML-ESCAPED — never as live HTML. Exercised directly via the
+# renderer (bypassing the view's outer _sanitise defence-in-depth) so it
+# probes the escape itself: an UNescaped block_code emits raw <script>/<img>
+# and FAILS these assertions. The falsifiability probe (SPEC §5 AC-7).
 # ---------------------------------------------------------------------------
 
 
-class TestMermaidFenceEscaping:
-    """block_code must HTML-escape mermaid fence content (XSS defence)."""
-
-    def test_hostile_script_fence_arrives_escaped(self) -> None:
-        """A <script> payload inside a mermaid fence arrives escaped, not executable."""
-        md = build_renderer("proj")
-        result: str = md("```mermaid\n<script>alert(1)</script>\n```\n")  # type: ignore[assignment]
-        # The mermaid class is preserved.
-        assert '<pre class="mermaid">' in result
-        # The payload is entity-escaped, not a live <script> tag.
-        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in result
-        assert "<script>alert(1)</script>" not in result
-
-    def test_hostile_img_onerror_fence_arrives_escaped(self) -> None:
-        """An <img onerror> payload (not caught by the script/style sanitiser) is escaped."""
-        md = build_renderer("proj")
-        result: str = md("```mermaid\n<img src=x onerror=alert(1)>\n```\n")  # type: ignore[assignment]
-        assert '<pre class="mermaid">' in result
-        assert "&lt;img src=x onerror=alert(1)&gt;" in result
-        assert "<img src=x onerror=alert(1)>" not in result
+@pytest.mark.parametrize(
+    ("fence_body", "escaped_needle", "raw_needle"),
+    [
+        pytest.param(
+            "<script>alert(1)</script>",
+            "&lt;script&gt;alert(1)&lt;/script&gt;",
+            "<script>alert(1)</script>",
+            id="hostile-script-fence",
+        ),
+        pytest.param(
+            "<img src=x onerror=alert(1)>",
+            "&lt;img src=x onerror=alert(1)&gt;",
+            "<img src=x onerror=alert(1)>",
+            id="hostile-img-onerror-fence",
+        ),
+    ],
+)
+def test_mermaid_fence_escapes_hostile_payloads(
+    fence_body: str, escaped_needle: str, raw_needle: str
+) -> None:
+    md = build_renderer("proj")
+    result: str = md(f"```mermaid\n{fence_body}\n```\n")  # type: ignore[assignment]
+    assert '<pre class="mermaid">' in result
+    assert escaped_needle in result
+    assert raw_needle not in result

@@ -2,45 +2,29 @@
 
 Panel auth removed by operator decision 2026-06-11 — see handler.py module
 docstring; the no-auth + Host-guard contract is pinned in
-``test_no_auth_contract.py``.  The Bearer/launch-token/session-cookie tests that
-used to live in this file (the ``T-010-21`` loopback-auth block, the ``T-011-13``
-launch-token exchange block, and ``test_make_handler_class_rejects_loopback_bypass_kwarg``)
-were DELETED with that change — the panel is a loopback-only local dev tool that
-serves every route WITHOUT a credential.  What remains here is the still-real
-behaviour: regex route dispatch, named-group capture, the 404 error contract, and
-POST workflow-run dispatch/validation (now credential-free).
+``test_no_auth_contract.py``. What remains here is the still-real behaviour:
+regex route dispatch (GET/DELETE/POST), named-group capture, the 404 error
+contract, and query-string stripping.
 
-Tests use a thin in-process driver that wires stub view callables into
-``make_handler_class`` and exercises the dispatch logic without spinning a
-real HTTP server.
-
-Stub views record which route was hit and which capture groups were passed;
-they return a minimal ``(status, content_type, body)`` triple.
-
-Assertions:
-  (a) ``/`` invokes the index view with no captured groups.
-  (b) ``/api/panel-status`` invokes the api_panel_status view with no captured groups.
-  (c) ``/memory/foo/bar.html`` invokes the memory view with
-      ``slug="foo"``, ``path="bar.html"``.
-  (d) ``/memory-view/foo/bar.html`` invokes the memory_view view with
-      ``slug="foo"``, ``path="bar.html"``.
-  (e) ``/static/panel.css`` invokes the static view with
-      ``name="panel.css"``.
-  (f) ``/unknown`` returns HTTP 404 with the error-contract body.
-  (g) ``/health`` returns HTTP 200 with JSON body (no credential).
+One merged param dispatch table: (method, path) -> (view name, captured
+kwargs) or 404, including the DELETE/POST report-important rows folded in from
+test_handler_delete.py (the `/important`-before-catchall ordering is proven by
+the DELETE-with-`/important`-suffix row dispatching to the unmark view, not the
+plain delete view).
 """
 
 from __future__ import annotations
 
 import io
+import json
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler
 
+import pytest
+
 from dadaia_workspace.features.panel.handler import _NOT_FOUND_BODY, make_handler_class
 
-# ---------------------------------------------------------------------------
-# Stub view infrastructure
-# ---------------------------------------------------------------------------
+pytestmark = pytest.mark.unit
 
 
 @dataclass
@@ -61,7 +45,6 @@ class _StubView:
 
 
 def _make_stubs() -> dict[str, _StubView]:
-    """Return a dict of stub views keyed by route name."""
     names = [
         "index",
         "api_panel_status",
@@ -70,13 +53,15 @@ def _make_stubs() -> dict[str, _StubView]:
         "memory",
         "memory_view",
         "static",
+        "api_report_delete",
+        "api_report_mark_important",
+        "api_report_unmark_important",
+        "api_reports",
     ]
-    return {n: _StubView(name=n) for n in names}
-
-
-# ---------------------------------------------------------------------------
-# In-process request driver
-# ---------------------------------------------------------------------------
+    stubs = {n: _StubView(name=n) for n in names}
+    stubs["health"].content_type = "application/json"
+    stubs["health"].body = json.dumps({"status": "ok", "version": "0.1.2"}).encode()
+    return stubs
 
 
 class _FakeSocket:
@@ -97,7 +82,6 @@ class _FakeSocket:
     def getpeername(self) -> tuple[str, int]:
         return ("127.0.0.1", 12345)
 
-    # BaseHTTPRequestHandler expects the socket to look like a real one.
     def sendall(self, data: bytes) -> None:
         self._wfile.write(data)
 
@@ -107,160 +91,123 @@ class _FakeSocket:
 
 def _dispatch(
     handler_class: type[BaseHTTPRequestHandler],
+    method: str,
     path: str,
 ) -> tuple[int, bytes]:
-    """Drive a single GET request through *handler_class* for *path*.
+    """Drive a single request through *handler_class* for *method*/*path*.
 
     Sends a loopback ``Host`` header (no credential — the panel serves every
-    route without one).  Returns ``(status_code, response_body_bytes)`` from the
-    fake socket's wfile.
+    route without one). Returns ``(status_code, response_body_bytes)``.
     """
-    raw_request = (f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").encode()
+    raw_request = f"{method} {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
     fake_sock = _FakeSocket(raw_request)
-
-    # Instantiate the handler; it will process the request in __init__.
     handler_class(fake_sock, ("127.0.0.1", 12345), None)  # type: ignore[arg-type]
 
     response = fake_sock._wfile.getvalue()
-
-    # Parse status line: "HTTP/1.1 <code> <reason>\r\n..."
     status_line = response.split(b"\r\n", 1)[0]
     status_code = int(status_line.split(b" ")[1])
-
-    # Body is after the double CRLF.
     body = response.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in response else b""
     return status_code, body
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
-def test_dispatch_index() -> None:
-    """(a) GET / invokes the index stub."""
+@pytest.mark.parametrize(
+    ("method", "path", "expected_view", "expected_kwargs"),
+    [
+        pytest.param("GET", "/", "index", {}, id="get-index-no-groups"),
+        pytest.param(
+            "GET", "/api/panel-status", "api_panel_status", {}, id="get-api-panel-status-no-groups"
+        ),
+        pytest.param("GET", "/api/contexts", "api_contexts", {}, id="get-api-contexts-no-groups"),
+        pytest.param(
+            "GET",
+            "/memory/foo/bar.html",
+            "memory",
+            {"slug": "foo", "path": "bar.html"},
+            id="get-memory-named-groups",
+        ),
+        pytest.param(
+            "GET",
+            "/memory/foo/dir/file.html",
+            "memory",
+            {"slug": "foo", "path": "dir/file.html"},
+            id="get-memory-nested-path",
+        ),
+        pytest.param(
+            "GET",
+            "/memory-view/foo/bar.html",
+            "memory_view",
+            {"slug": "foo", "path": "bar.html"},
+            id="get-memory-view-named-groups",
+        ),
+        pytest.param(
+            "GET", "/static/panel.css", "static", {"name": "panel.css"}, id="get-static-named-group"
+        ),
+        pytest.param(
+            "GET",
+            "/api/panel-status?refresh=1",
+            "api_panel_status",
+            {},
+            id="get-query-string-stripped-before-matching",
+        ),
+        pytest.param("GET", "/unknown", None, None, id="get-unknown-404"),
+        pytest.param(
+            "DELETE",
+            "/api/reports/foo.html",
+            "api_report_delete",
+            {"path": "foo.html"},
+            id="delete-report-dispatches-delete-view",
+        ),
+        pytest.param(
+            "DELETE",
+            "/api/reports/ctx/agent/file.html",
+            "api_report_delete",
+            {"path": "ctx/agent/file.html"},
+            id="delete-report-nested-path-full-capture",
+        ),
+        pytest.param("DELETE", "/unknown/path", None, None, id="delete-unknown-404"),
+        pytest.param(
+            "POST",
+            "/api/reports/ctx/agent/file.html/important",
+            "api_report_mark_important",
+            {"path": "ctx/agent/file.html"},
+            id="post-important-before-catchall-marks",
+        ),
+        pytest.param(
+            "DELETE",
+            "/api/reports/ctx/agent/file.html/important",
+            "api_report_unmark_important",
+            {"path": "ctx/agent/file.html"},
+            id="delete-important-before-catchall-unmarks-not-plain-delete",
+        ),
+        pytest.param("GET", "/health", "health", {}, id="get-health-200-json-no-credential"),
+    ],
+)
+def test_dispatch_table(
+    method: str,
+    path: str,
+    expected_view: str | None,
+    expected_kwargs: dict[str, str] | None,
+) -> None:
     stubs = _make_stubs()
     handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
 
-    _dispatch(handler_class, "/")
+    status, body = _dispatch(handler_class, method, path)
 
-    assert stubs["index"].call_count == 1
-    assert stubs["index"].last_kwargs == {}
-    # No other stub was called.
-    for name, stub in stubs.items():
-        if name != "index":
-            assert stub.call_count == 0, f"Unexpected call to stub '{name}'"
-
-
-def test_dispatch_api_panel_status() -> None:
-    """(b) GET /api/panel-status invokes the api_panel_status stub with no captured groups."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/api/panel-status")
-
-    assert stubs["api_panel_status"].call_count == 1
-    assert stubs["api_panel_status"].last_kwargs == {}
-
-
-def test_dispatch_api_contexts() -> None:
-    """GET /api/contexts invokes the api_contexts stub."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/api/contexts")
-
-    assert stubs["api_contexts"].call_count == 1
-    assert stubs["api_contexts"].last_kwargs == {}
-
-
-def test_dispatch_memory_with_named_groups() -> None:
-    """(c) GET /memory/foo/bar.html invokes memory view with slug="foo", path="bar.html"."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/memory/foo/bar.html")
-
-    assert stubs["memory"].call_count == 1
-    assert stubs["memory"].last_kwargs == {"slug": "foo", "path": "bar.html"}
-
-
-def test_dispatch_memory_view_with_named_groups() -> None:
-    """(d) GET /memory-view/foo/bar.html invokes memory_view with slug="foo", path="bar.html"."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/memory-view/foo/bar.html")
-
-    assert stubs["memory_view"].call_count == 1
-    assert stubs["memory_view"].last_kwargs == {"slug": "foo", "path": "bar.html"}
-
-
-def test_dispatch_static_with_named_group() -> None:
-    """(e) GET /static/panel.css invokes static view with name="panel.css"."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/static/panel.css")
-
-    assert stubs["static"].call_count == 1
-    assert stubs["static"].last_kwargs == {"name": "panel.css"}
-
-
-def test_dispatch_unknown_returns_404_with_error_contract_body() -> None:
-    """(f) GET /unknown returns HTTP 404 with the error-contract body (T-2.3)."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    status, body = _dispatch(handler_class, "/unknown")
-
-    assert status == 404
-    assert body == _NOT_FOUND_BODY
-
-    # No view stub should have been called.
-    for stub in stubs.values():
-        assert stub.call_count == 0, f"Stub '{stub.name}' was unexpectedly called"
-
-
-def test_dispatch_strips_query_string_before_matching() -> None:
-    """Route matching strips query string so /api/panel-status?x=1 still dispatches."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/api/panel-status?refresh=1")
-
-    assert stubs["api_panel_status"].call_count == 1
-
-
-def test_dispatch_health_returns_200() -> None:
-    """(g) GET /health returns HTTP 200 with JSON body containing status=ok (no credential)."""
-    import json
-
-    stubs = _make_stubs()
-    # Override health stub to return a realistic JSON body.
-    stubs["health"].content_type = "application/json"
-    stubs["health"].body = json.dumps({"status": "ok", "version": "0.1.2"}).encode()
-    stubs["health"].status = 200
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    status, body = _dispatch(handler_class, "/health")
+    if expected_view is None:
+        assert status == 404
+        assert body == _NOT_FOUND_BODY
+        for stub in stubs.values():
+            assert stub.call_count == 0, f"Stub '{stub.name}' was unexpectedly called"
+        return
 
     assert status == 200
-    assert stubs["health"].call_count == 1
-    data = json.loads(body)
-    assert data["status"] == "ok"
+    hit = stubs[expected_view]
+    assert hit.call_count == 1
+    assert hit.last_kwargs == expected_kwargs
+    for name, stub in stubs.items():
+        if name != expected_view:
+            assert stub.call_count == 0, f"Unexpected call to stub '{name}'"
 
-
-def test_dispatch_memory_nested_path() -> None:
-    """Memory route captures multi-segment paths: /memory/foo/dir/file.html."""
-    stubs = _make_stubs()
-    handler_class = make_handler_class(stubs)  # type: ignore[arg-type]
-
-    _dispatch(handler_class, "/memory/foo/dir/file.html")
-
-    assert stubs["memory"].call_count == 1
-    assert stubs["memory"].last_kwargs == {"slug": "foo", "path": "dir/file.html"}
-
-
-# The POST /api/workflows/<name>/run route was removed with the Run button
-# (operator decision 2026-06-11: workflow DAGs are documentation, not executables).
+    if expected_view == "health":
+        data = json.loads(body)
+        assert data["status"] == "ok"

@@ -1,89 +1,76 @@
-"""Unit tests for the canonical /api/agents response.
+"""Unit tests for the canonical /api/agents response — real decisions only.
 
-Coverage:
-- Default window (30 days): response shape + telemetry sub-object present
-- Custom window (?active_window_days=N): status_window_days reflects N
-- No telemetry: agent cards rendered with zero/null telemetry gracefully
-- Malformed agent (skipped by reader): does not appear in output
-- Response shape: exactly the §5.1 contract (top-level + agent + telemetry keys)
-- active_window_days validation: out-of-range → 400
-- Telemetry-only agents excluded from output
-- status "active" / "inactive" computed correctly against window
+Response shape/happy-path bytes are pinned by ``test_api_golden.py``; this file
+keeps only the tests that flip a real decision:
+
+1. Status-window math (active/inactive incl. custom window + 400/valid range).
+2. Runtime filter (provider-scope) + no-qs≡runtime=claude parity.
+3. No-telemetry / telemetry-None defaults + telemetry-only exclusion.
+4. Plugin-stub exclusion + phases derivation (known/unknown agent).
+5. Workflow membership + provider-failure→empty + model_inherited flag.
 """
 
 from __future__ import annotations
 
+import datetime
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.agents.reader import AgentDTO
+from dadaia_workspace.core.models.agent import AgentDTO
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
+from dadaia_workspace.features.telemetry.aggregator.models import (
+    AgentListResult,
+    AgentSummary,
+    TokenTotals,
+)
+
+pytestmark = pytest.mark.unit
 
 
 def _days_ago_iso(days: int) -> str:
-    """ISO-8601 UTC timestamp ``days`` in the past, relative to now.
-
-    Status windows are computed against ``datetime.now(UTC)`` in production
-    (see ``api.py``: ``cutoff = now - timedelta(days=...)``), so fixtures must
-    express activity relative to the current time. Absolute timestamps are
-    time-bombs that silently flip active->inactive as wall-clock time passes.
-    """
-    import datetime
-
+    """ISO-8601 UTC timestamp ``days`` in the past, relative to now (never a fixed-date time bomb)."""
     return (datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=days)).isoformat()
 
 
 class FakeServerRegistryService:
-    def list_entries(self, project=None, include_stale=True):
+    def list_entries(self, project: Any = None, include_stale: bool = True) -> list[Any]:
         return []
 
 
 class FakeSpecContextService:
-    def list_all(self):
+    def list_all(self) -> list[Any]:
         return []
 
 
-def _make_service(
-    agents: list[AgentDTO],
-    telemetry_stub=None,
-) -> PanelService:
+def _make_service(agents: list[AgentDTO], telemetry_stub: Any = None) -> PanelService:
     svc = PanelService(
         registry=FakeServerRegistryService(),  # type: ignore[arg-type]
         spec_context=FakeSpecContextService(),  # type: ignore[arg-type]
         workspace_root=Path("/workspace"),
         telemetry=telemetry_stub,
     )
-    svc._canonical_agents_override = agents  # injected by fake
+    svc._canonical_agents_override = agents  # type: ignore[attr-defined]
     return svc
-
-
-from dadaia_workspace.features.telemetry.aggregator.models import (  # noqa: E402
-    AgentListResult,
-    AgentSummary,
-    TokenTotals,
-)
 
 
 def _make_agent_summary(
     agent_id: str = "software-engineer",
-    session_count: int = 5,
-    total_cost_usd: float | None = 1.23,
-    cost_known: bool = True,
+    providers: list[str] | None = None,
     last_activity_at: str = "2026-05-17T10:00:00Z",
 ) -> AgentSummary:
     return AgentSummary(
         agent_id=agent_id,
         display_name=agent_id,
-        providers=["claude"],
+        providers=providers or ["claude"],
         dominant_model="claude-sonnet-4-6",
         is_subagent=False,
-        session_count=session_count,
-        total_cost_usd=total_cost_usd,
-        cost_known=cost_known,
+        session_count=5,
+        total_cost_usd=1.23,
+        cost_known=True,
         last_activity_at=last_activity_at,
         token_totals=TokenTotals(input=1000, cache_creation=200, cache_read=800, output=400),
         context_breakdown=[],
@@ -93,31 +80,15 @@ def _make_agent_summary(
 
 
 class FakeTelemetryService:
-    """Stub that returns a controlled AgentListResult."""
-
-    def __init__(
-        self,
-        agent_summaries: list[AgentSummary] | None = None,
-        window_days: int = 180,
-    ) -> None:
+    def __init__(self, agent_summaries: list[AgentSummary] | None = None) -> None:
         self._summaries = agent_summaries or []
-        self._window_days = window_days
-        self.last_call_kwargs: dict = {}
 
     def list_agents(
-        self,
-        window_days: int = 180,
-        context_slug=None,
-        limit: int = 50,
+        self, window_days: int = 180, context_slug: Any = None, limit: int = 50
     ) -> AgentListResult:
-        self.last_call_kwargs = {
-            "window_days": window_days,
-            "context_slug": context_slug,
-            "limit": limit,
-        }
         return AgentListResult(
             generated_at="2026-05-17T10:00:00Z",
-            window_days=self._window_days,
+            window_days=180,
             pricing_age_days=12,
             pricing_model_date="2026-05-01",
             agents=list(self._summaries),
@@ -126,24 +97,20 @@ class FakeTelemetryService:
 
 def _make_dto(
     agent_id: str = "software-engineer",
-    name: str | None = None,
-    description: str = "A software engineer agent.",
-    skills: list[str] | None = None,
-    tools: list[str] | None = None,
-    model: str = "claude-sonnet-4-6",
-    max_turns: int | None = 60,
-    dispatch_band: int = 3,
+    model: str | None = "claude-sonnet-4-6",
+    plugin: bool = False,
 ) -> AgentDTO:
     return AgentDTO(
         id=agent_id,
-        name=name or agent_id,
-        description=description,
-        dispatch_band=dispatch_band,
-        skills=skills or [],
-        tools=tools or [],
+        name=agent_id,
+        description="An agent.",
+        dispatch_band=3,
+        skills=[],
+        tools=[],
         model=model,
-        max_turns=max_turns,
+        max_turns=60,
         input_contract=None,
+        plugin=plugin,
     )
 
 
@@ -162,320 +129,166 @@ def _api_data(
     return status, content_type, json.loads(body)
 
 
-class TestResponseShape:
-    def test_response_contract_and_content_type(self) -> None:
-        """The canonical endpoint returns the expected envelope, card, and telemetry shape."""
-        agents = [_make_dto()]
-        summary = _make_agent_summary(agent_id="software-engineer")
-        tel = FakeTelemetryService(agent_summaries=[summary])
-        svc = _make_service(agents=agents, telemetry_stub=tel)
-
-        status, content_type, data = _api_data(svc)
-
-        assert status == 200
-        assert content_type == "application/json; charset=utf-8"
-
-        assert {
-            "generated_at",
-            "status_window_days",
-            "window_days",
-            "pricing_age_days",
-            "pricing_model_date",
-            "agents",
-        } <= set(data)
-
-        assert len(data["agents"]) == 1
-        card = data["agents"][0]
-        assert {
-            "agent_id",
-            "display_name",
-            "description",
-            "dispatch_band",
-            "status",
-            "skills",
-            "tools",
-            "model",
-            "max_turns",
-            "input_contract",
-            "telemetry",
-        } <= set(card)
-
-        tel_sub = card["telemetry"]
-        assert {
-            "session_count",
-            "total_cost_usd",
-            "total_cost_30d_usd",
-            "cost_known",
-            "last_activity_at",
-            "providers",
-            "dominant_model",
-            "is_subagent",
-            "suspect_count",
-            "token_totals",
-            "context_breakdown",
-            "recent_sessions",
-        } <= set(tel_sub)
-
-        assert not {
-            "session_count",
-            "total_cost_usd",
-            "last_activity_at",
-            "providers",
-            "dominant_model",
-            "is_subagent",
-        } & set(card), "Telemetry fields must stay nested under telemetry"
+# ---------------------------------------------------------------------------
+# 1. Status-window math
+# ---------------------------------------------------------------------------
 
 
-class TestDefaultWindow:
-    def test_default_status_window_is_30(self) -> None:
-        """status_window_days defaults to 30 when not specified."""
-        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
-        _, _, data = _api_data(svc)
-        assert data["status_window_days"] == 30
+@pytest.mark.parametrize(
+    ("active_window_days", "days_ago", "expected_status_field", "expected_http"),
+    [
+        pytest.param(None, 10, "active", 200, id="default-window-30-recent-is-active"),
+        pytest.param(None, 60, "inactive", 200, id="default-window-30-stale-is-inactive"),
+        pytest.param(90, 60, "active", 200, id="custom-window-90-recent-enough-is-active"),
+        pytest.param(30, 60, "inactive", 200, id="custom-window-30-same-activity-is-inactive"),
+        pytest.param(0, 60, "invalid", 400, id="window-below-min-rejected"),
+        pytest.param(366, 60, "invalid", 400, id="window-above-max-rejected"),
+        pytest.param(1, 60, "invalid-not-checked", 200, id="window-boundary-min-accepted"),
+        pytest.param(365, 60, "invalid-not-checked", 200, id="window-boundary-max-accepted"),
+    ],
+)
+def test_status_window_math(
+    active_window_days: int | None,
+    days_ago: int,
+    expected_status_field: str,
+    expected_http: int,
+) -> None:
+    agents = [_make_dto()]
+    summary = _make_agent_summary(last_activity_at=_days_ago_iso(days_ago))
+    svc = _make_service(agents, telemetry_stub=FakeTelemetryService([summary]))
 
-    @pytest.mark.parametrize(
-        ("days_ago", "expected_status"),
-        [
-            (10, "active"),  # within the 30-day window
-            (60, "inactive"),  # outside the 30-day window
-        ],
-    )
-    def test_default_window_status(
-        self,
-        days_ago: int,
-        expected_status: str,
-    ) -> None:
-        """The default status window marks recent telemetry active and old telemetry inactive."""
-        agents = [_make_dto()]
-        summary = _make_agent_summary(
-            agent_id="software-engineer",
-            last_activity_at=_days_ago_iso(days_ago),
-        )
-        tel = FakeTelemetryService(agent_summaries=[summary])
-        svc = _make_service(agents=agents, telemetry_stub=tel)
+    status, _, data = _api_data(svc, active_window_days=active_window_days)
 
-        _, _, data = _api_data(svc, active_window_days=30)
-        assert data["agents"][0]["status"] == expected_status
-
-
-class TestCustomWindow:
-    def test_custom_window_reflected_in_status_window_days(self) -> None:
-        """?active_window_days=90 → status_window_days=90 in response."""
-        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
-        _, _, data = _api_data(svc, active_window_days=90)
-        assert data["status_window_days"] == 90
-
-    def test_custom_window_changes_active_inactive(self) -> None:
-        """Agent active 60 days ago is inactive with window=30 but active with window=90."""
-        agents = [_make_dto()]
-        # last_activity_at 60 days ago (relative to now, not a fixed date)
-        summary = _make_agent_summary(
-            agent_id="software-engineer",
-            last_activity_at=_days_ago_iso(60),
-        )
-        tel = FakeTelemetryService(agent_summaries=[summary])
-        svc = _make_service(agents=agents, telemetry_stub=tel)
-
-        _, _, data_30 = _api_data(svc, active_window_days=30)
-        _, _, data_90 = _api_data(svc, active_window_days=90)
-        assert data_30["agents"][0]["status"] == "inactive"
-        assert data_90["agents"][0]["status"] == "active"
+    assert status == expected_http
+    if expected_http == 400:
+        assert "error" in data
+        return
+    assert data["status_window_days"] == (active_window_days or 30)
+    if expected_status_field not in ("invalid-not-checked",):
+        assert data["agents"][0]["status"] == expected_status_field
 
 
-class TestNoTelemetry:
-    def test_agent_without_telemetry_match_has_zero_defaults(self) -> None:
-        """When no telemetry summary matches the agent, defaults are zero/null."""
-        agents = [_make_dto(agent_id="unknown-agent")]
-        tel = FakeTelemetryService(agent_summaries=[])
-        svc = _make_service(agents=agents, telemetry_stub=tel)
-
-        _, _, data = _api_data(svc)
-
-        card = data["agents"][0]
-        assert card["status"] == "inactive"
-        tel_sub = card["telemetry"]
-        assert tel_sub["session_count"] == 0
-        assert tel_sub["total_cost_usd"] is None or tel_sub["total_cost_usd"] == 0
-        assert tel_sub["last_activity_at"] is None
-        assert tel_sub["cost_known"] is False
-
-    def test_no_telemetry_service_returns_all_inactive(self) -> None:
-        """When telemetry is None, all agents are inactive with zero stats."""
-        agents = [_make_dto()]
-        svc = _make_service(agents=agents, telemetry_stub=None)
-
-        _, _, data = _api_data(svc)
-
-        card = data["agents"][0]
-        assert card["status"] == "inactive"
-        assert card["telemetry"]["session_count"] == 0
-
-
-class TestTelemetryOnlyExclusion:
-    def test_output_is_limited_to_canonical_agents(self) -> None:
-        """Telemetry-only rows are excluded from the canonical agents response."""
-        agents = [_make_dto(agent_id=f"agent-{i}") for i in range(3)]
-        summaries = [_make_agent_summary(agent_id=f"agent-{i}") for i in range(5)]
-        tel = FakeTelemetryService(agent_summaries=summaries)
-        svc = _make_service(agents=agents, telemetry_stub=tel)
-
-        _, _, data = _api_data(svc)
-        ids = {card["agent_id"] for card in data["agents"]}
-        assert len(data["agents"]) == 3
-        assert ids == {"agent-0", "agent-1", "agent-2"}
-
-
-class TestWindowValidation:
-    def test_invalid_windows_return_400(self) -> None:
-        """active_window_days outside 1..365 returns 400."""
-        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
-
-        for window in [0, -1, 366]:
-            status, _, data = _api_data(svc, active_window_days=window)
-            assert status == 400
-            assert "error" in data
-
-    def test_valid_windows_are_reflected_in_response(self) -> None:
-        """Boundary and representative in-range windows are accepted."""
-        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
-
-        for window in [1, 90, 365]:
-            status, _, data = _api_data(svc, active_window_days=window)
-            assert status == 200
-            assert data["status_window_days"] == window
-
-
-class TestTierFieldInResponse:
-    """Tier integer is passed through by /api/agents responses."""
-
-    def test_dispatch_band_value_in_valid_set(self) -> None:
-        """Every agent's 'dispatch_band' must be an integer in {1, 2, 3}."""
-        agents = [
-            _make_dto(agent_id="tier-one", dispatch_band=1),
-            _make_dto(agent_id="tier-two", dispatch_band=2),
-            _make_dto(agent_id="tier-three", dispatch_band=3),
-        ]
-        summaries = [_make_agent_summary(agent_id=agent.id) for agent in agents]
-        svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService(summaries))
-        _, _, data = _api_data(svc)
-
-        for card in data["agents"]:
-            assert card["dispatch_band"] in {1, 2, 3}, (
-                f"Agent {card.get('agent_id')!r} has invalid dispatch_band "
-                f"{card.get('dispatch_band')!r}"
-            )
-
-
-def _make_agent_summary_with_provider(
-    agent_id: str,
-    providers: list[str],
-) -> AgentSummary:
-    """Return an AgentSummary with the specified providers list."""
-    return AgentSummary(
-        agent_id=agent_id,
-        display_name=agent_id,
-        providers=providers,
-        dominant_model="claude-sonnet-4-6",
-        is_subagent=False,
-        session_count=2,
-        total_cost_usd=0.50,
-        cost_known=True,
-        last_activity_at="2026-05-17T10:00:00Z",
-        token_totals=TokenTotals(input=500, cache_creation=100, cache_read=400, output=200),
-        context_breakdown=[],
-        recent_sessions=[],
-        suspect_count=0,
-    )
+# ---------------------------------------------------------------------------
+# 2. Runtime filter (provider-scope) + no-qs parity
+# ---------------------------------------------------------------------------
 
 
 def _build_mixed_runtime_service() -> PanelService:
     agents = [
-        _make_dto(agent_id="agent-claude", dispatch_band=3),
-        _make_dto(agent_id="agent-codex", dispatch_band=3),
-        _make_dto(agent_id="agent-both", dispatch_band=3),
+        _make_dto(agent_id="agent-claude"),
+        _make_dto(agent_id="agent-codex"),
+        _make_dto(agent_id="agent-both"),
     ]
     summaries = [
-        _make_agent_summary_with_provider("agent-claude", ["claude"]),
-        _make_agent_summary_with_provider("agent-codex", ["codex"]),
-        _make_agent_summary_with_provider("agent-both", ["claude", "codex"]),
+        _make_agent_summary("agent-claude", providers=["claude"]),
+        _make_agent_summary("agent-codex", providers=["codex"]),
+        _make_agent_summary("agent-both", providers=["claude", "codex"]),
     ]
-    tel = FakeTelemetryService(agent_summaries=summaries)
-    return _make_service(agents=agents, telemetry_stub=tel)
+    return _make_service(agents, telemetry_stub=FakeTelemetryService(summaries))
 
 
-class TestRuntimeFilter:
-    """Runtime filter keeps provider-scoped agent responses correct."""
-
-    @pytest.mark.parametrize(
-        ("runtime", "expected_ids"),
-        [
-            ("claude", {"agent-claude", "agent-both"}),
-            ("codex", {"agent-codex", "agent-both"}),
-            ("unknown-runtime", {"agent-claude", "agent-both"}),
-        ],
-    )
-    def test_runtime_filter_provider_scope(
-        self,
-        runtime: str,
-        expected_ids: set[str],
-    ) -> None:
-        svc = _build_mixed_runtime_service()
-        _, _, data = _api_data(svc, qs={"runtime": [runtime]})
-        ids = {card["agent_id"] for card in data["agents"]}
-        assert ids == expected_ids
-
-    @pytest.mark.parametrize(
-        ("runtime", "expected_present"),
-        [("claude", True), ("codex", False)],
-    )
-    def test_no_telemetry_agent_runtime_behavior(
-        self,
-        runtime: str,
-        expected_present: bool,
-    ) -> None:
-        agents = [_make_dto(agent_id="ghost-agent", dispatch_band=3)]
-        tel = FakeTelemetryService(agent_summaries=[])
-        svc = _make_service(agents=agents, telemetry_stub=tel)
-        _, _, data = _api_data(svc, qs={"runtime": [runtime]})
-        ids = {card["agent_id"] for card in data["agents"]}
-        assert ("ghost-agent" in ids) is expected_present
-
-
-class TestRuntimeFilterBackwardCompatParity:
-    def test_no_runtime_param_equals_runtime_claude(self) -> None:
-        """Response with no ?runtime= must be identical to ?runtime=claude."""
-        svc = _build_mixed_runtime_service()
-        _, _, data_no_qs = _api_data(svc)
-        _, _, data_claude = _api_data(svc, qs={"runtime": ["claude"]})
-
-        agents_no_qs = data_no_qs["agents"]
-        agents_claude = data_claude["agents"]
-        assert [card["agent_id"] for card in agents_no_qs] == [
-            card["agent_id"] for card in agents_claude
-        ]
-
-        for card_no_qs, card_claude in zip(agents_no_qs, agents_claude, strict=False):
-            keys_to_compare = set(card_no_qs.keys()) - {"telemetry"}
-            for key in keys_to_compare:
-                assert card_no_qs[key] == card_claude[key], (
-                    f"Agent {card_no_qs['agent_id']!r}: key {key!r} differs "
-                    f"between no-qs ({card_no_qs[key]!r}) and "
-                    f"runtime=claude ({card_claude[key]!r})"
-                )
-
-    def test_top_level_envelope_shape_identical(self) -> None:
-        """Top-level envelope keys are identical between no-?runtime= and ?runtime=claude."""
-        svc = _make_service(agents=[], telemetry_stub=FakeTelemetryService())
-        _, _, data_no_qs = _api_data(svc)
-        _, _, data_claude = _api_data(svc, qs={"runtime": ["claude"]})
-
-        assert set(data_no_qs.keys()) == set(data_claude.keys()), (
-            "Top-level envelope keys differ between no-qs and runtime=claude"
-        )
+@pytest.mark.parametrize(
+    ("qs", "expected_ids"),
+    [
+        pytest.param(
+            {"runtime": ["claude"]}, {"agent-claude", "agent-both"}, id="runtime-claude-scope"
+        ),
+        pytest.param(
+            {"runtime": ["codex"]}, {"agent-codex", "agent-both"}, id="runtime-codex-scope"
+        ),
+        pytest.param(
+            {"runtime": ["unknown-runtime"]},
+            {"agent-claude", "agent-both"},
+            id="unknown-runtime-falls-back-claude",
+        ),
+        pytest.param(
+            None, {"agent-claude", "agent-both"}, id="no-runtime-qs-matches-explicit-claude"
+        ),
+    ],
+)
+def test_runtime_filter_provider_scope(
+    qs: dict[str, list[str]] | None, expected_ids: set[str]
+) -> None:
+    svc = _build_mixed_runtime_service()
+    _, _, data = _api_data(svc, qs=qs)
+    ids = {card["agent_id"] for card in data["agents"]}
+    assert ids == expected_ids
 
 
 # ---------------------------------------------------------------------------
-# Agentic-tab redesign: plugin-stub exclusion + phases / workflows / model
+# 3. No-telemetry / telemetry-None defaults + telemetry-only exclusion
+# ---------------------------------------------------------------------------
+
+
+def test_no_telemetry_defaults_and_telemetry_only_exclusion() -> None:
+    """No-match / no-service both zero-default; telemetry-only rows never leak into the roster."""
+    agents = [_make_dto(agent_id="unmatched-agent")]
+
+    # No telemetry match for this agent.
+    svc_no_match = _make_service(agents, telemetry_stub=FakeTelemetryService([]))
+    _, _, data_no_match = _api_data(svc_no_match)
+    card = data_no_match["agents"][0]
+    assert card["status"] == "inactive"
+    assert card["telemetry"]["session_count"] == 0
+    assert card["telemetry"]["cost_known"] is False
+    assert card["telemetry"]["last_activity_at"] is None
+
+    # No telemetry service at all.
+    svc_none = _make_service(agents, telemetry_stub=None)
+    _, _, data_none = _api_data(svc_none)
+    card_none = data_none["agents"][0]
+    assert card_none["status"] == "inactive"
+    assert card_none["telemetry"]["session_count"] == 0
+
+    # Telemetry rows without a matching canonical DTO never leak into the response.
+    canonical_agents = [_make_dto(agent_id=f"agent-{i}") for i in range(3)]
+    summaries = [_make_agent_summary(agent_id=f"agent-{i}") for i in range(5)]
+    svc_extra_telemetry = _make_service(
+        canonical_agents, telemetry_stub=FakeTelemetryService(summaries)
+    )
+    _, _, data_extra = _api_data(svc_extra_telemetry)
+    ids = {card["agent_id"] for card in data_extra["agents"]}
+    assert len(data_extra["agents"]) == 3
+    assert ids == {"agent-0", "agent-1", "agent-2"}
+
+
+# ---------------------------------------------------------------------------
+# 4. Plugin-stub exclusion + phases derivation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("agent_id", "is_plugin", "expected_present", "expected_phases"),
+    [
+        pytest.param(
+            "software-engineer",
+            False,
+            True,
+            ["Implementation"],
+            id="core-agent-included-with-phase",
+        ),
+        pytest.param("design-specialist", True, False, None, id="plugin-stub-excluded"),
+        pytest.param("mystery-agent", False, True, [], id="unknown-agent-empty-phases-not-faked"),
+    ],
+)
+def test_plugin_exclusion_and_phase_derivation(
+    agent_id: str,
+    is_plugin: bool,
+    expected_present: bool,
+    expected_phases: list[str] | None,
+) -> None:
+    agents = [_make_dto(agent_id=agent_id, plugin=is_plugin)]
+    svc = _make_service(agents, telemetry_stub=FakeTelemetryService())
+    _, _, data = _api_data(svc)
+    ids = {card["agent_id"] for card in data["agents"]}
+    assert (agent_id in ids) is expected_present
+    if expected_present:
+        card = next(c for c in data["agents"] if c["agent_id"] == agent_id)
+        assert card["phases"] == expected_phases
+
+
+# ---------------------------------------------------------------------------
+# 5. Workflow membership + provider-failure→empty + model_inherited
 # ---------------------------------------------------------------------------
 
 
@@ -494,49 +307,11 @@ class _FakeWorkflowsService:
         return list(self._summaries)
 
 
-def test_plugin_stubs_excluded_from_roster() -> None:
-    """Agents with plugin=True (design-specialist/devops/frontend) never appear."""
-    agents = [
-        _make_dto(agent_id="software-engineer"),
-        AgentDTO(
-            id="design-specialist",
-            name="design-specialist",
-            description="[PLUGIN] stub.",
-            dispatch_band=3,
-            plugin=True,
-        ),
-    ]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    _, _, data = _api_data(svc)
-    ids = {a["agent_id"] for a in data["agents"]}
-    assert "software-engineer" in ids
-    assert "design-specialist" not in ids
-
-
-def test_agent_phases_derived_from_constitution() -> None:
-    """The §7 lifecycle phase(s) appear on each agent entry."""
-    agents = [_make_dto(agent_id="qa-engineer")]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    _, _, data = _api_data(svc)
-    card = data["agents"][0]
-    assert card["phases"] == ["Review gate — commit"]
-
-
-def test_unknown_agent_phases_empty_not_faked() -> None:
-    """An agent not in the §7 table gets an empty phases list — never fabricated."""
-    agents = [_make_dto(agent_id="mystery-agent")]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    _, _, data = _api_data(svc)
-    assert data["agents"][0]["phases"] == []
-
-
-def test_workflow_membership_derived_from_workflow_definitions() -> None:
-    """Workflows the agent takes part in are derived from workflow agent_ids."""
-    agents = [
-        _make_dto(agent_id="project-manager"),
-        _make_dto(agent_id="software-engineer"),
-    ]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
+def test_workflow_membership_provider_failure_and_model_inherited() -> None:
+    """Membership derives from workflow agent_ids; a provider failure yields empty (never 500);
+    model_inherited flips true only when no model: frontmatter is set."""
+    agents = [_make_dto(agent_id="project-manager"), _make_dto(agent_id="software-engineer")]
+    svc = _make_service(agents, telemetry_stub=FakeTelemetryService())
     svc._workflows_service_override = _FakeWorkflowsService(  # type: ignore[attr-defined]
         [
             _FakeWorkflowSummary("audit-fanout", ["project-auditor", "project-manager"]),
@@ -548,40 +323,25 @@ def test_workflow_membership_derived_from_workflow_definitions() -> None:
     assert by_id["project-manager"]["workflows"] == ["audit-fanout", "release-ship"]
     assert by_id["software-engineer"]["workflows"] == []
 
-
-def test_workflows_empty_when_provider_unavailable() -> None:
-    """A workflows-read failure yields empty membership, not a 500."""
-    agents = [_make_dto(agent_id="software-engineer")]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    # No workflows service injected → list_workflow_summaries() raises → caught.
-    status, _, data = _api_data(svc)
+    # No workflows service injected -> list_workflow_summaries() raises internally -> caught.
+    svc_no_wf = _make_service(
+        [_make_dto(agent_id="software-engineer")], telemetry_stub=FakeTelemetryService()
+    )
+    status, _, data_no_wf = _api_data(svc_no_wf)
     assert status == 200
-    assert data["agents"][0]["workflows"] == []
+    assert data_no_wf["agents"][0]["workflows"] == []
 
+    # model_inherited: true only with no model: frontmatter.
+    svc_no_model = _make_service(
+        [_make_dto(agent_id="x", model=None)], telemetry_stub=FakeTelemetryService()
+    )
+    _, _, data_no_model = _api_data(svc_no_model)
+    assert data_no_model["agents"][0]["model"] is None
+    assert data_no_model["agents"][0]["model_inherited"] is True
 
-def test_model_inherited_flag_when_no_model_frontmatter() -> None:
-    """An agent with no model: declares model_inherited=True and model=None."""
-    agents = [
-        AgentDTO(
-            id="no-model-agent",
-            name="no-model-agent",
-            description="No model frontmatter.",
-            dispatch_band=3,
-            model=None,
-        )
-    ]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    _, _, data = _api_data(svc)
-    card = data["agents"][0]
-    assert card["model"] is None
-    assert card["model_inherited"] is True
-
-
-def test_model_inherited_false_when_model_present() -> None:
-    """A configured model id sets model_inherited=False."""
-    agents = [_make_dto(agent_id="software-engineer", model="claude-opus-4-8")]
-    svc = _make_service(agents=agents, telemetry_stub=FakeTelemetryService())
-    _, _, data = _api_data(svc)
-    card = data["agents"][0]
-    assert card["model"] == "claude-opus-4-8"
-    assert card["model_inherited"] is False
+    svc_with_model = _make_service(
+        [_make_dto(agent_id="x", model="claude-opus-4-8")], telemetry_stub=FakeTelemetryService()
+    )
+    _, _, data_with_model = _api_data(svc_with_model)
+    assert data_with_model["agents"][0]["model"] == "claude-opus-4-8"
+    assert data_with_model["agents"][0]["model_inherited"] is False

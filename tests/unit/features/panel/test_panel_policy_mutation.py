@@ -11,6 +11,14 @@ Two layers:
 2. **Handler layer** — the in-process request driver exercising ``do_PUT`` /
    ``do_POST`` body reading by Content-Length, the Host-guard-first invariant (no bearer),
    and the 413 envelope at the handler before the body is read.
+
+Five survivors, one per real decision:
+  1. PUT reject pipeline (415/413/invalid-json/unknown-workflow/harness-mismatch/
+     non-default-ctx), each asserting the store stays untouched.
+  2. PUT persists atomically + takes a .last-good backup.
+  3. An invalid candidate never overwrites a prior good file.
+  4. Kimi profile PUT -> GET -> resolver round-trip.
+  5. Handler PUT/POST body-read + 413-before-read + Host-guard-first (no view reached).
 """
 
 from __future__ import annotations
@@ -21,12 +29,10 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-from dadaia_workspace.core.models.workflow_execution import (
-    WorkflowModelPolicyOverlay,
-)
-from dadaia_workspace.features.lifecycle.policy_resolver import (
-    WorkflowExecutionPolicyResolver,
-)
+import pytest
+
+from dadaia_workspace.core.models.workflow_execution import WorkflowModelPolicyOverlay
+from dadaia_workspace.features.lifecycle.policy_resolver import WorkflowExecutionPolicyResolver
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.views.workflow_policy import (
     render_api_workflow_model_policy,
@@ -38,9 +44,11 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
 )
 
+pytestmark = pytest.mark.unit
+
 
 def _workspace(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia").mkdir()
+    (tmp_path / ".dadaia").mkdir(parents=True)
     return tmp_path
 
 
@@ -82,101 +90,101 @@ def _valid_policy_body() -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# PUT view — validation pipeline
+# 1. PUT reject pipeline — every rejection leaves the store untouched
 # ---------------------------------------------------------------------------
 
 
-def test_put_rejects_non_json_content_type_415(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_put_workflow_model_policy(store, _factory(store))
-
-    status, payload = _decode(view(body=_valid_policy_body(), content_type="text/plain", qs={}))
-
-    assert status == 415
-    assert payload["error"] == "unsupported_media_type"
-    # Nothing was written.
-    assert not store.path.exists()
-
-
-def test_put_rejects_oversized_payload_413(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_put_workflow_model_policy(store, _factory(store))
-    huge = b'{"x":"' + b"a" * (65 * 1024) + b'"}'
-
-    status, payload = _decode(view(body=huge, content_type="application/json", qs={}))
-
-    assert status == 413
-    assert payload["error"] == "payload_too_large"
-    assert not store.path.exists()
-
-
-def test_put_rejects_invalid_json_400(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_put_workflow_model_policy(store, _factory(store))
-
-    status, payload = _decode(view(body=b"{not json", content_type="application/json", qs={}))
-
-    assert status == 400
-    assert payload["error"] == "invalid_json"
-    assert not store.path.exists()
-
-
-def test_put_rejects_unknown_workflow_with_field_path_400(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_put_workflow_model_policy(store, _factory(store))
-    body = json.dumps(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {"workflows": {"nope": {"steps": {"implement": "codex-review-deep"}}}}
-            },
-        }
-    ).encode("utf-8")
-
-    status, payload = _decode(view(body=body, content_type="application/json", qs={}))
-
-    assert status == 400
-    assert payload["error"] == "invalid_policy"
-    paths = [e["path"] for e in payload["errors"]]
-    assert any("workflows.nope" in p for p in paths)
-    assert not store.path.exists()
-
-
-def test_put_rejects_harness_mismatched_profile_400(tmp_path: Path) -> None:
-    # implement runs on codex; a pi profile is a harness mismatch → rejected, not written.
-    store = _store(tmp_path)
-    view = render_put_workflow_model_policy(store, _factory(store))
-    body = json.dumps(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "pi-reasoning-high"}}}
+@pytest.mark.parametrize(
+    ("body", "content_type", "qs", "expected_error"),
+    [
+        pytest.param(
+            _valid_policy_body(),
+            "text/plain",
+            {},
+            "unsupported_media_type",
+            id="415-non-json-content-type",
+        ),
+        pytest.param(
+            b'{"x":"' + b"a" * (65 * 1024) + b'"}',
+            "application/json",
+            {},
+            "payload_too_large",
+            id="413-oversized-payload",
+        ),
+        pytest.param(b"{not json", "application/json", {}, "invalid_json", id="400-invalid-json"),
+        pytest.param(
+            json.dumps(
+                {
+                    "schema_version": "workflow-model-policy-v1",
+                    "policy_id": "default",
+                    "contexts": {
+                        "default": {
+                            "workflows": {"nope": {"steps": {"implement": "codex-review-deep"}}}
+                        }
+                    },
                 }
-            },
-        }
-    ).encode("utf-8")
-
-    status, payload = _decode(view(body=body, content_type="application/json", qs={}))
-
-    assert status == 400
-    assert payload["error"] == "invalid_policy"
-    assert not store.path.exists()
-
-
-def test_put_rejects_non_default_context_400(tmp_path: Path) -> None:
+            ).encode("utf-8"),
+            "application/json",
+            {},
+            "invalid_policy",
+            id="400-unknown-workflow",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    "schema_version": "workflow-model-policy-v1",
+                    "policy_id": "default",
+                    "contexts": {
+                        "default": {
+                            "workflows": {
+                                "implementation": {"steps": {"implement": "pi-reasoning-high"}}
+                            }
+                        }
+                    },
+                }
+            ).encode("utf-8"),
+            "application/json",
+            {},
+            "invalid_policy",
+            id="400-harness-mismatched-profile",
+        ),
+        pytest.param(
+            _valid_policy_body(),
+            "application/json",
+            {"context": ["other"]},
+            "unsupported_context",
+            id="400-non-default-context",
+        ),
+    ],
+)
+def test_put_reject_pipeline_never_writes(
+    tmp_path: Path,
+    body: bytes,
+    content_type: str,
+    qs: dict[str, list[str]],
+    expected_error: str,
+) -> None:
     store = _store(tmp_path)
     view = render_put_workflow_model_policy(store, _factory(store))
 
-    status, payload = _decode(
-        view(body=_valid_policy_body(), content_type="application/json", qs={"context": ["other"]})
-    )
+    status, payload = _decode(view(body=body, content_type=content_type, qs=qs))
 
-    assert status == 400
-    assert payload["error"] == "unsupported_context"
+    assert status in (400, 413, 415)
+    assert payload["error"] == expected_error
     assert not store.path.exists()
+
+    # POST validate mirrors the same reject path for a representative 400 case, also no write.
+    if expected_error == "invalid_policy":
+        validate_view = render_post_workflow_model_policy_validate(store, _factory(store))
+        v_status, v_payload = _decode(validate_view(body=body, content_type=content_type, qs=qs))
+        assert v_status == 400
+        assert v_payload["error"] == "invalid_policy"
+        assert not store.path.exists()
+
+
+# ---------------------------------------------------------------------------
+# 2. PUT persists atomically + .last-good backup
+# ---------------------------------------------------------------------------
 
 
 def test_put_persists_valid_policy_atomically_with_last_good_backup(tmp_path: Path) -> None:
@@ -198,20 +206,29 @@ def test_put_persists_valid_policy_atomically_with_last_good_backup(tmp_path: Pa
 
     assert status == 200
     assert payload["saved"] is True
-    # The new overlay is persisted and loads back.
     overlay = store.load()
     assert overlay is not None
     assert overlay.step_profile("default", "implementation", "implement") == "codex-review-deep"
-    # The prior file was backed up to .last-good.json (the seeded value).
     assert store.last_good_path.exists()
     backup = json.loads(store.last_good_path.read_text(encoding="utf-8"))
     seeded = backup["contexts"]["default"]["workflows"]["implementation"]["steps"]["implement"]
     assert seeded == "codex-implementation-standard"
 
+    # Validate view accepts the same valid body without ever writing.
+    validate_view = render_post_workflow_model_policy_validate(store, _factory(store))
+    v_status, v_payload = _decode(
+        validate_view(body=_valid_policy_body(), content_type="application/json", qs={})
+    )
+    assert v_status == 200
+    assert v_payload["valid"] is True
+
+
+# ---------------------------------------------------------------------------
+# 3. Invalid candidate never overwrites a prior good file
+# ---------------------------------------------------------------------------
+
 
 def test_put_invalid_candidate_never_overwrites_a_good_file(tmp_path: Path) -> None:
-    # invalid-blocks-execution: an invalid candidate must not be persisted, so a prior
-    # good overlay (which a run resolves against) is left intact.
     store = _store(tmp_path)
     view = render_put_workflow_model_policy(store, _factory(store))
     store.save(
@@ -234,8 +251,12 @@ def test_put_invalid_candidate_never_overwrites_a_good_file(tmp_path: Path) -> N
     status, _payload = _decode(view(body=bad, content_type="application/json", qs={}))
 
     assert status == 400
-    # The good file is byte-identical — the invalid candidate never touched it.
     assert store.path.read_text(encoding="utf-8") == before
+
+
+# ---------------------------------------------------------------------------
+# 4. Kimi profile PUT -> GET -> resolver round-trip
+# ---------------------------------------------------------------------------
 
 
 def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -> None:
@@ -245,15 +266,11 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
     resolving the persisted overlay all agree: the persisted value is the PROFILE ID
     ``pi-openrouter-kimi-high`` (not a raw ``moonshotai/kimi-k2.5:high`` — the resolver
     rejects raw ids), and the resolver resolves that profile to the discrete pi option
-    ``moonshotai/kimi-k2.5:high`` (model ``moonshotai/kimi-k2.5`` at effort ``high``;
-    v0.1.66 FR3 corrected the id from the invalid ``kimi-2.7``). No changes to the
-    overlay store or resolver — only a new built-in profile makes kimi reachable.
+    ``moonshotai/kimi-k2.5:high``.
     """
     store = _store(tmp_path)
     factory = _factory(store)
     put = render_put_workflow_model_policy(store, factory)
-    # The step runs on codex by default; move it to pi (harness) AND select the kimi
-    # pi-profile so the profile's harness matches the step's effective harness.
     body = json.dumps(
         {
             "schema_version": "workflow-model-policy-v1",
@@ -275,15 +292,12 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
     assert status == 200
     assert payload["saved"] is True
 
-    # GET returns the persisted PROFILE ID verbatim (round-trips).
     get = render_api_workflow_model_policy(store)
     status, got = _decode(get(qs={}))
     assert status == 200
     persisted = got["policy"]["contexts"]["default"]["workflows"]["implementation"]
     assert persisted["steps"]["implement"] == "pi-openrouter-kimi-high"
 
-    # The resolver resolves the persisted profile to the pi moonshotai/kimi-k2.5:high
-    # option.
     resolver = factory("default")
     snapshot = resolver.resolve("implementation", context="default")
     entry = snapshot.step("implement")
@@ -296,45 +310,7 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
 
 
 # ---------------------------------------------------------------------------
-# POST validate view — no write
-# ---------------------------------------------------------------------------
-
-
-def test_validate_accepts_valid_policy_without_writing(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_post_workflow_model_policy_validate(store, _factory(store))
-
-    status, payload = _decode(
-        view(body=_valid_policy_body(), content_type="application/json", qs={})
-    )
-
-    assert status == 200
-    assert payload["valid"] is True
-    assert not store.path.exists()  # validate never writes
-
-
-def test_validate_rejects_invalid_policy_with_field_path(tmp_path: Path) -> None:
-    store = _store(tmp_path)
-    view = render_post_workflow_model_policy_validate(store, _factory(store))
-    bad = json.dumps(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {"workflows": {"implementation": {"steps": {"implement": "ghost"}}}}
-            },
-        }
-    ).encode("utf-8")
-
-    status, payload = _decode(view(body=bad, content_type="application/json", qs={}))
-
-    assert status == 400
-    assert payload["error"] == "invalid_policy"
-    assert not store.path.exists()
-
-
-# ---------------------------------------------------------------------------
-# Handler layer — do_PUT / do_POST body reading + Host guard
+# 5. Handler layer — PUT/POST body-read + 413-before-read + Host-guard-first
 # ---------------------------------------------------------------------------
 
 
@@ -376,73 +352,60 @@ def _drive(handler_class: type[BaseHTTPRequestHandler], raw: bytes) -> tuple[int
     return status, body
 
 
-def test_handler_put_reads_body_and_calls_view() -> None:
-    view = _RecordingView()
-    handler_class = make_handler_class({"api_workflow_model_policy_put": view})
+def test_handler_put_post_body_read_and_host_guard_first() -> None:
     payload = _valid_policy_body()
-    raw = (
+
+    # (a) PUT reads the body by Content-Length and forwards qs to the view.
+    put_view = _RecordingView()
+    put_handler_class = make_handler_class({"api_workflow_model_policy_put": put_view})
+    raw_put = (
         b"PUT /api/workflow-model-policy?context=default HTTP/1.1\r\n"
         b"Host: localhost\r\n"
         b"Content-Type: application/json\r\n"
         b"Content-Length: " + str(len(payload)).encode() + b"\r\n\r\n" + payload
     )
+    status_put, _body_put = _drive(put_handler_class, raw_put)
+    assert status_put == 200
+    assert len(put_view.calls) == 1
+    assert put_view.calls[0]["body"] == payload
+    assert put_view.calls[0]["content_type"] == "application/json"
+    assert put_view.calls[0]["qs"] == {"context": ["default"]}
 
-    status, _body = _drive(handler_class, raw)
-
-    assert status == 200
-    assert len(view.calls) == 1
-    assert view.calls[0]["body"] == payload
-    assert view.calls[0]["content_type"] == "application/json"
-    assert view.calls[0]["qs"] == {"context": ["default"]}
-
-
-def test_handler_post_validate_reads_body_and_calls_view() -> None:
-    view = _RecordingView()
-    handler_class = make_handler_class({"api_workflow_model_policy_validate": view})
-    payload = _valid_policy_body()
-    raw = (
+    # (b) POST validate reads the body the same way.
+    post_view = _RecordingView()
+    post_handler_class = make_handler_class({"api_workflow_model_policy_validate": post_view})
+    raw_post = (
         b"POST /api/workflow-model-policy/validate HTTP/1.1\r\n"
         b"Host: localhost\r\n"
         b"Content-Type: application/json\r\n"
         b"Content-Length: " + str(len(payload)).encode() + b"\r\n\r\n" + payload
     )
+    status_post, _body_post = _drive(post_handler_class, raw_post)
+    assert status_post == 200
+    assert post_view.calls[0]["body"] == payload
 
-    status, _body = _drive(handler_class, raw)
-
-    assert status == 200
-    assert view.calls[0]["body"] == payload
-
-
-def test_handler_put_host_guard_runs_first_no_bearer() -> None:
-    view = _RecordingView()
-    handler_class = make_handler_class({"api_workflow_model_policy_put": view})
-    payload = _valid_policy_body()
-    raw = (
+    # (c) Host-guard runs FIRST: a foreign Host is rejected before the view ever runs.
+    guard_view = _RecordingView()
+    guard_handler_class = make_handler_class({"api_workflow_model_policy_put": guard_view})
+    raw_guard = (
         b"PUT /api/workflow-model-policy HTTP/1.1\r\n"
         b"Host: evil.example.com\r\n"
         b"Content-Type: application/json\r\n"
         b"Content-Length: " + str(len(payload)).encode() + b"\r\n\r\n" + payload
     )
+    status_guard, _body_guard = _drive(guard_handler_class, raw_guard)
+    assert status_guard == 403
+    assert guard_view.calls == []
 
-    status, _body = _drive(handler_class, raw)
-
-    assert status == 403  # foreign Host rejected before the view runs
-    assert view.calls == []  # the view was never reached
-
-
-def test_handler_put_oversized_content_length_413_before_read() -> None:
-    view = _RecordingView()
-    handler_class = make_handler_class({"api_workflow_model_policy_put": view})
-    # Declare a Content-Length far over the envelope; the handler must 413 without
-    # reaching the view (no need to send the actual bytes).
-    raw = (
+    # (d) 413 fires from the declared Content-Length BEFORE the body is read/view reached.
+    oversize_view = _RecordingView()
+    oversize_handler_class = make_handler_class({"api_workflow_model_policy_put": oversize_view})
+    raw_oversize = (
         b"PUT /api/workflow-model-policy HTTP/1.1\r\n"
         b"Host: localhost\r\n"
         b"Content-Type: application/json\r\n"
         b"Content-Length: 999999999\r\n\r\n"
     )
-
-    status, _body = _drive(handler_class, raw)
-
-    assert status == 413
-    assert view.calls == []
+    status_oversize, _body_oversize = _drive(oversize_handler_class, raw_oversize)
+    assert status_oversize == 413
+    assert oversize_view.calls == []

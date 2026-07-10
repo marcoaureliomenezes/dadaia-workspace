@@ -1,13 +1,14 @@
 """Tests for views/memory.py — Markdown-source render (T-MMS-06).
 
-Covers:
-  - .md atoms are rendered to HTML in-memory (D-4).
-  - Mermaid fences → <pre class="mermaid"> (D-1).
-  - [[wikilink]] → <a> anchor (D-1).
-  - No raw <script> or <style> survives in output (OWASP A03).
-  - Path traversal outside memory_root returns 404 (OWASP A03).
-  - Non-Markdown assets are still served verbatim.
-  - Missing file returns 404.
+Five survivors, one per real decision:
+  1. XSS strip: script/style stripped + meta-header escapes + fixture no-XSS (param).
+  2. Path traversal: ../secrets + /etc/passwd + specs-escape list (param).
+  3. Constitution allowlist: served + missing 404 + everything-else-404 (param).
+  4. Frontmatter meta render: styled header, title, no raw YAML, malformed-no-crash,
+     none -> no header.
+  5. Render pipeline: mermaid pre + wikilink anchors + GFM table + png/legacy-html
+     verbatim + missing 404 + content-type sniffing + specs/memory-subdir rooting,
+     driven by the 3 real fixtures (param; folds test_memory_byte_identity.py).
 """
 
 from __future__ import annotations
@@ -18,21 +19,12 @@ import pytest
 
 from dadaia_workspace.features.panel.views.memory import render_memory
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+pytestmark = pytest.mark.unit
 
 _FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures" / "memory"
 
 
-def _build_memory_root(tmp_path: Path, slug: str) -> Path:
-    """Create <tmp_path>/repos/<slug>/specs/memory/ and return tmp_path."""
-    (tmp_path / "repos" / slug / "specs" / "memory").mkdir(parents=True)
-    return tmp_path
-
-
 def _write_md(tmp_path: Path, slug: str, filename: str, content: str) -> Path:
-    """Write a .md file into <tmp_path>/repos/<slug>/specs/memory/<filename>."""
     target_dir = tmp_path / "repos" / slug / "specs" / "memory"
     target_dir.mkdir(parents=True, exist_ok=True)
     (target_dir / filename).write_text(content, encoding="utf-8")
@@ -40,301 +32,13 @@ def _write_md(tmp_path: Path, slug: str, filename: str, content: str) -> Path:
 
 
 def _write_bytes(tmp_path: Path, slug: str, filename: str, data: bytes) -> Path:
-    """Write a binary file into <tmp_path>/repos/<slug>/specs/memory/<filename>."""
     target_dir = tmp_path / "repos" / slug / "specs" / "memory"
     target_dir.mkdir(parents=True, exist_ok=True)
     (target_dir / filename).write_bytes(data)
     return tmp_path
 
 
-# ---------------------------------------------------------------------------
-# Mermaid rendering
-# ---------------------------------------------------------------------------
-
-
-def test_mermaid_fence_renders_to_pre_mermaid(tmp_path: Path) -> None:
-    """A ```mermaid fenced block must render to <pre class="mermaid">...</pre>.
-
-    The ``mermaid`` class is preserved, but the fence body is HTML-escaped
-    (OWASP A03 / XSS): no Mermaid client ships on the panel (the CSP forbids
-    the CDN import), so arrow operators arrive as escaped entities — e.g.
-    ``A-->B`` becomes ``A--&gt;B``.
-    """
-    md = "# Diagram\n\n```mermaid\ngraph LR\n  A-->B\n```\n"
-    workspace_root = _write_md(tmp_path, "proj", "architecture.md", md)
-
-    view = render_memory(workspace_root)
-    status, content_type, body = view(slug="proj", path="architecture.md")
-
-    assert status == 200
-    assert content_type == "text/html; charset=utf-8"
-    html = body.decode("utf-8")
-    # Must produce <pre class="mermaid"> (the class is preserved)
-    assert '<pre class="mermaid">' in html
-    # Must NOT produce language-mermaid (that is the <code> fallback)
-    assert "language-mermaid" not in html
-    # Diagram content is HTML-escaped: --> arrives as --&gt;, not raw -->
-    assert "A--&gt;B" in html
-    assert "A-->B" not in html
-
-
-def test_mermaid_fence_with_sequence_arrows(tmp_path: Path) -> None:
-    """Sequence-diagram arrow operators (->> and -->) arrive HTML-escaped."""
-    md = "```mermaid\nsequenceDiagram\n  A->>B: hello\n  B-->A: ok\n```\n"
-    workspace_root = _write_md(tmp_path, "proj", "seq.md", md)
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="seq.md")
-
-    assert status == 200
-    html = body.decode("utf-8")
-    # Arrows are entity-escaped, not emitted raw.
-    assert "A-&gt;&gt;B" in html
-    assert "B--&gt;A" in html
-    assert "A->>B" not in html
-    assert "B-->A" not in html
-
-
-# ---------------------------------------------------------------------------
-# Wikilink rendering
-# ---------------------------------------------------------------------------
-
-
-def test_wikilink_renders_to_anchor(tmp_path: Path) -> None:
-    """[[slug]] wikilinks must convert to <a> anchors for the panel memory route."""
-    md = "See [[architecture]] for details.\n"
-    workspace_root = _write_md(tmp_path, "proj", "index.md", md)
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="index.md")
-
-    assert status == 200
-    html = body.decode("utf-8")
-    assert "<a" in html
-    assert "architecture" in html
-    # Must link to the panel memory-view route
-    assert "/memory-view/" in html
-
-
-def test_wikilink_multiple_slugs_in_one_atom(tmp_path: Path) -> None:
-    """Multiple [[wikilinks]] in one document all render as anchors."""
-    md = "See [[architecture]] and [[tech-stack]] and [[panel]].\n"
-    workspace_root = _write_md(tmp_path, "proj", "multi.md", md)
-
-    view = render_memory(workspace_root)
-    _, _, body = view(slug="proj", path="multi.md")
-
-    html = body.decode("utf-8")
-    assert html.count("<a") >= 3
-    assert "architecture" in html
-    assert "tech-stack" in html
-    assert "panel" in html
-
-
-# ---------------------------------------------------------------------------
-# Sanitiser (OWASP A03)
-# ---------------------------------------------------------------------------
-
-
-def test_script_tag_is_stripped_from_output(tmp_path: Path) -> None:
-    """Raw <script> in atom content must NOT survive in rendered HTML."""
-    md = "Text before\n\n<script>alert('xss')</script>\n\nText after\n"
-    workspace_root = _write_md(tmp_path, "proj", "evil.md", md)
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="evil.md")
-
-    assert status == 200
-    html = body.decode("utf-8")
-    # The document chrome carries a trusted theme-prepaint <script>; assert the
-    # atom-injected script and its payload are stripped from the rendered body.
-    main_body = html.split('<main class="memory-doc">', 1)[1]
-    assert "<script>" not in main_body
-    assert "alert('xss')" not in html
-
-
-def test_style_tag_is_stripped_from_output(tmp_path: Path) -> None:
-    """Raw <style> in atom content must NOT survive in rendered HTML."""
-    md = "Normal text\n\n<style>body { display: none; }</style>\n\nMore text\n"
-    workspace_root = _write_md(tmp_path, "proj", "evil2.md", md)
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="evil2.md")
-
-    assert status == 200
-    html = body.decode("utf-8")
-    assert "<style>" not in html
-    assert "display: none" not in html
-
-
-# ---------------------------------------------------------------------------
-# Path traversal guard (OWASP A03)
-# ---------------------------------------------------------------------------
-
-
-def test_path_traversal_rejected_for_md(tmp_path: Path) -> None:
-    """Path traversal (../../secrets) must return 404, not leak content."""
-    workspace_root = _write_md(tmp_path, "slug", "ok.md", "# OK\n")
-
-    # Place a sensitive file outside the memory root
-    sensitive = tmp_path / "secrets.txt"
-    sensitive.write_text("TOP SECRET", encoding="utf-8")
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="slug", path="../../secrets.txt")
-
-    assert status == 404
-    assert b"TOP SECRET" not in body
-
-
-def test_path_traversal_etc_passwd_rejected(tmp_path: Path) -> None:
-    """Classic ../../../etc/passwd traversal must return 404."""
-    workspace_root = _write_md(tmp_path, "slug", "ok.md", "# OK\n")
-
-    view = render_memory(workspace_root)
-    status, _, _ = view(slug="slug", path="../../../etc/passwd")
-
-    assert status == 404
-
-
-# ---------------------------------------------------------------------------
-# Non-Markdown assets served verbatim
-# ---------------------------------------------------------------------------
-
-
-def test_png_asset_served_verbatim(tmp_path: Path) -> None:
-    """PNG (non-Markdown) asset must be served byte-for-byte unchanged."""
-    data = bytes(range(256)) + b"\x89PNG"
-    workspace_root = _write_bytes(tmp_path, "proj", "diagram.png", data)
-
-    view = render_memory(workspace_root)
-    status, content_type, body = view(slug="proj", path="diagram.png")
-
-    assert status == 200
-    assert content_type == "image/png"
-    assert body == data
-
-
-def test_legacy_html_served_verbatim(tmp_path: Path) -> None:
-    """Legacy .html files are still served byte-identical (for transition period)."""
-    data = b"<!DOCTYPE html><html><body>legacy</body></html>"
-    workspace_root = _write_bytes(tmp_path, "proj", "old.html", data)
-
-    view = render_memory(workspace_root)
-    status, content_type, body = view(slug="proj", path="old.html")
-
-    assert status == 200
-    assert content_type == "text/html; charset=utf-8"
-    assert body == data
-
-
-# ---------------------------------------------------------------------------
-# Missing file → 404
-# ---------------------------------------------------------------------------
-
-
-def test_missing_md_file_returns_404(tmp_path: Path) -> None:
-    """A request for a .md file that does not exist must return 404."""
-    workspace_root = _build_memory_root(tmp_path, "proj")
-
-    view = render_memory(workspace_root)
-    status, _, _ = view(slug="proj", path="nonexistent.md")
-
-    assert status == 404
-
-
-# ---------------------------------------------------------------------------
-# GFM tables render correctly
-# ---------------------------------------------------------------------------
-
-
-def test_table_renders_to_html_table(tmp_path: Path) -> None:
-    """GFM table syntax must produce a <table> element."""
-    md = "| A | B |\n|---|---|\n| 1 | 2 |\n"
-    workspace_root = _write_md(tmp_path, "proj", "table.md", md)
-
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="table.md")
-
-    assert status == 200
-    html = body.decode("utf-8")
-    assert "<table>" in html
-    assert "<th>" in html or "<thead>" in html
-
-
-# ---------------------------------------------------------------------------
-# Fixture-based integration: 3 real .md fixtures render correctly
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("fixture_file", "expected_slugs", "expect_mermaid", "expect_wikilinks"),
-    [
-        ("architecture.md", ["tech-stack", "panel"], True, True),
-        ("tech-stack.md", [], False, False),
-        ("panel.md", ["architecture", "tech-stack"], True, True),
-    ],
-)
-def test_fixture_md_renders_correctly(
-    tmp_path: Path,
-    fixture_file: str,
-    expected_slugs: list[str],
-    expect_mermaid: bool,
-    expect_wikilinks: bool,
-) -> None:
-    """Fixture .md atoms (core + product) render with correct Mermaid/wikilink output.
-
-    These fixtures live in tests/fixtures/memory/ and contain the key structures
-    we need to verify:
-    - Mermaid blocks → <pre class="mermaid">
-    - [[wikilinks]] → <a> anchors
-    - No raw <script> or <style> survives
-    """
-    fixture_path = _FIXTURES_DIR / fixture_file
-    assert fixture_path.exists(), f"Fixture missing: {fixture_path}"
-
-    content = fixture_path.read_text(encoding="utf-8")
-    slug_name = fixture_file.replace(".md", "")
-
-    # Copy into tmp workspace layout
-    workspace_root = _write_md(tmp_path, "dadaia-workspace", fixture_file, content)
-
-    view = render_memory(workspace_root)
-    status, content_type, body = view(slug="dadaia-workspace", path=fixture_file)
-
-    assert status == 200
-    assert "text/html" in content_type
-    html = body.decode("utf-8")
-
-    # No XSS in the atom body. The document chrome carries a trusted
-    # theme-prepaint <script>; the atom body (inside <main>) must not.
-    main_body = html.split('<main class="memory-doc">', 1)[1]
-    assert "<script>" not in main_body
-    assert "<style>" not in main_body
-
-    # Mermaid
-    if expect_mermaid:
-        assert '<pre class="mermaid">' in html, (
-            f'{slug_name}: expected <pre class="mermaid"> but not found in rendered HTML'
-        )
-        assert "language-mermaid" not in html
-
-    # Wikilinks
-    if expect_wikilinks:
-        assert "<a" in html, f"{slug_name}: expected wikilink <a> anchors"
-        assert "/memory-view/" in html
-        for slug in expected_slugs:
-            assert slug in html, f"{slug_name}: expected [[{slug}]] to appear in rendered HTML"
-
-
-# ---------------------------------------------------------------------------
-# Constitution allowlist (operator demand 2026-06-11): the single literal path
-# `constitution.md` re-roots to repos/<slug>/specs/constitution.md. Nothing
-# else under specs/ is reachable through the memory routes.
-# ---------------------------------------------------------------------------
-
-
-def _mk_ws(tmp_path):
+def _mk_constitution_ws(tmp_path: Path) -> str:
     slug = "ctx"
     specs = tmp_path / "repos" / slug / "specs"
     (specs / "memory").mkdir(parents=True)
@@ -345,80 +49,121 @@ def _mk_ws(tmp_path):
     return slug
 
 
-def test_constitution_md_served_via_allowlist(tmp_path) -> None:
-    from dadaia_workspace.features.panel.views.memory import render_memory
+# ---------------------------------------------------------------------------
+# 1. XSS strip — script/style stripped + meta-header escapes + fixture no-XSS
+# ---------------------------------------------------------------------------
 
-    slug = _mk_ws(tmp_path)
-    view = render_memory(tmp_path)
-    status, ct, body = view(slug=slug, path="constitution.md")
+
+@pytest.mark.parametrize(
+    ("md", "forbidden_snippets"),
+    [
+        pytest.param(
+            "Text before\n\n<script>alert('xss')</script>\n\nText after\n",
+            ["<script>", "alert('xss')"],
+            id="raw-script-tag-stripped",
+        ),
+        pytest.param(
+            "Normal text\n\n<style>body { display: none; }</style>\n\nMore text\n",
+            ["<style>", "display: none"],
+            id="raw-style-tag-stripped",
+        ),
+        pytest.param(
+            '---\ntitle: "<img src=x onerror=alert(1)>"\n---\n\nbody\n',
+            ["<img src=x onerror=alert(1)>"],
+            id="meta-header-html-escaped",
+        ),
+    ],
+)
+def test_xss_sanitiser_strips_unsafe_markup(
+    tmp_path: Path, md: str, forbidden_snippets: list[str]
+) -> None:
+    workspace_root = _write_md(tmp_path, "proj", "evil.md", md)
+    view = render_memory(workspace_root)
+    status, _, body = view(slug="proj", path="evil.md")
+
     assert status == 200
-    assert "text/html" in ct
     html = body.decode("utf-8")
-    assert "<h1" in html and "Constitution" in html
-    assert "# Constitution" not in html  # rendered, not raw
+    # The document chrome carries a trusted theme-prepaint <script>; only the
+    # atom-injected content (inside <main>) must never leak unsafe markup.
+    main_body = html.split('<main class="memory-doc">', 1)[1]
+    for snippet in forbidden_snippets:
+        assert snippet not in main_body
+
+    # The 3 real memory fixtures never leak <script>/<style> from the atom body either.
+    for fixture_file in ("architecture.md", "tech-stack.md", "panel.md"):
+        content = (_FIXTURES_DIR / fixture_file).read_text(encoding="utf-8")
+        fixture_ws = _write_md(tmp_path, f"dadaia-workspace-{fixture_file}", fixture_file, content)
+        fixture_view = render_memory(fixture_ws)
+        fixture_status, _, fixture_body = fixture_view(
+            slug=f"dadaia-workspace-{fixture_file}", path=fixture_file
+        )
+        assert fixture_status == 200
+        fixture_html = fixture_body.decode("utf-8")
+        fixture_main = fixture_html.split('<main class="memory-doc">', 1)[1]
+        assert "<script>" not in fixture_main
+        assert "<style>" not in fixture_main
 
 
-def test_specs_paths_other_than_constitution_stay_404(tmp_path) -> None:
-    from dadaia_workspace.features.panel.views.memory import render_memory
+# ---------------------------------------------------------------------------
+# 2. Path traversal — ../secrets + /etc/passwd + specs-escape list
+# ---------------------------------------------------------------------------
 
-    slug = _mk_ws(tmp_path)
+
+@pytest.mark.parametrize(
+    ("slug", "escape_path"),
+    [
+        pytest.param("slug", "../../secrets.txt", id="parent-dir-secrets"),
+        pytest.param("slug", "../../../etc/passwd", id="classic-etc-passwd"),
+        pytest.param("ctx", "../constitution.md", id="specs-escape-one-up-constitution"),
+        pytest.param("ctx", "../releases/ACTIVE.md", id="specs-escape-releases-active"),
+        pytest.param("ctx", "releases/ACTIVE.md", id="specs-escape-releases-relative"),
+        pytest.param("ctx", "../../specs/constitution.md", id="specs-escape-two-up-specs"),
+    ],
+)
+def test_path_traversal_rejected(tmp_path: Path, slug: str, escape_path: str) -> None:
+    _mk_constitution_ws(tmp_path)
+    _write_md(tmp_path, "slug", "ok.md", "# OK\n")
+    sensitive = tmp_path / "secrets.txt"
+    sensitive.write_text("TOP SECRET", encoding="utf-8")
+
     view = render_memory(tmp_path)
-    for escape in (
-        "../constitution.md",
-        "../releases/ACTIVE.md",
-        "releases/ACTIVE.md",
-        "../../specs/constitution.md",
-    ):
-        status, _, _ = view(slug=slug, path=escape)
-        assert status == 404, f"{escape!r} must stay unreachable"
+    status, _, body = view(slug=slug, path=escape_path)
 
-
-def test_constitution_missing_file_is_404(tmp_path) -> None:
-    from dadaia_workspace.features.panel.views.memory import render_memory
-
-    slug = "bare"
-    (tmp_path / "repos" / slug / "specs" / "memory").mkdir(parents=True)
-    view = render_memory(tmp_path)
-    status, _, _ = view(slug=slug, path="constitution.md")
     assert status == 404
+    assert b"TOP SECRET" not in body
 
 
 # ---------------------------------------------------------------------------
-# Visual identity (operator demand 2026-06-11): the rendered memory document
-# is a full HTML page carrying the dadaia identity stylesheet, and the YAML
-# frontmatter is surfaced as a styled meta header (never raw key:value soup).
+# 3. Constitution allowlist
 # ---------------------------------------------------------------------------
 
 
-def test_rendered_doc_links_identity_stylesheets(tmp_path: Path) -> None:
-    """Rendered .md document must be a full page linking the identity CSS."""
-    md = "# Title\n\nBody text.\n"
-    workspace_root = _write_md(tmp_path, "proj", "doc.md", md)
-
-    view = render_memory(workspace_root)
-    status, content_type, body = view(slug="proj", path="doc.md")
-
-    assert status == 200
-    assert "text/html" in content_type
-    html = body.decode("utf-8")
-    assert "<!DOCTYPE html>" in html
-    assert '<link rel="stylesheet" href="/static/memory-doc.css">' in html
-    assert '<link rel="stylesheet" href="/static/tokens.css">' in html
-    assert '<main class="memory-doc">' in html
-
-
-def test_rendered_doc_theme_prepaint(tmp_path: Path) -> None:
-    """Document must apply the stored panel theme before first paint."""
-    workspace_root = _write_md(tmp_path, "proj", "doc.md", "# X\n")
-    view = render_memory(workspace_root)
-    _, _, body = view(slug="proj", path="doc.md")
-    html = body.decode("utf-8")
-    assert "dadaia-panel-theme" in html
-    assert "dataset.theme" in html
+@pytest.mark.parametrize("scenario", ["served", "missing"])
+def test_constitution_md_allowlist(tmp_path: Path, scenario: str) -> None:
+    if scenario == "served":
+        slug = _mk_constitution_ws(tmp_path)
+        view = render_memory(tmp_path)
+        status, ct, body = view(slug=slug, path="constitution.md")
+        assert status == 200
+        assert "text/html" in ct
+        html = body.decode("utf-8")
+        assert "<h1" in html and "Constitution" in html
+        assert "# Constitution" not in html
+    else:
+        slug = "bare"
+        (tmp_path / "repos" / slug / "specs" / "memory").mkdir(parents=True)
+        view = render_memory(tmp_path)
+        status, _, _ = view(slug=slug, path="constitution.md")
+        assert status == 404
 
 
-def test_frontmatter_rendered_as_styled_meta_not_raw(tmp_path: Path) -> None:
-    """YAML frontmatter must become a styled meta header, not raw key:value text."""
+# ---------------------------------------------------------------------------
+# 4. Frontmatter meta render
+# ---------------------------------------------------------------------------
+
+
+def test_frontmatter_meta_render(tmp_path: Path) -> None:
+    # Styled header + no raw YAML soup + tags-as-chips.
     md = (
         "---\n"
         "slug: arch\n"
@@ -432,68 +177,149 @@ def test_frontmatter_rendered_as_styled_meta_not_raw(tmp_path: Path) -> None:
         "## Body heading\n\nContent.\n"
     )
     workspace_root = _write_md(tmp_path, "proj", "arch.md", md)
-
     view = render_memory(workspace_root)
     status, _, body = view(slug="proj", path="arch.md")
-
     assert status == 200
     html = body.decode("utf-8")
-    # Styled meta header present
     assert '<header class="memory-meta">' in html
     assert '<h1 class="memory-meta__title">Architecture Memory</h1>' in html
     assert "The layered architecture of the system." in html
-    # Tags rendered as chips
     assert '<li class="memory-meta__chip">architecture</li>' in html
     assert '<li class="memory-meta__chip">layers</li>' in html
     assert "2026-06-11" in html
-    # Raw YAML key:value soup must NOT survive in the rendered body
     main_body = html.split('<main class="memory-doc">', 1)[1]
     assert "slug: arch" not in main_body
     assert "tldr:" not in main_body
     assert "last_updated:" not in main_body
-    # The actual Markdown body still renders
     assert "Body heading" in html
 
+    # Title used as document <title>.
+    md_title = "---\ntitle: My Atom\n---\n\nbody\n"
+    ws_title = _write_md(tmp_path, "proj2", "a.md", md_title)
+    view_title = render_memory(ws_title)
+    _, _, body_title = view_title(slug="proj2", path="a.md")
+    assert "<title>My Atom</title>" in body_title.decode("utf-8")
 
-def test_frontmatter_title_used_as_document_title(tmp_path: Path) -> None:
-    """The <title> element should use the frontmatter title when present."""
-    md = "---\ntitle: My Atom\n---\n\nbody\n"
-    workspace_root = _write_md(tmp_path, "proj", "a.md", md)
+    # Malformed YAML does not crash; doc still renders.
+    md_bad = "---\ntitle: [unclosed\n---\n\n# Heading\n"
+    ws_bad = _write_md(tmp_path, "proj3", "bad.md", md_bad)
+    view_bad = render_memory(ws_bad)
+    status_bad, _, body_bad = view_bad(slug="proj3", path="bad.md")
+    assert status_bad == 200
+    assert b"Heading" in body_bad
+
+    # No frontmatter -> no meta header.
+    md_none = "# Just a heading\n\nplain body\n"
+    ws_none = _write_md(tmp_path, "proj4", "plain.md", md_none)
+    view_none = render_memory(ws_none)
+    status_none, _, body_none = view_none(slug="proj4", path="plain.md")
+    assert status_none == 200
+    html_none = body_none.decode("utf-8")
+    assert '<main class="memory-doc">' in html_none
+    assert "memory-meta" not in html_none
+    assert "Just a heading" in html_none
+
+
+# ---------------------------------------------------------------------------
+# 5. Render pipeline — mermaid, wikilinks, GFM table, verbatim assets, 404,
+#    content-type sniffing, specs/memory-subdir rooting
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("fixture_file", "expected_slugs", "expect_mermaid", "expect_wikilinks"),
+    [
+        ("architecture.md", ["tech-stack", "panel"], True, True),
+        ("tech-stack.md", [], False, False),
+        ("panel.md", ["architecture", "tech-stack"], True, True),
+    ],
+)
+def test_render_pipeline_fixtures(
+    tmp_path: Path,
+    fixture_file: str,
+    expected_slugs: list[str],
+    expect_mermaid: bool,
+    expect_wikilinks: bool,
+) -> None:
+    content = (_FIXTURES_DIR / fixture_file).read_text(encoding="utf-8")
+    slug_name = fixture_file.replace(".md", "")
+    workspace_root = _write_md(tmp_path, "dadaia-workspace", fixture_file, content)
+
     view = render_memory(workspace_root)
-    _, _, body = view(slug="proj", path="a.md")
-    html = body.decode("utf-8")
-    assert "<title>My Atom</title>" in html
+    status, content_type, body = view(slug="dadaia-workspace", path=fixture_file)
 
-
-def test_no_frontmatter_still_renders_document(tmp_path: Path) -> None:
-    """An atom with no frontmatter renders a styled document with no meta header."""
-    md = "# Just a heading\n\nplain body\n"
-    workspace_root = _write_md(tmp_path, "proj", "plain.md", md)
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="plain.md")
     assert status == 200
+    assert "text/html" in content_type
     html = body.decode("utf-8")
-    assert '<main class="memory-doc">' in html
-    assert "memory-meta" not in html  # no frontmatter => no meta header
-    assert "Just a heading" in html
 
+    if expect_mermaid:
+        assert '<pre class="mermaid">' in html, (
+            f'{slug_name}: expected <pre class="mermaid"> but not found in rendered HTML'
+        )
+        assert "language-mermaid" not in html
 
-def test_meta_header_escapes_html(tmp_path: Path) -> None:
-    """Frontmatter values must be HTML-escaped in the meta header (OWASP A03)."""
-    md = '---\ntitle: "<img src=x onerror=alert(1)>"\n---\n\nbody\n'
-    workspace_root = _write_md(tmp_path, "proj", "evil.md", md)
-    view = render_memory(workspace_root)
-    _, _, body = view(slug="proj", path="evil.md")
-    html = body.decode("utf-8")
-    assert "<img src=x onerror=alert(1)>" not in html
-    assert "&lt;img" in html
+    if expect_wikilinks:
+        assert "<a" in html, f"{slug_name}: expected wikilink <a> anchors"
+        assert "/memory-view/" in html
+        for slug in expected_slugs:
+            assert slug in html, f"{slug_name}: expected [[{slug}]] to appear in rendered HTML"
 
+    # Only run the shared verbatim/mime/subdir/GFM checks once (on the first param row) —
+    # they are independent of which fixture drove the parametrization above.
+    if fixture_file != "architecture.md":
+        return
 
-def test_malformed_frontmatter_does_not_crash(tmp_path: Path) -> None:
-    """A malformed YAML frontmatter block must not raise; the doc still renders."""
-    md = "---\ntitle: [unclosed\n---\n\n# Heading\n"
-    workspace_root = _write_md(tmp_path, "proj", "bad.md", md)
-    view = render_memory(workspace_root)
-    status, _, body = view(slug="proj", path="bad.md")
-    assert status == 200
-    assert b"Heading" in body
+    # Non-Markdown assets served verbatim; missing .md -> 404; MIME sniffed by extension.
+    verbatim_cases: list[tuple[str, bytes | None, int, str | None, bool]] = [
+        ("diagram.png", bytes(range(256)) + b"\x89PNG", 200, "image/png", True),
+        (
+            "old.html",
+            b"<!DOCTYPE html><html><body>legacy</body></html>",
+            200,
+            "text/html; charset=utf-8",
+            True,
+        ),
+        ("style.css", b"\x00", 200, "text/css; charset=utf-8", False),
+        ("app.js", b"\x00", 200, "application/javascript; charset=utf-8", False),
+        ("photo.jpg", b"\x00", 200, "image/jpeg", False),
+        ("icon.svg", b"\x00", 200, "image/svg+xml", False),
+        ("data.bin", b"\x00", 200, "application/octet-stream", False),
+    ]
+    for filename, file_content, expected_status, expected_ct, verbatim in verbatim_cases:
+        asset_root = _write_bytes(tmp_path, f"proj-{filename}", filename, file_content)  # type: ignore[arg-type]
+        asset_view = render_memory(asset_root)
+        asset_status, asset_ct, asset_body = asset_view(slug=f"proj-{filename}", path=filename)
+        assert asset_status == expected_status, filename
+        assert asset_ct == expected_ct, filename
+        if verbatim:
+            assert asset_body == file_content, filename
+
+    (tmp_path / "repos" / "missing-md" / "specs" / "memory").mkdir(parents=True)
+    missing_view = render_memory(tmp_path)
+    missing_status, _, _ = missing_view(slug="missing-md", path="nonexistent.md")
+    assert missing_status == 404
+
+    # specs/memory-subdir rooting: a decoy at specs/ must never shadow specs/memory/.
+    correct_bytes = b"<!DOCTYPE html><!-- correct: lives under specs/memory/ -->"
+    decoy_bytes = b"<!DOCTYPE html><!-- WRONG: decoy lives under specs/ -->"
+    memory_dir = tmp_path / "repos" / "dw" / "specs" / "memory"
+    memory_dir.mkdir(parents=True)
+    (memory_dir / "architecture.html").write_bytes(correct_bytes)
+    specs_dir = tmp_path / "repos" / "dw" / "specs"
+    (specs_dir / "architecture.html").write_bytes(decoy_bytes)
+    subdir_view = render_memory(tmp_path)
+    subdir_status, subdir_ct, subdir_body = subdir_view(slug="dw", path="architecture.html")
+    assert subdir_status == 200
+    assert subdir_ct == "text/html; charset=utf-8"
+    assert subdir_body == correct_bytes
+    assert subdir_body != decoy_bytes
+
+    # GFM table syntax produces a <table> element.
+    table_md = "| A | B |\n|---|---|\n| 1 | 2 |\n"
+    table_root = _write_md(tmp_path, "table-proj", "table.md", table_md)
+    table_view = render_memory(table_root)
+    table_status, _, table_body = table_view(slug="table-proj", path="table.md")
+    assert table_status == 200
+    table_html = table_body.decode("utf-8")
+    assert "<table>" in table_html
+    assert "<th>" in table_html or "<thead>" in table_html

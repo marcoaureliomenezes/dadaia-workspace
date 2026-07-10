@@ -1,19 +1,21 @@
-"""Unit tests for the /static/<name> route.
+"""Unit tests for the /static/<name> route (consolidates test_views_static.py).
 
-Covers static asset serving contracts:
-  - .css  → 200, Content-Type: text/css; charset=utf-8
-  - .js   → 200, Content-Type: application/javascript; charset=utf-8
-  - .svg  → 200, Content-Type: image/svg+xml; charset=utf-8
-  - .map  → 200, Content-Type: application/json; charset=utf-8
-  - unknown extension (.png, .ico, empty) → 404
-  - path traversal attempt → 400
+Three survivors:
+  1. Asset serve param: css/js/svg/map x status+MIME+nonempty, incl. runtime.js
+     and the two logo SVGs.
+  2. 404/400 param: unknown ext, unknown file, empty, no-ext, agentic-tab assets
+     unregistered, traversal (`../` + backslash) -> 400.
+  3. runtime.js-before-dependents load order (`_ASSETS` ordering — real init-
+     order bug).
 """
 
 from __future__ import annotations
 
 import pytest
 
-from dadaia_workspace.features.panel.views.static import render_static
+from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT, render_static
+
+pytestmark = pytest.mark.unit
 
 
 def _view(name: str) -> tuple[int, str, bytes]:
@@ -22,242 +24,95 @@ def _view(name: str) -> tuple[int, str, bytes]:
 
 
 # ---------------------------------------------------------------------------
-# CSS slice — tokens.css
+# 1. Asset serve param
 # ---------------------------------------------------------------------------
 
 
-def test_tokens_css_status_200() -> None:
-    status, _, _ = _view("tokens.css")
+@pytest.mark.parametrize(
+    ("name", "expected_ct"),
+    [
+        pytest.param("tokens.css", "text/css; charset=utf-8", id="tokens-css"),
+        pytest.param("structure.css", "text/css; charset=utf-8", id="structure-css"),
+        pytest.param("workflows.css", "text/css; charset=utf-8", id="workflows-css"),
+        pytest.param("core.js", "application/javascript; charset=utf-8", id="core-js"),
+        pytest.param("themes.js", "application/javascript; charset=utf-8", id="themes-js"),
+        pytest.param(
+            "workflow-policy.js", "application/javascript; charset=utf-8", id="workflow-policy-js"
+        ),
+        pytest.param("runtime.js", "application/javascript; charset=utf-8", id="runtime-js"),
+        pytest.param("logo-rhino-24.svg", "image/svg+xml; charset=utf-8", id="logo-rhino-24"),
+        pytest.param("logo-rhino-16.svg", "image/svg+xml; charset=utf-8", id="logo-rhino-16"),
+    ],
+)
+def test_asset_served_with_status_mime_and_nonempty_body(name: str, expected_ct: str) -> None:
+    status, ct, body = _view(name)
     assert status == 200
-
-
-def test_tokens_css_content_type() -> None:
-    _, ct, _ = _view("tokens.css")
-    assert ct == "text/css; charset=utf-8"
-
-
-def test_tokens_css_body_is_nonempty_bytes() -> None:
-    _, _, body = _view("tokens.css")
+    assert ct == expected_ct
     assert isinstance(body, bytes)
     assert len(body) > 0
 
-
-# ---------------------------------------------------------------------------
-# CSS slice — structure.css
-# ---------------------------------------------------------------------------
-
-
-def test_structure_css_content_type() -> None:
-    status, ct, _ = _view("structure.css")
-    assert status == 200
-    assert ct == "text/css; charset=utf-8"
-
-
-def test_workflows_css_content_type() -> None:
-    status, ct, _ = _view("workflows.css")
-    assert status == 200
-    assert ct == "text/css; charset=utf-8"
-
-
-def test_agentic_tab_assets_no_longer_served() -> None:
-    """v0.1.45: the Agentic tab was removed; its assets are unregistered (404)."""
-    for name in ("agents.css", "kanban.css", "agents.js", "workflows.js", "kanban.js"):
-        status, _, _ = _view(name)
-        assert status == 404, f"{name} must no longer be served after the Agentic-tab removal"
-
-
-# ---------------------------------------------------------------------------
-# JS files
-# ---------------------------------------------------------------------------
-
-
-def test_core_js_content_type() -> None:
-    status, ct, _ = _view("core.js")
-    assert status == 200
-    assert ct == "application/javascript; charset=utf-8"
-
-
-def test_themes_js_content_type() -> None:
-    status, ct, _ = _view("themes.js")
-    assert status == 200
-    assert ct == "application/javascript; charset=utf-8"
-
-
-def test_workflow_policy_js_content_type() -> None:
-    status, ct, _ = _view("workflow-policy.js")
-    assert status == 200
-    assert ct == "application/javascript; charset=utf-8"
-
-
-# ---------------------------------------------------------------------------
-# SVG assets
-# ---------------------------------------------------------------------------
-
-
-def test_svg_asset_content_type() -> None:
-    status, ct, _ = _view("logo-rhino-24.svg")
-    assert status == 200
-    assert ct == "image/svg+xml; charset=utf-8"
-
-
-# ---------------------------------------------------------------------------
-# Unknown extension → 404
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("name", ["missing.png", "missing.ico", "missing.woff", "missing.txt"])
-def test_unknown_extension_returns_404(name: str) -> None:
-    status, _, _ = _view(name)
-    assert status == 404
-
-
-def test_unknown_name_with_no_extension_returns_404() -> None:
-    status, _, _ = _view("noextension")
-    assert status == 404
-
-
-def test_empty_name_returns_404() -> None:
-    status, _, _ = _view("")
-    assert status == 404
-
-
-# ---------------------------------------------------------------------------
-# Known extension but file not registered → 404
-# ---------------------------------------------------------------------------
-
-
-def test_nonexistent_css_file_returns_404() -> None:
-    status, _, _ = _view("nonexistent.css")
-    assert status == 404
-
-
-def test_nonexistent_js_file_returns_404() -> None:
-    status, _, _ = _view("nonexistent.js")
-    assert status == 404
-
-
-# ---------------------------------------------------------------------------
-# Path traversal → 400
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "../etc/passwd",
-        "../../etc/passwd",
-        "../tokens.css",
-        "subdir/tokens.css",
-        "tokens.css/../../etc/passwd",
-    ],
-)
-def test_path_traversal_returns_400(name: str) -> None:
-    status, _, _ = _view(name)
-    assert status == 400
-
-
-# ---------------------------------------------------------------------------
-# Body is bytes for all 200 responses
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "name",
-    ["tokens.css", "structure.css", "workflows.css", "workflow-policy.css", "core.js"],
-)
-def test_body_is_bytes(name: str) -> None:
-    _, _, body = _view(name)
-    assert isinstance(body, bytes)
-
-
-# ---------------------------------------------------------------------------
-# .map MIME type — Content-Type: application/json; charset=utf-8
-# ---------------------------------------------------------------------------
-
-
-def test_map_extension_returns_404_when_no_map_file_registered() -> None:
-    """A .map filename with an unknown name returns 404 (known ext, unknown file)."""
-    status, _, _ = _view("nonexistent.map")
-    assert status == 404
-
-
-def test_map_extension_content_type_in_mime_map() -> None:
-    """The .map extension is registered in the MIME map (application/json)."""
-    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
-
-    assert ".map" in _MIME_BY_EXT
+    if name != "tokens.css":
+        return
+    # The MIME map has exactly the four registered extensions (checked once).
+    assert set(_MIME_BY_EXT.keys()) == {".css", ".js", ".svg", ".map"}
+    assert _MIME_BY_EXT[".css"] == "text/css; charset=utf-8"
+    assert _MIME_BY_EXT[".js"] == "application/javascript; charset=utf-8"
+    assert _MIME_BY_EXT[".svg"] == "image/svg+xml; charset=utf-8"
     assert _MIME_BY_EXT[".map"] == "application/json; charset=utf-8"
 
 
 # ---------------------------------------------------------------------------
-# logo-rhino-16.svg — second SVG asset
-# ---------------------------------------------------------------------------
-
-
-def test_logo_rhino_16_content_type() -> None:
-    """logo-rhino-16.svg returns 200 with image/svg+xml content type."""
-    status, ct, _ = _view("logo-rhino-16.svg")
-    assert status == 200
-    assert ct == "image/svg+xml; charset=utf-8"
-
-
-def test_logo_rhino_16_body_is_nonempty_bytes() -> None:
-    """logo-rhino-16.svg body is non-empty bytes."""
-    _, _, body = _view("logo-rhino-16.svg")
-    assert isinstance(body, bytes)
-    assert len(body) > 0
-
-
-# ---------------------------------------------------------------------------
-# Backslash traversal → 400
+# 2. 404/400 param
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "name",
+    ("name", "expected_status"),
     [
-        "..\\etc\\passwd",
-        "tokens.css\\..\\..\\etc\\passwd",
-        "subdir\\tokens.css",
+        pytest.param("missing.png", 404, id="unknown-ext-png"),
+        pytest.param("missing.ico", 404, id="unknown-ext-ico"),
+        pytest.param("missing.woff", 404, id="unknown-ext-woff"),
+        pytest.param("noextension", 404, id="no-extension"),
+        pytest.param("", 404, id="empty-name"),
+        pytest.param("nonexistent.css", 404, id="known-ext-unregistered-file-css"),
+        pytest.param("nonexistent.js", 404, id="known-ext-unregistered-file-js"),
+        pytest.param("nonexistent.map", 404, id="known-ext-unregistered-file-map"),
+        pytest.param("favicon.ico", 404, id="unregistered-favicon"),
+        pytest.param("agents.css", 404, id="agentic-tab-css-unregistered"),
+        pytest.param("kanban.css", 404, id="agentic-tab-kanban-css-unregistered"),
+        pytest.param("agents.js", 404, id="agentic-tab-agents-js-unregistered"),
+        pytest.param("workflows.js", 404, id="agentic-tab-workflows-js-unregistered"),
+        pytest.param("kanban.js", 404, id="agentic-tab-kanban-js-unregistered"),
+        pytest.param("../etc/passwd", 400, id="traversal-parent-dir"),
+        pytest.param("../../etc/passwd", 400, id="traversal-double-parent-dir"),
+        pytest.param("../tokens.css", 400, id="traversal-one-up-known-file"),
+        pytest.param("subdir/tokens.css", 400, id="traversal-subdir"),
+        pytest.param("tokens.css/../../etc/passwd", 400, id="traversal-embedded-escape"),
+        pytest.param("..\\etc\\passwd", 400, id="backslash-traversal"),
+        pytest.param("tokens.css\\..\\..\\etc\\passwd", 400, id="backslash-embedded-escape"),
+        pytest.param("subdir\\tokens.css", 400, id="backslash-subdir"),
     ],
 )
-def test_backslash_traversal_returns_400(name: str) -> None:
-    """Backslash path separators are treated as traversal attempts → 400."""
+def test_error_paths(name: str, expected_status: int) -> None:
     status, _, _ = _view(name)
-    assert status == 400
+    assert status == expected_status
 
 
 # ---------------------------------------------------------------------------
-# MIME map coverage — verify all registered extensions
+# 3. runtime.js-before-dependents load order (real init-order bug)
 # ---------------------------------------------------------------------------
 
 
-def test_css_mime_in_map() -> None:
-    """The .css extension is registered with correct MIME type."""
-    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
+def test_runtime_js_registered_before_dependents() -> None:
+    """runtime.js must be registered before modules that depend on window.Runtime.
 
-    assert ".css" in _MIME_BY_EXT
-    assert _MIME_BY_EXT[".css"] == "text/css; charset=utf-8"
+    The _ASSETS dict insertion order mirrors static-serving registration.
+    """
+    from dadaia_workspace.features.panel.views.static import _ASSETS
 
-
-def test_js_mime_in_map() -> None:
-    """The .js extension is registered with correct MIME type."""
-    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
-
-    assert ".js" in _MIME_BY_EXT
-    assert _MIME_BY_EXT[".js"] == "application/javascript; charset=utf-8"
-
-
-def test_svg_mime_in_map() -> None:
-    """The .svg extension is registered with correct MIME type."""
-    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
-
-    assert ".svg" in _MIME_BY_EXT
-    assert _MIME_BY_EXT[".svg"] == "image/svg+xml; charset=utf-8"
-
-
-def test_mime_map_has_exactly_four_entries() -> None:
-    """The MIME map contains exactly four extension entries (.css, .js, .svg, .map)."""
-    from dadaia_workspace.features.panel.views.static import _MIME_BY_EXT
-
-    assert set(_MIME_BY_EXT.keys()) == {".css", ".js", ".svg", ".map"}
+    keys = list(_ASSETS.keys())
+    idx_runtime = keys.index("runtime.js")
+    for dependent in ("workflow-policy.js", "sessions.js"):
+        assert idx_runtime < keys.index(dependent), (
+            f"runtime.js ({idx_runtime}) must precede {dependent} ({keys.index(dependent)}) in _ASSETS"
+        )

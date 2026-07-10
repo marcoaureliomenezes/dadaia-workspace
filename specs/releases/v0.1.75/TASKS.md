@@ -5,9 +5,9 @@
 > Write sets are per-cluster test trees + the named config/script files. Production code
 > is OUT of scope for every task (test-only release, except T-8's script/config wiring).
 
-- [-] **T-1** Panel cluster per `plan-panel.md` (496→81).
+- [x] **T-1** Panel cluster per `plan-panel.md` (496→81).
   Write set: `tests/unit/features/panel/**`, `tests/e2e/panel/**` (goldens only)
-- [ ] **T-2** Infrastructure cluster per `plan-infrastructure.md` (622→~150; split
+- [-] **T-2** Infrastructure cluster per `plan-infrastructure.md` (622→~150; split
   `test_public_assets.py` by concern).
   Write set: `tests/unit/infrastructure/**`
 - [ ] **T-3** Contract+e2e cluster per `plan-contract-e2e.md` (294→~120).

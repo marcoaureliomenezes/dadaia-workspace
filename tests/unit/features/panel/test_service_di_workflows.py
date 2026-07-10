@@ -1,23 +1,21 @@
 """Unit tests for T-017-06: WorkflowsService injected into PanelService.
 
-The test verifies that:
-1. PanelService accepts workflows_service as a constructor parameter.
-2. PanelService does NOT construct WorkflowsService internally (no
-   self._workflows_service = WorkflowsService(...) in __init__).
-3. When a workflows_service is injected, list_workflow_summaries() uses it
-   (not an internally-created instance).
-
-(The former ``run_workflow`` delegation test was removed in v0.1.53 when the dead panel
-workflow-launcher chain was retired; the surviving ``workflows_service`` DI assertions
-above stay.)
+Keeps only the executed-path assertion: list_workflow_summaries() delegates to
+the injected workflows_service. The ``inspect.signature``/``getsource``
+introspection tests (constructor-parameter presence, source-string
+non-construction) were DELETED — they assert on implementation strings, not
+executed behavior.
 """
 
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.panel.service import PanelService
+
+pytestmark = pytest.mark.unit
 
 
 class _FakeWorkflowSummary:
@@ -59,29 +57,6 @@ def _build_service(
         spec_context=_FakeSpecContextService(),  # type: ignore[arg-type]
         workspace_root=workspace_root,
         workflows_service=workflows_service,  # type: ignore[arg-type]
-    )
-
-
-def test_panel_service_accepts_workflows_service_parameter() -> None:
-    """PanelService constructor must accept a workflows_service parameter."""
-    sig = inspect.signature(PanelService.__init__)
-    assert "workflows_service" in sig.parameters, (
-        "PanelService.__init__ must accept a workflows_service parameter (T-017-06)"
-    )
-
-
-def test_panel_service_does_not_construct_workflows_service_internally() -> None:
-    """PanelService __init__ source must not contain WorkflowsService(workspace_root).
-
-    This test is a code-quality guard: if WorkflowsService is constructed
-    inside __init__, DI is bypassed.
-    """
-    import inspect as _inspect
-
-    source = _inspect.getsource(PanelService.__init__)
-    assert "WorkflowsService(workspace_root)" not in source, (
-        "PanelService.__init__ must not self-construct WorkflowsService; "
-        "inject it via the constructor parameter instead (T-017-06)"
     )
 
 

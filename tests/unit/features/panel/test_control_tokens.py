@@ -1,21 +1,22 @@
 """Control token-anchor discipline for the panel (FR2 / AC-3, v0.1.59).
 
-Extends the ``test_palette.py`` PANEL_CSS-grep prior art. Where ``test_palette.py``
-asserts the brand-color token *contract* holds across the concatenated stylesheet,
-this module proves the **restyled interactive controls** (nav tabs, theme button,
-runtime switcher, workflow per-step pickers, report/academy CTAs and the report
-trash button) consume the design-token vocabulary rather than ad-hoc literals.
+Proves the **restyled interactive controls** (nav tabs, theme button, runtime
+switcher, workflow per-step pickers, report/academy CTAs and the report trash
+button) consume the design-token vocabulary rather than ad-hoc literals. Also
+absorbs the former ``test_palette.py`` PANEL_CSS-grep prior art: the brand-color
+token *contract* (definition + consumption) holds across the concatenated
+stylesheet.
 
 Mechanism (Q3, grep-falsifiable):
   * an explicit **selector allowlist** of the controls the W2 restyle touches;
   * for each allowlisted selector, the matching rule bodies are extracted from the
     **served control-surface** stylesheet strings — ``structure.py`` / ``workflows.py``
     / ``workflow_policy.py`` / ``reports.py`` / ``academy.py``;
-  * the token-DEFINITION file ``tokens.py`` is **excluded** — that is where
-    ``--color-accent: #9cddc8`` etc. legitimately define the tokens (scanning it would
-    false-positive on the definitions). The ``.runtime-btn`` component rules were
-    relocated out of ``tokens.py`` into ``structure.py`` in v0.1.59 exactly so the
-    allowlist + exclusion stay self-consistent;
+  * the token-DEFINITION file ``tokens.py`` is **excluded** from the control-anchor
+    scan — that is where ``--color-accent: #9cddc8`` etc. legitimately define the
+    tokens (scanning it would false-positive on the definitions). The ``.runtime-btn``
+    component rules were relocated out of ``tokens.py`` into ``structure.py`` in
+    v0.1.59 exactly so the allowlist + exclusion stay self-consistent;
   * every matched body must contain at least one ``var(--…)`` and must NOT contain any
     ad-hoc literal, rejected via three regexes: a hex color ``#[0-9a-fA-F]{3,8}``, a
     ``font-size:`` value carrying a ``px``/``rem`` literal, and a ``border-radius:``
@@ -29,11 +30,27 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
+from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
+from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflow_policy import WORKFLOW_POLICY_CSS
 from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
+
+pytestmark = pytest.mark.unit
+
+# The former test_palette.py PANEL_CSS (definition + consumption prior art).
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+_REQUIRED_COLOR_TOKENS = {
+    "--color-accent",
+    "--color-accent-secondary",
+    "--color-warning-bg",
+    "--color-alert",
+    "--color-cost",
+}
 
 # The served control-surface stylesheets. tokens.py (the token-DEFINITION file) is
 # deliberately EXCLUDED — see the module docstring.
@@ -113,8 +130,11 @@ def _matched_selectors(control: str) -> list[str]:
     return out
 
 
-def test_every_control_selector_has_a_rule() -> None:
-    """Every allowlisted control has at least one matching rule body (no silent drop)."""
+def test_control_tokens_selector_anchor_and_button_states() -> None:
+    """Merged control-discipline guard: selector-has-rule + token-anchored-no-literals
+    + button hover/focus/active states, plus the absorbed brand-token contract
+    (definition in TOKENS_CSS + consumption via var(--...) in PANEL_CSS)."""
+    # Every allowlisted control has at least one matching rule body (no silent drop).
     for control in CONTROL_SELECTORS:
         found = any(
             _selector_matches(selector_list, control)
@@ -123,9 +143,7 @@ def test_every_control_selector_has_a_rule() -> None:
         )
         assert found, f"no rule body found for allowlisted control {control!r}"
 
-
-def test_control_rules_are_token_anchored() -> None:
-    """Each matched control rule body is var(--…)-anchored and free of ad-hoc literals."""
+    # Each matched control rule body is var(--...)-anchored and free of ad-hoc literals.
     for surface_name, css in CONTROL_SURFACES.items():
         for selector_list, body in _iter_rules(css):
             for control in CONTROL_SELECTORS:
@@ -142,9 +160,7 @@ def test_control_rules_are_token_anchored() -> None:
                 assert "var(--" in body, f"control rule not token-anchored in {where}: {body!r}"
                 break
 
-
-def test_button_controls_cover_hover_focus_active() -> None:
-    """The button controls carry a hover, a focus-visible, and an active/selected state."""
+    # The button controls carry a hover, a focus-visible, and an active/selected state.
     for control in BUTTON_CONTROLS:
         joined = " ".join(_matched_selectors(control))
         assert ":hover" in joined, f"{control!r} missing a :hover state ({joined})"
@@ -155,3 +171,9 @@ def test_button_controls_cover_hover_focus_active() -> None:
             or "[aria-checked" in joined
             or "[aria-pressed" in joined
         ), f"{control!r} missing an active/selected state ({joined})"
+
+    # Absorbed test_palette.py: brand colors are sourced from CSS tokens (definition),
+    # and panel CSS consumes the token contract through var(--color-*) (consumption).
+    for token in _REQUIRED_COLOR_TOKENS:
+        assert re.search(rf"{re.escape(token)}\s*:\s*#[0-9a-fA-F]{{3,8}}\b", TOKENS_CSS)
+        assert f"var({token}" in PANEL_CSS or token in TOKENS_CSS

@@ -1,15 +1,8 @@
 """Unit tests for GET /api/workflows.
 
-Coverage:
-- Returns {"workflows": [...]} wrapper with generated_at + source_hint fields.
-- Each item carries only summary fields: name, display_name, description, version,
-  schema_version, stage_count (integer), agent_ids, has_parallel, has_gates, source_path.
-- No "diagram_svg" key on any item: LIST is a lean summary endpoint.
-- No "stages" key on any item.
-- Returns 200 (the view is credential-free; panel auth removed 2026-06-11 — the
-  no-auth contract is pinned in test_no_auth_contract.py).
-- Empty workflows dir → {"workflows": []} with 200 (no 503 from telemetry path).
-- stage_count is an int, not a list.
+Golden pins list bytes. Two survivors:
+  1. Envelope + items match the service + empty-list 200 (never 503).
+  2. Leanliness: no diagram_svg/dag_svg/stages/inputs on LIST items (D1).
 """
 
 from __future__ import annotations
@@ -17,12 +10,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.features.panel.views.api_workflows import render_api_workflows_list
 from dadaia_workspace.features.workflows.service import WorkflowSummaryDTO
 
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
+pytestmark = pytest.mark.unit
 
 
 class _FakeService:
@@ -60,174 +53,62 @@ def _make_summary(
 
 
 # ---------------------------------------------------------------------------
-# Tests: response envelope
+# 1. Envelope + items match the service + empty-list 200
 # ---------------------------------------------------------------------------
 
 
-class TestApiWorkflowsListEnvelope:
-    def test_returns_200(self) -> None:
-        """The /api/workflows view returns 200 (credential-free)."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        status, ct, body = view()
-        assert status == 200
+def test_envelope_and_items_match_service_including_empty() -> None:
+    summaries = [
+        _make_summary("tdd-cycle", stage_count=5, has_parallel=True, has_gates=True),
+        _make_summary("wf-2"),
+    ]
+    service = _FakeService(summaries)
+    view = render_api_workflows_list(service)  # type: ignore[arg-type]
 
-    def test_content_type_is_json(self) -> None:
-        """Content-Type must be application/json; charset=utf-8."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, ct, _ = view()
-        assert ct == "application/json; charset=utf-8"
+    status, content_type, body = view()
 
-    def test_body_is_valid_json(self) -> None:
-        """Response body must deserialise without error."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        assert isinstance(data, dict)
+    assert status == 200
+    assert content_type == "application/json; charset=utf-8"
+    data = json.loads(body)
+    assert isinstance(data, dict)
+    assert "generated_at" in data and isinstance(data["generated_at"], str) and data["generated_at"]
+    assert "source_hint" in data
+    assert len(data["workflows"]) == 2
 
-    def test_top_level_workflows_key(self) -> None:
-        """Response must include a top-level 'workflows' key."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        assert "workflows" in data
+    item = data["workflows"][0]
+    assert item["name"] == "tdd-cycle"
+    assert item["display_name"] == "tdd-cycle"
+    assert isinstance(item["description"], str)
+    assert item["version"] == "0.1.0"
+    assert item["schema_version"] == "1"
+    assert isinstance(item["stage_count"], int)
+    assert item["stage_count"] == 5
+    assert isinstance(item["agent_ids"], list)
+    assert item["has_parallel"] is True
+    assert item["has_gates"] is True
+    assert isinstance(item["source_path"], str)
 
-    def test_top_level_generated_at_key(self) -> None:
-        """Response must include a top-level 'generated_at' key (SPEC §5.3)."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        assert "generated_at" in data
-        assert isinstance(data["generated_at"], str)
-        assert len(data["generated_at"]) > 0
-
-    def test_top_level_source_hint_key(self) -> None:
-        """Response must include a top-level 'source_hint' key (SPEC §5.3)."""
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        assert "source_hint" in data
-
-    def test_empty_workflows_returns_200_empty_list(self) -> None:
-        """Empty source dir → 200 with workflows: [] (not 503)."""
-        service = _FakeService([])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        status, _, body = view()
-        assert status == 200
-        data = json.loads(body)
-        assert data["workflows"] == []
-
-    def test_workflows_count_matches_service(self) -> None:
-        """'workflows' list length matches what the service returns."""
-        summaries = [_make_summary(f"wf-{i}") for i in range(5)]
-        service = _FakeService(summaries)
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        assert len(data["workflows"]) == 5
+    # Empty source dir -> 200 with workflows: [] (not 503, never a telemetry-style failure).
+    empty_service = _FakeService([])
+    empty_view = render_api_workflows_list(empty_service)  # type: ignore[arg-type]
+    empty_status, _, empty_body = empty_view()
+    assert empty_status == 200
+    assert json.loads(empty_body)["workflows"] == []
 
 
 # ---------------------------------------------------------------------------
-# Tests: item shape — summary fields only
+# 2. Leanliness — D1 synthesis decision
 # ---------------------------------------------------------------------------
 
 
-class TestApiWorkflowsListItemShape:
-    def _get_first_item(self, summaries: list[WorkflowSummaryDTO] | None = None) -> dict:
-        if summaries is None:
-            summaries = [_make_summary()]
-        service = _FakeService(summaries)
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        return data["workflows"][0]
+def test_list_items_are_lean_no_detail_only_fields() -> None:
+    """LIST items must not carry diagram_svg/dag_svg/stages/inputs (detail-only)."""
+    service = _FakeService([_make_summary()])
+    view = render_api_workflows_list(service)  # type: ignore[arg-type]
+    _, _, body = view()
+    item = json.loads(body)["workflows"][0]
 
-    def test_item_has_name(self) -> None:
-        item = self._get_first_item([_make_summary("tdd-cycle")])
-        assert item["name"] == "tdd-cycle"
-
-    def test_item_has_display_name(self) -> None:
-        item = self._get_first_item([_make_summary("tdd-cycle")])
-        assert item["display_name"] == "tdd-cycle"
-
-    def test_item_has_description(self) -> None:
-        item = self._get_first_item()
-        assert "description" in item
-        assert isinstance(item["description"], str)
-
-    def test_item_has_version(self) -> None:
-        item = self._get_first_item()
-        assert item["version"] == "0.1.0"
-
-    def test_item_has_schema_version(self) -> None:
-        item = self._get_first_item()
-        assert item["schema_version"] == "1"
-
-    def test_item_stage_count_is_integer(self) -> None:
-        """stage_count must be an int, not a list (QA review correction absorbed)."""
-        item = self._get_first_item([_make_summary(stage_count=5)])
-        assert isinstance(item["stage_count"], int)
-        assert item["stage_count"] == 5
-
-    def test_item_has_agent_ids(self) -> None:
-        item = self._get_first_item()
-        assert "agent_ids" in item
-        assert isinstance(item["agent_ids"], list)
-
-    def test_item_has_has_parallel(self) -> None:
-        item = self._get_first_item([_make_summary(has_parallel=True)])
-        assert item["has_parallel"] is True
-
-    def test_item_has_has_gates(self) -> None:
-        item = self._get_first_item([_make_summary(has_gates=True)])
-        assert item["has_gates"] is True
-
-    def test_item_has_source_path(self) -> None:
-        item = self._get_first_item()
-        assert "source_path" in item
-        assert isinstance(item["source_path"], str)
-
-
-# ---------------------------------------------------------------------------
-# Tests: SPEC D1 synthesis decision — no diagram_svg, no stages[] on LIST items
-# ---------------------------------------------------------------------------
-
-
-class TestApiWorkflowsListLeanliness:
-    """LIST must be lean: no diagram_svg, no stages[] (D1 synthesis decision)."""
-
-    def _get_item(self) -> dict:
-        service = _FakeService([_make_summary()])
-        view = render_api_workflows_list(service)  # type: ignore[arg-type]
-        _, _, body = view()
-        data = json.loads(body)
-        return data["workflows"][0]
-
-    def test_no_diagram_svg_on_item(self) -> None:
-        """LIST items MUST NOT contain 'diagram_svg' (D1 decision, SPEC §5.3)."""
-        item = self._get_item()
-        assert "diagram_svg" not in item, (
-            "LIST /api/workflows must not include diagram_svg — use DETAIL endpoint"
-        )
-
-    def test_no_dag_svg_on_item(self) -> None:
-        """LIST items MUST NOT contain 'dag_svg' (legacy alias guard)."""
-        item = self._get_item()
-        assert "dag_svg" not in item
-
-    def test_no_stages_on_item(self) -> None:
-        """LIST items MUST NOT contain 'stages[]' (D1 decision, SPEC §5.3)."""
-        item = self._get_item()
-        assert "stages" not in item, (
-            "LIST /api/workflows must not include stages — use DETAIL endpoint"
-        )
-
-    def test_no_inputs_on_item(self) -> None:
-        """LIST items should not contain 'inputs' (detail-only field)."""
-        item = self._get_item()
-        assert "inputs" not in item
+    assert "diagram_svg" not in item, "LIST /api/workflows must not include diagram_svg"
+    assert "dag_svg" not in item, "legacy alias must not leak either"
+    assert "stages" not in item, "LIST /api/workflows must not include stages"
+    assert "inputs" not in item, "inputs is a detail-only field"

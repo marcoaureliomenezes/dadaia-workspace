@@ -16,6 +16,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 _REPO_ROOT = Path(__file__).parents[4]  # repos/dadaia-workspace/
 _PANEL = _REPO_ROOT / "dadaia_workspace" / "features" / "panel"
 _LAUNCH_CLI = _REPO_ROOT / "dadaia_workspace" / "cli" / "commands" / "panel.py"
@@ -32,23 +36,16 @@ def _python_sources() -> list[Path]:
     return files
 
 
-def test_no_credential_query_param_in_launch_cli() -> None:
-    """The CLI panel path must not print or open a credential-bearing URL."""
-    text = _LAUNCH_CLI.read_text(encoding="utf-8")
-    hits = [ln for ln in text.splitlines() if _TOKEN_IN_URL_RE.search(ln)]
-    assert not hits, (
-        "CLI panel path still places a credential in a URL (`?token=` / `?launch=`):\n"
-        + "\n".join(hits)
-        + "\nThe panel is credential-free (no-auth decision 2026-06-11)."
-    )
-
-
-def test_no_credential_query_param_in_panel_python_sources() -> None:
-    """No panel Python source (views/server) interpolates `?token=` / `?launch=`."""
+def test_no_credential_query_param_in_panel_or_cli_sources() -> None:
+    """Neither the CLI panel launch path nor any panel Python source ever
+    interpolates a credential into a URL (`?token=` / `?launch=`)."""
     offenders: list[str] = []
     for path in _python_sources():
         text = path.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), start=1):
             if _TOKEN_IN_URL_RE.search(line):
                 offenders.append(f"{path.relative_to(_REPO_ROOT)}:{i}: {line.strip()}")
-    assert not offenders, "Credential-in-URL residue found:\n" + "\n".join(offenders)
+    assert not offenders, (
+        "Credential-in-URL residue found (the panel is credential-free — "
+        "no-auth decision 2026-06-11):\n" + "\n".join(offenders)
+    )
