@@ -18,7 +18,7 @@
 | Remote replay (reporter's exact commands, live workspace) | PASS — `public install --force` → docs protected (25→27), `clean --apply` leaves both AGENTS.md in place, `public doctor` exit 0 (loop broken), post-clean **unprotected 0 → hygiene gate PASS** | replay transcript |
 | ruff / mypy --strict | PASS | pre-push + CI |
 | Security | APPROVED keyed to pushed sha | handoff |
-| CI (full matrix) | GREEN — PR #<PR> merged `<SHA>` | GitHub Actions |
+| CI (full matrix) | GREEN — PR #143 merged `7b08beef` | GitHub Actions |
 
 ## Drifts
 None. Classification-only change (mtime handling deliberately untouched — non-goal).
