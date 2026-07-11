@@ -38,7 +38,9 @@ block must carry evidence plus the exact next command.
   requested/actual reasoning, exit, parser classification, redacted output tail,
   session ref) referenced from `BlockedState.detail`; a no-op result still blocks —
   now with evidence. `PiHeadlessConfig.reasoning_effort` forwards to PI `--thinking`
-  (PI >= 0.80.3) and requested==actual is recorded/verified.
+  (PI >= 0.80.3); the diagnostic records requested reasoning and honestly leaves
+  `actual_reasoning` unset when the PI CLI does not report it back (never
+  fabricated — QA-review wording correction 2026-07-11).
 - **FR-E (write-scope parity + parser hardening).** `implement-review` gains
   `write_scope_from_tasks` + a `--write-scope` escape hatch (parity with `pipeline`);
   `_extract_globs` rejects absolute/`..`/`~`/`$` tokens at parse time

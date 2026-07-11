@@ -18,5 +18,5 @@ decomposition; anchors verified in `specs/backlog/candidates.md`.)
 - [x] **T-E — write-scope parity + parser hardening** (M) — owner: software-engineer
   Write set: `dadaia_workspace/cli/commands/lifecycle.py`,
   `dadaia_workspace/features/lifecycle/tasks_write_scope.py`, `tests/**`
-- [-] **T-F — full validation + ship gates** — owner: software-engineer
+- [x] **T-F — full validation + ship gates** — owner: software-engineer
   Write set: `tests/**`
