@@ -1,6 +1,7 @@
 ---
 name: panel-tab-reorg-agentic-layers
-status: candidate
+status: delivered
+delivered_in: v0.1.79
 opened: 2026-07-08
 owner: project-manager (curates)
 priority: P2
