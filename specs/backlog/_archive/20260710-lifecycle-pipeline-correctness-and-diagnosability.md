@@ -1,6 +1,7 @@
 ---
 name: lifecycle-pipeline-correctness-and-diagnosability
-status: candidate
+status: delivered
+delivered_in: v0.1.78
 opened: 2026-07-10
 owner: project-manager (curates)
 priority: P1
