@@ -8,5 +8,5 @@
   Write set: `dadaia_workspace/public/skills/**`, `tests/**`
 - [x] **T-3 — FR3 context-name allowlist at resolution rungs** — owner: software-engineer
   Write set: `dadaia_workspace/cli/_specs_resolution.py`, `tests/**`
-- [ ] **T-4 — validation + ship gates** — owner: software-engineer
+- [x] **T-4 — validation + ship gates** — owner: software-engineer
   Write set: `tests/**`
