@@ -212,6 +212,7 @@ def test_cli_run_phase_step_injects_persona(
             workflow_id="closure",
             catalog_step_label="close",
             json_output=True,
+            is_review=False,
         )
 
     assert recording.received, "worker was never called"

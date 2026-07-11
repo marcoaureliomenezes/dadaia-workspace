@@ -22,10 +22,7 @@ from dadaia_workspace.core.session_env import entry_harness
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
 from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
-from dadaia_workspace.features.lifecycle.phase_workflow import (
-    PhaseWorkflowResult,
-    is_review_phase,
-)
+from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
 from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
 from dadaia_workspace.features.lifecycle.service import (
     LifecycleCommandResult,
@@ -802,6 +799,9 @@ def implement(
         catalog_step_label="implement",
         step_model=step_model,
         json_output=json_output,
+        # v0.1.78 T-A / FR-A: implement is a CREATE step. It targets QA_REVIEW purely to
+        # advance the release phase; that transition target must not imply verdict-gating.
+        is_review=False,
     )
 
 
@@ -963,19 +963,23 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
-def _phase_step_prompt(
-    label: str, release_id: str, context: str, target_phase: LifecyclePhase
-) -> str:
+def _phase_step_prompt(label: str, release_id: str, context: str, *, is_review: bool) -> str:
     """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
 
     The CLI single-step verbs are the third worker-prompt surface (after
-    ``build_fragment_suffix`` and ``pipeline._generic_prompt``). A review-phase verb
-    (qa/security/code) is verdict-gated and must emit a verdict; a create verb
+    ``build_fragment_suffix`` and ``pipeline._generic_prompt``). A review step
+    (qa/security/code) is verdict-gated and must emit a verdict; a create step
     (implement/close/backlog|release define) produces an artifact and must NOT self-verdict
     — its verdict is ignored by the review-only gate, and instructing it to self-verdict is
     the Drift-1 incoherence this release eliminates.
+
+    v0.1.78 T-A / FR-A: ``is_review`` is now an EXPLICIT per-verb signal passed by the
+    caller, independent of the step's transition ``target_phase`` — the step kind and the
+    phase transition target are two different concerns (``implement`` targets QA_REVIEW
+    but is a create step). The former derivation via ``is_review_phase(target_phase)``
+    conflated them, misclassifying ``implement`` as a review step.
     """
-    if is_review_phase(target_phase):
+    if is_review:
         output_instruction = (
             "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
             "artifact_ref pointing at the handoff document."
@@ -1003,6 +1007,7 @@ def _run_phase_step(
     workflow_id: str,
     catalog_step_label: str,
     json_output: bool,
+    is_review: bool,
     step_model: list[str] | None = None,
     post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
 ) -> None:
@@ -1015,8 +1020,14 @@ def _run_phase_step(
     :func:`apply_entry_to_step` ONCE (there is no step object to iterate) to author its local
     ``runtime_kind`` (FAKE preserved for a dry-run) + ``resolved_model``. ``--step-model`` is
     profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6). The frozen
-    snapshot is passed to ``LifecyclePhaseWorkflow.run`` so the run records it (LAW 7). The
-    worker must emit an APPROVED handoff with an artifact_ref to advance the phase.
+    snapshot is passed to ``LifecyclePhaseWorkflow.run`` so the run records it (LAW 7).
+
+    ``is_review`` (v0.1.78 T-A / FR-A) is an EXPLICIT, caller-supplied step-kind signal,
+    independent of ``target_phase``: a review step's worker must emit an APPROVED handoff
+    to advance; a create step's worker must emit an artifact_ref (its self-reported verdict,
+    if any, is ignored). Deriving step kind from ``target_phase`` alone was the bug this
+    parameter fixes — ``implement`` targets QA_REVIEW (a review phase) purely to transition
+    the release, but is itself a create step.
     """
     from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.pipeline import apply_entry_to_step
@@ -1047,7 +1058,7 @@ def _run_phase_step(
         context=context,
         release_id=release_id,
         task_id=run_id,
-        prompt=_phase_step_prompt(label, release_id, context, target_phase),
+        prompt=_phase_step_prompt(label, release_id, context, is_review=is_review),
         allowed_paths=(f".dadaia/handoff/{context}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
         model_profile=entry.model_profile,
@@ -1061,6 +1072,7 @@ def _run_phase_step(
         target_phase=target_phase,
         scope=scope,
         policy_snapshot=snapshot,
+        is_review=is_review,
     )
     status = (
         LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
@@ -1141,6 +1153,7 @@ def review_qa(
         catalog_step_label="review_qa",
         step_model=step_model,
         json_output=json_output,
+        is_review=True,
     )
 
 
@@ -1184,6 +1197,7 @@ def review_security(
         catalog_step_label="review_security",
         step_model=step_model,
         json_output=json_output,
+        is_review=True,
     )
 
 
@@ -1227,6 +1241,7 @@ def review_code(
         catalog_step_label="review_code",
         step_model=step_model,
         json_output=json_output,
+        is_review=True,
     )
 
 
@@ -1291,6 +1306,7 @@ def close(
         catalog_step_label="close",
         step_model=step_model,
         json_output=json_output,
+        is_review=False,
         post_step=_apply_closure_removal,
     )
 
