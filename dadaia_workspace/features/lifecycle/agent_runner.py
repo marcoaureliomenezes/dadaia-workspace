@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.models.lifecycle import (
@@ -17,6 +19,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.core.scope_match import out_of_scope_paths
 from dadaia_workspace.features.lifecycle.context_selector import SelectionAudit
 from dadaia_workspace.features.lifecycle.state_machine import (
@@ -94,6 +97,17 @@ def replace_injected_context(
     return replace(lifecycle_run, injected_context=entries)
 
 
+def _safe_filename_segment(value: str) -> str:
+    """Sanitize *value* into a single filesystem-safe filename segment.
+
+    ``current_step`` values are internal labels (``"implement"``, ``"review_qa"``, ...)
+    but this stays defensive: any character outside ``[A-Za-z0-9._-]`` is replaced with
+    ``_`` and path separators can never smuggle a traversal into the run's artifact zone
+    (``FilesystemRuntimeFileAdapter._safe_segment`` is the hard backstop either way).
+    """
+    return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value) or "step"
+
+
 @dataclass(frozen=True)
 class AgentRunnerInput:
     """Inputs required to advance a lifecycle run through an agent result."""
@@ -119,9 +133,17 @@ class LifecycleAgentRunner:
         *,
         runtime: AgentRuntimePort,
         state_machine: LifecycleStateMachine | None = None,
+        runtime_files: RuntimeFilePort | None = None,
     ) -> None:
         self._runtime = runtime
         self._state_machine = state_machine or LifecycleStateMachine()
+        # v0.1.78 T-D / FR-D: additive-optional run-artifact writer. When injected, a
+        # worker attempt that ends blocked-for-noncompliance AND carries a
+        # ``result.diagnostic`` persists it under the run's step-artifact zone and
+        # references its path from ``BlockedState.detail["diagnostic_ref"]``. ``None`` (every
+        # pre-existing caller) keeps behavior byte-identical — the block still fires, just
+        # with no diagnostic_ref (nothing to reference).
+        self._runtime_files = runtime_files
 
     def evaluate_gate(
         self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
@@ -157,10 +179,26 @@ class LifecycleAgentRunner:
         return result, self._blocked_result(lifecycle_run, data, result)
 
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
+        decision, _result = self.run_with_result(lifecycle_run, data)
+        return decision
+
+    def run_with_result(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> tuple[TransitionDecision, AgentRunResult]:
+        """Run the worker ONCE and return both the phase transition AND the raw result.
+
+        v0.1.78 T-B / FR-B: :meth:`run` is the pre-existing transition-only entry point,
+        now a thin delegator so every existing caller is byte-identical. A caller that also
+        needs the worker's ``AgentRunResult`` (e.g. :class:`LifecyclePipeline` to build a
+        run-scoped handoff-ledger payload — the full-pipeline analogue of what
+        ``run_implement_review_loop`` already gets from
+        :meth:`evaluate_gate_with_result`) uses this instead of running the worker a second
+        time.
+        """
         result = self._runtime.run(data.request)
         blocked = self._blocked_result(lifecycle_run, data, result)
         if blocked is not None:
-            return self._state_machine.transition(
+            decision = self._state_machine.transition(
                 lifecycle_run,
                 TransitionInput(
                     target_phase=LifecyclePhase.BLOCKED,
@@ -168,8 +206,9 @@ class LifecycleAgentRunner:
                     current_step=data.current_step,
                 ),
             )
+            return decision, result
 
-        return self._state_machine.transition(
+        decision = self._state_machine.transition(
             lifecycle_run,
             TransitionInput(
                 target_phase=data.target_phase,
@@ -179,6 +218,7 @@ class LifecycleAgentRunner:
                 current_step=data.current_step,
             ),
         )
+        return decision, result
 
     def _blocked_result(
         self,
@@ -187,14 +227,16 @@ class LifecycleAgentRunner:
         result: AgentRunResult,
     ) -> BlockedState | None:
         if result.status is not AgentRunStatus.SUCCEEDED:
-            return self._blocked(lifecycle_run, data, result.error or result.summary)
+            return self._blocked(lifecycle_run, data, result.error or result.summary, result=result)
         # L1/L2 (v0.1.31): the verdict requirement is a REVIEW concept. A review step must
         # carry ``verdict == "APPROVED"``; a create step (``is_review=False``) is never
         # gated on a self-reported verdict — it passes on a schema-valid payload (which
         # populates ``artifact_refs``) + in-scope paths, regardless of the ``verdict``
         # field. The ``artifact_refs`` check below still BLOCKs a no-op create worker.
         if data.is_review and result.structured_output.get("verdict") != "APPROVED":
-            return self._blocked(lifecycle_run, data, "agent result missing APPROVED verdict")
+            return self._blocked(
+                lifecycle_run, data, "agent result missing APPROVED verdict", result=result
+            )
         if not result.artifact_refs:
             # FR1 (v0.1.68): the FR8 (v0.1.66) role-keyed disk-glob enrichment is RETIRED —
             # it could never be run-scoped (``.dadaia/handoff/<ctx>/*.handoff.json`` files
@@ -211,7 +253,11 @@ class LifecycleAgentRunner:
                 "no_current_artifact": f"{lifecycle_run.run_id}:{data.current_step or lifecycle_run.current_step}"
             }
             return self._blocked(
-                lifecycle_run, data, "agent result missing artifact evidence", detail=detail
+                lifecycle_run,
+                data,
+                "agent result missing artifact evidence",
+                detail=detail,
+                result=result,
             )
         out_of_scope = self._out_of_scope_paths(
             data.request,
@@ -223,6 +269,7 @@ class LifecycleAgentRunner:
                 data,
                 "agent result contains out-of-scope paths",
                 detail={"out_of_scope": ",".join(out_of_scope)},
+                result=result,
             )
         return None
 
@@ -233,13 +280,53 @@ class LifecycleAgentRunner:
         reason: str,
         *,
         detail: dict[str, str] | None = None,
+        result: AgentRunResult | None = None,
     ) -> BlockedState:
+        full_detail = dict(detail or {})
+        # v0.1.78 T-D / FR-D: persist the worker's diagnostic (when the adapter attached
+        # one) and reference its path from the block detail. Additive-optional on BOTH
+        # axes — no injected writer, or no diagnostic on this result — leaves the detail
+        # exactly as before.
+        if self._runtime_files is not None and result is not None and result.diagnostic is not None:
+            ref = self._persist_diagnostic(lifecycle_run, data, result.diagnostic)
+            if ref is not None:
+                full_detail["diagnostic_ref"] = ref
         return BlockedState(
             reason=reason,
             blocked_at_step=data.current_step or lifecycle_run.current_step,
             resume_token=lifecycle_run.idempotency_key,
-            detail=detail or {},
+            detail=full_detail,
         )
+
+    def _persist_diagnostic(
+        self,
+        lifecycle_run: LifecycleRun,
+        data: AgentRunnerInput,
+        diagnostic: object,
+    ) -> str | None:
+        """Write *diagnostic* under the run's step-artifact zone; return its workspace ref.
+
+        Never raises: a write failure (e.g. a fixture writer with no real filesystem
+        behind it) degrades to ``None`` — an evidence-persistence failure must never crash
+        the gate decision itself.
+        """
+        assert self._runtime_files is not None
+        step = data.current_step or lifecycle_run.current_step
+        payload = diagnostic.to_dict()  # type: ignore[attr-defined]
+        content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        digest = hashlib.sha256(f"{lifecycle_run.run_id}:{step}:{content}".encode()).hexdigest()[
+            :12
+        ]
+        filename = f"{_safe_filename_segment(step)}-noncompliance-{digest}.json"
+        try:
+            ref = self._runtime_files.write_run_artifact(
+                run_id=lifecycle_run.run_id,
+                filename=filename,
+                content=content,
+            )
+        except Exception:  # noqa: BLE001 — evidence persistence is best-effort, never fatal.
+            return None
+        return ref.path
 
     @staticmethod
     def _out_of_scope_paths(

@@ -73,23 +73,45 @@ class LifecycleHygieneService:
         policy: SlopPolicy | None = None,
         now: dt.datetime | None = None,
         active_release_id: str | None = None,
+        run_store: LifecycleRunStore | None = None,
     ) -> None:
         self._workspace_root = workspace_root.resolve()
         self._dadaia_root = self._workspace_root / ".dadaia"
         self._policy = policy or SlopPolicy()
         self._now = now
         self._active_release_id = active_release_id
+        # v0.1.78 T-C / FR-C: additive-optional. When wired, ``cleanup()`` ALSO reclaims
+        # stale, cleanup-eligible workflow-step handoff-ledger payloads under
+        # ``.dadaia/runs/lifecycle/`` — the ONE canonical cleanup contract that closes the
+        # split-cleanup-engines hole (``dadaia lifecycle hygiene clean``, the command
+        # preflight's remediation prints, used to be blind to that zone; only the
+        # DIFFERENT ``dadaia lifecycle clean`` / RetentionSweep command covered it). When
+        # absent (the pre-v0.1.78 default construction), behavior is byte-identical to
+        # before — no step-payload candidates are discovered.
+        self._run_store = run_store
 
     @property
     def policy(self) -> SlopPolicy:
         return self._policy
 
     def cleanup(self, *, dry_run: bool = True) -> HygieneCleanupResult:
-        """Discover and optionally delete expired safe-zone runtime files."""
+        """Discover and optionally delete expired safe-zone runtime files.
+
+        v0.1.78 T-C / FR-C: when a ``run_store`` is wired, the candidate set is UNIONED
+        with stale, cleanup-eligible workflow-step payloads (the same TTL + liveness +
+        consumption guard the doctor/retention-sweep already apply for that zone) — one
+        candidate classifier, one reclaim pass, shared by status/preflight-remediation/
+        doctor/dry-run/apply. Reclaiming a step payload ALSO drops its ledger record in the
+        same operation (:meth:`WorkflowStepLedger.remove`) so the doctor never sees the
+        physically-deleted file as a dangling ORPHAN record — a reclaim must never trade
+        one finding for another.
+        """
         protected_paths = self._protected_paths()
         candidates = tuple(self._cleanup_candidates(protected_paths))
+        step_payload_candidates, ledger_keys = self._step_payload_candidates()
+        all_candidates = candidates + tuple(step_payload_candidates)
         if dry_run:
-            return HygieneCleanupResult(dry_run=True, candidates=candidates)
+            return HygieneCleanupResult(dry_run=True, candidates=all_candidates)
 
         deleted: list[Path] = []
         skipped: list[Path] = []
@@ -105,14 +127,114 @@ class LifecycleHygieneService:
             except OSError:
                 skipped.append(path)
 
+        for candidate in step_payload_candidates:
+            path = self._workspace_root / candidate.path
+            if candidate.protected:
+                skipped.append(path)
+                continue
+            try:
+                if path.is_file():
+                    path.unlink()
+                    deleted.append(path)
+                    self._prune_ledger_record(candidate.path, ledger_keys)
+            except OSError:
+                skipped.append(path)
+
         pruned = self._prune_empty_safe_dirs()
         return HygieneCleanupResult(
             dry_run=False,
-            candidates=candidates,
+            candidates=all_candidates,
             deleted_paths=tuple(deleted),
             skipped_paths=tuple(skipped),
             pruned_dirs=tuple(pruned),
         )
+
+    def _step_payload_candidates(
+        self,
+    ) -> tuple[list[HygieneCandidate], dict[str, tuple[str, str, int]]]:
+        """Stale, cleanup-eligible workflow-step payloads under ``.dadaia/runs/lifecycle/``.
+
+        A payload is a reclaim candidate ONLY when ALL of:
+
+        - its ledger record is ``is_cleanup_eligible()`` (``DELETE_AFTER_CONSUMED`` +
+          every declared consumer has consumed it — mirrors the doctor's STALE check and
+          the retention sweep's reclaim-allow set: one eligibility rule, never a second
+          drifting definition);
+        - the OWNING RUN is terminal (``COMPLETED``/``FAILED``) — a live run's payload is
+          NEVER a candidate, matching the retention sweep's hard liveness gate;
+        - the on-disk file's mtime is past the tmp-zone consumed TTL (the same TTL
+          ``_swept_zones`` borrows for the ``runs`` zone, and the doctor's stale check
+          uses).
+
+        Returns ``(candidates, ledger_keys)`` where ``ledger_keys`` maps each candidate's
+        workspace-relative ``path`` to its ``(run_id, producer_step, attempt)`` identity —
+        the key :meth:`_prune_ledger_record` needs to drop the ledger record alongside the
+        physical delete. Returns ``([], {})`` when no ``run_store`` is wired (back-compat:
+        a default-constructed service behaves exactly as before this FR).
+        """
+        if self._run_store is None:
+            return [], {}
+        from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+        terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
+        cutoff = self._clock() - dt.timedelta(seconds=self._policy.tmp_ttl_seconds)
+        candidates: list[HygieneCandidate] = []
+        ledger_keys: dict[str, tuple[str, str, int]] = {}
+        for run in self._run_store.list_runs():
+            if run.status not in terminal:
+                continue
+            for record in run.workflow_steps:
+                if not record.is_cleanup_eligible():
+                    continue
+                path = self._workspace_root / record.payload_ref
+                if not path.is_file():
+                    continue
+                mtime = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
+                if mtime >= cutoff:
+                    continue
+                candidates.append(
+                    HygieneCandidate(
+                        path=record.payload_ref,
+                        zone=HygieneZone.TMP,
+                        kind=HygieneCandidateKind.EXPIRED_STEP_PAYLOAD,
+                        reason=f"consumed workflow-step payload older than "
+                        f"{self._policy.tmp_ttl_seconds} second TTL",
+                        age_seconds=int((self._clock() - mtime).total_seconds()),
+                        protected=False,
+                    )
+                )
+                ledger_keys[record.payload_ref] = (run.run_id, record.producer_step, record.attempt)
+        return candidates, ledger_keys
+
+    def _prune_ledger_record(
+        self, payload_ref: str, ledger_keys: dict[str, tuple[str, str, int]]
+    ) -> None:
+        """Drop the just-deleted payload's ledger record from its owning run (T-C).
+
+        Reloads the run fresh (never trusts a stale in-memory copy across the reclaim
+        pass — another record on the SAME run may have already been pruned earlier in
+        this loop) and persists the pruned ledger. Fail-soft: a load/save error is
+        swallowed — the physical file is already gone either way, and a subsequent
+        ``handoffs doctor`` run would surface a genuine store problem on its own terms
+        rather than this reclaim pass crashing mid-sweep.
+        """
+        assert self._run_store is not None
+        key = ledger_keys.get(payload_ref)
+        if key is None:
+            return
+        run_id, producer_step, attempt = key
+        try:
+            run = self._run_store.load(run_id)
+            if run is None:
+                return
+            pruned_ledger = run.workflow_steps.remove(producer_step, attempt)
+            if pruned_ledger is run.workflow_steps:
+                return
+            from dataclasses import replace
+
+            self._run_store.save(replace(run, workflow_steps=pruned_ledger))
+        except Exception:  # noqa: BLE001 — reclaim never crashes on a ledger-save hiccup.
+            return
 
     def protected_refs(self) -> frozenset[str]:
         """Workspace-relative refs the hygiene service protects from deletion.

@@ -43,10 +43,15 @@ def _payload(output: str) -> dict[str, object]:
 @pytest.mark.parametrize(
     ("command", "expected_reason"),
     (
+        # ``implement`` is a CREATE step (v0.1.78 T-A / FR-A): step kind is now EXPLICIT,
+        # independent of its transition target. It targets QA_REVIEW (for the phase
+        # transition) but is is_review=False, so the bare FAKE worker's lack of a
+        # self-verdict never blocks it — it blocks on the still-active artifact-evidence
+        # check instead, exactly like ``close``.
+        (["lifecycle", "implement"], "agent result missing artifact evidence"),
         # Review-phase verbs (target QA/SECURITY/CODE_REVIEW) run as REVIEW steps under the
         # v0.1.31 review-only gate: the bare FAKE worker emits no verdict → block on the
-        # verdict requirement. ``implement`` targets QA_REVIEW, so it is a review step too.
-        (["lifecycle", "implement"], "agent result missing APPROVED verdict"),
+        # verdict requirement.
         (["lifecycle", "review", "qa"], "agent result missing APPROVED verdict"),
         (["lifecycle", "review", "security"], "agent result missing APPROVED verdict"),
         (["lifecycle", "review", "code"], "agent result missing APPROVED verdict"),
@@ -67,14 +72,16 @@ def test_every_phase_verb_runs_the_engine_and_blocks_on_fake_harness(
 
     With the FAKE harness the bare worker emits neither an APPROVED verdict nor artifact
     evidence, so the real typed gate blocks every verb — proving the engine path executed
-    end-to-end on a selectable harness. Under the v0.1.31 **review-only** gate the *reason*
-    differs by step kind: a review-phase verb (implement, review qa/security/code) blocks on
-    the verdict requirement, while a create-phase verb (close → CLOSURE) is not verdict-gated
-    and blocks on the artifact-evidence check instead. Either way it is a real engine
-    ``BlockedState``, never an ``unavailable_workflow`` stub — and never a crash/traceback
-    (W1-11 / T-47-20 grill D-10 smoke folded in, exercised on every row via ``close`` and
-    every other verb identically). (``release define`` and ``backlog define`` are the
-    fragment-driven multi-step workflows — covered separately.)
+    end-to-end on a selectable harness. Under the v0.1.31 **review-only** gate, generalized
+    to an EXPLICIT per-verb step kind in v0.1.78 (T-A / FR-A), the *reason* differs by step
+    kind, independent of the verb's transition target: a review verb (review qa/security/code)
+    blocks on the verdict requirement, while a create verb (implement, close) is not
+    verdict-gated and blocks on the artifact-evidence check instead — even though
+    ``implement`` targets QA_REVIEW just like a review verb does. Either way it is a real
+    engine ``BlockedState``, never an ``unavailable_workflow`` stub — and never a
+    crash/traceback (W1-11 / T-47-20 grill D-10 smoke folded in, exercised on every row via
+    ``close`` and every other verb identically). (``release define`` and ``backlog define``
+    are the fragment-driven multi-step workflows — covered separately.)
     """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)

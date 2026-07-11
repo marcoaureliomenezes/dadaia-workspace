@@ -249,6 +249,9 @@ class ChangedPathsMixin:
             artifact_refs=result.artifact_refs,
             structured_output=structured,
             error=result.error,
+            # v0.1.78 T-D / FR-D: preserve a degraded/noncompliant result's diagnostic —
+            # this rebuild must never silently discard the evidence the adapter attached.
+            diagnostic=result.diagnostic,
         )
 
 

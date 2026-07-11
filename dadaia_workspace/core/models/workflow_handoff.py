@@ -281,6 +281,23 @@ class WorkflowStepLedger:
             out.append(record)
         return WorkflowStepLedger(records=tuple(out))
 
+    def remove(self, producer_step: str, attempt: int) -> WorkflowStepLedger:
+        """Return a ledger with the ``(producer_step, attempt)`` record dropped (v0.1.78 T-C).
+
+        Used by a reclaim path that physically deletes a cleanup-eligible on-disk payload
+        (hygiene clean's step-payload coverage): the ledger record must be dropped in the
+        SAME operation, or the doctor immediately flags the now-diskless record as
+        ``ORPHAN`` — a reclaim that "fixes" one finding by creating another. A no-op
+        (byte-identical ledger returned) when the key is absent.
+        """
+        return WorkflowStepLedger(
+            records=tuple(
+                existing
+                for existing in self.records
+                if not (existing.producer_step == producer_step and existing.attempt == attempt)
+            )
+        )
+
     def to_list(self) -> list[dict[str, Any]]:
         return [record.to_dict() for record in self.records]
 
