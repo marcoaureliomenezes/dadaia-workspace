@@ -2,7 +2,7 @@
 
 **Status:** Aprovado
 
-- [-] **T-1 — FR1 perf-test environment-independent invariant** — owner: software-engineer
+- [x] **T-1 — FR1 perf-test environment-independent invariant** — owner: software-engineer
   Write set: `tests/performance/**`, `dadaia_workspace/features/lifecycle/**`
 - [ ] **T-2 — FR2 handoff-emitter example fix + projection** — owner: ai-engineer
   Write set: `dadaia_workspace/public/skills/**`, `tests/**`
