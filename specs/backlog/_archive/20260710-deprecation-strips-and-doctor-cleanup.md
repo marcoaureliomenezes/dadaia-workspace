@@ -1,6 +1,7 @@
 ---
 name: deprecation-strips-and-doctor-cleanup
-status: candidate
+status: delivered
+delivered_in: v0.1.81 (date gate operator-waived 2026-07-11)
 opened: 2026-07-10
 owner: project-manager (curates)
 priority: P3
