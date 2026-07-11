@@ -38,9 +38,9 @@ Current-doc corrections to keep active:
 - HEADLINE (live-verified, codex-cli 0.139.0): command hooks fire ONLY in the
   interactive `codex` TUI. Under headless `codex exec` they never run, in any
   configuration form. Harness-hook gate enforcement on Codex is interactive-only
-  today; on the headless path the git chokepoints (pre-commit lease gate, pre-push
-  security-verdict gate, v0.1.14) provide the deterministic coverage — they fire as
-  git hooks, independent of any harness hook (§9).
+  today; on the headless path the git chokepoints (pre-commit, WARN-only presence
+  detection; pre-push security-verdict gate, v0.1.14) provide the deterministic
+  coverage — they fire as git hooks, independent of any harness hook (§9).
 
 ---
 
@@ -402,11 +402,11 @@ verdict wins (fixed in v0.1.14 — bug
 **Never claim "harness-hook enforcement on Codex" unqualified.** Harness hooks fire
 only in interactive sessions today (upstream defect, bug
 `codex-exec-hooks-do-not-fire-headless`, resolved per its option (b)). The headless
-gap is covered by the **git chokepoints** (v0.1.14): the pre-commit lease gate and
-the pre-push security-verdict gate run as git hooks and fire regardless of whether
-any harness hook ran — file-tool-level gating is absent headless, but commits and
-pushes stay deterministically gated. Agent discipline plus doctor checks cover the
-remainder.
+gap is covered by the **git chokepoints** (v0.1.14): pre-commit (WARN-only presence
+detection, NO-LOCKS DOCTRINE v0.1.76) and the pre-push security-verdict gate run as git
+hooks and fire regardless of whether any harness hook ran — file-tool-level gating is
+absent headless, but pushes stay deterministically gated. Agent discipline plus doctor
+checks cover the remainder.
 
 `dadaia public doctor` surfaces this boundary honestly as an INFO line
 (`[info] codex:trust-boundary — Codex interactive hooks fire and block; \`codex exec\`
@@ -442,7 +442,7 @@ dadaia reference wiring (live shape, v0.1.14): a SINGLE merged PreToolUse entryp
 — evaluates root-whitelist → venv-guard → SDD gate in order, first-block-wins (one
 interpreter spawn per tool call; `Bash` is in the matcher only for the venv-guard's
 fixed-pattern check — no shell parsing); `PostToolUse → …hooks.sdd_post_gate` with the
-matcher **omitted** — Codex's canonical match-all form — so the lease heartbeat fires
+matcher **omitted** — Codex's canonical match-all form — so the presence heartbeat fires
 after every tool; `SessionStart → …hooks.ctx_inject` (injection itself is bind-driven:
 re-injection only on a bind-epoch marker newer than the session sentinel; no first-ALIVE
 fallback). The anchored matcher is documented-valid and NOT to be changed

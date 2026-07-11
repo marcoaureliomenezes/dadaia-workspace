@@ -5,7 +5,7 @@ description: >
   Spec Context Project. Defines how to reserve, execute, and complete tasks in
   TASKS.md using the 3 canonical markers: [ ] OPEN → [-] IN PROGRESS → [x] DONE.
   Marker discipline is the human-auditable trace of "who took what"; the SDD
-  gate hook enforces path-class × lease × phase × mode separately.
+  gate hook enforces path-class × presence × phase × mode separately.
 applyTo: "specs/**/TASKS.md"
 ---
 
@@ -30,7 +30,7 @@ applyTo: "specs/**/TASKS.md"
 **Honesty note — markers are discipline, not a hook check.** The SDD-gate stage of the
 merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook never reads `TASKS.md`,
 `SPEC.md`, or any status marker. What it enforces deterministically is path-class ×
-lease × phase × mode on file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
+presence × phase × mode on file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
 for traceability and coordination between agents and the operator — uphold it even
 though no hook will block you for skipping it.
 
@@ -94,22 +94,24 @@ Document the reason in the commit message. Another agent can pick up the task la
 
 ### The SDD gate blocked my write
 
-The merged `pre_gate` hook blocks for **kernel** reasons, never for marker reasons
-(stages: root-whitelist → venv-guard → SDD gate, first-block-wins). The block message
-tells you which rule fired. The SDD-gate stage's reasons:
+Under the NO-LOCKS DOCTRINE (v0.1.76) the gate never blocks a write because of another
+session — races between sessions are accepted and surfaced, never prevented. The merged
+`pre_gate` hook blocks for **kernel** reasons only, never for marker or concurrency
+reasons (stages: root-whitelist → venv-guard → SDD gate, first-block-wins). The block
+message tells you which rule fired. The SDD-gate stage's block reasons:
 
-- **Live foreign lease** — another session genuinely holds this context's lease
-  (heartbeat fresh, or its recorded harness pid is still running — a live holder is
-  never stolen). Additive paths (`specs/bugs/`, `specs/backlog/`, `specs/audits/`,
-  `.dadaia/reports|handoff|tmp/`) remain writable; the lease frees itself when the
-  holder finishes or dies. Never ask the operator to rebind or steal.
-- **READ-mode session** — this session's mode resolved READ (the context was bound
-  `--mode read`; bind refreshes the context's incumbent pointer, which the gate reads).
-  Write rights require the operator binding once:
+- **READ-mode session (self-scoped only)** — this session's **own** mode resolved READ
+  (the context was bound `--mode read`); this blocks only your own MUTATING writes as
+  opt-in self-protection — a foreign session's bind can never change your mode. Write
+  rights require the operator binding once:
   `dadaia context bind <ctx> --mode implementation`.
 - **MEMORY phase** — `specs/memory/` is writable only in DEFINITION/CLOSURE phase.
 - **FROZEN / PROTECTED** — `specs/_archive/` is read-only; `.dadaia/sessions/` is
   CLI-owned (never write it via file tools).
+
+A live foreign session's presence on the same context never blocks — the write is
+**allowed** and a single throttled advisory warning is surfaced naming the other
+session. There is nothing to rebind or steal.
 
 A missing `[-]` marker never produces a gate block — it produces a **discipline
 violation** that reviewers and the operator will catch. Reserve anyway, always.

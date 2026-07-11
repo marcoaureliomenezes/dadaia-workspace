@@ -12,7 +12,7 @@
 
 | # | Entry | Priority | Release | One-liner |
 |---|---|---|---|---|
-| 1 | `20260710-lock-lease-session-identity-kernel` | **P0** | **v0.1.76** | REMOVE all concurrency blocking; advisory presence replaces the lease (no-locks doctrine) |
+| 1 |  `_archive/20260710-lock-lease-session-identity-kernel` (delivered v0.1.76) | **P0** | **v0.1.76** | REMOVE all concurrency blocking; advisory presence replaces the lease (no-locks doctrine) |
 | 2 | `20260709-central-bind-resolution-seam` | **P0** | **v0.1.77** | ONE bind-resolution seam for every resolver-driven verb + dynamic contract test |
 | 3 | `20260710-lifecycle-pipeline-correctness-and-diagnosability` | **P1** | **v0.1.78** | lifecycle engine tells the truth; every block carries evidence + exact next command |
 | 4 | `20260708-panel-tab-reorg-agentic-layers` | **P2** | **v0.1.79** | 7→6 primary tabs naming the two agentic layers |

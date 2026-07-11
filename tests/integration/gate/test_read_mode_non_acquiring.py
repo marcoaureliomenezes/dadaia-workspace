@@ -16,8 +16,13 @@ Covered:
   * READ-bound sid + in-repo MUTATING write ⇒ BLOCK, and NO lease record is created/modified
     (non-acquiring; FR-R4-03).
   * READ-bound sid + in-repo ADDITIVE (``specs/bugs``) write ⇒ ALLOW (FR-R4-03).
-  * unbound sid (no record, no env) ⇒ IMPLEMENTATION-capable: free-lease acquire proceeds
-    (FR-R4-04 / Decision D-3).
+  * unbound sid (no record, no env) ⇒ IMPLEMENTATION-capable: the write ALLOWs and upserts
+    an advisory presence record (FR-R4-04 / Decision D-3; v0.1.76 replaces the free-lease
+    acquire with presence).
+  * v0.1.76 FR4: a foreign session's ``dadaia context bind --mode read`` (context-incumbent
+    pointer) can no longer impose READ on a DIFFERENT harness session — mode resolution is
+    strictly self-scoped, so the cross-sid write now ALLOWs (successor to the deleted NF-2
+    incumbent-fallback behavior, kills audit P1-1).
 """
 
 from __future__ import annotations
@@ -47,6 +52,10 @@ def _make_workspace(tmp_path: Path) -> Path:
 
 def _lock_path(ws: Path) -> Path:
     return ws / ".dadaia" / "states" / "ctx_locks" / _LOCK_FILE.format(slug=_SLUG)
+
+
+def _presence_path(ws: Path, session_id: str) -> Path:
+    return ws / ".dadaia" / "states" / "presence" / _SLUG / f"{session_id}.json"
 
 
 def _write_payload(target: Path) -> dict[str, object]:
@@ -98,31 +107,37 @@ def test_unbound_session_is_implementation_capable(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.block_envelope() is None, f"unbound write must ALLOW; stdout={result.stdout!r}"
-    # Free-lease acquire proceeded: the lease record now exists, held by this session.
-    assert _lock_path(ws).exists()
+    # v0.1.76: no lease is ever acquired; the write upserts an advisory presence record.
+    assert not _lock_path(ws).exists()
+    assert _presence_path(ws, sid).exists()
 
 
 # --------------------------------------------------------------------------------------
-# NF-2 (rc-2): the default `dadaia context bind --mode read` flow — a sid the harness never
-# reports — is honored at the REAL hook boundary via the CONTEXT incumbent pointer, with a
-# DIFFERENT harness sid (no self record, no env var).
+# v0.1.76 FR4 (successor to NF-2 / kills audit P1-1): the context-incumbent pointer a
+# `dadaia context bind --mode read` refreshes is now COMPLETELY INERT to a DIFFERENT
+# harness session's mode resolution — a foreign session's bind can never impose READ (or
+# any other mode) on another session. Mode resolution is strictly self-scoped: env ->
+# own session record -> IMPLEMENTATION default.
 # --------------------------------------------------------------------------------------
 
 
 def _bind_read_incumbent(ws: Path, bind_sid: str) -> None:
     """Emulate `dadaia context bind --mode read`: persist a READ record AND refresh the
-    context incumbent pointer to ``bind_sid`` — exactly what the bind CLI now does (NF-2)."""
+    context incumbent pointer to ``bind_sid`` — what the pre-v0.1.76 bind CLI did (NF-2).
+    v0.1.76 FR4: the incumbent pointer this writes is now inert to OTHER sessions' mode
+    resolution — kept here only to prove that inertness, not to grant any authority."""
     session_identity.write_session(ws, bind_sid, {"session_id": bind_sid, "mode": "READ"})
     session_identity.set_incumbent(ws, _SLUG, bind_sid)
 
 
-def test_cross_sid_read_bind_blocks_mutating_and_allows_additive_via_incumbent(
+def test_cross_sid_read_bind_never_imposes_read_self_scoped_mode_allows(
     tmp_path: Path,
 ) -> None:
-    # The operator's `bind --mode read` minted a sid the running harness never reports. A
-    # DIFFERENT harness sid performs a MUTATING write under the real hook: it must resolve
-    # READ through the context incumbent pointer ⇒ BLOCK, no lease written. This is the
-    # NF-2 falsification: the mode channel works with NO env var and a cross-sid record.
+    # The operator's `bind --mode read` minted a sid the running harness never reports and
+    # set the context incumbent pointer. A DIFFERENT harness sid (no self record) performs
+    # a MUTATING write under the real hook: v0.1.76 FR4 — the foreign incumbent pointer is
+    # NEVER consulted, so this session resolves its own default (IMPLEMENTATION) and the
+    # write ALLOWs, upserting an advisory presence record for ITS OWN sid.
     ws = _make_workspace(tmp_path)
     _bind_read_incumbent(ws, "sess_operatorbind")
     assert not _lock_path(ws).exists()
@@ -130,20 +145,18 @@ def test_cross_sid_read_bind_blocks_mutating_and_allows_additive_via_incumbent(
     target = ws / "repos" / _SLUG / "specs" / "releases" / "v0.1.10" / "TASKS.md"
     target.parent.mkdir(parents=True, exist_ok=True)
     # The harness session id is DIFFERENT from the bind sid and has no record of its own.
-    env = claude_hook_env(ws, session_id="claude-harness-other")
+    foreign_sid = "claude-harness-other"
+    env = claude_hook_env(ws, session_id=foreign_sid)
     result = run_hook_subprocess("sdd_gate", _write_payload(target), env)
 
     assert result.returncode == 0
-    envelope = result.block_envelope()
-    assert envelope is not None, (
-        f"cross-sid read-bind must BLOCK MUTATING; stdout={result.stdout!r}"
+    assert result.block_envelope() is None, (
+        f"a foreign read-bind must NEVER impose READ on this session; stdout={result.stdout!r}"
     )
-    assert "read" in envelope["reason"].lower()
-    assert "--mode implementation" in envelope["reason"]
-    # Non-acquiring: no lease record created by the blocked write.
     assert not _lock_path(ws).exists()
+    assert _presence_path(ws, foreign_sid).exists()
 
-    # Same cross-sid read-bind, but an ADDITIVE write ⇒ ALLOW (FR-R4-03), still no lease.
+    # Same cross-sid read-bind, and an ADDITIVE write also ALLOWs (FR-R4-03), no lease.
     additive_target = ws / "repos" / _SLUG / "specs" / "bugs" / "planted-by-other.md"
     result_additive = run_hook_subprocess("sdd_gate", _write_payload(additive_target), env)
 

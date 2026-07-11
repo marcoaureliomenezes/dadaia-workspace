@@ -58,8 +58,8 @@ the disposition. The step order is fixed and the output format (handoff JSON) is
 contractual, which is why a reference file beats ad-hoc dispatch.
 
 Cites constitution §1 matrix: **activity class ADDITIVE, lifecycle phase Research** (§7
-phase 4, audit). The audit writes only to `.dadaia/reports/**` and `.dadaia/handoff/**` and
-takes no lease (§8 ADDITIVE).
+phase 4, audit). The audit writes only to `.dadaia/reports/**` and `.dadaia/handoff/**`;
+there is no lock to take (§8 ADDITIVE; NO-LOCKS DOCTRINE, v0.1.76).
 
 > **Honesty note.** This is a dispatch-reference document. Claude Code and Codex workflow
 > Markdown does not auto-execute at runtime (constitution §4). This file is read by an

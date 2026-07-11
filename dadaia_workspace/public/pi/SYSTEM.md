@@ -7,7 +7,7 @@ as a Layer-1 entry harness (the harness a human launched in a terminal).
 
 Read the workspace-root `AGENTS.md` and the nearest scoped `AGENTS.md` — PI loads them
 natively up the directory tree, and they are the binding contract. **Do not act on a
-restatement of the law here: this note carries none.** All SDD, gate, lease, phase,
+restatement of the law here: this note carries none.** All SDD, gate, presence, phase,
 memory, report, and workflow policy lives in those `AGENTS.md` files (and the rules and
 skills they reference). When law and this note appear to conflict, the law wins.
 

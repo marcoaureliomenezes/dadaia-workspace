@@ -14,7 +14,7 @@ review → closure sequence — is executed by the **dadaia-workflows** (the
 `dadaia lifecycle` verbs), each a Python workflow body with fragment-scoped prompts and
 **Python-validated gates**. Agents are **oriented toward** those workflows; the
 disk/commit boundary is **safety-gate-enforced** by the deterministic SDD gate and git
-chokepoints (write-scope, lease, phase). Open **`dadaia panel` → Agentic →
+chokepoints (write-scope, presence, phase). Open **`dadaia panel` → Agentic →
 dadaia-workflows** for each workflow's purpose, ordered steps, per-step harness/model,
 mermaid diagram, and availability.
 

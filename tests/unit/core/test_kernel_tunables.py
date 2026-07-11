@@ -102,8 +102,6 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
 @pytest.mark.parametrize(
     ("module", "name"),
     [
-        ("dadaia_workspace.features.spec_context.lease", "LEASE_TTL_SECONDS"),
-        ("dadaia_workspace.features.spec_context.lease", "CAS_MAX_RETRIES"),
         ("dadaia_workspace.hooks.ctx_inject", "SENTINEL_GC_TTL_SECONDS"),
         ("dadaia_workspace.features.spec_context.doctor", "SENTINEL_ORPHAN_AGE_SECONDS"),
     ],
@@ -114,30 +112,27 @@ def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) 
 
 
 # --------------------------------------------------------------------------- #
-# 3. Behavioral: lease liveness observes the centralized constant.
+# 3. Behavioral: the liveness predicate observes the centralized constant.
 # --------------------------------------------------------------------------- #
 
 
-def test_lease_renew_default_ttl_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lease liveness path observes the centralized ``kernel_tunables`` TTL constant.
+def test_lock_liveness_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The liveness predicate path observes the centralized ``kernel_tunables`` TTL constant.
 
-    Re-stamp ``kernel_tunables.LEASE_TTL_SECONDS`` to a sentinel and assert the
-    ``lock_liveness`` predicate judges a record against that very ttl field — wiring the
-    constant end-to-end through the liveness predicate, proving it is a live single source,
-    not a copy.
+    v0.1.76 T-3: ``lease.py`` no longer imports ``kernel_tunables`` at all (the acquisition
+    machinery that consumed ``LEASE_TTL_SECONDS``/``CAS_MAX_RETRIES`` as defaults —
+    ``acquire``/``steal`` — is deleted; the presence module carries the live TTL contract
+    now). This test re-baselines to the surviving single source: a record's own ``ttl``
+    field, judged by ``core.lock_liveness.is_stale`` against the SAME
+    ``kernel_tunables.LEASE_TTL_SECONDS`` a caller reads to stamp that field — proving the
+    constant is a live single source, not a copy, without depending on any acquisition API.
     """
-    import inspect
     from datetime import UTC, datetime, timedelta
 
     from dadaia_workspace.core import lock_liveness
-    from dadaia_workspace.features.spec_context import lease
 
     monkeypatch.setattr(kernel_tunables, "LEASE_TTL_SECONDS", 7)
     assert kernel_tunables.LEASE_TTL_SECONDS == 7
-    sig = inspect.signature(lease.acquire)
-    assert "ttl" in sig.parameters
-    # A record stamped with the current TTL is judged by lock_liveness against that very ttl
-    # field — wiring the constant end-to-end through the liveness predicate.
     ttl = kernel_tunables.LEASE_TTL_SECONDS
     old_hb = (datetime.now(tz=UTC) - timedelta(seconds=ttl + 10)).isoformat()
     fresh_hb = datetime.now(tz=UTC).isoformat()

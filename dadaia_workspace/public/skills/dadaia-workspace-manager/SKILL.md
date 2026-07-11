@@ -42,11 +42,11 @@ auto-resolve it by searching cwd and parent directories. You never need to pass
 **Bound context** - the context selected for the current agent session by
 `dadaia context bind <name> [--mode <read|implementation|review>] [--release <id>]`.
 The command **persists** the bound context, mode, and session id in the session record
-**and refreshes the context's incumbent pointer** (`sessions/runtime/<ctx>.ptr`) — the
-bind binds the CONTEXT, so the SDD gate resolves the bound mode for the running harness
-session through the incumbent pointer, no shell `eval` needed. Bind also stamps a
-bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — the SOLE trigger for
-context-memory injection: an unbound session gets generic preflight only (no
+— the SDD gate resolves each session's own mode strictly self-scoped (env → the
+session's own record → IMPLEMENTATION default), so bind never needs a shell `eval` and a
+foreign session's bind can never change your mode (NO-LOCKS DOCTRINE, v0.1.76). Bind
+also stamps a bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — the SOLE trigger
+for context-memory injection: an unbound session gets generic preflight only (no
 first-ALIVE injection fallback), and bind is never a precondition for ADDITIVE work.
 Pass `--print-env` to
 additionally emit `export DADAIA_CONTEXT=… DADAIA_SESSION_ID=…` lines for legacy
@@ -89,41 +89,39 @@ dadaia context delete <name>                 # delete context record (must be de
 # add --print-env only for legacy `eval $(…)` shells — bind persists the mode itself
 ```
 
-Implementation/review binds acquire the single per-context release **lease** (v0.1.6
-model: one MUTATING lease per context, coordinated by project-manager — see constitution
-§8/§9). `read` (and its legacy alias `spec`) binds are **non-acquiring**: they never
-block, never take a lease, and the gate blocks MUTATING file-tool writes from a
-READ-bound session before any lease call (additive paths stay writable). The lease
-record is `{context, release, session_id, mode, pid, acquired_at, heartbeat, ttl}`,
-where `pid` is the **long-lived harness pid** (hook payload pid when present, else the
-hook's parent process); liveness is **TTL + pid veto**: stale means
-`now − heartbeat > LEASE_TTL_SECONDS` (`= 120`, OQ-1 operator decision 2026-06-06)
-**and** the recorded holder pid is not demonstrably alive. The heartbeat renews on every
-PostToolUse hook firing (match-all on both harnesses; harness-native session id from the
-hook stdin payload), so a holder running long reads/tests stays live — and a single tool
-call outliving the TTL is still protected by the pid veto.
+**NO-LOCKS DOCTRINE (v0.1.76).** Binds never acquire anything blocking. Every MUTATING
+write upserts an **advisory presence record** for the session at
+`.dadaia/states/presence/<ctx>/<session_id>.json` — this never fails or blocks (presence
+I/O errors are swallowed and the write proceeds). `read` (and its legacy alias `spec`)
+binds are **self-scoped only**: a READ-bound session blocks its **own** MUTATING writes
+as opt-in self-protection, and a foreign session's bind can never change your mode
+(additive paths always stay writable). The presence record is
+`{session_id, runtime, pid, started_at, last_seen_at}`, where `pid` is the **long-lived
+harness pid** (hook payload pid when present, else the hook's parent process). The
+heartbeat (`last_seen_at`) renews on every PostToolUse hook firing (match-all on both
+harnesses; harness-native session id from the hook stdin payload). Presence with a
+`last_seen_at` older than `LEASE_TTL_SECONDS` (`= 120`, tunable retained with renamed
+"presence TTL" semantics) is stale and GC'd by doctor (PRESENCE-GC) or opportunistically
+on upsert.
 
-### Liveness & recovery (reclaim-iff-stale / yield-iff-live-foreign)
+### Liveness & advisory warnings (races accepted, never blocked)
 
 The gate never freezes the flow, and the operator is **never** asked to rebind,
-relaunch, or steal a lock. Behaviour on acquire:
+relaunch, or steal anything — there is nothing to steal. Behaviour on write:
 
-- **Your own session (even relaunched)** → RENEW. Stable identity via
-  `.dadaia/sessions/runtime/<ctx>.ptr` means a relaunched/continuing session resolves to
-  the same identity, so you never block yourself.
-- **Stale or absent lease** (no heartbeat within ~120s **and** holder pid not alive) →
-  reclaimed automatically on the next write (fail-open). A finished or dead holder frees
-  the lease by itself. A holder whose pid is still running is **never** stolen, however
-  old its heartbeat.
-- **Live foreign lease** (a genuinely different concurrent session) → the gate **yields**:
-  this session does not mutate (informative `LockHeldError`, additive writes still allowed),
-  and acquires automatically once the other session goes idle / expires. This is the
-  exactly-one-mutating-session invariant (§8) — not a freeze, and it requires no manual step.
+- **Your own session (even relaunched)** → presence record is renewed. Stable identity
+  via `.dadaia/sessions/runtime/<ctx>.ptr` means a relaunched/continuing session
+  resolves to the same identity.
+- **Stale or absent presence for other sessions** → GC'd; no advisory warning.
+- **Live foreign presence** (a genuinely different concurrent session) → the write is
+  **allowed**, and the gate surfaces one throttled advisory warning naming the other
+  session (session id, runtime, heartbeat age). Both sessions' MUTATING writes proceed
+  concurrently — this is the doctrine trade-off: a rare, surfaced race is preferred over
+  a blocked user.
 
-There is no per-session "implementation lock" vs "review lock" pair — v0.1.6 collapsed
-that into one release lease keyed to the coordinator session. `dadaia lock steal` exists
-only as an administrative/observability escape; it is **never** part of the normal flow,
-because reclaim-iff-stale already frees an abandoned lease without it.
+There is no per-session "implementation lock" vs "review lock" pair, no exclusivity
+invariant, and no lease to steal. `dadaia lock steal` is **deleted** — there is nothing
+left for it to do.
 
 ### Supporting commands
 
@@ -207,4 +205,4 @@ remove that repo from disk.
 |---|---|---|
 | INV-4 | `alive` context has repo on disk at `repos/<slug>/` | No (run `dadaia context alive <name>`) |
 | INV-5 | `dead` context does not have repo on disk | Yes |
-| LEASE | The per-context release lease record is consistent with context state; a stale lease (heartbeat aged past ~120s AND holder pid not alive — a running pid vetoes reclaim) auto-reclaims, no manual action. `dadaia lock steal` exists only as an admin/observability escape — never a routine unblock step | Auto (reclaim-iff-stale) |
+| PRESENCE-GC | Stale presence records (heartbeat aged past ~120s) are garbage-collected; presence is advisory-only and never blocks a write | Auto (GC on doctor + opportunistic sweep) |

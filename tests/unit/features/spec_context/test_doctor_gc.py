@@ -307,7 +307,7 @@ def test_renewed_bind_survives_gc_and_gate_still_resolves_read(tmp_path: Path) -
         f"Renewed bind must NOT be graveyard-collected: {actions}"
     )
     # The gate still resolves READ for this sid via the session record.
-    assert _resolve_mode(ws, sess_id, "myctx", None) == "READ"
+    assert _resolve_mode(ws, sess_id, "myctx") == "READ"
 
 
 def test_stale_unrenewed_bind_is_collected(tmp_path: Path) -> None:

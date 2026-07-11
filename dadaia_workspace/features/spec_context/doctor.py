@@ -15,7 +15,7 @@ from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.features.spec_context import lease, session_identity
+from dadaia_workspace.features.spec_context import lease, presence, session_identity
 from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
     _audit_log_path,
     context_lock,
@@ -426,6 +426,37 @@ class DoctorService:
             )
         return issues
 
+    # ------------------------------------------------------------------
+    # PRESENCE-GC: stale/corrupt advisory presence-record GC (v0.1.76 T-4, FR7)
+    # ------------------------------------------------------------------
+
+    def _check_presence_gc(self) -> list[DoctorIssue]:
+        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7).
+
+        ``features/spec_context/presence.py`` (``.dadaia/states/presence/<ctx>/<sid>.json``)
+        is the ONLY concurrency-signal surface post-NO-LOCKS-DOCTRINE (FR2) — the old
+        lease-heartbeat GC (``LOCK-GC`` above) is now a diagnostic-only sibling over
+        whatever residual ``.lock.json`` a pre-doctrine install may still carry. Presence
+        is advisory-only (never a security concern), so every reported record here is
+        always ``fixable``: ``--fix`` sweeps them via ``presence.sweep()``, the same
+        predicate ``presence.stale_records()`` reports (single source of truth — check()
+        and --fix can never disagree).
+        """
+        issues: list[DoctorIssue] = []
+        for ref in presence.stale_records(self._workspace_root):
+            issues.append(
+                DoctorIssue(
+                    code="PRESENCE-GC",
+                    description=(
+                        f"[stale-presence] context '{ref.context}': advisory presence record "
+                        f"for session '{ref.session_id}' is stale or corrupt — safe to reclaim. "
+                        "Run 'dadaia doctor --fix' to garbage-collect it."
+                    ),
+                    fixable=True,
+                )
+            )
+        return issues
+
     def _check_venv_health(self) -> list[DoctorIssue]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
@@ -652,6 +683,9 @@ class DoctorService:
         # ---- Stale-lease GC (probe-aware reclaim; T-011-02) ----
         issues.extend(self._check_lock_gc())
 
+        # ---- Stale/corrupt advisory presence-record GC (v0.1.76 T-4, FR7) ----
+        issues.extend(self._check_presence_gc())
+
         # ---- Venv health (FR-W3-02, T-014-13) ----
         issues.extend(self._check_venv_health())
 
@@ -743,6 +777,12 @@ class DoctorService:
                     actions.append(
                         f"{code_label}: deleted lease record '{lock_file.name}' ({reason_label})"
                     )
+
+        # PRESENCE-GC (v0.1.76 T-4, FR7): sweep stale/corrupt advisory presence records.
+        # presence.sweep() deletes exactly what presence.stale_records() (check()) reports —
+        # single source of truth, so --fix can never disagree with what check() flagged.
+        for sess_id in presence.sweep(self._workspace_root):
+            actions.append(f"PRESENCE-GC: deleted stale presence record for session '{sess_id}'")
 
         # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/
         sessions_dir = self._sessions_dir()

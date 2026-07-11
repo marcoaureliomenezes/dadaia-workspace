@@ -4,7 +4,7 @@ v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDocto
 coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to six
 single-responsibility validator siblings plus two shared leaf modules:
 
-  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary`` / ``PidProbe``
+  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
   * ``doctor_common``    — cross-validator pure helpers (``read_active_md`` + release-dir discovery)
   * ``doctor_structural``   — TREE-1..7 + TREE-5M spec-tree invariants; ``fix_tree4``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
@@ -12,15 +12,15 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_release``      — ACTIVE.md, release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— archive closures, orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — backlog schema, bug status/JSONL, consumed-backlog drift
-  * ``doctor_coherence``    — constitution, orchestration registry, lease/session coherence
-                              (holds the ``spec_context.{lease, session_identity}`` import)
+  * ``doctor_coherence``    — constitution, orchestration registry, pattern-version coherence
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
 original interleaved sequence (families interleave — coherence→memory→release→…→governance→
 closure→coherence), and ``fix()`` dispatches by issue code. It imports NEITHER ``spec_context``
-NOR ``infrastructure.subprocess_runner`` — the ``pid_probe`` seam is typed against the
-``doctor_types.PidProbe`` leaf, so the coordinator holds no ``spec_context`` cross-feature edge
-(R-1 cap invariant). Behavior is byte-identical to the pre-split module (golden lock
+NOR ``infrastructure.subprocess_runner`` (R-1 cap invariant): v0.1.76 T-4 retired the former
+``pid_probe``/``workspace_state_dir`` seam along with SPEC-DOC-029 (see ``doctor_coherence.py``),
+so the coordinator holds no ``spec_context`` cross-feature edge at all — not even via a typed
+leaf seam. Behavior is byte-identical to the pre-split module (golden lock
 ``tests/unit/features/specs/test_doctor_golden.py``).
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
@@ -31,7 +31,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
-from dadaia_workspace.features.specs import doctor_types
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -66,33 +65,12 @@ class SpecsDoctor:
         templates_dir: Path | None = None,
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
-        workspace_state_dir: Path | None = None,
-        pid_probe: doctor_types.PidProbe | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
         # resolves path-like references against it. None → that check is a no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
-        # workspace_state_dir: the workspace-level ``.dadaia/`` directory holding
-        # ``states/ctx_locks/*.lock`` + ``sessions/*.json``. The doctor is otherwise a
-        # pure module scoped to specs_dir/public_dir (both under the repo); lease/session
-        # records live at the WORKSPACE root, outside the specs tree, so the lease↔session
-        # coherence backstop (SPEC-DOC-029) can only run when a caller injects this path.
-        # None (the default) → the backstop is a documented no-op.
-        self.workspace_state_dir: Path | None = (
-            Path(workspace_state_dir) if workspace_state_dir is not None else None
-        )
-        # pid_probe: the PID-liveness seam for the SPEC-DOC-029 three-state triage
-        # (T-011-03). Composition-root-wired (like ``workspace_state_dir``): the CLI
-        # ``dadaia specs doctor`` builds it from the hook layer's ``OsProcessProbe`` and
-        # injects it here. The coordinator types it against the ``doctor_types.PidProbe``
-        # leaf (identical to ``spec_context.lease.PidProbe``) so it holds NO ``spec_context``
-        # import edge; the coherence validator is the sole holder of that edge (R-1).
-        # ``None`` (the default / a pure-module construction) ⇒ TTL-only liveness:
-        # a TTL-expired record is treated as a dead holder (no veto), and a legacy
-        # pid-less record likewise degrades to the TTL verdict.
-        self.pid_probe: doctor_types.PidProbe | None = pid_probe
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)
@@ -128,8 +106,6 @@ class SpecsDoctor:
             self.specs_dir,
             self.public_dir,
             self.repo_root,
-            self.workspace_state_dir,
-            self.pid_probe,
         )
 
     def check(self) -> list[SpecsDoctorIssue]:
@@ -173,7 +149,7 @@ class SpecsDoctor:
         issues.extend(self._release.check_unique_release_ids())  # SPEC-DOC-026
         issues.extend(self._release.check_release_naming_canon())  # SPEC-DOC-027
         issues.extend(self._coherence.check_constitution_file_refs())  # SPEC-DOC-028
-        issues.extend(self._coherence.check_lease_session_coherence())  # SPEC-DOC-029
+        # SPEC-DOC-029 RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE) — see doctor_coherence.py.
         issues.extend(self._closure_audit.check_audits_naming_canon())  # SPEC-DOC-030
         # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
         issues.extend(self._governance.check_consumed_backlog_disposition())  # SPEC-DOC-031

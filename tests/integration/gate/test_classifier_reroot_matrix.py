@@ -1,17 +1,18 @@
 """T-010-03 / WS-R1 (AC-R1-01/02): full-pipeline gate matrix + lease-theft incident regression.
 
 Where ``tests/unit/features/spec_context/test_gate_policy.py`` asserts *classification* in
-isolation, this suite drives the **whole gate decision pipeline** (``gate_policy.evaluate``,
-which classifies then acquires/blocks the per-context lease) for in-repo paths across both
-the default and a non-default slug. It proves three things the audit (CONF-1) demanded:
+isolation, this suite drives the **whole gate decision pipeline** (``gate_policy.evaluate``)
+for in-repo paths across both the default and a non-default slug. It proves three things the
+audit (CONF-1) demanded:
 
-1. In-repo ADDITIVE writes take **no** lease (the lease record stays absent) — the
-   lease-theft surface is closed (FR-R1-01).
+1. In-repo ADDITIVE writes take **no** presence record (never touch the concurrency-signal
+   surface) — the lease-theft-shaped surface stays closed (FR-R1-01 successor).
 2. The MEMORY phase rule and FROZEN block at ``gate_policy.py:90-93,137-143`` — previously
    dead for every real (in-repo) Spec Context — now execute for in-repo paths (FR-R1-02/03).
-3. The lease-theft incident (2026-06-10): a foreign session's in-repo ``specs/bugs`` write
-   while a holder lease is live and TTL-stale returns ALLOW **and leaves the lock record's
-   holder untouched** (FR-R1-08, asserted on file content, not the return value).
+3. v0.1.76 NO-LOCKS DOCTRINE: the 2026-06-10 lease-theft incident's PRECONDITION (a live
+   foreign holder) can no longer even produce a BLOCK — every in-repo MUTATING write ALLOWs
+   regardless of any lease-record residue, since ``gate_policy.evaluate`` no longer reads
+   ``ctx_locks/`` at all (FR-R1-08 successor).
 """
 
 from __future__ import annotations
@@ -74,9 +75,9 @@ def _evaluate(
     )
 
 
-# (row_id, ctx_rel, phase, expected_decision, lease_must_stay_absent, message_contains)
+# (row_id, ctx_rel, phase, expected_decision, presence_must_stay_absent, message_contains)
 _PIPELINE_ROWS: tuple[tuple[str, str, str, Decision, bool, tuple[str, ...]], ...] = (
-    # ADDITIVE in-repo — ALLOW, and (the incident surface) no lease is ever written.
+    # ADDITIVE in-repo — ALLOW, and (the incident surface) no presence record is written.
     ("additive_bugs_no_lease", "specs/bugs/x.md", "SPEC", Decision.ALLOW, True, ()),
     ("additive_audits_no_lease", "specs/audits/d/a.md", "SPEC", Decision.ALLOW, True, ()),
     ("additive_backlog_no_lease", "specs/backlog/x.md", "SPEC", Decision.ALLOW, True, ()),
@@ -101,7 +102,7 @@ _PIPELINE_ROWS: tuple[tuple[str, str, str, Decision, bool, tuple[str, ...]], ...
         True,
         ("RULE B", "frozen"),
     ),
-    # MUTATING in-repo — acquires the lease (free lease ⇒ ALLOW); record is written.
+    # MUTATING in-repo — ALLOWs (v0.1.76 doctrine) and upserts an advisory presence record.
     (
         "mutating_release_acquires",
         "specs/releases/v0.1.10/SPEC.md",
@@ -119,7 +120,7 @@ _PIPELINE_ROWS: tuple[tuple[str, str, str, Decision, bool, tuple[str, ...]], ...
 def test_full_pipeline_in_repo_matrix(
     row: tuple[str, str, str, Decision, bool, tuple[str, ...]], slug: str, tmp_path: Path
 ) -> None:
-    row_id, ctx_rel, phase, expected, lease_absent, message_contains = row
+    row_id, ctx_rel, phase, expected, presence_absent, message_contains = row
     rel_path = f"repos/{slug}/{ctx_rel}"
     decision, message = _evaluate(tmp_path, slug, rel_path, phase=phase)
 
@@ -129,13 +130,16 @@ def test_full_pipeline_in_repo_matrix(
     for fragment in message_contains:
         assert fragment in message, f"{row_id}: expected {fragment!r} in message {message!r}"
 
-    record_present = lease._record_path(tmp_path, slug).exists()
-    if lease_absent:
-        assert not record_present, (
-            f"{row_id}: a non-MUTATING in-repo write must take NO lease (lease-theft guard)"
+    presence_path = tmp_path / ".dadaia" / "states" / "presence" / slug / "sess.json"
+    if presence_absent:
+        assert not presence_path.exists(), (
+            f"{row_id}: a non-MUTATING in-repo write must touch NO presence record "
+            "(lease-theft-shaped surface guard)"
         )
     else:
-        assert record_present, f"{row_id}: MUTATING in-repo write must acquire the lease"
+        assert presence_path.exists(), (
+            f"{row_id}: MUTATING in-repo write must upsert an advisory presence record"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -144,30 +148,33 @@ def test_full_pipeline_in_repo_matrix(
 # ---------------------------------------------------------------------------
 
 
-def test_lease_theft_incident_two_phase_additive_free_mutating_blocks(tmp_path: Path) -> None:
+def test_lease_theft_incident_two_phase_additive_free_mutating_allows(tmp_path: Path) -> None:
     """The 2026-06-10 incident, reproduced as a regression, in two phases.
 
-    Phase 1 (ADDITIVE never steals): Session A holds the lease on context
-    ``dadaia-workspace``. The clock advances 130 s (> 120 s TTL) with no Write/Edit from
-    A (A is inside a long Bash/pytest call, the exact starvation in the incident).
-    Session B then does an **in-repo** ``specs/bugs`` write — the very write the
-    constitution promises is ADDITIVE and lock-free. Pre-WS-R1 this classified MUTATING
-    (because ``repos/`` won first) and B's evaluate auto-TAKEOVER'd A's TTL-stale lease —
-    stealing it mid-CLOSURE. Post-re-root it classifies ADDITIVE: B is ALLOWed with **no
-    lease interaction at all**, and the lock record still names A.
+    Phase 1 (ADDITIVE never steals): Session A holds a (now-inert) lease-record residue
+    on context ``dadaia-workspace``. The clock advances 130 s (> 120 s TTL) with no
+    Write/Edit from A (A is inside a long Bash/pytest call, the exact starvation in the
+    incident). Session B then does an **in-repo** ``specs/bugs`` write — the very write
+    the constitution promises is ADDITIVE and lock-free. Pre-WS-R1 this classified
+    MUTATING (because ``repos/`` won first) and B's evaluate auto-TAKEOVER'd A's
+    TTL-stale lease — stealing it mid-CLOSURE. Post-re-root it classifies ADDITIVE: B is
+    ALLOWed with **no lease interaction at all**, and the lock record still names A.
 
-    Phase 2 (MUTATING counterpart guard): a foreign *MUTATING* write does NOT silently
-    steal a live holder. With WS-R1, B's in-repo MUTATING write classifies MUTATING and
-    goes through the lease. Within TTL (holder still live by write-recency), the foreign
-    session is BLOCKed with the no-rebind yield message — it does not take over.
-    (TTL-stale + dead-pid TAKEOVER is the province of WS-R2 / T-010-05; here the holder
-    is fresh.)
+    Phase 2 (v0.1.76 NO-LOCKS DOCTRINE successor): a foreign *MUTATING* write against a
+    context with a live holder lease-record residue no longer BLOCKs at all — the
+    lease-theft incident's precondition (a live foreign holder) is now doctrinally
+    IRRELEVANT to the gate's verdict, since ``gate_policy.evaluate`` never reads
+    ``ctx_locks/``. The write ALLOWs and the (inert) lease record stays byte-for-byte
+    untouched.
     """
     slug = "dadaia-workspace"
     holder = "session-A-holder"
     foreign = "session-B-foreign"
 
-    # Phase 1 — Session A acquires the lease (in-repo MUTATING write at T0).
+    # Phase 1 — Session A's in-repo MUTATING write ALLOWs (v0.1.76: evaluate() no
+    # longer acquires a lease itself). A pre-existing lease-record residue is seeded
+    # directly to reproduce the incident's exact topology (a live-looking holder record
+    # on disk, e.g. a leftover from a prior release's lease machinery).
     a_decision, _ = evaluate(
         tmp_path,
         f"repos/{slug}/specs/releases/v0.1.10/TASKS.md",
@@ -179,6 +186,7 @@ def test_lease_theft_incident_two_phase_additive_free_mutating_blocks(tmp_path: 
         clock=fixed(BASE),
     )
     assert a_decision == Decision.ALLOW
+    _seed_lease(tmp_path, slug, holder, BASE)
     record_before = lease.read_record(tmp_path, slug)
     assert record_before is not None and record_before["session_id"] == holder
 
@@ -212,7 +220,8 @@ def test_lease_theft_incident_two_phase_additive_free_mutating_blocks(tmp_path: 
         "the holder's lease record must be byte-for-byte untouched by the foreign write"
     )
 
-    # Phase 2 — a fresh live holder's lease is never stolen by a foreign MUTATING write.
+    # Phase 2 — v0.1.76: a fresh live holder's lease-record residue is doctrinally inert;
+    # a foreign MUTATING write ALLOWs (never BLOCKs) and the residue stays untouched.
     slug2 = "dadaia-workspace-phase2"
     _seed_lease(tmp_path, slug2, holder, BASE)  # fresh heartbeat, live by recency
 
@@ -226,8 +235,11 @@ def test_lease_theft_incident_two_phase_additive_free_mutating_blocks(tmp_path: 
         mode="IMPLEMENTATION",
         clock=fixed(BASE + timedelta(seconds=30)),
     )
-    assert decision == Decision.BLOCK
+    assert decision == Decision.ALLOW
     record = lease.read_record(tmp_path, slug2)
-    assert record is not None and record["session_id"] == holder
+    assert record is not None and record["session_id"] == holder, (
+        "the inert lease-record residue must stay byte-for-byte untouched by the ALLOWed "
+        "foreign write — evaluate() never reads or writes ctx_locks/"
+    )
     for forbidden in ("bind --mode write", "relaunch", "lock steal"):
         assert forbidden not in message

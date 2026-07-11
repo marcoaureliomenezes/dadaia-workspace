@@ -1,14 +1,20 @@
-"""Coherence validator (v0.1.55 FR1): constitution, orchestration registry, lease/session.
+"""Coherence validator (v0.1.55 FR1): constitution, orchestration registry.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the cross-cutting coherence
 checks: constitution presence (SPEC-DOC-001), the D-OC-1 orchestration-registry coherence,
-pattern-version staleness (SPECS-VERSION), constitution file-refs (SPEC-DOC-028), the lease↔session
-coherence backstop (SPEC-DOC-029), and the constitution runtime-enum guard (SPEC-DOC-037).
+pattern-version staleness (SPECS-VERSION), constitution file-refs (SPEC-DOC-028), and the
+constitution runtime-enum guard (SPEC-DOC-037).
 
-This module HOLDS the single ``spec_context.{lease, session_identity}`` cross-feature import edge
-(moved off the coordinator) — the coordinator's ``pid_probe`` seam is typed against the
-``doctor_types.PidProbe`` leaf instead, so the coordinator holds NO ``spec_context`` edge (R-1 cap
-invariant). Leaf-only otherwise: imports the shared leaves + core, never a sibling validator.
+v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): the former lease<->session coherence backstop
+(SPEC-DOC-029) is RETIRED. It diagnosed a residual ``<ctx>.lock.json`` holder against the
+incumbent pointer / session record for possible "out-of-band forgery" — a diagnosis that
+depended on the lease's acquisition/CAS authority actually meaning something. T-3 deleted
+that authority (``acquire``/``steal``/the by-session index); a residual lock record is now
+legacy/diagnostic noise, not a security-relevant divergence, and its stale-reclaim WARN
+rung exactly duplicated ``LOCK-GC`` (``features/spec_context/doctor.py``). Retiring the
+check (rather than leaving a no-op standing) also retires its sole reason to hold a
+``spec_context`` cross-feature import edge — this module is leaf-only now, importing only
+the shared leaves + core (R-1 cap invariant preserved without needing a seam at all).
 """
 
 from __future__ import annotations
@@ -16,12 +22,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import lease, session_identity
-from dadaia_workspace.features.specs.doctor_types import PidProbe, Severity, SpecsDoctorIssue
-
-#: SPEC-DOC-029: a ``<ctx>.lock.json`` filename component must be a real context name
-#: (same path-traversal allowlist lease/session_identity enforce — CWE-22/CWE-59).
-_CTX_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
+from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # D-OC-1: orchestration registry coherence (orchestration-consolidation-v1).
 #
@@ -66,12 +67,6 @@ _CONSTITUTION_REF_RE = re.compile(
 )
 
 
-def _validate_ctx_name(ctx: str) -> str:
-    if not _CTX_NAME_RE.fullmatch(ctx):
-        raise ValueError(f"invalid context name {ctx!r}")
-    return ctx
-
-
 def _split_tier_blocks(text: str) -> tuple[str, str]:
     """Split project-manager.md into its Tier-1 and Tier-2 table sections.
 
@@ -110,21 +105,17 @@ def _extract_playbook_headings(skill_text: str) -> dict[str, bool]:
 
 
 class CoherenceValidator:
-    """Constitution, orchestration-registry, pattern-version, and lease/session coherence."""
+    """Constitution, orchestration-registry, and pattern-version coherence."""
 
     def __init__(
         self,
         specs_dir: Path,
         public_dir: Path | None = None,
         repo_root: Path | None = None,
-        workspace_state_dir: Path | None = None,
-        pid_probe: PidProbe | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
         self.repo_root = repo_root
-        self.workspace_state_dir = workspace_state_dir
-        self.pid_probe = pid_probe
 
     def check_constitution(self) -> list[SpecsDoctorIssue]:
         path = self.specs_dir / "constitution.md"
@@ -321,110 +312,6 @@ class CoherenceValidator:
                     path=str(constitution),
                 )
             )
-        return issues
-
-    def check_lease_session_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-029 (D-2 backstop) — three-state triage (T-011-03, bug B3).
-
-        The lease-record holder, the incumbent pointer, and the session record may never
-        name three different sessions for one *live* context. But a TTL-expired lock left
-        by a dead session is **not** forgery — it is just a stale lease that was never
-        garbage-collected. Conflating the two produced the
-        ``doctor-stale-lease-misdiagnosed-as-forgery`` bug (a ~36 h-old, ``ttl: 120`` record
-        from a dead session alleged as "possible out-of-band lock/ptr forgery"). The triage
-        distinguishes three states per ``<ctx>.lock.json`` record:
-
-        * **(a) stale lease, holder dead/unprobeable** — the record is TTL-expired and the
-          holder pid is dead (per the injected ``pid_probe``) OR the record predates the
-          ``pid`` field (legacy, unprobeable ⇒ TTL verdict). ⇒ **WARN**: "stale lease from
-          a dead session — safe to reclaim", naming the remediation commands
-          (``dadaia doctor --fix`` / ``dadaia lock steal <ctx>``). No forgery wording; the
-          overall doctor exit stays 0 when no other ERROR exists.
-        * **(b) live holder, genuine incoherence** — the record is live (TTL-fresh, or
-          TTL-expired but its pid is demonstrably alive per ``pid_probe``) AND the three
-          identity sources genuinely diverge. ⇒ **ERROR** with the out-of-band forgery
-          wording. This is the *only* state where forgery language is emitted.
-        * **(c) coherent** — a live, coherent lease ⇒ silent.
-
-        The doctor is a pure module scoped to specs_dir/public_dir; the lock and session
-        stores live at the *workspace* root (``.dadaia/states/ctx_locks/<ctx>.lock.json``
-        + ``.dadaia/sessions/<id>.json`` + ``.dadaia/sessions/runtime/<ctx>.ptr``), outside
-        the specs tree. This backstop only runs when a caller injects ``workspace_state_dir``;
-        with the default (``None``) it is a documented no-op (see ``__init__``).
-
-        Liveness is the canonical lease verdict (:func:`lease.is_held`, which delegates to
-        ``core.lock_liveness.is_stale``): TTL is the floor, the ``pid_probe`` is the veto. The
-        probe is composition-root-wired via ``self.pid_probe`` (never an infrastructure
-        import inside ``features``). The three-source divergence verdict for live holders is
-        delegated to :func:`session_identity.coherence` — the single designed coherence API
-        (FR-R3-02) — so there is no duplicate copy of that logic here.
-        """
-        state_dir = self.workspace_state_dir
-        if state_dir is None:
-            return []  # no-op: lease/session stores are unreachable from a pure specs_dir
-        locks_dir = state_dir / "states" / "ctx_locks"
-        if not locks_dir.is_dir():
-            return []
-        # session_identity / lease take the WORKSPACE root and append ``.dadaia/...``
-        # internally; workspace_state_dir is that ``.dadaia`` directory, so its parent is
-        # the workspace root.
-        workspace_root = state_dir.parent
-        issues: list[SpecsDoctorIssue] = []
-        for record_file in sorted(locks_dir.glob("*.lock.json")):
-            ctx = record_file.name[: -len(".lock.json")]
-            try:
-                _validate_ctx_name(ctx)
-            except ValueError:
-                continue  # not a real context-keyed record name
-            record = lease.read_record(workspace_root, ctx)
-            # State (a): a stale lease whose holder is dead/unprobeable. ``lease.is_held``
-            # is True iff the record is live (TTL-fresh, or TTL-expired with an alive pid
-            # under ``pid_probe``); not-held ⇒ reclaimable dead/legacy record.
-            holder_is_live = lease.is_held(workspace_root, ctx, pid_probe=self.pid_probe)
-            if not holder_is_live:
-                holder = record.get("session_id") if isinstance(record, dict) else None
-                holder_desc = repr(str(holder)) if holder else "an ended session"
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-029",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"Context {ctx!r}: stale lease from a dead session "
-                            f"(holder {holder_desc}, heartbeat past TTL) — safe to reclaim. "
-                            f"Run 'dadaia doctor --fix' to garbage-collect it, or "
-                            f"'dadaia lock steal {ctx}' to take it over (SPEC-DOC-029, "
-                            "WARNING)."
-                        ),
-                        path=str(record_file),
-                    )
-                )
-                continue
-            # State (b)/(c): the holder is LIVE. Only now is a three-source divergence a
-            # genuine incoherence worth flagging as possible forgery. Holder-
-            # confirmation (v0.1.50 FR2): a live holder whose by-session index entry
-            # names this ctx (same-CAS acquisition evidence) is the TRUE holder — a
-            # drifted incumbent .ptr is then drift, never a forgery ERROR.
-            holder = record.get("session_id") if isinstance(record, dict) else None
-            lock_holder = str(holder) if holder else None
-            holder_confirmed = bool(
-                lock_holder and lease.session_holds(workspace_root, ctx, lock_holder)
-            )
-            message = session_identity.coherence(
-                workspace_root, ctx, lock_holder=lock_holder, holder_confirmed=holder_confirmed
-            )
-            if message is not None:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-029",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"{message} — live lease↔session incoherence (possible "
-                            "out-of-band lock/ptr forgery; D-2 backstop, SPEC-DOC-029)."
-                        ),
-                        path=str(record_file),
-                    )
-                )
-            # else state (c): live + coherent ⇒ silent.
         return issues
 
     def check_constitution_no_runtime_enum(self) -> list[SpecsDoctorIssue]:

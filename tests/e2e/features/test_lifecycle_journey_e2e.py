@@ -4,13 +4,13 @@ Chains what the isolated probes prove separately, as production composes it:
 
     context create → context alive (real clone) → context bind (real subprocess,
     own minted sid) → ctx_inject (second subprocess, DIFFERENT sid, attributed via
-    the bind-epoch ancestry marker) → pre_gate MUTATING write acquires the lease →
-    a foreign-sid MUTATING attempt is blocked (no-steal).
+    the bind-epoch ancestry marker) → pre_gate MUTATING write upserts advisory
+    presence → a foreign-sid MUTATING attempt on the SAME context also ALLOWs
+    (v0.1.76 NO-LOCKS DOCTRINE: races are accepted and surfaced, never blocked).
 
-`tests/e2e/test_two_actor_lease.py` proves lease no-steal in isolation and
 `tests/e2e/features/test_ctx_inject_bind_boundary.py` proves the bind→inject cross-sid
-boundary in isolation; NEITHER chains the composition, so a regression in how bind
-attribution feeds injection feeds the gate is invisible to them. This journey asserts
+boundary in isolation; it does NOT chain the composition, so a regression in how bind
+attribution feeds injection feeds the gate is invisible to it. This journey asserts
 the COMPOSITION, not new mechanics: if a step fails here while the isolated probes
 stay green, that composition seam is the suspect (register a bug — test-only release,
 never an inline fix).
@@ -172,25 +172,31 @@ def test_master_lifecycle_journey_create_alive_bind_inject_gate(tmp_path: Path) 
     assert "JOURNEY-MARKER" in injected
     assert "end memory bootstrap" in injected
 
-    # 6) gate — a MUTATING write by the journey session ALLOWs and acquires the lease.
+    # 6) gate — a MUTATING write by the journey session ALLOWs and upserts advisory
+    #    presence (v0.1.76 NO-LOCKS DOCTRINE: the gate no longer acquires a lease).
     target = workspace / "repos" / _JOURNEY_CTX / "src" / "app.py"
     allowed = _gate(workspace, _GATE_SID, target)
     assert allowed.returncode == 0, allowed.stderr
     assert allowed.block_envelope() is None, allowed.stdout
 
-    lock_path = workspace / ".dadaia" / "states" / "ctx_locks" / f"{_JOURNEY_CTX}.lock.json"
-    assert lock_path.is_file(), "the MUTATING allow must have acquired the lease"
-    record = json.loads(lock_path.read_text(encoding="utf-8"))
-    assert record["context"] == _JOURNEY_CTX
+    presence_path = (
+        workspace / ".dadaia" / "states" / "presence" / _JOURNEY_CTX / f"{_GATE_SID}.json"
+    )
+    assert presence_path.is_file(), "the MUTATING allow must have upserted a presence record"
+    record = json.loads(presence_path.read_text(encoding="utf-8"))
     assert record["session_id"] == _GATE_SID
 
-    # 7) no-steal — a foreign sid's MUTATING attempt against the live holder is blocked
-    #    and the holder's record survives untouched.
-    blocked = _gate(workspace, _FOREIGN_SID, target)
-    envelope = blocked.block_envelope()
-    assert envelope is not None, (
-        f"foreign MUTATING attempt must be blocked; stdout={blocked.stdout!r} "
-        f"stderr={blocked.stderr!r}"
+    # 7) v0.1.76 doctrine — a foreign sid's MUTATING attempt against the same context ALSO
+    #    ALLOWs (never blocked); both sessions' presence records now coexist.
+    allowed_foreign = _gate(workspace, _FOREIGN_SID, target)
+    assert allowed_foreign.returncode == 0, allowed_foreign.stderr
+    assert allowed_foreign.block_envelope() is None, (
+        f"foreign MUTATING attempt must ALLOW under the no-locks doctrine; "
+        f"stdout={allowed_foreign.stdout!r} stderr={allowed_foreign.stderr!r}"
     )
-    surviving = json.loads(lock_path.read_text(encoding="utf-8"))
-    assert surviving["session_id"] == _GATE_SID, "no-steal: holder record must survive"
+    surviving = json.loads(presence_path.read_text(encoding="utf-8"))
+    assert surviving["session_id"] == _GATE_SID, "the holder's own presence record survives"
+    foreign_presence = (
+        workspace / ".dadaia" / "states" / "presence" / _JOURNEY_CTX / f"{_FOREIGN_SID}.json"
+    )
+    assert foreign_presence.is_file(), "the foreign session's own presence record is upserted too"

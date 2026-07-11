@@ -1,9 +1,9 @@
 ---
 name: qa-engineer
-description: QA + E2E specialist + pre-commit checkpoint. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only — no lease. Pairs with software-engineer to define E2E criteria before implementation.
+description: QA + E2E specialist + pre-commit checkpoint. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only. Pairs with software-engineer to define E2E criteria before implementation.
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lease — concurrent"
+lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
 gate_role: checkpoint-pre-commit
 tools:
   - Read
@@ -68,10 +68,11 @@ validate deploys. You never write application code, unit tests, or integration t
 
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
 **pre-commit checkpoint**: your `APPROVE` verdict is the precondition for a commit to the feature
-branch. You hold **no lease** and run concurrently — your writes (E2E tests + reports) are
-ADDITIVE and never contend for the release lease. You do not hold or compete for the lease;
-you vote. A `REQUEST_CHANGES` verdict keeps the task `[-]` and re-opens it for the
-implementer.
+branch (this is a quality-review checkpoint, distinct from the pre-commit git chokepoint's
+own presence detection, which is WARN-only under the NO-LOCKS DOCTRINE, v0.1.76). There is
+no lock to hold — you run concurrently with everything else; your writes (E2E tests +
+reports) are ADDITIVE. You never contend for anything; you vote. A `REQUEST_CHANGES`
+verdict keeps the task `[-]` and re-opens it for the implementer.
 
 ---
 

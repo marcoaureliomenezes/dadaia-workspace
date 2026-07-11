@@ -174,15 +174,17 @@ def test_allow_path_variants_flow(tmp_path: Path, variant: str) -> None:
         _stop_holder(holder_proc, stop)
 
 
-def test_live_foreign_lease_blocks_non_holder_commit(tmp_path: Path) -> None:
+def test_live_foreign_lease_allows_non_holder_commit_with_advisory(tmp_path: Path) -> None:
+    """v0.1.76 FR3 re-baseline: a live foreign lease record no longer blocks the commit —
+    it ALLOWS with an advisory WARN naming the other session (NO-LOCKS DOCTRINE)."""
     workspace = tmp_path
     repo = _init_repo(workspace, _SLUG)
     holder_proc, holder_pid, stop = _start_holder(tmp_path)
     try:
         _write_lease(workspace, _SLUG, sid="foreign-holder", pid=holder_pid)
         # Committer is a different session (no env sid, not in the holder's ancestry).
-        result = _commit(repo, _hook_env(workspace, session_id="committer-B"), "foreign-blocked")
-        assert result.returncode != 0, result.stdout + result.stderr
+        result = _commit(repo, _hook_env(workspace, session_id="committer-B"), "foreign-allowed")
+        assert result.returncode == 0, result.stdout + result.stderr
         out = result.stdout + result.stderr
         assert "foreign-holder" in out, out
         for forbidden in ("rebind", "relaunch", "lock steal"):

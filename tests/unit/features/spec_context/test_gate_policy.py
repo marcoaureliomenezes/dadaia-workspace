@@ -246,3 +246,75 @@ def test_evaluate_archive_block_and_additive_allow(
     assert decision == expected_decision
     if message_contains is not None:
         assert message_contains in message.lower()
+
+
+# ---------------------------------------------------------------------------
+# v0.1.76 T-4 (FR7): PRESENCE_UPSERT/PRESENCE_WARN audit-log events.
+# ---------------------------------------------------------------------------
+
+
+def _events(workspace: Path) -> list[dict[str, object]]:
+    import json as _json
+
+    log = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
+    if not log.exists():
+        return []
+    return [_json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
+
+
+def test_evaluate_mutating_write_emits_presence_upsert_event(tmp_path: Path) -> None:
+    decision, _ = evaluate(
+        tmp_path,
+        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="sess-solo",
+        release="v0.1.46",
+        mode="IMPLEMENTATION",
+        runtime="claude",
+        pid=1234,
+    )
+    assert decision == Decision.ALLOW
+    events = [e for e in _events(tmp_path) if e.get("event") == "PRESENCE_UPSERT"]
+    assert events, "expected a PRESENCE_UPSERT event on a MUTATING write"
+    assert events[0]["session_id"] == "sess-solo"
+    assert events[0]["context"] == "dadaia-workspace"
+
+
+def test_evaluate_advisory_fire_emits_presence_warn_event(tmp_path: Path) -> None:
+    from dadaia_workspace.features.spec_context import presence
+
+    presence.upsert(tmp_path, "dadaia-workspace", "owner-A", runtime="claude", pid=1)
+
+    decision, message = evaluate(
+        tmp_path,
+        "repos/dadaia-workspace/specs/releases/v0.1.46/PLAN.md",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="intruder",
+        release="v0.1.46",
+        mode="IMPLEMENTATION",
+        runtime="codex",
+        pid=5678,
+    )
+    assert decision == Decision.ALLOW
+    assert "owner-A" in message
+
+    events = [e for e in _events(tmp_path) if e.get("event") == "PRESENCE_WARN"]
+    assert events, "expected a PRESENCE_WARN event when the advisory fires"
+    assert events[0]["session_id"] == "intruder"
+    assert "owner-A" in events[0].get("reason", "")
+
+
+def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
+    decision, _ = evaluate(
+        tmp_path,
+        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="anon-session",
+        release="v0.1.46",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.ALLOW
+    assert _events(tmp_path) == []

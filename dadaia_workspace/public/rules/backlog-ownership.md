@@ -25,10 +25,11 @@ lock had no key (no harness can assert an agent's persona to the hook, in any ru
 so it blocked the legitimate owner instead of protecting the backlog. Ownership is now
 upheld by agent discipline and PM coordination.
 
-The **only** deterministic lock in the workspace is the single-session-per-Spec-Context
-lease (release-definition / implementation+review). No workflow — research,
-backlog-definition, release-definition, implementation+review, or audits — is ever
-gate-blocked for ownership reasons.
+There is no deterministic concurrency lock in the workspace at all (NO-LOCKS DOCTRINE,
+v0.1.76): the former single-session-per-Spec-Context lease is deleted, replaced by
+advisory presence that never blocks a write. No workflow — research, backlog-definition,
+release-definition, implementation+review, or audits — is ever gate-blocked for
+ownership or concurrency reasons.
 
 How a picked backlog set matures into a release is governed separately by
 `release-governance`; this rule governs only **who curates backlog entries**.

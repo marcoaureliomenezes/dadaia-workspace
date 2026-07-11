@@ -63,7 +63,7 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "D-OC-1": "coherence",
     "SPECS-VERSION": "coherence",
     "SPEC-DOC-028": "coherence",
-    "SPEC-DOC-029": "coherence",
+    # SPEC-DOC-029 RETIRED (v0.1.76 T-4) — never emitted; omitted from this map.
     "SPEC-DOC-037": "coherence",
     "SPEC-DOC-002": "memory",
     "SPEC-DOC-002L": "memory",
@@ -143,9 +143,8 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
     """Run the doctor on the fixture and serialize the normalized CLI ``--json`` payload.
 
     Returns ``(issues, normalized_json_text)``. The doctor is constructed as a pure module —
-    no ``public_dir`` / ``repo_root`` / ``workspace_state_dir`` injection — so the coherence
-    registry, constitution file-ref, and lease/session backstop checks are deterministic
-    no-ops and no subprocess (LINT-1) ever runs.
+    no ``public_dir`` / ``repo_root`` injection — so the coherence registry and constitution
+    file-ref checks are deterministic no-ops and no subprocess (LINT-1) ever runs.
     """
     doctor = SpecsDoctor(_FIXTURE)
     issues = doctor.check()

@@ -1,6 +1,7 @@
 ---
 name: lock-lease-session-identity-kernel
-status: candidate
+status: delivered
+delivered_in: v0.1.76
 opened: 2026-07-10
 owner: project-manager (curates)
 priority: P0

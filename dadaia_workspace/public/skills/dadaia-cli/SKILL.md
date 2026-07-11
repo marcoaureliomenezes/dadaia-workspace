@@ -20,7 +20,7 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 
 ## Panel — see everything
 
-`dadaia panel` starts the local UI (default port 4999). Tabs: Contexts (ALIVE/DEAD + leases), Workflows (verbs, diagrams, model pickers), Servers, Reports/Handoffs, Sub-agents, projection health. Use it to inspect state instead of reading files.
+`dadaia panel` starts the local UI (default port 4999). Tabs: Contexts (ALIVE/DEAD + advisory presence), Workflows (verbs, diagrams, model pickers), Servers, Reports/Handoffs, Sub-agents, projection health. Use it to inspect state instead of reading files.
 
 ## Command groups (`dadaia <group> --help` for detail)
 
@@ -33,7 +33,6 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 | `backlog` / `release` | Backlog + release entry management |
 | `reports` | Handoff/report inspection: `validate lint doctor status …` |
 | `server` | Dev-server port registry: `list next register release …` |
-| `lock` | SDD implementation lease records |
 | `ci` | Local CI-equivalent preflight + git-hook chokepoints |
 | `public` | Lib-asset projection: `stage install doctor` |
 | `doctor` / `migrate` | Diagnose+repair / migration helpers |
@@ -48,7 +47,7 @@ dadaia context bind <ctx> --mode implementation --release <id>   # bind THIS ses
 dadaia context alive <ctx> / dead <ctx>                          # lifecycle transitions
 ```
 
-Bind binds the **context** (persists mode + refreshes the incumbent pointer); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
+Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
 
 ## Workflows (`dadaia lifecycle <verb>`)
 

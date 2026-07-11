@@ -27,7 +27,7 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.locking import (
     workspace_lock,
 )
@@ -36,7 +36,6 @@ from dadaia_workspace.features.spec_context.service import (
     DeadSecretFoundError,
     SpecContextService,
 )
-from dadaia_workspace.infrastructure.process_probe_adapter import build_pid_probe
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 console = Console()
@@ -263,6 +262,23 @@ def show(
                 if session_data and not _session_is_stale(session_data):
                     session_obj = session_data
             data["session"] = session_obj
+            # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
+            # context, sourced from the ONLY concurrency-signal surface post-doctrine
+            # (features/spec_context/presence.py). Distinct from "session" above (which
+            # answers "what is MY session bound to" via the incumbent-pointer display
+            # hint, FR4). ``others_alive`` with an empty self-sid excludes nothing (no
+            # real presence record is ever keyed by ""), so every live record on the
+            # context is listed.
+            data["presence"] = [
+                {
+                    "session_id": rec.session_id,
+                    "runtime": rec.runtime,
+                    "pid": rec.pid,
+                    "started_at": rec.started_at,
+                    "last_seen_at": rec.last_seen_at,
+                }
+                for rec in presence.others_alive(workspace_root, ctx.name, "")
+            ]
             print(json.dumps(data, indent=2))
         return
 
@@ -278,6 +294,13 @@ def show(
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
+
+    presence_records = presence.others_alive(resolve_workspace_root(), ctx.name, "")
+    if presence_records:
+        names = ", ".join(f"{rec.session_id} ({rec.runtime})" for rec in presence_records)
+        console.print(f"[bold]Presence:[/bold]   {names}")
+    else:
+        console.print("[bold]Presence:[/bold]   —")
 
 
 @app.command()
@@ -451,12 +474,10 @@ def bind(
 
     # Persist the session record via the single session-identity owner (FR-R4-02 / R3),
     # and refresh the CONTEXT incumbent pointer to this bind's session id (NF-2 fix). The
-    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: the SDD
-    # gate resolves a harness session's mode through ``resolve_identity(ctx)`` →
-    # ``<ctx>.ptr`` → this record, so a default in-session `dadaia context bind --mode read`
-    # (whose minted sid no harness reports) is honored with no env var. For lease-taking
-    # binds the pointer is harmless — ``lease.acquire`` rewrites ``<ctx>.ptr`` to the real
-    # acquiring harness sid on first MUTATING write, so the incumbent self-corrects.
+    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: `context
+    # show` reads it for its default-target/session-object resolution (T-4 territory).
+    # v0.1.76 T-3: the pointer carries no gate authority anymore — the SDD gate's mode
+    # resolution dropped the context-incumbent fallback rung in T-2.
     try:
         with workspace_lock(workspace_root):
             session_identity.write_session(workspace_root, session_id, session_data)
@@ -503,31 +524,9 @@ def bind(
                 name,
                 pids=container.build_ancestry_pid_chain(os.getppid()),
             )
-            # v0.1.72 FR2 (bug rebind-does-not-adopt-same-process-lease): a lease record
-            # whose holder pid is in THIS bind's process lineage is OUR lease under a
-            # rotated session id (dead prior session / hook-heartbeat identity) — adopt it
-            # for the new session eagerly (the eager form of acquire's rung-1 `.ptr`
-            # normalization) so preflight never reports our own harness as a live foreign
-            # holder. Foreign records (pid outside our lineage) are never touched.
-            # Best-effort: adoption failure must never break the bind.
-            adopted = False
-            with contextlib.suppress(Exception):
-                from dadaia_workspace.features.spec_context import lease as _lease
-
-                adopted = _lease.adopt_if_own_lineage(
-                    workspace_root,
-                    name,
-                    session_id,
-                    ancestry_pids=frozenset(container.build_ancestry_pid_chain(os.getpid())),
-                )
     except WorkspaceLockTimeoutError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
-    if adopted:
-        console.print(
-            "[green]✓[/green] Adopted the context's existing same-process lease "
-            f"for session {session_id}"
-        )
 
     # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
     # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
@@ -550,90 +549,53 @@ def release_cmd(
         None,
         "--session",
         help=(
-            "CLI session id to release (default flow). When omitted, the eval-flow "
-            "DADAIA_SESSION_ID is used if set."
+            "Session id to release (optional override). When omitted, the session id is "
+            "resolved from DADAIA_SESSION_ID (eval-flow override) or the harness-native "
+            "session id (CLAUDE_CODE_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID) — "
+            "no flag is required in the normal harness case."
         ),
     ),
 ) -> None:
-    """Release the current session's binding AND any lease(s) it holds (FR-W4-03).
+    """Release the current session's binding AND its advisory presence (v0.1.76 FR2).
 
     Run: dadaia context release
 
-    Two flows (the CLI-sid/harness-sid split):
-
-    * **eval flow** — ``DADAIA_SESSION_ID`` exported (e.g. ``eval $(dadaia context bind
-      ... --print-env)``). Hooks key on the same sid, so every lock record naming it is
-      released exactly, then the session record is unlinked.
-    * **default flow** — a CLI-minted sid (``--session`` or the latest bind record). The
-      lock holder is a harness sid that never matches, so the bound context's lease is
-      released ONLY when its holder pid is dead or in the caller's process ancestry; a
-      live foreign holder's lease is NEVER released by context name alone.
-
-    In BOTH flows the lease is dropped BEFORE the session record is unlinked, so the
-    PostToolUse heartbeat cannot renew a released binding (closes
-    ``context-release-leaves-lease-heartbeat-renewing``). DP-3: there is no absence-based
-    renewal guard — ``release`` deletes the record, and ``renew_heartbeat`` no-ops on an
-    absent/foreign record, so resurrection is structurally impossible.
+    NO-LOCKS DOCTRINE: there is no lease to drop anymore — ``presence`` is the sole
+    concurrency-signal surface. Resolution order for "this session's own id": ``--session``
+    override -> ``DADAIA_SESSION_ID`` (eval-flow override) -> the harness-native session id
+    (:func:`harness_session_id`) -> the last bind's CLI-minted session id read back from the
+    session record directory (legacy default-flow fallback). Every presence record this
+    session owns (across every context) is deleted (:func:`presence.clear`, idempotent — a
+    session with no presence record is a clean no-op), then the CLI session record is
+    unlinked.
     """
-    from dadaia_workspace import container
-    from dadaia_workspace.features.spec_context import lease as _lease
+    from dadaia_workspace.features.spec_context import presence
 
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
 
-    env_sid = os.environ.get("DADAIA_SESSION_ID")
-    cli_sid = session or env_sid
-    if not cli_sid:
+    resolved_sid = session or os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
+    if not resolved_sid:
         err_console.print(
             "[red]Error:[/red] No active session. Pass --session <id> or set "
             "DADAIA_SESSION_ID (e.g. eval $(dadaia context bind ... --print-env))."
         )
         raise typer.Exit(1) from None
 
-    session_file = sessions_dir / f"{cli_sid}.json"
-    session_data = _load_session(sessions_dir, cli_sid)
-    released: list[str] = []
+    session_file = sessions_dir / f"{resolved_sid}.json"
 
     with workspace_lock(workspace_root):
-        if env_sid:
-            # Eval flow: the env sid is the lock holder key — release every lease it holds.
-            released = _lease.release_for_session(workspace_root, env_sid)
-        elif session_data is not None:
-            # Default flow: resolve the bound context from the CLI session record and
-            # release its lease only when the holder is dead or in our ancestry.
-            ctx_name = str(session_data.get("context", ""))
-            if ctx_name:
-                with contextlib.suppress(Exception):
-                    pid_probe = build_pid_probe()
-                    ancestry_probe = container.build_process_ancestry()
-
-                    def _is_ancestor(holder_pid: int, caller_pid: int) -> bool:
-                        from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-
-                        return (
-                            ancestry_probe.is_ancestor(holder_pid, caller_pid) is Ancestry.ANCESTOR
-                        )
-
-                    holder = _lease.release_context_if_caller_owned(
-                        workspace_root,
-                        ctx_name,
-                        caller_pid=os.getpid(),
-                        pid_probe=pid_probe,
-                        ancestry=_is_ancestor,
-                    )
-                    if holder is not None:
-                        released.append(ctx_name)
-
-        # Unlink the session record AFTER the lease has been dropped.
+        cleared = presence.clear(workspace_root, resolved_sid)
+        # Unlink the session record AFTER presence has been dropped.
         session_file.unlink(missing_ok=True)
 
-    if released:
+    if cleared:
         console.print(
-            f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released "
-            f"(lease(s) dropped: {', '.join(released)})"
+            f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released "
+            f"(presence record(s) dropped: {cleared})"
         )
     else:
-        console.print(f"[green]✓[/green] Session '[bold]{cli_sid}[/bold]' released")
+        console.print(f"[green]✓[/green] Session '[bold]{resolved_sid}[/bold]' released")
 
 
 @app.command()
@@ -663,12 +625,17 @@ def heartbeat() -> None:
         )
         raise typer.Exit(1) from None
 
-    # Renew the lease heartbeat via lease module
+    # Renew this session's advisory presence record(s) — the live concurrency signal
+    # (v0.1.76 FR2). Also renews a legacy/residual lease record if one still exists
+    # (dormant primitive kept for `adopt_if_own_lineage`-adopted records; harmless no-op
+    # otherwise) so a pre-doctrine record does not go falsely stale mid-migration.
     from dadaia_workspace.features.spec_context import lease as _lease
+    from dadaia_workspace.features.spec_context import presence
 
     ctx_name = session_data.get("context", "")
     if ctx_name:
         _lease.renew_heartbeat(workspace_root, ctx_name, session_id)
+    presence.renew(workspace_root, session_id)
 
     now = _now_iso()
     console.print(

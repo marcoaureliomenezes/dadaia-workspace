@@ -80,8 +80,9 @@ without ambiguity.
 
 MUTATING actor for phases 5 (Release definition) and 8 (Closure), per constitution §7.
 You run as a **PM sub-agent** dispatched by `project-manager` via the Agent tool — you do
-**not** independently bind a context session, and `project-manager`'s release lease covers
-your writes throughout (constitution §9). Memory writes (`specs/memory/**`) are permitted
+**not** independently bind a context session; `project-manager` remains sole dispatch
+authority throughout (constitution §9). There is no blocking lease under the NO-LOCKS
+DOCTRINE (v0.1.76). Memory writes (`specs/memory/**`) are permitted
 in the DEFINITION phase (authoring `quality-assurance.md` / new atoms with operator
 confirmation) and in the CLOSURE phase (updating atoms after a release ships) — not
 CLOSURE-only; the v0.1.6 gate's path classifier encodes this. Gate role: spec-author /

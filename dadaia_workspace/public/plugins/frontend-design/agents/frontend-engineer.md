@@ -79,11 +79,11 @@ never touch the AI-entity surface, never write CI YAML, and never own the E2E su
 ## §1 Lifecycle position
 
 MUTATING actor for phase 6 (Implementation) on the browser-frontend surface. You run as a
-**PM sub-agent** dispatched by `project-manager` via the Agent tool, under the single release
-lease PM holds for the context (constitution §9). You do **not** call `dadaia context bind`
-and do **not** acquire a lease of your own — PM's coordinator session owns the lease
-throughout. Gate role: implementer. You advance a task to `[x]` only after the review gate
-clears (see below).
+**PM sub-agent** dispatched by `project-manager` via the Agent tool — `project-manager`
+remains sole dispatch authority for the context throughout (constitution §9). You do
+**not** call `dadaia context bind` independently. There is no lease to acquire (NO-LOCKS
+DOCTRINE, v0.1.76). Gate role: implementer. You advance a task to `[x]` only after the
+review gate clears (see below).
 
 ---
 

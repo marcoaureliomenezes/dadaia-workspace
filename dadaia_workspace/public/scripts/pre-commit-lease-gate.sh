@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Pre-commit lease gate + backlog-consistency gate — dadaia-workspace (FR-W1-01; v0.1.25 R1).
+# Pre-commit WARN-only presence check + backlog-consistency gate — dadaia-workspace
+# (FR-W1-01; v0.1.25 R1; presence rewrite: NO-LOCKS DOCTRINE, v0.1.76 FR3).
 #
-# Blocks a `git commit` into a Spec Context repo when the committing session does NOT
-# hold that context's MUTATING lease. The holder's own commits flow; a commit while no
-# live lease exists flows (ADDITIVE work commits freely — zero-false-block); a live
-# FOREIGN holder is blocked with an actionable message. The gate consults the lease ONLY
-# — never a review verdict (commits are never review-blocked; that is the push gate).
+# NO-LOCKS DOCTRINE (v0.1.76): this hook file is named for its pre-v0.1.76 history
+# (the retired blocking-lease model) but no longer blocks a `git commit` for
+# concurrency reasons. It keeps detecting another live session's presence on the
+# context and prints one advisory line on detection, but it ALWAYS ALLOWS the commit
+# — there is no BLOCK verdict left. Commits are never review-blocked either (that is
+# the separate push gate).
 #
 # v0.1.25 R1: the same `dadaia ci pre-commit-check` backend ALSO runs `backlog doctor`
 # (BL-SCHEMA/DUP/CONFLICT/STALE) over the committing repo's specs/, so a hand-written
@@ -76,7 +78,7 @@ resolve_runner() {
 }
 
 if ! resolve_runner; then
-    echo "[pre-commit] ERROR: could not locate the dadaia runner to run the lease gate." >&2
+    echo "[pre-commit] ERROR: could not locate the dadaia runner to run the pre-commit check." >&2
     echo "[pre-commit]   tried: \$DADAIA_BIN, walk-up <ws>/.dadaia/.venv/bin/dadaia, poetry, .venv/bin/dadaia" >&2
     echo "[pre-commit]   fix: set DADAIA_BIN, install deps (poetry install), or run the check manually." >&2
     exit 1

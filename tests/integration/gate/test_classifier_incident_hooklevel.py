@@ -107,8 +107,10 @@ def test_incident_foreign_in_repo_bug_write_allows_and_holder_unchanged(tmp_path
     )
 
 
-def test_incident_foreign_mutating_does_not_steal_within_ttl(tmp_path: Path) -> None:
-    """Counterpart at the hook boundary: a fresh holder is not stolen by a foreign MUTATING write."""
+def test_incident_foreign_mutating_never_steals_and_never_blocks(tmp_path: Path) -> None:
+    """v0.1.76 NO-LOCKS DOCTRINE counterpart: a fresh holder's lease-record residue is
+    doctrinally inert — a foreign MUTATING write ALLOWs (never BLOCKs), and the residue
+    stays byte-for-byte untouched (evaluate() never reads or writes ctx_locks/)."""
     ws = _make_workspace(tmp_path)
     holder = "session-A-holder"
     foreign = "session-B-foreign"
@@ -123,7 +125,12 @@ def test_incident_foreign_mutating_does_not_steal_within_ttl(tmp_path: Path) -> 
     result = run_hook_subprocess("sdd_gate", payload, claude_hook_env(ws, session_id=foreign))
 
     assert result.returncode == 0
-    envelope = result.block_envelope()
-    assert envelope is not None, "a foreign MUTATING write must BLOCK against a live holder"
+    assert result.block_envelope() is None, (
+        "v0.1.76 doctrine: a foreign MUTATING write must never BLOCK, even against a "
+        "live-looking holder lease-record residue"
+    )
     record = lease.read_record(ws, _SLUG)
-    assert record is not None and record["session_id"] == holder
+    assert record is not None and record["session_id"] == holder, (
+        "the inert lease-record residue must stay byte-for-byte untouched by the ALLOWed "
+        "foreign write"
+    )

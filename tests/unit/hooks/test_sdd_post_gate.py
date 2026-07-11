@@ -1,4 +1,4 @@
-"""Unit tests for dadaia_workspace.hooks.sdd_post_gate (R2a, FR-R2-01/02).
+"""Unit tests for dadaia_workspace.hooks.sdd_post_gate (v0.1.76 T-3, presence-only).
 
 These are *in-process* unit tests of the hook's internals and the resolution-chain /
 fail-open contract. They import the module directly, which is legitimate under the
@@ -11,6 +11,10 @@ production ``_common.read_stdin_json`` symbol (``monkeypatch.setattr``) and neve
 hook — invoked as a subprocess with a ``claude_hook_env()`` and no hand-planted
 ``DADAIA_*`` — is proven in ``tests/unit/hooks/test_sdd_post_gate_behavior.py`` (which also
 owns the stronger no-cross-renewal / held-vs-foreign coverage).
+
+Re-baselined from the pre-v0.1.76 lease-renewal suite: the resolution-chain x renewal
+table now seeds and asserts on ``presence`` records — ``lease.acquire``/``renew_heartbeat``
+are gone (T-3, no more acquisition machinery at all).
 
 ``DADAIA_SESSION_ID`` appears here only as the *operator override* leg of the resolution
 chain (``resolve_session_id`` honors it first); the harness never sets it.
@@ -31,7 +35,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.hooks import _common, sdd_post_gate
 
 
@@ -69,23 +73,26 @@ def _seed_session_record(workspace: Path, sess_id: str) -> Path:
     return path
 
 
-def _seed_lease(workspace: Path, ctx: str, sess_id: str) -> None:
-    """Acquire a fresh (non-stale) lease for ``ctx`` held by ``sess_id``."""
-    status, _rec = lease.acquire(workspace, ctx, sess_id, "rel-1", "implementation")
-    assert status in {"ACQUIRED", "RENEWED"}
+def _presence_path(workspace: Path, ctx: str, sess_id: str) -> Path:
+    return workspace / ".dadaia" / "states" / "presence" / ctx / f"{sess_id}.json"
 
 
-def _lease_heartbeat(workspace: Path, ctx: str) -> str:
-    rec = lease.read_record(workspace, ctx)
-    assert rec is not None
-    return str(rec["heartbeat"])
+def _seed_presence(workspace: Path, ctx: str, sess_id: str) -> None:
+    """Create a fresh presence record for ``ctx`` owned by ``sess_id``."""
+    presence.upsert(workspace, ctx, sess_id, runtime="claude", pid=42)
+    assert _presence_path(workspace, ctx, sess_id).exists()
 
 
-def _age_heartbeat(workspace: Path, ctx: str, *, seconds: int = 30) -> None:
-    rec = lease.read_record(workspace, ctx)
-    assert rec is not None
-    rec["heartbeat"] = (datetime.now(tz=UTC) - timedelta(seconds=seconds)).isoformat()
-    lease._write_record(lease._record_path(workspace, ctx), rec)
+def _presence_last_seen(workspace: Path, ctx: str, sess_id: str) -> str:
+    rec = json.loads(_presence_path(workspace, ctx, sess_id).read_text(encoding="utf-8"))
+    return str(rec["last_seen_at"])
+
+
+def _age_presence(workspace: Path, ctx: str, sess_id: str, *, seconds: int = 30) -> None:
+    path = _presence_path(workspace, ctx, sess_id)
+    rec = json.loads(path.read_text(encoding="utf-8"))
+    rec["last_seen_at"] = (datetime.now(tz=UTC) - timedelta(seconds=seconds)).isoformat()
+    path.write_text(json.dumps(rec), encoding="utf-8")
 
 
 # --- Resolution chain x renewal: stdin payload / env override / no-session-file --------
@@ -106,10 +113,9 @@ def _age_heartbeat(workspace: Path, ctx: str, *, seconds: int = 30) -> None:
             False,
         ),
         # DADAIA_SESSION_ID is the operator-override leg of the chain; with an empty
-        # stdin payload it alone resolves the holder and renews the lease.
+        # stdin payload it alone resolves the holder and renews presence.
         ("env_only_no_stdin", "ovr-only", True, lambda sid: {}, False),
-        # The old `if not os.environ.get("DADAIA_SESSION_ID"): return` guard is dead —
-        # no DADAIA_SESSION_ID still renews via the native/stdin resolution.
+        # No DADAIA_SESSION_ID still renews via the native/stdin resolution.
         (
             "no_dadaia_sid_still_renews",
             "native-sess",
@@ -117,8 +123,8 @@ def _age_heartbeat(workspace: Path, ctx: str, *, seconds: int = 30) -> None:
             lambda sid: {"session_id": sid},
             False,
         ),
-        # FR-R2-01: no sessions/<id>.json on disk; the lease must still renew (renewal
-        # runs outside the session-file guard).
+        # FR-R2-01 (presence successor): no sessions/<id>.json on disk; presence must
+        # still renew (renewal runs outside the session-file guard).
         (
             "renews_without_session_file",
             "holder-no-file",
@@ -141,15 +147,15 @@ def test_sid_resolution_renewal_table(
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     if set_env_override:
         monkeypatch.setenv("DADAIA_SESSION_ID", session_id)
-    _seed_lease(tmp_path, "ctx", session_id)
-    _age_heartbeat(tmp_path, "ctx")
-    old = _lease_heartbeat(tmp_path, "ctx")
+    _seed_presence(tmp_path, "ctx", session_id)
+    _age_presence(tmp_path, "ctx", session_id)
+    old = _presence_last_seen(tmp_path, "ctx", session_id)
     if name == "renews_without_session_file":
         assert not (tmp_path / ".dadaia" / "sessions" / f"{session_id}.json").exists()
 
     monkeypatch.setattr(_common, "read_stdin_json", lambda: stdin_payload_fn(session_id))  # type: ignore[operator]
     assert sdd_post_gate.main() == 0
-    assert _lease_heartbeat(tmp_path, "ctx") != old
+    assert _presence_last_seen(tmp_path, "ctx", session_id) != old
 
 
 # --- Parity (b): session-id strip (CWE-22) via resolve_session_id ----------------------

@@ -29,8 +29,8 @@ quirk.)
 
 Bug files are **ADDITIVE** — the SDD gate's path classifier is context-relative
 (v0.1.10), so `specs/bugs/` resolves to the ADDITIVE class both at the workspace root
-and inside any `repos/<slug>/`: never blocked, never lease-gated, writable by any
-persona / any runtime. There is no excuse to defer registration.
+and inside any `repos/<slug>/`: never blocked, writable by any persona / any runtime
+regardless of any other session's presence. There is no excuse to defer registration.
 
 ## What NOT to register
 

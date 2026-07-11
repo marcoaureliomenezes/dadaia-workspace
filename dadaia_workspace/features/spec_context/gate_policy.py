@@ -17,9 +17,14 @@ property table (AC-04) and the activity-class exemption matrix (AC-05) are
 unit-tested against it, and ``hooks.sdd_gate`` delegates here so there is no
 second classifier implementation to keep in byte-parity.
 
-For the MUTATING class the gate is the single acquisition point: it delegates to
-:func:`lease.acquire` (O_EXCL CAS). This module does the same, so the Python tests
-exercise the real lease code path, not a stand-in.
+NO-LOCKS DOCTRINE (v0.1.76, SPEC ``specs/releases/v0.1.76/SPEC.md``, backlog
+``lock-lease-session-identity-kernel``): races between sessions are ACCEPTED and
+SURFACED, never prevented. For the MUTATING class the gate is no longer an acquisition
+point — it never calls ``lease.acquire`` and can never BLOCK on another session. It
+upserts an advisory :mod:`presence` record and, when another live session's presence
+is visible on the same context, ALLOWS with a one-line advisory warning (throttled).
+``lease.py`` itself is untouched by this module (T-3 removes its blocking machinery);
+this module simply stopped being one of its callers.
 
 The PROTECTED class (SEC-01, F-07) is the sole fail-CLOSED path: writes to
 ``.dadaia/sessions/`` (the CLI-owned lease-identity store) are blocked unconditionally
@@ -30,15 +35,23 @@ delegates here — PROTECTED flows through without reimplementation in the hook.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import LockHeldError
-from dadaia_workspace.features.spec_context import lease
+from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
+    _append_audit_event,
+)
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
+
+#: Throttle window (seconds) for the advisory concurrency warning (v0.1.76 FR1). A
+#: second write inside this window from the same session emits no repeat warning — the
+#: throttle marker lives at ``.dadaia/tmp/presence-warn-<sid>-<ctx>`` (mtime-based).
+_ADVISORY_THROTTLE_SECONDS = 300
 
 #: Ordered ADDITIVE prefixes — always allowed (never blocked, never locked).
 #: specs/audits/ is ADDITIVE (FR-P1-14/D2): parallel audit sessions write here
@@ -122,10 +135,114 @@ _READ_BLOCK_MESSAGE = (
     "binds implementation mode once: `dadaia context bind {ctx} --mode implementation`."
 )
 
+#: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
+#: ``resolve_session_id(payload, default="anon-session")``). FR5: an anonymous identity
+#: never creates a presence record — it degrades presence accuracy only, never the write
+#: (v0.1.76, kills the PI anon-session dual-writer facet of the CRITICAL bug at the root).
+_ANON_SESSION_ID = "anon-session"
+
 
 def _is_read_mode(mode: str) -> bool:
     """True iff ``mode`` resolves to a non-acquiring READ binding (case-insensitive)."""
     return mode.strip().upper() in _READ_MODES
+
+
+def _advisory_throttle_path(workspace: Path, session_id: str, ctx: str) -> Path | None:
+    # Defense-in-depth mirror of presence._valid_name: hook callers already sanitize both
+    # components, but a direct-API caller must not be able to place the marker outside
+    # .dadaia/tmp/ via a traversal-shaped session_id/ctx.
+    if not (presence._valid_name(session_id) and presence._valid_name(ctx)):
+        return None
+    return workspace / ".dadaia" / "tmp" / f"presence-warn-{session_id}-{ctx}"
+
+
+def _advisory_throttled(workspace: Path, session_id: str, ctx: str, *, now: float) -> bool:
+    """True iff an advisory for this (session, ctx) fired within the throttle window."""
+    marker = _advisory_throttle_path(workspace, session_id, ctx)
+    if marker is None:
+        return False
+    try:
+        last = marker.stat().st_mtime
+    except OSError:
+        return False
+    return (now - last) < _ADVISORY_THROTTLE_SECONDS
+
+
+def _stamp_advisory_throttle(workspace: Path, session_id: str, ctx: str) -> None:
+    """Record that an advisory fired now (best-effort; must never raise)."""
+    marker = _advisory_throttle_path(workspace, session_id, ctx)
+    if marker is None:
+        return
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(datetime.now(tz=UTC).isoformat(), encoding="utf-8")
+    except OSError:
+        return
+
+
+def _heartbeat_age_seconds(last_seen_at: str, *, now: datetime) -> float | None:
+    try:
+        seen = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=UTC)
+    return (now - seen).total_seconds()
+
+
+def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRecord]) -> str:
+    """Build the one-line advisory naming every other live session (FR1).
+
+    Names each other session's id, runtime, and heartbeat age; states plainly that the
+    write was ALLOWED — this is a signal, never a block.
+    """
+    now = _utcnow()
+    parts = []
+    for rec in others:
+        age = _heartbeat_age_seconds(rec.last_seen_at, now=now)
+        age_txt = f"{int(age)}s ago" if age is not None else "unknown"
+        parts.append(f"{rec.session_id!r} (runtime={rec.runtime}, last seen {age_txt})")
+    names = "; ".join(parts)
+    return (
+        f"[PRESENCE] '{rel_path}' write ALLOWED in context {ctx!r}. Other live session(s) "
+        f"present: {names}. Races between sessions are accepted and surfaced, never "
+        "blocked — no action required."
+    )
+
+
+def _audit_presence(
+    workspace: Path,
+    *,
+    event: str,
+    ctx: str,
+    release: str,
+    session_id: str,
+    runtime: str,
+    pid: int,
+    fpath: str,
+    reason: str = "",
+) -> None:
+    """Append a ``PRESENCE_UPSERT``/``PRESENCE_WARN`` line to lock-events.jsonl (FR7).
+
+    Additive event names alongside the pre-existing ACQUIRED/RELEASED/BLOCKED_ATTEMPT
+    vocabulary (``locking._append_audit_event`` — the single shared audit-log writer, same
+    schema, same O_APPEND-atomic write). Best-effort: any failure is swallowed — an audit-
+    log write must never affect the gate's ALLOW/BLOCK verdict (AC-04 fail-safe contract).
+    """
+    try:
+        _append_audit_event(
+            workspace,
+            event=event,
+            context=ctx,
+            release=release,
+            session_id=session_id,
+            runtime=runtime,
+            pid=pid,
+            reason=reason,
+            fpath=fpath,
+        )
+    except Exception:  # noqa: BLE001 — audit logging must never affect the gate verdict.
+        return
 
 
 class PathClass(Enum):
@@ -226,40 +343,35 @@ def evaluate(
     release: str,
     mode: str,
     clock: Callable[[], datetime] = _utcnow,
-    pid_probe: lease.PidProbe | None = None,
-    holder_pid: int | None = None,
-    veto_release: str | None = lease._UNSET_RELEASE,
+    runtime: str = "unknown",
+    pid: int | None = None,
 ) -> tuple[Decision, str]:
     """Return the gate decision for one write target — the fail-safe contract.
 
     Guarantees (AC-04): the return is always one of {ALLOW, BLOCK-with-actionable-
     message}; never an unhandled exception.
 
-    MUTATING paths are BLOCKed on a live foreign lease (yield-iff-live-foreign,
-    FR-P1-15): the block message is always actionable (never "bind --mode write",
-    never "relaunch"). A relaunched session with a matching ``.ptr`` is recognised
-    as the incumbent and RENEWs (never blocks). The flow only stops on a genuinely
-    concurrent foreign live session — and even then, additive writes are unblocked.
+    NO-LOCKS DOCTRINE (v0.1.76): a MUTATING write is NEVER blocked on another session.
+    Instead it upserts an advisory :mod:`presence` record for this ``(ctx, session_id)``
+    and, when another live session's presence is visible on the same context, ALLOWS
+    with a one-line advisory warning (throttled — see
+    ``gate_policy._advisory_throttled``). Presence I/O never raises (FR2); this function
+    remains fail-safe regardless of the presence subsystem's health.
 
     ``mode`` (WS-R4 FR-R4-03) selects the MUTATING sub-policy. A READ-resolved mode
     (``READ``/``BOUND_READ``, case-insensitive) is **non-acquiring**: a MUTATING write is
-    BLOCKed with the documented-path message BEFORE any lease call, so a read session never
-    writes a lease record. Every other mode (missing, IMPLEMENTATION, BOUND_IMPLEMENTATION,
-    BOUND_REVIEW) is lease-taking — only explicit READ blocks MUTATING (Decision D-3).
-    ADDITIVE/UNGATED ignore mode entirely; PROTECTED stays fail-closed regardless of mode.
+    BLOCKed with the documented-path message — this is the ONLY MUTATING block that
+    survives the doctrine, and it is strictly self-scoped (Decision D-3 / v0.1.76 FR4):
+    it fires only when THIS session's own mode resolved READ, never a foreign session's.
+    Every other mode (missing, IMPLEMENTATION, BOUND_IMPLEMENTATION, BOUND_REVIEW) is
+    presence-upserting. ADDITIVE/UNGATED ignore mode entirely; PROTECTED stays
+    fail-closed regardless of mode.
 
-    ``pid_probe`` (WS-R2 FR-R2-03) is threaded straight into :func:`lease.acquire` so a
-    TTL-expired-but-still-running foreign holder is BLOCKed (not taken over). It is
-    injected by the hook layer (``hooks/sdd_gate.py`` sources the container's
-    ``OsProcessProbe``); ``None`` ⇒ TTL-only fallback. This module imports no adapter.
-
-    ``holder_pid`` (WS-R2 FR-R2-03, NF-1 fix) is the pid stamped into the lease record so a
-    *foreign* probe can later confirm this holder is alive. It MUST be a **long-lived**
-    process id, not the ephemeral gate subprocess's own: the hook layer passes
-    ``os.getppid()`` (the harness process that spawned the hook) — the hook child dies
-    milliseconds after acquire, so recording its pid would make the no-steal veto probe a
-    dead pid and inert. ``None`` ⇒ :func:`lease.acquire` defaults to ``os.getpid()`` (correct
-    for a long-lived direct-API caller).
+    ``runtime``/``pid`` (v0.1.76 FR2) are recorded into the presence record so the
+    advisory and the panel can name a session's harness and process. An anonymous
+    session id (``anon-session`` — no harness-native id resolved) never creates a
+    presence record (FR5): its write is still allowed, but there is nothing to be
+    advisory about.
     """
     cls = classify_path(rel_path)
 
@@ -283,35 +395,49 @@ def evaluate(
             f"(current phase={phase})."
         )
 
-    # MUTATING + READ-resolved session (WS-R4 FR-R4-03 / D-3): non-acquiring BLOCK. This
-    # is evaluated BEFORE lease.acquire so NO lease file is written or modified — a read
-    # session can never take, renew, or steal a lease. Only explicit READ reaches here;
-    # missing/IMPLEMENTATION/BOUND_REVIEW fall through to the lease-taking path below.
+    # MUTATING + READ-resolved session (WS-R4 FR-R4-03 / D-3, self-scoped per v0.1.76
+    # FR4): the ONLY MUTATING block left standing. Opt-in self-protection only — it can
+    # NEVER fire because of a foreign session's mode; mode resolution itself is
+    # strictly self-scoped (see hooks/sdd_gate._resolve_mode). No presence record is
+    # written on this branch — a read session creates no advisory-relevant presence.
     if _is_read_mode(mode):
         return Decision.BLOCK, _READ_BLOCK_MESSAGE.format(rel_path=rel_path, ctx=ctx or "<ctx>")
 
-    # MUTATING — the gate is the single acquisition point (O_EXCL CAS in lease).
+    # MUTATING, lease-taking mode: advisory presence, NEVER a block (v0.1.76 doctrine).
+    # anon-session (no harness-native id resolved, FR5) creates no presence record — the
+    # write is still allowed, there is simply nothing to be advisory about. The whole
+    # block is wrapped fail-safe (AC-04 defense-in-depth): ``presence`` already swallows
+    # its own errors internally, but a MUTATING write must NEVER be able to raise out of
+    # this function regardless of what future presence code does.
     try:
-        lease.acquire(
-            workspace,
-            ctx,
-            session_id,
-            release,
-            mode,
-            clock=clock,
-            pid_probe=pid_probe,
-            pid=holder_pid,
-            # v0.1.50 FR1: the liveness-veto release, decoupled from the record
-            # release — None when ACTIVE.md was UNREADABLE (I/O failure ⇒ the
-            # pid-veto must hold); defaults to ``release`` (legacy coupling).
-            active_release=veto_release,
-        )
-    except LockHeldError as exc:
-        # Genuine live-foreign conflict — BLOCK with the informative yield message.
-        return Decision.BLOCK, str(exc)
-    except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead
-        # Any unexpected lease-subsystem error (OSError, corrupt record, ValueError,
-        # …) must NOT freeze the flow. Fail OPEN (heal-and-allow), matching the shell
-        # gate's fail-open exit path — the guarantee holds for direct API callers too.
+        if session_id and session_id != _ANON_SESSION_ID and ctx:
+            presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
+            _audit_presence(
+                workspace,
+                event="PRESENCE_UPSERT",
+                ctx=ctx,
+                release=release,
+                session_id=session_id,
+                runtime=runtime,
+                pid=pid or 0,
+                fpath=rel_path,
+            )
+            others = presence.others_alive(workspace, ctx, session_id)
+            if others and not _advisory_throttled(workspace, session_id, ctx, now=time.time()):
+                _stamp_advisory_throttle(workspace, session_id, ctx)
+                message = _advisory_message(ctx, rel_path, others)
+                _audit_presence(
+                    workspace,
+                    event="PRESENCE_WARN",
+                    ctx=ctx,
+                    release=release,
+                    session_id=session_id,
+                    runtime=runtime,
+                    pid=pid or 0,
+                    fpath=rel_path,
+                    reason=message,
+                )
+                return Decision.ALLOW, message
+    except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
         return Decision.ALLOW, ""
     return Decision.ALLOW, ""

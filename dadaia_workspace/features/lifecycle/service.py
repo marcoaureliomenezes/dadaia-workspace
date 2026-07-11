@@ -97,7 +97,14 @@ class SpecsDoctorState:
 
 @dataclass(frozen=True)
 class LeaseModeState:
-    """Resolved lifecycle lease and mode state."""
+    """Resolved lifecycle lease and mode state.
+
+    v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): ``live_foreign_holder`` can no longer BLOCK a
+    lifecycle verb — see :meth:`LifecyclePreflightService._check_lease`, which surfaces
+    it as an advisory warning only. The field is kept as an input (the composition root
+    still detects a live foreign-looking residual lease record) but the doctrine forbids
+    ever converting it into a :class:`~dadaia_workspace.core.models.lifecycle.BlockedState`.
+    """
 
     mode: str
     holder_session_id: str | None = None
@@ -136,11 +143,18 @@ class LifecyclePreflightInput:
 
 @dataclass(frozen=True)
 class LifecyclePreflightResult:
-    """Result of lifecycle preflight."""
+    """Result of lifecycle preflight.
+
+    ``warnings`` (v0.1.76 T-4, FR7): advisory, non-blocking lines — e.g. a live foreign
+    session's presence on the same context. Never a reason to fail the gate (the
+    NO-LOCKS DOCTRINE: no path may block an agent or operator because of another
+    session); purely informational for the operator/report.
+    """
 
     ok: bool
     blocked: BlockedState | None = None
     evidence: tuple[GateEvidence, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
 class LifecycleCommandStatus(StrEnum):
@@ -178,7 +192,6 @@ class LifecyclePreflightService:
             self._check_active_release,
             self._check_git,
             self._check_specs_doctor,
-            self._check_lease,
             self._check_hygiene,
         )
         for check in checks:
@@ -186,11 +199,17 @@ class LifecyclePreflightService:
             if blocked is not None:
                 return LifecyclePreflightResult(ok=False, blocked=blocked)
 
+        # v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): lease/presence state is advisory-only —
+        # it can NEVER block a lifecycle verb. See ``_check_lease``.
+        warnings = self._check_lease(data)
+
         handoff_result = self._check_handoffs(data)
         if handoff_result.blocked is not None:
             return handoff_result
 
-        return LifecyclePreflightResult(ok=True, evidence=handoff_result.evidence)
+        return LifecyclePreflightResult(
+            ok=True, evidence=handoff_result.evidence, warnings=warnings
+        )
 
     def resume_run(self, run_store: LifecycleRunStore, run_id: str) -> LifecycleCommandResult:
         """Resume a lifecycle run and translate persistence failures to typed output.
@@ -361,16 +380,29 @@ class LifecyclePreflightService:
             )
         return None
 
-    def _check_lease(self, data: LifecyclePreflightInput) -> BlockedState | None:
-        if not self._mode_matches(data.lease.mode, data.required_mode):
-            return self._blocked(data, "lease mode mismatch")
+    def _check_lease(self, data: LifecyclePreflightInput) -> tuple[str, ...]:
+        """Presence-advisory only (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE).
+
+        Neither a resolved-mode mismatch against the CONTEXT-INCUMBENT pointer nor a
+        live foreign holder may block a lifecycle verb — races between sessions are
+        accepted and surfaced, never prevented. ``data.lease.mode`` is deliberately NOT
+        re-checked against ``data.required_mode`` here: that field is sourced from the
+        context's incumbent pointer (``session_identity.resolve_identity``), which can
+        legitimately name a DIFFERENT session than the caller's own binding — the exact
+        foreign-mode-imposition shape the doctrine forbids. The caller's own self-scoped
+        mode is already validated in ``_check_binding`` (``data.binding.mode``), which
+        stays a legitimate BLOCKING check (opt-in self-protection, never foreign).
+        A live foreign lease holder still produces a one-line advisory naming the
+        holder session id — informational only, never a reason to fail the gate.
+        """
         if data.lease.live_foreign_holder:
-            return self._blocked(
-                data,
-                "live foreign lease holder",
-                detail={"holder_session_id": data.lease.holder_session_id or ""},
+            holder = data.lease.holder_session_id or "unknown"
+            return (
+                f"[PRESENCE] another session ({holder!r}) has a live presence on this "
+                "context. Races between sessions are accepted and surfaced, never "
+                "blocked — no action required.",
             )
-        return None
+        return ()
 
     def _check_hygiene(self, data: LifecyclePreflightInput) -> BlockedState | None:
         # v0.1.72 FR3 (bug `hygiene-preflight-blocks-protected-residuals`): candidates the

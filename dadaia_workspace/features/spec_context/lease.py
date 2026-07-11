@@ -1,50 +1,43 @@
-"""Single-record cross-platform TTL-lease (v0.1.6 + D1 soul-fold).
+"""Single-record cross-platform TTL-lease — DEMOTED to diagnostics-only (v0.1.76 FR2).
 
-One liveness record per context governs release-mutation serialization::
+NO-LOCKS DOCTRINE (v0.1.76, SPEC ``specs/releases/v0.1.76/SPEC.md``): races between
+sessions are ACCEPTED and SURFACED, never prevented. This module is **no longer the
+concurrency kernel** — ``features/spec_context/presence.py`` is the ONLY concurrency-signal
+surface the gate consults (``gate_policy.evaluate`` never imports this module; T-2).
+
+T-3 DELETES the whole acquisition/blocking machinery: :func:`acquire` and its six-rung
+decision tree, :class:`~dadaia_workspace.core.exceptions.LockHeldError`-raising, the
+O_EXCL sentinel CAS helpers that existed *only* to serialize acquire/steal/adopt,
+``adopt_if_own_lineage`` (the eager same-lineage rewrite ``dadaia context bind`` used to
+call), ``steal`` and its CLI verb (``dadaia lock steal`` — gone), and the by-session
+heartbeat index (``ctx_locks/by-session/<sid>.json`` — nothing writes it anymore, so a
+read-only index is a permanently-empty structure; deleted rather than kept as a lie).
+
+What legitimately survives here, and why — pure reads / dormant no-op writers over
+whatever residual record a pre-doctrine install may still carry on disk:
+
+* :func:`read_record` / :func:`is_held` / :func:`reclaim` / :func:`holder_in_lineage` —
+  pure reads consumed by ``doctor``/``doctor_coherence``/``container.py`` diagnostics
+  (staleness display, coherence backstop, preflight lease panel). Repointing these
+  T-4-territory consumers to ``presence`` is out of T-3's declared write set
+  (``spec_context/**``, ``chokepoints/**``, ``cli/**``, ``tests/**``).
+* :func:`release` / :func:`renew_heartbeat` — kept as simple, holder-guarded no-ops (a
+  single atomic read-verify-write, no CAS sentinel, no index) — harmless when no lease
+  record exists (the common case going forward), and correct if a residual one does.
+  ``cli/commands/context.py``'s ``context release``/``context heartbeat`` call these as a
+  belt-and-suspenders alongside the real (``presence``) mechanism.
+
+One liveness record per context, when one exists at all::
 
     .dadaia/states/ctx_locks/<ctx>.lock.json
 
-This module replaces the four desynchronized stores (workspace fcntl, per-context
-fcntl, per-release implementation lock, per-context semaphore) that soft-deadlocked
-the workspace and grew a 188-file session graveyard. fcntl Lock-1/Lock-2 in
-``locking.py`` are retained — they serialize short same-process git ops.
+Liveness is **TTL with a PID veto** (``core.lock_liveness.is_stale``; WS-R2 FR-R2-03),
+consumed here only as a pure predicate for :func:`is_held`/:func:`reclaim` diagnostics —
+never to gate a write.
 
-Acquisition is an **O_EXCL compare-and-swap** via a sentinel file (``open(path, "x")``):
-this closes the read→stale-check→write TOCTOU gap that caused the double-acquire
-race. No read-then-write acquire path exists anywhere — this is a security red line.
-
-Liveness is **TTL with a PID veto** (``core.lock_liveness.is_stale``; WS-R2 FR-R2-03).
-The record carries the holder's ``pid``. A holder whose heartbeat has aged past
-``LEASE_TTL_SECONDS`` is reclaimable **unless** an injected ``pid_probe`` reports that
-pid is still alive — in which case ``acquire`` BLOCKs rather than taking over a
-genuinely-running foreign session (the no-steal half that killed live-session lease
-theft). The probe is **injected** from the hook layer (``hooks/sdd_gate.py`` sources the
-container's ``OsProcessProbe``); this feature module never imports
-``infrastructure/process_probe_adapter`` — no new import-linter ignore. When no probe is
-wired (platforms without ``PLATFORM.has_os_kill_liveness``, or legacy records lacking a
-``pid``), liveness degrades cleanly to TTL-only and remains Windows-safe. An idle-but-alive
-holder still renews its heartbeat on every PreToolUse / PostToolUse, and a **confirmed
-holder renews even past TTL** (same session_id or ``.ptr`` match ⇒ no self-loss).
-
-**Stable session identity (D1 soul-fold):**  On first acquire for a (context,
-session_id) pair, a pointer file is written::
-
-    .dadaia/sessions/runtime/<ctx>.ptr
-
-On every subsequent acquire, if the ``.ptr`` file exists and its content matches
-``session_id``, the caller is treated as the incumbent → RENEW (no conflict, no
-freeze). This eliminates false-conflict from session-id instability across relaunches.
-
-**Yield-iff-live-foreign (FR-P1-15):** If the ``.ptr`` does not match and the
-existing lease holder is genuinely live (heartbeat < ``LEASE_TTL_SECONDS`` ago),
-``acquire`` raises :class:`~dadaia_workspace.core.exceptions.LockHeldError` with an
-informative yield message. The message never instructs the operator to rebind, relaunch,
-or steal — there is no manual unblock ceremony. A finished or dead holder is freed
-automatically by reclaim-iff-stale after ``LEASE_TTL_SECONDS`` without a heartbeat.
-
-Cross-harness honesty: this record + ``doctor`` GC are the real enforcement
-backstop across harnesses; Claude Code / Codex / Pi also get a real PreToolUse
-block.
+Cross-harness honesty (v0.1.76): this module no longer gates any PreToolUse write on any
+harness — ``presence.py`` is the sole cross-harness signal now. ``doctor`` GC over a
+residual record remains meaningful only as diagnostic hygiene.
 """
 
 from __future__ import annotations
@@ -53,18 +46,14 @@ import contextlib
 import json
 import os
 import re
-import sys
-import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
-from dadaia_workspace.core.exceptions import LockHeldError, PlatformSecurityError
+from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
-from dadaia_workspace.features.spec_context import session_identity
 
 #: Injected PID-liveness probe (WS-R2 FR-R2-03): ``(pid) -> alive?``. Threaded into
 #: ``core.lock_liveness.is_stale`` so a TTL-expired-but-still-running foreign holder is
@@ -74,42 +63,19 @@ PidProbe = Callable[[int], bool]
 
 __all__ = [
     "PidProbe",
-    "acquire",
-    "adopt_if_own_lineage",
-    "contexts_for_session",
     "holder_in_lineage",
     "is_held",
     "read_record",
     "reclaim",
     "release",
-    "release_context_if_caller_owned",
-    "release_for_session",
     "renew_heartbeat",
-    "steal",
 ]
 
 #: Heartbeat TTL in seconds lives in ``core.kernel_tunables.LEASE_TTL_SECONDS`` (the single
 #: canonical home, DP-1 v0.1.14). Every liveness comparison references that constant; no
 #: inline magic numbers are permitted anywhere in the liveness path. The lease-local
 #: re-export was removed in v0.1.53 — import ``LEASE_TTL_SECONDS`` from ``core.kernel_tunables``.
-_MAX_RETRIES = kernel_tunables.CAS_MAX_RETRIES
-_INITIAL_BACKOFF = kernel_tunables.CAS_INITIAL_BACKOFF_SECONDS
-#: A sentinel older than this is an orphan (process SIGKILLed between CAS and unlink).
-_SENTINEL_ORPHAN_AGE = kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
-
-#: Test-only TOCTOU seam. ``acquire`` calls it after the sentinel CAS wins and
-#: before the record is written, letting a test interleave a concurrent acquirer.
-#: MUST be ``None`` in production; tests set it via ``monkeypatch`` (guaranteed
-#: teardown even on failure).
-_before_write: Callable[[], None] | None = None
-
-# Import-time guard: in production _before_write is None. Tests under
-# DADAIA_TESTING=1 may install it after import.
-assert _before_write is None or os.environ.get("DADAIA_TESTING") == "1", (
-    "lease._before_write must be None in production "
-    "(set only by tests via monkeypatch under DADAIA_TESTING=1)"
-)
 
 
 def _utcnow() -> datetime:
@@ -156,210 +122,6 @@ def _record_path(
     return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.json"
 
 
-def _sentinel_path(
-    workspace: Path,
-    ctx: str,
-    permission_setter: FilePermissionSetter | None = None,
-) -> Path:
-    _validate(ctx, field="context")
-    return _lock_dir(workspace, permission_setter) / f"{ctx}.lock.sentinel"
-
-
-# --- By-session heartbeat index (FR-W4-02) -------------------------------------
-# ``ctx_locks/by-session/<sid>.json`` maps a session id to the set of contexts that
-# session currently holds. PostToolUse renewal reads this index instead of scanning
-# the whole lock dir, so a session holding nothing does no FS scan at all. The index
-# entry is written/removed INSIDE the SAME O_EXCL sentinel CAS as the lock record in
-# ``acquire``/``steal``/``release`` — record-write and index-write form one atomic
-# unit; a lost index entry must be structurally impossible (a silent miss starves
-# renewal and reopens the lease-theft class). ``_iter_lease_contexts`` falls back to a
-# full lock-dir scan whenever the by-session DIR is absent (migration window).
-
-
-def _by_session_dir(workspace: Path) -> Path:
-    return workspace / ".dadaia" / "states" / "ctx_locks" / "by-session"
-
-
-def _by_session_path(workspace: Path, session_id: str) -> Path:
-    _validate(session_id, field="session_id")
-    return _by_session_dir(workspace) / f"{session_id}.json"
-
-
-def _read_by_session(workspace: Path, session_id: str) -> list[str]:
-    """Read the contexts a session holds per its index entry (empty if absent/corrupt)."""
-    path = _by_session_path(workspace, session_id)
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    if isinstance(data, dict):
-        ctxs = data.get("contexts")
-        if isinstance(ctxs, list):
-            return [c for c in ctxs if isinstance(c, str)]
-    return []
-
-
-def _index_add(workspace: Path, ctx: str, session_id: str) -> None:
-    """Add ``ctx`` to ``session_id``'s by-session index entry (inside the CAS)."""
-    contexts = sorted({*_read_by_session(workspace, session_id), ctx})
-    path = _by_session_path(workspace, session_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_record(path, {"session_id": session_id, "contexts": list(contexts)})
-
-
-def _index_remove(workspace: Path, ctx: str, session_id: str) -> None:
-    """Remove ``ctx`` from ``session_id``'s index entry; unlink the entry when empty."""
-    remaining = [c for c in _read_by_session(workspace, session_id) if c != ctx]
-    path = _by_session_path(workspace, session_id)
-    if remaining:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _write_record(path, {"session_id": session_id, "contexts": sorted(remaining)})
-    else:
-        path.unlink(missing_ok=True)
-
-
-def session_holds(workspace: Path, ctx: str, session_id: str) -> bool:
-    """True iff ``session_id``'s by-session index entry names ``ctx`` (v0.1.50 FR2).
-
-    The entry is written in the SAME CAS transaction as every acquire, so it is
-    acquisition evidence: a lock record whose holder also appears in the index is a
-    CONFIRMED holder (holder-confirmation for SPEC-DOC-029) — a divergent incumbent
-    ``.ptr`` alone is drift, not forgery. Fail-soft: absent/corrupt index ⇒ False.
-    """
-    try:
-        return ctx in _read_by_session(workspace, session_id)
-    except (OSError, ValueError):
-        return False
-
-
-def release_for_session(workspace: Path, session_id: str) -> list[str]:
-    """Eval-flow release (FR-W4-03 a): drop every lease the ``session_id`` holds.
-
-    The env sid is the same key hooks renew on, so releasing every lock record naming
-    it is exact — there is no foreign-holder ambiguity. Returns the contexts released.
-    Falls back to a full lock-dir scan when the by-session index is absent (migration).
-    """
-    released: list[str] = []
-    contexts = contexts_for_session(workspace, session_id)
-    if not contexts:
-        contexts = _scan_contexts_held_by(workspace, session_id)
-    for ctx in contexts:
-        try:
-            if release(workspace, ctx, session_id):
-                released.append(ctx)
-        except (OSError, ValueError):
-            continue
-    return released
-
-
-def _scan_contexts_held_by(workspace: Path, session_id: str) -> list[str]:
-    """Migration fallback: scan lock records for those whose holder == ``session_id``."""
-    lock_dir = _lock_dir(workspace)
-    try:
-        entries = list(lock_dir.iterdir())
-    except OSError:
-        return []
-    suffix = ".lock.json"
-    out: list[str] = []
-    for p in entries:
-        if not p.name.endswith(suffix):
-            continue
-        ctx = p.name[: -len(suffix)]
-        rec = read_record(workspace, ctx)
-        if rec is not None and rec.get("session_id") == session_id:
-            out.append(ctx)
-    return sorted(out)
-
-
-def release_context_if_caller_owned(
-    workspace: Path,
-    ctx: str,
-    *,
-    caller_pid: int,
-    pid_probe: PidProbe | None = None,
-    ancestry: Callable[[int, int], bool] | None = None,
-) -> str | None:
-    """Default-flow release (FR-W4-03 b): drop ``ctx``'s lease only when caller-owned.
-
-    The CLI-minted sid never matches the harness sid recorded in the lock, so we cannot
-    release by sid. Instead, release the bound context's lease ONLY when its holder is:
-
-    * **dead** — the holder ``pid`` is no longer alive (``pid_probe`` reports dead), OR
-    * **the caller's own process** — the holder ``pid`` is an ancestor of ``caller_pid``
-      (the ``ancestry(holder_pid, caller_pid)`` predicate), i.e. the bind belongs to the
-      same harness tree issuing the release.
-
-    A live foreign holder (alive pid, not in the caller's ancestry) is NEVER released by
-    context name alone — that is exactly the cross-session theft the chokepoint forbids.
-    Indeterminate ancestry is treated as NOT-owned (conservative: do not release).
-
-    Returns the holder sid that was released, or ``None`` when nothing was released.
-    """
-    rec = read_record(workspace, ctx)
-    if rec is None:
-        return None
-    holder_sid = str(rec.get("session_id", ""))
-    holder_pid_raw = rec.get("pid")
-    holder_pid = int(holder_pid_raw) if isinstance(holder_pid_raw, int) else None
-
-    owned = False
-    if holder_pid is None:
-        # Legacy record without a pid — nothing to probe; treat as dead/releasable.
-        owned = True
-    else:
-        alive = pid_probe(holder_pid) if pid_probe is not None else False
-        if not alive:
-            owned = True
-        elif ancestry is not None and holder_pid != caller_pid:
-            owned = ancestry(holder_pid, caller_pid)
-        elif holder_pid == caller_pid:
-            owned = True
-
-    if not owned or not holder_sid:
-        return None
-    if release(workspace, ctx, holder_sid):
-        return holder_sid
-    return None
-
-
-def contexts_for_session(workspace: Path, session_id: str) -> list[str]:
-    """Public read of the by-session index: contexts ``session_id`` holds (FR-W4-02).
-
-    Consumed by ``hooks/sdd_post_gate._iter_lease_contexts`` to drive renewal without a
-    full lock-dir scan. Returns ``[]`` when the session holds nothing or its entry is
-    absent/corrupt. An invalid session id returns ``[]`` rather than raising (the hook
-    must never break the harness).
-    """
-    try:
-        return sorted(_read_by_session(workspace, session_id))
-    except ValueError:
-        return []
-
-
-# Stable-identity pointer reads/writes are owned by ``session_identity`` (WS-R3,
-# FR-R3-01). ``lease.py`` keeps these thin wrappers so its acquire/CAS logic and the
-# existing test seams read naturally, but it no longer constructs the
-# ``sessions/runtime/*.ptr`` path itself — the single owner does.
-
-
-def _ptr_path(workspace: Path, ctx: str) -> Path:
-    """Path for the stable-identity pointer file (delegated to ``session_identity``)."""
-    _validate(ctx, field="context")
-    return session_identity.ptr_path(workspace, ctx, create=True)
-
-
-def _read_ptr(workspace: Path, ctx: str) -> str | None:
-    """Read the stable-identity pointer; returns session_id string or None."""
-    _validate(ctx, field="context")
-    return session_identity.read_incumbent_ptr(workspace, ctx)
-
-
-def _write_ptr(workspace: Path, ctx: str, session_id: str) -> None:
-    """Write session_id to the incumbent pointer atomically (via ``session_identity``)."""
-    _validate(ctx, field="context")
-    session_identity.write_incumbent_ptr(workspace, ctx, session_id)
-
-
 def read_record(workspace: Path, ctx: str) -> dict[str, object] | None:
     """Read the lease record. Returns ``None`` if absent or unparseable (pure read)."""
     path = _record_path(workspace, ctx)
@@ -373,7 +135,7 @@ def read_record(workspace: Path, ctx: str) -> dict[str, object] | None:
 
 
 def _write_record(path: Path, data: dict[str, object]) -> None:
-    """Atomic write via unique tmp + ``os.replace`` (inside the sentinel CAS)."""
+    """Atomic write via unique tmp + ``os.replace``."""
     tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     try:
@@ -405,260 +167,19 @@ def _audit(
         fh.write(json.dumps(entry) + "\n")
 
 
-def _new_record(
-    ctx: str,
-    release: str,
-    session_id: str,
-    mode: str,
-    *,
-    clock: Callable[[], datetime],
-    ttl: int,
-    pid: int,
-) -> dict[str, object]:
-    now = clock().isoformat()
-    return {
-        "context": ctx,
-        "release": release,
-        "session_id": session_id,
-        "mode": mode,
-        "pid": pid,
-        "acquired_at": now,
-        "heartbeat": now,
-        "ttl": ttl,
-    }
+def holder_in_lineage(
+    record: dict[str, object] | None, ancestry_pids: frozenset[int] | None
+) -> bool:
+    """True iff the lease record's holder ``pid`` is in the CURRENT process lineage.
 
-
-def _gc_orphan_sentinel(sentinel: Path) -> None:
-    """Unlink an orphan sentinel (mtime > 30 s) — prevents permanent deadlock after SIGKILL."""
-    try:
-        age = time.time() - sentinel.stat().st_mtime
-    except OSError:
-        return
-    if age > _SENTINEL_ORPHAN_AGE:
-        sentinel.unlink(missing_ok=True)
-
-
-def _yield_message(ctx: str, holder_id: str, heartbeat: str) -> str:
-    """Build the informative yield-iff-live-foreign message (FR-P1-15).
-
-    HARD CONSTRAINT (operator forbidden-law): this message MUST NOT instruct the
-    operator to ``bind --mode write``, ``relaunch``, or ``lock steal`` — not even
-    as a conditional/emergency step. There is no manual unblock ceremony: the lease
-    auto-reclaims after ``LEASE_TTL_SECONDS`` without a heartbeat, so a finished or
-    dead holder frees it automatically and this session acquires on its next write.
+    Pure predicate — zero I/O. Kept for ``container.py``'s preflight diagnostics (T-4
+    territory, out of T-3's write set): a residual record whose holder pid is our own
+    process lineage is never reported as a "live foreign holder" in the preflight panel.
     """
-    return (
-        f"[SDD LOCK] Session {holder_id!r} is actively mutating context {ctx!r} "
-        f"(last heartbeat: {heartbeat}). "
-        "This session will not mutate to avoid a race. "
-        "Additive writes (backlog/audit/reports/handoff) are still allowed. "
-        f"The lease auto-reclaims after ~{kernel_tunables.LEASE_TTL_SECONDS}s without a heartbeat, "
-        "so a finished or dead session frees it automatically and this session "
-        "then acquires on its next write. No manual action is needed."
-    )
-
-
-#: Sentinel: "no explicit veto release supplied — use ``release``" (v0.1.50 FR1).
-_UNSET_RELEASE: str = "\x00unset"
-
-
-def _session_record_pid(workspace: Path, session_id: str) -> int | None:
-    """Fail-soft pid of a CLI session record (self-recognition lineage evidence).
-
-    Lazy import: ``session_identity`` owns the record path schema; ``lease`` only
-    reads through the owner's helper (no cycle — session_identity does not import
-    lease). Missing/corrupt record ⇒ ``None`` ⇒ no self-recognition (safe default).
-    """
-    from dadaia_workspace.features.spec_context.session_identity import (
-        session_record_pid,
-    )
-
-    return session_record_pid(workspace, session_id)
-
-
-def acquire(
-    workspace: Path,
-    ctx: str,
-    session_id: str,
-    release: str,
-    mode: str,
-    *,
-    clock: Callable[[], datetime] = _utcnow,
-    ttl: int = kernel_tunables.LEASE_TTL_SECONDS,
-    permission_setter: FilePermissionSetter | None = None,
-    pid_probe: PidProbe | None = None,
-    pid: int | None = None,
-    active_release: str | None = _UNSET_RELEASE,
-) -> tuple[str, dict[str, object]]:
-    """Acquire (or renew) the lease via O_EXCL CAS.
-
-    Decision tree (FR-P1-15 + WS-R2 FR-R2-03/04):
-
-    1. ``.ptr`` file matches ``session_id`` → **RENEW** unconditionally (stable identity:
-       this is the incumbent session, even if the lock record shows a different session_id
-       due to a relaunch). Updates the lock record to ``session_id`` (holder-safe past TTL).
-    2. Record present and ``session_id`` matches → **RENEWED**, *even past TTL* — a
-       confirmed holder never loses its own lease to its own staleness (FR-R2-04).
-    3. Record absent, or TTL-stale **and** the holder pid is dead/absent (per the injected
-       ``pid_probe``) → **ACQUIRED** / **TAKEOVER** (fresh write).
-    4. Record TTL-stale **but** the holder pid is still alive (``pid_probe`` veto), or
-       record TTL-fresh, with a foreign ``session_id`` and no ``.ptr`` match → raises
-       :class:`~dadaia_workspace.core.exceptions.LockHeldError` with the informative
-       yield-iff-live-foreign message (FR-P1-15/FR-R2-03). The caller must not proceed.
-
-    ``pid_probe`` (``(pid) -> alive?``) is injected from the hook layer (container's
-    ``OsProcessProbe``); ``None`` ⇒ TTL-only fallback (Windows-safe, legacy-record-safe).
-    ``pid`` defaults to this process's pid and is written into the record at acquire/takeover.
-
-    The only other :class:`LockHeldError` raised is transient sentinel-contention
-    (a genuinely simultaneous CAS that loses all retries); the SDD gate treats that
-    as fail-open (ALLOW), so it never freezes the flow either.
-
-    On every successful acquire/renew, the ``.ptr`` file is written or refreshed.
-    """
-    _validate(ctx, field="context")
-    _validate(session_id, field="session_id")
-    record_path = _record_path(workspace, ctx, permission_setter)
-    sentinel = _sentinel_path(workspace, ctx, permission_setter)
-    holder_pid = os.getpid() if pid is None else pid
-
-    backoff = _INITIAL_BACKOFF
-    for attempt in range(_MAX_RETRIES + 1):
-        _gc_orphan_sentinel(sentinel)
-        try:
-            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
-                pass
-        except FileExistsError:
-            if attempt >= _MAX_RETRIES:
-                rec = read_record(workspace, ctx)
-                holder = (rec or {}).get("session_id", "<acquiring>")
-                raise LockHeldError(
-                    f"context {ctx!r} lease is being acquired concurrently "
-                    f"(holder={holder}); retry the operation."
-                ) from None
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        try:
-            if _before_write is not None:
-                _before_write()
-
-            # --- Stable session identity (D1): check .ptr first ---
-            ptr_id = _read_ptr(workspace, ctx)
-            if ptr_id is not None and ptr_id == session_id:
-                # Incumbent session recognised via .ptr — RENEW unconditionally.
-                # Update the lock record to the current session_id (it may have
-                # drifted to a foreign id due to a relaunch without .ptr cleanup).
-                rec = read_record(workspace, ctx)
-                if rec is not None:
-                    # v0.1.50 FR2 (audit F-7): the replaced sid's by-session entry
-                    # must not dangle — same hygiene as the takeover branch.
-                    drifted_sid = str(rec.get("session_id", ""))
-                    if drifted_sid and drifted_sid != session_id:
-                        with contextlib.suppress(OSError, ValueError):
-                            _index_remove(workspace, ctx, drifted_sid)
-                    rec["session_id"] = session_id
-                    rec["pid"] = holder_pid
-                    rec["heartbeat"] = clock().isoformat()
-                    _write_record(record_path, rec)
-                    _index_add(workspace, ctx, session_id)
-                    _write_ptr(workspace, ctx, session_id)
-                    return "RENEWED", rec
-                else:
-                    # No record (e.g. GC'd) → create fresh.
-                    new = _new_record(
-                        ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
-                    )
-                    _write_record(record_path, new)
-                    _index_add(workspace, ctx, session_id)
-                    _write_ptr(workspace, ctx, session_id)
-                    _audit(workspace, "acquire", ctx, session_id, clock=clock)
-                    return "ACQUIRED", new
-
-            rec = read_record(workspace, ctx)
-
-            # --- Holder-safe renew (FR-R2-04): a confirmed holder renews even past TTL.
-            # Checked BEFORE the staleness branch so a holder never loses its own lease
-            # to its own heartbeat ageing.
-            if rec is not None and rec.get("session_id") == session_id:
-                rec["pid"] = holder_pid
-                rec["heartbeat"] = clock().isoformat()
-                _write_record(record_path, rec)
-                _index_add(workspace, ctx, session_id)
-                _write_ptr(workspace, ctx, session_id)
-                return "RENEWED", rec
-
-            # --- Foreign / absent: stale ⇒ takeover, live (TTL or pid-veto) ⇒ yield ---
-            # ``active_release=release`` (T-43-10): the release this session is acquiring FOR is
-            # the context's live ACTIVE release. A foreign lease pinned to a *different*
-            # (closed/archived) release is reclaimable despite a live holder pid, so an archived
-            # -release lease can no longer deadlock the next release. A foreign lease on the SAME
-            # release keeps the pid-veto (a genuinely-active holder is never stolen).
-            if rec is None or is_stale(
-                rec,
-                clock=clock,
-                pid_probe=pid_probe,
-                # v0.1.50 FR1 (audit F-3): the veto release is decoupled from the
-                # RECORD release. Callers that could not READ ACTIVE.md pass
-                # ``active_release=None`` (veto-preserving) while still writing a
-                # "none" record release; the default keeps the legacy coupling.
-                active_release=(release if active_release == _UNSET_RELEASE else active_release),
-            ):
-                # A takeover transfers holder identity: drop the stale holder's index
-                # entry for this ctx, then claim it for the new session — same CAS.
-                stale_holder = str(rec.get("session_id", "")) if rec else ""
-                if stale_holder and stale_holder != session_id:
-                    with contextlib.suppress(OSError, ValueError):
-                        _index_remove(workspace, ctx, stale_holder)
-                new = _new_record(
-                    ctx, release, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
-                )
-                _write_record(record_path, new)
-                _index_add(workspace, ctx, session_id)
-                _write_ptr(workspace, ctx, session_id)
-                _audit(workspace, "acquire", ctx, session_id, clock=clock)
-                return "ACQUIRED", new
-
-            # --- Self-recognition (v0.1.50 FR1, audit F-1): third identity rung ---
-            # The live record's holder pid IS this very process (same harness pid,
-            # rotated session id) AND the record's old sid demonstrably belonged to
-            # this pid (its CLI session record — written by `dadaia context bind` —
-            # carries the same pid: LINEAGE EVIDENCE). A process can never be foreign
-            # to itself: RENEW under the current sid instead of self-blocking. Bare
-            # pid equality is NOT enough — unit fixtures and eval flows legitimately
-            # model foreign holders with the current process pid and no session
-            # record, and those must keep blocking (yield-iff-live-foreign).
-            rec_pid = rec.get("pid")
-            old_sid = str(rec.get("session_id", ""))
-            if (
-                isinstance(rec_pid, int)
-                and rec_pid == holder_pid
-                and old_sid
-                and old_sid != session_id
-                and _session_record_pid(workspace, old_sid) == holder_pid
-            ):
-                with contextlib.suppress(OSError, ValueError):
-                    _index_remove(workspace, ctx, old_sid)
-                rec["session_id"] = session_id
-                rec["pid"] = holder_pid
-                rec["heartbeat"] = clock().isoformat()
-                _write_record(record_path, rec)
-                _index_add(workspace, ctx, session_id)
-                _write_ptr(workspace, ctx, session_id)
-                return "RENEWED", rec
-
-            # Foreign lease that is still live — either TTL-fresh, or TTL-stale but the
-            # holder pid is demonstrably alive (WS-R2 FR-R2-03 no-steal veto).
-            # NEVER take over a live foreign lease: that violates exactly-one-mutating.
-            holder_id = str(rec.get("session_id", "<unknown>"))
-            heartbeat = str(rec.get("heartbeat", "unknown"))
-            raise LockHeldError(_yield_message(ctx, holder_id, heartbeat))
-
-        finally:
-            sentinel.unlink(missing_ok=True)
-
-    # Unreachable: the loop either returns, raises, or exhausts retries above.
-    raise LockHeldError(f"context {ctx!r}: could not acquire lease sentinel")
+    if record is None or not ancestry_pids:
+        return False
+    rec_pid = record.get("pid")
+    return isinstance(rec_pid, int) and rec_pid in ancestry_pids
 
 
 def renew_heartbeat(
@@ -667,174 +188,38 @@ def renew_heartbeat(
     session_id: str,
     *,
     clock: Callable[[], datetime] = _utcnow,
-    permission_setter: FilePermissionSetter | None = None,
 ) -> bool:
-    """Renew heartbeat iff held by ``session_id``. No-op otherwise.
+    """Renew heartbeat iff a residual record is held by ``session_id``. No-op otherwise.
 
-    Atomic w.r.t. a foreign ``acquire`` (FR-R2-04): the read→verify→write runs **inside
-    the same O_EXCL sentinel CAS** that ``acquire``/``steal`` use, so a concurrent
-    takeover can never interleave between this renewal's read and write. Without the CAS
-    (the historical race at this site), a foreign acquirer could take over a stale record
-    *after* this read but *before* this write, and the write would then stamp the foreign
-    record back to ``session_id`` — producing a lock-file history in which two different
-    holders each believe they hold the lease. The CAS serializes them: whoever wins the
-    sentinel runs to completion; the loser observes the committed record.
-
-    Holder-safe past TTL: a confirmed holder renews even if its own heartbeat aged out —
-    it never loses its own lease to its own staleness (mirrors ``acquire``'s holder branch).
-    A non-holder is a guarded no-op (returns ``False``); it never overwrites a foreign
-    record.
+    Dormant simple read-verify-write (no CAS sentinel — nothing else writes this record
+    anymore, so the historical concurrent-acquirer race this CAS guarded against cannot
+    occur). A non-holder, or an absent record (the common case post-doctrine), is a
+    guarded no-op returning ``False``.
     """
-    sentinel = _sentinel_path(workspace, ctx, permission_setter)
-    record_path = _record_path(workspace, ctx, permission_setter)
-    backoff = _INITIAL_BACKOFF
-    for attempt in range(_MAX_RETRIES + 1):
-        _gc_orphan_sentinel(sentinel)
-        try:
-            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
-                pass
-        except FileExistsError:
-            if attempt >= _MAX_RETRIES:
-                return False  # contended renewal is a safe no-op (gate fail-open).
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        try:
-            rec = read_record(workspace, ctx)
-            if rec is None or rec.get("session_id") != session_id:
-                return False
-            rec["heartbeat"] = clock().isoformat()
-            _write_record(record_path, rec)
-            return True
-        finally:
-            sentinel.unlink(missing_ok=True)
-    return False
-
-
-def holder_in_lineage(
-    record: dict[str, object] | None, ancestry_pids: frozenset[int] | None
-) -> bool:
-    """True iff the lease record's holder ``pid`` is in the CURRENT process lineage.
-
-    v0.1.72 FR2 (bug ``rebind-does-not-adopt-same-process-lease``): the lock's recorded
-    pid is the long-lived harness process; a session rotation inside that same process
-    (rebind, relaunch, hook-heartbeat identity vs bind ``sess_*`` identity) leaves the
-    record naming an old sid while the pid IS an ancestor of every CLI this harness
-    spawns. A process lineage can never be foreign to itself — mirrors acquire's rung-1
-    ``.ptr`` semantics and the bind-marker ancestry attribution (W1-7/W1-8).
-    """
-    if record is None or not ancestry_pids:
-        return False
-    rec_pid = record.get("pid")
-    return isinstance(rec_pid, int) and rec_pid in ancestry_pids
-
-
-def adopt_if_own_lineage(
-    workspace: Path,
-    ctx: str,
-    session_id: str,
-    *,
-    ancestry_pids: frozenset[int] | None,
-    clock: Callable[[], datetime] = _utcnow,
-    permission_setter: FilePermissionSetter | None = None,
-) -> bool:
-    """Adopt a same-lineage lease record for ``session_id`` (v0.1.72 FR2).
-
-    Called by ``dadaia context bind`` after it refreshes the incumbent pointer: when the
-    existing lock record's holder pid is in THIS process's ancestry chain (see
-    :func:`holder_in_lineage`) and the record names a different session id, rewrite the
-    record to the current session — the eager form of acquire's rung-1 normalization, so
-    diagnostics (preflight) see a coherent holder immediately instead of a false
-    "live foreign holder". Foreign records (pid outside our lineage) are NEVER touched.
-    Same O_EXCL sentinel CAS as acquire/renew. Returns True iff adopted.
-    """
-    _validate(ctx, field="context")
-    _validate(session_id, field="session_id")
     rec = read_record(workspace, ctx)
-    if not holder_in_lineage(rec, ancestry_pids):
+    if rec is None or rec.get("session_id") != session_id:
         return False
-    assert rec is not None
-    old_sid = str(rec.get("session_id", ""))
-    if old_sid == session_id:
-        return False
-
-    record_path = _record_path(workspace, ctx, permission_setter)
-    sentinel = _sentinel_path(workspace, ctx, permission_setter)
-    backoff = _INITIAL_BACKOFF
-    for attempt in range(_MAX_RETRIES + 1):
-        _gc_orphan_sentinel(sentinel)
-        try:
-            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
-                pass
-        except FileExistsError:
-            if attempt >= _MAX_RETRIES:
-                return False  # contended — the next acquire will normalize (rung 1)
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        try:
-            rec = read_record(workspace, ctx)
-            if not holder_in_lineage(rec, ancestry_pids):
-                return False
-            assert rec is not None
-            drifted_sid = str(rec.get("session_id", ""))
-            if drifted_sid == session_id:
-                return False
-            if drifted_sid:
-                with contextlib.suppress(OSError, ValueError):
-                    _index_remove(workspace, ctx, drifted_sid)
-            rec["session_id"] = session_id
-            rec["heartbeat"] = clock().isoformat()
-            _write_record(record_path, rec)
-            _index_add(workspace, ctx, session_id)
-            _write_ptr(workspace, ctx, session_id)
-            _audit(workspace, "adopt", ctx, session_id, clock=clock)
-            return True
-        finally:
-            sentinel.unlink(missing_ok=True)
-    return False
+    rec["heartbeat"] = clock().isoformat()
+    _write_record(_record_path(workspace, ctx), rec)
+    return True
 
 
 def release(
     workspace: Path,
     ctx: str,
     session_id: str,
-    *,
-    permission_setter: FilePermissionSetter | None = None,
 ) -> bool:
-    """Delete the record iff held by ``session_id``. No-op otherwise.
+    """Delete a residual record iff held by ``session_id``. No-op otherwise.
 
-    Record-unlink and by-session-index removal happen inside the SAME O_EXCL sentinel
-    CAS as ``acquire``/``steal`` (FR-W4-02): the two removals are one atomic unit, so a
-    concurrent ``acquire`` can never interleave between them and observe a dangling index
-    entry whose record is gone (or vice versa). A non-holder is a guarded no-op.
+    Dormant simple guarded delete (no CAS sentinel, no by-session index — both deleted in
+    T-3 along with ``acquire``/``steal``, their sole writers).
     """
-    sentinel = _sentinel_path(workspace, ctx, permission_setter)
-    record_path = _record_path(workspace, ctx, permission_setter)
-    backoff = _INITIAL_BACKOFF
-    for attempt in range(_MAX_RETRIES + 1):
-        _gc_orphan_sentinel(sentinel)
-        try:
-            with open(sentinel, "x", encoding="utf-8"):  # O_CREAT|O_EXCL CAS
-                pass
-        except FileExistsError:
-            if attempt >= _MAX_RETRIES:
-                return False  # contended release is a safe no-op.
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        try:
-            rec = read_record(workspace, ctx)
-            if rec is None or rec.get("session_id") != session_id:
-                return False
-            record_path.unlink(missing_ok=True)
-            with contextlib.suppress(OSError, ValueError):
-                _index_remove(workspace, ctx, session_id)
-            _audit(workspace, "release", ctx, session_id, clock=_utcnow)
-            return True
-        finally:
-            sentinel.unlink(missing_ok=True)
-    return False
+    rec = read_record(workspace, ctx)
+    if rec is None or rec.get("session_id") != session_id:
+        return False
+    _record_path(workspace, ctx).unlink(missing_ok=True)
+    _audit(workspace, "release", ctx, session_id, clock=_utcnow)
+    return True
 
 
 def is_held(
@@ -844,7 +229,7 @@ def is_held(
     clock: Callable[[], datetime] = _utcnow,
     pid_probe: PidProbe | None = None,
 ) -> bool:
-    """True if a live (non-stale) record exists. Pure read.
+    """True if a live (non-stale) residual record exists. Pure read.
 
     ``pid_probe`` (when wired) keeps a TTL-expired-but-still-running holder reported
     as held (WS-R2 FR-R2-03); ``None`` ⇒ TTL-only.
@@ -859,198 +244,11 @@ def reclaim(
     clock: Callable[[], datetime] = _utcnow,
     pid_probe: PidProbe | None = None,
 ) -> bool:
-    """Return ``True`` if a lease record is safe to reclaim (GC/delete) — T-011-02.
+    """Return ``True`` if a residual lease record is safe to reclaim (GC/delete).
 
-    Reclaimability is the single liveness verdict (``core.lock_liveness.is_stale``):
-
-    * TTL-expired **and** the holder pid is dead/absent (per ``pid_probe``) ⇒ reclaimable.
-    * TTL-expired **but** the record carries **no** ``pid`` field (legacy/pre-pid record,
-      observed in the ``doctor-stale-lease-misdiagnosed-as-forgery`` bug) ⇒ reclaimable —
-      there is nothing to veto on, so it degrades to the TTL rule and is no longer
-      permanently un-reclaimable.
-    * TTL-expired **but** the holder pid is demonstrably **alive** (``pid_probe`` veto) ⇒
-      **NOT** reclaimable, regardless of how far past TTL the heartbeat is. A
-      genuinely-running session is never garbage-collected.
-    * TTL-fresh ⇒ NOT reclaimable.
-    * absent / corrupt record ⇒ reclaimable (fail-open: a corrupt lock never deadlocks).
-
-    This is the GC counterpart to ``acquire``'s reclaim-iff-stale branch and exposes the
-    same predicate to the workspace doctor's ``LOCK-GC`` sweep, so an idle workspace can
-    garbage-collect a dead session's stale lease without a MUTATING-write acquisition.
+    Reclaimability is the single liveness verdict (``core.lock_liveness.is_stale``) —
+    unchanged predicate, kept so the workspace doctor's ``LOCK-GC`` sweep and diagnostics
+    stay meaningful over a residual record from a pre-doctrine install, without any
+    acquisition path consuming the verdict anymore.
     """
     return is_stale(record, clock=clock, pid_probe=pid_probe)
-
-
-def steal(
-    workspace: Path,
-    ctx: str,
-    session_id: str,
-    *,
-    clock: Callable[[], datetime] = _utcnow,
-    ttl: int = kernel_tunables.LEASE_TTL_SECONDS,
-    permission_setter: FilePermissionSetter | None = None,
-    pid_probe: PidProbe | None = None,
-    pid: int | None = None,
-    active_release: str | None = None,
-) -> tuple[bool, dict[str, object] | None]:
-    """Reclaim a *stale* lease for ``session_id`` via the same O_EXCL CAS as acquire.
-
-    Refuses (returns ``(False, record)``) if the lease is live — including a
-    TTL-expired-but-pid-alive holder when ``pid_probe`` is wired (WS-R2 FR-R2-03: no
-    stealing a genuinely-running session). Returns ``(True, new_record)`` on success.
-    The CAS prevents a double-steal race.
-
-    ``active_release`` (T-43-10): the context's live ACTIVE release. When provided, a lease
-    pinned to a *different* (closed/archived) release is reclaimable despite a live holder pid
-    — ``lock steal`` can break an archived-release deadlock. A lease on the live ACTIVE release
-    keeps the pid-veto (no false steal of a genuinely-active session). ``None`` ⇒ legacy
-    release-agnostic behavior.
-    """
-    _validate(ctx, field="context")
-    _validate(session_id, field="session_id")
-    holder_pid = os.getpid() if pid is None else pid
-    rec = read_record(workspace, ctx)
-    if rec is not None and not is_stale(
-        rec, clock=clock, pid_probe=pid_probe, active_release=active_release
-    ):
-        return False, rec
-
-    sentinel = _sentinel_path(workspace, ctx, permission_setter)
-    record_path = _record_path(workspace, ctx, permission_setter)
-    backoff = _INITIAL_BACKOFF
-    for attempt in range(_MAX_RETRIES + 1):
-        _gc_orphan_sentinel(sentinel)
-        try:
-            with open(sentinel, "x", encoding="utf-8"):
-                pass
-        except FileExistsError:
-            if attempt >= _MAX_RETRIES:
-                return False, read_record(workspace, ctx)
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        try:
-            rec2 = read_record(workspace, ctx)
-            if rec2 is not None and not is_stale(
-                rec2, clock=clock, pid_probe=pid_probe, active_release=active_release
-            ):
-                return False, rec2  # became live during the race
-            release_id = str(rec2.get("release", "")) if rec2 else ""
-            mode = str(rec2.get("mode", "")) if rec2 else ""
-            stale_holder = str(rec2.get("session_id", "")) if rec2 else ""
-            if stale_holder and stale_holder != session_id:
-                with contextlib.suppress(OSError, ValueError):
-                    _index_remove(workspace, ctx, stale_holder)
-            new = _new_record(
-                ctx, release_id, session_id, mode, clock=clock, ttl=ttl, pid=holder_pid
-            )
-            _write_record(record_path, new)
-            _index_add(workspace, ctx, session_id)
-            _write_ptr(workspace, ctx, session_id)
-            _audit(workspace, "steal", ctx, session_id, clock=clock)
-            return True, new
-        finally:
-            sentinel.unlink(missing_ok=True)
-    return False, read_record(workspace, ctx)
-
-
-def _main_pid_probe() -> PidProbe | None:
-    """Resolve the PID-liveness probe for the ``_main`` CLI side door (T-011-01).
-
-    ``_main`` is the SDD gate's single acquisition point; its ``acquire``/``steal``
-    paths must consult the SAME probe the MUTATING gate path uses, so a TTL-expired
-    foreign holder whose pid is still alive is never taken over via this side door
-    (residual R1; bug ``doctor-stale-lease-misdiagnosed-as-forgery``).
-
-    The concrete probe is the ``OsProcessProbe``. ``features/`` must not import
-    ``infrastructure/`` statically (import-linter law). The single public builder lives in
-    the infrastructure adapter (``infrastructure.process_probe_adapter.build_pid_probe`` —
-    v0.1.54 FR6, the sole successor to the three deleted private probe-builder wrappers); we
-    resolve it here through a **dynamic** ``importlib`` lookup at the
-    composition boundary (this entrypoint is the lease's own composition root, analogous to
-    the doctor's composition-root-wired probe seam — never a static feature→infrastructure
-    import). The dynamic resolution keeps the static import graph clean: ``features/lease.py``
-    has zero static edge into ``infrastructure`` or ``hooks``, so the ignore-cap stays 26.
-    Any failure ⇒ ``None`` ⇒ TTL-only fallback (Windows-safe, legacy-record-safe), exactly
-    as the gate degrades.
-    """
-    try:
-        import importlib
-
-        adapter = importlib.import_module("dadaia_workspace.infrastructure.process_probe_adapter")
-        builder: Callable[[], PidProbe | None] = adapter.build_pid_probe
-        return builder()
-    except Exception:  # noqa: BLE001 — probe wiring must never deadlock the gate side door.
-        return None
-
-
-def _main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint: the SDD gate's SINGLE acquisition point.
-
-    Usage::
-
-        python -m dadaia_workspace.features.spec_context.lease acquire <ctx> <sid> <release> <mode>
-
-    Prints ``ACQUIRED`` / ``RENEWED`` and exits 0 on success; prints the unblock
-    message and exits 1 on a live conflict. Any unexpected failure exits 0
-    (fail-open) so the gate never deadlocks on a lease-subsystem bug.
-
-    Both the ``acquire`` and ``steal`` paths thread the pid-liveness probe
-    (``_main_pid_probe``) so this side door honours the no-steal veto (T-011-01).
-    """
-    args = list(sys.argv[1:] if argv is None else argv)
-    if not args:
-        print("usage: lease <acquire|steal|release|status> <ctx> ...", file=sys.stderr)
-        return 2
-
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    # The gate passes WORKSPACE_ROOT so the lease acts on the same workspace it
-    # classified (hermetic); fall back to CWD resolution for direct CLI use.
-    ws_env = os.environ.get("WORKSPACE_ROOT")
-    try:
-        workspace = Path(ws_env) if ws_env else resolve_workspace_root()
-    except Exception as exc:  # noqa: BLE001 — fail-open: gate must never deadlock
-        print(f"WORKSPACE_UNRESOLVED: {exc}", file=sys.stderr)
-        return 0
-
-    # Single probe for every side-door path so the no-steal veto holds (T-011-01).
-    pid_probe = _main_pid_probe()
-
-    cmd = args[0]
-    try:
-        if cmd == "acquire":
-            ctx, session_id, release_id, mode = args[1], args[2], args[3], args[4]
-            try:
-                status, _rec = acquire(
-                    workspace, ctx, session_id, release_id, mode, pid_probe=pid_probe
-                )
-            except LockHeldError as exc:
-                print(str(exc))
-                return 1
-            print(status)
-            return 0
-        if cmd == "steal":
-            ctx, session_id = args[1], args[2]
-            ok, _srec = steal(workspace, ctx, session_id, pid_probe=pid_probe)
-            print("STOLEN" if ok else "LIVE")
-            return 0 if ok else 1
-        if cmd == "release":
-            ctx, session_id = args[1], args[2]
-            print("RELEASED" if release(workspace, ctx, session_id) else "NOOP")
-            return 0
-        if cmd == "status":
-            ctx = args[1]
-            print("HELD" if is_held(workspace, ctx) else "FREE")
-            return 0
-    except (IndexError, ValueError) as exc:
-        # Bad args / invalid name → fail-open (allow); never deadlock the gate.
-        print(f"LEASE_ARG_ERROR: {exc}", file=sys.stderr)
-        return 0
-
-    print(f"unknown command {cmd!r}", file=sys.stderr)
-    return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(_main())

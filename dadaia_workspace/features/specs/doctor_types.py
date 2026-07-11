@@ -1,25 +1,18 @@
 """Shared leaf types for the SpecsDoctor decomposition (v0.1.55 FR1).
 
-Pure leaf module: imports ONLY stdlib (``collections.abc`` / ``dataclasses`` / ``enum``).
-It holds no I/O and no sibling-validator import, so the coordinator can depend on it without
-pulling in ``spec_context`` or ``infrastructure``.
+Pure leaf module: imports ONLY stdlib (``dataclasses`` / ``enum``). It holds no I/O and no
+sibling-validator import, so the coordinator can depend on it without pulling in
+``spec_context`` or ``infrastructure``.
 
-``PidProbe`` is re-homed here as a leaf alias (R-1). It is byte-identical to
-``spec_context.lease.PidProbe`` (both are the bare callable ``Callable[[int], bool]``), so the
-coordinator can type its ``pid_probe`` seam against this leaf and hold NO ``spec_context`` import
-edge — the CAP-CRITICAL invariant that keeps ``features-no-cross-feature`` at 13.
+v0.1.76 T-4: the ``PidProbe`` leaf alias (formerly re-homed here for the SPEC-DOC-029
+``pid_probe`` composition-root seam, R-1) is REMOVED — SPEC-DOC-029 is retired (see
+``doctor_coherence.py``) and nothing else in the SpecsDoctor decomposition consumed it.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-
-#: The PID-liveness seam type: ``pid -> is_alive``. Identical to ``spec_context.lease.PidProbe``
-#: (a bare ``Callable[[int], bool]``); re-homed as a leaf so the coordinator holds no
-#: ``spec_context`` import edge (R-1 cap invariant).
-PidProbe = Callable[[int], bool]
 
 
 class Severity(StrEnum):

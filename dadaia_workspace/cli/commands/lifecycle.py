@@ -306,9 +306,13 @@ def preflight(
     )
     result = service.preflight(data)
     if result.ok:
-        command_result = LifecycleCommandResult(
-            status=LifecycleCommandStatus.OK, message="preflight passed"
-        )
+        message = "preflight passed"
+        # v0.1.76 T-4 (FR7): advisory-only presence warnings (e.g. a live foreign
+        # session on this context) are surfaced but NEVER block — appended to the OK
+        # message so both --json and human output carry them.
+        if result.warnings:
+            message = message + " | " + " | ".join(result.warnings)
+        command_result = LifecycleCommandResult(status=LifecycleCommandStatus.OK, message=message)
     else:
         assert result.blocked is not None
         command_result = LifecycleCommandResult(
