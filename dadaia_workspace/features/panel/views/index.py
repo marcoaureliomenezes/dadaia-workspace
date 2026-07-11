@@ -22,8 +22,8 @@ Client-side (fetched via XHR/fetch after Bearer auth):
   - Reports   — auth-gated; file-system backed; sidecar-indexed
 
 Primary tabs (v0.1.79 panel agentic-layers reorg — 7 -> 6 tabs):
-  Projects | 2º Agentic Layer (id ``tab-workflows``) |
-  1º Agentic Layer (id ``tab-subagents``) | Reports | Academy | Servers.
+  Projects | 1º Agentic Layer (id ``tab-subagents``) |
+  2º Agentic Layer (id ``tab-workflows``) | Reports | Academy | Servers.
   The 1º Agentic Layer governs Layer-1 Claude sub-agent model+effort
   (v0.1.65 L1 governance) and now also hosts the Sessions cost/telemetry
   dashboard as a sub-section (``render_sessions_section``, appended inside
@@ -31,7 +31,10 @@ Primary tabs (v0.1.79 panel agentic-layers reorg — 7 -> 6 tabs):
   pi/codex workflow model policy. Tab/section
   ids are unchanged (``tab-subagents``/``section-subagents``,
   ``tab-workflows``/``section-workflows``) — label-only rename plus the
-  Sessions relocation.
+  Sessions relocation. The nav-button order AND the tabpanel body order both
+  place 1º Agentic Layer before 2º Agentic Layer (ratified SPEC order); the
+  ``.active`` class toggle in core.js is position-independent, but body order
+  is kept aligned with button order for visual/reading-order sanity.
 """
 
 from __future__ import annotations
@@ -121,8 +124,8 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="2º Agentic Layer">2&#186; Agentic Layer</button>
     <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="1º Agentic Layer">1&#186; Agentic Layer</button>
+    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="2º Agentic Layer">2&#186; Agentic Layer</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
@@ -155,9 +158,9 @@ def render_index(
       </div>
     </section>
 
-    {workflows_section}
-
     {_render_subagents_section()}
+
+    {workflows_section}
 
     {academy_section}
 

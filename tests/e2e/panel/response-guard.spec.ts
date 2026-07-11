@@ -45,8 +45,8 @@ import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 // Tab tour definition — 6 primary tabs in display order (v0.1.79 nav set)
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
-  { tabId: '#tab-workflows', sectionId: 'workflows', label: '2º Agentic Layer' },
   { tabId: '#tab-subagents', sectionId: 'subagents', label: '1º Agentic Layer' },
+  { tabId: '#tab-workflows', sectionId: 'workflows', label: '2º Agentic Layer' },
   { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },

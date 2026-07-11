@@ -27,13 +27,14 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
 
   // v0.1.79 panel agentic-layers reorg: 7 -> 6 primary tabs. The standalone
   // Sessions tab is merged into "1º Agentic Layer" (ex "Sub-agents") as a
-  // sub-section; "Workflows" is renamed "2º Agentic Layer". The nav is now
-  // exactly Projects, 2º Agentic Layer, 1º Agentic Layer, Reports, Academy,
-  // Servers (tab ids are unchanged: tab-workflows, tab-subagents).
+  // sub-section; "Workflows" is renamed "2º Agentic Layer". Per the ratified
+  // SPEC order, 1º Agentic Layer comes BEFORE 2º Agentic Layer. The nav is
+  // now exactly Projects, 1º Agentic Layer, 2º Agentic Layer, Reports,
+  // Academy, Servers (tab ids are unchanged: tab-subagents, tab-workflows).
   expect(tabs).toEqual([
     'Projects',
-    '2º Agentic Layer',
     '1º Agentic Layer',
+    '2º Agentic Layer',
     'Reports',
     'Academy',
     'Servers',
@@ -79,8 +80,8 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
   await page.waitForSelector('[role="tab"]');
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
-    { tabId: '#tab-workflows', sectionId: 'workflows' },
     { tabId: '#tab-subagents', sectionId: 'subagents' },
+    { tabId: '#tab-workflows', sectionId: 'workflows' },
     { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
     { tabId: '#tab-servers', sectionId: 'servers' },
@@ -155,7 +156,7 @@ test('E2E-TAB-04 — No CSP violations on load and all tab activations', async (
   await page.waitForSelector('[role="tab"]');
 
   // Navigate across the surviving tabs (Agentic/agents/kanban removed in v0.1.45).
-  for (const sectionId of ['workflows', 'subagents', 'servers', 'memories'] as const) {
+  for (const sectionId of ['subagents', 'workflows', 'servers', 'memories'] as const) {
     await activateTab(page, sectionId);
   }
 

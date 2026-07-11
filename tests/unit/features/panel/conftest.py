@@ -21,8 +21,8 @@ from __future__ import annotations
 # consumption point for every surviving DOM-contract test in this cluster.
 PANEL_PRIMARY_TABS: list[tuple[str, str]] = [
     ("memories", "Projects"),
-    ("workflows", "2º Agentic Layer"),
     ("subagents", "1º Agentic Layer"),
+    ("workflows", "2º Agentic Layer"),
     ("reports", "Reports"),
     ("academy", "Academy"),
     ("servers", "Servers"),
