@@ -556,9 +556,18 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
 
 
 def build_lifecycle_hygiene_service(workspace_root: Path) -> LifecycleHygieneService:
-    """Compose lifecycle hygiene service."""
+    """Compose lifecycle hygiene service.
+
+    v0.1.78 T-C / FR-C: always wires a real run store, so ``cleanup()``'s step-payload
+    coverage (``.dadaia/runs/lifecycle/``) is live in every production caller — the CLI
+    ``hygiene clean``/``hygiene status`` commands and the preflight gate's remediation
+    text alike now share the SAME candidate classifier the handoffs doctor and the
+    retention sweep already use for that zone.
+    """
     _guard_initialized(workspace_root)
-    return LifecycleHygieneService(workspace_root)
+    return LifecycleHygieneService(
+        workspace_root, run_store=build_lifecycle_run_store(workspace_root)
+    )
 
 
 def build_slop_report(
@@ -1134,7 +1143,11 @@ def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWork
     return LifecycleReportWorkflow(
         workspace_root=workspace_root,
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        hygiene=LifecycleHygieneService(workspace_root),
+        # v0.1.78 T-C / FR-C: same run-store wiring as build_lifecycle_hygiene_service so an
+        # explicit report-workflow cleanup shares the one canonical candidate classifier.
+        hygiene=LifecycleHygieneService(
+            workspace_root, run_store=build_lifecycle_run_store(workspace_root)
+        ),
         validation=build_reports_validation_service(workspace_root),
     )
 

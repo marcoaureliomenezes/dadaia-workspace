@@ -326,9 +326,28 @@ class LifecyclePreflightService:
                 ),
             )
         if data.binding.context != data.context:
-            return self._blocked(data, "wrong bound context")
+            # v0.1.78 T-C / FR-C: the session is bound to the WRONG context — the exact
+            # remediation is re-binding THIS session to the context the run actually needs
+            # (never a foreign session's binding; opt-in self-scoped correction only).
+            return self._blocked(
+                data,
+                "wrong bound context",
+                operator_command=(
+                    f"dadaia context bind {data.context} --mode {data.required_mode} "
+                    f"--release {data.release_id}"
+                ),
+            )
         if data.binding.release_id != data.release_id:
-            return self._blocked(data, "wrong bound release")
+            # v0.1.78 T-C / FR-C: same remediation shape — re-bind to the release the run
+            # targets.
+            return self._blocked(
+                data,
+                "wrong bound release",
+                operator_command=(
+                    f"dadaia context bind {data.context} --mode {data.required_mode} "
+                    f"--release {data.release_id}"
+                ),
+            )
         if not self._mode_matches(data.binding.mode, data.required_mode):
             return self._blocked(
                 data,
@@ -342,9 +361,28 @@ class LifecyclePreflightService:
 
     def _check_active_release(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if data.active_release.release_id != data.release_id:
-            return self._blocked(data, "active release mismatch")
+            # v0.1.78 T-C / FR-C: the workspace's ACTIVE.md points at a different release
+            # than the one this run targets — re-binding is the operator's actionable fix
+            # (mirrors the binding-mismatch sites above; the underlying condition is the
+            # same "session/workspace pointing somewhere else" shape).
+            return self._blocked(
+                data,
+                "active release mismatch",
+                operator_command=(
+                    f"dadaia context bind {data.context} --mode {data.required_mode} "
+                    f"--release {data.release_id}"
+                ),
+            )
         if not self._phase_matches(data.active_release.phase, data.expected_phase):
-            return self._blocked(data, "active release phase mismatch")
+            # v0.1.78 T-C / FR-C: ACTIVE.md's phase does not match what this step expects —
+            # `dadaia lifecycle status` is the read-only command that surfaces the current
+            # release/phase/step so the operator can see exactly where the ladder actually
+            # is before deciding the next move.
+            return self._blocked(
+                data,
+                "active release phase mismatch",
+                operator_command="dadaia lifecycle status --json",
+            )
         return None
 
     def _check_git(self, data: LifecyclePreflightInput) -> BlockedState | None:
@@ -443,11 +481,17 @@ class LifecyclePreflightService:
                 age_seconds=required.age_seconds,
             )
             if not validation.accepted:
+                # v0.1.78 T-C / FR-C: name the exact failed handoff so the operator's next
+                # command inspects the SAME document the gate rejected, not a generic status
+                # dump — ``detail["handoff"]`` above already carries the source path; the
+                # remediation command surfaces it too so `--json` consumers don't have to
+                # cross-reference ``detail``.
                 return LifecyclePreflightResult(
                     ok=False,
                     blocked=self._blocked(
                         data,
                         "required handoff gate failed",
+                        operator_command=f"dadaia lifecycle status --json  # inspect {required.source}",
                         detail={
                             "handoff": required.source,
                             "reasons": ",".join(validation.reasons),

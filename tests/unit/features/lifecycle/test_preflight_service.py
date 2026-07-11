@@ -133,7 +133,7 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
                 )
             },
             "wrong bound context",
-            None,
+            "dadaia context bind",
         ),
         (
             {
@@ -145,7 +145,7 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
                 )
             },
             "wrong bound release",
-            None,
+            "dadaia context bind",
         ),
         (
             {
@@ -162,12 +162,12 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.14", phase="implementation")},
             "active release mismatch",
-            None,
+            "dadaia context bind",
         ),
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.15", phase="definition")},
             "active release phase mismatch",
-            None,
+            "dadaia lifecycle status",
         ),
         (
             {"git": GitPreflightState(dirty_paths=("file.py",), upstream_branch="origin/main")},
@@ -211,8 +211,15 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
 def test_preflight_failures_return_typed_blocked_state(
     override: dict[str, object],
     reason: str,
-    command: str | None,
+    command: str,
 ) -> None:
+    """v0.1.78 T-C / FR-C: EVERY blocked reason carries a non-null, actionable
+    ``operator_command`` — no site defaults to ``None`` and leaves the operator guessing
+    the next command. Parametrized over every ``_blocked(...)`` call site in
+    ``LifecyclePreflightService.preflight`` (bug
+    ``split-cleanup-engines-strand-stale-step-payloads``, absorbed backlog
+    ``preflight-block-reasons-missing-operator-command``).
+    """
     result = LifecyclePreflightService().preflight(_input(**override))
 
     assert result.ok is False
@@ -220,11 +227,10 @@ def test_preflight_failures_return_typed_blocked_state(
     assert result.blocked.reason == reason
     assert result.blocked.blocked_at_step == "preflight"
     assert result.blocked.resume_token == "dadaia-workspace:v0.1.15:preflight"
-    if command is None:
-        assert result.blocked.operator_command is None
-    else:
-        assert result.blocked.operator_command is not None
-        assert result.blocked.operator_command.startswith(command)
+    assert result.blocked.operator_command is not None, (
+        f"blocked reason {reason!r} must carry a non-null operator_command"
+    )
+    assert result.blocked.operator_command.startswith(command)
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +291,9 @@ def test_preflight_blocks_when_required_handoff_gate_fails() -> None:
     assert result.blocked is not None
     assert result.blocked.reason == "required handoff gate failed"
     assert result.blocked.detail["handoff"] == ".dadaia/handoff/dadaia-workspace/qa.handoff.json"
+    # v0.1.78 T-C / FR-C: this site used to default operator_command=None.
+    assert result.blocked.operator_command is not None
+    assert result.blocked.operator_command.startswith("dadaia lifecycle")
 
 
 # ---------------------------------------------------------------------------

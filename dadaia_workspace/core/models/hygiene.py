@@ -21,6 +21,13 @@ class HygieneCandidateKind(StrEnum):
     MALFORMED_HANDOFF = "malformed_handoff"
     EMPTY_DIRECTORY = "empty_directory"
     UNKNOWN_TOP_LEVEL = "unknown_top_level"
+    #: v0.1.78 T-C / FR-C: a workflow-step handoff-ledger payload
+    #: (``.dadaia/runs/lifecycle/<run>/steps/*.step-payload.json``) that is cleanup-eligible
+    #: (``DELETE_AFTER_CONSUMED`` + every declared consumer has consumed it), belongs to a
+    #: TERMINAL run, and is past the tmp-zone consumed TTL — the ONE canonical cleanup
+    #: contract's ``.dadaia/runs`` coverage (bug
+    #: ``split-cleanup-engines-strand-stale-step-payloads``).
+    EXPIRED_STEP_PAYLOAD = "expired_step_payload"
 
 
 class HygieneProtectionKind(StrEnum):
