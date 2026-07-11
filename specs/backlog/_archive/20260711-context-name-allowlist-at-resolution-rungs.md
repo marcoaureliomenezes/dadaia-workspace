@@ -1,6 +1,7 @@
 ---
 name: context-name-allowlist-at-resolution-rungs
-status: candidate
+status: delivered
+delivered_in: v0.1.80
 opened: 2026-07-11
 owner: project-manager (curates)
 priority: P4
