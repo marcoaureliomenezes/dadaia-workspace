@@ -25,14 +25,15 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
-  // v0.1.45 panel redesign: the Agentic tab was deleted. v0.1.65 (FR8) added the
-  // Sub-agents tab beside Workflows; the nav is now exactly Projects, Workflows,
-  // Sub-agents, Sessions, Reports, Academy, Servers.
+  // v0.1.79 panel agentic-layers reorg: 7 -> 6 primary tabs. The standalone
+  // Sessions tab is merged into "1º Agentic Layer" (ex "Sub-agents") as a
+  // sub-section; "Workflows" is renamed "2º Agentic Layer". The nav is now
+  // exactly Projects, 2º Agentic Layer, 1º Agentic Layer, Reports, Academy,
+  // Servers (tab ids are unchanged: tab-workflows, tab-subagents).
   expect(tabs).toEqual([
     'Projects',
-    'Workflows',
-    'Sub-agents',
-    'Sessions',
+    '2º Agentic Layer',
+    '1º Agentic Layer',
     'Reports',
     'Academy',
     'Servers',
@@ -80,7 +81,6 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
     { tabId: '#tab-workflows', sectionId: 'workflows' },
     { tabId: '#tab-subagents', sectionId: 'subagents' },
-    { tabId: '#tab-sessions', sectionId: 'sessions' },
     { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
     { tabId: '#tab-servers', sectionId: 'servers' },
@@ -106,6 +106,29 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
 
   // No JS errors during navigation
   expect(consoleErrors.filter((e) => !e.includes('favicon'))).toHaveLength(0);
+});
+
+// ---------------------------------------------------------------------------
+// E2E-TAB-07 — Sessions dashboard merged into 1º Agentic Layer, no standalone tab
+// ---------------------------------------------------------------------------
+test('E2E-TAB-07 — Sessions dashboard renders inside 1º Agentic Layer, no #tab-sessions', async ({
+  page,
+}) => {
+  await gotoPanel(page);
+  await page.waitForSelector('[role="tab"]');
+
+  // No standalone Sessions tab/section remnants.
+  expect(await page.locator('#tab-sessions').count()).toBe(0);
+  expect(await page.locator('#section-sessions.section').count()).toBe(0);
+
+  await page.click('#tab-subagents');
+  await page.waitForSelector('#section-subagents.active', { timeout: 8000 });
+
+  // The relocated Sessions cost/telemetry dashboard is a sub-section inside
+  // the 1º Agentic Layer tabpanel.
+  const sessionsMount = page.locator('#section-subagents #section-sessions');
+  await expect(sessionsMount).toHaveCount(1);
+  await expect(page.locator('#section-subagents #sessions-dashboard')).toHaveCount(1);
 });
 
 // ---------------------------------------------------------------------------
