@@ -4,7 +4,7 @@
 
 - [x] **T-1 — FR1 perf-test environment-independent invariant** — owner: software-engineer
   Write set: `tests/performance/**`, `dadaia_workspace/features/lifecycle/**`
-- [ ] **T-2 — FR2 handoff-emitter example fix + projection** — owner: ai-engineer
+- [x] **T-2 — FR2 handoff-emitter example fix + projection** — owner: ai-engineer
   Write set: `dadaia_workspace/public/skills/**`, `tests/**`
 - [x] **T-3 — FR3 context-name allowlist at resolution rungs** — owner: software-engineer
   Write set: `dadaia_workspace/cli/_specs_resolution.py`, `tests/**`

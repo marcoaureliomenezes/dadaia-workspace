@@ -20,10 +20,13 @@ re-verifies this contract post-rename.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
+
+from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 pytestmark = pytest.mark.contract
 
@@ -133,3 +136,52 @@ def test_roster_completeness_and_sixteen_surface_v12_self_pull_adoption() -> Non
             f"{missing} — both examples must model schema_version handoff-v1.2 with a "
             "self_pull.refs block"
         )
+
+
+# ---------------------------------------------------------------------------
+# Schema-validity guard (bug: handoff-emitter-example-omits-required-artifact).
+#
+# Token presence (above) does not prove the example is schema-valid — a doc
+# regressing to omit the required `artifact` object still carries both tokens
+# and would pass the roster test above silently. Regex-extract the SAME two
+# JSON blocks straight from SKILL.md (no hand-transcription) and run them
+# through the REAL StdlibHandoffValidator + the REAL public schema.
+#
+# The default "handoff-only" example (#1) MUST be fully schema-valid as
+# written — that is the exact shape an agent copies verbatim. The "with HTML
+# report" example (#2) documents illustrative `artifact.path`/`content_hash`
+# placeholders that point at no real file (see the skill's warning directly
+# above that example) — schema shape validation still holds (only the
+# artifact-hash filesystem check, which the schema-only validator below does
+# not perform, would reject it).
+# ---------------------------------------------------------------------------
+
+_SCHEMA_PATH = _PUBLIC / "schemas" / "handoff-v1.schema.json"
+
+
+def test_skill_examples_are_schema_valid_as_written() -> None:
+    """Both SKILL.md JSON examples parse and pass the real handoff-v1.2 schema.
+
+    Regression guard for handoff-emitter-example-omits-required-artifact: a
+    doc edit that drops the required top-level `artifact` object (or any
+    other required field) fails here even though it would still carry the
+    handoff-v1.2 / self_pull tokens checked above.
+    """
+    examples = _skill_json_examples()
+    assert len(examples) == 2
+
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+
+    handoff_only = json.loads(examples[0])
+    errors = list(validator.validate(handoff_only))
+    assert not errors, (
+        "SKILL.md 'Example — handoff-only (the default)' must validate as written "
+        f"against the real handoff-v1.2 schema — errors: {errors}"
+    )
+
+    with_report = json.loads(examples[1])
+    errors = list(validator.validate(with_report))
+    assert not errors, (
+        "SKILL.md 'Example — with HTML report' must satisfy the schema SHAPE as "
+        f"written (artifact object present with a valid type) — errors: {errors}"
+    )
