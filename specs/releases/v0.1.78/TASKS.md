@@ -4,7 +4,7 @@
 (PLAN is folded into SPEC FRs — research already produced the per-intent task
 decomposition; anchors verified in `specs/backlog/candidates.md`.)
 
-- [ ] **T-A — explicit step kind** (S) — owner: software-engineer
+- [-] **T-A — explicit step kind** (S) — owner: software-engineer
   Write set: `dadaia_workspace/cli/commands/lifecycle.py`,
   `dadaia_workspace/features/lifecycle/**`, `tests/**`
 - [ ] **T-B — atomic pipeline terminal state + step payloads** (M) — owner: software-engineer
