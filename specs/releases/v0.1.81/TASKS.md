@@ -2,9 +2,9 @@
 
 **Status:** Aprovado
 
-- [-] **T-1 — FR1 tier: fallback strip + alias deletion** — owner: software-engineer
+- [x] **T-1 — FR1 tier: fallback strip + alias deletion** — owner: software-engineer
   Write set: `dadaia_workspace/features/agents/**`, `tests/**`
-- [-] **T-2 — FR2 partial-archive doctor invariant** — owner: software-engineer
+- [x] **T-2 — FR2 partial-archive doctor invariant** — owner: software-engineer
   Write set: `dadaia_workspace/features/specs/**`, `tests/**`
-- [ ] **T-3 — validation + ship gates** — owner: software-engineer
+- [-] **T-3 — validation + ship gates** — owner: software-engineer
   Write set: `tests/**`
