@@ -147,13 +147,20 @@ def _is_read_mode(mode: str) -> bool:
     return mode.strip().upper() in _READ_MODES
 
 
-def _advisory_throttle_path(workspace: Path, session_id: str, ctx: str) -> Path:
+def _advisory_throttle_path(workspace: Path, session_id: str, ctx: str) -> Path | None:
+    # Defense-in-depth mirror of presence._valid_name: hook callers already sanitize both
+    # components, but a direct-API caller must not be able to place the marker outside
+    # .dadaia/tmp/ via a traversal-shaped session_id/ctx.
+    if not (presence._valid_name(session_id) and presence._valid_name(ctx)):
+        return None
     return workspace / ".dadaia" / "tmp" / f"presence-warn-{session_id}-{ctx}"
 
 
 def _advisory_throttled(workspace: Path, session_id: str, ctx: str, *, now: float) -> bool:
     """True iff an advisory for this (session, ctx) fired within the throttle window."""
     marker = _advisory_throttle_path(workspace, session_id, ctx)
+    if marker is None:
+        return False
     try:
         last = marker.stat().st_mtime
     except OSError:
@@ -164,6 +171,8 @@ def _advisory_throttled(workspace: Path, session_id: str, ctx: str, *, now: floa
 def _stamp_advisory_throttle(workspace: Path, session_id: str, ctx: str) -> None:
     """Record that an advisory fired now (best-effort; must never raise)."""
     marker = _advisory_throttle_path(workspace, session_id, ctx)
+    if marker is None:
+        return
     try:
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(datetime.now(tz=UTC).isoformat(), encoding="utf-8")

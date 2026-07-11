@@ -428,3 +428,27 @@ def test_anon_session_write_allowed_but_creates_no_presence_record(tmp_path: Pat
     recorded = {p.stem for p in presence_dir.glob("*.json")} if presence_dir.is_dir() else set()
     assert "anon-session" not in recorded, recorded
     assert recorded == set(), recorded
+
+
+def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: Path) -> None:
+    """Direct-API defense-in-depth (v0.1.76 security-review LOW): a traversal-shaped
+    ``session_id``/``ctx`` must never place the advisory throttle marker outside
+    ``.dadaia/tmp/`` — the helpers reject invalid name components outright (hook callers
+    already sanitize; this pins the module's own guard)."""
+    from dadaia_workspace.features.spec_context import gate_policy
+
+    ws = _mk_workspace(tmp_path, "dadaia-workspace")
+    escape_probe = tmp_path / "escape-probe"
+    hostile = f"../../../{escape_probe.name}"
+
+    assert gate_policy._advisory_throttle_path(ws, hostile, "dadaia-workspace") is None
+    assert gate_policy._advisory_throttle_path(ws, "session-ok", hostile) is None
+
+    gate_policy._stamp_advisory_throttle(ws, hostile, "dadaia-workspace")
+    gate_policy._stamp_advisory_throttle(ws, "session-ok", hostile)
+    assert not escape_probe.exists()
+    assert gate_policy._advisory_throttled(ws, hostile, "dadaia-workspace", now=0.0) is False
+
+    marker = gate_policy._advisory_throttle_path(ws, "session-ok", "dadaia-workspace")
+    assert marker is not None
+    assert marker.parent == ws / ".dadaia" / "tmp"
