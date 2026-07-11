@@ -15,7 +15,10 @@ import re
 from pathlib import Path
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
-_RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "CLOSURE.md")
+# Public name (v0.1.81 FR2): reused by doctor_release's partial-archive invariant
+# (SPEC-DOC-039) so both checks share one canonical artifact-filename set.
+RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "CLOSURE.md")
+_RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
 # Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves releases:
 # alpha-N, rc-N, plus the historical `integration` segment container.
 _SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")

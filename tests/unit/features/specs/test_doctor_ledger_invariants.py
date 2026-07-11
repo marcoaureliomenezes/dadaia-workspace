@@ -485,6 +485,88 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
 
 
 # ---------------------------------------------------------------------------
+# DOC-039 (v0.1.81 FR2) — partial (artifact-empty) archived release dirs are residue.
+#
+# A ``specs/_archive/releases/<id>/`` dir that carries NONE of
+# SPEC.md/PLAN.md/TASKS.md/CLOSURE.md (directly or nested inside its segment
+# subdirs) is residue masquerading as an archived release — the v0.1.41 precedent
+# (only GRILL.md + OQ-DECISIONS.md, no real artifact). WARNING severity only.
+# ---------------------------------------------------------------------------
+
+
+def test_doc039_partial_archive_fires_on_artifact_empty_dir(tmp_path: Path) -> None:
+    """An artifact-empty archived release dir (no SPEC/PLAN/TASKS/CLOSURE anywhere
+    under it) fires SPEC-DOC-039 at WARNING severity."""
+    specs = _make_clean_specs_tree(tmp_path)
+    residue = specs / "_archive" / "releases" / "wip-abandoned-thing-v1"
+    residue.mkdir(parents=True)
+    (residue / "NOTES.md").write_text("# Notes\n\nSome scratch notes.\n", encoding="utf-8")
+    doc039 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-039")
+    assert doc039 and all(i.severity == Severity.WARNING for i in doc039)
+    assert any("wip-abandoned-thing-v1" in (i.path or "") for i in doc039)
+    text = " ".join(i.description for i in doc039)
+    assert "specs/_archive/wip-abandoned/" in text
+
+
+def test_doc039_partial_archive_fires_on_v0141_class_fixture(tmp_path: Path) -> None:
+    """The exact v0.1.41 precedent: a dir holding only GRILL.md + OQ-DECISIONS.md
+    (no SDD artifact) fires SPEC-DOC-039."""
+    specs = _make_clean_specs_tree(tmp_path)
+    residue = specs / "_archive" / "releases" / "some-old-feature-v1"
+    residue.mkdir(parents=True)
+    (residue / "GRILL.md").write_text("# Grill\n\nQuestions.\n", encoding="utf-8")
+    (residue / "OQ-DECISIONS.md").write_text("# OQ Decisions\n\nAnswers.\n", encoding="utf-8")
+    doc039 = _by_code(SpecsDoctor(specs).check(), "SPEC-DOC-039")
+    assert doc039 and all(i.severity == Severity.WARNING for i in doc039)
+    assert any("some-old-feature-v1" in (i.path or "") for i in doc039)
+
+
+def test_doc039_silent_on_segmented_dir_with_artifacts_in_segments(tmp_path: Path) -> None:
+    """A segmented archived release dir (alpha-1/rc-1 style) whose SEGMENT subdirs
+    carry the SDD artifacts is a legitimate layout — SPEC-DOC-039 stays silent even
+    though the parent dir itself holds none of the artifacts directly."""
+    specs = _make_clean_specs_tree(tmp_path)
+    segmented = specs / "_archive" / "releases" / "v0.1.50"
+    for segment in ("alpha-1", "rc-1"):
+        seg_dir = segmented / segment
+        seg_dir.mkdir(parents=True)
+        (seg_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
+        (seg_dir / "TASKS.md").write_text("# Tasks\n\n> **Status:** Aprovado\n", encoding="utf-8")
+    (segmented / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+
+
+def test_doc039_silent_on_allowlisted_legacy_name(tmp_path: Path) -> None:
+    """A dir on the SPEC-DOC-027 permanent legacy-name allowlist (ADR-9) stays silent
+    for SPEC-DOC-039 too, even when it is artifact-empty — frozen history is never
+    flagged as residue by name alone (reuses the same allowlist)."""
+    specs = _make_clean_specs_tree(tmp_path)
+    legacy = specs / "_archive" / "releases" / "memory-markdown-source-v1"
+    legacy.mkdir(parents=True)
+    (legacy / "README.md").write_text("# Legacy\n\nHistorical note only.\n", encoding="utf-8")
+    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+
+
+def test_doc039_silent_on_complete_archive(tmp_path: Path) -> None:
+    """A properly closed archived release dir (SPEC/PLAN/TASKS/CLOSURE all present
+    directly) never fires SPEC-DOC-039."""
+    specs = _make_clean_specs_tree(tmp_path)
+    complete = specs / "_archive" / "releases" / "v0.1.9"
+    complete.mkdir(parents=True)
+    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        (complete / fname).write_text(f"# {fname}\n\n> **Status:** Aprovado\n", encoding="utf-8")
+    (complete / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+
+
+def test_doc039_silent_on_live_releases_tree(tmp_path: Path) -> None:
+    """SPEC-DOC-039 only inspects ``_archive/releases/`` — the active release dir
+    under the live ``releases/`` tree is never flagged, regardless of contents."""
+    specs = _make_clean_specs_tree(tmp_path)
+    assert "SPEC-DOC-039" not in _codes(SpecsDoctor(specs).check())
+
+
+# ---------------------------------------------------------------------------
 # DOC-029 RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). The lease-record holder no
 # longer carries any acquisition/CAS authority to be "forged" against — ``lease.acquire``/
 # ``steal``/the by-session index are deleted (T-3), so a residual ``<ctx>.lock.json`` is

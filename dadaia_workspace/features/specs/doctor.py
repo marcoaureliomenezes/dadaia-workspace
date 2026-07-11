@@ -163,6 +163,8 @@ class SpecsDoctor:
         # v0.1.47 / W1-9 — recurrence guards (constitution runtime enum + loose audits)
         issues.extend(self._coherence.check_constitution_no_runtime_enum())  # SPEC-DOC-037
         issues.extend(self._closure_audit.check_loose_undisposed_audits())  # SPEC-DOC-038
+        # v0.1.81 / FR2 (audit G-23) — partial (artifact-empty) archived release dirs
+        issues.extend(self._release.check_partial_archived_release_dirs())  # SPEC-DOC-039
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:

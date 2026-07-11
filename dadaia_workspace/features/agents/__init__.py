@@ -7,7 +7,6 @@ Public API:
     InvalidAgentIdError   — raised when agent_id fails validation or path traversal check
     AgentNotFoundError    — raised when agent_id is valid but file does not exist
     MissingDispatchBandError — raised when an agent frontmatter has an invalid band value (present but non-int or out of {1,2,3})
-    MissingTierError      — DEPRECATED alias of MissingDispatchBandError (v0.1.64 rename window)
 """
 
 from dadaia_workspace.features.agents.reader import (
@@ -15,7 +14,6 @@ from dadaia_workspace.features.agents.reader import (
     AgentNotFoundError,
     InvalidAgentIdError,
     MissingDispatchBandError,
-    MissingTierError,
     get_prompt,
     read_canonical_agents,
 )
@@ -25,7 +23,6 @@ __all__ = [
     "AgentNotFoundError",
     "InvalidAgentIdError",
     "MissingDispatchBandError",
-    "MissingTierError",
     "get_prompt",
     "read_canonical_agents",
 ]
