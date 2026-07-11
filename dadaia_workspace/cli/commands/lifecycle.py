@@ -1785,6 +1785,15 @@ def implement_review(
         "--max-review-retries",
         help="Bounded retry count: after this many REJECTED rounds the loop BLOCKS.",
     ),
+    write_scope: list[str] | None = typer.Option(
+        None,
+        "--write-scope",
+        help="Extra write-scope path glob for the implement step ONLY (repeatable). "
+        "Unions with the handoff-dir scope so an implement worker may legally edit the "
+        "given production/test path(s); the review step is never widened. The reserved "
+        "[-] task's TASKS.md 'Write set:' is derived automatically (parity with "
+        "'pipeline') — this flag is an additive escape hatch, not a requirement.",
+    ),
     skip_preflight: bool = typer.Option(
         False,
         "--skip-preflight",
@@ -1805,13 +1814,18 @@ def implement_review(
     is profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
+    v0.1.78 T-E / FR-E: the implement step's write scope is derived from the reserved
+    TASKS.md task's declared ``Write set:`` globs — parity with the ``pipeline`` verb
+    (FR3, v0.1.68) — plus the additive ``--write-scope`` escape hatch above.
     """
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
+    from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.pipeline import (
         PipelineStep,
         apply_resolved_policy,
     )
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
 
     workspace_root = resolve_workspace_root()
     # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
@@ -1837,12 +1851,20 @@ def implement_review(
         step_model=step_model,
         step_harness_names={},
     )
+    # T-E / FR-E: derive the implement step's write scope from the reserved TASKS.md task's
+    # declared `Write set:` globs, unioned BEFORE any --write-scope extras — exactly the
+    # `pipeline` verb's FR3 (v0.1.68) derivation. Additive-optional: an absent/ambiguous
+    # TASKS.md degrades to () with no crash.
+    specs_dir = container.resolve_context_specs_dir(workspace_root, context)
+    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
+    extra_paths = tuple(tasks_paths) + tuple(write_scope or ())
     implement_step = PipelineStep(
         label="implement",
         role="software-engineer",
         from_phase=LifecyclePhase.IMPLEMENTATION,
         target_phase=LifecyclePhase.QA_REVIEW,
         runtime_kind=default_kind,
+        extra_allowed_paths=extra_paths,
     )
     review_step = PipelineStep(
         label="review_qa",

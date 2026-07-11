@@ -33,7 +33,10 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
+from dadaia_workspace.features.lifecycle.tasks_write_scope import (
+    _extract_globs,
+    write_scope_from_tasks,
+)
 
 _RELEASE = "v-grammar-test"
 
@@ -325,3 +328,67 @@ def test_absent_tasks_absent_releases_dir_and_per_path_parenthetical_not_termina
 """,
     )
     assert write_scope_from_tasks(tmp_path, _RELEASE) == ("a/one.py", "b/two.py")
+
+
+# --- ⑤ v0.1.78 T-E / FR-E — traversal hardening: reject absolute / `..` / `~` / `$` ------
+#
+# Defense-in-depth (SPEC FR-E, absorbed backlog `tasks-write-scope-traversal-hardening`):
+# inert today because ``allowed_paths`` only feeds the ADVISORY scope check
+# (``core/scope_match.py``), but the parser must not silently WIDEN scope if matching ever
+# gains real glob semantics. A rejected token maps to NO captured glob (never a raised
+# error — this derivation stays additive-optional / never-crash).
+
+_TRAVERSAL_REJECTED_TOKENS = (
+    ("absolute-unix-path", "/etc/passwd"),
+    ("absolute-repo-path", "/home/operator/repo/secrets.env"),
+    ("dotdot-segment-prefix", "../../etc/passwd"),
+    ("dotdot-segment-mid", "foo/../../../etc/passwd"),
+    ("dotdot-segment-suffix", "foo/bar/.."),
+    ("tilde-home-expansion", "~/secrets.env"),
+    ("tilde-mid-path", "foo/~/bar.py"),
+    ("dollar-env-var", "$HOME/.ssh/id_rsa"),
+    ("dollar-brace-env-var", "${HOME}/.ssh/id_rsa"),
+    ("dollar-mid-path", "foo/$USER/bar.py"),
+)
+
+
+@pytest.mark.parametrize(
+    "token",
+    [t[1] for t in _TRAVERSAL_REJECTED_TOKENS],
+    ids=[t[0] for t in _TRAVERSAL_REJECTED_TOKENS],
+)
+def test_extract_globs_rejects_traversal_tokens_at_parse_time(token: str) -> None:
+    """A single unsafe token yields NO captured glob (empty result, not a raised error)."""
+    assert _extract_globs(f"`{token}`") == ()
+
+
+@pytest.mark.parametrize(
+    "token",
+    [t[1] for t in _TRAVERSAL_REJECTED_TOKENS],
+    ids=[t[0] for t in _TRAVERSAL_REJECTED_TOKENS],
+)
+def test_extract_globs_rejects_traversal_token_amid_safe_tokens(token: str) -> None:
+    """An unsafe token mixed with legitimate paths maps to NO captured glob for itself —
+    the safe siblings are still extracted (rejection is per-token, not whole-line)."""
+    line = f"`safe/before.py`, `{token}`, `safe/after.py`"
+    assert _extract_globs(line) == ("safe/before.py", "safe/after.py")
+
+
+def test_extract_globs_accepts_ordinary_relative_paths_unaffected_by_hardening() -> None:
+    """The hardening must not regress the ordinary relative-path grammar."""
+    assert _extract_globs("`foo/bar.py`, `pyproject.toml`") == ("foo/bar.py", "pyproject.toml")
+
+
+def test_write_scope_from_tasks_end_to_end_rejects_traversal_write_set(tmp_path: Path) -> None:
+    """Executed-path proof through the full ``write_scope_from_tasks`` entry point: a
+    TASKS.md whose declared Write set mixes a traversal token with a legitimate path
+    captures ONLY the legitimate path."""
+    _write_tasks(
+        tmp_path,
+        """# TASKS
+
+### T-1 — do a thing `[-]`
+- **Write set:** `foo/bar.py`, `../../etc/passwd`, `~/secrets.env`
+""",
+    )
+    assert write_scope_from_tasks(tmp_path, _RELEASE) == ("foo/bar.py",)

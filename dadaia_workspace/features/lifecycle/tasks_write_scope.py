@@ -190,7 +190,7 @@ def _extract_globs(write_set_line: str) -> tuple[str, ...]:
         candidate = span.strip()
         if not candidate:
             continue
-        if _is_path_shaped(candidate):
+        if _is_path_shaped(candidate) and _is_traversal_safe(candidate):
             globs.append(candidate)
     return tuple(globs)
 
@@ -207,3 +207,23 @@ def _is_path_shaped(candidate: str) -> bool:
         return True
     name, _dot, ext = candidate.rpartition(".")
     return bool(name) and bool(ext) and ext.isalnum()
+
+
+def _is_traversal_safe(candidate: str) -> bool:
+    """v0.1.78 T-E / FR-E: reject at parse time a token that is absolute (leading ``/``),
+    contains a ``..`` path segment, or contains a ``~``/``$`` token anywhere in the path.
+
+    Defense-in-depth (absorbed backlog ``tasks-write-scope-traversal-hardening``): inert
+    today because ``allowed_paths`` only feeds the ADVISORY scope check
+    (``core/scope_match.py``), but the parser must not silently widen scope if matching
+    ever gains real glob semantics. A rejected token maps to NO captured glob — this never
+    raises (the derivation stays additive-optional / never-crash). ``~``/``$`` are checked
+    per path segment (not just a leading anchor): a legitimate repo path never contains
+    either, so ``foo/~/bar.py`` or ``foo/$USER/bar.py`` are rejected exactly like a
+    leading ``~/secrets.env`` or ``$HOME/.ssh/id_rsa``.
+    """
+    if candidate.startswith("/"):
+        return False
+    if "$" in candidate:
+        return False
+    return not any(segment == ".." or segment.startswith("~") for segment in candidate.split("/"))
