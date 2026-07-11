@@ -6,5 +6,5 @@
   Write set: `tests/**`, `setup.cfg`
 - [x] **T-2 — Seam generalization + defaults retirement** — owner: software-engineer
   Write set: `dadaia_workspace/cli/**`, `dadaia_workspace/core/**`, `tests/**`
-- [-] **T-3 — Full validation + ship gates** — owner: software-engineer
+- [x] **T-3 — Full validation + ship gates** — owner: software-engineer
   Write set: `tests/**`
