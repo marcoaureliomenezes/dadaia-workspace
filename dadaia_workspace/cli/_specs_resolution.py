@@ -21,6 +21,22 @@ resolves through: explicit -> ``DADAIA_CONTEXT`` env -> this session's OWN recor
 foreign session's bind, consistent with the v0.1.76 NO-LOCKS DOCTRINE's self-scoped
 identity) -> first-ALIVE context (fail-soft; mirrors ``context show``'s pre-v0.1.77
 no-arg fallback, folded into the seam here per SPEC FR1's explicit disposition).
+
+v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
+defense-in-depth per v0.1.77 security review INFO): the *explicit* and ``DADAIA_CONTEXT``
+env rungs both feed a ``repos/<name>/specs`` path join further downstream (this module's
+own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
+context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
+already enforced for bind-epoch marker filenames
+(:data:`~dadaia_workspace.core.specs_resolver._CONTEXT_NAME_RE`, mirrored in
+``features.spec_context.presence._valid_name``) BEFORE either value is used — an
+operator-controlled input has no privilege elevation here (the operator can already touch
+any path directly), so this is defense-in-depth, not a privilege boundary. The two rungs
+get DIFFERENT dispositions on a traversal-shaped value: *explicit* is deliberate call-site
+input, so it raises a clear, actionable :class:`ValueError`; ``DADAIA_CONTEXT`` is ambient
+shell state (inherited/stale environment an operator may not have set deliberately for
+THIS invocation), so an invalid value is treated as unset and resolution continues to the
+next rung — never a crash over environment the operator didn't knowingly provide.
 """
 
 from __future__ import annotations
@@ -30,6 +46,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name as _resolve_bound_name
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -99,10 +116,41 @@ def resolve_context_for_cli(explicit: str | None) -> str:
     with no context registered at all degrades to the same self-hosting name every
     resolver-driven verb has always assumed by construction (unchanged prior behavior
     for that degenerate case).
+
+    v0.1.80 FR3: both the *explicit* and ``DADAIA_CONTEXT`` env rungs are validated
+    against the ``[A-Za-z0-9_-]+`` context-name allowlist before use (defense-in-depth
+    against a traversal-shaped name reaching the downstream ``repos/<name>/specs`` path
+    join). A traversal-shaped *explicit* value raises :class:`ValueError` (deliberate
+    call-site input — reject loudly). A traversal-shaped ``DADAIA_CONTEXT`` value is
+    treated as unset (ambient environment — never crash the CLI over it) and resolution
+    continues to the next rung.
     """
     if explicit:
+        if not _CONTEXT_NAME_RE.fullmatch(explicit):
+            raise ValueError(
+                f"Invalid context name {explicit!r}: context names must match "
+                f"{_CONTEXT_NAME_RE.pattern!r} (letters, digits, '_', '-' only). "
+                "Pass a valid Spec Context Project name."
+            )
         return explicit
-    resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
+    env_context = os.environ.get("DADAIA_CONTEXT")
+    if env_context and _CONTEXT_NAME_RE.fullmatch(env_context):
+        return env_context
+    # A present-but-INVALID DADAIA_CONTEXT (``env_context`` truthy but rejected above)
+    # must not silently reach ``resolve_bound_context_name`` below — that function
+    # re-reads the same env var internally (its own explicit -> env -> session ->
+    # persisted-bind order) and would otherwise return the same unvalidated value we
+    # just rejected. Scope the env var out for the duration of this single delegated
+    # call only, restoring it immediately after on every exit path (it is present, by
+    # construction, whenever we reach this branch, so the restore is unconditional).
+    if env_context:
+        os.environ.pop("DADAIA_CONTEXT")
+        try:
+            resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
+        finally:
+            os.environ["DADAIA_CONTEXT"] = env_context
+    else:
+        resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
     if resolved:
         return resolved
     return _first_alive_context_name() or _SELF_HOSTING_SLUG

@@ -134,6 +134,14 @@ rather than fabricating refs. Historical v1/v1.1 documents on disk stay valid fo
 
 #### Example — with HTML report (operator-requested / human-facing)
 
+**This example's `artifact.path` and `content_hash` are illustrative placeholders that
+point at no real file.** Copying this example verbatim FAILS validation with
+`artifact.content_hash: artifact hash check failed: missing_artifact`, because
+`dadaia reports validate` resolves `artifact.path` against the workspace root and
+recomputes its hash — it never accepts a placeholder. In report mode, always: write the
+real HTML report first (Step 1), compute its real SHA-256 (Step 2), and substitute both
+the real `path` and the real `content_hash` before emitting.
+
 ```json
 {
   "schema_version": "handoff-v1.2",

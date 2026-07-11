@@ -16,7 +16,7 @@
 | 2 | `20260709-central-bind-resolution-seam` | **P0** | **v0.1.77** | ONE bind-resolution seam for every resolver-driven verb + dynamic contract test |
 | 3 | `20260710-lifecycle-pipeline-correctness-and-diagnosability` | **P1** | **v0.1.78** | lifecycle engine tells the truth; every block carries evidence + exact next command |
 | 4 | `20260708-panel-tab-reorg-agentic-layers` | **P2** | **v0.1.79** | 7→6 primary tabs naming the two agentic layers |
-| 5 | `20260710-deprecation-strips-and-doctor-cleanup` | **P3** | **v0.1.80** | `tier:` strip (**ship ≥ 2026-08-01**) + doctor partial-archive invariant |
+| 5 | `20260710-deprecation-strips-and-doctor-cleanup` | **P3** | **v0.1.81** | `tier:` strip (**ship ≥ 2026-08-01**) + doctor partial-archive invariant |
 
 ## NO-LOCKS DOCTRINE (operator-ratified 2026-07-10 — 4 binding decisions)
 
@@ -119,7 +119,7 @@ labels.
 **Acceptance:** exactly 6 tabs in order; no `tab-sessions` remnants; CSP hashes equal
 served scripts; v0.1.59 grep gates pass. **Size:** M. **Risk:** low.
 
-### v0.1.80 — Deprecation strips & doctor cleanup — P3
+### v0.1.81 — Deprecation strips & doctor cleanup — P3 (renumbered from v0.1.80; the number was consumed by the 2026-07-11 LOW-debt cleanup release)
 
 **Scope (entry #5):** strip `tier:` fallback (reader.py:173) + `_ALLOWED_FIELDS` key +
 `MissingTierError` alias + re-export; flip AC-6 test to unknown-key truth. Add

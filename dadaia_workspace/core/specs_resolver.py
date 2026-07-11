@@ -26,7 +26,11 @@ _SESSION_TTL_FIELD = "ttl_seconds"
 
 #: Bind-epoch marker name allowlist (W1-8). A marker's filename IS the context slug and
 #: becomes a ``repos/<slug>/specs`` path component, so it is validated before use
-#: (CWE-22/CWE-59 defence in depth) — mirrors ``session_identity._NAME_RE``.
+#: (CWE-22/CWE-59 defence in depth) — mirrors ``session_identity._NAME_RE``. Reused
+#: directly (not duplicated) by ``cli._specs_resolution.resolve_context_for_cli`` for the
+#: SAME reason at its own *explicit*/``DADAIA_CONTEXT`` rungs (v0.1.80 FR3) — both
+#: modules sit in the same import direction (``cli`` -> ``core``), so importing this
+#: module-level compiled pattern is a clean reuse, not a layering violation.
 _CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
