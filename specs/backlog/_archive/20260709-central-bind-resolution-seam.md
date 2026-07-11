@@ -1,6 +1,7 @@
 ---
 name: central-bind-resolution-seam
-status: candidate
+status: delivered
+delivered_in: v0.1.77
 opened: 2026-07-09
 owner: project-manager (curates)
 priority: P0
