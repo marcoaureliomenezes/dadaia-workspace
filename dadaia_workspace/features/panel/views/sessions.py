@@ -1,4 +1,11 @@
-"""Sessions tab view — aggregated-cost dashboard scaffold (panel-plumbing v0.1.52 FR2).
+"""Sessions dashboard sub-section view — aggregated-cost dashboard scaffold.
+
+panel-plumbing v0.1.52 FR2 introduced the dashboard-only scaffold; v0.1.79
+(panel agentic-layers reorg) relocated it from its own standalone primary tab
+into a sub-section rendered INSIDE the "1º Agentic Layer" (``#section-subagents``)
+tabpanel. ``#section-sessions`` survives as the nested mount id — ``sessions.js``
+keys on it unchanged — but it is now a plain ``<div>`` sub-section (like
+``.ops-subsection`` in ``workflows.py``), not a standalone ``role="tabpanel"``.
 
 Security (OWASP A03):
   This module returns a static HTML scaffold only. No session data is serialised
@@ -8,11 +15,11 @@ Security (OWASP A03):
   prevents any accidental injection of API payloads into HTML.
 
 FR2 (SPEC §FR2):
-  The Sessions tab renders ONLY the 4-card summary dashboard (#sessions-dashboard)
-  plus the cost-unknown banner (#sessions-banner). The list table, sortable
-  headers, filter toolbar, detail drawer, and skeleton machinery were removed with
-  the client-computed statistics — the aggregate now lives server-side and is
-  served by ``/api/sessions`` (v0.1.52 FR1). The #sessions-last-updated badge,
+  The Sessions dashboard renders ONLY the 4-card summary dashboard
+  (#sessions-dashboard) plus the cost-unknown banner (#sessions-banner). The list
+  table, sortable headers, filter toolbar, and skeleton machinery were removed
+  with the client-computed statistics — the aggregate now lives server-side and
+  is served by ``/api/sessions`` (v0.1.52 FR1). The #sessions-last-updated badge,
   extracted from the deleted toolbar, reports the last aggregate refresh time.
 """
 
@@ -20,17 +27,21 @@ from __future__ import annotations
 
 
 def render_sessions_section() -> str:
-    """Return the static HTML scaffold for the dashboard-only Sessions tab.
+    """Return the static HTML scaffold for the dashboard-only Sessions sub-section.
 
-    ``sessions.js`` fetches the ``/api/sessions`` aggregate on tab load and on
-    every ``dadaia:runtime-change`` event, renders the four stat cards into
-    #sessions-dashboard, toggles #sessions-banner for cost-unknown runtimes
-    (codex/pi), and updates the #sessions-last-updated badge. No per-session rows
-    are rendered.
+    ``sessions.js`` fetches the ``/api/sessions`` aggregate on 1º Agentic Layer
+    tab load and on every ``dadaia:runtime-change`` event, renders the four stat
+    cards into #sessions-dashboard, toggles #sessions-banner for cost-unknown
+    runtimes (codex/pi), and updates the #sessions-last-updated badge. No
+    per-session rows are rendered.
+
+    v0.1.79: rendered as a plain ``<div id="section-sessions" class="ops-subsection">``
+    — NOT a standalone ``.section``/``.panel-section`` tabpanel — so it is shown or
+    hidden by its PARENT tabpanel's (#section-subagents) ``.active`` toggle, never
+    independently.
     """
     return (
-        '<section id="section-sessions" class="section panel-section" '
-        'role="tabpanel" tabindex="0" aria-labelledby="tab-sessions">\n'
+        '<div id="section-sessions" class="ops-subsection">\n'
         '  <header class="section-header">\n'
         "    <h2>Sessions</h2>\n"
         '    <div class="runtime-switcher" role="radiogroup" aria-label="Active runtime">\n'
@@ -61,5 +72,5 @@ def render_sessions_section() -> str:
         # codex or pi. aria-live="polite" so screen readers announce it when it appears.
         '  <div id="sessions-banner" class="sessions-banner"\n'
         '       role="status" aria-live="polite" hidden></div>\n'
-        "</section>"
+        "</div>"
     )

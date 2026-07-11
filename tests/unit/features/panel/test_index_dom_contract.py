@@ -25,6 +25,7 @@ Three survivors, the sole selector-presence lock for the index page:
 
 from __future__ import annotations
 
+import html as html_lib
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
-from .conftest import PANEL_PRIMARY_TABS, PANEL_PRIMARY_TAB_SLUGS
+from .conftest import PANEL_PRIMARY_TAB_SLUGS, PANEL_PRIMARY_TABS
 
 pytestmark = pytest.mark.unit
 
@@ -155,18 +156,18 @@ def test_exactly_six_primary_tabs_in_order(index_html: str) -> None:
         positions.append(pos)
 
         # The label renders as the visible button text (between the opening tag's
-        # closing '>' and the '</button>' close).
+        # closing '>' and the '</button>' close). The masculine ordinal "º" is
+        # served as a numeric HTML entity (&#186;, same convention as &#183; / &mdash;
+        # elsewhere in this module) — decode before comparing operator-visible text.
         open_end = index_html.find(">", pos) + 1
         close = index_html.find("</button>", open_end)
         assert close >= 0, f"missing </button> for tab-{slug}"
-        button_text = index_html[open_end:close]
+        button_text = html_lib.unescape(index_html[open_end:close])
         assert label in button_text, (
             f"tab-{slug} label mismatch: expected {label!r} in {button_text!r}"
         )
 
-    assert positions == sorted(positions), (
-        "primary tabs do not render in PANEL_PRIMARY_TABS order"
-    )
+    assert positions == sorted(positions), "primary tabs do not render in PANEL_PRIMARY_TABS order"
 
 
 def test_no_sessions_tab_or_section_remnants(index_html: str) -> None:
