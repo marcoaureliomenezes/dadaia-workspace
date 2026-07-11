@@ -1,9 +1,9 @@
 ---
-release: none
-phase: none
+release: v0.1.77
+phase: IMPLEMENTATION
 ---
 
-# Active release: none
+# Active release: v0.1.77 — Central bind-resolution seam (feature/v0.1.77)
 
 v0.1.76 "Lock liberation" shipped (PR #149, `5dbe209c`) and closed — archived to
 `specs/_archive/v0.1.76/`. The NO-LOCKS DOCTRINE is live: no path in
