@@ -30,7 +30,7 @@
   FR5 (PI extension session id + hook guard), FR6 (PLATFORM.has_fcntl ×3), FR7
   (doctor/panel/context-show/lifecycle-preflight presence repoint).
 
-- [ ] **T-5 — full validation + ship gates** — owner: software-engineer
+- [x] **T-5 — full validation + ship gates** — owner: software-engineer
   Write set: `tests/**`
   Full suite green, mypy --strict, specs doctor 0 errors, ruff; AC1–AC5 checked;
   QA + security reviews; push.
