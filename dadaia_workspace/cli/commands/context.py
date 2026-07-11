@@ -195,30 +195,29 @@ def list_all() -> None:
 
 
 def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
-    """Resolve the no-arg ``context show`` target (v0.1.71 FR3, bug
-    ``context-show-noarg-ignores-bound-session``).
+    """Resolve the no-arg ``context show`` target through the SINGLE bind-resolution seam
+    (v0.1.77 FR1, folding in the v0.1.71 FR3 no-arg default).
 
-    Prefer the ALIVE context whose incumbent pointer references a LIVE (non-stale) bound
-    session — most recently seen first — so a bare ``context bind <ctx>`` is reflected by
-    ``context show`` with no arg. Fall back to the first ALIVE context when none has a
-    live bound session (unchanged prior behaviour).
+    Pre-v0.1.77 this scanned EVERY ALIVE context's incumbent pointer for the
+    most-recently-seen live bound session — a cross-context, context-global signal the
+    v0.1.76 NO-LOCKS DOCTRINE retired in spirit (the doctrine's identity model is
+    self-scoped: env -> this session's OWN record -> ancestry -> first-ALIVE, never a
+    scan of "whichever session touched any context most recently"). This now resolves via
+    :func:`~dadaia_workspace.cli._specs_resolution.resolve_context_for_cli` — the exact
+    same seam every other resolver-driven verb consumes — and looks the name up in *svc*.
+    The "who else is live where" signal is unchanged and still shown in ``show``'s
+    presence display body below; it no longer drives which context gets RESOLVED.
     """
-    alive = [c for c in svc.list_all() if c.state == ContextState.ALIVE]
-    if not alive:
+    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+
+    _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
+    resolved_name = resolve_context_for_cli(None)
+    if not resolved_name:
         return None
-    sessions_dir = _sessions_dir(workspace_root)
-    best: tuple[str, Any] | None = None  # (last_seen_at, ctx)
-    for ctx in alive:
-        session_id = session_identity.read_incumbent_ptr(workspace_root, ctx.name)
-        if not session_id:
-            continue
-        session_data = _load_session(sessions_dir, session_id)
-        if not session_data or _session_is_stale(session_data):
-            continue
-        last_seen = str(session_data.get("last_seen_at", ""))
-        if best is None or last_seen > best[0]:
-            best = (last_seen, ctx)
-    return best[1] if best is not None else alive[0]
+    try:
+        return svc.show(resolved_name)
+    except ContextNotFoundError:
+        return None
 
 
 @app.command()

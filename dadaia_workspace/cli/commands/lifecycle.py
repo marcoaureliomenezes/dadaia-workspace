@@ -117,6 +117,25 @@ def _preflight_service() -> LifecyclePreflightService:
     return container.build_lifecycle_preflight_service(workspace_root)
 
 
+def _resolve_context_option(context: str | None) -> str:
+    """Resolve a lifecycle verb's ``--context`` through the single bind-resolution seam
+    (SPEC v0.1.77 FR1/FR2). Every lifecycle verb below unsets its Typer default to
+    ``None`` and calls this at the top of its body — the ~15-verb hardcoded literal
+    ``"dadaia-workspace"`` default (never consulting a bind) is retired for good (FR4: no
+    further per-command patches accepted for recurrence family F2).
+
+    ``resolve_context_for_cli`` always returns a non-empty string (explicit -> env ->
+    bound session -> first-ALIVE -> the self-hosting-workspace slug terminal fallback),
+    so a bare verb invocation with no context registered at all keeps its long-standing
+    behavior (degrading to the self-hosting slug, which every downstream ``container``
+    factory already resolves gracefully); a real bind or a real ALIVE context now
+    correctly takes priority over that fallback, which is the FR1 bug this release fixes.
+    """
+    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+
+    return resolve_context_for_cli(context)
+
+
 def _relative_path_refs(workspace_root: Path, paths: tuple[Path, ...]) -> list[str]:
     refs: list[str] = []
     for path in paths:
@@ -284,21 +303,26 @@ def clean(
 
 @app.command()
 def preflight(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str | None = typer.Option(None, "--release-id", help="Release id."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run lifecycle preflight.
 
-    v0.1.69 FR3: ``--context``/``--release-id`` (default ``dadaia-workspace``) feed the real
-    ``LifecyclePreflightInput`` assembly (``container.build_lifecycle_preflight_input``),
-    composed from existing readers (ACTIVE.md, git, specs-doctor, session-identity/lease,
-    hygiene) and evaluated by ``service.preflight(data)``. A blocked result carries a
-    specific reason and (whenever applicable) a non-null ``operator_command`` — the
-    always-BLOCKED ``unresolved_runtime_preflight`` stub is retired.
+    v0.1.69 FR3: ``--context``/``--release-id`` feed the real ``LifecyclePreflightInput``
+    assembly (``container.build_lifecycle_preflight_input``), composed from existing
+    readers (ACTIVE.md, git, specs-doctor, session-identity/lease, hygiene) and evaluated
+    by ``service.preflight(data)``. A blocked result carries a specific reason and
+    (whenever applicable) a non-null ``operator_command`` — the always-BLOCKED
+    ``unresolved_runtime_preflight`` stub is retired. v0.1.77 FR1/FR2: an unset
+    ``--context`` resolves through the single bind-resolution seam (explicit -> env ->
+    bound session -> first-ALIVE) instead of a hardcoded literal default.
     """
     from dadaia_workspace import container
 
+    context = _resolve_context_option(context)
     workspace_root = resolve_workspace_root()
     service = _preflight_service()
     data = container.build_lifecycle_preflight_input(
@@ -325,7 +349,9 @@ def preflight(
 
 @app.command()
 def report(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Report context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Report context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option("v0.1.15", "--release-id", help="Release id."),
     run_id: str = typer.Option("lifecycle-report", "--run-id", help="Lifecycle run id."),
     apply_cleanup: bool = typer.Option(
@@ -335,9 +361,15 @@ def report(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run lifecycle report workflow."""
+    """Run lifecycle report workflow.
+
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam (explicit -> env -> bound session -> first-ALIVE) instead of a hardcoded literal
+    default.
+    """
     from dadaia_workspace import container
 
+    context = _resolve_context_option(context)
     workspace_root = resolve_workspace_root()
     result = container.build_lifecycle_report_workflow(workspace_root).run(
         context=context,
@@ -417,7 +449,9 @@ def hygiene_clean(
 
 @backlog_app.command("define")
 def backlog_define(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("backlog-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -449,7 +483,10 @@ def backlog_define(
     registry + classifier; a blocked gate stops the sequence. ``--harness fake`` walks the
     whole sequence; ``claude`` is rejected (LAW 1); the per-step model is profile-ids-only
     via ``--step-model`` (D-3) — the legacy ``--model`` flag was removed in v0.1.57 (FR6).
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
@@ -549,7 +586,9 @@ def backlog_define(
 
 @release_app.command("define")
 def release_define(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -578,8 +617,11 @@ def release_define(
     from its fragment bundle + selected dynamic context + output schema + the discrete
     ``(harness, model)`` — there is no generic "Run the step" suffix. A REJECTED or
     missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
-    advances the release to IMPLEMENTATION only when every gate passed.
+    advances the release to IMPLEMENTATION only when every gate passed. v0.1.77 FR1/FR2:
+    an unset ``--context`` resolves through the single bind-resolution seam instead of a
+    hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
@@ -722,7 +764,9 @@ def _apply_release_consume(
 
 @app.command()
 def implement(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -738,7 +782,12 @@ def implement(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the implementation step on a selectable harness."""
+    """Run the implementation step on a selectable harness.
+
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
+    """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="implement",
@@ -1054,7 +1103,9 @@ def _run_phase_step(
 
 @review_app.command("qa")
 def review_qa(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1070,7 +1121,12 @@ def review_qa(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the QA review gate on a selectable harness."""
+    """Run the QA review gate on a selectable harness.
+
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
+    """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="qa",
@@ -1090,7 +1146,9 @@ def review_qa(
 
 @review_app.command("security")
 def review_security(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1106,7 +1164,12 @@ def review_security(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the security review gate on a selectable harness."""
+    """Run the security review gate on a selectable harness.
+
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
+    """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="security",
@@ -1126,7 +1189,9 @@ def review_security(
 
 @review_app.command("code")
 def review_code(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Review context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1142,7 +1207,12 @@ def review_code(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the code review gate on a selectable harness."""
+    """Run the code review gate on a selectable harness.
+
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
+    """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     _run_phase_step(
         label="code",
@@ -1162,7 +1232,9 @@ def review_code(
 
 @app.command()
 def close(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1186,8 +1258,10 @@ def close(
     rewritten to their residual. If no consumed ledger exists, removal is a
     no-op (``remove_at_closure`` reads an empty ledger). The removal runs as a
     guarded post-step so a removal error surfaces clearly without corrupting the
-    closure result.
+    closure result. v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single
+    bind-resolution seam instead of a hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
 
     def _apply_closure_removal(_result: PhaseWorkflowResult) -> dict[str, Any]:
@@ -1294,7 +1368,9 @@ def _emit_wire_result(verb: str, result: _WireWorkflowResult, *, json_output: bo
 
 @app.command("audit")
 def audit(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("audit", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1316,7 +1392,10 @@ def audit(
     ``WorkflowExecutionPolicyResolver`` and the frozen snapshot is recorded on the run before
     step 1 (LAW 7). ``--harness fake`` walks the whole sequence; ``--step-model`` is
     profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
@@ -1354,7 +1433,9 @@ def audit(
 
 @app.command("research")
 def research(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("research", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1375,8 +1456,11 @@ def research(
 
     Born resolver-governed (v0.1.56 / FR2), mirroring ``audit``: the frozen snapshot is
     recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); the legacy
-    ``--model`` flag was removed in v0.1.57 (FR6).
+    ``--model`` flag was removed in v0.1.57 (FR6). v0.1.77 FR1/FR2: an unset ``--context``
+    resolves through the single bind-resolution seam instead of a hardcoded literal
+    default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
@@ -1411,7 +1495,9 @@ def research(
 
 @app.command("bug_report")
 def bug_report(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("bug-report", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1433,8 +1519,11 @@ def bug_report(
     ADDITIVE ``specs/bugs/`` path class — it takes no MUTATING lease by construction. Under
     ``--harness fake`` a step-aware driving fake keeps the ADDITIVE ``bug_write`` step in-scope
     so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); the legacy
-    ``--model`` flag was removed in v0.1.57 (FR6).
+    ``--model`` flag was removed in v0.1.57 (FR6). v0.1.77 FR1/FR2: an unset ``--context``
+    resolves through the single bind-resolution seam instead of a hardcoded literal
+    default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
 
@@ -1659,7 +1748,9 @@ def _emit_implement_review_result(result: ImplementReviewLoopResult, *, json_out
 
 @app.command("implement-review")
 def implement_review(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("implement-review", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1696,7 +1787,10 @@ def implement_review(
     review verdict. An APPROVED review COMPLETES the loop; exhausting ``--max-review-retries``
     REJECTED rounds BLOCKS it. ``--harness fake`` drives it deterministically; ``--step-model``
     is profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dadaia_workspace.features.lifecycle.pipeline import (
         PipelineStep,
@@ -1759,7 +1853,9 @@ def implement_review(
 
 @app.command()
 def pipeline(
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("pipeline", "--run-id", help="Lifecycle run id."),
     harness: str = typer.Option(
@@ -1809,7 +1905,10 @@ def pipeline(
     model profile (D-3), resolved through the shared ``WorkflowExecutionPolicyResolver``
     (CLI > overlay > library default). The resolved policy is snapshotted onto the run
     before the first step (LAW 7). ``--show-policy`` prints the resolved policy and exits.
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default.
     """
+    context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace
 
@@ -1986,17 +2085,25 @@ workflow_profiles_app = typer.Typer(help="Model-profile inspection.", no_args_is
 @workflow_policy_app.command("show")
 def workflow_policy_show(
     workflow: str = typer.Argument("implementation", help="Workflow id to resolve."),
-    context: str = typer.Option("dadaia-workspace", "--context", help="Context."),
+    context: str | None = typer.Option(
+        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Show the resolved model policy for a workflow (read-only).
 
     Resolves through the shared ``WorkflowExecutionPolicyResolver`` (overlay > library
     default) with no CLI overrides — what a run would use today before any ``--step-model``.
+    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
+    seam instead of a hardcoded literal default (the resolved name is still not consumed
+    downstream — ``build_workflow_policy_resolver``'s ``context`` param is reserved for a
+    future per-context overlay, D-2 — but the CLI surface stays consistent with every
+    other lifecycle verb).
     """
     from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
 
+    context = _resolve_context_option(context)
     workspace_root = resolve_workspace_root()
     resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
     try:

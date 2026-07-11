@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 import typer
@@ -59,6 +60,21 @@ import typer
 from dadaia_workspace.cli.main import app
 
 pytestmark = pytest.mark.contract
+
+
+class _ClickParam(Protocol):
+    """Structural shape of a Click/Typer parameter this contract inspects."""
+
+    name: str | None
+    default: object
+
+
+class _ClickCommand(Protocol):
+    """Structural shape of a Click/Typer leaf command this contract inspects."""
+
+    params: list[_ClickParam]
+    callback: object
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CLI_DIR = _REPO_ROOT / "dadaia_workspace" / "cli"
@@ -78,8 +94,19 @@ _RESOLUTION_PARAM_NAMES = frozenset({"context", "specs_dir"})
 #: the ``container.build_*``/``container.resolve_*`` families already exist at HEAD.
 _SEAM_FUNCTION_NAMES = frozenset({"resolve_specs_dir_for_cli", "resolve_context_for_cli"})
 
+#: ``container.build_*``/``container.resolve_*`` factories whose ``context`` kwarg is a
+#: documented FILTER (equality-narrows an already-resolved list, e.g.
+#: ``LifecycleRun.context ==``), never a specs-dir/bound-context RESOLUTION input — the
+#: general "reaches a container.build_*/resolve_* call" heuristic below would otherwise
+#: false-positive on these (their factory happens to accept ``context`` as a plain
+#: pass-through kwarg with no ``resolve_bound_context_name`` in its own body). Verified by
+#: reading each factory's source at v0.1.77 T-2 time; a factory added here must be
+#: re-verified whenever its body changes, since this is a manually-audited exception list,
+#: not an automatically-derived one.
+_FILTER_ONLY_CONTAINER_FACTORIES = frozenset({"container.build_workflow_handoff_doctor"})
 
-def _walk_leaf_commands() -> list[tuple[tuple[str, ...], "typer.core.TyperCommand"]]:  # type: ignore[name-defined]
+
+def _walk_leaf_commands() -> list[tuple[tuple[str, ...], _ClickCommand]]:
     """Every leaf (non-group) command in the real app tree, dynamically discovered.
 
     Recurses on ``getattr(cmd, "commands", None)`` rather than
@@ -90,7 +117,7 @@ def _walk_leaf_commands() -> list[tuple[tuple[str, ...], "typer.core.TyperComman
     future-proof against either shim shape.
     """
     root = typer.main.get_command(app)
-    out: list[tuple[tuple[str, ...], object]] = []
+    out: list[tuple[tuple[str, ...], _ClickCommand]] = []
 
     def _walk(cmd: object, prefix: tuple[str, ...]) -> None:
         commands = getattr(cmd, "commands", None)
@@ -98,15 +125,27 @@ def _walk_leaf_commands() -> list[tuple[tuple[str, ...], "typer.core.TyperComman
             for name, sub in commands.items():
                 _walk(sub, (*prefix, name))
         else:
-            out.append((prefix, cmd))
+            out.append((prefix, cmd))  # type: ignore[arg-type]
 
     _walk(root, ())
-    return out  # type: ignore[return-value]
+    return out
 
 
-def _resolution_params(cmd: object) -> list[object]:
+def _resolution_params(cmd: _ClickCommand) -> list[_ClickParam]:
     """This command's Click parameters named ``context`` or ``specs_dir``."""
-    return [p for p in cmd.params if getattr(p, "name", None) in _RESOLUTION_PARAM_NAMES]  # type: ignore[attr-defined]
+    return [p for p in cmd.params if p.name in _RESOLUTION_PARAM_NAMES]
+
+
+def _param_name(param: _ClickParam) -> str:
+    """Narrow a resolution-shaped param's ``.name`` to ``str`` (never ``None`` here — it
+    already matched ``_RESOLUTION_PARAM_NAMES`` membership, a set of non-``None`` strings)."""
+    assert param.name is not None
+    return param.name
+
+
+def _verb_label(path: tuple[str, ...], param: _ClickParam) -> str:
+    """``dadaia <path> --<option>`` label used in every assertion message/set below."""
+    return f"{'.'.join(('dadaia', *path))} --{_param_name(param).replace('_', '-')}"
 
 
 # --- AST reachability: is a context/specs_dir parameter resolver-driven? -------------
@@ -177,8 +216,10 @@ def _names_reaching_seam(func: ast.FunctionDef) -> set[str]:
     """Local variable/parameter names inside *func* that are passed BY NAME (positional
     ``Name`` argument or ``keyword`` whose value is that ``Name``) into a call to one of
     ``_SEAM_FUNCTION_NAMES``, OR into any ``container.build_*``/``container.resolve_*``
-    attribute call (the container's factories internally resolve through
-    ``resolve_bound_context_name`` — reaching one of them IS reaching the seam family)."""
+    attribute call EXCEPT the documented filter-only factories in
+    ``_FILTER_ONLY_CONTAINER_FACTORIES`` (the container's other factories internally
+    resolve through ``resolve_bound_context_name`` — reaching one of them IS reaching the
+    seam family; the filter-only ones do not)."""
     reached: set[str] = set()
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
@@ -196,6 +237,8 @@ def _names_reaching_seam(func: ast.FunctionDef) -> set[str]:
             ):
                 callee_name = f"container.{func_node.attr}"
         if callee_name is None:
+            continue
+        if callee_name in _FILTER_ONLY_CONTAINER_FACTORIES:
             continue
         is_seam_call = callee_name in _SEAM_FUNCTION_NAMES or callee_name.startswith("container.")
         if not is_seam_call:
@@ -259,9 +302,13 @@ def _param_reaches_seam(module_path: Path, func_name: str, param_name: str) -> b
             callee_params += [a.arg for a in callee_def.args.kwonlyargs]
             # Positional match.
             for idx, arg in enumerate(node.args):
-                if isinstance(arg, ast.Name) and arg.id in closure and idx < len(callee_params):
-                    if _explore(callee_name, callee_params[idx]):
-                        return True
+                if (
+                    isinstance(arg, ast.Name)
+                    and arg.id in closure
+                    and idx < len(callee_params)
+                    and _explore(callee_name, callee_params[idx])
+                ):
+                    return True
             # Keyword match.
             for kw in node.keywords:
                 if (
@@ -269,25 +316,25 @@ def _param_reaches_seam(module_path: Path, func_name: str, param_name: str) -> b
                     and isinstance(kw.value, ast.Name)
                     and kw.value.id in closure
                     and kw.arg in callee_params
+                    and _explore(callee_name, kw.arg)
                 ):
-                    if _explore(callee_name, kw.arg):
-                        return True
+                    return True
         return False
 
     return _explore(func_name, param_name)
 
 
-def _cli_function_name(cmd: object) -> str | None:
+def _cli_function_name(cmd: _ClickCommand) -> str | None:
     """Best-effort recovery of the Python function name backing a Typer command.
 
     Typer stores the original callback on ``.callback``; its ``__name__`` is the
     module-level function name AST reachability keys on.
     """
-    callback = getattr(cmd, "callback", None)
+    callback = cmd.callback
     return getattr(callback, "__name__", None) if callback is not None else None
 
 
-def _is_resolver_driven(path: tuple[str, ...], cmd: object, param_name: str) -> bool:
+def _is_resolver_driven(path: tuple[str, ...], cmd: _ClickCommand, param_name: str) -> bool:
     """True iff *param_name* on the command at *path* is a genuine resolution input
     (AST-reachable to the seam family), per the module-local reachability graph."""
     module_path = _module_path_for_command_path(path)
@@ -309,8 +356,8 @@ def test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default() -> Non
     offenders: list[str] = []
     for path, cmd in _walk_leaf_commands():
         for param in _resolution_params(cmd):
-            if getattr(param, "default", None) == _HARDCODED_DEFAULT:
-                offenders.append(f"{'.'.join(('dadaia', *path))} --{param.name.replace('_', '-')}")
+            if param.default == _HARDCODED_DEFAULT:
+                offenders.append(_verb_label(path, param))
     assert not offenders, (
         "resolver-driven verb(s) carry the hardcoded literal default "
         f"{_HARDCODED_DEFAULT!r} instead of resolving through the seam (SPEC FR2):\n"
@@ -339,8 +386,8 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     not_seam_reaching: list[str] = []
     for path, cmd in _walk_leaf_commands():
         for param in _resolution_params(cmd):
-            label = f"{'.'.join(('dadaia', *path))} --{param.name.replace('_', '-')}"
-            if _is_resolver_driven(path, cmd, param.name):
+            label = _verb_label(path, param)
+            if _is_resolver_driven(path, cmd, _param_name(param)):
                 seam_reaching.append(label)
             else:
                 not_seam_reaching.append(label)
@@ -353,10 +400,10 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     # true by construction of `_is_resolver_driven`, restated here as the load-bearing
     # assertion so a future refactor of the classifier cannot silently invert it).
     assert all(
-        _is_resolver_driven(path, cmd, param.name)
+        _is_resolver_driven(path, cmd, _param_name(param))
         for path, cmd in _walk_leaf_commands()
         for param in _resolution_params(cmd)
-        if f"{'.'.join(('dadaia', *path))} --{param.name.replace('_', '-')}" in seam_reaching
+        if _verb_label(path, param) in seam_reaching
     )
 
     # The known non-resolver params stay excluded (classifier honesty pin — fails loudly
