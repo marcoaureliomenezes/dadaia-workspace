@@ -232,7 +232,7 @@ Restrict-vs-trust protocol:
 > extras (`tier`, `input_contract`, `paths.write_allowlist`) are silently ignored by the
 > runtime — and dadaia's PreToolUse gate does NOT read them either (no hook can resolve
 > persona identity; the RULE-D allowlist check was removed in 0.1.7 rc-3). The gate
-> enforces path-class × lease × phase × mode, persona-blind. `paths.write_allowlist` is
+> enforces path-class × presence × phase × mode, persona-blind. `paths.write_allowlist` is
 > an agent-instruction convention checked by tooling/tests and reviewers, nothing else.
 > Never assume any runtime or hook polices a persona's write scope.
 

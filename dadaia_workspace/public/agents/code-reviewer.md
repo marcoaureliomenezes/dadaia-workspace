@@ -1,9 +1,9 @@
 ---
 name: code-reviewer
-description: PR/branch reviewer + pre-PR checkpoint. 6-axis review (architecture/patterns/tests/security/perf/dead code) via gh CLI. ADDITIVE evidence only — no lease. Emits report with severity + recommendation. NEVER edits code or approves PRs.
+description: PR/branch reviewer + pre-PR checkpoint. 6-axis review (architecture/patterns/tests/security/perf/dead code) via gh CLI. ADDITIVE evidence only. Emits report with severity + recommendation. NEVER edits code or approves PRs.
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lease — concurrent"
+lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
 gate_role: checkpoint-pre-PR
 tools:
   - Read
@@ -56,10 +56,10 @@ fixes. The implementing agent owns the fix; you own the verdict.
 
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the **pre-PR
 checkpoint**: your `APPROVE` verdict is the precondition for opening/merging a PR. You consume
-qa-engineer + security-reviewer evidence plus architecture adherence on the diff. You hold
-**no lease** and run concurrently — your writes (reports only) are ADDITIVE and never
-contend for the release lease. You vote; you do not hold the lease. A `REQUEST_CHANGES`
-verdict keeps the task `[-]` and blocks the PR.
+qa-engineer + security-reviewer evidence plus architecture adherence on the diff. There is
+no lock to hold — you run concurrently with everything else (NO-LOCKS DOCTRINE, v0.1.76);
+your writes (reports only) are ADDITIVE. You vote; you never contend for anything. A
+`REQUEST_CHANGES` verdict keeps the task `[-]` and blocks the PR.
 
 ---
 

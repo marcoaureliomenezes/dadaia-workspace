@@ -139,7 +139,7 @@ See `workspace-protocol` rule for the full context-resolution and spec-loading p
 ## Bug Registration (all runtimes)
 
 Any time you hit a **bug** while operating dadaia-workspace tooling — projection,
-`specs doctor`/`upgrade`, scaffolding/onboarding, hooks, the SDD gate, locks,
+`specs doctor`/`upgrade`, scaffolding/onboarding, hooks, the SDD gate, presence,
 context bind/alive/dead, panel, reports, the `dadaia` CLI, or any production
 behavior that breaks its own contract — you MUST register the bug before the
 turn ends by appending a `reported` event with `dadaia bugs append` (event-sourced
@@ -148,14 +148,21 @@ JSONL, v0.1.46 — **not** a hand-authored `specs/bugs/<slug>.md`). Events land 
 to `repos/dadaia-workspace/specs/bugs/`; in a consumer workspace, to the active
 context's `specs/bugs/` plus an upstream report. Bug events are ADDITIVE — the gate's
 path classifier resolves `specs/bugs/` (at the workspace root **and** inside any
-`repos/<slug>/`) to the ADDITIVE class, which is never blocked and never takes a
-lease — there is no excuse to defer. Do NOT file a bug for an error in
+`repos/<slug>/`) to the ADDITIVE class, which is never blocked — there is no excuse to
+defer. Do NOT file a bug for an error in
 your own throwaway script or for a validation the tool is *designed* to emit
 (e.g. doctor correctly flagging a non-compliant tree, or the gate correctly
 blocking an unauthorized write). See the `bug-registration-guardrail` rule for
 the `dadaia bugs append` event contract and redaction requirement.
 
-## SDD Gate
+## SDD Gate — NO-LOCKS DOCTRINE (v0.1.76)
+
+Races between sessions are ACCEPTED and SURFACED, never prevented. No path in
+dadaia-workspace blocks an agent or operator because of another session's presence:
+there is no blocking lease, no `LockHeldError`, no lease acquisition/adoption, and no
+`lock steal` verb. Quality gates (pre-push security verdict, CI preflight) and
+non-concurrency path-class policy (PROTECTED/FROZEN/MEMORY-phase/READ-mode) are NOT
+locks and stay in force.
 
 The gate has two layers. Know which one you are relying on.
 
@@ -169,38 +176,40 @@ three policies in fixed order, **first-block-wins**:
    parsing): `dadaia`, `pip`, and `python -m dadaia_workspace` invocations must be
    rooted in `.dadaia/.venv/bin/`; the block message carries the corrected command.
 3. **SDD gate** — evaluates every file-write tool call as
-   **path-class × lease × phase × mode**:
+   **path-class × presence × phase × mode**:
    - **Path class** (context-relative — the same `specs/` taxonomy applies at the
      workspace root and inside every `repos/<slug>/`): ADDITIVE (`specs/bugs/`,
      `specs/backlog/`, `specs/audits/`, `.dadaia/reports|handoff|tmp/`) always allows;
      MEMORY (`specs/memory/`) allows only in `DEFINITION`/`CLOSURE` phase; FROZEN
      (`specs/_archive/`) always blocks; PROTECTED (`.dadaia/sessions/`) always blocks
-     (fail-closed, lease-identity integrity); everything else in-repo is MUTATING.
-   - **Lease**: a MUTATING write acquires the single per-context TTL lease (O_EXCL
-     CAS). The record carries the long-lived harness pid (hook payload pid when
-     present, else the hook's parent process). A live foreign holder — heartbeat fresh
-     **or** recorded pid demonstrably alive — is never stolen; the gate yields with an
-     actionable message.
-   - **Mode**: resolved env → session record → the context's incumbent pointer
-     (refreshed by `dadaia context bind`) → IMPLEMENTATION default. A session
-     resolving READ is non-acquiring — MUTATING writes are blocked before any lease
-     call; ADDITIVE paths stay writable.
+     (fail-closed, session-identity integrity); everything else in-repo is MUTATING.
+   - **Presence**: a MUTATING write upserts an advisory presence record for the
+     session at `.dadaia/states/presence/<ctx>/<session_id>.json` — this never fails
+     or blocks (presence I/O errors are swallowed and the write proceeds). When another
+     live session's presence already exists on the same context, the write is
+     **allowed** and a single throttled advisory warning is surfaced naming the other
+     session (session id, runtime, heartbeat age). Stale presence is GC'd by doctor
+     (PRESENCE-GC) and opportunistically on upsert.
+   - **Mode**: resolved env → the session's **own** record → IMPLEMENTATION default
+     (there is no context-incumbent-pointer fallback — a foreign session's bind can
+     never change your mode). A session resolving READ is non-acquiring and blocks
+     only its **own** MUTATING writes as opt-in self-protection; ADDITIVE paths stay
+     writable.
 
 **Chokepoint envelope** — the PreToolUse gate does not parse arbitrary shell command
 strings; the `Bash`-write hole is closed at the git chokepoints instead, which run as
 git hooks and do not depend on any harness hook firing:
 
-- **pre-commit lease gate** — a commit into a Spec Context repo from a session that
-  does not hold the context's live MUTATING lease is blocked with an actionable
-  message. The holder's commits flow; commits flow when no lease exists (ADDITIVE work
-  commits freely). When holder identity is indeterminate (ancestry probe unavailable,
-  or the holder pid is dead) the gate ALLOWs with a logged WARN — zero-false-block
-  dominates.
+- **pre-commit is WARN-only** — a commit into a Spec Context repo keeps detecting
+  another live session's presence on the context, but it **always ALLOWs** the commit;
+  on detection it prints one advisory line naming the other session. There is no BLOCK
+  verdict — commits always flow.
 - **pre-push security-verdict gate** — a push is blocked unless an APPROVED
   `security-reviewer` handoff whose `metrics.commit_sha` equals each pushed ref sha
   exists; branch deletions and tag-only pushes pass. Runs alongside the CI preflight
-  in the same pre-push hook. Commits are never review-blocked — only pushes.
-- An **advisory reconciler** (PostToolUse) flags out-of-lease dirty MUTATING paths;
+  in the same pre-push hook. Commits are never review-blocked — only pushes. This is a
+  quality gate, not a concurrency lock, and is unchanged by the NO-LOCKS DOCTRINE.
+- An **advisory reconciler** (PostToolUse) flags out-of-scope dirty MUTATING paths;
   it never blocks. Doctor coherence checks remain the after-the-fact backstop.
 
 **Bind-driven injection** — `dadaia context bind` writes a bind-epoch marker and is
@@ -211,9 +220,9 @@ is never a precondition for ADDITIVE work.
 **What the gate does NOT do.** The hook reads no SDD artifacts: it does not know the
 active phase from `ACTIVE.md`, whether `SPEC.md`/`PLAN.md`/`TASKS.md` are `Aprovado`,
 which task is reserved, or whether an edit is inside its declared write set. The
-deterministic gate constrains **what** may be written (path-class, lease, phase, mode) —
-not **how** the change was produced. (`Aprovado`, `Em revisão`, and `Draft` are the
-canonical SDD status tokens — do not translate or change them.)
+deterministic gate constrains **what** may be written (path-class, presence, phase,
+mode) — not **how** the change was produced. (`Aprovado`, `Em revisão`, and `Draft` are
+the canonical SDD status tokens — do not translate or change them.)
 
 **Ordered lifecycle is owned by the dadaia-workflows, not by this file.** The ordered
 ritual — reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition →
@@ -238,9 +247,10 @@ an explicit `--harness`/`--step-harness` always wins. Claude Code is Layer-1-onl
 never a Layer-2 worker.
 Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
 **safety-gate-enforced** by the deterministic gate and git chokepoints described above
-(write-scope, lease, and phase) — there is no procedural check that a given workflow verb
-was actually run. For the full per-workflow description — purpose, ordered steps,
-per-step harness/model, flow diagram, and availability — open the **`dadaia panel` Workflows tab**.
+(write-scope, presence, and phase) — there is no procedural check that a given
+workflow verb was actually run. For the full per-workflow description — purpose,
+ordered steps, per-step harness/model, flow diagram, and availability — open the
+**`dadaia panel` Workflows tab**.
 
 ## Memory
 

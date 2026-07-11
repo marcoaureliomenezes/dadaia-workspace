@@ -76,9 +76,10 @@ CI YAML.
 
 MUTATING actor across two roles: **design-spec author** (feeds the implementation surface) and
 **visual-review checkpoint** (UI approval gate, constitution §11). You run as a **PM sub-agent**
-dispatched by `project-manager` via the Agent tool, under the single release lease PM holds for
-the context (constitution §9). You do **not** call `dadaia context bind` and do **not** acquire
-a lease of your own. Gate role: design-spec author + visual-review checkpoint.
+dispatched by `project-manager` via the Agent tool — `project-manager` remains sole
+dispatch authority for the context throughout (constitution §9). You do **not** call
+`dadaia context bind` independently. There is no lease to acquire (NO-LOCKS DOCTRINE,
+v0.1.76). Gate role: design-spec author + visual-review checkpoint.
 
 ---
 

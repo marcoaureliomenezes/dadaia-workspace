@@ -58,7 +58,8 @@ mechanical sequence that follows that decision.
 
 Cites constitution §1 matrix: **activity class MUTATING, lifecycle phase Closure** (§7
 phase 8). The deploy mutates `main`, the tag namespace, and the published package — a
-single MUTATING actor under the PM-held release lease (§8/§9).
+single MUTATING actor under PM's sole dispatch authority (§8/§9; NO-LOCKS DOCTRINE,
+v0.1.76 — there is no lease to hold).
 
 > **Honesty note.** This is a dispatch-reference document. Claude Code and Codex workflow
 > Markdown does not auto-execute at runtime (constitution §4). This file is read by an

@@ -19,8 +19,10 @@ slugs, or optional domain-pack assumptions.
 
 ## Agent Inventory
 
-Default topology: 9 core agents (constitution §14 roster). Roles, phases, and lease
-relationships are normative in the §7/§14 matrices; this table is the dispatch view.
+Default topology: 9 core agents (constitution §14 roster). Roles and phases are
+normative in the §7/§14 matrices; this table is the dispatch view. There is no
+concurrency lock between agents (NO-LOCKS DOCTRINE, v0.1.76) — dispatch purity below is
+an orchestration convention, not a session primitive.
 
 The "Routes next to" column is **handoff routing, not executable dispatch**: it names
 the agent the dispatcher (PM, top-level) should send to next after consuming this
@@ -31,7 +33,7 @@ when it runs as the top-level session agent.
 
 | Agent | Phase (§7) | Primary mission | Routes next to (via PM) | Do not call when |
 |---|---|---|---|---|
-| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, lease coordinator | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
+| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |

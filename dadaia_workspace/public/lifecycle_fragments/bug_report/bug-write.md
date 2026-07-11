@@ -35,5 +35,5 @@ additive by construction: a new file appears, nothing else changes.
 ## Output
 
 A record handoff naming the new bug file's slug and the fields it carries. The write
-is additive — no lease is taken and the write is never blocked; the bug channel only
+is additive — no lock is taken and the write is never blocked; the bug channel only
 grew by one file.

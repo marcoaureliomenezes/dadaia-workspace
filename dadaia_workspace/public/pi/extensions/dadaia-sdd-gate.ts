@@ -70,7 +70,7 @@ import { join } from "node:path";
 
 // PI built-in file-write tools → the Python gate's canonical WRITE_TOOLS vocabulary.
 // Mapping (not passthrough) keeps the Python vocabulary stable: the classifier sees
-// "Write"/"Edit" and applies the identical path-class × lease × phase × mode policy.
+// "Write"/"Edit" and applies the identical path-class × presence × phase × mode policy.
 const TOOL_NAME_MAP: Record<string, string> = {
   write: "Write",
   edit: "Edit",

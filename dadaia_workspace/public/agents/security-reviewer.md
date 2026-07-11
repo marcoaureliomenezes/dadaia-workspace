@@ -1,9 +1,9 @@
 ---
 name: security-reviewer
-description: "Vulnerability auditor + pre-push checkpoint. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. ADDITIVE evidence only — no lease. Findings: CWE id, file:line, redacted evidence. NEVER writes fixes."
+description: "Vulnerability auditor + pre-push checkpoint. OWASP Top 10, secret detection, dep CVEs (pip-audit/npm audit/go list), IaC review. ADDITIVE evidence only. Findings: CWE id, file:line, redacted evidence. NEVER writes fixes."
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lease — concurrent"
+lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
 gate_role: checkpoint-pre-push
 tools:
   - Read
@@ -58,10 +58,10 @@ a structured finding report that the operator or implementing agent uses to reme
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
 **pre-push gate**: your `APPROVE` verdict is mechanically enforced — the pre-push
 security-verdict chokepoint (`dadaia ci push-gate-check`) blocks any push whose ref sha
-lacks a matching APPROVED handoff from you. You hold **no lease** and run concurrently —
-your writes (reports only) are ADDITIVE and never contend for the release lease. You
-vote; you do not hold the lease. A `REQUEST_CHANGES` verdict keeps the task `[-]` and
-blocks the push.
+lacks a matching APPROVED handoff from you. There is no lock to hold — you run
+concurrently with everything else (NO-LOCKS DOCTRINE, v0.1.76); your writes (reports
+only) are ADDITIVE. You vote; you never contend for anything. A `REQUEST_CHANGES`
+verdict keeps the task `[-]` and blocks the push.
 
 ---
 

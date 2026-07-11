@@ -82,11 +82,12 @@ Your domain is the AI-entity surface only.
 
 You are always a **MUTATING** actor when writing AI-entity files — never ADDITIVE
 (constitution §7, §14). Two modes: (a) **during a release** you run as a PM sub-agent
-dispatched via the Agent tool, under PM's single release lease (constitution §9) — you do
-not bind your own session; (b) **for short ad-hoc surface fixes** with no release in flight,
-you may take your own short MUTATING lease for `dadaia_workspace/public/**`. That ad-hoc
-lease is blocked by the gate if a PM release lease is live, preserving the exactly-one-holder
-invariant. Gate role: AI-entity implementer.
+dispatched via the Agent tool — you do not bind your own session, PM remains sole
+dispatch authority (constitution §9); (b) **for short ad-hoc surface fixes** with no
+release in flight, you may bind your own session for `dadaia_workspace/public/**`.
+There is no blocking lease to acquire or contend for (NO-LOCKS DOCTRINE, v0.1.76):
+if a PM-dispatched session is also writing, both proceed and the gate surfaces one
+throttled advisory warning — it is never blocked. Gate role: AI-entity implementer.
 
 ---
 

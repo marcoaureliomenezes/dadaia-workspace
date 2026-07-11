@@ -8,7 +8,15 @@ always_on: true
 
 All dadaia-workspace agents follow this shared protocol. Do not duplicate these rules inline.
 
-## 1. SDD gate
+## 1. SDD gate — NO-LOCKS DOCTRINE (v0.1.76)
+
+Races between sessions are ACCEPTED and SURFACED, never prevented. No path in
+dadaia-workspace blocks an agent or operator because of another session's presence.
+There is no blocking lease, no `LockHeldError`, no lease acquisition, no adoption, and
+no `lock steal` verb — that CLI verb is deleted. Quality gates (pre-push security
+verdict, CI preflight) and non-concurrency path-class policy
+(PROTECTED/FROZEN/MEMORY-phase/READ-mode) are NOT locks and stay in force.
+
 **What the hooks enforce (deterministic).** A single merged PreToolUse entrypoint —
 `dadaia_workspace.hooks.pre_gate` — reads each tool payload once and evaluates three
 policies in fixed order, **first-block-wins**:
@@ -17,38 +25,37 @@ policies in fixed order, **first-block-wins**:
 2. **venv-guard** — Bash-only, fixed leading-token patterns (no general shell parsing):
    `dadaia`, `pip`, and `python -m dadaia_workspace` invocations must be rooted in
    `.dadaia/.venv/bin/`; the block message carries the corrected command.
-3. **SDD gate** — evaluates each `Edit`/`Write`-family call as path-class × lease ×
+3. **SDD gate** — evaluates each `Edit`/`Write`-family call as path-class × presence ×
    phase × mode: ADDITIVE paths (`specs/bugs|backlog|audits/`,
    `.dadaia/reports|handoff|tmp/` — root or in-repo) always pass; MEMORY
    (`specs/memory/`) passes only in DEFINITION/CLOSURE phase; FROZEN (`specs/_archive/`)
-   and PROTECTED (`.dadaia/sessions/`) block; MUTATING acquires the single per-context
-   lease. Liveness is TTL + pid veto: the lease records the long-lived harness pid (hook
-   payload pid when present, else the hook's parent process) — a holder whose recorded
-   pid is still running is never stolen — and the heartbeat renews on every PostToolUse
-   (match-all on both harnesses; harness-native session id from the hook stdin payload).
-   A session whose mode resolves READ (env → session record → the context's incumbent
-   pointer, which `bind` refreshes → IMPLEMENTATION default) is non-acquiring — MUTATING
-   writes block before any lease call.
+   and PROTECTED (`.dadaia/sessions/`) block; MUTATING writes upsert an **advisory
+   presence record** for the session (never blocks — presence I/O errors are swallowed
+   and the write proceeds). When another live session's presence already exists on the
+   same context, the write is **allowed** and a single throttled advisory warning is
+   surfaced naming the other session (session id, runtime, heartbeat age). A session
+   whose mode resolves READ (env → the session's **own** record → IMPLEMENTATION
+   default — never a foreign session's bind) is non-acquiring and self-blocks its own
+   MUTATING writes as opt-in self-protection; it never affects any other session's mode.
 
 **Chokepoints close the Bash hole at the git boundaries.** Arbitrary `Bash`-tool file
 writes are not classified by the PreToolUse gate (no shell parsing); instead, two
 deterministic git-hook chokepoints gate the exits — they run as git hooks and do not
 depend on any harness hook firing:
-- **pre-commit lease gate** — a `git commit` into a Spec Context repo from a session
-  that does not hold the context's live MUTATING lease is blocked with an actionable
-  message. The holder's commits flow, and commits flow when no lease exists at all
-  (ADDITIVE work commits freely). When holder identity is indeterminate (the ancestry
-  probe is unavailable, or the holder pid is dead) the gate **ALLOWs with a logged
-  WARN** — zero-false-block dominates; the chokepoint degrades to advisory on that
-  platform.
+- **pre-commit is WARN-only** — a `git commit` into a Spec Context repo keeps
+  detecting another live session's presence on the context, but it **always ALLOWs**
+  the commit; on detection it prints one advisory line naming the other session. There
+  is no BLOCK verdict — commits always flow.
 - **pre-push security-verdict gate** — a `git push` is blocked unless an APPROVED
   `security-reviewer` handoff whose `metrics.commit_sha` equals each pushed ref sha
   exists. Branch deletions and tag-only pushes pass. Commits are never review-blocked —
-  only pushes.
+  only pushes. This gate is a quality gate, not a concurrency lock, and is unchanged by
+  the NO-LOCKS DOCTRINE.
 
-An **advisory working-tree reconciler** (PostToolUse) flags out-of-lease dirty MUTATING
+An **advisory working-tree reconciler** (PostToolUse) flags out-of-scope dirty MUTATING
 paths in the bound context's repo (log event / report line); it NEVER blocks. Doctor
-coherence checks remain the after-the-fact backstop.
+coherence checks remain the after-the-fact backstop, including GC of stale presence
+records (PRESENCE-GC).
 
 **What you uphold as discipline (the hook reads no SDD artifacts).** Before editing any
 production file:
@@ -65,7 +72,7 @@ When you need to resolve specs_dir yourself, use this priority order:
 3. `dadaia context show --json`
 
 (The first-ALIVE fallback above is agent-side discovery discipline; the SDD gate's
-lease-context resolution also uses it. It is NOT how injection works.)
+presence-context resolution also uses it. It is NOT how injection works.)
 
 **Injection is bind-driven.** `dadaia context bind` writes a bind-epoch marker
 (`.dadaia/states/bind_epoch/<ctx>`) and is the **sole trigger** for context-memory
@@ -102,4 +109,4 @@ to work on.
 `specs/memory/**/*.md` files are write-locked for all agents EXCEPT `product-engineer`, who may write in the DEFINITION and CLOSURE phases per `constitution.md §13`. No other agent edits memory atoms in any phase. The gate enforces the phase half deterministically (MEMORY path class, root and in-repo); the who half is agent discipline.
 
 ## 6. Write-allowlist convention
-Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. This is an **agent-instruction convention**, not gate-enforced — no hook reads persona frontmatter, and no harness can assert persona identity to a hook (the RULE-D allowlist check was removed from the SDD gate in 0.1.7 rc-3 for exactly that reason). The only deterministic lock is the single-session lease (§1).
+Each agent declares `paths.write_allowlist` in its frontmatter. Do not touch files outside your allowlist. This is an **agent-instruction convention**, not gate-enforced — no hook reads persona frontmatter, and no harness can assert persona identity to a hook (the RULE-D allowlist check was removed from the SDD gate in 0.1.7 rc-3 for exactly that reason). There is no session-exclusivity lock (§1, NO-LOCKS DOCTRINE) — concurrent writes are always allowed and surfaced advisory-only.
