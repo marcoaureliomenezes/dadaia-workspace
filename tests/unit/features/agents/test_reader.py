@@ -288,13 +288,13 @@ def test_skip_bad_frontmatter_file_others_still_load(
         ),
         pytest.param(
             {"name": "legacy-agent", "description": "Legacy tier.", "tier": 2},
-            lambda dto: dto is not None and dto.dispatch_band == 2,
-            id="legacy-tier-only-resolves-band",
+            lambda dto: dto is not None and dto.dispatch_band == 3,
+            id="legacy-tier-key-is-unknown-band-defaults-to-3",
         ),
         pytest.param(
             {"name": "both-agent", "description": "Both.", "dispatch_band": 1, "tier": 3},
             lambda dto: dto is not None and dto.dispatch_band == 1,
-            id="dispatch-band-beats-legacy-tier",
+            id="dispatch-band-resolves-tier-is-unknown-and-dropped",
         ),
         pytest.param(
             {"name": "no-band-agent", "description": "No band."},
@@ -354,6 +354,36 @@ def test_raw_to_dto_edge_cases(
         return
     dto = _raw_to_dto(raw)
     assert assert_fn(dto)
+
+
+# ---------------------------------------------------------------------------
+# AC-6 — the v0.1.64 ``tier:`` tolerate window is closed (v0.1.81 FR1 strip).
+# A body carrying legacy ``tier:`` and no ``dispatch_band:`` is no longer
+# silently honored: ``tier`` is dropped as an unknown frontmatter field (with
+# the standard unknown-field warning) and the band defaults to 3 with the
+# missing-band warning — proving the fallback read is gone, not just that the
+# resolved band happens to differ.
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_tier_only_is_unknown_field_and_band_defaults_to_3(
+    caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    caplog.set_level("WARNING", logger="dadaia_workspace.features.agents.reader")
+    raw = {"name": "legacy-only-agent", "description": "Legacy tier only.", "tier": 2}
+
+    dto = _raw_to_dto(raw)
+
+    assert dto is not None
+    # band is NOT resolved from the legacy key — it falls through to the
+    # missing-band default, proving `raw.get("tier")` is no longer read.
+    assert dto.dispatch_band == 3
+    assert any(
+        "unknown frontmatter fields" in rec.message and "'tier'" in rec.message
+        for rec in caplog.records
+    )
+    captured = capsys.readouterr()
+    assert "missing the 'dispatch_band' frontmatter field" in captured.err
 
 
 # ---------------------------------------------------------------------------

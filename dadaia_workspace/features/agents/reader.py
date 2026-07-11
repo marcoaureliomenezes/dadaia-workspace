@@ -42,7 +42,6 @@ __all__ = [
     "FileSystemAgentsProvider",
     "InvalidAgentIdError",
     "MissingDispatchBandError",
-    "MissingTierError",
     "get_prompt",
     "read_canonical_agents",
 ]
@@ -75,7 +74,6 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "name",
         "description",
         "dispatch_band",  # dispatch band: 1 = orchestrator, 2 = curator, 3 = leaf specialist
-        "tier",  # LEGACY spelling of dispatch_band — tolerated during the v0.1.64 rename window
         "skills",
         "tools",
         "model",
@@ -96,17 +94,11 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
 class MissingDispatchBandError(ValueError):
     """Raised when an agent frontmatter has an invalid (non-int or out-of-range) band value.
 
-    The band key is ``dispatch_band`` (preferred) or the legacy ``tier`` spelling
-    (silently tolerated during the v0.1.64 rename window). Note: a *missing* band field
-    is tolerated — it defaults to 3 with a stderr warning. This error is only raised
-    when the band is present but invalid (non-integer or not in {1, 2, 3}), so that
-    typos produce loud failures while stale staged files are tolerated.
+    The band key is ``dispatch_band``. Note: a *missing* band field is tolerated — it
+    defaults to 3 with a stderr warning. This error is only raised when the band is
+    present but invalid (non-integer or not in {1, 2, 3}), so that typos produce loud
+    failures while a missing field is tolerated.
     """
-
-
-#: Deprecated alias kept for the v0.1.64 tolerate-then-strip window
-#: (removal tracked by the ``dispatch-band-legacy-fallback-removal`` backlog return).
-MissingTierError = MissingDispatchBandError
 
 
 def _resolve_agents_dir(workspace_root: Path) -> Path | None:
@@ -164,13 +156,9 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     # panel roster downstream, so suppress the missing-band warning for them.
     is_plugin_stub = raw.get("plugin") is True
 
-    # dispatch_band: int in {1, 2, 3}. Preferred key is 'dispatch_band'; the legacy
-    # 'tier' spelling is a SILENT fallback during the v0.1.64 rename window (a stale
-    # consumer projection must not warn-spam). Missing both → default 3 with warning;
+    # dispatch_band: int in {1, 2, 3}. Missing → default 3 with warning;
     # invalid → MissingDispatchBandError.
     band_raw = raw.get("dispatch_band")
-    if band_raw is None:
-        band_raw = raw.get("tier")
     if band_raw is None:
         if not is_plugin_stub:
             sys.stderr.write(
