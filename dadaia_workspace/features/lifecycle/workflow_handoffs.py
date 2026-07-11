@@ -159,6 +159,13 @@ def _validate_generic_handoff(payload: dict[str, object]) -> list[str]:
 #: - bug_report: intake → ``bug-intake-handoff-v1`` (summary), dedupe review →
 #:               ``bug-dedupe-handoff-v1`` (verdict), bug_write →
 #:               ``bug-record-handoff-v1`` (summary — the ADDITIVE bug record).
+#: - pipeline (v0.1.78 T-B / FR-B): the full IMPLEMENTATION→QA→SECURITY→CODE ladder
+#:               (``LifecyclePipeline.run``) produces one payload per step through the
+#:               (additive-optional) wired ``handoff_resolver`` — ``implement`` (create) →
+#:               ``generic-step-handoff-v1`` (summary), ``review_qa`` → the existing
+#:               ``qa-review-handoff-v1`` (verdict), ``review_security`` →
+#:               ``security-review-handoff-v1`` (verdict), ``review_code`` →
+#:               ``code-review-handoff-v1`` (verdict).
 _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "release-scope-handoff-v1": _validate_release_scope_handoff,
     "spec-review-handoff-v1": _validate_review_verdict,
@@ -178,6 +185,9 @@ _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "bug-intake-handoff-v1": _validate_generic_handoff,
     "bug-dedupe-handoff-v1": _validate_review_verdict,
     "bug-record-handoff-v1": _validate_generic_handoff,
+    # v0.1.78 T-B / FR-B — full-pipeline (``LifecyclePipeline.run``) step payloads.
+    "security-review-handoff-v1": _validate_review_verdict,
+    "code-review-handoff-v1": _validate_review_verdict,
 }
 
 

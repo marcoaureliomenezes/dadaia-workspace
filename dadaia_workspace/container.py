@@ -1226,6 +1226,14 @@ def build_lifecycle_pipeline(
     every step. ``policy_snapshot`` is the resolved governance snapshot (T-28-A-08, from
     :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
     the first step (LAW 7) — an overlay mutated after start cannot change the in-flight run.
+
+    v0.1.78 T-B / FR-B: the ``handoff_resolver`` is now ALWAYS wired (bug
+    ``full-pipeline-success-persists-running-empty-ledger`` — the production ``pipeline``
+    CLI verb used to build a pipeline with no resolver, so every full-ladder run's
+    ``workflow_steps`` ledger stayed permanently empty). Every real ``build_lifecycle_pipeline``
+    caller now gets the same run-scoped per-step handoff-ledger payloads
+    ``run_implement_review_loop`` already produced; only a direct, fixture-level
+    ``LifecyclePipeline(...)`` construction (tests) can still omit it.
     """
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
@@ -1240,6 +1248,7 @@ def build_lifecycle_pipeline(
         or (lambda kind: build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))),
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
         # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
         specs_dir=_context_specs_dir(workspace_root, context),

@@ -132,6 +132,20 @@ class PipelineResult:
     blocked: BlockedState | None = None
 
 
+#: v0.1.78 T-B / FR-B — the named payload schema each REVIEW step's handoff-ledger payload
+#: is produced under (see ``workflow_handoffs._PAYLOAD_VALIDATORS``). ``review_qa`` reuses
+#: the pre-existing ``qa-review-handoff-v1``; ``review_security``/``review_code`` get their
+#: own verdict-shaped schemas so the ledger's ``output_schema`` stays honest about which
+#: gate produced it. An unmapped review label falls back to ``qa-review-handoff-v1`` (a
+#: generic verdict shape) rather than raising — the ladder's 4 canonical labels are always
+#: covered; a future custom review step still produces *a* valid payload.
+_REVIEW_OUTPUT_SCHEMA_BY_LABEL: dict[str, str] = {
+    "review_qa": "qa-review-handoff-v1",
+    "review_security": "security-review-handoff-v1",
+    "review_code": "code-review-handoff-v1",
+}
+
+
 @dataclass(frozen=True)
 class ImplementReviewRound:
     """One implement→review round of the bounded retry loop (T-30-D-06)."""
@@ -263,7 +277,11 @@ class LifecyclePipeline:
                 runtime=runtime,
                 state_machine=self._state_machine,
             )
-            decision = runner.run(
+            # v0.1.78 T-B / FR-B: run the worker ONCE and get back both the phase-transition
+            # decision AND the raw result — the latter is what lets this ladder produce a
+            # run-scoped handoff-ledger payload per step (below), exactly as
+            # ``run_implement_review_loop`` already does via ``evaluate_gate_with_result``.
+            decision, worker_result = runner.run_with_result(
                 run,
                 AgentRunnerInput(
                     request=built.request,
@@ -274,11 +292,18 @@ class LifecyclePipeline:
                 ),
             )
             run = decision.run
-            self._run_store.save(run)
             # FR5 (A5): the accept signal is the state machine's dual-signal contract, NOT
             # ``run.blocked is None`` — the latter read ``True`` on an illegal transition
             # (run unchanged, no blocked state) and wrongly advanced the ladder.
             accepted = decision.advanced
+            if accepted and self._handoff_resolver is not None:
+                # FR-B: every accepted step produces its run-scoped step payload — additive
+                # optional (a fixture pipeline with no wired resolver behaves exactly as
+                # before: no payload, no doctor/ledger coverage). A structurally-blocked step
+                # never reaches here, matching the loop's structural-block-skips-produce
+                # behavior.
+                run = self._produce_step_payload(run, step, worker_result)
+            self._run_store.save(run)
             results.append(
                 PipelineStepResult(
                     label=step.label,
@@ -296,12 +321,56 @@ class LifecyclePipeline:
                     steps=tuple(results),
                     blocked=run.blocked,
                 )
+        # FR-B: the terminal ATOMIC save — CLI-reported success and the persisted run must
+        # agree. Mirrors ``run_implement_review_loop``'s terminal
+        # ``replace(run, status=COMPLETED)`` + save (pipeline.py, APPROVED branch). A save
+        # failure propagates (the run store raises), which fails the command rather than
+        # silently reporting success over an unpersisted terminal state.
+        run = replace(run, status=LifecycleRunStatus.COMPLETED)
+        self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,
             completed=True,
             final_phase=run.phase,
             steps=tuple(results),
         )
+
+    def _produce_step_payload(
+        self,
+        run: LifecycleRun,
+        step: PipelineStep,
+        result: AgentRunResult,
+    ) -> LifecycleRun:
+        """Write *step*'s run-scoped handoff-ledger payload through the wired resolver.
+
+        A review step (``is_review=True``) produces a verdict-shaped payload (the schema
+        keyed by label — ``qa-review-handoff-v1`` / ``security-review-handoff-v1`` /
+        ``code-review-handoff-v1``); a create step (``is_review=False``, e.g.
+        ``implement``) produces a summary-shaped ``generic-step-handoff-v1`` payload. No
+        consumer is declared (the full ladder is Python-sequenced, not itself a
+        producer→consumer graph like the implement/review loop) — this is pure
+        observability/diagnosability for ``handoffs doctor`` and the panel, matching the
+        loop's per-attempt payloads.
+        """
+        assert self._handoff_resolver is not None
+        if step.is_review:
+            verdict = result.structured_output.get("verdict")
+            output_schema = _REVIEW_OUTPUT_SCHEMA_BY_LABEL.get(step.label, "qa-review-handoff-v1")
+            payload: dict[str, object] = {
+                "verdict": verdict if isinstance(verdict, str) else "APPROVED",
+                "verdict_reason": result.summary or step.label,
+            }
+        else:
+            output_schema = "generic-step-handoff-v1"
+            payload = {"summary": result.summary or f"{step.label} complete"}
+        run, _record = self._handoff_resolver.produce(
+            run,
+            producer_step=step.label,
+            attempt=0,
+            output_schema=output_schema,
+            payload=payload,
+        )
+        return run
 
     # -- implement/review attempt loop (T-30-D-06 / A24) ---------------------
 

@@ -157,10 +157,26 @@ class LifecycleAgentRunner:
         return result, self._blocked_result(lifecycle_run, data, result)
 
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
+        decision, _result = self.run_with_result(lifecycle_run, data)
+        return decision
+
+    def run_with_result(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> tuple[TransitionDecision, AgentRunResult]:
+        """Run the worker ONCE and return both the phase transition AND the raw result.
+
+        v0.1.78 T-B / FR-B: :meth:`run` is the pre-existing transition-only entry point,
+        now a thin delegator so every existing caller is byte-identical. A caller that also
+        needs the worker's ``AgentRunResult`` (e.g. :class:`LifecyclePipeline` to build a
+        run-scoped handoff-ledger payload — the full-pipeline analogue of what
+        ``run_implement_review_loop`` already gets from
+        :meth:`evaluate_gate_with_result`) uses this instead of running the worker a second
+        time.
+        """
         result = self._runtime.run(data.request)
         blocked = self._blocked_result(lifecycle_run, data, result)
         if blocked is not None:
-            return self._state_machine.transition(
+            decision = self._state_machine.transition(
                 lifecycle_run,
                 TransitionInput(
                     target_phase=LifecyclePhase.BLOCKED,
@@ -168,8 +184,9 @@ class LifecycleAgentRunner:
                     current_step=data.current_step,
                 ),
             )
+            return decision, result
 
-        return self._state_machine.transition(
+        decision = self._state_machine.transition(
             lifecycle_run,
             TransitionInput(
                 target_phase=data.target_phase,
@@ -179,6 +196,7 @@ class LifecycleAgentRunner:
                 current_step=data.current_step,
             ),
         )
+        return decision, result
 
     def _blocked_result(
         self,
