@@ -39,6 +39,7 @@ from dadaia_workspace.core.models.workflow_execution import (
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
@@ -185,6 +186,7 @@ class LifecyclePipeline:
         handoff_resolver: WorkflowHandoffResolver | None = None,
         max_review_retries: int = 2,
         specs_dir: Path | None = None,
+        runtime_files: RuntimeFilePort | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -193,6 +195,11 @@ class LifecyclePipeline:
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
+        # v0.1.78 T-D / FR-D: additive-optional run-artifact writer, threaded to every
+        # ``LifecycleAgentRunner`` this pipeline constructs — a noncompliant worker attempt
+        # persists its diagnostic under the run's step-artifact zone. ``None`` (the default,
+        # every pre-existing fixture pipeline) keeps behavior byte-identical.
+        self._runtime_files = runtime_files
         # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
         # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
         # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
@@ -276,6 +283,7 @@ class LifecyclePipeline:
             runner = LifecycleAgentRunner(
                 runtime=runtime,
                 state_machine=self._state_machine,
+                runtime_files=self._runtime_files,
             )
             # v0.1.78 T-B / FR-B: run the worker ONCE and get back both the phase-transition
             # decision AND the raw result — the latter is what lets this ladder produce a
@@ -570,6 +578,7 @@ class LifecyclePipeline:
         runner = LifecycleAgentRunner(
             runtime=runtime,
             state_machine=self._state_machine,
+            runtime_files=self._runtime_files,
         )
         return runner.evaluate_gate_with_result(
             run,

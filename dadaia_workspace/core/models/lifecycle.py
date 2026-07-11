@@ -428,12 +428,71 @@ class AgentRunRequest:
 
 
 @dataclass(frozen=True)
+class WorkerDiagnostic:
+    """Evidence for ONE real worker attempt (v0.1.78 T-D / FR-D).
+
+    Populated by an adapter (:mod:`infrastructure.pi_runtime`,
+    :mod:`infrastructure.codex_runtime`, ...) whenever it produces a degraded or
+    noncompliant :class:`AgentRunResult` — a run that FAILED, or SUCCEEDED with no usable
+    result payload (empty ``artifact_refs``). :class:`LifecycleAgentRunner` persists this
+    record under the run's step-artifact zone (``.dadaia/runs/lifecycle/<run_id>/...``) and
+    references its path from ``BlockedState.detail`` whenever the gate blocks — so a
+    noncompliant worker attempt is never a silent black box (bug
+    ``worker-noncompliance-block-carries-no-diagnostic-evidence``).
+
+    ``output_tail`` is bounded and MUST already be redacted (the adapter's own
+    ``RedactionMixin._redact`` — see ``infrastructure/headless_adapter_base.py``) before this
+    record is constructed; :class:`LifecycleAgentRunner` does not re-scrub it.
+    """
+
+    runtime: str
+    model: str | None
+    requested_reasoning: str | None
+    actual_reasoning: str | None
+    exit_code: int | None
+    parser_classification: str
+    output_tail: str
+    session_ref: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "runtime": self.runtime,
+            "model": self.model,
+            "requested_reasoning": self.requested_reasoning,
+            "actual_reasoning": self.actual_reasoning,
+            "exit_code": self.exit_code,
+            "parser_classification": self.parser_classification,
+            "output_tail": self.output_tail,
+            "session_ref": self.session_ref,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> WorkerDiagnostic:
+        exit_code_raw = data.get("exit_code")
+        assert exit_code_raw is None or isinstance(exit_code_raw, int)
+        return cls(
+            runtime=str(data["runtime"]),
+            model=_optional_str(data.get("model")),
+            requested_reasoning=_optional_str(data.get("requested_reasoning")),
+            actual_reasoning=_optional_str(data.get("actual_reasoning")),
+            exit_code=exit_code_raw,
+            parser_classification=str(data["parser_classification"]),
+            output_tail=str(data.get("output_tail", "")),
+            session_ref=_optional_str(data.get("session_ref")),
+        )
+
+
+@dataclass(frozen=True)
 class AgentRunResult:
     status: AgentRunStatus
     summary: str
     artifact_refs: tuple[str, ...] = ()
     structured_output: dict[str, str] = field(default_factory=dict)
     error: str | None = None
+    # Additive-optional (v0.1.78 T-D / FR-D): diagnostic evidence for a degraded/noncompliant
+    # attempt. ``None`` for a normal compliant result — every existing caller/fixture stays
+    # byte-identical.
+    diagnostic: WorkerDiagnostic | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -442,6 +501,7 @@ class AgentRunResult:
             "artifact_refs": list(self.artifact_refs),
             "structured_output": dict(self.structured_output),
             "error": self.error,
+            "diagnostic": self.diagnostic.to_dict() if self.diagnostic else None,
         }
 
     @classmethod
@@ -450,12 +510,15 @@ class AgentRunResult:
         structured_output = data.get("structured_output", {})
         assert isinstance(artifact_refs, list)
         assert isinstance(structured_output, dict)
+        diagnostic_raw = data.get("diagnostic")
+        assert diagnostic_raw is None or isinstance(diagnostic_raw, dict)
         return cls(
             status=AgentRunStatus(str(data["status"])),
             summary=str(data["summary"]),
             artifact_refs=tuple(str(ref) for ref in artifact_refs),
             structured_output={str(k): str(v) for k, v in structured_output.items()},
             error=_optional_str(data.get("error")),
+            diagnostic=(WorkerDiagnostic.from_dict(diagnostic_raw) if diagnostic_raw else None),
         )
 
 

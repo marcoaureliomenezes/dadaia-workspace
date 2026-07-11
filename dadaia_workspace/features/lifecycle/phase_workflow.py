@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
@@ -82,6 +83,7 @@ class LifecyclePhaseWorkflow:
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         specs_dir_resolver: Callable[[str], Path | None] | None = None,
+        runtime_files: RuntimeFilePort | None = None,
     ) -> None:
         self._runtime = runtime
         self._run_store = run_store
@@ -92,6 +94,9 @@ class LifecyclePhaseWorkflow:
         # context is only known at ``run()`` time from ``scope.context``. When ``None`` (a
         # fixture-constructed workflow) no role atom is injected.
         self._specs_dir_resolver = specs_dir_resolver
+        # v0.1.78 T-D / FR-D: additive-optional run-artifact writer threaded to the
+        # ``LifecycleAgentRunner`` this workflow constructs (see ``pipeline.py`` twin).
+        self._runtime_files = runtime_files
 
     def run(
         self,
@@ -149,6 +154,7 @@ class LifecyclePhaseWorkflow:
         runner = LifecycleAgentRunner(
             runtime=self._runtime,
             state_machine=self._state_machine,
+            runtime_files=self._runtime_files,
         )
         decision = runner.run(
             run,

@@ -1215,6 +1215,10 @@ def build_lifecycle_phase_workflow(
         runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root, model=model),
         run_store=build_lifecycle_run_store(workspace_root),
         specs_dir_resolver=lambda ctx: _context_specs_dir(workspace_root, ctx),
+        # v0.1.78 T-D / FR-D: a noncompliant worker attempt's diagnostic is persisted under
+        # the run's step-artifact zone via the same canonical runtime-file writer every other
+        # lifecycle artifact uses.
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
     )
 
 
@@ -1265,6 +1269,10 @@ def build_lifecycle_pipeline(
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
         # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
         specs_dir=_context_specs_dir(workspace_root, context),
+        # v0.1.78 T-D / FR-D: same canonical runtime-file writer as the phase workflow —
+        # a noncompliant worker attempt persists its diagnostic under the run's
+        # step-artifact zone.
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
     )
 
 

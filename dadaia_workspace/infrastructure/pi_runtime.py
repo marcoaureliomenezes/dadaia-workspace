@@ -31,6 +31,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRunStatus,
     AgentRuntimeKind,
+    WorkerDiagnostic,
 )
 from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
@@ -49,6 +50,10 @@ _DEFAULT_ENV_ALLOWLIST = (
     "TERM",
 )
 
+#: v0.1.78 T-D / FR-D: bound on the redacted diagnostic ``output_tail`` — never an
+#: unbounded raw stdout dump.
+_MAX_DIAGNOSTIC_TAIL = 4096
+
 
 @dataclass(frozen=True)
 class PiHeadlessConfig:
@@ -56,11 +61,9 @@ class PiHeadlessConfig:
 
     ``model`` is the discrete Layer-2 GPT id (LAW 2 / ADR-B) PI runs against its Codex
     subscription; it is passed verbatim as ``pi --model <id>``. ``reasoning_effort``
-    carries the chosen option's effort for observability/parity, but PI's CLI exposes
-    **no verified separate reasoning-effort flag**, so the effort is *not* forwarded as
-    a flag — only ``--model`` reaches the command. (Limitation noted per WS-2: a unit
-    test asserts the discrete id reaches ``pi --model``; effort honoring is upstream-CLI
-    dependent and is a follow-up if/when PI exposes the flag.)
+    carries the chosen option's effort — ``low``/``medium``/``high`` — and is forwarded
+    verbatim as ``pi --thinking <level>`` (v0.1.78 T-D / FR-D: installed PI >= 0.80.3
+    supports ``--thinking``; the prior "no verified flag" limitation is resolved).
     """
 
     cwd: Path
@@ -156,6 +159,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                     status=AgentRunStatus.FAILED,
                     summary=result.summary,
                     error=self._redact((proc.stderr or proc.stdout or "").strip()),
+                    diagnostic=result.diagnostic,
                 )
             return result
         return self._with_changed_paths(result)
@@ -171,8 +175,8 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
            selection (legacy LAW-2 path).
         3. neither ⇒ no ``--model`` flag (PI uses its own default).
 
-        PI exposes no verified separate reasoning-effort flag, so only ``--model`` is
-        forwarded (see :class:`PiHeadlessConfig`).
+        v0.1.78 T-D / FR-D: the reasoning effort follows the SAME ordered precedence and
+        is forwarded as ``pi --thinking <level>`` (installed PI >= 0.80.3).
         """
         args = [
             self._config.pi_bin,
@@ -184,6 +188,9 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         model = self._resolve_model(request)
         if model is not None:
             args += ["--model", model]
+        reasoning = self._resolve_reasoning(request)
+        if reasoning is not None:
+            args += ["--thinking", reasoning]
         # ``--print``/-p is non-interactive; the prompt is piped via stdin
         # (``subprocess.run(..., input=self._prompt(request))``). PI reads the piped
         # stdin in print mode — do NOT append a ``-`` stdin marker: ``pi`` has no such
@@ -196,6 +203,13 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
+
+    def _resolve_reasoning(self, request: AgentRunRequest) -> str | None:
+        """Resolve the requested reasoning effort — mirrors :meth:`_resolve_model`'s
+        ordered precedence (resolved_model wins over construction-time config)."""
+        if request.resolved_model is not None:
+            return request.resolved_model.reasoning
+        return self._config.reasoning_effort
 
     # -- result extraction (WS-PI-2) -------------------------------------
 
@@ -219,15 +233,23 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             # (redacted) ``proc.stderr``/``proc.stdout`` in — no additional plumbing
             # needed here. This mirrors ``CodexExecAdapter.run``'s returncode-first check
             # (``codex_runtime.py:150-157``).
+            diagnostic = self._diagnostic(
+                request,
+                exit_code=returncode,
+                parser_classification="no-result",
+                output_tail=text or stdout or "",
+            )
             if returncode != 0:
                 return AgentRunResult(
                     status=AgentRunStatus.FAILED,
                     summary="pi headless returned non-zero exit",
                     error="",
+                    diagnostic=diagnostic,
                 )
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(text or "pi headless completed"),
+                diagnostic=diagnostic,
             )
 
         assistant_text = self._extract_text(message.get("content"))
@@ -243,9 +265,46 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                 structured_output=self._structured_from_verdict(verdict_payload),
             )
 
+        # Noncompliant: a real message_end arrived but carried no recognizable result
+        # payload (no-op prose / shapeless JSON) — the gate BLOCKs on empty artifact_refs
+        # (agent_runner.py), and this diagnostic is the evidence for WHY (bug
+        # worker-noncompliance-block-carries-no-diagnostic-evidence).
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary=self._redact(assistant_text or "pi headless completed"),
+            diagnostic=self._diagnostic(
+                request,
+                exit_code=returncode,
+                parser_classification="no-artifact-refs",
+                output_tail=assistant_text or stdout or "",
+            ),
+        )
+
+    def _diagnostic(
+        self,
+        request: AgentRunRequest,
+        *,
+        exit_code: int | None,
+        parser_classification: str,
+        output_tail: str,
+    ) -> WorkerDiagnostic:
+        """Build the redacted, bounded :class:`WorkerDiagnostic` for a degraded/noncompliant
+        result (v0.1.78 T-D / FR-D)."""
+        tail = self._redact((output_tail or "").strip())
+        if len(tail) > _MAX_DIAGNOSTIC_TAIL:
+            tail = tail[-_MAX_DIAGNOSTIC_TAIL:]
+        return WorkerDiagnostic(
+            runtime=AgentRuntimeKind.PI_HEADLESS.value,
+            model=self._resolve_model(request),
+            requested_reasoning=self._resolve_reasoning(request),
+            # No verified in-band signal for the ACTUAL thinking level PI ran at (that
+            # metadata lives only in PI's own on-disk session store, a separate data
+            # source from this subprocess's `--mode json` stdout stream) — left unset
+            # rather than fabricated. See PiHeadlessConfig / _resolve_reasoning.
+            actual_reasoning=None,
+            exit_code=exit_code,
+            parser_classification=parser_classification,
+            output_tail=tail,
         )
 
     @staticmethod

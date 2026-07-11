@@ -669,3 +669,238 @@ def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_
 
     with pytest.raises(RuntimeError, match="real pi/codex binary invocation attempted"):
         adapter.run(_request())
+
+
+# ---------------------------------------------------------------------------
+# v0.1.78 T-D / FR-D — worker-noncompliance diagnostic evidence + PI --thinking
+# (bug worker-noncompliance-block-carries-no-diagnostic-evidence).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "resolved-model-reasoning-reaches-thinking-flag",
+        "construction-config-reasoning-reaches-thinking-flag",
+        "resolved-model-reasoning-overrides-construction",
+        "no-reasoning-anywhere-omits-thinking-flag",
+    ],
+)
+def test_pi_thinking_flag_resolution(tmp_path: Path, case: str) -> None:
+    """``PiHeadlessConfig.reasoning_effort`` (and the per-request resolved reasoning)
+    forwards to PI's ``--thinking <level>`` flag — same ordered precedence as ``--model``
+    (resolved_model wins over construction-time config)."""
+    import dataclasses
+
+    from dadaia_workspace.core.models.workflow_execution import (
+        PolicySource,
+        ResolvedModelConfig,
+    )
+
+    captured: list[list[str]] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end("done"))
+
+    if case == "resolved-model-reasoning-reaches-thinking-flag":
+        adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={})
+        request = dataclasses.replace(
+            _request(),
+            resolved_model=ResolvedModelConfig(
+                profile_id="pi-reasoning-high",
+                harness="pi",
+                model="gpt-5.5",
+                reasoning="high",
+                source=PolicySource.CLI,
+            ),
+        )
+        adapter.run(request)
+        argv = captured[0]
+        assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
+            "--thinking",
+            "high",
+        ]
+
+    elif case == "construction-config-reasoning-reaches-thinking-flag":
+        adapter = PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=tmp_path, reasoning_effort="medium"),
+            runner=fake_runner,
+            environ={},
+        )
+        adapter.run(_request())
+        argv = captured[0]
+        assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
+            "--thinking",
+            "medium",
+        ]
+
+    elif case == "resolved-model-reasoning-overrides-construction":
+        adapter = PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=tmp_path, reasoning_effort="low"),
+            runner=fake_runner,
+            environ={},
+        )
+        request = dataclasses.replace(
+            _request(),
+            resolved_model=ResolvedModelConfig(
+                profile_id="pi-reasoning-high",
+                harness="pi",
+                model="gpt-5.5",
+                reasoning="high",
+                source=PolicySource.CLI,
+            ),
+        )
+        adapter.run(request)
+        argv = captured[0]
+        assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
+            "--thinking",
+            "high",
+        ]
+
+    else:  # no-reasoning-anywhere-omits-thinking-flag
+        adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={})
+        adapter.run(_request())
+        assert "--thinking" not in captured[0]
+
+
+def test_pi_thinking_flag_precedes_print_flag_and_stays_after_model(tmp_path: Path) -> None:
+    """Contract test on the assembled command line (SPEC guidance: not a live-PI test)."""
+    captured: list[list[str]] = []
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end("done"))
+
+    adapter = PiHeadlessAdapter(
+        PiHeadlessConfig(cwd=tmp_path, model="gpt-5.5", reasoning_effort="high"),
+        runner=fake_runner,
+        environ={},
+    )
+    adapter.run(_request())
+    argv = captured[0]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "gpt-5.5"]
+    assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
+        "--thinking",
+        "high",
+    ]
+    assert argv[-1] == "-p"
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "no-message-end-nonzero-exit-classifies-as-no-result",
+        "no-message-end-zero-exit-classifies-as-no-result",
+        "noop-worker-classifies-as-missing-artifact-refs",
+    ],
+)
+def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> None:
+    """Every degraded/noncompliant PI result carries a ``WorkerDiagnostic`` — the
+    adapter never discards the evidence a noncompliant attempt produced (bug
+    ``worker-noncompliance-block-carries-no-diagnostic-evidence``)."""
+    if case == "no-message-end-nonzero-exit-classifies-as-no-result":
+
+        def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            argv = args[0]
+            assert isinstance(argv, list)
+            return subprocess.CompletedProcess(argv, 1, stdout="", stderr="boom")
+
+        adapter = PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=tmp_path, model="gpt-5.5", reasoning_effort="high"),
+            runner=fake_runner,
+            environ={},
+        )
+        result = adapter.run(_request())
+        assert result.status is AgentRunStatus.FAILED
+        assert result.diagnostic is not None
+        assert result.diagnostic.runtime == "pi_headless"
+        assert result.diagnostic.model == "gpt-5.5"
+        assert result.diagnostic.requested_reasoning == "high"
+        assert result.diagnostic.exit_code == 1
+        assert result.diagnostic.parser_classification == "no-result"
+
+    elif case == "no-message-end-zero-exit-classifies-as-no-result":
+
+        def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            argv = args[0]
+            assert isinstance(argv, list)
+            return subprocess.CompletedProcess(argv, 0, stdout="not json at all", stderr="")
+
+        adapter = PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=tmp_path, model="gpt-5.5"), runner=fake_runner, environ={}
+        )
+        result = adapter.run(_request())
+        assert result.status is AgentRunStatus.SUCCEEDED
+        assert result.diagnostic is not None
+        assert result.diagnostic.exit_code == 0
+        assert result.diagnostic.parser_classification == "no-result"
+        assert "not json at all" in result.diagnostic.output_tail
+
+    else:  # noop-worker-classifies-as-missing-artifact-refs
+        payload = "I had nothing structured to emit."
+
+        def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            argv = args[0]
+            assert isinstance(argv, list)
+            return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
+
+        adapter = PiHeadlessAdapter(
+            PiHeadlessConfig(cwd=tmp_path, model="gpt-5.5"), runner=fake_runner, environ={}
+        )
+        result = adapter.run(_request(expected_schema="agent-run-result-v1"))
+        assert result.status is AgentRunStatus.SUCCEEDED
+        assert result.artifact_refs == ()
+        assert result.diagnostic is not None
+        assert result.diagnostic.parser_classification == "no-artifact-refs"
+        assert payload in result.diagnostic.output_tail
+
+
+def test_pi_compliant_result_carries_no_diagnostic(tmp_path: Path) -> None:
+    """A normal compliant result (populated artifact_refs) attaches NO diagnostic — the
+    field stays additive-optional and never pollutes the happy path."""
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        payload = json.dumps(
+            {
+                "schema": "agent-run-result-v1",
+                "summary": "ok",
+                "artifact_refs": [".dadaia/handoff/dadaia-workspace/x.handoff.json"],
+                "structured_output": {"verdict": "APPROVED"},
+            }
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
+
+    adapter = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={})
+    result = adapter.run(_request(expected_schema="agent-run-result-v1"))
+    assert result.status is AgentRunStatus.SUCCEEDED
+    assert result.artifact_refs
+    assert result.diagnostic is None
+
+
+def test_pi_diagnostic_output_tail_is_redacted_and_bounded(tmp_path: Path) -> None:
+    """The diagnostic's ``output_tail`` runs through the adapter's own redaction and is
+    bounded (never an unbounded raw stdout dump)."""
+    secret = "sk-anthropic-xyz"
+    huge_tail = "x" * 10_000 + secret
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        return subprocess.CompletedProcess(argv, 0, stdout=huge_tail, stderr="")
+
+    adapter = PiHeadlessAdapter(
+        PiHeadlessConfig(cwd=tmp_path),
+        runner=fake_runner,
+        environ={"PATH": "/bin", "ANTHROPIC_API_KEY": secret},
+    )
+    result = adapter.run(_request())
+    assert result.diagnostic is not None
+    assert secret not in result.diagnostic.output_tail
+    assert len(result.diagnostic.output_tail) <= 4096
