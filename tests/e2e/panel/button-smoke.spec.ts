@@ -21,7 +21,7 @@
  */
 
 import { test, expect, Page } from '@playwright/test';
-import { gotoPanel, activateTab } from './helpers';
+import { gotoPanel, activateSessionsSubsection } from './helpers';
 
 type BoxStyle = {
   paddingTop: number;
@@ -62,9 +62,10 @@ test('FR7 — restyled controls carry token-driven padding rhythm (not browser-d
   const navTab = await readControlStyle(page, '.nav-tab');
   const themeBtn = await readControlStyle(page, '.theme-btn');
 
-  // .runtime-btn lives in the Sessions section header — activate it so the control
-  // is laid out exactly as the operator sees it.
-  await activateTab(page, 'sessions');
+  // .runtime-btn lives in the Sessions sub-section header, now nested inside the
+  // 1º Agentic Layer tabpanel — activate it so the control is laid out exactly as
+  // the operator sees it (v0.1.79 relocation).
+  await activateSessionsSubsection(page);
   const runtimeBtn = await readControlStyle(page, '.runtime-btn');
 
   for (const [name, s] of [
@@ -97,7 +98,7 @@ test('FR7 — pill/segmented controls carry a token-driven border-radius (not sq
   ).toBeGreaterThan(MIN_RADIUS);
 
   // .runtime-btn is a soft-cornered segment (var(--control-radius) = 6px).
-  await activateTab(page, 'sessions');
+  await activateSessionsSubsection(page);
   const runtimeBtn = await readControlStyle(page, '.runtime-btn');
   expect(
     runtimeBtn.borderRadius,

@@ -13,10 +13,16 @@
  * `dadaia-panel-runtime`); sessions.js then fetches ?runtime=<runtime>, which the
  * mock scopes its aggregate to. The empty sandbox store is irrelevant because the
  * aggregate endpoint is intercepted.
+ *
+ * v0.1.79 amendment: the standalone Sessions tab was removed — the dashboard is now
+ * a sub-section rendered inside the "1º Agentic Layer" (`#section-subagents`)
+ * tabpanel. `activateSessionsSubsection()` opens that tab and waits for the
+ * relocated `#section-sessions` mount; `sessions.js` and the `/api/sessions`
+ * contract are otherwise unchanged.
  */
 
 import { test, expect, type Page, type Route } from '@playwright/test';
-import { gotoPanel, activateTab } from './helpers';
+import { gotoPanel, activateSessionsSubsection } from './helpers';
 
 // ---------------------------------------------------------------------------
 // Aggregate envelope shape (SPEC §FR1). `top_agent` is {name, session_count} | null.
@@ -157,7 +163,7 @@ test('E2E-SES-DASH-01 — claude with cost renders $X.XX, N-active, and top agen
   await mockAggregate(page, CLAUDE_WITH_COST);
 
   await gotoPanel(page);
-  await activateTab(page, 'sessions');
+  await activateSessionsSubsection(page);
 
   await expect(statValue(page, 'Total Cost')).toHaveText('$1.73');
   await expect(statValue(page, 'Total Sessions')).toHaveText('3');
@@ -183,7 +189,7 @@ test('E2E-SES-DASH-02 — claude with null cost renders the em-dash, not N/A', a
   await mockAggregate(page, CLAUDE_NULL_COST);
 
   await gotoPanel(page);
-  await activateTab(page, 'sessions');
+  await activateSessionsSubsection(page);
 
   await expect(statValue(page, 'Total Cost')).toHaveText('—');
   await expect(statValue(page, 'Total Sessions')).toHaveText('2');
@@ -206,7 +212,7 @@ test('E2E-SES-DASH-03 — codex renders N/A cost and the cost-unknown banner', a
   await mockAggregate(page, CODEX_AGG);
 
   await gotoPanel(page);
-  await activateTab(page, 'sessions');
+  await activateSessionsSubsection(page);
 
   await expect(statValue(page, 'Total Cost')).toHaveText('N/A');
   await expect(statValue(page, 'Total Sessions')).toHaveText('5');
@@ -230,7 +236,7 @@ test('E2E-SES-DASH-04 — pi renders N/A cost and the PI cost-unknown banner', a
   await mockAggregate(page, PI_AGG);
 
   await gotoPanel(page);
-  await activateTab(page, 'sessions');
+  await activateSessionsSubsection(page);
 
   await expect(statValue(page, 'Total Cost')).toHaveText('N/A');
 

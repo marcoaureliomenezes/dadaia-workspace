@@ -23,10 +23,16 @@
  * the 6 combinations is genuinely RED against the pre-fix tree and GREEN after the
  * fix. (AC-9(d) sabotage: restoring the inline `margin-left:auto` wrapping row
  * re-reds this spec at the pinned width.)
+ *
+ * v0.1.79 amendment: the Sessions dashboard relocated from its own standalone tab
+ * into a sub-section inside the "1º Agentic Layer" (`#section-subagents`) tabpanel;
+ * `#section-sessions` and its `.section-header` survive unchanged as the nested
+ * mount, so this guard still applies at its original selector, now scoped under
+ * `#section-subagents`.
  */
 
 import { test, expect, Page } from '@playwright/test';
-import { gotoPanel, activateTab } from './helpers';
+import { gotoPanel, activateSessionsSubsection } from './helpers';
 
 const THEMES = ['mint', 'sage', 'warm'] as const;
 const WIDTHS = [1024, 1440] as const;
@@ -38,7 +44,7 @@ type RowBoxes = {
 };
 
 async function measureSessionsHeaderRow(page: Page): Promise<RowBoxes> {
-  const header = page.locator('#section-sessions .section-header');
+  const header = page.locator('#section-subagents #section-sessions .section-header');
   const h2 = header.locator('h2');
   const rs = header.locator('.runtime-switcher');
   await header.waitFor({ state: 'visible', timeout: 8000 });
@@ -72,7 +78,7 @@ for (const theme of THEMES) {
       const applied = await page.evaluate(() => document.documentElement.dataset.theme);
       expect(applied, `theme was not applied by the pre-paint script`).toBe(theme);
 
-      await activateTab(page, 'sessions');
+      await activateSessionsSubsection(page);
       const { headerBox, h2Box, rsBox } = await measureSessionsHeaderRow(page);
 
       const h2Bottom = h2Box.y + h2Box.height;

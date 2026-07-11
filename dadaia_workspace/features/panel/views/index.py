@@ -15,9 +15,26 @@ SSR (data inlined into the initial HTML response, no auth required):
 
 Client-side (fetched via XHR/fetch after Bearer auth):
   - Agents    — auth-gated; telemetry-enriched; dynamic
-  - Sessions  — auth-gated; large/dynamic; runtime-dependent
+  - Sessions  — auth-gated; large/dynamic; runtime-dependent; rendered as a
+                sub-section INSIDE the 1º Agentic Layer (subagents) tabpanel
+                (v0.1.79 — the standalone Sessions tab was removed)
   - Workflows — auth-gated; file-system backed
   - Reports   — auth-gated; file-system backed; sidecar-indexed
+
+Primary tabs (v0.1.79 panel agentic-layers reorg — 7 -> 6 tabs):
+  Projects | 1º Agentic Layer (id ``tab-subagents``) |
+  2º Agentic Layer (id ``tab-workflows``) | Reports | Academy | Servers.
+  The 1º Agentic Layer governs Layer-1 Claude sub-agent model+effort
+  (v0.1.65 L1 governance) and now also hosts the Sessions cost/telemetry
+  dashboard as a sub-section (``render_sessions_section``, appended inside
+  ``_render_subagents_section``); the 2º Agentic Layer governs Layer-2
+  pi/codex workflow model policy. Tab/section
+  ids are unchanged (``tab-subagents``/``section-subagents``,
+  ``tab-workflows``/``section-workflows``) — label-only rename plus the
+  Sessions relocation. The nav-button order AND the tabpanel body order both
+  place 1º Agentic Layer before 2º Agentic Layer (ratified SPEC order); the
+  ``.active`` class toggle in core.js is position-independent, but body order
+  is kept aligned with button order for visual/reading-order sanity.
 """
 
 from __future__ import annotations
@@ -54,7 +71,6 @@ def render_index(
         academy_section = render_academy_section()
         reports_section = render_reports_section()
         workflows_section = render_workflows_first_class_section()
-        sessions_section = render_sessions_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -108,9 +124,8 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="Workflows">Workflows</button>
-    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Sub-agents">Sub-agents</button>
-    <button class="nav-tab" data-section="sessions" aria-selected="false" role="tab" id="tab-sessions">Sessions</button>
+    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="1º Agentic Layer">1&#186; Agentic Layer</button>
+    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="2º Agentic Layer">2&#186; Agentic Layer</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
@@ -143,13 +158,11 @@ def render_index(
       </div>
     </section>
 
-    {workflows_section}
-
     {_render_subagents_section()}
 
-    {academy_section}
+    {workflows_section}
 
-    {sessions_section}
+    {academy_section}
 
     {reports_section}
 
@@ -179,18 +192,26 @@ def render_index(
 
 
 def _render_subagents_section() -> str:
-    """The Sub-agents tab scaffold (v0.1.65 FR8) — hydrated by agent_policy.js.
+    """The "1º Agentic Layer" tab scaffold (v0.1.65 FR8; relabeled + Sessions-merged
+    v0.1.79) — hydrated by agent_policy.js (roster) and sessions.js (dashboard).
 
     Static server-rendered shell: section header with the template selector + explicit
     Apply button, the status banner, the roster mount, and the (hidden) post-apply
     pop-up that agent_policy.js fills with the G-2 per-harness pickup instructions.
+
+    v0.1.79 (panel agentic-layers reorg): the standalone Sessions tab was removed —
+    its cost/telemetry dashboard (``render_sessions_section``) is now appended as a
+    sub-section INSIDE this tabpanel body, after the agent-model-governance roster.
+    The ``/api/sessions`` endpoint contract and ``sessions.js`` are unchanged; only
+    the DOM placement moved (``#section-sessions`` is now a nested mount, not its
+    own tabpanel — see ``sessions.py``).
     """
     return (
         '<section id="section-subagents" class="section" '
-        'aria-label="Sub-agent model governance" role="tabpanel" tabindex="0" '
+        'aria-label="Layer-1 sub-agent model governance" role="tabpanel" tabindex="0" '
         'aria-labelledby="tab-subagents">\n'
         '      <header class="section-header">\n'
-        "        <h2>Sub-agents</h2>\n"
+        "        <h2>1&#186; Agentic Layer</h2>\n"
         '        <div class="ap-toolbar">\n'
         '          <select id="ap-template-select" class="ap-template-select" '
         'aria-label="Agent model template"></select>\n'
@@ -213,6 +234,7 @@ def _render_subagents_section() -> str:
         "Close</button>\n"
         "        </div>\n"
         "      </div>\n"
+        f"      {render_sessions_section()}\n"
         "    </section>"
     )
 

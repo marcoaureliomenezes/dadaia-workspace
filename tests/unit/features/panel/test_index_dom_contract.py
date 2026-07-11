@@ -25,6 +25,7 @@ Three survivors, the sole selector-presence lock for the index page:
 
 from __future__ import annotations
 
+import html as html_lib
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
-from .conftest import PANEL_PRIMARY_TAB_SLUGS
+from .conftest import PANEL_PRIMARY_TAB_SLUGS, PANEL_PRIMARY_TABS
 
 pytestmark = pytest.mark.unit
 
@@ -140,6 +141,82 @@ def test_tab_and_section_present(index_html: str, section: str) -> None:
     assert f'data-section="{section}"' in index_html, f"missing data-section={section}"
     assert f'id="section-{section}"' in index_html, f"missing #section-{section}"
     assert 'class="nav-tab' in index_html
+
+
+def test_exactly_six_primary_tabs_in_order(index_html: str) -> None:
+    """v0.1.79: exactly 6 primary tabs render, in the exact PANEL_PRIMARY_TABS order,
+    with the operator's exact label strings (masculine ordinal º)."""
+    assert len(PANEL_PRIMARY_TABS) == 6
+
+    positions = []
+    for slug, label in PANEL_PRIMARY_TABS:
+        tab_marker = f'id="tab-{slug}"'
+        pos = index_html.find(tab_marker)
+        assert pos >= 0, f"missing tab id tab-{slug}"
+        positions.append(pos)
+
+        # The label renders as the visible button text (between the opening tag's
+        # closing '>' and the '</button>' close). The masculine ordinal "º" is
+        # served as a numeric HTML entity (&#186;, same convention as &#183; / &mdash;
+        # elsewhere in this module) — decode before comparing operator-visible text.
+        open_end = index_html.find(">", pos) + 1
+        close = index_html.find("</button>", open_end)
+        assert close >= 0, f"missing </button> for tab-{slug}"
+        button_text = html_lib.unescape(index_html[open_end:close])
+        assert label in button_text, (
+            f"tab-{slug} label mismatch: expected {label!r} in {button_text!r}"
+        )
+
+    assert positions == sorted(positions), "primary tabs do not render in PANEL_PRIMARY_TABS order"
+
+
+def test_no_sessions_tab_or_section_remnants(index_html: str) -> None:
+    """v0.1.79 FR1: the standalone Sessions tab/section is fully removed — no
+    #tab-sessions button and no top-level #section-sessions tabpanel remain."""
+    assert 'id="tab-sessions"' not in index_html
+    assert 'data-section="sessions"' not in index_html
+    assert 'aria-labelledby="tab-sessions"' not in index_html
+
+
+def test_sessions_dashboard_relocated_inside_agentic_layer_one(index_html: str) -> None:
+    """v0.1.79 FR1: the Sessions cost/telemetry dashboard renders as a sub-section
+    INSIDE the 1º Agentic Layer (#section-subagents) tabpanel — #section-sessions
+    survives as a nested mount (sessions.js keys on this id), #sessions-dashboard
+    and #sessions-banner render after #section-subagents opens and before it closes."""
+    subagents_start = index_html.find('id="section-subagents"')
+    assert subagents_start >= 0, "missing #section-subagents"
+    # Find the matching </section> close for the subagents tabpanel — it is the
+    # first </section> after the subagents section opens (no nested <section> tags
+    # are used for sub-sections, only <div>).
+    subagents_close = index_html.find("</section>", subagents_start)
+    assert subagents_close >= 0, "missing </section> close for #section-subagents"
+
+    sessions_pos = index_html.find('id="section-sessions"')
+    assert sessions_pos >= 0, "missing #section-sessions (relocated dashboard mount)"
+    assert subagents_start < sessions_pos < subagents_close, (
+        "#section-sessions must render INSIDE the #section-subagents tabpanel body"
+    )
+
+    dashboard_pos = index_html.find('id="sessions-dashboard"')
+    banner_pos = index_html.find('id="sessions-banner"')
+    assert subagents_start < dashboard_pos < subagents_close
+    assert subagents_start < banner_pos < subagents_close
+
+    # The relocated sub-section must NOT carry the top-level .section/.panel-section
+    # class that would let CSS hide it independently of the parent tabpanel's
+    # .active toggle (that class pair is display:none until .active is applied).
+    sessions_tag_start = index_html.rfind("<", 0, sessions_pos + 1)
+    # crude-but-sufficient: look at the opening tag text up to its '>' close.
+    tag_close = index_html.find(">", sessions_pos)
+    opening_tag = index_html[sessions_tag_start:tag_close]
+    assert 'class="section' not in opening_tag, (
+        f"#section-sessions must not carry the standalone .section class after "
+        f"relocation: {opening_tag!r}"
+    )
+    assert 'class="panel-section' not in opening_tag, (
+        f"#section-sessions must not carry the standalone .panel-section class "
+        f"after relocation: {opening_tag!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
