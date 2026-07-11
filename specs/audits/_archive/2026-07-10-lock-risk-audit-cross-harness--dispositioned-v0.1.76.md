@@ -1,6 +1,9 @@
 # CRITICAL AUDIT: dadaia-workspace lock and lease risk across Codex, PI, and Claude Code
 
-Audit status: source-complete for production lock/lease paths at 7b08beef
+Audit status: ARCHIVED — fully dispositioned
+Disposing release: v0.1.76 (lock liberation, PR #149, merged 5dbe209c)
+Disposition record: every finding mapped in backlog `_archive/20260710-lock-lease-session-identity-kernel.md` — P0-1/P0-3/P1-1/P1-4/P1-5 fixed, P0-2 superseded by the NO-LOCKS DOCTRINE (anon presence guarded), P1-2/P1-3/P2-1/P2-2 moot-by-removal, P3-1 kept as designed
+Original status: source-complete for production lock/lease paths at 7b08beef
 Primary context: dd-chain-capture
 Audited repository: repos/dadaia-workspace
 Priority: P0
