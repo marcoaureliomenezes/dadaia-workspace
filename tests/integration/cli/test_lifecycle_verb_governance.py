@@ -126,10 +126,17 @@ def test_verb_persists_resolver_derived_snapshot(
                 summary="recording fake: APPROVED",
                 artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
                 structured_output={"verdict": "APPROVED"},
-            )
+            ),
+            # Gate verifies refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+            materialize_root=Path.cwd(),
         )
 
-        def factory_builder(*, context: str, run_cwd: Path) -> object:  # noqa: ARG001
+        def factory_builder(
+            *,
+            context: str,  # noqa: ARG001
+            run_cwd: Path,  # noqa: ARG001
+            release_id: str | None = None,  # noqa: ARG001
+        ) -> object:
             def factory(kind: AgentRuntimeKind) -> FakeAgentRuntime:
                 return recording  # type: ignore[return-value]
 

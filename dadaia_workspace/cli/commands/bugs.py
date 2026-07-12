@@ -20,8 +20,13 @@ import typer
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_context_for_cli,
+    resolve_specs_dir_for_cli,
+)
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BugEvent, BugEventKind
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
 from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore
 
@@ -35,6 +40,35 @@ _SCHEMA_ID = "bug-event-v1"
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve the target specs/ directory (explicit flag → bound context → cwd/specs)."""
+    return resolve_specs_dir_for_cli(specs_dir)
+
+
+def _resolve_append_specs_dir(specs_dir: str | None, event_context: str | None) -> Path:
+    """Resolve the ledger destination for ``bugs append``.
+
+    Bug ``bugs-append-ledger-ignores-context-flag``: the event's ``--context`` field is
+    a ROUTING key, not an inert label — an event whose context names B must never land
+    silently in the bound context A's ledger. Order: explicit ``--specs-dir`` (always
+    wins, unchanged) → ``--context``'s own ``repos/<name>/specs`` (refused loudly when
+    that directory does not exist) → the pre-existing bound-context/cwd resolution.
+    """
+    if specs_dir is not None:
+        return resolve_specs_dir_for_cli(specs_dir)
+    if event_context:
+        resolved_name = resolve_context_for_cli(event_context)  # validates the name shape
+        try:
+            workspace_root = resolve_workspace_root()
+        except WorkspaceNotInitializedError:
+            workspace_root = None
+        if workspace_root is not None:
+            candidate = workspace_root / "repos" / resolved_name / "specs"
+            if candidate.is_dir():
+                return candidate.resolve()
+            raise typer.BadParameter(
+                f"--context {resolved_name!r} names no 'repos/{resolved_name}/specs' "
+                "directory in this workspace. Fix the context name or pass --specs-dir "
+                "explicitly — refusing to land the event in a different context's ledger."
+            )
     return resolve_specs_dir_for_cli(specs_dir)
 
 
@@ -100,7 +134,7 @@ def bugs_append_cmd(
     ADDITIVE — takes no lease. On a schema-validation failure nothing is written and the
     command exits non-zero with the validation message.
     """
-    target = _resolve_specs_dir(specs_dir)
+    target = _resolve_append_specs_dir(specs_dir, context)
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         raise typer.Exit(code=1)

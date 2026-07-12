@@ -213,6 +213,11 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
 
     accept_workspace = _init_workspace(tmp_path / "accept-case")
     monkeypatch.chdir(accept_workspace)
+    # A REAL worker writes its artifact; the faked subprocess can't, so materialize it —
+    # the gate now verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+    impl_ref = accept_workspace / ".dadaia" / "handoff" / "dadaia-workspace" / "impl.handoff.json"
+    impl_ref.parent.mkdir(parents=True, exist_ok=True)
+    impl_ref.write_text('{"fake": true}\n', encoding="utf-8")
 
     accept_result = _runner.invoke(
         app,

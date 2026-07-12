@@ -60,6 +60,9 @@ class RetentionSkipReason(StrEnum):
     IMPORTANT = "important"
     #: Resolved path escapes the workspace ``.dadaia/`` (symlink-out, ``..``). Refused.
     ESCAPE = "escape"
+    #: Filesystem refused the removal (permissions, busy mount). Skipped, never fatal
+    #: (bug retention-sweep-crashes-on-permission-denied).
+    UNRECLAIMABLE = "unreclaimable"
 
 
 @dataclass(frozen=True)
@@ -162,7 +165,15 @@ class RetentionSweep:
                 skipped.append((candidate.rel, reason))
                 continue
             if apply:
-                if not self._reclaim(candidate):
+                try:
+                    removed = self._reclaim(candidate)
+                except OSError:
+                    # Bug retention-sweep-crashes-on-permission-denied: a guarded deleter
+                    # must skip-and-report an unreclaimable entry (root-owned container
+                    # artifact, busy mount), never abort the whole sweep on it.
+                    skipped.append((candidate.rel, RetentionSkipReason.UNRECLAIMABLE))
+                    continue
+                if not removed:
                     # Disappeared / vanished under us — not an error, just nothing to do.
                     continue
                 self._prune_empty_parents(candidate.node)

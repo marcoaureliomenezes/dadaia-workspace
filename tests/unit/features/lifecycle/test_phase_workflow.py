@@ -148,7 +148,10 @@ def test_phase_workflow_review_phase_step_gates_on_verdict() -> None:
 
     assert result.accepted is False
     assert result.blocked is not None
-    assert "APPROVED verdict" in result.blocked.reason
+    # Explicit rejections name the verdict (bug
+    # blocked-reason-misreports-rejected-verdict-as-missing).
+    assert result.blocked.reason == "review verdict REJECTED"
+    assert result.blocked.detail["verdict"] == "REJECTED"
 
 
 def test_phase_workflow_persists_policy_snapshot_and_threads_resolved_model() -> None:

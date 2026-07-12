@@ -37,7 +37,11 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
     SubprocessAdapterMixin,
     _GitDiffPort,
+    changed_paths_csv,
+    derive_result_summary,
+    findings_json,
     normalize_artifact_refs,
+    salvage_result_from_handoff,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -256,13 +260,45 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         verdict_payload = self._extract_result_payload(assistant_text, request.expected_schema)
 
         if verdict_payload is not None:
-            summary = str(verdict_payload.get("summary", assistant_text))
+            summary = derive_result_summary(verdict_payload) or assistant_text
             refs = normalize_artifact_refs(verdict_payload)
+            # Findings survive into the flat structured map (bug
+            # step-payload-drops-worker-findings) — codex parity.
+            structured = self._structured_from_verdict(verdict_payload)
+            findings = findings_json(verdict_payload)
+            if findings is not None and "findings" not in structured:
+                structured["findings"] = self._redact(findings)
+            changed = changed_paths_csv(verdict_payload)
+            if changed is not None and "changed_paths" not in structured:
+                structured["changed_paths"] = self._redact(changed)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(summary or "pi headless completed"),
                 artifact_refs=tuple(self._redact(path) for path in refs),
-                structured_output=self._structured_from_verdict(verdict_payload),
+                structured_output=structured,
+            )
+
+        # SALVAGE (bug prose-worker-with-valid-handoff-loses-verdict): a prose message
+        # naming an existing on-disk handoff yields a result grounded in that file.
+        salvaged = salvage_result_from_handoff(assistant_text, self._config.cwd)
+        if salvaged is not None:
+            structured = {}
+            verdict = salvaged.get("verdict")
+            if isinstance(verdict, str):
+                structured["verdict"] = self._redact(verdict)
+                reason = salvaged.get("verdict_reason")
+                if isinstance(reason, str):
+                    structured["verdict_reason"] = self._redact(reason)
+            findings = findings_json(salvaged)
+            if findings is not None:
+                structured["findings"] = self._redact(findings)
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary=self._redact(derive_result_summary(salvaged) or "pi headless completed"),
+                artifact_refs=tuple(
+                    self._redact(path) for path in normalize_artifact_refs(salvaged)
+                ),
+                structured_output=structured,
             )
 
         # Noncompliant: a real message_end arrived but carried no recognizable result

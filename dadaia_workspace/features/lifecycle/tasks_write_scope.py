@@ -54,6 +54,10 @@ _STANDALONE_MARKER_RE = re.compile(r"^\[(?P<marker>[ x-])\]\s+(?P<id>T-[0-9][0-9
 _INLINE_MARKER_RE = re.compile(r"`?\[(?P<marker>[ x-])\]`?")
 # Any markdown heading (``#``..``######``) — a block boundary regardless of task-ness.
 _ANY_HEADING_RE = re.compile(r"^#{1,6}\s")
+# A checklist-bullet task heading (the engine's OWN release_definition ``tasks_create``
+# output — bug write-scope-parser-blind-to-own-tasks-create-checklist-grammar):
+# ``- [-] **T-MB-01 — title**`` at column 0, marker inline, sub-bullets indented below.
+_CHECKLIST_HEADING_RE = re.compile(r"^-\s+\[(?P<marker>[ x-])\]\s+\S")
 
 _BULLET_RE = re.compile(
     r"^-\s+(?:\*\*(?P<bkey>[^*]+):\*\*|(?P<pkey>[A-Za-z][\w ]*?):)\s*(?P<rest>.*)$"
@@ -114,6 +118,15 @@ def _reserved_task_block(text: str) -> str | None:
                 inline_reserved.append(idx)
         elif _ANY_HEADING_RE.match(line):
             heading_idxs.append(idx)
+        elif _CHECKLIST_HEADING_RE.match(line):
+            # Checklist grammar: the column-0 ``- [m] …`` bullet is itself the task
+            # heading (block boundary); its marker is inline. Indented sub-bullets
+            # below it stay inside the block.
+            checklist = _CHECKLIST_HEADING_RE.match(line)
+            assert checklist is not None
+            heading_idxs.append(idx)
+            if checklist.group("marker") == "-":
+                inline_reserved.append(idx)
         else:
             bold = _BOLD_HEADING_RE.match(line)
             if bold is not None:
@@ -161,7 +174,10 @@ def _write_set_line(block: str) -> str | None:
             first_rest = match.group("rest")
             break
     if start_idx is None:
-        return None
+        # Third real grammar (bug write-scope-parser-rejects-own-tasks-grammar — the
+        # engine's OWN tasks_create output): a standalone bold/plain ``Write set:``
+        # paragraph followed by (blank line +) a bullet list of backticked paths.
+        return _standalone_key_write_set(lines)
 
     parts = [first_rest]
     for line in lines[start_idx + 1 :]:
@@ -227,3 +243,36 @@ def _is_traversal_safe(candidate: str) -> bool:
     if "$" in candidate:
         return False
     return not any(segment == ".." or segment.startswith("~") for segment in candidate.split("/"))
+
+
+_STANDALONE_KEY_RE = re.compile(r"^(?:\*\*)?write set:(?:\*\*)?\s*$", re.IGNORECASE)
+
+
+def _standalone_key_write_set(lines: list[str]) -> str | None:
+    """Value of a standalone ``**Write set:**`` paragraph (third real grammar).
+
+    The key sits on its own line; the value is the following bullet list (blank lines
+    between key and list tolerated), joined into one logical line. Stops at the first
+    non-bullet non-blank line after the list has started. Returns ``None`` when the key
+    is absent or the list is empty.
+    """
+    key_idx: int | None = None
+    for idx, line in enumerate(lines):
+        if _STANDALONE_KEY_RE.match(line.strip()):
+            key_idx = idx
+            break
+    if key_idx is None:
+        return None
+    parts: list[str] = []
+    for line in lines[key_idx + 1 :]:
+        stripped = line.strip()
+        if not stripped:
+            if parts:
+                break
+            continue
+        if not stripped.startswith("- "):
+            break
+        parts.append(stripped[2:].strip())
+    if not parts:
+        return None
+    return " ".join(parts).strip()

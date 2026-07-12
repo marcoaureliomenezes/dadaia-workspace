@@ -96,7 +96,8 @@ def _inject_passing_fake(
             idx = calls["n"]
             calls["n"] = idx + 1
             chosen = per_step.get(str(idx), default)
-            return FakeAgentRuntime(result=chosen)
+            # Gate verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+            return FakeAgentRuntime(result=chosen, materialize_root=cwd or Path.cwd())
         return real_build(kind, cwd=cwd)
 
     monkeypatch.setattr(container, "build_agent_runtime", fake_build)

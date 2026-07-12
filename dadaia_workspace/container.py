@@ -1219,6 +1219,8 @@ def build_lifecycle_phase_workflow(
         # the run's step-artifact zone via the same canonical runtime-file writer every other
         # lifecycle artifact uses.
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 
@@ -1266,6 +1268,8 @@ def build_lifecycle_pipeline(
         prefix=prefix,
         policy_snapshot=policy_snapshot,
         handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
         # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
         specs_dir=_context_specs_dir(workspace_root, context),
@@ -1280,34 +1284,70 @@ def _release_definition_runtime_factory(
     *,
     context: str,
     run_cwd: Path,
+    release_id: str | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build the per-step runtime factory for the release-definition workflow.
 
     Real harnesses (pi/codex/claude) resolve to their live adapters — the policy-resolved
     concrete model reaches each adapter through ``request.resolved_model`` (threaded from
     the step's ``resolved_model`` by ``apply_resolved_policy``), not a construction-time
-    model. ``FAKE`` resolves to a *driving* fake that returns an APPROVED handoff with an
-    in-scope artifact_ref — so ``--harness fake`` walks the whole §6.1 sequence
-    deterministically (the DoD requirement), exercising every fragment-assembled prompt and
-    Python gate without a live worker. The artifact_ref stays inside the step's allowed
-    handoff path.
+    model. ``FAKE`` resolves to a *driving* fake so ``--harness fake`` walks the whole
+    §6.1 sequence deterministically. The fake is STEP-AWARE: a create step
+    (spec/plan/tasks) also declares + materializes its real deliverable under the
+    release's specs zone — the gate now requires deliverable-zone evidence and verifies
+    refs exist (bugs gate-accepts-phantom-artifact-evidence /
+    create-step-gate-accepts-refusal-handoff-as-success).
     """
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake release-definition worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/release-definition-step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
+    _CREATE_DELIVERABLES = {
+        "spec_create": "SPEC.md",
+        "plan_create": "PLAN.md",
+        "tasks_create": "TASKS.md",
+    }
+
+    class _ReleaseDefinitionDrivingFake:
+        def __init__(self, kind: AgentRuntimeKind) -> None:
+            self._kind = kind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self._kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            label = (request.task_id or "").rsplit(":", 1)[-1]
+            refs = [f".dadaia/handoff/{context}/release-definition-step.handoff.json"]
+            deliverable = _CREATE_DELIVERABLES.get(label)
+            if deliverable is not None and release_id is not None:
+                specs_prefix = (
+                    f"repos/{context}/specs"
+                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    else "specs"
+                )
+                refs.append(f"{specs_prefix}/releases/{release_id}/{deliverable}")
+            for ref in refs:
+                target = run_cwd / ref
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(
+                        '{"fake": true, "summary": "driving-fake stub artifact"}\n'
+                        if ref.endswith(".json")
+                        else "# driving-fake stub artifact\n\n> **Status:** Draft\n",
+                        encoding="utf-8",
+                    )
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake release-definition worker: APPROVED",
+                artifact_refs=tuple(refs),
+                structured_output={"verdict": "APPROVED"},
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=approving)
+            return _ReleaseDefinitionDrivingFake(kind)
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1364,11 +1404,19 @@ def build_release_definition_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_release_definition_runtime_factory(context=context, run_cwd=run_cwd),
+        runtime_factory=_release_definition_runtime_factory(
+            context=context, run_cwd=run_cwd, release_id=release_id
+        ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # Bug fragment-workflows-never-persist-step-handoffs: same ALWAYS-wired rule as
+        # build_lifecycle_pipeline (v0.1.78 FR-B) — without it every produces= step's
+        # payload is silently dropped and the run's ledger stays empty.
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 
@@ -1401,7 +1449,9 @@ def _backlog_definition_runtime_factory(
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=approving)
+            # materialize_root: the gate now verifies declared refs EXIST (bug
+            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
+            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1477,6 +1527,8 @@ def build_backlog_definition_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 
@@ -1511,7 +1563,9 @@ def _handoff_driving_fake_factory(
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=approving)
+            # materialize_root: the gate now verifies declared refs EXIST (bug
+            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
+            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1572,6 +1626,10 @@ def build_audit_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 
@@ -1626,6 +1684,10 @@ def build_research_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 
@@ -1667,6 +1729,15 @@ def _bug_report_runtime_factory(
                 ref = f"repos/{context}/specs/bugs/fake-bug-report-record.md"
             else:
                 ref = f".dadaia/handoff/{context}/bug-report-step.handoff.json"
+            # Gate now verifies refs EXIST (bug gate-accepts-phantom-artifact-evidence):
+            # materialize the stub like FakeAgentRuntime's driving mode does.
+            target = run_cwd / ref
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(
+                    '{"fake": true, "summary": "driving-fake stub artifact"}\n',
+                    encoding="utf-8",
+                )
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="fake bug-report worker: APPROVED",
@@ -1729,6 +1800,10 @@ def build_bug_report_workflow(
         default_runtime_kind=default_runtime_kind,
         prefix=prefix,
         policy_snapshot=policy_snapshot,
+        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
+        artifact_root=workspace_root,
     )
 
 

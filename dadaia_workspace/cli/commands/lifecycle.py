@@ -469,6 +469,13 @@ def backlog_define(
         "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
         "profiles list'.",
     ),
+    demand: str | None = typer.Option(
+        None,
+        "--demand",
+        help="Raw operator demand text the intake grill interrogates (bug "
+        "backlog-define-has-no-demand-input-channel). Injected into every model "
+        "step's prompt as an '## Operator demand' block.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the backlog-definition workflow (§4) as a fragment-driven sequence.
@@ -532,7 +539,7 @@ def backlog_define(
     # The CLI verb walks the §4 sequence on the chosen harness; absent a structured demand
     # source it threads an empty demand (no proposed intents, an empty authored result) so
     # the Python gates dispose deterministically and the sequence completes on ``fake``.
-    demand = BacklogDemand(
+    structured_demand = BacklogDemand(
         proposed_intents=(),
         existing=(),
         authored=AuthoredItem(
@@ -541,7 +548,7 @@ def backlog_define(
             bound=BoundItem(slug=run_id, anchor_changes={}),
         ),
     )
-    result = workflow.run(run_id, demand, sequence=sequence)
+    result = workflow.run(run_id, structured_demand, sequence=sequence, operator_demand=demand)
 
     status = (
         LifecycleCommandStatus.OK.value
@@ -606,6 +613,13 @@ def release_define(
         "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
         "profiles list'.",
     ),
+    resume_from: str | None = typer.Option(
+        None,
+        "--resume-from",
+        help="Re-execute the existing run from this step label onward (bug "
+        "blocked-definition-run-cannot-resume-from-step): already-approved upstream "
+        "steps are NOT re-run; their ledger payloads stay addressable.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the release-definition workflow (§6.1) as a fragment-driven sequence.
@@ -659,7 +673,7 @@ def release_define(
         default_runtime_kind=default_kind,
         policy_snapshot=snapshot,
     )
-    result = workflow.run(run_id, sequence)
+    result = workflow.run(run_id, sequence, resume_from=resume_from)
 
     # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
     # **Consumes:** line, bind the declared slugs' anchors through the R1 registry, and write
@@ -777,6 +791,14 @@ def implement(
         help="Per-step model override 'implement=profile-id' (repeatable). Profile ids "
         "ONLY (D-3); see 'lifecycle workflow profiles list'.",
     ),
+    write_scope: list[str] | None = typer.Option(
+        None,
+        "--write-scope",
+        help="Extra write-scope path glob (repeatable). The reserved [-] task's "
+        "TASKS.md 'Write set:' is derived automatically (bug "
+        "implement-verb-never-derives-task-write-scope; parity with pipeline/"
+        "implement-review).",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Run the implementation step on a selectable harness.
@@ -784,8 +806,16 @@ def implement(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    from dadaia_workspace import container
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
+
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
+    # Bug implement-verb-never-derives-task-write-scope: same derivation as the
+    # pipeline (FR3 v0.1.68) and implement-review (T-E/FR-E v0.1.78) verbs.
+    workspace_root = resolve_workspace_root()
+    specs_dir = container.resolve_context_specs_dir(workspace_root, context)
+    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
     _run_phase_step(
         label="implement",
         role="software-engineer",
@@ -802,6 +832,7 @@ def implement(
         # v0.1.78 T-A / FR-A: implement is a CREATE step. It targets QA_REVIEW purely to
         # advance the release phase; that transition target must not imply verdict-gating.
         is_review=False,
+        extra_allowed_paths=tuple(tasks_paths) + tuple(write_scope or ()),
     )
 
 
@@ -1010,6 +1041,7 @@ def _run_phase_step(
     is_review: bool,
     step_model: list[str] | None = None,
     post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
+    extra_allowed_paths: tuple[str, ...] = (),
 ) -> None:
     """Run one bounded lifecycle step through the engine on a selectable harness.
 
@@ -1059,7 +1091,7 @@ def _run_phase_step(
         release_id=release_id,
         task_id=run_id,
         prompt=_phase_step_prompt(label, release_id, context, is_review=is_review),
-        allowed_paths=(f".dadaia/handoff/{context}/**",),
+        allowed_paths=(f".dadaia/handoff/{context}/**", *extra_allowed_paths),
         required_evidence=(GateEvidenceKind.HANDOFF,),
         model_profile=entry.model_profile,
         resolved_model=resolved_model,
@@ -1606,7 +1638,8 @@ def _implement_review_runtime_factory(
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=approving)
+            # Gate verifies refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+            return FakeAgentRuntime(result=approving, materialize_root=workspace_root)
         return container.build_agent_runtime(kind, cwd=workspace_root)
 
     return factory
@@ -1693,7 +1726,7 @@ def _pipeline_runtime_factory(
         ):
             # Attribute access (not a from-import) so test seams patching the CLASS on
             # the infrastructure module are honored here too.
-            return fake_runtime.FakeAgentRuntime(result=approving)
+            return fake_runtime.FakeAgentRuntime(result=approving, materialize_root=workspace_root)
         return runtime
 
     return factory

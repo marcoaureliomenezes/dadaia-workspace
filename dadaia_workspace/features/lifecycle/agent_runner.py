@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -117,6 +118,11 @@ class AgentRunnerInput:
     requirements: tuple[GateRequirement, ...] = ()
     resume_token: str | None = None
     current_step: str | None = None
+    # Deliverable-zone globs (bug create-step-gate-accepts-refusal-handoff-as-success):
+    # when non-empty, at least one artifact ref or changed path must fall INSIDE this
+    # zone or the gate BLOCKs — a step whose worker only wrote an explanatory handoff
+    # never counts as having delivered.
+    deliverable_globs: tuple[str, ...] = ()
     # Whether this is a REVIEW step (v0.1.31 / L1). The verdict gate
     # (``structured_output["verdict"] == "APPROVED"``) applies ONLY to review steps. A
     # create step (``is_review=False``) passes on a schema-valid payload — which is what
@@ -134,9 +140,16 @@ class LifecycleAgentRunner:
         runtime: AgentRuntimePort,
         state_machine: LifecycleStateMachine | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        artifact_root: Path | None = None,
     ) -> None:
         self._runtime = runtime
         self._state_machine = state_machine or LifecycleStateMachine()
+        # Bug gate-accepts-phantom-artifact-evidence: when injected (production builders
+        # pass the workspace root), every declared artifact ref must EXIST under this
+        # root or the step BLOCKs — a fabricated ref (e.g. a read-only-sandbox worker
+        # that "declared" a handoff it never wrote) is fake evidence, worse than none.
+        # ``None`` (unit fixtures) keeps behavior byte-identical.
+        self._artifact_root = artifact_root
         # v0.1.78 T-D / FR-D: additive-optional run-artifact writer. When injected, a
         # worker attempt that ends blocked-for-noncompliance AND carries a
         # ``result.diagnostic`` persists it under the run's step-artifact zone and
@@ -234,6 +247,26 @@ class LifecycleAgentRunner:
         # populates ``artifact_refs``) + in-scope paths, regardless of the ``verdict``
         # field. The ``artifact_refs`` check below still BLOCKs a no-op create worker.
         if data.is_review and result.structured_output.get("verdict") != "APPROVED":
+            # Diagnostic contract: an explicit non-APPROVED verdict (e.g. REJECTED) is a
+            # different operator situation than an absent one — the review *worked* and
+            # said no. Name the verdict (and its reason) instead of misreporting it as
+            # missing; reserve the "missing" wording for a genuinely absent verdict.
+            verdict = result.structured_output.get("verdict")
+            if verdict:
+                verdict_reason = result.structured_output.get("verdict_reason")
+                reason = f"review verdict {verdict}"
+                verdict_detail = {"verdict": str(verdict)}
+                if verdict_reason:
+                    reason = f"{reason}: {verdict_reason}"
+                    verdict_detail["verdict_reason"] = str(verdict_reason)
+                if result.artifact_refs:
+                    # Pointer to the rejecting reviewer's own handoff (full findings) —
+                    # consumed by the resume-feedback digest so a revision worker can
+                    # open it (bug resumed-definition-step-blind-to-rejecting-review-feedback).
+                    verdict_detail["review_artifact_refs"] = ",".join(result.artifact_refs)
+                return self._blocked(
+                    lifecycle_run, data, reason, detail=verdict_detail, result=result
+                )
             return self._blocked(
                 lifecycle_run, data, "agent result missing APPROVED verdict", result=result
             )
@@ -259,10 +292,17 @@ class LifecycleAgentRunner:
                 detail=detail,
                 result=result,
             )
-        out_of_scope = self._out_of_scope_paths(
-            data.request,
-            (*result.artifact_refs, *self._changed_paths(result)),
+        # Bug review-step-out-of-scope-blocks-cited-reviewed-artifact: a review step's
+        # artifact_refs CITE what it reviewed (the handoff schema requires artifact.path
+        # to name the reviewed artifact) — citations are evidence, not writes. Scope-check
+        # a review's actual writes (changed_paths) only; a create step's artifact_refs
+        # remain its deliverables and stay fully scope-checked.
+        scope_candidates = (
+            tuple(self._changed_paths(result))
+            if data.is_review
+            else (*result.artifact_refs, *self._changed_paths(result))
         )
+        out_of_scope = self._out_of_scope_paths(data.request, scope_candidates)
         if out_of_scope:
             return self._blocked(
                 lifecycle_run,
@@ -271,6 +311,30 @@ class LifecycleAgentRunner:
                 detail={"out_of_scope": ",".join(out_of_scope)},
                 result=result,
             )
+        if self._artifact_root is not None:
+            missing = [
+                ref for ref in result.artifact_refs if not (self._artifact_root / ref).exists()
+            ]
+            if missing:
+                return self._blocked(
+                    lifecycle_run,
+                    data,
+                    "agent result references nonexistent artifact(s)",
+                    detail={"missing_artifacts": ",".join(missing)},
+                    result=result,
+                )
+        if data.deliverable_globs and self._artifact_root is not None:
+            candidates = (*result.artifact_refs, *self._changed_paths(result))
+            outside = out_of_scope_paths(candidates, allowed=data.deliverable_globs, forbidden=())
+            delivered = [path for path in candidates if path not in set(outside)]
+            if not delivered:
+                return self._blocked(
+                    lifecycle_run,
+                    data,
+                    "agent result carries no deliverable in the step's declared zone",
+                    detail={"deliverable_zone": ",".join(data.deliverable_globs)},
+                    result=result,
+                )
         return None
 
     def _blocked(

@@ -144,9 +144,15 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
     _WORKFLOW_LABEL = "audit"
     _INITIAL_PHASE = LifecyclePhase.QA_REVIEW
 
-    def run(self, run_id: str, sequence: tuple[AuditStep, ...] = _SEQUENCE) -> AuditResult:
+    def run(
+        self,
+        run_id: str,
+        sequence: tuple[AuditStep, ...] = _SEQUENCE,
+        *,
+        resume_from: str | None = None,
+    ) -> AuditResult:
         """Execute the sequence; stop at the first blocked gate; complete on success."""
-        return self._run_sequence(run_id, sequence)
+        return self._run_sequence(run_id, sequence, resume_from=resume_from)
 
     def _make_result(
         self,

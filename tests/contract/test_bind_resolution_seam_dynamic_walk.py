@@ -408,8 +408,10 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
 
     # The known non-resolver params stay excluded (classifier honesty pin — fails loudly
     # if source drift changes their shape without updating this contract's understanding).
+    # `dadaia.bugs.append --context` left this set in v0.1.82: the event's context is
+    # now a ROUTING key resolved through the seam (bug
+    # bugs-append-ledger-ignores-context-flag), no longer inert event metadata.
     known_non_resolver = {
-        "dadaia.bugs.append --context",
         "dadaia.lifecycle.status --context",
         "dadaia.lifecycle.handoffs.doctor --context",
         "dadaia.specs.init --specs-dir",

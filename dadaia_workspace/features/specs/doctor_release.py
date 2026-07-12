@@ -241,7 +241,12 @@ class ReleaseValidator:
         whose SPEC.md has Created: >= RELEASE_SEMVER_CUTOFF.
 
         Vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF) are excluded.
-        Severity: WARNING until RELEASE_SEMVER_HARD, ERROR on/after that date.
+        Severity: WARNING until RELEASE_SEMVER_HARD, ERROR on/after that date;
+        an ARCHIVED legacy dir is always at most WARNING — SPEC-DOC-027 explicitly
+        preserves archived legacy names until renamed, and a hard 016 ERROR on the
+        same path contradicted it and left preflight permanently red with no
+        non-destructive remediation (bug
+        doctor-016-errors-archived-legacy-release-027-tolerates).
 
         Applies to both specs/releases/ and specs/_archive/releases/.
         """
@@ -252,7 +257,7 @@ class ReleaseValidator:
         if today < RELEASE_SEMVER_CUTOFF:
             return issues
 
-        severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
+        base_severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
 
         for releases_root in (
             self.specs_dir / "releases",
@@ -260,6 +265,8 @@ class ReleaseValidator:
         ):
             if not releases_root.exists():
                 continue
+            is_archive = releases_root.name != "releases" or releases_root.parent.name == "_archive"
+            severity = Severity.WARNING if is_archive else base_severity
             for entry in releases_root.iterdir():
                 if not entry.is_dir():
                     continue

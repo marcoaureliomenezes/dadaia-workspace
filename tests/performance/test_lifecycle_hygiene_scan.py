@@ -68,6 +68,12 @@ class _SyntheticPath:
     def name(self) -> str:
         return self.rel_path.name
 
+    @property
+    def parent(self) -> Path:
+        # The unreclaimable check (os.access on the parent) probes a real, writable
+        # dir for synthetic entries — the workspace root stands in.
+        return self.workspace_root
+
     def __lt__(self, other: _SyntheticPath) -> bool:
         return self.rel_path < other.rel_path
 

@@ -71,7 +71,11 @@ def _inject_fake_implement_result(monkeypatch: pytest.MonkeyPatch) -> None:
         kind: AgentRuntimeKind, *, cwd: Path | None = None, model: object = None
     ) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            return FakeAgentRuntime(result=_implement_result_with_production_change())
+            # Gate verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+            return FakeAgentRuntime(
+                result=_implement_result_with_production_change(),
+                materialize_root=cwd or Path.cwd(),
+            )
         return real_build(kind, cwd=cwd)
 
     monkeypatch.setattr(container, "build_agent_runtime", fake_build)

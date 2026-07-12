@@ -291,10 +291,13 @@ def test_filter_env_and_build_prompt_envelope() -> None:
         pytest.param(
             {
                 "artifact_refs": [".dadaia/handoff/dadaia-workspace/a.handoff.json"],
-                "artifact": {"type": "other", "path": "repos/x/should-not-be-used.py"},
+                "artifact": {"type": "other", "path": "repos/x/also-delivered.py"},
             },
-            (".dadaia/handoff/dadaia-workspace/a.handoff.json",),
-            id="populated-list-wins-over-singular-fallback",
+            (
+                ".dadaia/handoff/dadaia-workspace/a.handoff.json",
+                "repos/x/also-delivered.py",
+            ),
+            id="singular-artifact-merges-into-populated-list",
         ),
         pytest.param(
             {"artifact": {"type": "other"}},
@@ -325,3 +328,41 @@ def test_classify_result_payload_accepts_schema_version_as_strict_label() -> Non
         "artifact_refs": [],
     }
     assert classify_result_payload(payload, "agent-run-result-v1") is ResultMatch.STRICT
+
+
+def test_salvage_result_from_handoff_matrix(tmp_path: Path) -> None:
+    """Bug prose-worker-with-valid-handoff-loses-verdict — prose naming a real handoff
+    salvages verdict+refs from the file; missing/unparseable refs stay None."""
+    import json as _json
+
+    from dadaia_workspace.infrastructure.headless_adapter_base import (
+        salvage_result_from_handoff,
+    )
+
+    ref = ".dadaia/handoff/ctx/2026-07-12T0742Z-qa-review.handoff.json"
+    target = tmp_path / ref
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        _json.dumps(
+            {
+                "verdict": "APPROVED",
+                "verdict_reason": "all ACs observable",
+                "findings": [{"severity": "INFO", "message": "clean"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    prose = f"QA review completed.\n\nVerdict: `APPROVED`\n\nHandoff: [{ref}](/abs/{ref})"
+
+    payload = salvage_result_from_handoff(prose, tmp_path)
+    assert payload is not None
+    assert payload["artifact_refs"] == [ref]
+    assert payload["verdict"] == "APPROVED"
+    assert payload["verdict_reason"] == "all ACs observable"
+
+    # Missing file → None (no-op invariant untouched).
+    assert (
+        salvage_result_from_handoff("see .dadaia/handoff/ctx/ghost.handoff.json", tmp_path) is None
+    )
+    # No handoff ref at all → None.
+    assert salvage_result_from_handoff("did nothing, sorry", tmp_path) is None

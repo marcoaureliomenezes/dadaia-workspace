@@ -143,3 +143,45 @@ def test_stubbed_compatible_merge_downgrades(tmp_path: Path) -> None:
     verdicts = [c.verdict for c in result.overlap]
     assert Verdict.OVERLAP in verdicts
     assert Verdict.DIVERGENT_CONFLICT not in verdicts
+
+
+def test_operator_demand_reaches_every_model_step_prompt(tmp_path: Path) -> None:
+    """Bug backlog-define-has-no-demand-input-channel: the raw demand text the intake
+    grill exists to interrogate is injected into the model steps' prompts."""
+    captured: list[str] = []
+
+    @dataclass
+    class _PromptCapturingFake:
+        kind: AgentRuntimeKind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self.kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            captured.append(request.prompt)
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="ok",
+                artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+                structured_output={"verdict": "APPROVED"},
+            )
+
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    selector = ContextSelector(
+        SpecContext(specs_dir=specs, release_id=_RELEASE, handoff_dir=tmp_path / "handoff")
+    )
+    wf = BacklogDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=_MemoryRunStore(),  # type: ignore[arg-type]
+        runtime_factory=lambda kind: _PromptCapturingFake(kind),  # type: ignore[arg-type, return-value]
+        context_selector=selector,
+        registry=_registry(tmp_path),
+    )
+    demand_text = "Quero um jogo de corrida navegador-first para o Tauan."
+    wf.run("demand-run", _cd_demand(), operator_demand=demand_text)
+
+    assert captured, "at least one model step must have run"
+    assert all("## Operator demand" in prompt for prompt in captured)
+    assert all(demand_text in prompt for prompt in captured)

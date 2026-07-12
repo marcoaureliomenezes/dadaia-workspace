@@ -113,6 +113,36 @@ class FilesystemRuntimeFileAdapter:
         assert ref.content_hash is not None
         return StepPayloadRef(payload_ref=ref.path, content_hash=ref.content_hash)
 
+    def purge_step_payloads(
+        self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
+    ) -> int:
+        """Reclaim the run's step-payload zone for a RESTART; return files removed.
+
+        Restarting a run_id replaces the run record — and with it the ledger that
+        addressed these payloads — so the zone's files are orphans that would otherwise
+        block the new generation's ``attempt-0`` writes (bug
+        rerun-of-run-id-collides-with-immutable-payload-zone). Confined to
+        ``.dadaia/runs/lifecycle/<run_id>/steps`` via ``_canonical_path``; only
+        ``*.step-payload.json`` files are removed. In-run immutability is untouched —
+        ``write_step_payload`` still never overwrites a live key.
+
+        *producer_steps* narrows the reclaim to the named steps' payloads (the
+        resume-from-step case, bug blocked-definition-run-cannot-resume-from-step):
+        upstream steps' payloads stay addressable for ``consumes`` resolution.
+        """
+        steps_dir = self._canonical_path("runs", "lifecycle", run_id, "steps")
+        if not steps_dir.is_dir():
+            return 0
+        removed = 0
+        for entry in steps_dir.glob("*.step-payload.json"):
+            if producer_steps is not None:
+                producer = entry.name.rsplit("-attempt-", 1)[0]
+                if producer not in producer_steps:
+                    continue
+            entry.unlink()
+            removed += 1
+        return removed
+
     def read_step_payload(self, payload_ref: str) -> str | None:
         """Return the raw step payload envelope JSON at *payload_ref*, or ``None`` if absent.
 

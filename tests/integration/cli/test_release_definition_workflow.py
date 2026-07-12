@@ -30,7 +30,7 @@ varies per step while no live worker is ever spawned.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -84,8 +84,28 @@ class _KindReportingFake:
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
 
-    def run(self, request: AgentRunRequest) -> AgentRunResult:  # noqa: ARG002
-        return self.result
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        # The structural gate verifies declared refs EXIST and that a create step
+        # delivers INSIDE its declared zone (bugs gate-accepts-phantom-artifact-evidence
+        # / create-step-gate-accepts-refusal-handoff-as-success): be step-aware and
+        # materialize like the production driving fake.
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        deliverable = {
+            "spec_create": "SPEC.md",
+            "plan_create": "PLAN.md",
+            "tasks_create": "TASKS.md",
+        }.get(label)
+        refs = list(self.result.artifact_refs)
+        if deliverable is not None:
+            zone = Path.cwd() / "repos" / _CONTEXT / "specs"
+            prefix = f"repos/{_CONTEXT}/specs" if zone.is_dir() else "specs"
+            refs.append(f"{prefix}/releases/{_RELEASE}/{deliverable}")
+        for ref in refs:
+            target = Path.cwd() / ref
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('{"fake": true}\n', encoding="utf-8")
+        return replace(self.result, artifact_refs=tuple(refs))
 
 
 def _approving_result() -> AgentRunResult:
@@ -123,6 +143,7 @@ def _install_fake_factory(
         *,
         context: str,  # noqa: ARG001
         run_cwd: Path,  # noqa: ARG001
+        release_id: str | None = None,  # noqa: ARG001
     ) -> object:
         def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
             if reject_kind is not None and kind is reject_kind:

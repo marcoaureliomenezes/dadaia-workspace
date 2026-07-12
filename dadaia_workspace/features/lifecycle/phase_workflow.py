@@ -84,6 +84,7 @@ class LifecyclePhaseWorkflow:
         state_machine: LifecycleStateMachine | None = None,
         specs_dir_resolver: Callable[[str], Path | None] | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        artifact_root: Path | None = None,
     ) -> None:
         self._runtime = runtime
         self._run_store = run_store
@@ -97,6 +98,9 @@ class LifecyclePhaseWorkflow:
         # v0.1.78 T-D / FR-D: additive-optional run-artifact writer threaded to the
         # ``LifecycleAgentRunner`` this workflow constructs (see ``pipeline.py`` twin).
         self._runtime_files = runtime_files
+        # Bug gate-accepts-phantom-artifact-evidence: when wired, declared artifact refs
+        # must EXIST under this root or the step BLOCKs.
+        self._artifact_root = artifact_root
 
     def run(
         self,
@@ -155,6 +159,7 @@ class LifecyclePhaseWorkflow:
             runtime=self._runtime,
             state_machine=self._state_machine,
             runtime_files=self._runtime_files,
+            artifact_root=self._artifact_root,
         )
         decision = runner.run(
             run,
