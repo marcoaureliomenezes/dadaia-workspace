@@ -20,6 +20,15 @@ take precedence.
 - Public defaults must stay generic: no private repo names, hostnames, IPs,
   customer names, operator-local paths, or optional domain-pack assumptions.
 
+## Credential Boundary
+
+**Always no:** credential material is allowed only in the operator-managed
+workspace-root `.env`. Never create, copy, persist, commit, print, or report
+tokens, passwords, private keys, cookies, auth payloads, or secret files in a
+repository, runtime mount, image, generated configuration, cache, report, or
+handoff. Runtime processes may receive only the minimum required values from
+that root `.env`; they must not write a second credential store.
+
 ## Workspace Root Law
 
 The workspace **root** may contain **only**:
