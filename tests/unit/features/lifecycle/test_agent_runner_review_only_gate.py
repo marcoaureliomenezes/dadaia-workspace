@@ -34,6 +34,7 @@ from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
 _ARTIFACT = ".dadaia/handoff/dadaia-workspace/step.handoff.json"
 _VERDICT_REASON = "agent result missing APPROVED verdict"
+_REJECTED_REASON = "review verdict REJECTED"
 _ARTIFACT_REASON = "agent result missing artifact evidence"
 
 
@@ -92,7 +93,7 @@ def _gate(result: AgentRunResult, *, is_review: bool) -> object:
 _MATRIX = (
     # (case_id, verdict, artifact_refs, is_review, expect_blocked, expect_reason)
     ("review-missing-blocks", None, (_ARTIFACT,), True, True, _VERDICT_REASON),
-    ("review-rejected-blocks", "REJECTED", (_ARTIFACT,), True, True, _VERDICT_REASON),
+    ("review-rejected-blocks", "REJECTED", (_ARTIFACT,), True, True, _REJECTED_REASON),
     ("review-approved-passes", "APPROVED", (_ARTIFACT,), True, False, None),
     ("create-approved-passes", "APPROVED", (_ARTIFACT,), False, False, None),
     # "regardless of verdict" pinned adversarially: create passes even REJECTED/absent.
@@ -121,6 +122,85 @@ def test_verdict_review_gate_matrix(
         assert blocked.reason == expect_reason
     else:
         assert blocked is None
+
+
+# -- ①b explicit-rejection diagnostics (bug: blocked-reason-misreports-rejected-verdict) --
+
+
+def test_rejected_verdict_block_carries_verdict_and_reason_detail() -> None:
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="step output",
+        artifact_refs=(_ARTIFACT,),
+        structured_output={"verdict": "REJECTED", "verdict_reason": "spec not measurable"},
+    )
+    blocked = _gate(result, is_review=True)
+    assert blocked is not None
+    assert blocked.reason == "review verdict REJECTED: spec not measurable"
+    assert blocked.detail["verdict"] == "REJECTED"
+    assert blocked.detail["verdict_reason"] == "spec not measurable"
+
+
+def test_rejected_verdict_without_reason_still_names_the_verdict() -> None:
+    blocked = _gate(_result(verdict="REJECTED", artifact_refs=(_ARTIFACT,)), is_review=True)
+    assert blocked is not None
+    assert blocked.reason == "review verdict REJECTED"
+    assert blocked.detail["verdict"] == "REJECTED"
+    assert "verdict_reason" not in blocked.detail
+
+
+def test_missing_verdict_keeps_missing_wording() -> None:
+    blocked = _gate(_result(verdict=None, artifact_refs=(_ARTIFACT,)), is_review=True)
+    assert blocked is not None
+    assert blocked.reason == _VERDICT_REASON
+    assert "verdict" not in blocked.detail
+
+
+# -- ①c review citations are not writes (bug review-step-out-of-scope-...-artifact) ------
+
+
+def _result_with_changed(
+    *, verdict: str, artifact_refs: tuple[str, ...], changed_paths: tuple[str, ...]
+) -> AgentRunResult:
+    return AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="step output",
+        artifact_refs=artifact_refs,
+        structured_output={"verdict": verdict, "changed_paths": ",".join(changed_paths)},
+    )
+
+
+def test_approving_review_citing_reviewed_artifact_outside_allowlist_passes() -> None:
+    """The reviewed artifact citation (artifact.path) is evidence, not a write."""
+    blocked = _gate(
+        _result(verdict="APPROVED", artifact_refs=("specs/releases/r1/TASKS.md",)),
+        is_review=True,
+    )
+    assert blocked is None
+
+
+def test_review_with_out_of_scope_changed_paths_still_blocks() -> None:
+    """A reviewer that actually WRITES outside its allowlist stays blocked."""
+    blocked = _gate(
+        _result_with_changed(
+            verdict="APPROVED",
+            artifact_refs=(_ARTIFACT,),
+            changed_paths=("specs/releases/r1/TASKS.md",),
+        ),
+        is_review=True,
+    )
+    assert blocked is not None
+    assert blocked.reason == "agent result contains out-of-scope paths"
+
+
+def test_create_step_out_of_scope_artifact_refs_still_block() -> None:
+    """Create-step deliverables (artifact_refs) remain fully scope-checked."""
+    blocked = _gate(
+        _result(verdict="APPROVED", artifact_refs=("specs/releases/r1/TASKS.md",)),
+        is_review=False,
+    )
+    assert blocked is not None
+    assert blocked.reason == "agent result contains out-of-scope paths"
 
 
 # -- ② ladder review steps carry is_review flags -----------------------------------------
@@ -152,4 +232,5 @@ def test_pipeline_review_steps_block_on_missing_or_rejected_verdict(verdict: str
             is_review=step.is_review,
         )
         assert blocked is not None, f"{step.label} should block on {verdict!r} verdict"
-        assert blocked.reason == _VERDICT_REASON
+        expected = _VERDICT_REASON if verdict is None else _REJECTED_REASON
+        assert blocked.reason == expected

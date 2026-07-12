@@ -428,3 +428,54 @@ Criar a pasta.
         "corrida/game.js",
         "corrida/README.md",
     )
+
+
+def test_engine_authored_checklist_bullet_grammar_with_indented_write_set(
+    tmp_path: Path,
+) -> None:
+    """Bug write-scope-parser-blind-to-own-tasks-create-checklist-grammar: the
+    release-definition ``tasks_create`` step authors ``- [-] **T-x — title**``
+    checklist bullets with indented ``  - **Write set:** ...`` sub-bullets
+    (multi-line continuation). The parser must read the grammar the engine
+    itself emits."""
+    _write_tasks(
+        tmp_path,
+        """# TASKS — memoria-bichos-v1
+
+## Tarefas
+
+- [-] **T-MB-01 — Scaffold standalone, primeira tela e catalogo**
+  - **Owner:** game-developer
+  - **Write set:** `memoria-bichos/index.html`, `memoria-bichos/styles.css`,
+    `memoria-bichos/game.js`, `memoria-bichos/README.md`, `index.html`.
+  - **Depends:** none
+
+- [ ] **T-MB-02 — Smoke Playwright offline e navegacao inicial**
+  - **Owner:** qa-engineer
+  - **Write set:** `tests/memoria-bichos/memoria-bichos.spec.js`, `package.json`.
+""",
+    )
+    assert write_scope_from_tasks(tmp_path, _RELEASE) == (
+        "memoria-bichos/index.html",
+        "memoria-bichos/styles.css",
+        "memoria-bichos/game.js",
+        "memoria-bichos/README.md",
+        "index.html",
+    )
+
+
+def test_checklist_bullet_grammar_zero_or_multiple_reserved_returns_empty(
+    tmp_path: Path,
+) -> None:
+    _write_tasks(
+        tmp_path,
+        """# TASKS
+
+- [-] **T-01 — a**
+  - **Write set:** `a/x.js`.
+
+- [-] **T-02 — b**
+  - **Write set:** `b/y.js`.
+""",
+    )
+    assert write_scope_from_tasks(tmp_path, _RELEASE) == ()

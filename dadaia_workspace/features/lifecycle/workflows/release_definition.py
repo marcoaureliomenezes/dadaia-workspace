@@ -274,6 +274,21 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 path.write_text(text.replace(marker, "> **Status:** Aprovado", 1), encoding="utf-8")
                 return
 
+    def _on_sequence_completed(self) -> None:
+        """Repoint ACTIVE.md to the newly defined release (deterministic Python).
+
+        Bug definition-commit-gate-never-repoints-active-md: a completed definition IS
+        the release-activation authority — every ACTIVE.md reader (doctor, memory-phase
+        gate, spec navigator, workers) must see the new release immediately, not the
+        previous one. Same Python-owned semantics as the review status flips.
+        """
+        releases_dir = self._selector.spec_context.specs_dir / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        (releases_dir / "ACTIVE.md").write_text(
+            f"release: {self._release_id}\nphase: IMPLEMENTATION\n",
+            encoding="utf-8",
+        )
+
     def _make_result(
         self,
         *,

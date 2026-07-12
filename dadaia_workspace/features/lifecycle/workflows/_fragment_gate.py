@@ -342,6 +342,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # the workspace root), the structural gate additionally requires every declared
         # artifact ref to EXIST under this root.
         self._artifact_root = artifact_root
+        # Bug resumed-definition-step-blind-to-rejecting-review-feedback: on a resume of a
+        # run that blocked on a review rejection, the resume-point step's prompt carries a
+        # compact digest of that prior BlockedState (the definition-sequence analogue of
+        # run_implement_review_loop's FR3 rejection digest). Keyed by step label; consumed
+        # exactly once by the first re-run of that step.
+        self._resume_feedback: dict[str, str] = {}
 
     # -- post-acceptance hook (divergence axis) --------------------------
 
@@ -421,6 +427,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 )
             index = labels.index(resume_from)
             resumed_labels = set(labels[index:])
+            if prior.blocked is not None:
+                # Feed the prior rejection back into the resumed step (bug
+                # resumed-definition-step-blind-to-rejecting-review-feedback) — without it
+                # the revision worker re-authors blind and the rejecting reviewer repeats
+                # the identical findings forever.
+                self._resume_feedback[resume_from] = self._render_prior_block_digest(prior.blocked)
             if self._handoff_resolver is not None:
                 # Reclaim only the resume-point-onward payloads; the kept upstream
                 # payloads stay addressable through the preserved ledger entries.
@@ -461,6 +473,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     outcomes=tuple(outcomes),
                     blocked=run.blocked,
                 )
+        # Post-completion hook (bug definition-commit-gate-never-repoints-active-md):
+        # bodies override to apply their deterministic Python-owned completion effects
+        # (e.g. release_definition rewrites ACTIVE.md). Runs only on a FULLY completed
+        # sequence — a blocked run never reaches it.
+        self._on_sequence_completed()
         return self._make_result(
             run_id=run_id,
             completed=True,
@@ -468,6 +485,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             outcomes=tuple(outcomes),
             blocked=None,
         )
+
+    def _on_sequence_completed(self) -> None:
+        """Called once after every step of the sequence is accepted. Default: no-op."""
 
     # -- model step ------------------------------------------------------
 
@@ -498,6 +518,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
+        # One-shot prior-rejection digest for the resume-point step (bug
+        # resumed-definition-step-blind-to-rejecting-review-feedback).
+        resume_digest = self._resume_feedback.pop(step.label, None)
+        if resume_digest:
+            digests = (*digests, resume_digest)
         if digests:
             selected = "\n\n".join(filter(None, (selected, *digests)))
         suffix = build_fragment_suffix(
@@ -575,6 +600,28 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             runtime_kind=kind,
             blocked=blocked,
         )
+
+    @staticmethod
+    def _render_prior_block_digest(blocked: BlockedState) -> str:
+        """Render the prior run's BlockedState as a compact revision brief.
+
+        Includes the blocking step, the gate reason (which names an explicit review
+        verdict + its reason since bug blocked-reason-misreports-rejected-verdict), and
+        every detail entry — notably ``verdict``/``verdict_reason`` and any artifact or
+        diagnostic refs the worker can open for the full findings.
+        """
+        lines = [
+            "## Prior rejection feedback (resumed run)",
+            f"The previous run of this workflow blocked at step "
+            f"'{blocked.blocked_at_step}': {blocked.reason}",
+        ]
+        for key, value in sorted(blocked.detail.items()):
+            lines.append(f"- {key}: {value}")
+        lines.append(
+            "Revise the artifact so every point above is addressed; the same reviewer "
+            "gate runs again after this step."
+        )
+        return "\n".join(lines)
 
     @staticmethod
     def _with_step_outcome(

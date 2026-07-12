@@ -73,7 +73,12 @@ def _request() -> AgentRunRequest:
     )
 
 
-def _decision(result: AgentRunResult, *, requirements: tuple[GateRequirement, ...] = ()):
+def _decision(
+    result: AgentRunResult,
+    *,
+    requirements: tuple[GateRequirement, ...] = (),
+    is_review: bool = True,
+):
     runtime: AgentRuntimePort = FakeAgentRuntime(result)
     return LifecycleAgentRunner(runtime=runtime).run(
         _run(),
@@ -82,7 +87,7 @@ def _decision(result: AgentRunResult, *, requirements: tuple[GateRequirement, ..
             target_phase=LifecyclePhase.QA_REVIEW,
             requirements=requirements,
             current_step="qa-review",
-            is_review=True,
+            is_review=is_review,
         ),
     )
 
@@ -142,36 +147,44 @@ def test_prose_verdict_and_missing_artifact_evidence_both_block_the_gate() -> No
 
 # -- out-of-scope detector: 3 input variants of the same `out_of_scope` block reason -----
 
+# Review steps scope-check their WRITES (changed_paths) only — artifact_refs are the
+# reviewed-artifact citations the handoff schema demands (bug
+# review-step-out-of-scope-blocks-cited-reviewed-artifact). The citation variants of the
+# out-of-scope cases therefore assert on is_review=False (create-step deliverables).
 _OUT_OF_SCOPE_CASES = (
     (
         "artifact-ref-outside-scope",
         ("repos/dadaia-workspace/src/secrets.py",),
         None,
+        False,
         "repos/dadaia-workspace/src/secrets.py",
     ),
     (
         "sibling-prefix-does-not-match",
         (".dadaia/handoff/dadaia-workspace-secret/qa.handoff.json",),
         None,
+        False,
         ".dadaia/handoff/dadaia-workspace-secret/qa.handoff.json",
     ),
     (
         "changed-paths-validated-against-write-scope",
         (".dadaia/handoff/dadaia-workspace/qa.handoff.json",),
         ".dadaia/handoff/dadaia-workspace/qa.handoff.json,repos/dadaia-workspace/src/secrets.py",
+        True,
         "repos/dadaia-workspace/src/secrets.py",
     ),
 )
 
 
 @pytest.mark.parametrize(
-    "artifact_refs,changed_paths,expected_out_of_scope",
+    "artifact_refs,changed_paths,is_review,expected_out_of_scope",
     [c[1:] for c in _OUT_OF_SCOPE_CASES],
     ids=[c[0] for c in _OUT_OF_SCOPE_CASES],
 )
 def test_out_of_scope_paths_block_before_transition(
     artifact_refs: tuple[str, ...],
     changed_paths: str | None,
+    is_review: bool,
     expected_out_of_scope: str,
 ) -> None:
     structured = {"verdict": "APPROVED"}
@@ -183,7 +196,8 @@ def test_out_of_scope_paths_block_before_transition(
             summary="approved",
             artifact_refs=artifact_refs,
             structured_output=structured,
-        )
+        ),
+        is_review=is_review,
     )
 
     assert decision.accepted is True
@@ -191,3 +205,17 @@ def test_out_of_scope_paths_block_before_transition(
     assert decision.run.blocked is not None
     assert decision.run.blocked.reason == "agent result contains out-of-scope paths"
     assert decision.run.blocked.detail["out_of_scope"] == expected_out_of_scope
+
+
+def test_review_citation_of_reviewed_artifact_outside_allowlist_passes() -> None:
+    """An APPROVED review citing the reviewed artifact (no writes) is NOT out-of-scope."""
+    decision = _decision(
+        AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary="approved",
+            artifact_refs=("repos/dadaia-workspace/specs/releases/r1/TASKS.md",),
+            structured_output={"verdict": "APPROVED"},
+        ),
+        is_review=True,
+    )
+    assert decision.run.blocked is None

@@ -54,6 +54,10 @@ _STANDALONE_MARKER_RE = re.compile(r"^\[(?P<marker>[ x-])\]\s+(?P<id>T-[0-9][0-9
 _INLINE_MARKER_RE = re.compile(r"`?\[(?P<marker>[ x-])\]`?")
 # Any markdown heading (``#``..``######``) — a block boundary regardless of task-ness.
 _ANY_HEADING_RE = re.compile(r"^#{1,6}\s")
+# A checklist-bullet task heading (the engine's OWN release_definition ``tasks_create``
+# output — bug write-scope-parser-blind-to-own-tasks-create-checklist-grammar):
+# ``- [-] **T-MB-01 — title**`` at column 0, marker inline, sub-bullets indented below.
+_CHECKLIST_HEADING_RE = re.compile(r"^-\s+\[(?P<marker>[ x-])\]\s+\S")
 
 _BULLET_RE = re.compile(
     r"^-\s+(?:\*\*(?P<bkey>[^*]+):\*\*|(?P<pkey>[A-Za-z][\w ]*?):)\s*(?P<rest>.*)$"
@@ -114,6 +118,15 @@ def _reserved_task_block(text: str) -> str | None:
                 inline_reserved.append(idx)
         elif _ANY_HEADING_RE.match(line):
             heading_idxs.append(idx)
+        elif _CHECKLIST_HEADING_RE.match(line):
+            # Checklist grammar: the column-0 ``- [m] …`` bullet is itself the task
+            # heading (block boundary); its marker is inline. Indented sub-bullets
+            # below it stay inside the block.
+            checklist = _CHECKLIST_HEADING_RE.match(line)
+            assert checklist is not None
+            heading_idxs.append(idx)
+            if checklist.group("marker") == "-":
+                inline_reserved.append(idx)
         else:
             bold = _BOLD_HEADING_RE.match(line)
             if bold is not None:
