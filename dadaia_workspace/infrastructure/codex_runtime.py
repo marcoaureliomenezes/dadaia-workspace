@@ -30,7 +30,11 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
     SubprocessAdapterMixin,
     _GitDiffPort,
+    changed_paths_csv,
+    derive_result_summary,
+    findings_json,
     normalize_artifact_refs,
+    salvage_result_from_handoff,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
@@ -339,11 +343,44 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         payload = self._extract_result_payload(raw, request.expected_schema)
         if payload is not None:
             refs = normalize_artifact_refs(payload)
+            # Substantive summary + findings survive into the flat structured map (bug
+            # step-payload-drops-worker-findings): real workers emit findings with no
+            # top-level summary, and the old generic default erased their content.
+            structured = self._structured_from_payload(payload)
+            findings = findings_json(payload)
+            if findings is not None and "findings" not in structured:
+                structured["findings"] = self._redact(findings)
+            changed = changed_paths_csv(payload)
+            if changed is not None and "changed_paths" not in structured:
+                structured["changed_paths"] = self._redact(changed)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
-                summary=self._redact(str(payload.get("summary", "codex exec completed"))),
+                summary=self._redact(derive_result_summary(payload) or "codex exec completed"),
                 artifact_refs=tuple(self._redact(path) for path in refs),
-                structured_output=self._structured_from_payload(payload),
+                structured_output=structured,
+            )
+
+        # SALVAGE (bug prose-worker-with-valid-handoff-loses-verdict): a prose message
+        # that names an existing on-disk handoff yields a result grounded in that file.
+        salvaged = salvage_result_from_handoff(raw, self._config.cwd)
+        if salvaged is not None:
+            structured = {}
+            verdict = salvaged.get("verdict")
+            if isinstance(verdict, str):
+                structured["verdict"] = self._redact(verdict)
+                reason = salvaged.get("verdict_reason")
+                if isinstance(reason, str):
+                    structured["verdict_reason"] = self._redact(reason)
+            findings = findings_json(salvaged)
+            if findings is not None:
+                structured["findings"] = self._redact(findings)
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary=self._redact(derive_result_summary(salvaged) or "codex exec completed"),
+                artifact_refs=tuple(
+                    self._redact(path) for path in normalize_artifact_refs(salvaged)
+                ),
+                structured_output=structured,
             )
 
         # FALLBACK: no result object was accepted — degrade safely (never crash, no
@@ -370,8 +407,20 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         )
 
     def _structured_from_payload(self, payload: dict[str, object]) -> dict[str, str]:
-        """Flatten a result payload's ``structured_output`` into the redacted string map."""
+        """Flatten a result payload into the redacted string map — PI-parity lifting.
+
+        Bug codex-adapter-drops-top-level-verdict: like PI's ``_structured_from_verdict``,
+        top-level ``verdict``/``verdict_reason``/``commit_sha``/``task_group`` are lifted
+        (real review workers emit them top-level), then the nested ``structured_output``
+        dict merges over them.
+        """
+        structured: dict[str, str] = {}
+        for key in ("verdict", "verdict_reason", "commit_sha", "task_group"):
+            value = payload.get(key)
+            if value is not None:
+                structured[key] = self._redact(str(value))
         extra = payload.get("structured_output")
-        if not isinstance(extra, dict):
-            return {}
-        return {str(key): self._redact(str(value)) for key, value in extra.items()}
+        if isinstance(extra, dict):
+            for key, value in extra.items():
+                structured[str(key)] = self._redact(str(value))
+        return structured

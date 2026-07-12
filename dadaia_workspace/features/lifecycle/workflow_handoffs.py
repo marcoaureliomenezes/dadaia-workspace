@@ -109,6 +109,14 @@ class WorkflowStepPayloadWriter(Protocol):
         """Return the raw envelope JSON at ``payload_ref``, or ``None`` if absent."""
         ...
 
+    def purge_step_payloads(
+        self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
+    ) -> int:
+        """Reclaim the run's orphaned step-payload zone on RESTART; return files removed.
+
+        *producer_steps* narrows the reclaim to the named steps (resume-from-step)."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Named payload validators (A21 — per output_schema Python validators this release)
@@ -254,6 +262,22 @@ class WorkflowHandoffResolver:
         self._writer = payload_writer
         self._clock = clock
         self._envelope_validator = _load_envelope_validator(schema_root or _default_schema_root())
+
+    # -- restart (bug rerun-of-run-id-collides-with-immutable-payload-zone) ---
+
+    def reset_run_zone(
+        self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
+    ) -> int:
+        """Reclaim *run_id*'s orphaned payload zone before a fresh run replaces the record.
+
+        Called by engines at run-creation time (fragment gate, pipeline, implement/review
+        loop): the replaced run record discards the ledger that addressed these payloads,
+        so the surviving files are unreferenced orphans that would block the new
+        generation's ``attempt-0`` writes. In-run immutability is unchanged.
+        *producer_steps* narrows the reclaim to the named steps (resume-from-step, bug
+        blocked-definition-run-cannot-resume-from-step).
+        """
+        return self._writer.purge_step_payloads(run_id, producer_steps)
 
     # -- produce (A18 / A21) -------------------------------------------------
 

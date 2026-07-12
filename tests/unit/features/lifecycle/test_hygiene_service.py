@@ -112,8 +112,15 @@ def test_status_ttl_policy_workspace_clean_reconciled_and_unknown_dirs_orphan_ha
         encoding="utf-8",
     )
     (handoff_root / "malformed-json.handoff.json").write_text("{not json", encoding="utf-8")
-    (handoff_root / "bad-artifact.handoff.json").write_text(
-        json.dumps({"artifact": {"path": "repos/dadaia-workspace/report.html"}}),
+    # A workspace-relative NON-reports artifact.path is the legitimate handoff-first
+    # contract (a real SPEC/backlog/audit artifact), NOT malformation (bug
+    # malformed-handoff-classifier-rejects-non-report-artifacts).
+    (handoff_root / "real-artifact.handoff.json").write_text(
+        json.dumps({"artifact": {"path": "repos/dadaia-workspace/specs/releases/v1/SPEC.md"}}),
+        encoding="utf-8",
+    )
+    (handoff_root / "absolute-artifact.handoff.json").write_text(
+        json.dumps({"artifact": {"path": "/etc/passwd"}}),
         encoding="utf-8",
     )
     (handoff_root / "traversal-artifact.handoff.json").write_text(

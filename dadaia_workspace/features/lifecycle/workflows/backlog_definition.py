@@ -32,8 +32,9 @@ terminal success advances the run to RELEASE_DEFINITION (the next lifecycle phas
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from pathlib import Path
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
@@ -269,6 +270,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
+        artifact_root: Path | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -286,6 +288,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # the first step (mirroring ``LifecyclePipeline`` / ``LifecyclePhaseWorkflow``). The
         # replace-based run-record helpers preserve it across every Python-step transition.
         self._policy_snapshot = policy_snapshot
+        # Bug gate-accepts-phantom-artifact-evidence: when wired, declared artifact refs
+        # must EXIST under this root or the step BLOCKs.
+        self._artifact_root = artifact_root
 
     # -- public entrypoint ----------------------------------------------
 
@@ -295,10 +300,17 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         demand: BacklogDemand,
         *,
         sequence: tuple[BacklogStep, ...] = _SEQUENCE,
+        operator_demand: str | None = None,
     ) -> BacklogDefinitionResult:
-        """Execute the §4 sequence; stop at the first blocked gate; advance on success."""
+        """Execute the §4 sequence; stop at the first blocked gate; advance on success.
+
+        *operator_demand* is the raw demand text the intake grill exists to interrogate
+        (bug backlog-define-has-no-demand-input-channel); when set it is injected into
+        every model step's prompt as an "## Operator demand" block.
+        """
         if not sequence:
             raise ValueError("backlog-definition workflow requires at least one step")
+        self._operator_demand = operator_demand
         self._prefix = self._prefix_with_static_inputs(sequence)
         run = LifecycleRun(
             run_id=run_id,
@@ -557,9 +569,15 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         audit = self._select_context(step, fragment)
         run = record_injected_context(run, audit)
 
+        selected = self._render_selection(audit)
+        # Bug backlog-define-has-no-demand-input-channel: the raw operator demand IS the
+        # workflow's subject — every model step reasons over it.
+        demand_text = getattr(self, "_operator_demand", None)
+        if demand_text:
+            selected = "\n\n".join(filter(None, (f"## Operator demand\n\n{demand_text}", selected)))
         suffix = build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
-            selected_context=self._render_selection(audit),
+            selected_context=selected,
             # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
             # field) — it emits an artifact, never a self-verdict (D-2 / A4).
             is_review=False,
@@ -567,10 +585,26 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)
         scope = self._scope(step, run.run_id, suffix)
+        if step.label == "backlog_author":
+            # Bug backlog-author-write-scope-excludes-backlog: the author step's whole
+            # job is writing the ADDITIVE specs/backlog item — mirror the bug_report
+            # bug_write step-aware scope (A29) so the real deliverable is in-scope.
+            scope = replace(
+                scope,
+                allowed_paths=(
+                    *scope.allowed_paths,
+                    f"repos/{self._context}/specs/backlog/**",
+                    "specs/backlog/**",
+                ),
+            )
         built = self._prompt_builder.build(
             scope, runtime=runtime.runtime_kind(), prefix=self._prefix
         )
-        runner = LifecycleAgentRunner(runtime=runtime, state_machine=self._state_machine)
+        runner = LifecycleAgentRunner(
+            runtime=runtime,
+            state_machine=self._state_machine,
+            artifact_root=self._artifact_root,
+        )
         blocked = runner.evaluate_gate(
             run,
             AgentRunnerInput(

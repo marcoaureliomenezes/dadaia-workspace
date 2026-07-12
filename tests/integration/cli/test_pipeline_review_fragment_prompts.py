@@ -64,7 +64,14 @@ class _RecordingFake:
         task_id = request.task_id or ""
         label = task_id.rsplit(":", 1)[-1]
         self.captured[label] = request.prompt
-        return _passing_result(label)
+        result = _passing_result(label)
+        # Gate verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
+        for ref in result.artifact_refs:
+            target = Path.cwd() / ref
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('{"fake": true}\n', encoding="utf-8")
+        return result
 
 
 def _install_recording_fake(monkeypatch: pytest.MonkeyPatch) -> _RecordingFake:

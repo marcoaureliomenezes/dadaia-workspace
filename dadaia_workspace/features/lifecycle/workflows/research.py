@@ -134,9 +134,15 @@ class ResearchWorkflow(FragmentGateWorkflow[ResearchStep, ResearchResult]):
     _WORKFLOW_LABEL = "research"
     _INITIAL_PHASE = LifecyclePhase.BACKLOG_DEFINITION
 
-    def run(self, run_id: str, sequence: tuple[ResearchStep, ...] = _SEQUENCE) -> ResearchResult:
+    def run(
+        self,
+        run_id: str,
+        sequence: tuple[ResearchStep, ...] = _SEQUENCE,
+        *,
+        resume_from: str | None = None,
+    ) -> ResearchResult:
         """Execute the sequence; stop at the first blocked gate; complete on success."""
-        return self._run_sequence(run_id, sequence)
+        return self._run_sequence(run_id, sequence, resume_from=resume_from)
 
     def _make_result(
         self,

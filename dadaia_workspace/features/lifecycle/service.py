@@ -447,7 +447,15 @@ class LifecyclePreflightService:
         # cleaner itself protects (current_release_evidence) are NOT reclaimable waste —
         # a gate must never demand deletion of evidence the deleter refuses to delete.
         # Block only on the UNPROTECTED remainder.
-        unprotected = data.hygiene.cleanup_candidate_count - data.hygiene.protected_residual_count
+        # Permission-unreclaimable candidates (root-owned container artifacts) join the
+        # protected residuals on the never-demand side of the gate (bug
+        # preflight-hygiene-gate-demands-root-owned-deletions): the cleaner cannot
+        # delete them, so blocking on them makes the remediation loop unsatisfiable.
+        unprotected = (
+            data.hygiene.cleanup_candidate_count
+            - data.hygiene.protected_residual_count
+            - data.hygiene.unreclaimable_count
+        )
         if unprotected > 0:
             return self._blocked(
                 data,

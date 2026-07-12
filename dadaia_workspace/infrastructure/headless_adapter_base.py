@@ -138,13 +138,10 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
     object form was silently dropped → empty refs → a real review/create step BLOCKed on
     "missing artifact evidence".)
 
-    FR2 (bug: lifecycle-agent-run-result-extraction-too-strict): when the list-based
-    extraction above yields NOTHING, fall back to a singular ``payload["artifact"]["path"]``
-    as a one-element tuple — a real worker that emits a single ``artifact`` object instead
-    of an ``artifact_refs`` list genuinely reported one produced artifact. The fallback is
-    checked ONLY when ``paths`` is still empty after the list-based pass, so a populated
-    ``artifact_refs`` list always wins (AC2.3) — this never turns "nothing emitted" into
-    "something accepted": a payload with neither a populated list nor a well-formed
+    A well-formed singular ``payload["artifact"]["path"]`` MERGES into the refs
+    (deduped) — additional declared evidence, not a fallback (bug
+    artifact-path-discarded-when-refs-list-present; supersedes the v0.1.66 FR2
+    fallback-only rule). A payload with neither a populated list nor a well-formed
     ``artifact.path`` still yields ``()``, preserving the no-op-worker BLOCK invariant.
     """
     raw = payload.get("artifact_refs")
@@ -157,14 +154,59 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
                 path = item.get("path")
                 if isinstance(path, str) and path.strip():
                     paths.append(path)
-    if paths:
-        return tuple(paths)
+    # Bug artifact-path-discarded-when-refs-list-present: a well-formed singular
+    # ``artifact.path`` is ADDITIONAL declared evidence, merged (deduped) into the refs
+    # — not a fallback discarded whenever the list is populated. Real workers emit the
+    # deliverable in ``artifact.path`` and the handoff in ``artifact_refs``; dropping
+    # the former made the deliverable-zone gate block a compliant worker. Both-empty
+    # still yields ``()`` — the no-op-worker BLOCK invariant is untouched.
     artifact = payload.get("artifact")
     if isinstance(artifact, dict):
         path = artifact.get("path")
-        if isinstance(path, str) and path.strip():
-            return (path,)
-    return ()
+        if isinstance(path, str) and path.strip() and path not in paths:
+            paths.append(path)
+    # Fourth real shape (bug
+    # result-contract-drops-singular-artifact-ref-and-changed-paths-list): a singular
+    # ``artifact_ref`` string, observed live from a compliant codex implementation.
+    singular = payload.get("artifact_ref")
+    if isinstance(singular, str) and singular.strip() and singular not in paths:
+        paths.append(singular)
+    return tuple(paths)
+
+
+def derive_result_summary(payload: dict[str, object]) -> str | None:
+    """Best substantive one-line summary from a result payload — single-sourced for pi+codex.
+
+    Prefers an explicit non-empty ``summary``; otherwise falls back to the first
+    ``findings[].message`` (real workers routinely emit findings with no top-level
+    summary — bug step-payload-drops-worker-findings showed the generic adapter default
+    replacing actual content). Returns ``None`` when neither exists.
+    """
+    summary = payload.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        return summary.strip()
+    findings = payload.get("findings")
+    if isinstance(findings, list):
+        for finding in findings:
+            if isinstance(finding, dict):
+                message = finding.get("message")
+                if isinstance(message, str) and message.strip():
+                    return message.strip()
+    return None
+
+
+def findings_json(payload: dict[str, object]) -> str | None:
+    """JSON-encode a result payload's ``findings`` list for the flat structured-output map.
+
+    ``AgentRunResult.structured_output`` is a ``dict[str, str]``; the findings survive as
+    one JSON-encoded entry (key ``"findings"``) so the engine's step-payload writer can
+    re-parse and persist them (bug step-payload-drops-worker-findings). Returns ``None``
+    when the payload carries no non-empty findings list.
+    """
+    findings = payload.get("findings")
+    if isinstance(findings, list) and findings:
+        return json.dumps(findings, sort_keys=True)
+    return None
 
 
 def extract_result_payload(text: str, expected_schema: str | None) -> dict[str, object] | None:
@@ -241,6 +283,13 @@ class ChangedPathsMixin:
         if self._git is None:
             return result
         changed = self._git.diff_name_only(self._cwd_for_diff)
+        if not changed:
+            # An empty diff must not clobber a worker-reported changed_paths with ""
+            # (bug result-contract-drops-singular-artifact-ref-and-changed-paths-list):
+            # the diff root is the run cwd (typically the WORKSPACE root, which is not
+            # the context's git repo), so an empty answer is structurally blind, not
+            # proof of a no-op. Git truth still wins whenever it actually sees changes.
+            return result
         structured = dict(result.structured_output)
         structured["changed_paths"] = ",".join(changed)
         return AgentRunResult(
@@ -339,3 +388,63 @@ class SubprocessAdapterMixin(RedactionMixin, ChangedPathsMixin):
         positive proof (C3) that ``pi_runtime`` and ``codex_runtime`` cannot diverge.
         """
         return extract_result_payload(text, expected_schema)
+
+
+def changed_paths_csv(payload: dict[str, object]) -> str | None:
+    """Comma-joined top-level ``changed_paths`` list from a result payload, or ``None``.
+
+    Real workers emit ``changed_paths`` as a top-level JSON array (bug
+    result-contract-drops-singular-artifact-ref-and-changed-paths-list); the engine's
+    changed-path detection reads ``structured_output["changed_paths"]`` as a comma
+    string, so the adapters fold the list into that slot when it is not already set.
+    """
+    raw = payload.get("changed_paths")
+    if isinstance(raw, list):
+        items = [item.strip() for item in raw if isinstance(item, str) and item.strip()]
+        if items:
+            return ",".join(items)
+    return None
+
+
+_HANDOFF_REF_RE = re.compile(r"(?P<ref>(?:\.dadaia/handoff/)[^\s`'\")\]]+\.handoff\.json)")
+
+
+def salvage_result_from_handoff(text: str, workspace_root: Path) -> dict[str, object] | None:
+    """Rebuild a result payload from an on-disk handoff a prose message names.
+
+    Bug prose-worker-with-valid-handoff-loses-verdict: GPT workers intermittently emit a
+    VALID handoff file and then answer in prose instead of the result JSON object. The
+    handoff IS the deliverable (handoff-first law), so when inline extraction fails the
+    adapters call this: the first ``.dadaia/handoff/...*.handoff.json`` ref named in the
+    message that EXISTS workspace-relative and parses as a JSON dict yields a payload
+    ``{artifact_refs: [ref], verdict?, verdict_reason?, summary?, findings?}`` lifted
+    from that handoff. No named ref / missing file / unparseable ⇒ ``None`` — the
+    no-op-worker BLOCK invariant is untouched (the gate's existence check re-verifies
+    the ref either way).
+    """
+    for match in _HANDOFF_REF_RE.finditer(text or ""):
+        ref = match.group("ref")
+        target = workspace_root / ref
+        if not target.is_file():
+            continue
+        try:
+            doc = json.loads(target.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(doc, dict):
+            continue
+        payload: dict[str, object] = {"artifact_refs": [ref]}
+        verdict = doc.get("verdict")
+        if isinstance(verdict, str) and verdict.strip():
+            payload["verdict"] = verdict.strip()
+            reason = doc.get("verdict_reason")
+            if isinstance(reason, str) and reason.strip():
+                payload["verdict_reason"] = reason.strip()
+        summary = derive_result_summary(doc)
+        if summary:
+            payload["summary"] = summary
+        findings = doc.get("findings")
+        if isinstance(findings, list) and findings:
+            payload["findings"] = findings
+        return payload
+    return None

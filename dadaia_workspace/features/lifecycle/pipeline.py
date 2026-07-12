@@ -11,6 +11,7 @@ and persists progress at every step (resumable).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import Field, dataclass, replace
 from pathlib import Path
@@ -187,6 +188,7 @@ class LifecyclePipeline:
         max_review_retries: int = 2,
         specs_dir: Path | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        artifact_root: Path | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -200,6 +202,9 @@ class LifecyclePipeline:
         # persists its diagnostic under the run's step-artifact zone. ``None`` (the default,
         # every pre-existing fixture pipeline) keeps behavior byte-identical.
         self._runtime_files = runtime_files
+        # Bug gate-accepts-phantom-artifact-evidence: when wired (production builders pass
+        # the workspace root), declared artifact refs must EXIST or the step BLOCKs.
+        self._artifact_root = artifact_root
         # Workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-06). Drives the
         # implement/review attempt ledger so ``implement#2`` consumes the EXACT ``qa#1``
         # rejection by (run, producer step, attempt) — never qa#0 / latest-by-filename.
@@ -255,6 +260,11 @@ class LifecyclePipeline:
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
         if not steps:
             raise ValueError("pipeline requires at least one step")
+        # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
+        # replacing the run record discards its ledger, so reclaim the orphaned payload
+        # zone before the new generation's attempt-0 writes.
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(run_id)
         run = LifecycleRun(
             run_id=run_id,
             context=self._context,
@@ -284,6 +294,7 @@ class LifecyclePipeline:
                 runtime=runtime,
                 state_machine=self._state_machine,
                 runtime_files=self._runtime_files,
+                artifact_root=self._artifact_root,
             )
             # v0.1.78 T-B / FR-B: run the worker ONCE and get back both the phase-transition
             # decision AND the raw result — the latter is what lets this ladder produce a
@@ -371,6 +382,17 @@ class LifecyclePipeline:
         else:
             output_schema = "generic-step-handoff-v1"
             payload = {"summary": result.summary or f"{step.label} complete"}
+        # Bug step-payload-drops-worker-findings: substantive worker output survives.
+        findings_raw = result.structured_output.get("findings")
+        if isinstance(findings_raw, str) and findings_raw.strip():
+            try:
+                findings = json.loads(findings_raw)
+            except json.JSONDecodeError:
+                findings = None
+            if isinstance(findings, list) and findings:
+                payload["findings"] = findings
+        if result.artifact_refs:
+            payload["artifact_refs"] = list(result.artifact_refs)
         run, _record = self._handoff_resolver.produce(
             run,
             producer_step=step.label,
@@ -403,6 +425,8 @@ class LifecyclePipeline:
         if self._handoff_resolver is None:
             raise ValueError("run_implement_review_loop requires a wired handoff_resolver")
         resolver = self._handoff_resolver
+        # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone).
+        resolver.reset_run_zone(run_id)
 
         run = LifecycleRun(
             run_id=run_id,
@@ -579,6 +603,7 @@ class LifecyclePipeline:
             runtime=runtime,
             state_machine=self._state_machine,
             runtime_files=self._runtime_files,
+            artifact_root=self._artifact_root,
         )
         return runner.evaluate_gate_with_result(
             run,

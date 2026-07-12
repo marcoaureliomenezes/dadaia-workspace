@@ -306,3 +306,101 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
             f"{module.__name__} dropped its module-global _SEQUENCE"
         )
         assert module._SEQUENCE, f"{module.__name__}._SEQUENCE is empty"
+
+
+# ---------------------------------------------------------------------------
+# resume_from — bug blocked-definition-run-cannot-resume-from-step
+# ---------------------------------------------------------------------------
+
+
+class _RejectOnceFake(_ScopeFake):
+    """REJECTs the named review step until ``approve`` flips; approves everything else."""
+
+    def __init__(self, reject_label: str) -> None:
+        super().__init__()
+        self.reject_label = reject_label
+        self.approve = False
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        result = super().run(request)
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        if label == self.reject_label and not self.approve:
+            return replace(
+                result, structured_output={"verdict": "REJECTED", "verdict_reason": "fix spec"}
+            )
+        return result
+
+
+def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
+    """A REJECTED mid-sequence review resumes from that step: upstream steps are NOT
+    re-run, their ledger payloads survive, and the resumed run completes."""
+    specs = _seed(tmp_path)
+    fake = _RejectOnceFake("cs_review")
+    resolver = _resolver(tmp_path)
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        context_selector=_selector(specs, tmp_path),
+        handoff_resolver=resolver,
+    )
+    custom = (
+        ReleaseStep(
+            label="cs_a",
+            role="product-engineer",
+            fragment_id="release_definition.release_scope",
+            produces="release-scope-handoff-v1",
+        ),
+        ReleaseStep(
+            label="cs_review",
+            role="qa-engineer",
+            fragment_id="release_definition.spec_review_qa",
+            is_review=True,
+            produces="spec-review-handoff-v1",
+        ),
+        ReleaseStep(label="cs_gate", role="python", fragment_id=None),
+    )
+
+    first = wf.run("resume-run", sequence=custom)
+    assert first.completed is False
+    assert first.blocked is not None and first.blocked.blocked_at_step == "cs_review"
+    calls_after_first = len(fake.received_requests)
+    assert calls_after_first == 2  # cs_a + cs_review ran
+
+    fake.approve = True
+    resumed = wf.run("resume-run", sequence=custom, resume_from="cs_review")
+
+    assert resumed.completed is True
+    # Only cs_review re-ran — cs_a was NOT re-executed.
+    assert len(fake.received_requests) == calls_after_first + 1
+    run = JsonLifecycleRunStore(tmp_path).load("resume-run")
+    assert run is not None
+    # The kept upstream ledger record AND the re-run review record both exist.
+    assert run.workflow_steps.find("cs_a", 0) is not None
+    assert run.workflow_steps.find("cs_review", 0) is not None
+
+
+def test_resume_from_unknown_step_or_missing_run_raises(tmp_path: Path) -> None:
+    specs = _seed(tmp_path)
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ScopeFake(),  # type: ignore[arg-type,return-value]
+        context_selector=_selector(specs, tmp_path),
+        handoff_resolver=_resolver(tmp_path),
+    )
+    custom = (
+        ReleaseStep(
+            label="cs_a",
+            role="product-engineer",
+            fragment_id="release_definition.release_scope",
+            produces="release-scope-handoff-v1",
+        ),
+        ReleaseStep(label="cs_gate", role="python", fragment_id=None),
+    )
+    with pytest.raises(ValueError, match="not in the"):
+        wf.run("never-ran", sequence=custom, resume_from="ghost_step")
+    with pytest.raises(ValueError, match="no persisted run"):
+        wf.run("never-ran", sequence=custom, resume_from="cs_a")

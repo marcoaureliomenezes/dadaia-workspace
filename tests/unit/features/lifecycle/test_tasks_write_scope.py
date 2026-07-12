@@ -392,3 +392,39 @@ def test_write_scope_from_tasks_end_to_end_rejects_traversal_write_set(tmp_path:
 """,
     )
     assert write_scope_from_tasks(tmp_path, _RELEASE) == ("foo/bar.py",)
+
+
+def test_engine_authored_grammar_standalone_bold_key_bullet_list(tmp_path: Path) -> None:
+    """Third real grammar — the engine's OWN tasks_create output (bug
+    write-scope-parser-rejects-own-tasks-grammar): standalone '**Write set:**'
+    paragraph, blank line, then a bullet list of backticked paths."""
+    _write_tasks(
+        tmp_path,
+        """# TASKS
+
+### [-] T-01 - Scaffold standalone
+
+**Owner:** game-developer
+
+**Write set:**
+
+- `corrida/index.html`
+- `corrida/game.js`
+- `corrida/README.md`
+
+**Descricao:**
+
+Criar a pasta.
+
+### [ ] T-02 - Outra task
+
+**Write set:**
+
+- `corrida/track.js`
+""",
+    )
+    assert write_scope_from_tasks(tmp_path, _RELEASE) == (
+        "corrida/index.html",
+        "corrida/game.js",
+        "corrida/README.md",
+    )

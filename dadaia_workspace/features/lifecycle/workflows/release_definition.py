@@ -23,6 +23,7 @@ IMPLEMENTATION only when every prior gate passed and the workflow-step handoff g
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
@@ -63,6 +64,10 @@ class ReleaseStep:
     # the adapter runs the policy-selected model. Additive-optional, mirroring ``PipelineStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
+    # Step-declared write paths beyond the handoff zone (bug
+    # release-definition-create-steps-cannot-write-specs). Placeholders {context} and
+    # {release_id} are expanded by the shared ``_scope``.
+    extra_allowed_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -115,6 +120,12 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
             "shared.memory_selection",
         ),
         produces="generic-step-handoff-v1",
+        extra_allowed_paths=(
+            "repos/{context}/specs/releases/{release_id}/**",
+            "specs/releases/{release_id}/**",
+            "repos/{context}/specs/releases/ACTIVE.md",
+            "specs/releases/ACTIVE.md",
+        ),
         consumes=("release_scope",),
     ),
     ReleaseStep(
@@ -152,6 +163,12 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
             "shared.memory_selection",
         ),
         produces="generic-step-handoff-v1",
+        extra_allowed_paths=(
+            "repos/{context}/specs/releases/{release_id}/**",
+            "specs/releases/{release_id}/**",
+            "repos/{context}/specs/releases/ACTIVE.md",
+            "specs/releases/ACTIVE.md",
+        ),
         consumes=("spec_create",),
     ),
     ReleaseStep(
@@ -177,6 +194,12 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
             "shared.memory_selection",
         ),
         produces="generic-step-handoff-v1",
+        extra_allowed_paths=(
+            "repos/{context}/specs/releases/{release_id}/**",
+            "specs/releases/{release_id}/**",
+            "repos/{context}/specs/releases/ACTIVE.md",
+            "specs/releases/ACTIVE.md",
+        ),
         consumes=("plan_create",),
     ),
     ReleaseStep(
@@ -213,10 +236,43 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     _TERMINAL_PHASE = LifecyclePhase.IMPLEMENTATION
 
     def run(
-        self, run_id: str, sequence: tuple[ReleaseStep, ...] = _SEQUENCE
+        self,
+        run_id: str,
+        sequence: tuple[ReleaseStep, ...] = _SEQUENCE,
+        *,
+        resume_from: str | None = None,
     ) -> ReleaseDefinitionResult:
         """Execute the sequence; stop at the first blocked gate; advance on success."""
-        return self._run_sequence(run_id, sequence)
+        return self._run_sequence(run_id, sequence, resume_from=resume_from)
+
+    #: Review-gate label → the SDD artifact it approves (bug
+    #: approved-review-never-flips-artifact-status). ``spec_qa_review`` is the LAST of
+    #: the two SPEC gates in the sequence, so the flip lands only when both passed.
+    _STATUS_FLIP_BY_REVIEW: ClassVar[dict[str, str]] = {
+        "spec_qa_review": "SPEC.md",
+        "plan_review": "PLAN.md",
+        "tasks_implementability_review": "TASKS.md",
+    }
+
+    def _on_step_accepted(self, step: ReleaseStep) -> None:
+        """Flip the reviewed artifact's canonical Status token to ``Aprovado``.
+
+        Deterministic Python, not model output: the workflow's own review gate IS the
+        approval authority, so the canonical ``> **Status:**`` token must reflect it —
+        otherwise downstream workers correctly refuse to build on a Draft artifact.
+        """
+        filename = self._STATUS_FLIP_BY_REVIEW.get(step.label)
+        if filename is None:
+            return
+        path = self._selector.spec_context.specs_dir / "releases" / self._release_id / filename
+        if not path.is_file():
+            return
+        text = path.read_text(encoding="utf-8")
+        for token in ("Draft", "Em revisão", "Em revisao"):
+            marker = f"> **Status:** {token}"
+            if marker in text:
+                path.write_text(text.replace(marker, "> **Status:** Aprovado", 1), encoding="utf-8")
+                return
 
     def _make_result(
         self,

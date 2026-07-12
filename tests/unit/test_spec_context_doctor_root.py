@@ -83,6 +83,10 @@ def test_root1_block_table(tmp_path: Path, name: str, setup_fn: object) -> None:
         # `.pi/` (PI Layer-2 harness home) does not trigger ROOT-1.
         ("pi_dir", lambda tp: (tp / ".pi").mkdir(exist_ok=True)),
         (".gitignore", lambda tp: (tp / ".gitignore").write_text("*.pyc\n")),
+        # Root-law-allowed files need NO exception list (bug
+        # doctor-root-whitelist-contradicts-root-law).
+        ("claude_bridge", lambda tp: (tp / "CLAUDE.md").write_text("@AGENTS.md")),
+        ("operator_prompt", lambda tp: (tp / "prompt.md").write_text("# notes")),
         (
             "operator_exception_exact",
             lambda tp: (
@@ -182,10 +186,12 @@ def test_root3_table(tmp_path: Path) -> None:
     assert "ROOT-3" in codes_mcp
     (tmp_path / ".mcp.json").unlink()
 
-    # CLAUDE.md at root triggers ROOT-3.
-    (tmp_path / "CLAUDE.md").write_text("# stub")
+    # CLAUDE.md at root is root-law-allowed (required Claude bridge) — no ROOT-3 WARN;
+    # its ROOT-1 cleanliness is covered by the allow-table above (bug
+    # doctor-root-whitelist-contradicts-root-law).
+    (tmp_path / "CLAUDE.md").write_text("@AGENTS.md")
     codes_claude = {i.code for i in _make_doctor(tmp_path).check()}
-    assert "ROOT-3" in codes_claude
+    assert "ROOT-3" not in codes_claude
     (tmp_path / "CLAUDE.md").unlink()
 
     # Tool config present in root_exceptions.txt does not trigger ROOT-3.

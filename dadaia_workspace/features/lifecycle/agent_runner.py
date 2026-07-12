@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -117,6 +118,11 @@ class AgentRunnerInput:
     requirements: tuple[GateRequirement, ...] = ()
     resume_token: str | None = None
     current_step: str | None = None
+    # Deliverable-zone globs (bug create-step-gate-accepts-refusal-handoff-as-success):
+    # when non-empty, at least one artifact ref or changed path must fall INSIDE this
+    # zone or the gate BLOCKs — a step whose worker only wrote an explanatory handoff
+    # never counts as having delivered.
+    deliverable_globs: tuple[str, ...] = ()
     # Whether this is a REVIEW step (v0.1.31 / L1). The verdict gate
     # (``structured_output["verdict"] == "APPROVED"``) applies ONLY to review steps. A
     # create step (``is_review=False``) passes on a schema-valid payload — which is what
@@ -134,9 +140,16 @@ class LifecycleAgentRunner:
         runtime: AgentRuntimePort,
         state_machine: LifecycleStateMachine | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        artifact_root: Path | None = None,
     ) -> None:
         self._runtime = runtime
         self._state_machine = state_machine or LifecycleStateMachine()
+        # Bug gate-accepts-phantom-artifact-evidence: when injected (production builders
+        # pass the workspace root), every declared artifact ref must EXIST under this
+        # root or the step BLOCKs — a fabricated ref (e.g. a read-only-sandbox worker
+        # that "declared" a handoff it never wrote) is fake evidence, worse than none.
+        # ``None`` (unit fixtures) keeps behavior byte-identical.
+        self._artifact_root = artifact_root
         # v0.1.78 T-D / FR-D: additive-optional run-artifact writer. When injected, a
         # worker attempt that ends blocked-for-noncompliance AND carries a
         # ``result.diagnostic`` persists it under the run's step-artifact zone and
@@ -271,6 +284,30 @@ class LifecycleAgentRunner:
                 detail={"out_of_scope": ",".join(out_of_scope)},
                 result=result,
             )
+        if self._artifact_root is not None:
+            missing = [
+                ref for ref in result.artifact_refs if not (self._artifact_root / ref).exists()
+            ]
+            if missing:
+                return self._blocked(
+                    lifecycle_run,
+                    data,
+                    "agent result references nonexistent artifact(s)",
+                    detail={"missing_artifacts": ",".join(missing)},
+                    result=result,
+                )
+        if data.deliverable_globs and self._artifact_root is not None:
+            candidates = (*result.artifact_refs, *self._changed_paths(result))
+            outside = out_of_scope_paths(candidates, allowed=data.deliverable_globs, forbidden=())
+            delivered = [path for path in candidates if path not in set(outside)]
+            if not delivered:
+                return self._blocked(
+                    lifecycle_run,
+                    data,
+                    "agent result carries no deliverable in the step's declared zone",
+                    detail={"deliverable_zone": ",".join(data.deliverable_globs)},
+                    result=result,
+                )
         return None
 
     def _blocked(

@@ -148,9 +148,15 @@ class BugReportWorkflow(FragmentGateWorkflow[BugReportStep, BugReportResult]):
     _WORKFLOW_LABEL = "bug_report"
     _INITIAL_PHASE = LifecyclePhase.BACKLOG_DEFINITION
 
-    def run(self, run_id: str, sequence: tuple[BugReportStep, ...] = _SEQUENCE) -> BugReportResult:
+    def run(
+        self,
+        run_id: str,
+        sequence: tuple[BugReportStep, ...] = _SEQUENCE,
+        *,
+        resume_from: str | None = None,
+    ) -> BugReportResult:
         """Execute the sequence; stop at the first blocked gate; complete on success."""
-        return self._run_sequence(run_id, sequence)
+        return self._run_sequence(run_id, sequence, resume_from=resume_from)
 
     def _scope(self, step: AssemblyStep, run_id: str, suffix: str) -> PromptScope:
         """Build the per-step worker scope, special-casing the ADDITIVE ``bug_write`` step.

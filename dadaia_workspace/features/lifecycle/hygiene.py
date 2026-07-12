@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import fnmatch
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
@@ -299,10 +300,12 @@ class LifecycleHygieneService:
         zone_totals: dict[HygieneZone, int] = {}
         expired_totals: dict[HygieneZone, int] = {}
 
+        unreclaimable_total = 0
         for zone in self._policy.safe_zones:
-            total, expired = self._zone_counts(zone)
+            total, expired, unreclaimable = self._zone_counts(zone)
             zone_totals[zone] = total
             expired_totals[zone] = expired
+            unreclaimable_total += unreclaimable
 
         orphan_handoffs, malformed_handoffs = self._handoff_semantic_counts()
         protected_paths = self._protected_paths()
@@ -316,6 +319,7 @@ class LifecycleHygieneService:
             unknown_top_level_dirs=self._unknown_top_level_dirs(),
             cleanup_candidate_count=cleanup_candidates,
             protected_residual_count=self._protected_residual_count(protected_paths),
+            unreclaimable_count=unreclaimable_total,
             scan_elapsed_ms=elapsed,
         )
 
@@ -480,14 +484,22 @@ class LifecycleHygieneService:
                 pruned.append(directory)
         return pruned
 
-    def _zone_counts(self, zone: HygieneZone) -> tuple[int, int]:
+    def _zone_counts(self, zone: HygieneZone) -> tuple[int, int, int]:
+        """Return ``(total, expired, unreclaimable)`` for the zone.
+
+        ``unreclaimable`` counts expired files the cleaner cannot legally delete
+        (parent directory not writable by this user — e.g. root-owned container
+        artifacts). The preflight hygiene gate must not demand their deletion (bug
+        preflight-hygiene-gate-demands-root-owned-deletions; v0.1.72 law).
+        """
         zone_dir = self._dadaia_root / zone.value
         if not zone_dir.is_dir():
-            return 0, 0
+            return 0, 0, 0
         zone_root = zone_dir.resolve()
         cutoff = self._clock() - dt.timedelta(seconds=self._policy.ttl_for(zone))
         total = 0
         expired = 0
+        unreclaimable = 0
         for path in zone_dir.rglob("*"):
             if not path.is_file() or not self._is_under_resolved(path, zone_root):
                 continue
@@ -495,7 +507,9 @@ class LifecycleHygieneService:
             mtime = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
             if mtime < cutoff:
                 expired += 1
-        return total, expired
+                if not os.access(path.parent, os.W_OK):
+                    unreclaimable += 1
+        return total, expired, unreclaimable
 
     def _unknown_top_level_dirs(self) -> tuple[str, ...]:
         if not self._dadaia_root.is_dir():
@@ -537,7 +551,25 @@ class LifecycleHygieneService:
             if not isinstance(artifact_path, str):
                 malformed += 1
                 continue
-            report_path = self._valid_report_artifact_path(artifact_path)
+            # Bug malformed-handoff-classifier-rejects-non-report-artifacts: a
+            # handoff-v1.2 artifact.path may name the REAL artifact (a SPEC.md, a
+            # backlog item, an audit) anywhere workspace-relative — that is the
+            # handoff-first contract, not malformation. Malformed = structurally
+            # broken paths only (empty, absolute, traversal). The reports-zone
+            # orphan check applies only to paths that claim the reports zone.
+            stripped = artifact_path.strip()
+            raw = Path(stripped) if stripped else None
+            if (
+                raw is None
+                or PurePosixPath(stripped).is_absolute()
+                or PureWindowsPath(stripped).is_absolute()
+                or ".." in raw.parts
+            ):
+                malformed += 1
+                continue
+            if raw.parts[:2] != (".dadaia", "reports"):
+                continue
+            report_path = self._valid_report_artifact_path(stripped)
             if report_path is None:
                 malformed += 1
                 continue

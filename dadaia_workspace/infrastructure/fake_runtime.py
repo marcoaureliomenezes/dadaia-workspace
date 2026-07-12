@@ -10,6 +10,7 @@ with no real harness. Tests that need a specific result inject their own via
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -35,9 +36,15 @@ class FakeAgentRuntime:
         *,
         result: AgentRunResult | None = None,
         on_run: Callable[[AgentRunRequest], None] | None = None,
+        materialize_root: Path | None = None,
     ) -> None:
         self._result = result
         self._on_run = on_run
+        # Bug gate-accepts-phantom-artifact-evidence: the structural gate now verifies
+        # declared artifact refs EXIST. A driving fake (production ``--harness fake``
+        # factories) sets this to the run root so its canned refs are materialized as
+        # real stub files — fake runs stay honest under the same gate as real workers.
+        self._materialize_root = materialize_root
         self.received_requests: list[AgentRunRequest] = []
 
     @property
@@ -64,6 +71,15 @@ class FakeAgentRuntime:
         if self._on_run is not None:
             self._on_run(request)
         if self._result is not None:
+            if self._materialize_root is not None:
+                for ref in self._result.artifact_refs:
+                    target = self._materialize_root / ref
+                    if not target.exists():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(
+                            '{"fake": true, "summary": "driving-fake stub artifact"}\n',
+                            encoding="utf-8",
+                        )
             return self._result
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,

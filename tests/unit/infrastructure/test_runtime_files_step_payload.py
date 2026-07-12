@@ -102,3 +102,39 @@ def test_write_step_payload_and_read_matrix(tmp_path: Path, case: str) -> None:
             adapter.read_step_payload(".dadaia/runs/lifecycle/run-1/steps/ghost.step-payload.json")
             is None
         )
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "purge-reclaims-zone-and-allows-attempt-0-rewrite",
+        "purge-missing-zone-returns-zero",
+        "purge-spares-non-payload-files",
+        "purge-rejects-traversal-in-run-id",
+    ],
+)
+def test_purge_step_payloads_matrix(tmp_path: Path, case: str) -> None:
+    """Restart reclaim (bug rerun-of-run-id-collides-with-immutable-payload-zone)."""
+    adapter = FilesystemRuntimeFileAdapter(tmp_path)
+
+    if case == "purge-reclaims-zone-and-allows-attempt-0-rewrite":
+        adapter.write_step_payload(run_id="run-1", producer_step="qa", attempt=0, content="a")
+        adapter.write_step_payload(run_id="run-1", producer_step="impl", attempt=0, content="b")
+        assert adapter.purge_step_payloads("run-1") == 2
+        # The reclaimed key is writable again — restart is a new generation.
+        ref = adapter.write_step_payload(run_id="run-1", producer_step="qa", attempt=0, content="c")
+        assert adapter.read_step_payload(ref.payload_ref) == "c"
+
+    elif case == "purge-missing-zone-returns-zero":
+        assert adapter.purge_step_payloads("never-ran") == 0
+
+    elif case == "purge-spares-non-payload-files":
+        adapter.write_step_payload(run_id="run-1", producer_step="qa", attempt=0, content="a")
+        stray = tmp_path / ".dadaia" / "runs" / "lifecycle" / "run-1" / "steps" / "note.txt"
+        stray.write_text("keep me")
+        assert adapter.purge_step_payloads("run-1") == 1
+        assert stray.exists()
+
+    else:  # purge-rejects-traversal-in-run-id
+        with pytest.raises(RuntimeFilePathError):
+            adapter.purge_step_payloads("../escape")

@@ -147,6 +147,10 @@ class HygieneCounters:
     unknown_top_level_dirs: tuple[str, ...] = ()
     cleanup_candidate_count: int = 0
     protected_residual_count: int = 0
+    #: Expired candidates the cleaner cannot delete (parent not user-writable) — an
+    #: OPERATOR advisory, never a preflight block (bug
+    #: preflight-hygiene-gate-demands-root-owned-deletions).
+    unreclaimable_count: int = 0
     scan_elapsed_ms: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -158,6 +162,7 @@ class HygieneCounters:
             "unknown_top_level_dirs": list(self.unknown_top_level_dirs),
             "cleanup_candidate_count": self.cleanup_candidate_count,
             "protected_residual_count": self.protected_residual_count,
+            "unreclaimable_count": self.unreclaimable_count,
             "scan_elapsed_ms": self.scan_elapsed_ms,
         }
 
@@ -181,6 +186,7 @@ class HygieneCounters:
             malformed_handoff_count=_required_int(data.get("malformed_handoff_count", 0)),
             unknown_top_level_dirs=tuple(str(item) for item in unknown_dirs),
             cleanup_candidate_count=_required_int(data.get("cleanup_candidate_count", 0)),
+            unreclaimable_count=_required_int(data.get("unreclaimable_count", 0)),
             protected_residual_count=_required_int(data.get("protected_residual_count", 0)),
             scan_elapsed_ms=_optional_int(data.get("scan_elapsed_ms")),
         )

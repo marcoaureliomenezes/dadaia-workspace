@@ -59,6 +59,23 @@ class _FakeWriter:
     def read_step_payload(self, payload_ref: str) -> str | None:
         return self.files.get(payload_ref)
 
+    def purge_step_payloads(
+        self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
+    ) -> int:
+        zone = f".dadaia/runs/lifecycle/{run_id}/steps/"
+        doomed = [
+            ref
+            for ref in self.files
+            if ref.startswith(zone)
+            and (
+                producer_steps is None
+                or ref.rsplit("/", 1)[-1].rsplit("-attempt-", 1)[0] in producer_steps
+            )
+        ]
+        for ref in doomed:
+            del self.files[ref]
+        return len(doomed)
+
 
 _T = "2026-06-27T12:00:00Z"
 

@@ -58,8 +58,11 @@ _ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
     {".agents", ".claude", ".codex", ".dadaia", ".pi", "repos"}
 )
 
-#: Files allowed at workspace root (exact names, no wildcards).
-_ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md"})
+#: Files allowed at workspace root (exact names, no wildcards). Mirrors the Workspace
+#: Root Law and ``hooks/root_whitelist.py``: ``CLAUDE.md`` is the required Claude Code
+#: bridge, ``prompt.md`` the optional operator long-prompt file (bug
+#: doctor-root-whitelist-contradicts-root-law).
+_ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "prompt.md"})
 
 #: Caches and tool outputs that are forbidden at workspace root (ROOT-2).
 #: These are safe to delete — they regenerate.
@@ -76,8 +79,9 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 )
 
 #: Tool config files that have canonical homes elsewhere but are currently
-#: tolerated at root with a WARN (ROOT-3, lenient).
-_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json", "CLAUDE.md"})
+#: tolerated at root with a WARN (ROOT-3, lenient). ``CLAUDE.md`` is NOT here — it is
+#: root-law-allowed (see ``_ROOT_ALLOWED_FILES``).
+_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 
 #: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
