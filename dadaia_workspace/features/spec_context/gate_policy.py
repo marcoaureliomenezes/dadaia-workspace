@@ -1,36 +1,8 @@
-"""Path-classifier + decision policy for the SDD gate (single source of truth).
+"""Path classifier and decision policy for the merged SDD PreToolUse gate.
 
-The enforced gate is the Python hook package ``dadaia_workspace.hooks``. Since
-v0.1.14 (FR-W4-01) a SINGLE merged PreToolUse entrypoint ``pre_gate`` reads stdin
-once and runs the registered policies in order (root-whitelist → venv-guard → SDD
-gate); the standalone ``sdd_gate`` / ``root_whitelist`` entrypoints retain their
-``main()`` one release for back-compat but their pure ``evaluate_payload`` policy
-surfaces are what ``pre_gate`` reuses. ``sdd_post_gate`` (PostToolUse heartbeat) and
-``ctx_inject`` (session bootstrap) stay separate. All are wired as ``<python> -m
-dadaia_workspace.hooks.<name>`` commands across every harness (Claude
-``settings.json``, Codex ``hooks.json``). The legacy bash hook quartet was retired in
-v0.1.10 (Decision D-1); the only remaining shell asset is
-``public/scripts/pre-push-ci-gate.sh`` (a real git hook, deliberately shell).
-
-This module is the gate's path-classifier and decision policy: the fail-safe
-property table (AC-04) and the activity-class exemption matrix (AC-05) are
-unit-tested against it, and ``hooks.sdd_gate`` delegates here so there is no
-second classifier implementation to keep in byte-parity.
-
-NO-LOCKS DOCTRINE (v0.1.76, SPEC ``specs/releases/v0.1.76/SPEC.md``, backlog
-``lock-lease-session-identity-kernel``): races between sessions are ACCEPTED and
-SURFACED, never prevented. For the MUTATING class the gate is no longer an acquisition
-point — it never calls ``lease.acquire`` and can never BLOCK on another session. It
-upserts an advisory :mod:`presence` record and, when another live session's presence
-is visible on the same context, ALLOWS with a one-line advisory warning (throttled).
-``lease.py`` itself is untouched by this module (T-3 removes its blocking machinery);
-this module simply stopped being one of its callers.
-
-The PROTECTED class (SEC-01, F-07) is the sole fail-CLOSED path: writes to
-``.dadaia/sessions/`` (the CLI-owned lease-identity store) are blocked unconditionally
-and evaluated BEFORE any fail-open branch, protecting the ``.ptr`` from forgery
-(confused-deputy / CWE-284). The Python hook ``dadaia_workspace.hooks.sdd_gate``
-delegates here — PROTECTED flows through without reimplementation in the hook.
+Races between sessions are surfaced through advisory presence and never prevented.
+The only mutating-mode denial is the caller's own explicit READ mode. Protected CLI
+session records remain fail-closed against file-tool writes.
 """
 
 from __future__ import annotations
@@ -42,9 +14,6 @@ from enum import Enum
 from pathlib import Path
 
 from dadaia_workspace.features.spec_context import presence
-from dadaia_workspace.features.spec_context.locking import (  # noqa: PLC2701
-    _append_audit_event,
-)
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -53,9 +22,8 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 #: throttle marker lives at ``.dadaia/tmp/presence-warn-<sid>-<ctx>`` (mtime-based).
 _ADVISORY_THROTTLE_SECONDS = 300
 
-#: Ordered ADDITIVE prefixes — always allowed (never blocked, never locked).
-#: specs/audits/ is ADDITIVE (FR-P1-14/D2): parallel audit sessions write here
-#: without a MUTATING lease. Audit dirs use collision-safe naming per FR-P1-16:
+#: Ordered ADDITIVE prefixes — always allowed.
+#: Parallel audit sessions use collision-safe directories:
 #:   specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
 #:
 #: WS-R1 split (FR-R1-01/05): the ``specs/`` ADDITIVE classes apply both at the
@@ -92,35 +60,21 @@ _FROZEN_PREFIX = "specs/_archive/"
 #: ``specs/`` class prefixes is classified by that class. Every other in-repo remainder —
 #: production source AND unlisted ``specs/<other>`` files (e.g. ``specs/constitution.md``)
 #: — is MUTATING (FR-R1-04): a ``ctx_rel`` matching no class NEVER falls through to UNGATED.
-#: SEC-01 (CWE-284): .dadaia/sessions/ holds CLI-owned runtime session state, incl. the
-#: single-session lease identity pointer (.dadaia/sessions/runtime/<ctx>.ptr). Agents must
-#: NOT write these via Write/Edit — only the dadaia CLI/bootstrap may (it writes via Python,
-#: outside the tool gate). This is the SOLE fail-CLOSED class: it blocks unconditionally,
-#: evaluated BEFORE the fail-open branches below.
+#: .dadaia/sessions/ holds protected, caller-owned bind records. Agents must not write
+#: these via file tools; only the CLI/bootstrap may write them.
 _PROTECTED_PREFIX = ".dadaia/sessions/"
 #: SEC-01 block reason emitted by the Python hook ``dadaia_workspace.hooks.sdd_gate``,
 #: which delegates here so PROTECTED has a single message source.
 _PROTECTED_MESSAGE = (
-    "[GATE] .dadaia/sessions/ is CLI-owned runtime state, incl. the single-session lease "
-    "identity pointer .dadaia/sessions/runtime/<ctx>.ptr. Agents must not write here via "
-    "Write/Edit — only the dadaia CLI/bootstrap may. Blocked to protect lease-identity "
-    "integrity (the sole deterministic lock); forging the .ptr would let a second session "
-    "steal a Spec Context binding (SEC-01 / CWE-284)."
+    "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
+    "here via file tools; use dadaia context commands. Blocked to preserve caller session "
+    "identity integrity (SEC-01 / CWE-284)."
 )
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).
 _MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
-#: Non-acquiring (READ-resolved) mode tokens (WS-R4 FR-R4-03 / Decision D-3). A session
-#: whose resolved mode is one of these is **non-acquiring**: a MUTATING write is BLOCKed
-#: WITHOUT touching the lease (no acquire, no lease-record write). The bind CLI persists
-#: ``READ`` (operator aliases ``read``/``spec`` both map here); ``BOUND_READ`` is accepted
-#: as a defensive synonym. Comparison is case-insensitive against the upper-cased token.
-#:
-#: Only explicit READ blocks MUTATING (Decision D-3): every other mode — missing,
-#: ``IMPLEMENTATION``, ``BOUND_IMPLEMENTATION``, ``BOUND_REVIEW`` — is lease-taking and may
-#: acquire a *free* lease. ``BOUND_REVIEW`` is treated exactly like implementation at the
-#: gate: the spec grants review no gate rights distinct from implementation (FR-R4-03
-#: scopes READ as the only blocking mode), so review keeps the simple lease-taking path.
+#: READ-resolved mode tokens. READ is opt-in self-protection; all other modes permit
+#: mutating writes and record advisory presence.
 _READ_MODES: frozenset[str] = frozenset({"READ", "BOUND_READ"})
 
 #: BLOCK message for a READ-resolved session attempting a MUTATING write. It names the
@@ -129,7 +83,7 @@ _READ_MODES: frozenset[str] = frozenset({"READ", "BOUND_READ"})
 #: operator action that grants write rights, never instructing a mid-flow relaunch.
 _READ_BLOCK_MESSAGE = (
     "[RULE READ] '{rel_path}' is a MUTATING write, but this session is bound in read "
-    "(observe) mode — read sessions are non-acquiring and never take or modify a lease. "
+    "(observe) mode. "
     "Additive paths (specs/backlog, specs/bugs, specs/audits, .dadaia/reports, "
     ".dadaia/handoff, .dadaia/tmp) remain writable. To gain write rights, the operator "
     "binds implementation mode once: `dadaia context bind {ctx} --mode implementation`."
@@ -208,41 +162,6 @@ def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRec
         f"present: {names}. Races between sessions are accepted and surfaced, never "
         "blocked — no action required."
     )
-
-
-def _audit_presence(
-    workspace: Path,
-    *,
-    event: str,
-    ctx: str,
-    release: str,
-    session_id: str,
-    runtime: str,
-    pid: int,
-    fpath: str,
-    reason: str = "",
-) -> None:
-    """Append a ``PRESENCE_UPSERT``/``PRESENCE_WARN`` line to lock-events.jsonl (FR7).
-
-    Additive event names alongside the pre-existing ACQUIRED/RELEASED/BLOCKED_ATTEMPT
-    vocabulary (``locking._append_audit_event`` — the single shared audit-log writer, same
-    schema, same O_APPEND-atomic write). Best-effort: any failure is swallowed — an audit-
-    log write must never affect the gate's ALLOW/BLOCK verdict (AC-04 fail-safe contract).
-    """
-    try:
-        _append_audit_event(
-            workspace,
-            event=event,
-            context=ctx,
-            release=release,
-            session_id=session_id,
-            runtime=runtime,
-            pid=pid,
-            reason=reason,
-            fpath=fpath,
-        )
-    except Exception:  # noqa: BLE001 — audit logging must never affect the gate verdict.
-        return
 
 
 class PathClass(Enum):
@@ -375,9 +294,7 @@ def evaluate(
     """
     cls = classify_path(rel_path)
 
-    # PROTECTED is the SOLE fail-CLOSED class (SEC-01). It is evaluated FIRST — before any
-    # fail-open branch — so an agent write to .dadaia/sessions/ is blocked unconditionally,
-    # protecting the lease-identity .ptr from forgery (confused-deputy / CWE-284).
+    # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
     if cls == PathClass.PROTECTED:
         return Decision.BLOCK, _PROTECTED_MESSAGE
 
@@ -395,15 +312,14 @@ def evaluate(
             f"(current phase={phase})."
         )
 
-    # MUTATING + READ-resolved session (WS-R4 FR-R4-03 / D-3, self-scoped per v0.1.76
-    # FR4): the ONLY MUTATING block left standing. Opt-in self-protection only — it can
+    # MUTATING + READ-resolved session: opt-in self-protection only. It can
     # NEVER fire because of a foreign session's mode; mode resolution itself is
     # strictly self-scoped (see hooks/sdd_gate._resolve_mode). No presence record is
     # written on this branch — a read session creates no advisory-relevant presence.
     if _is_read_mode(mode):
         return Decision.BLOCK, _READ_BLOCK_MESSAGE.format(rel_path=rel_path, ctx=ctx or "<ctx>")
 
-    # MUTATING, lease-taking mode: advisory presence, NEVER a block (v0.1.76 doctrine).
+    # MUTATING mode: advisory presence, never a peer-session block.
     # anon-session (no harness-native id resolved, FR5) creates no presence record — the
     # write is still allowed, there is simply nothing to be advisory about. The whole
     # block is wrapped fail-safe (AC-04 defense-in-depth): ``presence`` already swallows
@@ -412,31 +328,10 @@ def evaluate(
     try:
         if session_id and session_id != _ANON_SESSION_ID and ctx:
             presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
-            _audit_presence(
-                workspace,
-                event="PRESENCE_UPSERT",
-                ctx=ctx,
-                release=release,
-                session_id=session_id,
-                runtime=runtime,
-                pid=pid or 0,
-                fpath=rel_path,
-            )
             others = presence.others_alive(workspace, ctx, session_id)
             if others and not _advisory_throttled(workspace, session_id, ctx, now=time.time()):
                 _stamp_advisory_throttle(workspace, session_id, ctx)
                 message = _advisory_message(ctx, rel_path, others)
-                _audit_presence(
-                    workspace,
-                    event="PRESENCE_WARN",
-                    ctx=ctx,
-                    release=release,
-                    session_id=session_id,
-                    runtime=runtime,
-                    pid=pid or 0,
-                    fpath=rel_path,
-                    reason=message,
-                )
                 return Decision.ALLOW, message
     except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.
         return Decision.ALLOW, ""

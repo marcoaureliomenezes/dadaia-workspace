@@ -6,8 +6,6 @@ FR-W1-02 no-steal for LOCK-GC — kept verbatim, never merged away.
 
 import json
 import os
-import sys
-import types
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -45,7 +43,6 @@ def _init_states_v2(tmp_path: Path) -> Path:
         container.build_doctor_service,
         container.build_academy_service,
         container.build_export_service,
-        container.build_orchestration_catalog_service,
         container.build_panel_service,
     ],
 )
@@ -75,28 +72,13 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
     assert container.build_academy_service(tmp_path) is not None
-    assert isinstance(container.build_orchestration_catalog_service(tmp_path), WorkflowsService)
+    assert isinstance(container.build_workflow_catalog_service(tmp_path), WorkflowsService)
     assert isinstance(container.build_export_service(tmp_path), ExportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 
     from dadaia_workspace.features.panel.service import PanelService
 
     assert isinstance(container.build_panel_service(tmp_path), PanelService)
-
-
-# ---------------------------------------------------------------------------
-# _agent_catalog
-# ---------------------------------------------------------------------------
-
-
-def test_agent_catalog_empty_and_sorted(tmp_path: Path) -> None:
-    assert container._agent_catalog(tmp_path) == ()
-
-    agents_dir = tmp_path / ".dadaia" / "agentic" / "agents"
-    agents_dir.mkdir(parents=True)
-    (agents_dir / "product-engineer.md").write_text("# Product Engineer")
-    (agents_dir / "software-architect.md").write_text("# Software Architect")
-    assert container._agent_catalog(tmp_path) == ("product-engineer", "software-architect")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +101,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     ctx_locks = tmp_path / ".dadaia" / "states" / "ctx_locks"
     ctx_locks.mkdir(parents=True, exist_ok=True)
     hb = (
-        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.LEASE_TTL_SECONDS + 600)
+        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.PRESENCE_TTL_SECONDS + 600)
     ).isoformat()
     rec: dict[str, object] = {
         "context": _GC_CTX,
@@ -128,7 +110,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
         "mode": "IMPLEMENTATION",
         "acquired_at": hb,
         "heartbeat": hb,
-        "ttl": kernel_tunables.LEASE_TTL_SECONDS,
+        "ttl": kernel_tunables.PRESENCE_TTL_SECONDS,
     }
     if pid is not None:
         rec["pid"] = pid
@@ -138,37 +120,22 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
 
 
 def test_build_doctor_service_wires_pid_probe_live_holder_never_reclaimed(tmp_path: Path) -> None:
-    """Production wiring: a TTL-expired lease held by the LIVE test pid is NEVER reclaimed.
-
-    Exercises container.build_doctor_service() with the real OsProcessProbe — no lambda.
-    os.getpid() is demonstrably alive, so the probe must veto LOCK-GC. Against the unfixed
-    container (pid_probe=None, TTL-only) this record would be reported + deleted by --fix.
-    """
+    """Residual lock state has no authority even when its recorded pid is live."""
     pytest.importorskip("fcntl")  # ctx-lock GC is POSIX-seamed like the gate.
     _init_states_v2(tmp_path)
     path = _seed_stale_lock(tmp_path, pid=os.getpid())
 
     doctor = container.build_doctor_service(tmp_path)
 
-    lock_gc = [i for i in doctor.check() if i.code == "LOCK-GC"]
-    assert lock_gc == [], (
-        "live-pid holder must NOT be reported reclaimable through production container "
-        "wiring — build_doctor_service must inject the PID-liveness probe (FR-W1-02)"
-    )
+    retired = [i for i in doctor.check() if i.code == "RETIRED-LOCK-STATE"]
+    assert retired
 
     doctor.fix()
-    assert path.exists(), "live-pid TTL-expired lease must NEVER be deleted by --fix"
-    stored = json.loads(path.read_text())
-    assert stored["session_id"] == "holder"
+    assert not path.exists()
 
 
 def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Path) -> None:
-    """Production wiring: a TTL-expired lease held by a DEAD pid is reported + reclaimed.
-
-    Companion to the live-holder case. Uses a pid that is virtually certain to be dead
-    (a freshly spawned child that has already exited), proving the probe does not over-veto:
-    genuinely-dead holders are still garbage-collected by --fix.
-    """
+    """Residual lock state is removed without consulting holder liveness."""
     pytest.importorskip("fcntl")
     _init_states_v2(tmp_path)
 
@@ -184,88 +151,12 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
     path = _seed_stale_lock(tmp_path, pid=dead_pid)
     doctor = container.build_doctor_service(tmp_path)
 
-    lock_gc = [i for i in doctor.check() if i.code == "LOCK-GC"]
-    assert lock_gc, "TTL-expired dead-holder lease must be reported LOCK-GC via container wiring"
+    retired = [i for i in doctor.check() if i.code == "RETIRED-LOCK-STATE"]
+    assert retired
 
     actions = doctor.fix()
     assert not path.exists(), "TTL-expired dead-holder lease should be reclaimed by --fix"
-    assert any("LOCK-GC" in a for a in actions)
-
-
-# ---------------------------------------------------------------------------
-# Platform adapter selection — T-018-08
-# ---------------------------------------------------------------------------
-
-
-def test_select_lock_adapter_returns_posix_and_windows_by_has_fcntl(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """_select_lock_adapter() routes by PLATFORM.has_fcntl: POSIX adapter when True,
-    Windows adapter when False.
-
-    Monkeypatches PLATFORM so the test is platform-neutral (runs on Linux). Does NOT
-    use importorskip for the POSIX leg — it exercises the selection logic directly.
-    """
-    import importlib.util
-
-    from dadaia_workspace.core.platform import Capabilities
-
-    # --- has_fcntl=True -> POSIX adapter ---
-    # The POSIX adapter module imports fcntl at module load; on Windows it cannot
-    # be imported at all, so selecting it is meaningless there — skip.
-    pytest.importorskip("fcntl")
-
-    posix_caps = Capabilities.detect("linux")
-    assert posix_caps.has_fcntl is True  # pre-condition
-
-    monkeypatch.setattr("dadaia_workspace.container.PLATFORM", posix_caps, raising=False)
-    # Ensure the PLATFORM import inside _select_lock_adapter sees the patch.
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", posix_caps)
-
-    import dadaia_workspace.infrastructure.file_lock_posix as _posix_mod
-
-    adapter = container._select_lock_adapter()
-    assert adapter is _posix_mod, (
-        f"Expected file_lock_posix adapter, got {adapter!r}. "
-        "Container must route to POSIX adapter when PLATFORM.has_fcntl is True."
-    )
-
-    # --- has_fcntl=False -> Windows adapter ---
-    # Injects a fake 'dadaia_workspace.infrastructure.file_lock_windows' module into
-    # sys.modules to prevent the module-level Windows platform guard from raising on
-    # Linux.
-    win_caps = Capabilities.detect("win32")
-    assert win_caps.has_fcntl is False  # pre-condition
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", win_caps)
-
-    module_key = "dadaia_workspace.infrastructure.file_lock_windows"
-
-    if importlib.util.find_spec("fcntl") is None:
-        # Real Windows runner: the Windows adapter imports cleanly (no module-level
-        # guard fires), so assert the genuinely-selected module by name. Avoids the
-        # fake-vs-real identity fragility of sys.modules injection on Windows.
-        win_adapter = container._select_lock_adapter()
-        assert win_adapter.__name__ == module_key, (
-            f"Expected {module_key} adapter, got {win_adapter!r}. "
-            "Container must route to the Windows adapter when has_fcntl is False."
-        )
-    else:
-        # Linux/macOS: the real module raises PlatformCapabilityError at import time
-        # (it is Windows-only), so inject a stub to exercise the selection branch.
-        _fake_windows_mod = types.ModuleType(module_key)
-        _fake_windows_mod.__spec__ = None  # type: ignore[attr-defined]
-        original = sys.modules.pop(module_key, None)
-        sys.modules[module_key] = _fake_windows_mod
-        try:
-            win_adapter = container._select_lock_adapter()
-            assert win_adapter is _fake_windows_mod, (
-                f"Expected file_lock_windows adapter, got {win_adapter!r}. "
-                "Container must route to Windows adapter when PLATFORM.has_fcntl is False."
-            )
-        finally:
-            sys.modules.pop(module_key, None)
-            if original is not None:
-                sys.modules[module_key] = original
+    assert any("RETIRED-LOCK-STATE" in a for a in actions)
 
 
 # ---------------------------------------------------------------------------
@@ -275,13 +166,14 @@ def test_select_lock_adapter_returns_posix_and_windows_by_has_fcntl(
 
 def test_build_workflow_model_profile_registry_catalog_and_policy_store(tmp_path: Path) -> None:
     catalog = container.build_workflow_model_profile_registry()
-    impl = catalog.workflow("implementation")
+    impl = catalog.workflow("implementation_reviews")
     assert impl is not None
     assert [s.label for s in impl.steps] == [
         "implement",
         "review_qa",
         "review_security",
         "review_code",
+        "close",
     ]
 
     with pytest.raises(WorkspaceNotInitializedError):
@@ -297,7 +189,7 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
 
     _init_states(tmp_path)
     resolver = container.build_workflow_policy_resolver(tmp_path)
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
     impl = snapshot.step("implement")
     assert impl is not None
     assert impl.source is PolicySource.LIBRARY_DEFAULT
@@ -310,7 +202,7 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 }
             },
         }
@@ -318,7 +210,7 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
     store.save(overlay)
 
     overlay_resolver = container.build_workflow_policy_resolver(tmp_path)
-    overlay_impl = overlay_resolver.resolve("implementation", context="default").step("implement")
+    overlay_impl = overlay_resolver.resolve("implementation_reviews", context="default").step("implement")
     assert overlay_impl is not None
     assert overlay_impl.model_profile == "codex-review-deep"
 
@@ -339,7 +231,7 @@ def test_build_lifecycle_pipeline_accepts_policy_snapshot(tmp_path: Path) -> Non
     _init_states(tmp_path)
     (tmp_path / "repos").mkdir(exist_ok=True)
     resolver = container.build_workflow_policy_resolver(tmp_path)
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
     pipe = container.build_lifecycle_pipeline(
         tmp_path,
         context="dadaia-workspace",

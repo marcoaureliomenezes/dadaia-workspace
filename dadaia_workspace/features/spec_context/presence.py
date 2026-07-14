@@ -1,9 +1,6 @@
-"""Advisory session presence — the ONLY concurrency-signal surface (v0.1.76 FR2).
+"""Advisory session presence: races are surfaced and never prevented.
 
-SPEC ``specs/releases/v0.1.76/SPEC.md`` (backlog ``lock-lease-session-identity-kernel``,
-operator-ratified NO-LOCKS DOCTRINE): races between sessions are ACCEPTED and SURFACED,
-never prevented. This module replaces ``lease.py``'s blocking acquire/CAS/adoption/
-incumbent machinery as the gate's concurrency signal. It is NOT a lock:
+This module is not a lock:
 
 * :func:`upsert` can NEVER fail a write — every exception is swallowed.
 * :func:`others_alive` is a pure, best-effort read used only to compose an ADVISORY
@@ -19,13 +16,11 @@ One record per (context, session) at::
 
 carrying ``{session_id, runtime, pid, started_at, last_seen_at}``. Records are written
 atomically (temp file + ``os.replace``). Staleness reuses the single canonical TTL,
-``core.kernel_tunables.LEASE_TTL_SECONDS`` (renamed semantics: presence TTL) — a
+``core.kernel_tunables.PRESENCE_TTL_SECONDS`` — a
 sibling whose ``last_seen_at`` is older than the TTL is excluded from
 :func:`others_alive` and opportunistically swept.
 
-No CAS, no sentinel, no adoption, no incumbent pointer, no by-session index: a simple
-upsert can never fail another session's work, by construction — the acceptance bar the
-SPEC names explicitly (FR2).
+A simple atomic upsert can never fail another session's work by construction.
 """
 
 from __future__ import annotations
@@ -52,7 +47,7 @@ __all__ = [
     "upsert",
 ]
 
-#: Path-traversal allowlist (CWE-22/CWE-59), matching ``lease._validate`` /
+#: Path-traversal allowlist (CWE-22/CWE-59), matching
 #: ``session_identity._validate``. Context names and session ids are filename
 #: components and must never escape their directory.
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
@@ -121,9 +116,8 @@ def _read_json(path: Path) -> dict[str, object] | None:
 def _is_stale(record: dict[str, object], *, now: datetime) -> bool:
     """True iff ``record``'s heartbeat is missing, unparseable, or TTL-expired.
 
-    Deliberately independent of ``core.lock_liveness.is_stale`` (which is lease-shaped:
-    it requires ``heartbeat``/``ttl`` fields and a pid-veto). Presence has no veto — it
-    is advisory-only, so simple TTL-only staleness is both correct and sufficient.
+    Presence has no process/release veto. It is advisory-only, so simple TTL-only
+    staleness is both correct and sufficient.
     """
     raw = record.get("last_seen_at")
     if not isinstance(raw, str) or not raw:
@@ -135,7 +129,7 @@ def _is_stale(record: dict[str, object], *, now: datetime) -> bool:
     if seen.tzinfo is None:
         seen = seen.replace(tzinfo=UTC)
     elapsed = (now - seen).total_seconds()
-    return elapsed >= kernel_tunables.LEASE_TTL_SECONDS
+    return elapsed >= kernel_tunables.PRESENCE_TTL_SECONDS
 
 
 def upsert(workspace: Path, ctx: str, session_id: str, *, runtime: str, pid: int) -> None:
@@ -173,8 +167,7 @@ def others_alive(workspace: Path, ctx: str, session_id: str) -> list[PresenceRec
 
     Fail-soft: an unreadable context dir, a corrupt sibling record, or an invalid name
     yields ``[]``/skips that entry — never raises. Stale siblings (heartbeat older than
-    ``LEASE_TTL_SECONDS``) are excluded AND opportunistically removed (best-effort GC on
-    the read path, mirroring the lease's reclaim-on-touch behavior).
+    ``PRESENCE_TTL_SECONDS``) are excluded and opportunistically removed (best-effort GC).
     """
     try:
         if not _valid_name(ctx):

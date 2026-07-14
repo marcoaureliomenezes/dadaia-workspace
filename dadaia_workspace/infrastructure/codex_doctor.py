@@ -76,7 +76,6 @@ def check_codex_drift(
     out: list[str] = []
     out.extend(dcx1_missing_toml(agentic_dir, codex_dir))
     out.extend(dcx2_config_toml_entries(agentic_dir, codex_dir))
-    out.extend(dcx3_workflow_drift(agentic_dir, codex_dir))
     out.extend(dcx4_claude_strings(codex_dir))
     out.extend(dcx5_empty_developer_instructions(codex_dir))
     out.extend(dcx6_codex_runtime_adapters(workspace_root, public_dir))
@@ -130,27 +129,6 @@ def dcx2_config_toml_entries(agentic_dir: Path, codex_dir: Path) -> list[str]:
         needle = f'config_file = "agents/{name}.toml"'
         if needle not in config_text:
             out.append(f"[missing] codex:config.toml entry for {name} (D-CX-2)")
-    return out
-
-
-def dcx3_workflow_drift(agentic_dir: Path, codex_dir: Path) -> list[str]:
-    """D-CX-3: .codex/workflows/ must mirror the canonical workflow set exactly."""
-    canonical_dir = agentic_dir / "workflows"
-    codex_wf = codex_dir / "workflows"
-    out: list[str] = []
-
-    canonical_names: set[str] = set()
-    if canonical_dir.exists():
-        canonical_names = {f.name for f in canonical_dir.glob("*.workflow.md")}
-
-    codex_names: set[str] = set()
-    if codex_wf.exists():
-        codex_names = {f.name for f in codex_wf.glob("*.workflow.md")}
-
-    for name in sorted(canonical_names - codex_names):
-        out.append(f"[missing] codex:workflows/{name} (D-CX-3)")
-    for name in sorted(codex_names - canonical_names):
-        out.append(f"[extra] codex:workflows/{name} (D-CX-3)")
     return out
 
 
@@ -578,7 +556,7 @@ def codex_trust_boundary_info() -> list[str]:
 
     Codex governance hooks fire and block only in **interactive** sessions; under
     headless ``codex exec`` they never fire, so the headless posture is protected by
-    the git chokepoints (pre-commit lease gate + pre-push security-verdict gate) only.
+    the git chokepoints (pre-commit presence advisory + pre-push security-verdict gate) only.
     This INFO line states that boundary honestly in ``dadaia public doctor`` output.
     """
     return [
@@ -586,16 +564,3 @@ def codex_trust_boundary_info() -> list[str]:
         "`codex exec` headless does not (headless is protected by the git "
         "chokepoints only). (WS-CDX-HYGIENE)"
     ]
-
-
-def classify_workflows(agentic_dir: Path) -> list[str]:
-    """Classify workflows by parallel_group usage for doctor output."""
-    out: list[str] = []
-    workflows_dir = agentic_dir / "workflows"
-    if not workflows_dir.exists():
-        return out
-    for wf in sorted(workflows_dir.glob("*.workflow.md")):
-        tag = f"workflows/{wf.name}"
-        out.append(f"[reference-only] codex:{tag} (installed, no workflow executor)")
-        out.append(f"[ok] claude:{tag}")
-    return out

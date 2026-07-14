@@ -1,7 +1,7 @@
 """W1-3 (T-47-12) — persona injection on ALL verbs, not just the pipeline.
 
 Before this fix, role->persona resolution existed only in ``LifecyclePipeline._scope``. The
-five fragment workflow bodies (release_definition / audit / research / bug_report /
+three fragment workflow bodies (release_definition / audit /
 backlog_definition) and the CLI single-step path (``_run_phase_step``) built their
 ``PromptScope`` WITHOUT a persona, so every model step reached the worker with no operative
 role directive on those verbs.
@@ -18,20 +18,15 @@ import json
 from pathlib import Path
 
 import pytest
-import typer
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
-    AgentRunResult,
-    AgentRunStatus,
     AgentRuntimeKind,
-    LifecyclePhase,
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStoreError
 from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
 from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
-from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
 from dadaia_workspace.features.lifecycle.prompt_builder import LifecyclePromptBuilder
 from dadaia_workspace.infrastructure.headless_adapter_base import build_prompt_envelope
 
@@ -70,7 +65,7 @@ def _envelope_persona(request: AgentRunRequest) -> str:
     return str(payload["persona"])
 
 
-# --- the five fragment workflow bodies, parametrized over (workflow_cls, extra kwargs) ---
+# --- the fragment workflow bodies, parametrized over (workflow_cls, extra kwargs) ---
 
 
 def _first_persona_step(sequence: object) -> object:
@@ -98,21 +93,6 @@ def _audit_case(tmp_path: Path):
     return AuditWorkflow, {}, _SEQUENCE
 
 
-def _research_case(tmp_path: Path):
-    from dadaia_workspace.features.lifecycle.workflows.research import _SEQUENCE, ResearchWorkflow
-
-    return ResearchWorkflow, {}, _SEQUENCE
-
-
-def _bug_report_case(tmp_path: Path):
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-        _SEQUENCE,
-        BugReportWorkflow,
-    )
-
-    return BugReportWorkflow, {}, _SEQUENCE
-
-
 def _backlog_definition_case(tmp_path: Path):
     from dadaia_workspace.features.backlog.subject_registry import Registry
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
@@ -126,8 +106,6 @@ def _backlog_definition_case(tmp_path: Path):
 _CASE_BUILDERS = {
     "release_definition": _release_definition_case,
     "audit": _audit_case,
-    "research": _research_case,
-    "bug_report": _bug_report_case,
     "backlog_definition": _backlog_definition_case,
 }
 
@@ -153,70 +131,3 @@ def test_workflow_body_scope_carries_persona(tmp_path: Path, case_id: str) -> No
     persona_field = _envelope_persona(built.request)
     assert "OPERATIVE DIRECTIVE" in persona_field
     assert expected in persona_field
-
-
-# --- the CLI single-step path (_run_phase_step) ------------------------------------
-
-
-class _RecordingRuntime:
-    """A FAKE-kind runtime that records every request it receives (blocks the gate)."""
-
-    def __init__(self) -> None:
-        self.received: list[AgentRunRequest] = []
-
-    def runtime_kind(self) -> AgentRuntimeKind:
-        return AgentRuntimeKind.FAKE
-
-    def run(self, request: AgentRunRequest) -> AgentRunResult:
-        self.received.append(request)
-        return AgentRunResult(status=AgentRunStatus.SUCCEEDED, summary="fake no-op")
-
-
-def test_cli_run_phase_step_injects_persona(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The CLI single-step path (close/qa/security/code/implement/define) injects persona."""
-    from dadaia_workspace import container
-    from dadaia_workspace.cli.commands import lifecycle as lifecycle_cli
-    from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
-    from dadaia_workspace.features.lifecycle.policy_resolver import (
-        WorkflowExecutionPolicyResolver,
-    )
-
-    recording = _RecordingRuntime()
-
-    def _fake_phase_workflow(*_args: object, **_kwargs: object) -> LifecyclePhaseWorkflow:
-        return LifecyclePhaseWorkflow(runtime=recording, run_store=_MemoryRunStore())  # type: ignore[arg-type]
-
-    monkeypatch.setattr(lifecycle_cli, "resolve_workspace_root", lambda: tmp_path)
-    monkeypatch.setattr(container, "build_lifecycle_phase_workflow", _fake_phase_workflow)
-    # v0.1.56 FR1: the CLI phase path resolves a governed snapshot first; back it with the
-    # code-only governed catalog so no initialized workspace is needed for this unit test.
-    monkeypatch.setattr(
-        container,
-        "build_workflow_policy_resolver",
-        lambda *a, **k: WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog()),
-    )
-
-    # The FAKE worker emits no artifact_refs → the create-step gate blocks → typer.Exit.
-    with pytest.raises(typer.Exit):
-        lifecycle_cli._run_phase_step(
-            label="close",
-            role="product-engineer",
-            from_phase=LifecyclePhase.CODE_REVIEW,
-            target_phase=LifecyclePhase.CLOSURE,
-            context=_CONTEXT,
-            release_id=_RELEASE,
-            run_id="close-run",
-            harness="fake",
-            workflow_id="closure",
-            catalog_step_label="close",
-            json_output=True,
-            is_review=False,
-        )
-
-    assert recording.received, "worker was never called"
-    persona = recording.received[0].persona
-    expected = resolve_persona_for_role("product-engineer")
-    assert expected is not None
-    assert persona == expected

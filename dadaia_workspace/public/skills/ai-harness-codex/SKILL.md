@@ -248,7 +248,7 @@ artifacts.
 | Guard | Rule |
 |---|---|
 | Read vs write | Parallel read is the safe default. Parallel write requires **disjoint allowlists** + rigorous coordination. |
-| Same path family | Never let two implementers write the same path family without a lock and separate TASKS. |
+| Same path family | Do not fan out parallel writes to the same path family; assign one implementer and one task owner. |
 | SPEC ambiguity | Never fan out to resolve SPEC ambiguity — that is operator refinement, not parallel work. |
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases. |
 | Output contract | Each subagent returns findings with severity, evidence, and a verdict; primary consolidates to Approve / Request Changes / Needs Discussion via handoff JSON. |
@@ -339,24 +339,20 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 |---|---|---|---|
 | Intake | `project-manager` | clear scope | backlog candidate / bug |
 | Specs | `product-engineer` + specialists | SPEC/PLAN/TASKS **Aprovado** | release with test criteria, reviewers agreeing pre-impl |
-| Reserve | implementer | TASKS.md marker `[-]` | clear write set, locked session |
+| Reserve | implementer | TASKS.md marker `[-]` | clear write set, reserved task |
 | Implementation | specialist by path family | unit/integration tests | implementation handoff (task NOT done if review pending) |
 | QA / review | `qa-engineer`, `security-reviewer`, `code-reviewer` | all approve | consolidated verdict |
 | Closure | `product-engineer` | triple evidence | CLOSURE + memory update + archived release |
 
-**`.codex/workflows/` keep-or-drop decision (WS-CDX-HYGIENE — RECORDED: KEEP).**
-The `.codex/workflows/*.workflow.md` files **are** physically projected (mirrored from
-`public/workflows/` by `dadaia public install`), and the `dcx3_workflow_drift` doctor
-check verifies `.codex/workflows/` matches the canonical set exactly. They are NOT
-inert: `classify_workflows` marks each `[reference-only] codex:<wf> (installed, no
-workflow executor)` — Codex has no workflow auto-executor, so they ship as readable
-documentation, not auto-fan-out. Decision: **keep** the projection (it is real,
-consistent, and doctor-verified); there is no dangling/inert reference to remove. The
-`.codex/config.toml` carries no inert keys either (`approved_commands`, `[agents.*]`,
-`[skills]` are all live; `provider`/`api_key`/`telemetry` are forbidden by `dcx10`).
+**No `.codex/workflows/` projection.** The retired `*.workflow.md` reference layer
+duplicated executable lifecycle behavior without providing an executor. The four
+Python-backed `dadaia lifecycle` commands are the sole workflow authority; their
+fragments live under `public/lifecycle_fragments/` and their operative role mandates
+under `public/personas/`. The installer removes legacy projected workflow files and
+the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
 
 Authoring consequences:
-- Hooks/workflow files enforce *mechanics* of these gates; they must never decide
+- Hooks and Python lifecycle workflows enforce *mechanics* of these gates; they must never decide
   product scope, rewrite the SPEC to justify code, or hide human approval.
 - For difficult tasks, plan before implementing (reduces rework). For bugs,
   reproduction + verification matter more than a vague description.

@@ -8,7 +8,7 @@ output schema + the discrete ``(harness, model)`` for the step.
 
 As of v0.1.57 FR1 the assembly + gate machinery lives once in
 :class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate.FragmentGateWorkflow`
-(the ONE prompt-assembly seam shared with ``audit`` / ``research`` / ``bug_report``). This body
+(the ONE prompt-assembly seam shared with ``audit``). This body
 is now a thin subclass that declares the five divergence hooks — the ``release_definition``
 command, the RELEASE_DEFINITION initial phase, the terminal transition to IMPLEMENTATION, and
 the ``ReleaseStep`` / ``ReleaseDefinitionResult`` dataclass types — and keeps its module-global
@@ -22,6 +22,7 @@ IMPLEMENTATION only when every prior gate passed and the workflow-step handoff g
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -254,25 +255,175 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         "tasks_implementability_review": "TASKS.md",
     }
 
-    def _on_step_accepted(self, step: ReleaseStep) -> None:
-        """Flip the reviewed artifact's canonical Status token to ``Aprovado``.
+    def _on_step_accepted(self, step: ReleaseStep) -> BlockedState | None:
+        """Validate PLAN dependencies, then approve reviewed artifacts.
 
         Deterministic Python, not model output: the workflow's own review gate IS the
         approval authority, so the canonical ``> **Status:**`` token must reflect it —
         otherwise downstream workers correctly refuse to build on a Draft artifact.
         """
+        if step.label == "plan_create":
+            dependency_block = self._validate_plan_dependency_table()
+            if dependency_block is not None:
+                return dependency_block
+        if step.label == "tasks_create":
+            hygiene_block = self._validate_tasks_command_hygiene()
+            if hygiene_block is not None:
+                return hygiene_block
         filename = self._STATUS_FLIP_BY_REVIEW.get(step.label)
         if filename is None:
-            return
+            return None
         path = self._selector.spec_context.specs_dir / "releases" / self._release_id / filename
         if not path.is_file():
-            return
+            return None
         text = path.read_text(encoding="utf-8")
-        for token in ("Draft", "Em revisão", "Em revisao"):
-            marker = f"> **Status:** {token}"
-            if marker in text:
-                path.write_text(text.replace(marker, "> **Status:** Aprovado", 1), encoding="utf-8")
-                return
+        status_line = (
+            r"(?mi)^(?:>\s*)?(?:\*\*Status:\*\*|Status:)\s*"
+            r"(?:Draft|Em revisão|Em revisao|Aprovado)\s*$"
+        )
+        updated = re.sub(status_line + r"\n?", "", text)
+        frontmatter = re.match(r"\A---\n.*?\n---\n?", updated, flags=re.DOTALL)
+        if frontmatter is not None:
+            insertion_at = frontmatter.end()
+        else:
+            heading = re.match(r"\A#[^\n]*(?:\n|\Z)", updated)
+            insertion_at = heading.end() if heading is not None else 0
+        updated = (
+            updated[:insertion_at].rstrip()
+            + "\n\n> **Status:** Aprovado\n\n"
+            + updated[insertion_at:].lstrip()
+        )
+        path.write_text(updated, encoding="utf-8")
+        return None
+
+    def _validate_tasks_command_hygiene(self) -> BlockedState | None:
+        """Reject executable pytest snippets that can dirty the repository.
+
+        Model review still judges the full validation strategy. This narrow Python
+        backstop enforces the workspace invariant that pytest must not create
+        ``.pytest_cache``. ``--cache-clear`` is deliberately insufficient because it
+        removes an old cache before allowing the cache provider to create a new one.
+        """
+        path = self._selector.spec_context.specs_dir / "releases" / self._release_id / "TASKS.md"
+        if not path.is_file():
+            return self._tasks_hygiene_block("TASKS.md was not created")
+
+        text = path.read_text(encoding="utf-8")
+        snippets = re.findall(r"`([^`\n]+)`", text)
+        snippets.extend(
+            match.group(1)
+            for match in re.finditer(r"```[^\n]*\n(.*?)```", text, flags=re.DOTALL)
+        )
+        pytest_invocation = re.compile(
+            r"(?:^|[;&|\n]\s*|\s)"
+            r"(?:(?:\S*/)?python(?:\d+(?:\.\d+)*)?\s+-m\s+)?"
+            r"(?:\S*/)?pytest(?:\s|$)",
+            flags=re.IGNORECASE,
+        )
+        for snippet in snippets:
+            if pytest_invocation.search(snippet) and not re.search(
+                r"(?:^|\s)-p\s+no:cacheprovider(?:\s|$)", snippet
+            ):
+                compact = " ".join(snippet.split())
+                if len(compact) > 160:
+                    compact = compact[:157] + "..."
+                return self._tasks_hygiene_block(
+                    "pytest validation command is missing '-p no:cacheprovider': "
+                    f"{compact!r}"
+                )
+        return None
+
+    @staticmethod
+    def _tasks_hygiene_block(reason: str) -> BlockedState:
+        return BlockedState(
+            reason=f"TASKS command hygiene lint failed: {reason}",
+            blocked_at_step="tasks_command_hygiene_gate",
+            operator_command="restart release-definition from release_scope after fixing the workflow",
+            detail={"artifact": "TASKS.md", "gate": "task-command-hygiene-v1"},
+        )
+
+    def _validate_plan_dependency_table(self) -> BlockedState | None:
+        """Reject structurally unverifiable or forward-dependent PLAN validation.
+
+        Model review still judges whether the table is truthful. This Python gate makes
+        the dependency declaration mandatory and prevents an explicitly forward-pointing
+        validation plan from consuming reviewer time or reaching TASK authoring.
+        """
+        path = self._selector.spec_context.specs_dir / "releases" / self._release_id / "PLAN.md"
+        if not path.is_file():
+            return self._plan_dependency_block("PLAN.md was not created")
+        lines = path.read_text(encoding="utf-8").splitlines()
+        try:
+            heading = next(
+                index
+                for index, line in enumerate(lines)
+                if re.fullmatch(
+                    r"##\s+(?:\d+\.\s+)?validation dependency table",
+                    line.strip(),
+                    flags=re.IGNORECASE,
+                )
+            )
+        except StopIteration:
+            return self._plan_dependency_block(
+                "PLAN.md is missing the required 'Validation Dependency Table' section"
+            )
+
+        section: list[str] = []
+        for line in lines[heading + 1 :]:
+            if line.lstrip().startswith("## "):
+                break
+            section.append(line)
+        table_lines = [line.strip() for line in section if line.strip().startswith("|")]
+        if len(table_lines) < 3:
+            return self._plan_dependency_block(
+                "validation dependency table requires a header and at least one workstream row"
+            )
+        header = [cell.strip().lower() for cell in table_lines[0].strip("|").split("|")]
+        expected = [
+            "workstream",
+            "produces by end",
+            "direct validation",
+            "validation dependencies",
+            "deferred integration evidence",
+        ]
+        if header != expected:
+            return self._plan_dependency_block(
+                "validation dependency table columns must exactly match the workflow contract"
+            )
+
+        seen: set[int] = set()
+        for raw in table_lines[2:]:
+            cells = [cell.strip() for cell in raw.strip("|").split("|")]
+            if len(cells) != len(expected) or any(not cell for cell in cells):
+                return self._plan_dependency_block(
+                    "every validation dependency row must contain all five non-empty cells"
+                )
+            match = re.fullmatch(r"WS-(\d+)", cells[0], flags=re.IGNORECASE)
+            if match is None:
+                return self._plan_dependency_block(
+                    f"invalid workstream identifier {cells[0]!r}; expected WS-<number>"
+                )
+            current = int(match.group(1))
+            if current in seen:
+                return self._plan_dependency_block(f"duplicate workstream WS-{current}")
+            seen.add(current)
+            refs = {int(value) for value in re.findall(r"WS-(\d+)", cells[3], flags=re.IGNORECASE)}
+            forward = sorted(ref for ref in refs if ref > current)
+            if forward:
+                return self._plan_dependency_block(
+                    f"WS-{current} validation depends on later workstream(s): "
+                    + ", ".join(f"WS-{ref}" for ref in forward)
+                )
+        return None
+
+    @staticmethod
+    def _plan_dependency_block(reason: str) -> BlockedState:
+        return BlockedState(
+            reason=f"plan dependency lint failed: {reason}",
+            blocked_at_step="plan_dependency_gate",
+            operator_command="restart release-definition from release_scope after fixing the workflow",
+            detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
+        )
 
     def _on_sequence_completed(self) -> None:
         """Repoint ACTIVE.md to the newly defined release (deterministic Python).

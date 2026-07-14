@@ -8,8 +8,8 @@ Pins the v0.1.32 canonical worker-output contract at the fragment source level:
 - A3 (Drift 2): the BODY carries NO residual "conform to the ``output_schema``" emit-framing
   — the worker is never told to emit/conform-to the fragment's domain schema as the emitted
   field.
-- The frontmatter ``output_schema: handoff-v1.1`` (a distinct concept — the fragment's own
-  id, not the worker-emitted field) stays UNCHANGED.
+- The frontmatter names the same ``agent-run-result-v1`` transport, so metadata and body
+  cannot describe two competing schemas.
 - A5: no fragment under ``public/lifecycle_fragments/`` instructs ``schema_version``; no
   ``create_handoff`` fragment exists; ``shared.output_handoff`` is the single output contract.
 
@@ -54,8 +54,8 @@ def test_output_handoff_body_contract() -> None:
     assert "output_schema" not in lowered
     assert "conform" not in lowered or "output schema" not in lowered
 
-    # The fragment's own id is a distinct concept and stays unchanged.
-    assert "output_schema: handoff-v1.1" in frontmatter
+    # Metadata and body name one transport contract.
+    assert f"output_schema: {_TRANSPORT_SCHEMA}" in frontmatter
 
 
 # --- ② library-wide: no fragment instructs schema_version + single output contract -----

@@ -59,17 +59,12 @@ _SHARED_IDS = {
     "shared.output_handoff",
     "shared.write_scope",
 }
-# Workflow dirs that still ship only a `_README.md` stub (no authored step fragments).
-# ``closure`` stays a README-only stub (its close worker is generic, no fragment).
-_DEFERRED_WORKFLOW_DIRS = {
-    "closure",
-}
+# No canonical workflow ships a deferred README-only directory.
+_DEFERRED_WORKFLOW_DIRS: set[str] = set()
 
 # Workflow dirs that ship authored step fragments backing a real fragment+gate body.
 _AUTHORED_WORKFLOW_DIRS = {
     "audit",
-    "research",
-    "bug_report",
 }
 
 _VALID_FRONTMATTER = """\
@@ -148,15 +143,52 @@ def test_load_by_id_and_path_round_trip_unknown_id_raises() -> None:
         load_fragment("release_definition.does_not_exist")
 
 
+def test_release_definition_prompts_treat_validation_as_dependency() -> None:
+    """Regression: an early task must not require a later integration surface to pass."""
+    plan_create = load_fragment("release_definition.plan_create").body
+    plan_review = load_fragment("release_definition.plan_review").body
+    tasks_create = load_fragment("release_definition.tasks_create").body
+    tasks_review = load_fragment("release_definition.tasks_review_implementability").body
+
+    assert "validation dependency-safe" in plan_create
+    assert "validation depends on work scheduled later" in plan_review
+    assert "validation is part of its dependency graph" in tasks_create
+    assert "Validation is a dependency" in tasks_review
+
+
+def test_spec_create_requires_proof_for_internal_negative_constraints() -> None:
+    """Regression: internal "must not" claims need evidence beyond equal outputs."""
+    spec_create = load_fragment("release_definition.spec_create").body
+
+    assert "concrete verification path for every acceptance criterion" in spec_create
+    assert "controlled probe/fake" in spec_create
+    assert "structural/static inspection" in spec_create
+    assert "equal end results to prove which internal path" in spec_create
+
+
+def test_release_definition_binds_public_contract_before_implementation() -> None:
+    plan_create = load_fragment("release_definition.plan_create").body
+    plan_review = load_fragment("release_definition.plan_review").body
+    tasks_create = load_fragment("release_definition.tasks_create").body
+    tasks_review = load_fragment("release_definition.tasks_review_implementability").body
+
+    for body in (plan_create, plan_review, tasks_create, tasks_review):
+        assert "module/export path" in body
+    assert "do not leave them for TASKS or implementation to invent" in plan_create
+    assert "no public design decision is deferred" in plan_review
+    assert "Copy those bindings faithfully" in tasks_create
+    assert "not defer it to the implementer" in tasks_review
+
+
 # ---------------------------------------------------------------------------
 # ③ workflow-dir shape param: authored / deferred README-only / README-never-a-fragment /
-#    implementation ships its 5
+#    implementation ships its 6
 # ---------------------------------------------------------------------------
 
 
 def test_workflow_dir_shape_matrix() -> None:
     """authored dirs ship fragments / deferred README-only / README-never-a-fragment /
-    implementation ships its 5 — one loader, one param-shaped assertion table."""
+    implementation ships its 6 — one loader, one param-shaped assertion table."""
     loader = FragmentLoader()
 
     # v0.1.43 added the security-review and code-review gate fragments. No README-only
@@ -168,6 +200,7 @@ def test_workflow_dir_shape_matrix() -> None:
         "implementation.qa_review",
         "implementation.security_review",
         "implementation.code_review",
+        "implementation.close_release",
     }
     assert len(loader.list_fragments(workflow="shared")) == 5
     assert len(loader.list_fragments(workflow="release_definition")) == 8
@@ -181,8 +214,7 @@ def test_workflow_dir_shape_matrix() -> None:
         readme = loader.root / workflow / "_README.md"
         assert readme.exists(), f"deferred workflow '{workflow}' must ship a _README.md stub"
 
-    # T-30-E-01..03: audit / research / bug_report are no longer README-only deferred
-    # stubs — each ships real fragment+gate step fragments backing its workflow body.
+    # Audit ships real fragment+gate step fragments backing its workflow body.
     for workflow in _AUTHORED_WORKFLOW_DIRS:
         fragments = loader.list_fragments(workflow=workflow)
         assert fragments, f"authored workflow '{workflow}' must ship step fragments"

@@ -37,8 +37,7 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
         app,
         [
             "lifecycle",
-            "backlog",
-            "define",
+            "backlog-definition",
             "--release-id",
             "v0.1.26",
             "--harness",

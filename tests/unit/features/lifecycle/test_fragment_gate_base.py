@@ -40,9 +40,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandof
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
     backlog_definition,
-    bug_report,
     release_definition,
-    research,
 )
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     AuthoredItem,
@@ -324,9 +322,8 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
     """Grep evidence that the FR1 dedup landed and stayed landed:
 
     * the base defines every shared gate/assembly member + ``_scope``;
-    * no handoff-ledger body (release_definition/audit/research/bug_report) redefines a
-      shared gate/assembly member — except bug_report, which overrides ONLY ``_scope``
-      (its ADDITIVE bug_write special-case);
+    * no handoff-ledger body (release_definition/audit) redefines a shared gate/assembly
+      member;
     * backlog_definition mixes in the assembly helpers via ``_FragmentAssemblyMixin`` with
       no local copy of any of them;
     * every body keeps its module-global ``_SEQUENCE`` (Q3) — the guardrail suites import it.
@@ -335,12 +332,11 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
     for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS, "_scope"):
         assert f"def {member}(" in base, f"base must define {member}"
 
-    for body in ("release_definition", "audit", "research", "bug_report"):
+    for body in ("release_definition", "audit"):
         src = _defs(body)
         for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS):
             assert f"def {member}(" not in src, f"{body} still defines shared member {member}"
-    assert "def _scope(" in _defs("bug_report")
-    for body in ("release_definition", "audit", "research"):
+    for body in ("release_definition", "audit"):
         assert "def _scope(" not in _defs(body), f"{body} must not redefine _scope"
 
     backlog_src = _defs("backlog_definition")
@@ -350,7 +346,7 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
             f"backlog still defines assembly member {member}"
         )
 
-    for module in (release_definition, audit, research, bug_report, backlog_definition):
+    for module in (release_definition, audit, backlog_definition):
         assert hasattr(module, "_SEQUENCE"), (
             f"{module.__name__} dropped its module-global _SEQUENCE"
         )

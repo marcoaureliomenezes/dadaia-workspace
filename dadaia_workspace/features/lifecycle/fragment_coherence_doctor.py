@@ -15,7 +15,7 @@ grep-assertable, and the label order is identical across SPEC FR3 / AC-5 / AC-10
 * **FRAG-COH-2 (ERROR, SCOPED — A2)** — a ``dynamic_inputs`` entry resolves to a registered
   ``ContextSelector`` selector, checked as ERROR **only** for a dynamic_input that is actually
   resolved at runtime: the **MAIN fragment of a selector-wired workflow step**
-  (release_definition / audit / research / bug_report / backlog_definition ``_SEQUENCE`` main
+  (release_definition / audit / backlog_definition ``_SEQUENCE`` main
   fragments). It is **WARN** for (i) shared-fragment inputs (body-only, the workflow resolves
   only a step's main fragment inputs, never the cited shared fragments' inputs) and (ii)
   main-fragment inputs of a **selector-less path** (the ``implementation.*`` fragments the
@@ -26,7 +26,7 @@ grep-assertable, and the label order is identical across SPEC FR3 / AC-5 / AC-10
 * **FRAG-COH-4 (ERROR)** — role→atom-map coverage: each model-driven step's role-mapped atom
   appears in its resolved injected refs (the mechanical Layer-2 grounding proof, FR4). The
   covered scope is the **three FR2 delivery surfaces** — the ``FragmentGateWorkflow`` base
-  (release_definition / audit / research / bug_report), the ``LifecyclePipeline`` ladder, and
+  (release_definition / audit), the ``LifecyclePipeline`` ladder, and
   the ``LifecyclePhaseWorkflow`` path. ``backlog_definition`` is **excluded**: it shares only
   the pure ``_FragmentAssemblyMixin`` (no ``_run_model_step``), so its steps receive no
   role→atom injection — the coverage scope must match the FR2 delivery scope exactly, or the
@@ -60,9 +60,7 @@ from dadaia_workspace.features.lifecycle.role_atoms import (
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
     backlog_definition,
-    bug_report,
     release_definition,
-    research,
 )
 
 #: Fragment ``role`` values that are NOT Layer-2 worker personas and need no persona atom:
@@ -136,27 +134,25 @@ def _split_roles(role: str) -> tuple[str, ...]:
 
 
 def _selector_wired_sequences() -> dict[str, tuple[object, ...]]:
-    """The five workflows whose main-fragment ``dynamic_inputs`` are resolved by a selector.
+    """Canonical workflows whose fragment ``dynamic_inputs`` use a selector.
 
-    ``release_definition`` / ``audit`` / ``research`` / ``bug_report`` run on a wired
-    ``ContextSelector`` via the ``FragmentGateWorkflow`` base; ``backlog_definition`` resolves
-    its main-fragment inputs through the shared ``_FragmentAssemblyMixin``. FRAG-COH-2 ERRORs
-    are scoped to these bodies' MAIN fragments (A2).
+    Definition and audit use ``FragmentGateWorkflow``; backlog definition uses the
+    shared assembly mixin; implementation reviews receives a selector from its container
+    builder. FRAG-COH-2 errors therefore apply to all four canonical workflows.
     """
     return {
         "release_definition": release_definition._SEQUENCE,
         "audit": audit._SEQUENCE,
-        "research": research._SEQUENCE,
-        "bug_report": bug_report._SEQUENCE,
         "backlog_definition": backlog_definition._SEQUENCE,
+        "implementation_reviews": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
     }
 
 
 def _fr2_covered_sequences() -> dict[str, tuple[object, ...]]:
     """The workflows whose model-driven steps receive the FR2 role→atom injection.
 
-    The three FR2 delivery surfaces are the ``FragmentGateWorkflow`` base
-    (release_definition / audit / research / bug_report), the ``LifecyclePipeline`` ladder, and
+    The FR2 delivery surfaces are the ``FragmentGateWorkflow`` base
+    (release_definition / audit), the ``LifecyclePipeline`` ladder, and
     the ``LifecyclePhaseWorkflow`` single-step path (structurally identical to a ladder step —
     represented here by the ladder). ``backlog_definition`` is **excluded**: it shares only the
     pure assembly mixin (no ``_run_model_step``), so its steps are NOT grounded by the map —
@@ -165,18 +161,14 @@ def _fr2_covered_sequences() -> dict[str, tuple[object, ...]]:
     return {
         "release_definition": release_definition._SEQUENCE,
         "audit": audit._SEQUENCE,
-        "research": research._SEQUENCE,
-        "bug_report": bug_report._SEQUENCE,
-        "pipeline": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
+        "implementation_reviews": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
     }
 
 
 def _selector_wired_main_fragment_ids() -> frozenset[str]:
     """The MAIN fragment ids of every selector-wired workflow step (FRAG-COH-2 ERROR scope).
 
-    Deliberately EXCLUDES the ``implementation.*`` pipeline fragments: the pipeline /
-    phase_workflow are the selector-less path, so their main-fragment inputs are WARN, not ERROR
-    (A2 clause (ii)).
+    The implementation pipeline is selector-wired at the composition boundary.
     """
     ids: set[str] = set()
     for seq in _selector_wired_sequences().values():
@@ -259,7 +251,10 @@ def _check_frag_coh_3(fragments: tuple[Fragment, ...]) -> list[FragCohFinding]:
     out: list[FragCohFinding] = []
     bound_main: set[str] = set()
     cited_shared: set[str] = set()
-    sequences = {**_selector_wired_sequences(), "pipeline": _fr2_covered_sequences()["pipeline"]}
+    sequences = {
+        **_selector_wired_sequences(),
+        "implementation_reviews": _fr2_covered_sequences()["implementation_reviews"],
+    }
     for seq in sequences.values():
         for step in seq:
             fid = getattr(step, "fragment_id", None)

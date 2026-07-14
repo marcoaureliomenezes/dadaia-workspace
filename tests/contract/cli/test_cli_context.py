@@ -192,7 +192,7 @@ def test_context_bind_read_persistence_variants(workspace: Path) -> None:
     """FR-R4-01/02: bind with NO --mode exits 0, defaults to read, persists READ, and
     prints a human confirmation (context/mode/session id) — never a shell export line.
     Explicit --mode read persists READ; legacy --mode spec alias maps and persists as
-    READ too (no lease-taking)."""
+    READ too."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
@@ -240,30 +240,24 @@ def test_context_bind_print_env_read_and_implementation_shapes(workspace: Path) 
     assert record["mode"] == "BOUND_IMPLEMENTATION"
 
 
-# --- NF-2 (rc-2): bind refreshes the CONTEXT incumbent pointer -------------
+# --- caller-scoped harness binding -----------------------------------------
 
 
-def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> None:
-    """NF-2 (rc-2): bind writes the CONTEXT incumbent pointer to the bind's session id.
-
-    The incumbent pointer is what makes a default in-session bind bind the CONTEXT (not just
-    a throwaway sid): the SDD gate resolves a harness session's mode through
-    ``resolve_identity(ctx)`` → ``<ctx>.ptr`` → the persisted record.
-    """
+def test_context_bind_persists_harness_owned_record(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bind persists the mode under the current harness id without a global pointer."""
     from dadaia_workspace.features.spec_context import session_identity
 
+    monkeypatch.setenv("CODEX_THREAD_ID", "harness-session")
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
     assert result.exit_code == 0, result.output
-    record = _session_record_for(workspace, result.output)
-    incumbent = session_identity.read_incumbent_ptr(workspace, "myctx")
-    assert incumbent == record["session_id"], (
-        "bind must refresh the context incumbent pointer to its session id"
-    )
-    # And the gate resolves the bound mode through the incumbent for a DIFFERENT harness sid.
-    identity = session_identity.resolve_identity(workspace, "myctx")
-    assert identity["incumbent"] == record["session_id"]
-    assert identity["mode"] == "READ"
+    record = session_identity.read_session(workspace, "harness-session")
+    assert record is not None
+    assert record["context"] == "myctx"
+    assert record["mode"] == "READ"
+    assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
 
 
 # --- FR-W2-02 (T-014-09): bind writes the standalone bind-epoch marker --------
@@ -271,8 +265,7 @@ def test_context_bind_refreshes_context_incumbent_pointer(workspace: Path) -> No
 
 def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
     """FR-W2-02: a successful bind stamps `.dadaia/states/bind_epoch/<ctx>`
-    (standalone) — created on demand, refreshed on re-bind, and never folded into
-    the incumbent `.ptr` payload (which carries ONLY the bare session id).
+    (standalone) — created on demand and refreshed on re-bind.
 
     The marker is the SOLE trigger for context-memory injection and the ctx-inject
     hook's harness-real discovery source.
@@ -289,15 +282,8 @@ def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
     assert marker_dir.is_dir()
     assert marker.is_file(), "bind must write a standalone bind-epoch marker"
 
-    record = _session_record_for(workspace, result.output)
-    incumbent = session_identity.read_incumbent_ptr(workspace, "myctx")
-    assert incumbent == record["session_id"]
-    ptr_text = (
-        (workspace / ".dadaia" / "sessions" / "runtime" / "myctx.ptr")
-        .read_text(encoding="utf-8")
-        .strip()
-    )
-    assert ptr_text == record["session_id"]
+    _session_record_for(workspace, result.output)
+    assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
 
     first_mtime = marker.stat().st_mtime
     # Backdate the marker so a refresh is observable regardless of clock granularity.
@@ -318,12 +304,10 @@ def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
         pytest.param("review", "BOUND_REVIEW", id="review"),
     ],
 )
-def test_context_bind_implementation_and_review_persist_mode_no_lock3(
+def test_context_bind_implementation_and_review_persist_mode(
     workspace: Path, mode: str, expected_record_mode: str
 ) -> None:
-    """FR-R4-02: --mode implementation/review persists the BOUND_* mode + creates a
-    session, and (v0.1.6) never creates a Lock-3 per-release implementation lock file
-    on bind — the gate's single TTL-lease enforces one writer at write time instead."""
+    """FR-R4-02: implementation/review binds persist BOUND_* mode and a session."""
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", mode, "--release", "v1"])
     assert result.exit_code == 0, result.output
@@ -335,13 +319,8 @@ def test_context_bind_implementation_and_review_persist_mode_no_lock3(
         session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
         assert session_file.exists(), "Session file must be created"
 
-    lock_file = workspace / ".dadaia" / "locks" / "implementation" / "myctx__v1.json"
-    assert not lock_file.exists(), "bind must NOT create a Lock-3 implementation lock (v0.1.6)"
-
-
 def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
-    """v0.1.6: bind no longer serializes — a second implementation bind succeeds
-    (the gate's single TTL-lease, not bind, enforces one writer at write time)."""
+    """Independent implementation binds both succeed; peer presence is advisory."""
     _register_alive_ctx(workspace)
     result1 = _runner.invoke(
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
@@ -361,8 +340,7 @@ def test_context_bind_second_implementation_does_not_block(workspace: Path) -> N
 def test_context_release_deletes_session_and_without_session_exits_nonzero(
     workspace: Path,
 ) -> None:
-    """v0.1.6: release deletes the session file (Lock-3 retired — no lock file to
-    delete), and release without DADAIA_SESSION_ID exits non-zero."""
+    """Release deletes the caller's session file; missing identity exits non-zero."""
     _register_alive_ctx(workspace)
     bind_result = _runner.invoke(
         app,

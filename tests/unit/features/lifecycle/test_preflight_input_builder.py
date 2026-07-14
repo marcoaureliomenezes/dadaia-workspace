@@ -7,8 +7,8 @@
 
 Each test below drives real producers' behavior against a hand-assembled ``tmp_path``
 workspace (no fakes-of-the-thing-under-test): active-release from a real ACTIVE.md, git
-state from a real git repo, specs-doctor from a real specs tree, lease/mode from real
-session-identity + lease records, hygiene from the real ``LifecycleHygieneService``, and
+state from a real git repo, specs-doctor from a real specs tree, mode from the caller's
+session record, hygiene from the real ``LifecycleHygieneService``, and
 the composed ``expected_phase``/``required_mode`` policy from ACTIVE.md's phase.
 
 CRITICAL: preflight inputs come from REAL producers (v0.1.69 zero-producers bug) — do not
@@ -41,7 +41,6 @@ def _mk_workspace(tmp_path: Path, *, ctx: str = "proj") -> Path:
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
         json.dumps(
             {
@@ -121,18 +120,24 @@ def test_git_producer_reads_real_clean_and_dirty_state(tmp_path: Path) -> None:
     assert dirty_data.git.dirty_paths != ()
 
 
-# --- ③ lease unbound default + bound incumbent binding -----------------------------------
+# --- ③ caller-scoped binding ------------------------------------------------------------
 
 
-def test_lease_unbound_default_and_bound_incumbent_binding(tmp_path: Path) -> None:
+def test_unbound_default_and_caller_owned_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from dadaia_workspace import container
     from dadaia_workspace.features.spec_context import session_identity
 
     ws = _mk_workspace(tmp_path)
     data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
 
-    # No bind yet ⇒ no live foreign holder, mode resolves to the unbound default.
-    assert data.lease.live_foreign_holder is False
+    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+
+    # No caller record means no binding and no sibling presence.
+    assert data.presence.live_foreign_holder is False
+    assert data.binding is None
 
     session_identity.write_session(
         ws,
@@ -144,7 +149,7 @@ def test_lease_unbound_default_and_bound_incumbent_binding(tmp_path: Path) -> No
             "release": "v0.1.99",
         },
     )
-    session_identity.set_incumbent(ws, "proj", "sess-bound-1")
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess-bound-1")
 
     bound_data = container.build_lifecycle_preflight_input(ws, context="proj", release_id="v0.1.99")
 

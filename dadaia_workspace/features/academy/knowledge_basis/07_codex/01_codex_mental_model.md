@@ -5,11 +5,11 @@ dadaia-workspace, the local CLI/runtime projection matters most: Codex reads the
 repository, follows instructions, uses tools, can run hooks, can load skills, and
 can spawn custom agents when explicitly asked.
 
-The first correction is simple: Codex is not a workflow daemon. It does not watch
-`public/workflows/*.workflow.md` and automatically route every user demand through
-`project-manager`. It follows instructions in the current session. If the task
-needs subagents, the operator or dispatcher must explicitly ask Codex to spawn or
-delegate to them.
+The first correction is simple: Codex is not a workflow daemon. It follows
+instructions in the current session. The four Python-backed `dadaia lifecycle`
+commands run the governed SDD workflows and call Layer-2 workers explicitly. Outside
+those workflows, the operator or dispatcher must explicitly ask Codex to spawn or
+delegate when subagents are needed.
 
 ## The Surfaces That Matter
 

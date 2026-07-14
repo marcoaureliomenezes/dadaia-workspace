@@ -19,11 +19,9 @@ from pathlib import Path
 
 _LIFECYCLE = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "features" / "lifecycle"
 
-#: Every module that calls ``build_fragment_suffix`` (D-2 / A4). Since v0.1.57 FR1 the four
-#: handoff-ledger bodies (``release_definition`` / ``audit`` / ``research`` / ``bug_report``)
-#: share ONE call in the ``_fragment_gate`` base — which threads ``step.is_review`` — instead of
-#: a per-body copy. ``pipeline`` threads ``step.is_review``; ``backlog_definition`` threads the
-#: literal ``False`` for its create steps. (The whole-tree scan below still guards every file.)
+#: Every module that calls ``build_fragment_suffix``. Release definition and audit share
+#: one call in ``_fragment_gate``; implementation-reviews uses ``pipeline``; backlog
+#: definition threads the literal ``False`` for create steps.
 _CALLER_MODULES = {
     "workflows/_fragment_gate.py": "step.is_review",
     "workflows/backlog_definition.py": "False",

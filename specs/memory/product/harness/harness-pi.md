@@ -1,108 +1,65 @@
 ---
 slug: harness-pi
-title: Harness — PI (pi-coding-agent)
+title: Harness - PI (pi-coding-agent)
 category: product
-tldr: 'Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator''s Codex subscription.'
-summary: Capability and scaffold truth for the PI harness at both agentic layers — the
-  post-trust Ring-1 extension, the PI_HEADLESS worker transport and auth, the model
-  set including the OpenRouter allowlist, telemetry posture, and what a PI-only
-  workspace installation contains.
+tldr: Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles.
+summary: >-
+  PI can enter the workspace interactively after explicit trust and can execute bounded
+  Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified
+  Codex-subscription ids; optional OpenRouter profiles remain explicit.
 tags:
 - harness
 - pi
 - layer-1
 - layer-2
 - projection
-token_estimate: 740
-last_updated: '2026-07-08'
-release_origin: v0.1.66
+token_estimate: 348
+last_updated: '2026-07-13'
+release_origin: v0.2.3
 ---
 
 ## Purpose
 
-PI (`@earendil-works/pi-coding-agent`) is a **dual-layer** harness. Layer 1: the
-operator's `pi` terminal agent — it reads `AGENTS.md` natively up-tree and, once the
-operator grants trust to `.pi/`, gains a genuine **pre-disk Ring-1 gate**: the
-projected `.pi/extensions/dadaia-sdd-gate.ts` `tool_call` handler blocks write/edit
-before disk by delegating to the same Python `pre_gate` the other harnesses use.
-Layer 2: the `PI_HEADLESS` worker — `pi --mode json` driven one-shot per step, Ring-2
-bounded. In a PI entry session, dadaia-workflows default the Layer-2 harness to `pi`
-unless the operator overrides — mechanically, via the post-trust entry-signal pin below.
+PI is both a Layer-1 entry harness and a Layer-2 workflow worker. It is an operator-
+installed external CLI, not a Python package dependency.
 
-## Usage flow
+## Layer 1
 
-1. Operator installs `pi` (external optional CLI — never a pinned dependency; build
-   stays offline-first without it) and grants `.pi/` trust on first launch.
-2. Layer-1 governance: `AGENTS.md` up-tree + post-trust extension gate + git
-   chokepoints. **Trust boundary:** `.pi/**` is post-trust executable TypeScript — a
-   deliberate privilege grant, lib-originated and manifest-tracked, never hand-edited.
-3. **Entry-signal seam (post-trust):** at factory load the Ring-1 extension
-   (`dadaia-sdd-gate.ts`) sets `process.env.DADAIA_ENTRY_HARNESS = "pi"` **only when
-   unset**, so PI tool subprocesses (bash → `dadaia lifecycle …`) auto-default
-   `--harness` to `pi`. **Security posture: the pin is session-wide and
-   credit-affecting** — every child process of the PI session inherits it, and an
-   auto-defaulted `pi` worker spends real credits. The guardrails are structural:
-   **set-only-when-unset** (an operator pin always wins); the **loud
-   `[harness] auto-default:` echo** guards every real-worker auto-default (never
-   silent); and the signal is **never derived from telemetry** (no session-file/mtime
-   heuristics — the pin is the extension's explicit, post-trust act). Pre-trust
-   (extension not loaded) there is no signal and the default honestly stays `fake`.
-4. As a Layer-2 worker: the engine invokes `pi --mode json --model <id>` with the
-   fragment+persona step prompt; auth comes from `~/.pi/agent/auth.json` under the
-   operator's **Codex subscription** (provider openai-codex) — PI itself requires no
-   Anthropic key. Qualification: the PI worker env allowlist **deliberately passes
-   `ANTHROPIC_API_KEY` through when present** (`infrastructure/pi_runtime.py`, via the
-   shared `headless_adapter_base` env filter) so provider-flexible setups work; it is
-   pass-through, not a requirement. Result extraction is the shared
-   strict-schema-first path (tolerates bare unfenced JSON).
-   **Non-zero exit is FAILED (v0.1.66, FR1).** `PiHeadlessAdapter._result_from_output`
-   returns `AgentRunStatus.FAILED` whenever the subprocess `returncode != 0`,
-   regardless of whether `stdout` is non-empty — previously a non-empty stdout (e.g. a
-   JSONL session/event preamble with no usable `message_end`) masked a genuine setup
-   failure as `SUCCEEDED`. `run()`'s stderr-backfill threads the real (redacted)
-   `stderr`/`stdout` into `result.error` so the downstream block reason is the actual
-   upstream failure (e.g. "No API key found for azure-openai-responses."), never the
-   generic "agent result missing artifact evidence".
-   **Tolerant result-payload contract, no-op invariant unchanged (v0.1.66, FR2).** The
-   shared extraction (`headless_adapter_base`) now also accepts `schema_version` as an
-   equivalent label to `schema` for strict classification, and falls back to a
-   singular `payload["artifact"]["path"]` as a one-element `artifact_refs` when the
-   list-based extraction yields nothing. A genuine no-op worker — no result object at
-   all — still yields empty `artifact_refs` and BLOCKs exactly as before; the widened
-   acceptance only ever recognizes a payload that genuinely is a result with content.
-5. Telemetry: `features/telemetry/reader/pi.py` ingests session METADATA only from
-   `~/.pi/agent/sessions/` (invariant T1 — no message bodies; cost unknown ⇒ never
-   fabricated).
+`.pi/` is a generated projection. PI loads its TypeScript SDD gate extension only after
+the operator trusts the workspace. The extension maps PI tool events to the same Python
+gate policies and sets `DADAIA_ENTRY_HARNESS=pi` so `--harness auto` can prefer PI.
+Generated `.pi/**` files contain no secrets and must not be hand-edited.
 
-## Typical trigger
+## Layer 2
 
-Layer 1: operator preference for PI. Layer 2: every dadaia-workflow step whose
-governed harness resolves to `pi` — model set `(gpt-5.5, high)`, `(gpt-5.5, low)`,
-`(gpt-5.3-codex, medium)`, plus the curated OpenRouter `moonshotai/kimi-k2.5:high`
-(v0.1.66 — corrected from the invalid literal `kimi-2.7`, which OpenRouter rejected;
-via the Layer-2 allowlist + the `pi-openrouter-kimi-high` profile; never a `claude-*`
-id).
+`PiHeadlessAdapter` invokes `pi --mode json` with the exact governed model id and
+`--thinking` effort. It parses the event stream, validates `agent-run-result-v1`, retains
+redacted diagnostics for malformed/non-zero attempts, and returns artifact references to
+the lifecycle engine.
 
-## Differentiator
+The built-in PI catalog includes:
 
-The only harness with BOTH a real Layer-1 pre-disk gate (post-trust) and a Layer-2
-worker role, and the widest Layer-2 model set (operator-extensible via the local
-profile store, validated, no API keys stored). Live-verified build: pi 0.79.3.
+- `openai-codex/gpt-5.5` at high, medium, and low reasoning;
+- `moonshotai/kimi-k2.5` at high reasoning through the explicit OpenRouter profile.
 
-## Runtime state touched
+Provider qualification is mandatory. A Codex-subscription profile cannot resolve to
+OpenRouter, and an OpenRouter profile cannot masquerade as subscription-backed. OAuth
+and API-key storage are operator/runtime concerns outside generated workspace assets;
+the workspace never copies credential material.
 
-Scaffold projected by `dadaia public install --target pi`: `.pi/SYSTEM.md`,
-`.pi/settings.json`, `.pi/prompts/`, `.pi/extensions/dadaia-sdd-gate.ts`.
-Operator-local model profiles live in `.dadaia/states/workflow_model_profiles.local.json`
-(validated, never projected to `public/`). A PI-only workspace = `--target pi`
-(+ shared `--target agents`). This isolation is now **enforced mechanically at init** —
-`dadaia init --harness pi` scaffolds only the `.pi/` post-trust projection and persists
-the profile ([[workspace-init]]) — not merely documented.
+## Workflow Use
+
+All four dadaia-workflows accept PI globally or per step. The workflow policy freezes the
+selected profile for each run. PI receives fragment plus persona, scoped context, allowed
+paths, exact dependencies, and a required output schema just like Codex.
+
+## Telemetry
+
+The PI telemetry reader ingests allowlisted metadata from PI session records. It does
+not ingest prompt or response bodies and does not fabricate pricing for models without a
+known pricing row.
 
 ## Dependencies
 
-- [[tech-stack]] — roster, PI auth truth, model catalog single source.
-- [[lifecycle-foundation]] — the engine driving the PI_HEADLESS worker.
-- [[sdd-gate-v3]] — the pre_gate the Ring-1 extension delegates to.
-- [[agent-monitoring]] — the metadata-only PI telemetry posture.
-- [[public-asset-distribution]] — the `.pi/` projection pipeline.
+[[dadaia-workflows]], [[lifecycle-foundation]], [[multi-platform-parity]],
+[[agent-monitoring]], [[sdd-gate-v3]].

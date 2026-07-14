@@ -82,8 +82,6 @@ _ALL_VIEW_NAMES = [
     "api_report_mark_important",
     "api_agent_prompt",
     "api_workflow_run",
-    "api_workflow_detail",
-    "api_workflows",
 ]
 
 
@@ -125,8 +123,6 @@ _VIEW_ROUTE_CASES = [
     ("/api/academy", "api_academy"),
     ("/api/reports", "api_reports"),
     ("/api/agents/software-engineer/prompt", "api_agent_prompt"),
-    ("/api/workflows", "api_workflows"),
-    ("/api/workflows/audit-fanout", "api_workflow_detail"),
 ]
 
 _TELEMETRY_ROUTE_PATHS = [

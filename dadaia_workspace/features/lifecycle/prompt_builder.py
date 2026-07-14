@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -45,6 +47,85 @@ class FragmentBundle:
 _TRANSPORT_SCHEMA_ID = "agent-run-result-v1"
 
 
+def canonical_worker_output_ref(context: str, task_id: str) -> str:
+    """Return the deterministic raw-output path assigned to one worker step.
+
+    The workflow engine owns ``context`` and ``task_id``; workers no longer invent a
+    filename and then risk claiming a path they never materialized. The raw
+    ``agent-run-result-v1`` object is deliberately stored outside
+    ``.dadaia/handoff``: that namespace is reserved for public ``handoff-v1.x``
+    documents. Python promotes the validated domain payload into the immutable
+    run-scoped workflow ledger under ``.dadaia/runs/lifecycle``.
+
+    The short digest prevents two task ids that sanitize to the same filename from
+    colliding while keeping the reference readable. ``.dadaia/tmp`` is ADDITIVE and
+    cleanup-governed, so a failed worker cannot pollute durable handoff evidence.
+    """
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", task_id).strip("-._") or "step"
+    digest = hashlib.sha256(task_id.encode("utf-8")).hexdigest()[:12]
+    return f".dadaia/tmp/lifecycle-worker/{context}/{stem}-{digest}.step-output.json"
+
+
+def worker_output_glob(context: str) -> str:
+    """Return the only additive raw-output zone a lifecycle worker may use."""
+    return f".dadaia/tmp/lifecycle-worker/{context}/**"
+
+
+def filter_context_spec_paths(
+    paths: tuple[str, ...],
+    *,
+    workspace_root: Path | None,
+    specs_dir: Path | None,
+) -> tuple[str, ...]:
+    """Remove generic/foreign specs fallbacks when the real context root is known.
+
+    Declarative step tables carry both ``repos/{context}/specs/**`` and ``specs/**``
+    so direct fixture workspaces remain usable.  Production composition knows the
+    exact context ``specs_dir``; retaining both there lets a worker satisfy the gate
+    in the wrong tree.  Non-spec paths are preserved unchanged.
+    """
+    if workspace_root is None or specs_dir is None:
+        return paths
+    try:
+        prefix = specs_dir.resolve().relative_to(workspace_root.resolve()).as_posix()
+    except ValueError:
+        return paths
+    return tuple(
+        path
+        for path in paths
+        if "specs/" not in path
+        or path == prefix
+        or path.startswith(f"{prefix}/")
+    )
+
+
+def _materialization_instruction(scope: "PromptScope") -> str:
+    if GateEvidenceKind.HANDOFF not in scope.required_evidence:
+        return ""
+    ref = canonical_worker_output_ref(scope.context, scope.task_id)
+    return (
+        "## Mandatory evidence materialization\n"
+        f"Use your write tool to create exactly `{ref}` before returning the result. "
+        "Put the exact substantive `agent-run-result-v1` JSON object in that temporary "
+        "step-output file, then use your read tool to "
+        "read it back and confirm it exists. Set `artifact_refs` to include exactly "
+        f"`{ref}`. Never invent a timestamped alternative, never claim "
+        "`handoff_validated` before the read-back succeeds, and never return the final "
+        "result object while this file is absent. Resolve this relative reference only "
+        "beneath the outer prompt envelope's `execution_root`; do not infer a different "
+        "workspace from global skills or configuration. Do not write this raw result "
+        "under `.dadaia/handoff`; Python owns promotion into the immutable run-scoped "
+        "workflow handoff ledger."
+    )
+
+
+def _worker_prompt(scope: "PromptScope") -> str:
+    materialization = _materialization_instruction(scope)
+    if not materialization:
+        return scope.prompt
+    return f"{scope.prompt}\n\n{materialization}"
+
+
 def _required_output_section(*, is_review: bool) -> str:
     """The step-kind-aware "## Required output" instruction (v0.1.32 / L1·L2·L3 / D-1·D-2·D-3).
 
@@ -63,13 +144,16 @@ def _required_output_section(*, is_review: bool) -> str:
             f"`{_TRANSPORT_SCHEMA_ID}`. Because this is a REVIEW step, set "
             "`structured_output.verdict` to APPROVED or REJECTED and justify it with "
             "`verdict_reason` (and `findings` when REJECTED). Include `artifact_refs` "
-            "pointing at the handoff document."
+            "pointing at the assigned step-output artifact. Before returning, write it to "
+            "disk inside the allowed write scope; never reference a nonexistent file."
         )
     else:
         body = (
             "Emit one result object whose `schema` field is the literal transport id "
             f"`{_TRANSPORT_SCHEMA_ID}`. Because this is a CREATE step, emit the produced "
-            "artifact and list it in `artifact_refs` pointing at the handoff document. Do "
+            "artifact and list it in `artifact_refs` pointing at the assigned step-output. "
+            "Before returning, write that step-output to disk inside the allowed write scope; "
+            "never reference a nonexistent file. Do "
             "NOT self-judge: a create step does not emit an APPROVED/REJECTED decision — "
             "the review gate owns that."
         )
@@ -190,7 +274,8 @@ class LifecyclePromptBuilder:
         self._validate_scope(scope)
         # The cacheable prefix leads the worker prompt verbatim; the per-step scope is the
         # variable suffix. Identical prefix bytes across steps => provider cache hit.
-        worker_prompt = scope.prompt if prefix is None else f"{prefix.text}\n\n{scope.prompt}"
+        scoped_prompt = _worker_prompt(scope)
+        worker_prompt = scoped_prompt if prefix is None else f"{prefix.text}\n\n{scoped_prompt}"
         request = AgentRunRequest(
             role=scope.role,
             prompt=worker_prompt,
@@ -221,7 +306,7 @@ class LifecyclePromptBuilder:
             "context": scope.context,
             "release_id": scope.release_id,
             "task_id": scope.task_id,
-            "instructions": scope.prompt,
+            "instructions": _worker_prompt(scope),
             "write_scope": {
                 "allowed_paths": list(scope.allowed_paths),
                 "forbidden_paths": list(scope.forbidden_paths),

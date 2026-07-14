@@ -225,8 +225,8 @@ def resolve_persona_for_role(role: str, loader: PersonaLoader | None = None) -> 
 
     This is the SINGLE source of role→persona resolution shared by every prompt-assembly
     surface — the :class:`~dadaia_workspace.features.lifecycle.pipeline.LifecyclePipeline`,
-    each fragment workflow body (release_definition / audit / research / bug_report /
-    backlog_definition), and the CLI single-step path — so every model-driven step prompt
+    each fragment workflow body (release_definition / audit / backlog_definition),
+    and the implementation pipeline — so every model-driven step prompt
     on every verb carries the persona body as its operative role directive (W1-3).
 
     ``role`` is comma-split (a multi-role step such as ``plan_review`` names

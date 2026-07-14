@@ -35,6 +35,12 @@ role, its write set, and how it is validated.
 | Preconditions | Other tasks that must complete first, matching the PLAN's dependency order. |
 | Marker | The open marker `[ ]`, ready to be reserved. |
 
+When a task creates or changes a caller-facing surface, its description must carry
+the exact public type/function/method name, signature, fields, and module/export path
+already approved in the PLAN. Copy those bindings faithfully. Never replace them with
+generic phrases such as "one value" or "one API", and never invent a binding missing
+from the approved PLAN.
+
 ## Rules
 
 - Group tasks so that two tasks with disjoint write sets can proceed independently,
@@ -46,6 +52,18 @@ role, its write set, and how it is validated.
   needs invites scope drift at implementation.
 - Tasks declare validation; an implementer must never have to invent how their work
   is verified.
+- Tasks carry approved public contract bindings; an implementer must never have to
+  choose caller-facing names, signatures, fields, or import paths.
+- Repository-local pytest commands must disable cache creation with the exact option
+  `-p no:cacheprovider`. `--cache-clear` is not a substitute: it clears an existing
+  cache and then permits pytest to recreate `.pytest_cache/`. Do not author any
+  validation command that can leave a cache, coverage, report, or tool-state artifact
+  inside the repository.
+- A task's validation is part of its dependency graph. Every API, command, fixture,
+  snapshot, integration path, or evidence source named by that validation must exist by
+  the end of the task or one of its preconditions. Put cross-component/end-to-end
+  assertions in the later integration task; validate earlier adapters or units directly.
+  Never make task `Tn` depend on evidence first created by a later task.
 
 ## Output
 

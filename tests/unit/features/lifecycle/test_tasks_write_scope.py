@@ -35,6 +35,7 @@ import pytest
 
 from dadaia_workspace.features.lifecycle.tasks_write_scope import (
     _extract_globs,
+    write_scope_from_release_tasks,
     write_scope_from_tasks,
 )
 
@@ -461,6 +462,58 @@ def test_engine_authored_checklist_bullet_grammar_with_indented_write_set(
         "memoria-bichos/game.js",
         "memoria-bichos/README.md",
         "index.html",
+    )
+
+
+def test_generated_checklist_grammar_reads_nested_path_bullets(tmp_path: Path) -> None:
+    """The generated task can put the key and paths on separate indentation levels."""
+    _write_tasks(
+        tmp_path,
+        """# TASKS
+
+- [-] **T01 - Define state contract.**
+  - Owner role: implementer.
+  - Write set:
+    - `repos/demo/src/games.py`
+    - `repos/demo/tests/test_games.py`
+  - Preconditions: none.
+
+- [ ] **T02 - Add movement.**
+  - Write set:
+    - `repos/demo/src/games.py`
+""",
+    )
+    assert write_scope_from_tasks(tmp_path, _RELEASE) == (
+        "repos/demo/src/games.py",
+        "repos/demo/tests/test_games.py",
+    )
+    assert write_scope_from_release_tasks(tmp_path, _RELEASE) == (
+        "repos/demo/src/games.py",
+        "repos/demo/tests/test_games.py",
+    )
+
+
+def test_release_scope_unions_open_and_reserved_tasks_but_skips_done(tmp_path: Path) -> None:
+    _write_tasks(
+        tmp_path,
+        """# TASKS
+
+- [x] **T01 - Done.**
+  - Write set:
+    - `done/ignore.py`
+- [-] **T02 - Reserved.**
+  - Write set:
+    - `src/games.py`
+- [ ] **T03 - Open.**
+  - Write set:
+    - `src/games.py`
+    - `tests/test_games.py`
+""",
+    )
+
+    assert write_scope_from_release_tasks(tmp_path, _RELEASE) == (
+        "src/games.py",
+        "tests/test_games.py",
     )
 
 

@@ -32,7 +32,7 @@ fixed centrally — each fix patched one command surface and the family kept rec
    deliberately:
      - ``bugs append --context`` is bug-event METADATA (flows into ``BugEvent(context=...)``,
        never into a resolution call) — never a specs-dir resolution input.
-     - ``lifecycle status --context`` / ``lifecycle handoffs doctor --context`` are OPTIONAL
+     - ``reports workflow-status --context`` / ``reports workflow-handoffs-doctor --context`` are OPTIONAL
        RUN FILTERS (``LifecycleRun.context`` equality; omitting means "no filter, show
        everything" per the v0.1.71 FR2 docstring) — never a specs-dir resolution input.
    The reachability check is itself dynamic (graph search over the real source), not a
@@ -44,8 +44,8 @@ RED against HEAD (v0.1.77 T-1): part (a) below fails today because 15 lifecycle 
 default ``--context`` to the literal ``"dadaia-workspace"``. Part (b) (the seam-boundary
 assertion) is checked as a structural stand-in for the executed-path probe in
 ``tests/integration/cli/test_bind_resolution_seam_executed_path.py`` — that companion
-module runs the REAL bind + verb invocation end-to-end for a representative verb per
-command module (bugs, specs, context, lifecycle).
+module runs the REAL bind + verb invocation end-to-end for the resolver-driven command
+modules (bugs, specs, and context).
 """
 
 from __future__ import annotations
@@ -412,8 +412,10 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     # now a ROUTING key resolved through the seam (bug
     # bugs-append-ledger-ignores-context-flag), no longer inert event metadata.
     known_non_resolver = {
-        "dadaia.lifecycle.status --context",
-        "dadaia.lifecycle.handoffs.doctor --context",
+        "dadaia.reports.workflow-handoffs-doctor --context",
+        # Diagnostic filter only: it narrows persisted run summaries and does not
+        # resolve a Spec Context filesystem root.
+        "dadaia.reports.workflow-status --context",
         "dadaia.specs.init --specs-dir",
     }
     unexpected_non_resolver = set(not_seam_reaching) - known_non_resolver

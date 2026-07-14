@@ -42,8 +42,8 @@ def _harness_only_overlay() -> WorkflowModelPolicyOverlay:
     return WorkflowModelPolicyOverlay(
         policy_id="default",
         contexts={},
-        default_harness_overlay={DEFAULT_CONTEXT: {"implementation": "pi"}},
-        step_harness_overlay={DEFAULT_CONTEXT: {"implementation": {"implement": "pi"}}},
+        default_harness_overlay={DEFAULT_CONTEXT: {"implementation_reviews": "pi"}},
+        step_harness_overlay={DEFAULT_CONTEXT: {"implementation_reviews": {"implement": "pi"}}},
     )
 
 

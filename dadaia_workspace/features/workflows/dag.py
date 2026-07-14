@@ -40,10 +40,6 @@ from __future__ import annotations
 import html
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from dadaia_workspace.features.workflows.service import StageDTO
 
 # ---------------------------------------------------------------------------
 # Layout constants
@@ -63,6 +59,20 @@ BAND_PAD: int = 8  # padding around parallel-group band
 # ---------------------------------------------------------------------------
 # Optional per-node enrichment (AC-1 / T-45-01)
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class StageDTO:
+    """Minimal workflow step shape consumed by the SVG renderer."""
+
+    id: str
+    agent: str
+    needs: list[str]
+    parallel_group: str | None
+    gate: bool
+    expected_output_path: str | None
+    must_include: list[str] | None
+    on_failure: str
 
 
 @dataclass(frozen=True)
@@ -423,7 +433,7 @@ def render_dag_svg(
     No I/O, no global state mutation.
 
     Args:
-        stages: Ordered list of StageDTO objects from WorkflowDetailDTO.stages.
+        stages: Ordered list of StageDTO objects assembled from governed steps.
         node_meta: Optional map ``{stage_id: NodeMeta}`` carrying harness/model to
             draw inside each node (Workflows-card fluxogram). ``None`` (the default)
             yields the historical, byte-for-byte-identical output used by the

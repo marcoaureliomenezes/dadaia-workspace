@@ -16,21 +16,16 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
-    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
     RepoCatalogError,
     SchemaVersionError,
-    WorkspaceLockTimeoutError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
-from dadaia_workspace.features.spec_context.locking import (
-    workspace_lock,
-)
 from dadaia_workspace.features.spec_context.service import (
     DeadReviewRequiredError,
     DeadSecretFoundError,
@@ -195,19 +190,7 @@ def list_all() -> None:
 
 
 def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
-    """Resolve the no-arg ``context show`` target through the SINGLE bind-resolution seam
-    (v0.1.77 FR1, folding in the v0.1.71 FR3 no-arg default).
-
-    Pre-v0.1.77 this scanned EVERY ALIVE context's incumbent pointer for the
-    most-recently-seen live bound session — a cross-context, context-global signal the
-    v0.1.76 NO-LOCKS DOCTRINE retired in spirit (the doctrine's identity model is
-    self-scoped: env -> this session's OWN record -> ancestry -> first-ALIVE, never a
-    scan of "whichever session touched any context most recently"). This now resolves via
-    :func:`~dadaia_workspace.cli._specs_resolution.resolve_context_for_cli` — the exact
-    same seam every other resolver-driven verb consumes — and looks the name up in *svc*.
-    The "who else is live where" signal is unchanged and still shown in ``show``'s
-    presence display body below; it no longer drives which context gets RESOLVED.
-    """
+    """Resolve no-arg ``context show`` through the caller-owned resolution seam."""
     from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
     _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
@@ -228,8 +211,7 @@ def show(
     """Show details of a context."""
     svc = _ctx_service()
     if name is None:
-        # No name: prefer the context with a live bound session, else first ALIVE (v2:
-        # no global primary). v0.1.71 FR3 — reflect a bare `context bind`.
+        # No name: use only explicit/caller-owned/cwd resolution; never foreign presence.
         ctx = _resolve_default_context(svc, resolve_workspace_root())
     else:
         try:
@@ -243,18 +225,11 @@ def show(
             print(json.dumps({"context": None}, indent=2))
         else:
             data = _ctx_to_dict(ctx)
-            # Add session sub-object (AC-T10d-6). v0.1.69 FR4 (bug
-            # context-bind-success-not-reflected-in-context-show): resolution order is
-            # the explicit DADAIA_SESSION_ID override FIRST, then — when absent, the
-            # normal case after a bare `dadaia context bind` with no `eval $(...)` — the
-            # CONTEXT's incumbent pointer that `bind` already refreshes
-            # (session_identity.set_incumbent). A stale/absent pointer still yields
-            # `session: null` (AC4.2, unchanged behavior).
+            # Show only this caller's session. A context-wide "last binder" fallback would
+            # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
             sessions_dir = _sessions_dir(workspace_root)
-            session_id = os.environ.get("DADAIA_SESSION_ID")
-            if not session_id:
-                session_id = session_identity.read_incumbent_ptr(workspace_root, ctx.name)
+            session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
             session_obj = None
             if session_id:
                 session_data = _load_session(sessions_dir, session_id)
@@ -264,8 +239,8 @@ def show(
             # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
             # context, sourced from the ONLY concurrency-signal surface post-doctrine
             # (features/spec_context/presence.py). Distinct from "session" above (which
-            # answers "what is MY session bound to" via the incumbent-pointer display
-            # hint, FR4). ``others_alive`` with an empty self-sid excludes nothing (no
+            # answers "what is MY session bound to" via the caller-owned record).
+            # ``others_alive`` with an empty self-sid excludes nothing (no
             # real presence record is ever keyed by ""), so every live record on the
             # context is listed.
             data["presence"] = [
@@ -354,25 +329,20 @@ def dead(
     except DeadSecretFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
-    except ContextLockedError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
 
-# Bind mode resolution (FR-R4-01/02). The operator-facing aliases map onto two
-# canonical, non-acquiring modes (READ) and two lease-taking modes (IMPLEMENTATION,
-# REVIEW). `spec` is a legacy alias of `read`; both persist as READ. Lease-taking modes
-# persist with the BOUND_ prefix the gate/lease layer expects.
+# Bind mode resolution. READ is self-protecting; IMPLEMENTATION and REVIEW are mutating.
+# `spec` remains a legacy alias of READ. Mutating modes carry the BOUND_ prefix.
 _BIND_MODE_ALIASES: dict[str, str] = {
     "READ": "READ",
-    "SPEC": "READ",  # legacy alias → READ (no lease)
+    "SPEC": "READ",
     "IMPLEMENTATION": "IMPLEMENTATION",
     "REVIEW": "REVIEW",
 }
-_LEASE_TAKING_MODES = ("IMPLEMENTATION", "REVIEW")
+_MUTATING_MODES = ("IMPLEMENTATION", "REVIEW")
 
 
 @app.command()
@@ -383,7 +353,7 @@ def bind(
         "--mode",
         help=(
             "Binding mode (optional; default 'read'): read | implementation | review. "
-            "Legacy alias: 'spec' maps to read. read never takes a lease."
+            "Legacy alias: 'spec' maps to read."
         ),
     ),
     release: str | None = typer.Option(
@@ -398,7 +368,7 @@ def bind(
             "the mode in the session record instead."
         ),
     ),
-    force: bool = typer.Option(False, "--force", help="Accepted but no-op (lock-steal replaces)"),
+    force: bool = typer.Option(False, "--force", help="Deprecated compatibility flag (no-op)"),
     reason: str = typer.Option("", "--reason", help="Reason note (informational only)"),
 ) -> None:
     """Bind this shell session to a context.
@@ -420,8 +390,8 @@ def bind(
 
     resolved_mode = _BIND_MODE_ALIASES[mode_upper]
 
-    # --release is required for the lease-taking modes (implementation, review).
-    if resolved_mode in _LEASE_TAKING_MODES and not release:
+    # Mutating bindings identify the release whose work they intend to change.
+    if resolved_mode in _MUTATING_MODES and not release:
         err_console.print(f"[red]Error:[/red] --release <id> is required for --mode {mode.lower()}")
         raise typer.Exit(1) from None
 
@@ -439,8 +409,8 @@ def bind(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # ALIVE guard: lease-taking modes require an ALIVE context (AC-T11-5)
-    if resolved_mode in _LEASE_TAKING_MODES and ctx.state != ContextState.ALIVE:
+    # Mutating modes require a checked-out ALIVE context.
+    if resolved_mode in _MUTATING_MODES and ctx.state != ContextState.ALIVE:
         err_console.print(
             f"[red]Error:[/red] Context '{name}' is not ALIVE (state={ctx.state.value}). "
             "Run 'dadaia context alive <name>' first."
@@ -452,10 +422,9 @@ def bind(
     runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     pid = os.getpid()
 
-    # The persisted mode the gate reads: lease-taking modes carry the BOUND_ prefix; READ
-    # persists bare. (spec → READ, review → BOUND_REVIEW per FR-R4-02 mapping table.)
+    # The persisted mode the gate reads: mutating modes carry BOUND_; READ stays bare.
     persisted_mode = (
-        f"BOUND_{resolved_mode}" if resolved_mode in _LEASE_TAKING_MODES else resolved_mode
+        f"BOUND_{resolved_mode}" if resolved_mode in _MUTATING_MODES else resolved_mode
     )
 
     session_data: dict = {  # type: ignore[type-arg]
@@ -471,61 +440,24 @@ def bind(
         "is_stale": False,
     }
 
-    # Persist the session record via the single session-identity owner (FR-R4-02 / R3),
-    # and refresh the CONTEXT incumbent pointer to this bind's session id (NF-2 fix). The
-    # incumbent pointer makes the bind bind the CONTEXT, not just a throwaway sid: `context
-    # show` reads it for its default-target/session-object resolution (T-4 territory).
-    # v0.1.76 T-3: the pointer carries no gate authority anymore — the SDD gate's mode
-    # resolution dropped the context-incumbent fallback rung in T-2.
-    try:
-        with workspace_lock(workspace_root):
-            session_identity.write_session(workspace_root, session_id, session_data)
-            session_identity.set_incumbent(workspace_root, name, session_id)
-            # FR4 (v0.1.55, bug bugs-append-ignores-persisted-bind): ALSO persist the session
-            # record under the harness-native session id, when the harness exports one. The
-            # bind mints a random ``sess_<uuid>`` no harness ever reports, and a codex/claude
-            # CLI call (e.g. ``dadaia bugs append``) is NOT a process-descendant of the bind —
-            # so the ancestry-chain marker below can never attribute it. But the harness
-            # exports a stable ``CODEX_SESSION_ID`` / ``CLAUDE_CODE_SESSION_ID`` for the whole
-            # session, so keying a session-record copy by it lets ``core.specs_resolver``
-            # resolve the bound context deterministically (ahead of the ancestry path). The
-            # PostToolUse heartbeat renews ``sessions/<harness_id>.json`` on every tool use, so
-            # the resolver's staleness guard keeps a live session resolving while rejecting a
-            # stale/inherited id. Best-effort: a pathological id must never break the bind.
-            harness_id = harness_session_id()
-            if harness_id:
-                with contextlib.suppress(ValueError, OSError):
-                    session_identity.write_session(
-                        workspace_root,
-                        harness_id,
-                        {**session_data, "session_id": harness_id},
-                    )
-            # FR-W2-02 (ADR-G5): stamp the bind-epoch marker. This is the SOLE trigger for
-            # context-memory injection and the ctx-inject hook's harness-real discovery
-            # source — the bind CLI's minted sid is invisible to the harness, so the marker's
-            # mtime+name is what the hook scans to re-inject on the next prompt. Standalone
-            # file, NOT a `.ptr` field (the `.ptr` is lease-incumbency, untouched here).
-            #
-            # W1-7/W1-8 (v0.1.47 ancestry-chain amendment): record the bind process's
-            # ANCESTRY PID CHAIN (nearest-first — ``os.getppid()`` then its ancestors) so the
-            # ctx-inject hook and the specs resolver can attribute this marker by MEMBERSHIP,
-            # not by single-pid equality. Recording only ``os.getppid()`` broke when bind ran
-            # through a harness Bash tool: the immediate parent is an EPHEMERAL shell that dies
-            # between calls, so a later hook/resolver (whose ``getppid`` is a NEW shell) never
-            # matched. The chain also captures the long-lived HARNESS pid deeper up, which both
-            # a later hook (its own ``os.getppid()`` == harness) and a later ``dadaia`` CLI
-            # child (harness in ITS ancestry) share — so attribution survives the shell churn
-            # while a concurrent session's disjoint chain still can never steal this injection.
-            # If the ancestry port is unavailable, the chain degrades to the single
-            # ``os.getppid()`` line (the pre-v0.1.47 behavior).
-            session_identity.write_bind_epoch(
+    # Persist the CLI session and, when available, the harness-native session record. There
+    # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.
+    session_identity.write_session(workspace_root, session_id, session_data)
+    # Also persist under the harness-native id so later harness calls resolve this bind.
+    harness_id = harness_session_id()
+    if harness_id:
+        with contextlib.suppress(ValueError, OSError):
+            session_identity.write_session(
                 workspace_root,
-                name,
-                pids=container.build_ancestry_pid_chain(os.getppid()),
+                harness_id,
+                {**session_data, "session_id": harness_id},
             )
-    except WorkspaceLockTimeoutError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+    # The bind epoch is the sole context-memory injection trigger.
+    session_identity.write_bind_epoch(
+        workspace_root,
+        name,
+        pids=container.build_ancestry_pid_chain(os.getppid()),
+    )
 
     # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
     # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
@@ -555,12 +487,11 @@ def release_cmd(
         ),
     ),
 ) -> None:
-    """Release the current session's binding AND its advisory presence (v0.1.76 FR2).
+    """Release the current session's binding and advisory presence.
 
     Run: dadaia context release
 
-    NO-LOCKS DOCTRINE: there is no lease to drop anymore — ``presence`` is the sole
-    concurrency-signal surface. Resolution order for "this session's own id": ``--session``
+    Resolution order for "this session's own id": ``--session``
     override -> ``DADAIA_SESSION_ID`` (eval-flow override) -> the harness-native session id
     (:func:`harness_session_id`) -> the last bind's CLI-minted session id read back from the
     session record directory (legacy default-flow fallback). Every presence record this
@@ -583,10 +514,8 @@ def release_cmd(
 
     session_file = sessions_dir / f"{resolved_sid}.json"
 
-    with workspace_lock(workspace_root):
-        cleared = presence.clear(workspace_root, resolved_sid)
-        # Unlink the session record AFTER presence has been dropped.
-        session_file.unlink(missing_ok=True)
+    cleared = presence.clear(workspace_root, resolved_sid)
+    session_file.unlink(missing_ok=True)
 
     if cleared:
         console.print(
@@ -624,16 +553,10 @@ def heartbeat() -> None:
         )
         raise typer.Exit(1) from None
 
-    # Renew this session's advisory presence record(s) — the live concurrency signal
-    # (v0.1.76 FR2). Also renews a legacy/residual lease record if one still exists
-    # (dormant primitive kept for `adopt_if_own_lineage`-adopted records; harmless no-op
-    # otherwise) so a pre-doctrine record does not go falsely stale mid-migration.
-    from dadaia_workspace.features.spec_context import lease as _lease
+    # Renew this session's advisory presence record(s), the sole concurrency signal.
     from dadaia_workspace.features.spec_context import presence
 
     ctx_name = session_data.get("context", "")
-    if ctx_name:
-        _lease.renew_heartbeat(workspace_root, ctx_name, session_id)
     presence.renew(workspace_root, session_id)
 
     now = _now_iso()

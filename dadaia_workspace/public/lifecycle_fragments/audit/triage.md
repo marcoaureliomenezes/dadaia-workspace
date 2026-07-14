@@ -32,9 +32,32 @@ Audit output is never a deletion — it is a status token plus a routing decisio
    and routing; the audit itself deletes nothing.
 3. **Cite the evidence.** Every disposition carries the finding's severity and the
    evidence behind it so the routing is auditable.
+4. **Preserve identity exactly.** Copy each upstream `id` byte-for-byte into
+   `finding_id`; never rename, normalize, summarize, or regenerate an ID. The terminal
+   Python gate compares the two sets exactly.
 
 ## Output
 
-A disposition handoff naming, per finding, its disposition token and route, the
-severity, and the evidence. This output is disposition-ready: the operator or a
-downstream workflow acts on the tokens directly.
+Write one `agent-run-result-v1` object whose domain fields have this exact shape:
+
+```json
+{
+  "summary": "one sentence",
+  "source_verdict": "REJECTED",
+  "dispositions": [
+    {
+      "finding_id": "stable-kebab-case-id",
+      "disposition": "bug",
+      "route": "specs/bugs via dadaia bugs append",
+      "severity": "HIGH",
+      "evidence": "the upstream finding evidence"
+    }
+  ]
+}
+```
+
+`source_verdict` must equal the drift-scan verdict. Dispose every upstream finding
+exactly once and preserve its severity. Allowed disposition tokens are `bug`, `backlog`,
+`accepted-risk`, and `resolved`. When the scan is approved with no findings, emit
+`"source_verdict": "APPROVED"` and an empty `dispositions` list. Generic summaries and
+artifact-only transport objects fail the Python gate.

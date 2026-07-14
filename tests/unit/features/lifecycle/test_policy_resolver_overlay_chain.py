@@ -26,7 +26,7 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
     JsonWorkflowModelPolicyStore,
 )
 
-_WORKFLOW = "implementation"
+_WORKFLOW = "implementation_reviews"
 
 
 def _resolver(overlay: WorkflowModelPolicyOverlay | None = None) -> WorkflowExecutionPolicyResolver:
@@ -50,7 +50,7 @@ def test_extends_chain_inherits_and_child_override_wins(tmp_path) -> None:  # ty
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 },
                 "child": {"extends": "default", "workflows": {}},
             },
@@ -69,12 +69,12 @@ def test_extends_chain_inherits_and_child_override_wins(tmp_path) -> None:  # ty
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 },
                 "pi-shop": {
                     "extends": "default",
                     "workflows": {
-                        "implementation": {
+                        "implementation_reviews": {
                             "steps": {"implement": "pi-reasoning-high"},
                             "harnesses": {"implement": "pi"},
                         }
@@ -102,7 +102,7 @@ _FAIL_CLOSED_CASES = (
             "contexts": {
                 "child": {
                     "extends": "default",
-                    "workflows": {"implementation": {"steps": {"implement": "no-such-profile"}}},
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "no-such-profile"}}},
                 }
             },
         },
@@ -116,7 +116,7 @@ _FAIL_CLOSED_CASES = (
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"ghost-step": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"ghost-step": "codex-review-deep"}}}
                 },
                 "child": {"extends": "default", "workflows": {}},
             },
@@ -132,7 +132,7 @@ _FAIL_CLOSED_CASES = (
             "contexts": {
                 "child": {
                     "extends": "default",
-                    "workflows": {"implementation": {"steps": {"implement": "pi-reasoning-high"}}},
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "pi-reasoning-high"}}},
                 }
             },
         },

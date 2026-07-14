@@ -64,8 +64,6 @@ BASE_STUB_VIEWS: dict[str, View] = {
     "api_contexts": _stub_json,
     "api_agents": _stub_json,
     "api_agent_prompt": _stub_json,
-    "api_workflows": _stub_json,
-    "api_workflow_detail": _stub_json,
     "memory": _stub_html,
     "memory_view": _stub_html,
     "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),

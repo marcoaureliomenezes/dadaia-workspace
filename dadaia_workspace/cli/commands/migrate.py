@@ -72,7 +72,6 @@ def _print_plan(plan: MigrationPlan) -> None:
         typer.echo("  DELETE .dadaia/states/primary_context.json")
     for d in plan.dirs_to_create:
         typer.echo(f"  MKDIR  {d}")
-    typer.echo("  APPEND .dadaia/logs/lock-events.jsonl  (migration event)")
 
 
 @app.callback()

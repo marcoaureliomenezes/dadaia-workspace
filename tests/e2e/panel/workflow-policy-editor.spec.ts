@@ -32,7 +32,7 @@ const EMPTY_OVERLAY = {
 
 // The implement step's inline picker mount inside the implementation card's expand.
 const IMPLEMENT_PICKER =
-  'details.dadaia-wf-card[data-workflow="implementation"] .wf-step-picker[data-wfp-step="implement"]';
+  'details.dadaia-wf-card[data-workflow="implementation_reviews"] .wf-step-picker[data-wfp-step="implement"]';
 
 async function restoreEmptyOverlay(request: any): Promise<void> {
   await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
@@ -44,7 +44,7 @@ async function restoreEmptyOverlay(request: any): Promise<void> {
 async function openImplementPicker(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
-  await expandWorkflowCard(page, 'implementation');
+  await expandWorkflowCard(page, 'implementation_reviews');
   await page.waitForSelector(`${IMPLEMENT_PICKER} .wfp-picker`, {
     state: 'visible',
     timeout: 15000,

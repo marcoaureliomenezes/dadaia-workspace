@@ -108,23 +108,20 @@ def _agent_phases(agent_id: str) -> list[str]:
 def _workflow_membership(service: PanelService) -> dict[str, list[str]]:
     """Build an ``agent_id -> [workflow display names]`` map.
 
-    Derived at request time by parsing the canonical workflow definitions via
-    ``PanelService.list_workflow_summaries()`` and reading each workflow's
-    ``agent_ids`` (the distinct agents appearing in its stages). Best-effort:
-    a workflows-read failure yields an empty map rather than failing the
-    /api/agents response.
+    Derived at request time from the governed Python workflow catalog. Best-effort:
+    a catalog-read failure yields an empty map rather than failing /api/agents.
     """
     membership: dict[str, list[str]] = {}
     try:
-        summaries = service.list_workflow_summaries()
+        workflows = service.list_dadaia_workflows()
     except Exception:  # noqa: BLE001
         logger.warning(
-            "_workflow_membership: list_workflow_summaries() failed; "
+            "_workflow_membership: list_dadaia_workflows() failed; "
             "continuing with empty workflow membership"
         )
         return membership
-    for wf in summaries:
-        for agent_id in wf.agent_ids:
+    for wf in workflows:
+        for agent_id in dict.fromkeys(step.role for step in wf.steps):
             bucket = membership.setdefault(agent_id, [])
             if wf.display_name not in bucket:
                 bucket.append(wf.display_name)

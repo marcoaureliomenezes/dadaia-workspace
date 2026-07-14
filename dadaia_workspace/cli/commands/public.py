@@ -27,7 +27,6 @@ _ONLY_CHOICES = (
     "agents",
     "skills",
     "rules",
-    "workflows",
     "schemas",
     "scripts",
     "runtime",

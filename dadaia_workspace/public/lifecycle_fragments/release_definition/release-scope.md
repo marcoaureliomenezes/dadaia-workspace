@@ -31,6 +31,10 @@ and bound; you do not write the SPEC.
    now) or rejected (invalid), each with a one-line reason. Nothing is ever deleted.
 2. **Pick the set.** Select the bugs, audits, and backlog items this release will
    address. This is selection within the open pool — not wide-codebase discovery.
+   When the prompt carries an `authoritative-backlog-definition` block, its exact
+   producer-run artifact paths are mandatory scope inputs: pick those items and do
+   not replace them with another candidate from the pool. Sanitize neighboring stale
+   items normally, but never let pool order override the exact workflow handoff.
 3. **Apply bug-always-solved.** Every picked bug is solved in this release, with one
    exception: a picked backlog item may supersede a bug with a more complete
    solution — then record the subsumption (mark the bug superseded by that item and

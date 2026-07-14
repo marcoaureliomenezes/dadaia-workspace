@@ -26,7 +26,7 @@ from dadaia_workspace.features.lifecycle.policy_resolver import (
 )
 from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
-_WORKFLOW = "implementation"
+_WORKFLOW = "implementation_reviews"
 
 
 def _resolver(overlay: WorkflowModelPolicyOverlay | None = None) -> WorkflowExecutionPolicyResolver:

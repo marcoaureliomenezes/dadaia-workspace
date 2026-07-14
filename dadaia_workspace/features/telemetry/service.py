@@ -13,10 +13,9 @@ Refresh logic:
     3. Open DAO + apply schema migrations.
     4. Walk ~/.claude/projects/*/*.jsonl — call claude reader for each.
     5. Run codex reader on ~/.codex/state_5.sqlite (or env override).
-    6. Run workflows reader against workspace_root.
-    7. Backfill costs: UPDATE events WHERE cost_micro_usd IS NULL AND model known.
-    8. Update last_refresh timestamp.
-    9. Release lock.
+    6. Backfill costs: UPDATE events WHERE cost_micro_usd IS NULL AND model known.
+    7. Update last_refresh timestamp.
+    8. Release lock.
 """
 
 from __future__ import annotations
@@ -101,13 +100,11 @@ class TelemetryService:
         (read_session_file, read_codex_db, read_pi_sessions respectively). A legacy
         2-tuple is still accepted — PI ingestion is skipped when no third element
         is present.
-        Workflow ingestion is no longer performed here — workflows are read
-        directly from the canonical store (PR3-18 cleanup).
     pricing_module:
         The features/telemetry/pricing module (or compatible stub).  Must
         expose compute_cost() and PRICING_TABLE.
     workspace_root:
-        pathlib.Path to the dadaia workspace root (used by workflows reader).
+        pathlib.Path to the dadaia workspace root.
     state_dir:
         pathlib.Path where the SQLite file and lock file are stored.
         Defaults to ~/.dadaia/state/telemetry/.

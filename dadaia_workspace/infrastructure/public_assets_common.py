@@ -34,12 +34,11 @@ _COPY_DIRS = (
     "templates",
     "plugins",
     "runtime",
-    "workflows",
     "lifecycle_fragments",
     "personas",
     "pi",
 )
-_CLAUDE_DIRS = ("rules", "skills", "commands", "agents", "workflows")
+_CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
 #: Subdirectories of the staged ``pi/`` tree that are copied as-is into ``.pi/``.
 _PI_DIRS = ("prompts", "extensions")
 

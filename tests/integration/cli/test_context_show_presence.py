@@ -104,7 +104,7 @@ def test_context_show_json_excludes_stale_presence_records(
     stale_path = ws / ".dadaia" / "states" / "presence" / _CTX / "sess-stale.json"
     stale_path.parent.mkdir(parents=True, exist_ok=True)
     stale_ts = (
-        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.LEASE_TTL_SECONDS + 100)
+        datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.PRESENCE_TTL_SECONDS + 100)
     ).isoformat()
     stale_path.write_text(
         _json.dumps(

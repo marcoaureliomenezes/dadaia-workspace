@@ -68,8 +68,7 @@ def test_backlog_define_runs_the_real_workflow_and_exits_clean(workspace: Path) 
         app,
         [
             "lifecycle",
-            "backlog",
-            "define",
+            "backlog-definition",
             "--harness",
             "fake",
             "--release-id",
@@ -94,7 +93,7 @@ def test_backlog_define_runs_the_real_workflow_and_exits_clean(workspace: Path) 
 def test_backlog_define_rejects_claude_harness_law1(workspace: Path) -> None:
     result = _runner.invoke(
         app,
-        ["lifecycle", "backlog", "define", "--release-id", "v0.1.26", "--harness", "claude"],
+        ["lifecycle", "backlog-definition", "--release-id", "v0.1.26", "--harness", "claude"],
     )
     assert result.exit_code != 0
     assert "Layer-2 workflow harness" in result.output or "LAW 1" in result.output

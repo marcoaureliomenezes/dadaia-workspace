@@ -1,8 +1,8 @@
 """Golden byte-identical behaviour lock for the FR1 fragment-workflow dedup (T-57-10, AC-1).
 
 v0.1.57 FR1 extracts one ``FragmentGateWorkflow`` base + a ``_FragmentAssemblyMixin`` behind
-the four handoff-ledger workflow bodies (``release_definition`` / ``audit`` / ``research`` /
-``bug_report``) and the ``backlog_definition`` assembly seam. The refactor MUST be
+the handoff-ledger workflow bodies (``release_definition`` / ``audit``) and the
+``backlog_definition`` assembly seam. The refactor MUST be
 behaviour-preserving: each body's **built worker prompt** and its **produced ledger payload**
 have to serialize byte-identically to the pre-extraction tree.
 
@@ -69,11 +69,9 @@ from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     BacklogDemand,
     ProposedIntent,
 )
-from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportWorkflow
 from dadaia_workspace.features.lifecycle.workflows.release_definition import (
     ReleaseDefinitionWorkflow,
 )
-from dadaia_workspace.features.lifecycle.workflows.research import ResearchWorkflow
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 
@@ -94,7 +92,7 @@ class _GoldenFake:
     """Scope-aware deterministic ``AgentRuntimePort`` recording every request.
 
     The canned result's single ``artifact_ref`` is derived from the request's first
-    ``allowed_path`` (``**`` -> ``step.handoff.json``) so every step — including the
+    ``allowed_path`` (``**`` -> ``step.step-output.json``) so every step — including the
     ADDITIVE ``bug_write`` step scoped to ``specs/bugs/**`` — is in-scope and the whole
     sequence completes/produces. The requests are recorded in call order for prompt capture.
     """
@@ -107,13 +105,56 @@ class _GoldenFake:
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         self.received_requests.append(request)
-        allowed = request.allowed_paths[0] if request.allowed_paths else ".dadaia/handoff/x/**"
-        artifact = allowed.replace("**", "step.handoff.json")
+        allowed = (
+            request.allowed_paths[0]
+            if request.allowed_paths
+            else ".dadaia/tmp/lifecycle-worker/x/**"
+        )
+        artifact = allowed.replace("**", "step.step-output.json")
+        step = (request.task_id or "").rsplit(":", 1)[-1]
+        audit_payloads: dict[str, dict[str, object]] = {
+            "audit_scope": {
+                "summary": "Bound architecture drift.",
+                "audit_question": "Does implementation match architecture memory?",
+                "lenses": [
+                    {"name": "architecture", "rationale": "Contract fidelity."}
+                ],
+                "surfaces": ["pkg/a.py"],
+                "acceptance_criteria": [
+                    {"lens": "architecture", "pass_condition": "No contract drift."}
+                ],
+            },
+            "drift_scan": {
+                "summary": "No drift found.",
+                "verdict": "APPROVED",
+                "verdict_reason": "Every scoped lens passed.",
+                "lens_results": [
+                    {
+                        "lens": "architecture",
+                        "status": "PASS",
+                        "evidence": ["pkg/a.py:1"],
+                    }
+                ],
+                "findings": [],
+            },
+            "triage": {
+                "summary": "No findings require routing.",
+                "source_verdict": "APPROVED",
+                "dispositions": [],
+            },
+        }
+        domain_payload = audit_payloads.get(step, {})
+        verdict = domain_payload.get("verdict", "APPROVED")
+        structured: dict[str, str] = {"verdict": str(verdict)}
+        reason = domain_payload.get("verdict_reason")
+        if isinstance(reason, str):
+            structured["verdict_reason"] = reason
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
-            summary="golden step ok",
+            summary=str(domain_payload.get("summary", "golden step ok")),
             artifact_refs=(artifact,),
-            structured_output={"verdict": "APPROVED"},
+            structured_output=structured,
+            domain_payload=domain_payload,
         )
 
 
@@ -140,10 +181,20 @@ def _seed_workspace(tmp_path: Path) -> Path:
     (specs / "memory" / "product" / "catalog.json").write_text(
         '{"features": [{"slug": "demo", "tldr": "demo feature"}]}\n', encoding="utf-8"
     )
-    for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / _RELEASE / art).write_text(
-            f"# {art}\n\nGolden fixture {art} body.\n", encoding="utf-8"
-        )
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text(
+        "# SPEC.md\n\nGolden fixture SPEC.md body.\n", encoding="utf-8"
+    )
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# PLAN.md\n\nGolden fixture PLAN.md body.\n\n"
+        "## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value | direct unit tests | None | None |\n",
+        encoding="utf-8",
+    )
+    (specs / "releases" / _RELEASE / "TASKS.md").write_text(
+        "# TASKS.md\n\nGolden fixture TASKS.md body.\n", encoding="utf-8"
+    )
     return specs
 
 
@@ -261,7 +312,7 @@ def _assert_golden(name: str, capture: dict[str, object], workspace_root: Path) 
 
 
 # ---------------------------------------------------------------------------
-# the six goldens
+# the four goldens
 # ---------------------------------------------------------------------------
 
 
@@ -311,55 +362,10 @@ def test_audit_golden(tmp_path: Path) -> None:
     )
 
 
-def test_research_golden(tmp_path: Path) -> None:
-    specs = _seed_workspace(tmp_path)
-    fake = _GoldenFake()
-    resolver = _resolver(tmp_path)
-    wf = ResearchWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=JsonLifecycleRunStore(tmp_path),
-        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(specs, tmp_path),
-        handoff_resolver=resolver,
-    )
-    result = wf.run("re-golden")
-    assert result.completed is True
-    run = JsonLifecycleRunStore(tmp_path).load("re-golden")
-    assert run is not None
-    _assert_golden(
-        "research",
-        {"steps": _capture_requests(fake), "ledger": _capture_ledger(resolver, run)},
-        tmp_path,
-    )
-
-
-def test_bug_report_golden(tmp_path: Path) -> None:
-    specs = _seed_workspace(tmp_path)
-    fake = _GoldenFake()
-    resolver = _resolver(tmp_path)
-    wf = BugReportWorkflow(
-        context=_CONTEXT,
-        release_id=_RELEASE,
-        run_store=JsonLifecycleRunStore(tmp_path),
-        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
-        context_selector=_selector(specs, tmp_path),
-        handoff_resolver=resolver,
-    )
-    result = wf.run("bu-golden")
-    assert result.completed is True
-    run = JsonLifecycleRunStore(tmp_path).load("bu-golden")
-    assert run is not None
-    _assert_golden(
-        "bug_report",
-        {"steps": _capture_requests(fake), "ledger": _capture_ledger(resolver, run)},
-        tmp_path,
-    )
-
-
 def test_backlog_definition_golden(tmp_path: Path) -> None:
     specs = _seed_workspace(tmp_path)
     fake = _GoldenFake()
+    resolver = _resolver(tmp_path)
     wf = BacklogDefinitionWorkflow(
         context=_CONTEXT,
         release_id=_RELEASE,
@@ -367,12 +373,19 @@ def test_backlog_definition_golden(tmp_path: Path) -> None:
         runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
         context_selector=_selector(specs, tmp_path),
         registry=_registry(tmp_path, specs),
+        handoff_resolver=resolver,
     )
     result = wf.run("bd-golden", _clean_demand())
     assert result.completed is True
-    # backlog_definition owns no handoff-ledger data plane — the golden pins the two model
-    # steps' built prompts (intake_grill + backlog_author; the conditional grill is skipped).
-    _assert_golden("backlog_definition", {"steps": _capture_requests(fake), "ledger": []}, tmp_path)
+    run = JsonLifecycleRunStore(tmp_path).load("bd-golden")
+    assert run is not None
+    assert run.workflow_steps.find("intake_grill", 0) is not None
+    assert run.workflow_steps.find("backlog_author", 0) is not None
+    _assert_golden(
+        "backlog_definition",
+        {"steps": _capture_requests(fake), "ledger": _capture_ledger(resolver, run)},
+        tmp_path,
+    )
 
 
 def test_pipeline_ladder_golden(tmp_path: Path) -> None:
@@ -403,8 +416,6 @@ def test_goldens_are_non_vacuous() -> None:
     for name in (
         "release_definition",
         "audit",
-        "research",
-        "bug_report",
         "backlog_definition",
         "pipeline",
     ):

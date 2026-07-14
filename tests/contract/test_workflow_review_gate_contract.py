@@ -160,7 +160,6 @@ def test_done_gate_terms_present_everywhere_and_old_shortcuts_never_reappear() -
         TASK_MANAGER_SKILL,
         PROJECT_MANAGER,
         *agent_paths,
-        *sorted((PUBLIC / "workflows").glob("*.workflow.md")),
     ]
     for path in old_wording_paths:
         content = _read(path)

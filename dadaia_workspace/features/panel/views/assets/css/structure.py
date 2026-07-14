@@ -76,6 +76,9 @@ code {
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 0 var(--space-lg);
   gap: 0;
 }
@@ -325,6 +328,9 @@ table.servers-table tbody tr:hover { background: var(--color-row-hover); }
    screen readers (PR3-06).
    ─────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  .topbar { padding-inline: var(--space-sm); gap: var(--space-xs); }
+  .topbar-divider, .topbar-subtitle, .theme-btn-label, .theme-btn-caret { display: none; }
+  .theme-btn { width: var(--control-height); justify-content: center; padding: 0; }
   .tab-memories-btn {
     font-size: 0;
   }

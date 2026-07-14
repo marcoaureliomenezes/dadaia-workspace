@@ -56,11 +56,16 @@ _ANCHOR_C = "pkg/c.py#C"
 class _KindFake:
     kind: AgentRuntimeKind
     result: AgentRunResult
+    root: Path
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
+        for ref in self.result.artifact_refs:
+            path = self.root / ref
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"fake": true}\n', encoding="utf-8")
         return self.result
 
 
@@ -85,7 +90,7 @@ def _approved() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -119,7 +124,7 @@ def _workflow(
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=store,
-        runtime_factory=lambda kind: _KindFake(kind, _approved()),
+        runtime_factory=lambda kind: _KindFake(kind, _approved(), tmp_path),
         context_selector=selector,
         registry=registry,
     )

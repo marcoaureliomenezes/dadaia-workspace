@@ -1,30 +1,23 @@
 """Unit tests for SpecContextService current ALIVE/DEAD behavior.
 
-CRIT: dead() blocked by a live lease (ContextLockedError), the untracked-review-gate
-refusals, and the secret/private-IP/.pem redaction blocks are the no-steal + redaction
-half of the workspace's security law — kept standalone/param, never weakened. The secret
-value must NEVER be echoed back in a DeadSecretFoundError message.
+The suite proves lock-free context transitions plus the untracked-review and
+secret/private-IP/.pem redaction gates. Secret values must never be echoed back in a
+``DeadSecretFoundError`` message.
 """
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
 import pytest
+from pathlib import Path
 
-pytest.importorskip("fcntl")
-
-import json  # noqa: E402
-from pathlib import Path  # noqa: E402
-
-from dadaia_workspace.core.exceptions import (  # noqa: E402
+from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
-    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
 )
-from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
-from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
-from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
+from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.features.spec_context.service import SpecContextService
+from tests.fakes import FakeContextStore, FakeGitClient
 
 
 @pytest.fixture()
@@ -139,41 +132,18 @@ def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
         service.dead("ghost")
 
 
-def test_dead_raises_context_locked_when_impl_lock_held(
+def test_dead_ignores_residual_legacy_lock_record(
     service: SpecContextService, workspace_root: Path
 ) -> None:
-    """v0.1.6: dead() when a LIVE TTL-lease record exists raises ContextLockedError.
-
-    The four-store lock model is retired; a live single-record lease
-    (.dadaia/states/ctx_locks/<ctx>.lock.json, fresh heartbeat) is the guard. CRIT
-    no-steal: a live lease must block dead() unconditionally.
-    """
-    from datetime import UTC
-    from datetime import datetime as _datetime
-
+    """A pre-doctrine lock file can never block a context transition."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
 
-    # Create a LIVE lease record (fresh heartbeat → is_held True).
     lock_dir = workspace_root / ".dadaia" / "states" / "ctx_locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
-    now = _datetime.now(tz=UTC).isoformat()
-    (lock_dir / "proj.lock.json").write_text(
-        json.dumps(
-            {
-                "context": "proj",
-                "release": "v1",
-                "session_id": "sess_abc123",
-                "mode": "IMPLEMENTATION",
-                "acquired_at": now,
-                "heartbeat": now,
-                "ttl": 1800,
-            }
-        )
-    )
+    (lock_dir / "proj.lock.json").write_text('{"legacy": true}', encoding="utf-8")
 
-    with pytest.raises(ContextLockedError):
-        service.dead("proj")
+    assert service.dead("proj").state is ContextState.DEAD
 
 
 # ------------------------------------------------------ dead() review gate (F-5 / AC-R7-01)

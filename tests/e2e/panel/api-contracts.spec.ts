@@ -8,7 +8,7 @@ test('Panel APIs expose non-empty agents and workflows catalogs', async ({ reque
   expect(Array.isArray(agentsBody.agents)).toBe(true);
   expect(agentsBody.agents.length).toBeGreaterThan(0);
 
-  const workflowsResponse = await request.get(`${BASE_URL}/api/workflows`, {
+  const workflowsResponse = await request.get(`${BASE_URL}/api/workflow-catalog`, {
     headers: authHeaders(),
   });
   expect(workflowsResponse.status()).toBe(200);
@@ -25,7 +25,7 @@ test('Prompt and workflow detail endpoints handle unknown names safely', async (
   expect(prompt.status()).toBe(404);
 
   const workflow = await request.get(
-    `${BASE_URL}/api/workflows/unknown-workflow-xyz-that-does-not-exist`,
+    `${BASE_URL}/api/workflow-catalog/unknown-workflow-xyz-that-does-not-exist`,
     { headers: authHeaders() }
   );
   expect(workflow.status()).toBe(404);

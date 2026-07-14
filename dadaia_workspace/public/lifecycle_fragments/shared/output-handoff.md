@@ -4,12 +4,12 @@ role: shared
 workflow: shared
 step: output_handoff
 static_inputs: []
-dynamic_inputs: [output_schema]
-output_schema: handoff-v1.1
+dynamic_inputs: []
+output_schema: agent-run-result-v1
 max_context_policy: exact-files-only
 ---
 
-# Output contract — emit a structured handoff
+# Output contract — emit a structured step result
 
 Your step does not end with prose. It ends with a single structured result object
 that the workflow's Python gate validates before any state advances. Produce that
@@ -42,18 +42,24 @@ Review and gate steps additionally carry:
 When the step produced a written artifact (SPEC, PLAN, report) the result names its
 path and a content hash so the gate can confirm the file exists and matches.
 
-## Self-pull proof (handoff-v1.2)
+## Workflow handoff promotion
 
-The workflow persists your step's result as a `handoff-v1.2` document whose
-`self_pull.refs` records the memory atoms actually self-pulled/read during the step,
-in `specs/`-prefixed context-relative form (e.g. `specs/memory/architecture.md`).
+You materialize one raw `agent-run-result-v1` step output at the exact temporary path
+assigned later in the prompt. Python validates that result and promotes its domain
+payload into the immutable run-scoped handoff ledger under
+`.dadaia/runs/lifecycle/<run>/steps/`. Do not write the raw result under
+`.dadaia/handoff/`; that namespace is reserved for public `handoff-v1.2` documents.
+
 When you read memory atoms beyond the injected context, include a `self_pull` object
-with those `refs` in your result. Never list an atom that was not read — with zero
-atoms read the emitter falls back to the honest legacy version token rather than
-fabricating proof.
+with the exact `specs/`-prefixed refs you read. Never list an atom that was not read.
 
 ## Rules
 
+- Before returning the result object, write every path named in `artifact_refs` to disk
+  inside the step's allowed write scope. A path is evidence only after this write succeeds;
+  never name a planned, virtual, or nonexistent file.
+- Put the substantive step result in that temporary step-output artifact. The final
+  response is the same transport envelope referencing the file, not a substitute for it.
 - The verdict is a judgment from evidence, never a courtesy. If acceptance is not
   met, return `REJECTED` with the specific failing criterion in `verdict_reason` and
   a `findings` entry — do not approve to be agreeable.

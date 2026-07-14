@@ -9,7 +9,7 @@ This is not a normal application bug. It touches AI-entity surfaces:
 
 - projected custom agents;
 - skills;
-- workflow docs;
+- lifecycle prompt fragments;
 - hooks;
 - Codex Rules;
 - config trust boundaries.
@@ -46,7 +46,6 @@ dadaia public doctor
 Interpretation:
 
 - `.codex/agents/*.toml` means roles are spawnable.
-- `.codex/workflows/*.workflow.md` means workflow references are visible.
 - `.codex/hooks.json` means lifecycle enforcement may run if trusted.
 - `.codex/rules/*.rules` must use Codex's documented Starlark Rule shape.
 - `dadaia public doctor` tells you whether projection drift is detected, not
@@ -59,7 +58,7 @@ Use the right primitive:
 - Course: teach the operator the true Codex model.
 - Skill: give `ai-engineer` operational decision tables.
 - Projection code: fix invalid Rules and sandbox boundaries.
-- Workflow docs: say "reference-only" unless a real dispatcher executes the graph.
+- Lifecycle fragments: keep each worker prompt scoped to one Python-governed step.
 - Hooks: keep SDD/root enforcement mechanical.
 
 Do not fix this by stuffing more prose into root `AGENTS.md`. That increases context

@@ -11,21 +11,14 @@ from pathlib import Path
 from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
-    ContextLockedError,
     ContextNotFoundError,
     ContextStateError,
     DadaiaError,
     GitSyncError,
 )
-from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
-from dadaia_workspace.features.spec_context import lease as _lease
-from dadaia_workspace.features.spec_context.locking import (
-    context_lock,
-    workspace_lock,
-)
 
 # Canonical scaffold source — lives inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
@@ -246,40 +239,23 @@ class SpecContextService:
     def _specs_dir(self, repo_slug: str) -> Path:
         return self._repo_path(repo_slug) / "specs"
 
-    def _has_implementation_lock(self, name: str) -> bool:
-        """Return True if a live (non-stale) lease record exists for the named context.
-
-        v0.1.6: delegates to lease.is_held() (single-record TTL-lease).
-        Performs inline GC: if the record is stale, deletes it before returning False.
-        """
-        rec = _lease.read_record(self._workspace_root, name)
-        if rec is None:
-            return False
-        if is_stale(rec):
-            # Inline GC: delete the stale record (no CAS needed for deletion).
-            with contextlib.suppress(OSError):
-                _lease._record_path(self._workspace_root, name).unlink(missing_ok=True)
-            return False
-        return True
-
     # ------------------------------------------------------------------ create
 
     def create(self, name: str, repo_slug: str, repo_url: str) -> SpecContextProject:
-        with workspace_lock(self._workspace_root):
-            if self._store.get(name) is not None:
-                raise ContextAlreadyExistsError(
-                    f"Context '{name}' already exists. Use a different name."
-                )
-            ctx = SpecContextProject(
-                name=name,
-                state=ContextState.DEAD,
-                repo_slug=repo_slug,
-                repo_url=repo_url,
-                created_at=_now(),
-                alive_since=None,
-                dead_since=None,
+        if self._store.get(name) is not None:
+            raise ContextAlreadyExistsError(
+                f"Context '{name}' already exists. Use a different name."
             )
-            self._store.save(ctx)
+        ctx = SpecContextProject(
+            name=name,
+            state=ContextState.DEAD,
+            repo_slug=repo_slug,
+            repo_url=repo_url,
+            created_at=_now(),
+            alive_since=None,
+            dead_since=None,
+        )
+        self._store.save(ctx)
         return ctx
 
     # ------------------------------------------------------------------ update_url
@@ -289,25 +265,23 @@ class SpecContextService:
 
         FR-W2-03 (c) / T-011-08: the operator repair verb for the VPS-migration
         scenario where no on-disk repo is present to back-fill from. Preserves the
-        record shape and locking discipline (the store ``update()`` does the JSON
-        write under the workspace lock). Raises ``ContextNotFoundError`` if the
-        context does not exist.
+        record shape and writes through the atomic store. Raises
+        ``ContextNotFoundError`` if the context does not exist.
         """
-        with workspace_lock(self._workspace_root):
-            ctx = self._store.get(name)
-            if ctx is None:
-                raise ContextNotFoundError(f"Context '{name}' not found.")
-            updated = SpecContextProject(
-                name=ctx.name,
-                state=ctx.state,
-                repo_slug=ctx.repo_slug,
-                repo_url=repo_url,
-                created_at=ctx.created_at,
-                alive_since=ctx.alive_since,
-                dead_since=ctx.dead_since,
-                current_branch=ctx.current_branch,
-            )
-            self._store.update(updated)
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        updated = SpecContextProject(
+            name=ctx.name,
+            state=ctx.state,
+            repo_slug=ctx.repo_slug,
+            repo_url=repo_url,
+            created_at=ctx.created_at,
+            alive_since=ctx.alive_since,
+            dead_since=ctx.dead_since,
+            current_branch=ctx.current_branch,
+        )
+        self._store.update(updated)
         return updated
 
     # ------------------------------------------------------------------ back-fill
@@ -350,123 +324,87 @@ class SpecContextService:
         """Transition a context from DEAD to ALIVE; clone repo if absent.
 
         Idempotent: calling alive() on an already-ALIVE context is a no-op (no error).
-        Sets alive_since=now, clears dead_since=None.
-
-        Lock 2 (context_lock) wraps ALL per-repo filesystem operations: git clone,
-        branch checkout, branch read, scaffold copytree/mkdir, and AGENTS.md copy.
-        Lock 2 is released BEFORE Lock 1 is acquired — never held simultaneously
-        (no AB-BA deadlock possible with doctor.fix() which nests L2 inside L1).
-
-        Lock 1 (workspace_lock) wraps only the JSON load→mutate→dump.
+        Sets alive_since=now and clears dead_since. Concurrent races are accepted and
+        surfaced by advisory presence; this operation never acquires a lock.
         """
-        # Pre-flight read (no lock) to get repo_slug for Lock 2 acquisition
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
 
-        # Idempotent: already ALIVE — no-op (no lock needed)
         if ctx.state == ContextState.ALIVE:
             return ctx
 
         repo_slug = ctx.repo_slug
         repo_path = self._repo_path(repo_slug)
 
-        # Lock 2: serialize ALL per-repo filesystem ops for this slug.
-        # Released before Lock 1 is requested — no simultaneous L1+L2 hold here.
         actual_branch: str | None = None
         backfilled_url: str = ctx.repo_url
-        with context_lock(self._workspace_root, repo_slug):
-            # Re-read ctx inside Lock 2 so we use the freshest repo_url / current_branch.
-            ctx_l2 = self._store.get(name)
-            if ctx_l2 is None:
-                raise ContextNotFoundError(f"Context '{name}' not found.")
+        ctx_latest = self._store.get(name)
+        if ctx_latest is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
 
-            # Clone if repo absent
-            if not repo_path.exists():
-                self._git.clone(ctx_l2.repo_url, repo_path)
+        if not repo_path.exists():
+            self._git.clone(ctx_latest.repo_url, repo_path)
 
-            # Checkout target branch if stored in context
-            if ctx_l2.current_branch:
-                try:
-                    self._git.checkout(repo_path, ctx_l2.current_branch)
-                except Exception as exc:
-                    print(
-                        f"WARNING: could not checkout branch {ctx_l2.current_branch!r}: {exc}",
-                        file=sys.stderr,
-                    )
-
-            # Read actual branch from disk
+        if ctx_latest.current_branch:
             try:
-                actual_branch = self._git.current_branch(repo_path)
-            except Exception:
-                actual_branch = None
+                self._git.checkout(repo_path, ctx_latest.current_branch)
+            except Exception as exc:
+                print(
+                    f"WARNING: could not checkout branch {ctx_latest.current_branch!r}: {exc}",
+                    file=sys.stderr,
+                )
 
-            # Back-fill repo_url from the on-disk origin remote when the record's URL
-            # is empty (FR-W2-03 b / T-011-08) — keeps the context portable for a
-            # later export/import + alive clone on another machine.
-            backfilled_url = self._backfill_repo_url(repo_slug, ctx_l2.repo_url)
+        try:
+            actual_branch = self._git.current_branch(repo_path)
+        except Exception:
+            actual_branch = None
 
-            # Scaffold specs/. A fresh tree is copied whole; a pre-existing tree is
-            # SAFE-PRESERVED — snapshot it to specs_bkp/preserve-<UTC>/ before merging
-            # in any missing canonical files (never overwriting operator content). The
-            # backup is retained only when the merge actually adds files (FR-S06 path a).
-            specs_dir = self._specs_dir(repo_slug)
-            if not specs_dir.exists():
-                # Fresh scaffold: copy the whole scaffold source tree.
-                if _SCAFFOLD_SRC.exists():
-                    shutil.copytree(_SCAFFOLD_SRC, specs_dir)
-                else:
-                    for subdir in ("", "memory", "features"):
-                        (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
+        backfilled_url = self._backfill_repo_url(repo_slug, ctx_latest.repo_url)
+
+        specs_dir = self._specs_dir(repo_slug)
+        if not specs_dir.exists():
+            if _SCAFFOLD_SRC.exists():
+                shutil.copytree(_SCAFFOLD_SRC, specs_dir)
             else:
-                # specs/ already exists — back up first, then merge missing canonical
-                # files without overwriting operator content (never silently skip).
-                if _SCAFFOLD_SRC.exists():
-                    preserved = _backup.preserve_specs(specs_dir)
-                    added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
-                    if added:
-                        _log.info(
-                            "scaffold merge into pre-existing specs/: %d file(s) added: %s "
-                            "(pre-existing tree preserved at %s)",
-                            len(added),
-                            added,
-                            preserved,
-                        )
-                    else:
-                        # No change — the snapshot is unnecessary; do not litter specs_bkp/.
-                        shutil.rmtree(preserved, ignore_errors=True)
-                        _log.info("scaffold merge into pre-existing specs/: no missing files found")
+                for subdir in ("", "memory", "features"):
+                    (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
+        elif _SCAFFOLD_SRC.exists():
+            preserved = _backup.preserve_specs(specs_dir)
+            added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
+            if added:
+                _log.info(
+                    "scaffold merge into pre-existing specs/: %d file(s) added: %s "
+                    "(pre-existing tree preserved at %s)",
+                    len(added),
+                    added,
+                    preserved,
+                )
+            else:
+                shutil.rmtree(preserved, ignore_errors=True)
+                _log.info("scaffold merge into pre-existing specs/: no missing files found")
 
-            # Copy repo-AGENTS.md template if not already present
-            repo_agents_dst = repo_path / "AGENTS.md"
-            repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
-            if not repo_agents_dst.exists() and repo_agents_src.exists():
-                shutil.copy2(repo_agents_src, repo_agents_dst)
-        # Lock 2 released here — before acquiring Lock 1.
+        repo_agents_dst = repo_path / "AGENTS.md"
+        repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
+        if not repo_agents_dst.exists() and repo_agents_src.exists():
+            shutil.copy2(repo_agents_src, repo_agents_dst)
 
-        # Lock 1: load → mutate → dump
-        with workspace_lock(self._workspace_root):
-            # Re-read inside lock in case another thread updated the state
-            ctx_fresh = self._store.get(name)
-            if ctx_fresh is None:
-                raise ContextNotFoundError(f"Context '{name}' not found.")
-            if ctx_fresh.state == ContextState.ALIVE:
-                return ctx_fresh  # another thread already transitioned
-
-            # Prefer the back-filled URL only when the freshest record URL is still
-            # empty — never clobber a URL another writer set in the meantime.
-            resolved_url = ctx_fresh.repo_url or backfilled_url
-            alive_ctx = SpecContextProject(
-                name=ctx_fresh.name,
-                state=ContextState.ALIVE,
-                repo_slug=ctx_fresh.repo_slug,
-                repo_url=resolved_url,
-                created_at=ctx_fresh.created_at,
-                alive_since=_now(),
-                dead_since=None,
-                current_branch=actual_branch,
-            )
-            self._store.update(alive_ctx)
+        ctx_fresh = self._store.get(name)
+        if ctx_fresh is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if ctx_fresh.state == ContextState.ALIVE:
+            return ctx_fresh
+        alive_ctx = SpecContextProject(
+            name=ctx_fresh.name,
+            state=ContextState.ALIVE,
+            repo_slug=ctx_fresh.repo_slug,
+            repo_url=ctx_fresh.repo_url or backfilled_url,
+            created_at=ctx_fresh.created_at,
+            alive_since=_now(),
+            dead_since=None,
+            current_branch=actual_branch,
+        )
+        self._store.update(alive_ctx)
 
         return alive_ctx
 
@@ -532,8 +470,6 @@ class SpecContextService:
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
         """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
-        Raises ContextLockedError if a live lease record exists for this context.
-
         Review gate (F-5 / AC-R7-01): if the repo has untracked non-gitignored
         files and *commit* is False, dead() REFUSES — it raises
         ``DeadReviewRequiredError`` listing the files, pushes nothing, and leaves
@@ -544,21 +480,14 @@ class SpecContextService:
         modifications keep the existing auto-sync behaviour (FR-R7: only untracked
         content is gated). A clean tree behaves exactly as before.
 
-        Lock 1 wraps the JSON write (spec_contexts.json update).
-        Lock 2 wraps git push and shutil.rmtree (OUTSIDE Lock 1).
+        Concurrent races are accepted and surfaced by advisory presence; this operation
+        never waits for or refuses another session.
         """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
-
-        # Block if a live lease record exists for this context (T-10b AC-T10b-4 / T-11 AC-T11-9)
-        if self._has_implementation_lock(name):
-            raise ContextLockedError(
-                f"Context '{name}' has an active implementation lock. "
-                "Release the implementation session before calling dead()."
-            )
 
         repo_path = self._repo_path(ctx.repo_slug)
         branch_before_sync: str | None = None
@@ -567,67 +496,56 @@ class SpecContextService:
         # DEAD record with a known URL stays portable for a future alive clone.
         backfilled_url: str = self._backfill_repo_url(ctx.repo_slug, ctx.repo_url)
 
-        # Review gate (F-5): evaluate untracked content BEFORE any lock, commit,
+        # Review gate (F-5): evaluate untracked content before any commit,
         # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
         if repo_path.exists() and self._git.is_git_root(repo_path):
             self._enforce_dead_review_gate(name, repo_path, commit=commit)
 
-        # Git sync + rmtree under Lock 2 (OUTSIDE Lock 1)
+        # Git sync + rmtree. Races are accepted by the NO-LOCKS doctrine.
         if repo_path.exists():
-            import contextlib
+            with contextlib.suppress(Exception):
+                branch_before_sync = self._git.current_branch(repo_path)
+            if self._git.is_git_root(repo_path):
+                if self._git.is_dirty(repo_path):
+                    try:
+                        self._git.commit_all(repo_path, "chore: auto-sync before dead")
+                    except GitSyncError as exc:
+                        raise GitSyncError(
+                            f"Git sync failed for context '{name}' at '{repo_path}'. "
+                            "Resolve the issue and retry dead()."
+                        ) from exc
+                if self._git.has_remote(repo_path):
+                    try:
+                        self._git.push(repo_path)
+                    except GitSyncError as exc:
+                        raise GitSyncError(
+                            f"Git push failed for context '{name}' at '{repo_path}'. "
+                            "Resolve the issue and retry dead()."
+                        ) from exc
+            shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
 
-            with context_lock(self._workspace_root, ctx.repo_slug):
-                with contextlib.suppress(Exception):
-                    branch_before_sync = self._git.current_branch(repo_path)
-                if self._git.is_git_root(repo_path):
-                    if self._git.is_dirty(repo_path):
-                        try:
-                            self._git.commit_all(repo_path, "chore: auto-sync before dead")
-                        except GitSyncError as exc:
-                            raise GitSyncError(
-                                f"Git sync failed for context '{name}' at '{repo_path}'. "
-                                "Resolve the issue and retry dead()."
-                            ) from exc
-                    if self._git.has_remote(repo_path):
-                        try:
-                            self._git.push(repo_path)
-                        except GitSyncError as exc:
-                            raise GitSyncError(
-                                f"Git push failed for context '{name}' at '{repo_path}'. "
-                                "Resolve the issue and retry dead()."
-                            ) from exc
-                # v0.1.50 FR3 (bug context-dead-nonwritable-guard-rejects-standard-
-                # git-objects): git loose objects are 0444 BY DESIGN, and POSIX
-                # unlink needs parent-dir write, not file write — the old rglob
-                # non-writable pre-scan refused every repo with a local commit.
-                # rmtree with a chmod-and-retry handler is the canonical pattern.
-                shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
-
-        # Lock 1: load → mutate → dump (JSON write only)
-        with workspace_lock(self._workspace_root):
-            dead_ctx = SpecContextProject(
-                name=ctx.name,
-                state=ContextState.DEAD,
-                repo_slug=ctx.repo_slug,
-                repo_url=ctx.repo_url or backfilled_url,
-                created_at=ctx.created_at,
-                alive_since=None,
-                dead_since=_now(),
-                current_branch=branch_before_sync,
-            )
-            self._store.update(dead_ctx)
+        dead_ctx = SpecContextProject(
+            name=ctx.name,
+            state=ContextState.DEAD,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url or backfilled_url,
+            created_at=ctx.created_at,
+            alive_since=None,
+            dead_since=_now(),
+            current_branch=branch_before_sync,
+        )
+        self._store.update(dead_ctx)
 
         return dead_ctx
 
     # ------------------------------------------------------------------ delete
 
     def delete(self, name: str) -> None:
-        with workspace_lock(self._workspace_root):
-            ctx = self._store.get(name)
-            if ctx is None:
-                raise ContextNotFoundError(f"Context '{name}' not found.")
-            if ctx.state == ContextState.ALIVE:
-                raise ContextStateError(
-                    f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
-                )
-            self._store.delete(name)
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if ctx.state == ContextState.ALIVE:
+            raise ContextStateError(
+                f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
+            )
+        self._store.delete(name)

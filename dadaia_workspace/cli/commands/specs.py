@@ -19,10 +19,6 @@ from dadaia_workspace.features.specs.scaffolder import (
     scaffold_hotfix_release,
     scaffold_release_segment,
 )
-from dadaia_workspace.infrastructure.bug_reporter import (
-    load_open_bugs,
-    mark_bugs_in_release,
-)
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
@@ -57,7 +53,8 @@ def _resolve_public_dir(specs_dir: Path) -> Path | None:
     ``<repo-root>/specs/`` alongside ``<repo-root>/dadaia_workspace/public/``.
 
     Walk up from ``specs_dir`` until we find a sibling ``dadaia_workspace/public/``
-    directory.  Returns ``None`` when not found (D-OC-1 check will be skipped).
+    directory. Returns ``None`` when not found; template drift checks then use
+    structure-only validation.
     """
     candidate = specs_dir.parent / "dadaia_workspace" / "public"
     if candidate.is_dir():
@@ -85,7 +82,7 @@ def doctor(
         "--public-dir",
         help=(
             "Path to dadaia_workspace/public/. "
-            "Enables D-OC-1 orchestration-registry check. "
+            "Enables canonical template and scaffold drift checks. "
             "Default: auto-detected from specs_dir/../dadaia_workspace/public/."
         ),
     ),
@@ -102,10 +99,10 @@ def doctor(
 ) -> None:
     """Run structural checks on the SDD specs tree.
 
-    v0.1.69 FR2.2: ``--context`` resolves the context's ``specs/`` tree via
-    ``container.resolve_context_specs_dir`` — the SAME resolver
-    ``lifecycle pipeline`` (FR3) already uses — mutually exclusive with
-    ``--specs-dir``. That resolver falls back to the workspace-root ``specs/`` tree
+    ``--context`` resolves the context's ``specs/`` tree via the same
+    ``container.resolve_context_specs_dir`` seam used by the four lifecycle workflows,
+    and is mutually exclusive with ``--specs-dir``. The resolver falls back to the
+    workspace-root ``specs/`` tree
     when ``repos/<context>/specs`` does not exist (self-hosting workspaces), instead
     of hand-rolling a ``repos/<context>/specs`` path that may not exist.
     """
@@ -274,37 +271,6 @@ def upgrade(
 # Canonical templates directory — inside the installed package
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 
-# Workspace root — four levels up from this file (cli/commands/specs.py →
-# cli/ → dadaia_workspace/ → repos/dadaia-workspace/ → workspace root)
-_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
-
-def _prompt_open_bugs(workspace_root: Path) -> None:
-    """Surface open bugs from .dadaia/bugs/reported.json to the operator.
-
-    If no open bugs exist the function returns silently.  If open bugs are
-    found the operator is asked whether to include all of them in the current
-    release.  Confirmed bugs receive status='in_release'; declined bugs stay
-    'open'.
-    """
-    bugs = load_open_bugs(workspace_root)
-    if not bugs:
-        return
-
-    n = len(bugs)
-    typer.echo(f"\n⚠  {n} known bug(s) in .dadaia/bugs/reported.json:")
-    for i, bug in enumerate(bugs, start=1):
-        source = bug.get("source", "unknown")
-        message = (bug.get("message") or "")[:120]
-        typer.echo(f"  [{i}] [{source}] {message}")
-
-    if typer.confirm("Include all open bugs in this release?", default=False):
-        mark_bugs_in_release(workspace_root, [b["id"] for b in bugs])
-        typer.echo(f"✓ {n} bug(s) marked as in_release.")
-    else:
-        typer.echo("Bugs left as 'open'. You can include them in a future release.")
-
-
 @app.command("init")
 def init(
     specs_dir: str | None = typer.Option(
@@ -393,9 +359,6 @@ def hotfix_open(
     D4 backlog-origin audit; it does not create segment folders.
     """
     target = _resolve_specs_dir(specs_dir)
-
-    # Surface open bugs before proceeding (T-BCR-07)
-    _prompt_open_bugs(_WORKSPACE_ROOT)
 
     # Human-audit warning for D4: check if ## Hotfixes pendentes has any bullets
     candidates_path = target / "backlog" / "candidates.md"

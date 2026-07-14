@@ -12,9 +12,7 @@ hook — invoked as a subprocess with a ``claude_hook_env()`` and no hand-plante
 ``DADAIA_*`` — is proven in ``tests/unit/hooks/test_sdd_post_gate_behavior.py`` (which also
 owns the stronger no-cross-renewal / held-vs-foreign coverage).
 
-Re-baselined from the pre-v0.1.76 lease-renewal suite: the resolution-chain x renewal
-table now seeds and asserts on ``presence`` records — ``lease.acquire``/``renew_heartbeat``
-are gone (T-3, no more acquisition machinery at all).
+The resolution-chain table seeds and asserts current ``presence`` records only.
 
 ``DADAIA_SESSION_ID`` appears here only as the *operator override* leg of the resolution
 chain (``resolve_session_id`` honors it first); the harness never sets it.
@@ -22,8 +20,7 @@ chain (``resolve_session_id`` honors it first); the harness never sets it.
 Mandatory parity preserved from rc-4:
   (a) session-record renewal via os.replace (atomic on Windows too) — owned by
       test_common.py's atomic_write_text roundtrip (shared primitive, single owner);
-  (b) [A-Za-z0-9_-] session-id strip (CWE-22) — via resolve_session_id, CRIT, kept
-      standalone below (redaction e2e half — lands in lock-events);
+  (b) [A-Za-z0-9_-] session-id strip (CWE-22) — via resolve_session_id, CRIT;
   (c) fail-open: any error -> exit 0, never a crash/block.
 """
 
@@ -166,12 +163,13 @@ def test_session_id_strip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setenv("DADAIA_SESSION_ID", "../../etc/passwd")
     _seed_session_record(tmp_path, sanitized)
+    _seed_presence(tmp_path, "ctx", sanitized)
+    _age_presence(tmp_path, "ctx", sanitized)
+    old = _presence_last_seen(tmp_path, "ctx", sanitized)
     monkeypatch.setattr(_common, "read_stdin_json", lambda: {})
     assert sdd_post_gate.main() == 0
-    record = json.loads(
-        (tmp_path / ".dadaia" / "logs" / "lock-events.jsonl").read_text(encoding="utf-8").strip()
-    )
-    assert record["session_id"] == sanitized
+    assert _presence_last_seen(tmp_path, "ctx", sanitized) != old
+    assert not (tmp_path / ".dadaia" / "states" / "presence" / "ctx" / "etc").exists()
 
 
 # --- Parity (c): fail-open on every error path -----------------------------------------

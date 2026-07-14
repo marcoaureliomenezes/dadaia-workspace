@@ -13,30 +13,15 @@ import typer
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
-    GateEvidenceKind,
     LifecyclePhase,
 )
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
-from dadaia_workspace.core.protocols.runtime_files import RuntimeFileRef
 from dadaia_workspace.core.session_env import entry_harness
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.lifecycle.hygiene import HygieneCleanupResult
-from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
-from dadaia_workspace.features.lifecycle.phase_workflow import PhaseWorkflowResult
-from dadaia_workspace.features.lifecycle.prompt_builder import PromptScope
-from dadaia_workspace.features.lifecycle.service import (
-    LifecycleCommandResult,
-    LifecycleCommandStatus,
-    LifecyclePreflightService,
-)
+from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
-    from dadaia_workspace.features.lifecycle.pipeline import (
-        ImplementReviewLoopResult,
-        LifecyclePipeline,
-        RuntimeFactory,
-    )
 
 # Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
 # deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
@@ -61,14 +46,6 @@ _LAYER1_ONLY_HARNESSES = {
 }
 
 app = typer.Typer(help="Deterministic lifecycle workflow commands.", no_args_is_help=True)
-hygiene_app = typer.Typer(help="Lifecycle hygiene commands.", no_args_is_help=True)
-review_app = typer.Typer(help="Lifecycle review commands.", no_args_is_help=True)
-backlog_app = typer.Typer(help="Lifecycle backlog commands.", no_args_is_help=True)
-release_app = typer.Typer(help="Lifecycle release commands.", no_args_is_help=True)
-workflow_app = typer.Typer(
-    help="Read-only workflow model-governance inspection.", no_args_is_help=True
-)
-handoffs_app = typer.Typer(help="Workflow-step handoff ledger inspection.", no_args_is_help=True)
 
 
 class LifecycleExitCode(IntEnum):
@@ -80,38 +57,6 @@ class LifecycleExitCode(IntEnum):
 
 def _emit_json(payload: dict[str, Any]) -> None:
     typer.echo(json.dumps(payload, sort_keys=True))
-
-
-def _command_result_payload(result: LifecycleCommandResult) -> dict[str, Any]:
-    return {
-        "status": result.status.value,
-        "message": result.message,
-        "blocked": result.blocked.to_dict() if result.blocked else None,
-    }
-
-
-def _emit_command_result(result: LifecycleCommandResult, *, json_output: bool = False) -> None:
-    if json_output:
-        _emit_json(_command_result_payload(result))
-    else:
-        is_error = result.status is LifecycleCommandStatus.INTERNAL_ERROR
-        typer.echo(f"{result.status.value} {result.message}", err=is_error)
-    _exit_for_command_result(result)
-
-
-def _exit_for_command_result(result: LifecycleCommandResult) -> None:
-    if result.status is LifecycleCommandStatus.OK:
-        return
-    if result.status is LifecycleCommandStatus.INTERNAL_ERROR:
-        raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
-    raise typer.Exit(LifecycleExitCode.BLOCKED)
-
-
-def _preflight_service() -> LifecyclePreflightService:
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    return container.build_lifecycle_preflight_service(workspace_root)
 
 
 def _resolve_context_option(context: str | None) -> str:
@@ -133,318 +78,105 @@ def _resolve_context_option(context: str | None) -> str:
     return resolve_context_for_cli(context)
 
 
-def _relative_path_refs(workspace_root: Path, paths: tuple[Path, ...]) -> list[str]:
-    refs: list[str] = []
-    for path in paths:
-        try:
-            refs.append(path.relative_to(workspace_root).as_posix())
-        except ValueError:
-            refs.append(path.as_posix())
-    return refs
+def _authoritative_backlog_prefix(
+    workspace_root: Path,
+    *,
+    context: str,
+    release_id: str,
+    backlog_run_id: str | None,
+) -> "PromptPrefix | None":
+    """Resolve one exact completed backlog-definition producer for release scope.
 
-
-def _cleanup_result_payload(
-    result: HygieneCleanupResult, *, workspace_root: Path
-) -> dict[str, Any]:
-    return {
-        "status": LifecycleCommandStatus.OK.value,
-        "dry_run": result.dry_run,
-        "candidate_count": len(result.candidates),
-        "candidates": [candidate.to_dict() for candidate in result.candidates],
-        "deleted_paths": _relative_path_refs(workspace_root, result.deleted_paths),
-        "skipped_paths": _relative_path_refs(workspace_root, result.skipped_paths),
-        "pruned_dirs": _relative_path_refs(workspace_root, result.pruned_dirs),
-    }
-
-
-def _runtime_ref_payload(ref: RuntimeFileRef) -> dict[str, object]:
-    return {
-        "kind": ref.kind.value,
-        "path": ref.path,
-        "content_hash": ref.content_hash,
-        "ttl_seconds": ref.ttl_seconds,
-    }
-
-
-@app.command()
-def status(
-    context: str | None = typer.Option(
-        None, "--context", help="Scope the run summary to one Spec Context."
-    ),
-    release_id: str | None = typer.Option(
-        None, "--release-id", help="Scope the run summary to one release."
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Show lifecycle status.
-
-    Hygiene counters are workspace-global. v0.1.71 FR2: ``--context``/``--release-id`` add
-    a REAL run-scoped summary (``LifecycleRun`` carries both) — the count of lifecycle runs
-    matching the filter, grouped by status — so the diagnostic accepts the same explicit
-    context surface as the rest of the lifecycle CLI. Omitting both summarises every run.
+    Direct release definition remains valid when no matching backlog workflow exists.
+    When one does exist, its run-scoped ``backlog_author`` payload is authoritative;
+    ambiguity is an operator-visible usage error rather than a model choice over stale
+    candidates.
     """
     from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    service = container.build_lifecycle_hygiene_service(workspace_root)
-    counters = service.status()
-    runs_summary = _runs_summary(workspace_root, context=context, release_id=release_id)
-    if json_output:
-        _emit_json(
-            {
-                "status": LifecycleCommandStatus.OK.value,
-                "counters": counters.to_dict(),
-                "runs": runs_summary,
-            }
-        )
-        return
-    typer.echo(
-        f"OK cleanup_candidates={counters.cleanup_candidate_count} "
-        f"runs_matched={runs_summary['matched']}"
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+    from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        MalformedHandoffError,
+        RequiredHandoffMissingError,
     )
 
-
-def _runs_summary(
-    workspace_root: Path, *, context: str | None, release_id: str | None
-) -> dict[str, Any]:
-    """Count lifecycle runs matching an optional (context, release_id) filter, by status.
-
-    A REAL filter over ``LifecycleRun.context``/``release_id`` — never accepted-but-ignored.
-    """
-    from dadaia_workspace import container
-
-    runs = container.build_lifecycle_run_store(workspace_root).list_runs()
-    matched = [
+    run_store = container.build_lifecycle_run_store(workspace_root)
+    matches = [
         run
-        for run in runs
-        if (context is None or run.context == context)
-        and (release_id is None or run.release_id == release_id)
+        for run in run_store.list_runs()
+        if run.command == "backlog_definition"
+        and run.context == context
+        and run.release_id == release_id
+        and run.status is LifecycleRunStatus.COMPLETED
+        and (backlog_run_id is None or run.run_id == backlog_run_id)
     ]
-    by_status: dict[str, int] = {}
-    for run in matched:
-        key = run.status.value if hasattr(run.status, "value") else str(run.status)
-        by_status[key] = by_status.get(key, 0) + 1
-    return {
-        "context": context,
-        "release_id": release_id,
-        "matched": len(matched),
-        "by_status": by_status,
-    }
-
-
-@app.command()
-def slop(
-    limit: int = typer.Option(10, "--limit", help="Number of top offenders to show."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Show the directory-aware anti-slop metric (read-only).
-
-    Unlike file-only hygiene, a directory tree counts as ONE entry with its recursive
-    byte size — so stray venvs/caches no longer hide from the metric. Never deletes.
-    """
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    report = container.build_slop_report(workspace_root)
-    if json_output:
-        payload = report.to_dict()
-        payload["status"] = LifecycleCommandStatus.OK.value
-        payload["top_offenders"] = [entry.to_dict() for entry in report.top_offenders(limit)]
-        _emit_json(payload)
-        return
-    typer.echo(
-        f"OK entries={report.total_entries} stale={report.stale_count} "
-        f"reclaimable_bytes={report.reclaimable_bytes}"
-    )
-    for entry in report.top_offenders(limit):
-        marker = "dir " if entry.is_dir else "file"
-        typer.echo(f"  [{entry.kind.value}] {marker} {entry.size_bytes:>12} B  {entry.path}")
-
-
-@app.command()
-def clean(
-    apply: bool = typer.Option(
-        False,
-        "--apply",
-        help="Actually reclaim (delete). Default is dry-run preview only.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Directory-aware retention SWEEP (D5) — the guarded deleter.
-
-    Reclaims past-TTL / non-canonical entries from the recognised swept ``.dadaia/`` zones:
-    whole directory trees via rmtree (the stray-venv case the file-only cleanup misses) and
-    files via unlink. DRY-RUN BY DEFAULT — pass ``--apply`` to actually delete. Never touches
-    a live lifecycle run's tmp, an operator-marked-important report, a canonical/durable
-    path, anything outside ``.dadaia/``, or a symlink whose target escapes ``.dadaia/``.
-    """
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    result = container.build_retention_sweep(workspace_root).sweep(apply=apply)
-    if json_output:
-        payload = result.to_dict()
-        payload["status"] = LifecycleCommandStatus.OK.value
-        _emit_json(payload)
-        return
-    mode = "applied" if result.applied else "dry-run"
-    typer.echo(
-        f"OK {mode} reclaimed={len(result.reclaimed_paths)} "
-        f"reclaimed_bytes={result.reclaimed_bytes} skipped={len(result.skipped)}"
-    )
-    for rel in result.reclaimed_paths:
-        typer.echo(f"  reclaim {rel}")
-    for rel, reason in result.skipped:
-        typer.echo(f"  skip [{reason.value}] {rel}")
-
-
-@app.command()
-def preflight(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str | None = typer.Option(None, "--release-id", help="Release id."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run lifecycle preflight.
-
-    v0.1.69 FR3: ``--context``/``--release-id`` feed the real ``LifecyclePreflightInput``
-    assembly (``container.build_lifecycle_preflight_input``), composed from existing
-    readers (ACTIVE.md, git, specs-doctor, session-identity/lease, hygiene) and evaluated
-    by ``service.preflight(data)``. A blocked result carries a specific reason and
-    (whenever applicable) a non-null ``operator_command`` — the always-BLOCKED
-    ``unresolved_runtime_preflight`` stub is retired. v0.1.77 FR1/FR2: an unset
-    ``--context`` resolves through the single bind-resolution seam (explicit -> env ->
-    bound session -> first-ALIVE) instead of a hardcoded literal default.
-    """
-    from dadaia_workspace import container
-
-    context = _resolve_context_option(context)
-    workspace_root = resolve_workspace_root()
-    service = _preflight_service()
-    data = container.build_lifecycle_preflight_input(
-        workspace_root, context=context, release_id=release_id
-    )
-    result = service.preflight(data)
-    if result.ok:
-        message = "preflight passed"
-        # v0.1.76 T-4 (FR7): advisory-only presence warnings (e.g. a live foreign
-        # session on this context) are surfaced but NEVER block — appended to the OK
-        # message so both --json and human output carry them.
-        if result.warnings:
-            message = message + " | " + " | ".join(result.warnings)
-        command_result = LifecycleCommandResult(status=LifecycleCommandStatus.OK, message=message)
-    else:
-        assert result.blocked is not None
-        command_result = LifecycleCommandResult(
-            status=LifecycleCommandStatus.BLOCKED,
-            message=result.blocked.reason,
-            blocked=result.blocked,
+    if backlog_run_id is not None and not matches:
+        raise typer.BadParameter(
+            f"--backlog-run-id {backlog_run_id!r} is not a completed backlog-definition "
+            f"run for context={context!r}, release={release_id!r}"
         )
-    _emit_command_result(command_result, json_output=json_output)
+    if not matches:
+        return None
+    if len(matches) != 1:
+        ids = ", ".join(sorted(run.run_id for run in matches))
+        raise typer.BadParameter(
+            "multiple completed backlog-definition runs match this release; pass "
+            f"--backlog-run-id explicitly ({ids})"
+        )
+    upstream = matches[0]
+    try:
+        resolved = container.build_workflow_handoff_resolver(
+            workspace_root
+        ).resolve_required(upstream, producer_step="backlog_author", attempt=0)
+    except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
+        raise typer.BadParameter(
+            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author "
+            f"payload: {exc}"
+        ) from exc
 
+    authored_paths: set[str] = set()
 
-@app.command()
-def report(
-    context: str | None = typer.Option(
-        None, "--context", help="Report context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option("v0.1.15", "--release-id", help="Release id."),
-    run_id: str = typer.Option("lifecycle-report", "--run-id", help="Lifecycle run id."),
-    apply_cleanup: bool = typer.Option(
-        False,
-        "--apply-cleanup",
-        help="Apply hygiene cleanup after writing the report.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run lifecycle report workflow.
+    def _record_backlog_path(value: object) -> None:
+        if not isinstance(value, str):
+            return
+        clean = value.strip().lstrip("/")
+        if clean.startswith("specs/backlog/") or "/specs/backlog/" in clean:
+            authored_paths.add(clean)
 
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam (explicit -> env -> bound session -> first-ALIVE) instead of a hardcoded literal
-    default.
-    """
-    from dadaia_workspace import container
-
-    context = _resolve_context_option(context)
-    workspace_root = resolve_workspace_root()
-    result = container.build_lifecycle_report_workflow(workspace_root).run(
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        apply_cleanup=apply_cleanup,
+    raw_refs = resolved.payload.get("artifact_refs")
+    refs = tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
+    root = workspace_root.resolve()
+    for ref in refs:
+        _record_backlog_path(ref)
+        target = (root / ref).resolve()
+        if root not in target.parents or not target.is_file() or not ref.endswith(".json"):
+            continue
+        try:
+            document = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        artifact = document.get("artifact") if isinstance(document, dict) else None
+        if isinstance(artifact, dict):
+            _record_backlog_path(artifact.get("path"))
+    if not authored_paths:
+        raise typer.BadParameter(
+            f"backlog-definition run {upstream.run_id!r} produced no exact specs/backlog "
+            "artifact path in its backlog_author evidence"
+        )
+    paths = "\n".join(f"- `{path}`" for path in sorted(authored_paths))
+    directive = (
+        f"Exact producer run: `{upstream.run_id}`.\n"
+        "The following authored backlog artifact(s) are the authoritative scope input "
+        "for this release:\n"
+        f"{paths}\n"
+        "Pick these items. Candidate-backlog scanning may sanitize or identify stale "
+        "neighbors, but it must not substitute a different candidate for this exact "
+        "producer output."
     )
-    if json_output:
-        _emit_json(
-            {
-                "status": LifecycleCommandStatus.OK.value,
-                "report": _runtime_ref_payload(result.report),
-                "handoff": _runtime_ref_payload(result.handoff),
-                "baseline_snapshot": _runtime_ref_payload(result.baseline_snapshot),
-                "final_snapshot": _runtime_ref_payload(result.final_snapshot),
-                "cleanup_dry_run": result.cleanup.dry_run,
-                "cleanup_candidate_count": len(result.cleanup.candidates),
-                "validation_valid": result.validation.valid,
-                "validation_hash_status": result.validation.hash_status,
-            }
-        )
-        return
-    typer.echo(f"OK report={result.report.path} handoff={result.handoff.path}")
+    return PromptPrefix.from_sections({"authoritative-backlog-definition": directive})
 
 
-@app.command()
-def resume(run_id: str) -> None:
-    """Resume a lifecycle run by id."""
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    store = container.build_lifecycle_run_store(workspace_root)
-    service = container.build_lifecycle_preflight_service(workspace_root)
-    _emit_command_result(service.resume_run(store, run_id))
-
-
-@hygiene_app.command("status")
-def hygiene_status(
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Show lifecycle hygiene status."""
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    counters = container.build_lifecycle_hygiene_service(workspace_root).status()
-    if json_output:
-        _emit_json(
-            {
-                "status": LifecycleCommandStatus.OK.value,
-                "counters": counters.to_dict(),
-            }
-        )
-        return
-    typer.echo(f"OK cleanup_candidates={counters.cleanup_candidate_count}")
-
-
-@hygiene_app.command("clean")
-def hygiene_clean(
-    dry_run: bool = typer.Option(
-        True,
-        "--dry-run/--apply",
-        help="Preview cleanup or apply it explicitly.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run lifecycle hygiene cleanup."""
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(dry_run=dry_run)
-    if json_output:
-        _emit_json(_cleanup_result_payload(result, workspace_root=workspace_root))
-        return
-    mode = "dry-run" if dry_run else "applied"
-    typer.echo(f"OK {mode} candidates={len(result.candidates)}")
-
-
-@backlog_app.command("define")
+@app.command("backlog-definition")
 def backlog_define(
     context: str | None = typer.Option(
         None, "--context", help="Context. Default: resolved via the bind-resolution seam."
@@ -466,8 +198,8 @@ def backlog_define(
         None,
         "--step-model",
         help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
-        "profiles list'.",
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see "
+        "'dadaia reports workflow-profiles'.",
     ),
     demand: str | None = typer.Option(
         None,
@@ -588,13 +320,18 @@ def backlog_define(
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
-@release_app.command("define")
+@app.command("release-definition")
 def release_define(
     context: str | None = typer.Option(
         None, "--context", help="Context. Default: resolved via the bind-resolution seam."
     ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
+    backlog_run_id: str | None = typer.Option(
+        None,
+        "--backlog-run-id",
+        help="Exact completed backlog-definition run to consume. Auto-resolves only when unique.",
+    ),
     harness: str = typer.Option(
         "auto",
         "--harness",
@@ -610,8 +347,8 @@ def release_define(
         None,
         "--step-model",
         help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
-        "profiles list'.",
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see "
+        "'dadaia reports workflow-profiles'.",
     ),
     resume_from: str | None = typer.Option(
         None,
@@ -666,11 +403,18 @@ def release_define(
     )
     sequence = apply_resolved_policy(base, snapshot)
 
+    upstream_prefix = _authoritative_backlog_prefix(
+        workspace_root,
+        context=context,
+        release_id=release_id,
+        backlog_run_id=backlog_run_id,
+    )
     workflow = container.build_release_definition_workflow(
         workspace_root,
         context=context,
         release_id=release_id,
         default_runtime_kind=default_kind,
+        prefix=upstream_prefix,
         policy_snapshot=snapshot,
     )
     result = workflow.run(run_id, sequence, resume_from=resume_from)
@@ -757,6 +501,9 @@ def _apply_release_consume(
     spec_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
     slugs = parse_consumes_line(spec_text)
 
+    if not slugs:
+        return {"consumed_slugs": [], "shipped_anchors": [], "ledger": None}
+
     lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
     shipped = shipped_anchors_for(
         slugs, backlog_dir=lifecycle.backlog_dir, registry=lifecycle.registry
@@ -773,67 +520,28 @@ def _apply_release_consume(
     }
 
 
-@app.command()
-def implement(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("implement", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'implement=profile-id' (repeatable). Profile ids "
-        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    write_scope: list[str] | None = typer.Option(
-        None,
-        "--write-scope",
-        help="Extra write-scope path glob (repeatable). The reserved [-] task's "
-        "TASKS.md 'Write set:' is derived automatically (bug "
-        "implement-verb-never-derives-task-write-scope; parity with pipeline/"
-        "implement-review).",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the implementation step on a selectable harness.
-
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default.
-    """
+def _apply_closure_removal_for_release(
+    workspace_root: Path, *, context: str, release_id: str
+) -> dict[str, Any]:
+    """Apply the implementation workflow's terminal backlog-removal gate."""
     from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
 
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    # Bug implement-verb-never-derives-task-write-scope: same derivation as the
-    # pipeline (FR3 v0.1.68) and implement-review (T-E/FR-E v0.1.78) verbs.
-    workspace_root = resolve_workspace_root()
-    specs_dir = container.resolve_context_specs_dir(workspace_root, context)
-    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
-    _run_phase_step(
-        label="implement",
-        role="software-engineer",
-        from_phase=LifecyclePhase.IMPLEMENTATION,
-        target_phase=LifecyclePhase.QA_REVIEW,
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        workflow_id="implementation",
-        catalog_step_label="implement",
-        step_model=step_model,
-        json_output=json_output,
-        # v0.1.78 T-A / FR-A: implement is a CREATE step. It targets QA_REVIEW purely to
-        # advance the release phase; that transition target must not imply verdict-gating.
-        is_review=False,
-        extra_allowed_paths=tuple(tasks_paths) + tuple(write_scope or ()),
-    )
+    lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
+    removal = lifecycle.remove(release_id=release_id)
+    return {
+        "removed": [
+            action.slug
+            for action in removal.actions
+            if action.action.value == "archived_and_removed"
+        ],
+        "rewritten": [
+            action.slug for action in removal.actions if action.action.value == "rewritten"
+        ],
+        "unchanged": [
+            action.slug for action in removal.actions if action.action.value == "unchanged"
+        ],
+    }
+
 
 
 def _resolve_default_harness(harness: str) -> str:
@@ -994,360 +702,12 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
-def _phase_step_prompt(label: str, release_id: str, context: str, *, is_review: bool) -> str:
-    """Step-kind-aware worker instruction for a single-step lifecycle verb (v0.1.32 D-2/L1).
 
-    The CLI single-step verbs are the third worker-prompt surface (after
-    ``build_fragment_suffix`` and ``pipeline._generic_prompt``). A review step
-    (qa/security/code) is verdict-gated and must emit a verdict; a create step
-    (implement/close/backlog|release define) produces an artifact and must NOT self-verdict
-    — its verdict is ignored by the review-only gate, and instructing it to self-verdict is
-    the Drift-1 incoherence this release eliminates.
-
-    v0.1.78 T-A / FR-A: ``is_review`` is now an EXPLICIT per-verb signal passed by the
-    caller, independent of the step's transition ``target_phase`` — the step kind and the
-    phase transition target are two different concerns (``implement`` targets QA_REVIEW
-    but is a create step). The former derivation via ``is_review_phase(target_phase)``
-    conflated them, misclassifying ``implement`` as a review step.
-    """
-    if is_review:
-        output_instruction = (
-            "Emit a handoff whose structured_output.verdict is APPROVED or REJECTED, with an "
-            "artifact_ref pointing at the handoff document."
-        )
-    else:
-        output_instruction = (
-            "Emit a handoff with an artifact_ref pointing at the handoff document (the "
-            "artifact you produced). Do not self-verdict — create steps are not verdict-gated."
-        )
-    return (
-        f"Run the {label} step for release {release_id} in context {context}. {output_instruction}"
-    )
-
-
-def _run_phase_step(
-    *,
-    label: str,
-    role: str,
-    from_phase: LifecyclePhase,
-    target_phase: LifecyclePhase,
-    context: str,
-    release_id: str,
-    run_id: str,
-    harness: str,
-    workflow_id: str,
-    catalog_step_label: str,
-    json_output: bool,
-    is_review: bool,
-    step_model: list[str] | None = None,
-    post_step: Callable[[PhaseWorkflowResult], dict[str, Any] | None] | None = None,
-    extra_allowed_paths: tuple[str, ...] = (),
-) -> None:
-    """Run one bounded lifecycle step through the engine on a selectable harness.
-
-    Shared by every single-step lifecycle verb (implement, review qa|security|code, close).
-    The harness is chosen per invocation (LAW 1: pi/codex/fake only — ``claude`` is
-    rejected). FR1: the step's model is governed — the verb resolves the ``workflow_id``
-    snapshot through the shared resolver, selects its ``catalog_step_label`` entry, and calls
-    :func:`apply_entry_to_step` ONCE (there is no step object to iterate) to author its local
-    ``runtime_kind`` (FAKE preserved for a dry-run) + ``resolved_model``. ``--step-model`` is
-    profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6). The frozen
-    snapshot is passed to ``LifecyclePhaseWorkflow.run`` so the run records it (LAW 7).
-
-    ``is_review`` (v0.1.78 T-A / FR-A) is an EXPLICIT, caller-supplied step-kind signal,
-    independent of ``target_phase``: a review step's worker must emit an APPROVED handoff
-    to advance; a create step's worker must emit an artifact_ref (its self-reported verdict,
-    if any, is ignored). Deriving step kind from ``target_phase`` alone was the bug this
-    parameter fixes — ``implement`` targets QA_REVIEW (a review phase) purely to transition
-    the release, but is itself a create step.
-    """
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import apply_entry_to_step
-
-    workspace_root = resolve_workspace_root()
-    kind = _resolve_harness(harness)
-    snapshot = _resolve_workflow_snapshot(
-        workspace_root,
-        workflow_id=workflow_id,
-        context=context,
-        harness=harness,
-        step_model=step_model,
-        step_harness_names={},
-    )
-    entry = snapshot.step(catalog_step_label)
-    if entry is None:
-        raise typer.BadParameter(
-            f"workflow {workflow_id!r} has no governed step {catalog_step_label!r}"
-        )
-    # apply_entry_to_step is the SOLE runtime_kind author (no step object here): FAKE is
-    # preserved for a fake run while the snapshot still records the governed harness/model.
-    local_kind, resolved_model = apply_entry_to_step(
-        entry, base_kind=kind, preserve_fake=(harness.lower() == "fake")
-    )
-    workflow = container.build_lifecycle_phase_workflow(workspace_root, runtime_kind=local_kind)
-    scope = PromptScope(
-        role=role,
-        context=context,
-        release_id=release_id,
-        task_id=run_id,
-        prompt=_phase_step_prompt(label, release_id, context, is_review=is_review),
-        allowed_paths=(f".dadaia/handoff/{context}/**", *extra_allowed_paths),
-        required_evidence=(GateEvidenceKind.HANDOFF,),
-        model_profile=entry.model_profile,
-        resolved_model=resolved_model,
-        persona=resolve_persona_for_role(role),
-    )
-    result = workflow.run(
-        run_id=run_id,
-        command=label,
-        from_phase=from_phase,
-        target_phase=target_phase,
-        scope=scope,
-        policy_snapshot=snapshot,
-        is_review=is_review,
-    )
-    status = (
-        LifecycleCommandStatus.OK.value if result.accepted else LifecycleCommandStatus.BLOCKED.value
-    )
-    # Post-step action (e.g. closure-time backlog removal). Runs ONLY when the phase step
-    # was accepted, so a blocked step never triggers side effects. Guarded so a post-step
-    # error surfaces clearly without corrupting the already-accepted phase result.
-    post_step_result: dict[str, Any] | None = None
-    post_step_error: str | None = None
-    if result.accepted and post_step is not None:
-        try:
-            post_step_result = post_step(result)
-        except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the step.
-            post_step_error = f"{type(exc).__name__}: {exc}"
-    if json_output:
-        _emit_json(
-            {
-                "status": status,
-                "run_id": result.run_id,
-                "accepted": result.accepted,
-                "phase": result.phase.value,
-                "runtime": result.runtime_kind.value,
-                "blocked": result.blocked.to_dict() if result.blocked else None,
-                "post_step": post_step_result,
-                "post_step_error": post_step_error,
-            }
-        )
-    else:
-        typer.echo(
-            f"{status} {label} run={result.run_id} "
-            f"harness={result.runtime_kind.value} phase={result.phase.value}"
-        )
-        if post_step_result is not None:
-            typer.echo(f"  post_step: {post_step_result}")
-        if post_step_error is not None:
-            typer.echo(f"  post_step ERROR: {post_step_error}")
-    if not result.accepted:
-        raise typer.Exit(LifecycleExitCode.BLOCKED)
-
-
-@review_app.command("qa")
-def review_qa(
-    context: str | None = typer.Option(
-        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("review-qa", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'review_qa=profile-id' (repeatable). Profile ids "
-        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the QA review gate on a selectable harness.
-
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    _run_phase_step(
-        label="qa",
-        role="qa-engineer",
-        from_phase=LifecyclePhase.IMPLEMENTATION,
-        target_phase=LifecyclePhase.QA_REVIEW,
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        workflow_id="implementation",
-        catalog_step_label="review_qa",
-        step_model=step_model,
-        json_output=json_output,
-        is_review=True,
-    )
-
-
-@review_app.command("security")
-def review_security(
-    context: str | None = typer.Option(
-        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("review-security", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'review_security=profile-id' (repeatable). Profile "
-        "ids ONLY (D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the security review gate on a selectable harness.
-
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    _run_phase_step(
-        label="security",
-        role="security-reviewer",
-        from_phase=LifecyclePhase.QA_REVIEW,
-        target_phase=LifecyclePhase.SECURITY_REVIEW,
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        workflow_id="implementation",
-        catalog_step_label="review_security",
-        step_model=step_model,
-        json_output=json_output,
-        is_review=True,
-    )
-
-
-@review_app.command("code")
-def review_code(
-    context: str | None = typer.Option(
-        None, "--context", help="Review context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("review-code", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'review_code=profile-id' (repeatable). Profile ids "
-        "ONLY (D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the code review gate on a selectable harness.
-
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    _run_phase_step(
-        label="code",
-        role="code-reviewer",
-        from_phase=LifecyclePhase.SECURITY_REVIEW,
-        target_phase=LifecyclePhase.CODE_REVIEW,
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        workflow_id="implementation",
-        catalog_step_label="review_code",
-        step_model=step_model,
-        json_output=json_output,
-        is_review=True,
-    )
-
-
-@app.command()
-def close(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("close", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'close=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the release-closure step on a selectable harness.
-
-    On a successful closure phase step, mechanically applies residual-aware
-    backlog removal over the consumed-ledger (SPEC §3.6): items whose intents
-    fully shipped are archived-then-removed; partially-shipped items are
-    rewritten to their residual. If no consumed ledger exists, removal is a
-    no-op (``remove_at_closure`` reads an empty ledger). The removal runs as a
-    guarded post-step so a removal error surfaces clearly without corrupting the
-    closure result. v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single
-    bind-resolution seam instead of a hardcoded literal default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-
-    def _apply_closure_removal(_result: PhaseWorkflowResult) -> dict[str, Any]:
-        from dadaia_workspace import container
-
-        workspace_root = resolve_workspace_root()
-        lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
-        removal = lifecycle.remove(release_id=release_id)
-        return {
-            "removed": [
-                a.slug for a in removal.actions if a.action.value == "archived_and_removed"
-            ],
-            "rewritten": [a.slug for a in removal.actions if a.action.value == "rewritten"],
-            "unchanged": [a.slug for a in removal.actions if a.action.value == "unchanged"],
-        }
-
-    _run_phase_step(
-        label="close",
-        role="product-engineer",
-        from_phase=LifecyclePhase.CODE_REVIEW,
-        target_phase=LifecyclePhase.CLOSURE,
-        context=context,
-        release_id=release_id,
-        run_id=run_id,
-        harness=harness,
-        workflow_id="closure",
-        catalog_step_label="close",
-        step_model=step_model,
-        json_output=json_output,
-        is_review=False,
-        post_step=_apply_closure_removal,
-    )
-
-
-# -- FR2: wire audit / research / bug_report as invocable, resolver-governed verbs -------
+# -- Audit workflow emitter ------------------------------------------------------------
 
 
 class _WireStepResult(Protocol):
-    """Structural read view of one Wave-E workflow step result (audit/research/bug_report)."""
+    """Structural read view of one audit workflow step result."""
 
     @property
     def label(self) -> str: ...
@@ -1362,11 +722,7 @@ class _WireStepResult(Protocol):
 
 
 class _WireWorkflowResult(Protocol):
-    """Structural read view of a Wave-E workflow result, shared across the three FR2 verbs.
-
-    ``AuditResult`` / ``ResearchResult`` / ``BugReportResult`` satisfy this Protocol
-    field-for-field, so one emitter serves all three verbs without a per-type union.
-    """
+    """Structural read view of an audit workflow result."""
 
     @property
     def run_id(self) -> str: ...
@@ -1381,7 +737,7 @@ class _WireWorkflowResult(Protocol):
 
 
 def _emit_wire_result(verb: str, result: _WireWorkflowResult, *, json_output: bool) -> None:
-    """Emit an FR2 wire-verb result (JSON or human) + set the exit code (BLOCKED on failure)."""
+    """Emit an audit result and set the exit code."""
     status = (
         LifecycleCommandStatus.OK.value
         if result.completed
@@ -1430,7 +786,8 @@ def audit(
         None,
         "--step-model",
         help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3); steps: audit_scope, drift_scan, triage. See 'lifecycle workflow profiles list'.",
+        "(D-3); steps: audit_scope, drift_scan, triage. See "
+        "'dadaia reports workflow-profiles'.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -1479,171 +836,6 @@ def audit(
     _emit_wire_result("audit", result, json_output=json_output)
 
 
-@app.command("research")
-def research(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("research", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3); steps: research_scope, investigate, synthesis. See 'lifecycle workflow "
-        "profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the research workflow (scope→investigate→synthesis) as a fragment-driven sequence.
-
-    Born resolver-governed (v0.1.56 / FR2), mirroring ``audit``: the frozen snapshot is
-    recorded on the run before step 1; ``--step-model`` is profile-ids-only (D-3); the legacy
-    ``--model`` flag was removed in v0.1.57 (FR6). v0.1.77 FR1/FR2: an unset ``--context``
-    resolves through the single bind-resolution seam instead of a hardcoded literal
-    default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    from dataclasses import replace as _replace
-
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
-    from dadaia_workspace.features.lifecycle.workflows.research import _SEQUENCE
-
-    workspace_root = resolve_workspace_root()
-    default_kind = _resolve_harness(harness)
-
-    snapshot = _resolve_workflow_snapshot(
-        workspace_root,
-        workflow_id="research",
-        context=context,
-        harness=harness,
-        step_model=step_model,
-        step_harness_names={},
-    )
-    base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
-    sequence = apply_resolved_policy(base, snapshot)
-
-    workflow = container.build_research_workflow(
-        workspace_root,
-        context=context,
-        release_id=release_id,
-        default_runtime_kind=default_kind,
-        policy_snapshot=snapshot,
-    )
-    result = workflow.run(run_id, sequence=sequence)
-    _emit_wire_result("research", result, json_output=json_output)
-
-
-@app.command("bug_report")
-def bug_report(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("bug-report", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3); steps: bug_intake, dedupe, bug_write. See 'lifecycle workflow profiles list'.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the bug-report workflow (intake→dedupe→bug_write) as a fragment-driven sequence.
-
-    Born resolver-governed (v0.1.56 / FR2). The verb's real ``bug_write`` target is the
-    ADDITIVE ``specs/bugs/`` path class — it takes no MUTATING lease by construction. Under
-    ``--harness fake`` a step-aware driving fake keeps the ADDITIVE ``bug_write`` step in-scope
-    so the run reaches COMPLETED. ``--step-model`` is profile-ids-only (D-3); the legacy
-    ``--model`` flag was removed in v0.1.57 (FR6). v0.1.77 FR1/FR2: an unset ``--context``
-    resolves through the single bind-resolution seam instead of a hardcoded literal
-    default.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    from dataclasses import replace as _replace
-
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import _SEQUENCE
-
-    workspace_root = resolve_workspace_root()
-    default_kind = _resolve_harness(harness)
-
-    snapshot = _resolve_workflow_snapshot(
-        workspace_root,
-        workflow_id="bug_report",
-        context=context,
-        harness=harness,
-        step_model=step_model,
-        step_harness_names={},
-    )
-    base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
-    sequence = apply_resolved_policy(base, snapshot)
-
-    workflow = container.build_bug_report_workflow(
-        workspace_root,
-        context=context,
-        release_id=release_id,
-        default_runtime_kind=default_kind,
-        policy_snapshot=snapshot,
-    )
-    result = workflow.run(run_id, sequence=sequence)
-    _emit_wire_result("bug_report", result, json_output=json_output)
-
-
-# -- FR3: implement/review attempt loop as an invocable, resolver-governed verb ----------
-
-
-def _implement_review_runtime_factory(
-    workspace_root: Path,
-    *,
-    context: str,
-) -> RuntimeFactory:
-    """Per-step runtime factory for the implement/review loop verb (FR3).
-
-    ``FAKE`` resolves to a *driving* fake returning an APPROVED handoff with an in-scope
-    ``.dadaia/handoff/<ctx>/**`` artifact_ref, so ``--harness fake`` drives the loop to
-    COMPLETED deterministically (both workers pass the structural gate; the review's APPROVED
-    verdict completes the loop) — mirroring the audit/research driving fakes. Real harnesses
-    (pi/codex) resolve to their live adapters; the policy-resolved concrete model reaches each
-    adapter through ``request.resolved_model`` (threaded by ``apply_resolved_policy``).
-
-    Kept a module-level seam so a CLI test can inject a scripted-verdict fake (the all-REJECTED
-    → BLOCK path) without bypassing the real snapshot-freezing wiring in
-    :func:`_build_implement_review_pipeline`.
-    """
-    from dadaia_workspace import container
-    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake implement/review worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/implement-review-step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
-
-    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
-            # Gate verifies refs EXIST (bug gate-accepts-phantom-artifact-evidence).
-            return FakeAgentRuntime(result=approving, materialize_root=workspace_root)
-        return container.build_agent_runtime(kind, cwd=workspace_root)
-
-    return factory
-
 
 def _enforce_preflight_gate(
     workspace_root: Path,
@@ -1671,32 +863,33 @@ def _enforce_preflight_gate(
     data = container.build_lifecycle_preflight_input(
         workspace_root, context=context, release_id=release_id
     )
-    result = _preflight_service().preflight(data)
+    result = container.build_lifecycle_preflight_service(workspace_root).preflight(data)
     if result.ok:
         return
     assert result.blocked is not None
-    # _emit_command_result exits with LifecycleExitCode.BLOCKED for non-OK statuses.
-    _emit_command_result(
-        LifecycleCommandResult(
-            status=LifecycleCommandStatus.BLOCKED,
-            message=f"preflight blocked: {result.blocked.reason}",
-            blocked=result.blocked,
-        ),
-        json_output=json_output,
-    )
+    message = f"preflight blocked: {result.blocked.reason}"
+    if json_output:
+        _emit_json(
+            {
+                "status": LifecycleCommandStatus.BLOCKED.value,
+                "message": message,
+                "blocked": result.blocked.to_dict(),
+            }
+        )
+    else:
+        typer.echo(f"{LifecycleCommandStatus.BLOCKED.value} {message}")
+    raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
-def _pipeline_runtime_factory(
+def _implementation_runtime_factory(
     workspace_root: Path,
     *,
     context: str,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Per-step runtime factory for the ``pipeline`` verb (v0.1.72 FR5, bug
-    ``fake-pipeline-blocks-missing-artifact-evidence``).
+    """Per-step runtime factory for the implementation-reviews workflow.
 
-    ``FAKE`` resolves to the same DRIVING fake the release-definition and
-    implement-review verbs already had — an APPROVED result carrying artifact evidence —
-    so ``pipeline --harness fake`` is a usable deterministic workflow-wiring smoke test
+    ``FAKE`` resolves to a driving APPROVED result carrying artifact evidence, so
+    ``implementation-reviews --harness fake`` is a deterministic workflow-wiring smoke test
     instead of always blocking at ``implement`` with ``agent result missing artifact
     evidence``. Real harnesses (pi/codex) resolve to their live adapters; the
     policy-resolved concrete model reaches each adapter through
@@ -1732,197 +925,7 @@ def _pipeline_runtime_factory(
     return factory
 
 
-def _build_implement_review_pipeline(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    snapshot: WorkflowPolicySnapshot,
-    max_review_retries: int,
-) -> LifecyclePipeline:
-    """Compose the loop pipeline with the wired ``handoff_resolver`` the loop requires (FR3).
-
-    The run store + workflow-step handoff resolver come from the container seams; the frozen
-    ``snapshot`` is passed as ``policy_snapshot`` so the run records it before step 1 (LAW 7).
-    The runtime factory is resolved through :func:`_implement_review_runtime_factory` (the
-    monkeypatch seam), so the snapshot-freezing path is exercised on both the APPROVED and the
-    all-REJECTED test drives.
-    """
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
-
-    return LifecyclePipeline(
-        context=context,
-        release_id=release_id,
-        run_store=container.build_lifecycle_run_store(workspace_root),
-        runtime_factory=_implement_review_runtime_factory(workspace_root, context=context),
-        handoff_resolver=container.build_workflow_handoff_resolver(workspace_root),
-        policy_snapshot=snapshot,
-        max_review_retries=max_review_retries,
-    )
-
-
-def _emit_implement_review_result(result: ImplementReviewLoopResult, *, json_output: bool) -> None:
-    """Emit the loop result (JSON or human) + set the exit code (BLOCKED on failure)."""
-    status = (
-        LifecycleCommandStatus.OK.value
-        if result.completed
-        else LifecycleCommandStatus.BLOCKED.value
-    )
-    final_verdict = result.rounds[-1].review_verdict if result.rounds else None
-    if json_output:
-        _emit_json(
-            {
-                "status": status,
-                "run_id": result.run_id,
-                "completed": result.completed,
-                "attempts": result.attempts,
-                "final_verdict": final_verdict,
-                "rounds": [
-                    {"attempt": r.attempt, "review_verdict": r.review_verdict}
-                    for r in result.rounds
-                ],
-                "blocked": result.blocked.to_dict() if result.blocked else None,
-            }
-        )
-    else:
-        trail = " → ".join(f"#{r.attempt}:{r.review_verdict}" for r in result.rounds)
-        typer.echo(
-            f"{status} implement-review run={result.run_id} "
-            f"attempts={result.attempts} verdict={final_verdict} {trail}"
-        )
-    if not result.completed:
-        raise typer.Exit(LifecycleExitCode.BLOCKED)
-
-
-@app.command("implement-review")
-def implement_review(
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    release_id: str = typer.Option(..., "--release-id", help="Release id."),
-    run_id: str = typer.Option("implement-review", "--run-id", help="Lifecycle run id."),
-    harness: str = typer.Option(
-        "auto",
-        "--harness",
-        help="Layer-2 harness: auto (entry session) | fake | codex | pi (claude is Layer-1 only).",
-    ),
-    step_model: list[str] | None = typer.Option(
-        None,
-        "--step-model",
-        help="Per-step model override 'implement|review_qa=profile-id' (repeatable). Profile "
-        "ids ONLY (D-3); see 'lifecycle workflow profiles list'.",
-    ),
-    max_review_retries: int = typer.Option(
-        2,
-        "--max-review-retries",
-        help="Bounded retry count: after this many REJECTED rounds the loop BLOCKS.",
-    ),
-    write_scope: list[str] | None = typer.Option(
-        None,
-        "--write-scope",
-        help="Extra write-scope path glob for the implement step ONLY (repeatable). "
-        "Unions with the handoff-dir scope so an implement worker may legally edit the "
-        "given production/test path(s); the review step is never widened. The reserved "
-        "[-] task's TASKS.md 'Write set:' is derived automatically (parity with "
-        "'pipeline') — this flag is an additive escape hatch, not a requirement.",
-    ),
-    skip_preflight: bool = typer.Option(
-        False,
-        "--skip-preflight",
-        help="Explicit operator override: run WITHOUT the preflight gate (wiring smoke "
-        "tests / deliberate judgment). Never silently skipped.",
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the implement/review attempt loop (implement → review, bounded retry) on a harness.
-
-    Born resolver-governed (v0.1.56 / FR3): the per-step model is resolved through the shared
-    ``WorkflowExecutionPolicyResolver`` (the ``implementation`` workflow snapshot) and the
-    frozen snapshot is recorded on the run before step 1 (LAW 7). Each REJECTED review injects
-    a COMPACT rejection digest into the next implement prompt; every loop worker is gated on
-    EVIDENCE ONLY (non-SUCCEEDED / empty artifact_refs / out-of-scope ⇒ BLOCK), never on the
-    review verdict. An APPROVED review COMPLETES the loop; exhausting ``--max-review-retries``
-    REJECTED rounds BLOCKS it. ``--harness fake`` drives it deterministically; ``--step-model``
-    is profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default.
-    v0.1.78 T-E / FR-E: the implement step's write scope is derived from the reserved
-    TASKS.md task's declared ``Write set:`` globs — parity with the ``pipeline`` verb
-    (FR3, v0.1.68) — plus the additive ``--write-scope`` escape hatch above.
-    """
-    context = _resolve_context_option(context)
-    harness = _resolve_default_harness(harness)
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.pipeline import (
-        PipelineStep,
-        apply_resolved_policy,
-    )
-    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
-
-    workspace_root = resolve_workspace_root()
-    # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
-    default_kind = _resolve_harness(harness)
-    # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created.
-    _enforce_preflight_gate(
-        workspace_root,
-        context=context,
-        release_id=release_id,
-        skip=skip_preflight,
-        json_output=json_output,
-    )
-
-    # FR3: resolve the ``implementation`` snapshot through the shared resolver; seed each base
-    # step's runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let
-    # apply_resolved_policy — the sole runtime_kind author — preserve FAKE while recording the
-    # governed harness/model onto the implement + review steps.
-    snapshot = _resolve_workflow_snapshot(
-        workspace_root,
-        workflow_id="implementation",
-        context=context,
-        harness=harness,
-        step_model=step_model,
-        step_harness_names={},
-    )
-    # T-E / FR-E: derive the implement step's write scope from the reserved TASKS.md task's
-    # declared `Write set:` globs, unioned BEFORE any --write-scope extras — exactly the
-    # `pipeline` verb's FR3 (v0.1.68) derivation. Additive-optional: an absent/ambiguous
-    # TASKS.md degrades to () with no crash.
-    specs_dir = container.resolve_context_specs_dir(workspace_root, context)
-    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
-    extra_paths = tuple(tasks_paths) + tuple(write_scope or ())
-    implement_step = PipelineStep(
-        label="implement",
-        role="software-engineer",
-        from_phase=LifecyclePhase.IMPLEMENTATION,
-        target_phase=LifecyclePhase.QA_REVIEW,
-        runtime_kind=default_kind,
-        extra_allowed_paths=extra_paths,
-    )
-    review_step = PipelineStep(
-        label="review_qa",
-        role="qa-engineer",
-        from_phase=LifecyclePhase.QA_REVIEW,
-        target_phase=LifecyclePhase.SECURITY_REVIEW,
-        runtime_kind=default_kind,
-        is_review=True,
-    )
-    implement_step, review_step = apply_resolved_policy((implement_step, review_step), snapshot)
-
-    pipeline = _build_implement_review_pipeline(
-        workspace_root,
-        context=context,
-        release_id=release_id,
-        snapshot=snapshot,
-        max_review_retries=max_review_retries,
-    )
-    result = pipeline.run_implement_review_loop(
-        run_id, implement_step=implement_step, review_step=review_step
-    )
-    _emit_implement_review_result(result, json_output=json_output)
-
-
-@app.command()
+@app.command("implementation-reviews")
 def pipeline(
     context: str | None = typer.Option(
         None, "--context", help="Context. Default: resolved via the bind-resolution seam."
@@ -1938,14 +941,14 @@ def pipeline(
         None,
         "--step-harness",
         help="Per-step override 'label=harness' (repeatable); labels: "
-        "implement, review_qa, review_security, review_code.",
+        "implement, review_qa, review_security, review_code, close.",
     ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
         help="Per-step model override 'label=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3) — a raw '<id>:<effort>' string is rejected; see 'lifecycle workflow "
-        "profiles list'.",
+        "(D-3) — a raw '<id>:<effort>' string is rejected; see "
+        "'dadaia reports workflow-profiles'.",
     ),
     write_scope: list[str] | None = typer.Option(
         None,
@@ -1953,9 +956,15 @@ def pipeline(
         help="Extra write-scope path glob for the implement step ONLY (repeatable). "
         "FR7 (T-66-08): unions with the handoff-dir scope so an implement worker may "
         "legally edit the given production/test path(s); review steps are never "
-        "widened. Since v0.1.71 the reserved [-] task's TASKS.md 'Write set:' is "
-        "derived automatically — this flag is an additive escape hatch, not a "
+        "widened. The approved release's incomplete TASKS.md write sets are derived "
+        "automatically — this flag is an additive escape hatch, not a "
         "requirement.",
+    ),
+    max_review_retries: int = typer.Option(
+        2,
+        "--max-review-retries",
+        min=0,
+        help="Maximum automatic correction rounds after a rejected review.",
     ),
     show_policy: bool = typer.Option(
         False,
@@ -1970,7 +979,7 @@ def pipeline(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the multi-step release pipeline (implement→qa→security→code) with per-step harness mixing.
+    """Run implementation, bounded review corrections, and closure.
 
     The per-step model is governed: ``--step-model label=profile-id`` selects a built-in
     model profile (D-3), resolved through the shared ``WorkflowExecutionPolicyResolver``
@@ -2042,7 +1051,7 @@ def pipeline(
     resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
     try:
         snapshot = resolver.resolve(
-            "implementation",
+            "implementation_reviews",
             context="default",
             cli_overrides=typed_overrides,
             default_harness=resolve_default_harness,
@@ -2064,10 +1073,12 @@ def pipeline(
     # task's declared `Write set:` globs, unioned BEFORE any --write-scope extras (FR3.2).
     # Additive-optional: an absent/ambiguous TASKS.md degrades to () with no crash (AC3.2),
     # so a fixture/dry-run pipeline with no real TASKS.md behaves exactly as before.
-    from dadaia_workspace.features.lifecycle.tasks_write_scope import write_scope_from_tasks
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import (
+        write_scope_from_release_tasks,
+    )
 
     specs_dir = container.resolve_context_specs_dir(workspace_root, context)
-    tasks_paths = write_scope_from_tasks(specs_dir, release_id)
+    tasks_paths = write_scope_from_release_tasks(specs_dir, release_id)
     # FR7 (T-66-08): --write-scope threads into extra_allowed_paths for non-review steps
     # ONLY (gated on step.is_review is False, not a label match — ARCHITECT MEDIUM-2);
     # review steps are never widened. Today the ladder has exactly one non-review step
@@ -2077,7 +1088,9 @@ def pipeline(
         replace(
             step,
             runtime_kind=step_harness_kinds.get(step.label, default_kind),
-            extra_allowed_paths=extra_paths if not step.is_review else (),
+            extra_allowed_paths=(
+                extra_paths if step.label == "implement" else step.extra_allowed_paths
+            ),
         )
         for step in implementation_ladder(default_kind)
     )
@@ -2088,11 +1101,19 @@ def pipeline(
         context=context,
         release_id=release_id,
         policy_snapshot=snapshot,
-        # v0.1.72 FR5: the driving-fake-aware factory — `--harness fake` completes the
-        # smoke path with artifact evidence (parity with implement-review).
-        runtime_factory=_pipeline_runtime_factory(workspace_root, context=context),
+        # The driving-fake-aware factory lets `--harness fake` complete the smoke path
+        # with artifact evidence.
+        runtime_factory=_implementation_runtime_factory(workspace_root, context=context),
+        max_review_retries=max_review_retries,
     )
     result = pipe.run(run_id, steps)
+    closure_gate = (
+        _apply_closure_removal_for_release(
+            workspace_root, context=context, release_id=release_id
+        )
+        if result.completed
+        else None
+    )
     status = (
         LifecycleCommandStatus.OK.value
         if result.completed
@@ -2111,10 +1132,12 @@ def pipeline(
                         "runtime": step.runtime_kind.value,
                         "accepted": step.accepted,
                         "phase": step.phase.value,
+                        "attempt": step.attempt,
                     }
                     for step in result.steps
                 ],
                 "blocked": result.blocked.to_dict() if result.blocked else None,
+                "closure_gate": closure_gate,
                 "workflow_policy": _policy_snapshot_payload(snapshot),
             }
         )
@@ -2134,177 +1157,3 @@ def _policy_snapshot_payload(snapshot: object) -> dict[str, Any]:
 
     assert isinstance(snapshot, WorkflowPolicySnapshot)
     return snapshot.to_dict()
-
-
-def _print_policy(snapshot: object) -> None:
-    """Print a resolved policy snapshot as a human-readable step table."""
-    from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
-
-    assert isinstance(snapshot, WorkflowPolicySnapshot)
-    typer.echo(f"OK workflow={snapshot.workflow_id} policy={snapshot.policy_id}")
-    for entry in snapshot.steps:
-        typer.echo(
-            f"  {entry.step}: profile={entry.model_profile} harness={entry.harness} "
-            f"model={entry.model} reasoning={entry.reasoning} source={entry.source.value}"
-        )
-
-
-workflow_policy_app = typer.Typer(help="Workflow policy inspection.", no_args_is_help=True)
-workflow_profiles_app = typer.Typer(help="Model-profile inspection.", no_args_is_help=True)
-
-
-@workflow_policy_app.command("show")
-def workflow_policy_show(
-    workflow: str = typer.Argument("implementation", help="Workflow id to resolve."),
-    context: str | None = typer.Option(
-        None, "--context", help="Context. Default: resolved via the bind-resolution seam."
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Show the resolved model policy for a workflow (read-only).
-
-    Resolves through the shared ``WorkflowExecutionPolicyResolver`` (overlay > library
-    default) with no CLI overrides — what a run would use today before any ``--step-model``.
-    v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
-    seam instead of a hardcoded literal default (the resolved name is still not consumed
-    downstream — ``build_workflow_policy_resolver``'s ``context`` param is reserved for a
-    future per-context overlay, D-2 — but the CLI surface stays consistent with every
-    other lifecycle verb).
-    """
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.policy_resolver import PolicyResolutionError
-
-    context = _resolve_context_option(context)
-    workspace_root = resolve_workspace_root()
-    resolver = container.build_workflow_policy_resolver(workspace_root, context=context)
-    try:
-        snapshot = resolver.resolve(workflow, context="default")
-    except PolicyResolutionError as exc:
-        raise typer.BadParameter(str(exc)) from exc
-    if json_output:
-        _emit_json(_policy_snapshot_payload(snapshot))
-    else:
-        _print_policy(snapshot)
-
-
-@workflow_profiles_app.command("list")
-def workflow_profiles_list(
-    harness: str | None = typer.Option(None, "--harness", help="Filter to a harness (codex|pi)."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """List the built-in model profiles (read-only) — the valid ``--step-model`` ids (D-3)."""
-    from dadaia_workspace.features.lifecycle import model_profiles
-
-    profiles = model_profiles.profiles_for(harness) if harness else model_profiles.list_profiles()
-    if json_output:
-        _emit_json({"profiles": [p.to_dict() for p in profiles]})
-        return
-    for profile in profiles:
-        flag = " [deprecated]" if profile.deprecated else ""
-        typer.echo(
-            f"  {profile.id}: harness={profile.harness} model={profile.model_id}:{profile.effort} "
-            f"— {profile.purpose}{flag}"
-        )
-
-
-@workflow_app.command("doctor")
-def workflow_doctor(
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Run the lifecycle governance + fragment-coherence doctors (WMP-* + FRAG-COH-*).
-
-    The WMP-* governance doctor checks the governed catalog + built-in profile registry +
-    persisted overlay for: workflow/step id uniqueness, default-profile resolution + harness
-    match, fragment + output-schema resolution, overlay override validity, and any
-    ``claude``/``opencode`` Layer-2 residue. The FRAG-COH-* coherence doctor (v0.1.57 FR3) adds
-    the fragment-file surface: fragment role→persona resolution (FRAG-COH-1), selector-wired
-    main-fragment ``dynamic_inputs`` registration (FRAG-COH-2), orphan/dangling fragments
-    (FRAG-COH-3), and role→atom-map coverage across the FR2 delivery surfaces (FRAG-COH-4). An
-    invalid overlay state file is reported as an actionable error and never crashes. Exit 1 if
-    any ERROR finding is present in either doctor.
-    """
-    from dadaia_workspace import container
-    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
-        Severity as CoherenceSeverity,
-    )
-    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
-        run_fragment_coherence_doctor,
-    )
-    from dadaia_workspace.features.lifecycle.policy_doctor import (
-        Severity,
-        run_policy_doctor,
-    )
-
-    workspace_root = resolve_workspace_root()
-    store = container.build_workflow_model_policy_store(workspace_root)
-    findings = run_policy_doctor(store=store)
-    coherence = run_fragment_coherence_doctor()
-    if json_output:
-        _emit_json(
-            {
-                "findings": [f.to_dict() for f in findings],
-                "coherence": [f.to_dict() for f in coherence.findings],
-            }
-        )
-    else:
-        if not findings:
-            typer.echo("[ok] workflow-model-policy (no governance issues)")
-        for finding in findings:
-            typer.echo(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
-        if coherence.ok and not coherence.findings:
-            typer.echo("[ok] fragment-coherence (no coherence issues)")
-        for coh in coherence.findings:
-            typer.echo(f"[{coh.severity.value}] {coh.code.value}: {coh.message}")
-    has_error = any(f.severity is Severity.ERROR for f in findings) or any(
-        c.severity is CoherenceSeverity.ERROR for c in coherence.findings
-    )
-    if has_error:
-        raise typer.Exit(LifecycleExitCode.INTERNAL_ERROR)
-
-
-@handoffs_app.command("doctor")
-def handoffs_doctor(
-    context: str | None = typer.Option(
-        None, "--context", help="Narrow the report to one Spec Context's runs."
-    ),
-    release_id: str | None = typer.Option(
-        None, "--release-id", help="Narrow the report to one release's runs."
-    ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-) -> None:
-    """Reconcile the workflow-step handoff ledger against on-disk payloads (A26).
-
-    Fails (exit 3) on any orphan / malformed / stale / undeclared / unconsumed-required
-    workflow-step payload; exit 0 when the ledger and the data plane are coherent.
-
-    v0.1.71 FR2: ``--context``/``--release-id`` are REAL run filters (``LifecycleRun``
-    carries both) — the report and its on-disk scan narrow to the matched runs. Omitting
-    both preserves the whole-workspace scope.
-    """
-    from dadaia_workspace import container
-
-    workspace_root = resolve_workspace_root()
-    report = container.build_workflow_handoff_doctor(
-        workspace_root, context=context, release_id=release_id
-    ).run()
-    if json_output:
-        _emit_json({"status": "ok" if report.ok else "blocked", **report.to_dict()})
-    else:
-        if report.ok:
-            typer.echo("OK workflow-step handoff ledger coherent")
-        else:
-            for finding in report.findings:
-                typer.echo(f"[{finding.kind.value}] {finding.ref}: {finding.message}")
-    if not report.ok:
-        raise typer.Exit(LifecycleExitCode.BLOCKED)
-
-
-workflow_app.add_typer(workflow_policy_app, name="policy")
-workflow_app.add_typer(workflow_profiles_app, name="profiles")
-
-app.add_typer(hygiene_app, name="hygiene")
-app.add_typer(handoffs_app, name="handoffs")
-app.add_typer(backlog_app, name="backlog")
-app.add_typer(release_app, name="release")
-app.add_typer(review_app, name="review")
-app.add_typer(workflow_app, name="workflow")

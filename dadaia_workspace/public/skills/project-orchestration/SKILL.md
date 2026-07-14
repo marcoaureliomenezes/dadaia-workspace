@@ -38,7 +38,7 @@ when it runs as the top-level session agent.
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
 | `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec authorship, AI-entity surface, or pure review |
-| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, skills, rules, workflows, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
+| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, personas, lifecycle fragments, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
 | `qa-engineer` | 7 gate → commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
 | `security-reviewer` | 7 gate → push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface is involved |
 | `code-reviewer` | 7 gate → PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
@@ -49,17 +49,16 @@ but they do not appear in the default core topology above.
 
 ## Workflow Inventory
 
-Workflows: see `public/workflows/` — exactly 2 workflows in the default installation.
-Each is a dispatch-reference document (Claude Code and Codex do not auto-load
-`.claude/workflows/` at runtime; PM loads them as context).
+Python owns exactly four executable workflows. Run them only through `dadaia lifecycle`:
 
-| Workflow | File | Trigger | Owner |
-|---|---|---|---|
-| `release-ship` | `public/workflows/release-ship.workflow.md` | Operator elects to ship an rc-N | project-manager |
-| `audit-fanout` | `public/workflows/audit-fanout.workflow.md` | Operator requests audit, or CLOSURE checkpoint | project-manager |
+| Workflow | Command |
+|---|---|
+| `backlog_definition` | `dadaia lifecycle backlog-definition` |
+| `release_definition` | `dadaia lifecycle release-definition` |
+| `implementation_reviews` | `dadaia lifecycle implementation-reviews` |
+| `audit` | `dadaia lifecycle audit` |
 
-Optional packs may add workflows, agents, and rules, but they must not be part
-of the public default install unless explicitly selected by the operator.
+There is no parallel Markdown workflow catalog and no manual workflow executor.
 
 ## Dispatch Protocol
 
@@ -112,10 +111,10 @@ ladder and its gate ordering — is the engine's TRANSITIONS made executable:
 (`is_legal_transition`, `TransitionDecision`), `features/lifecycle/gates.py` owns the
 typed handoff gate (the APPROVED-verdict requirement), and
 `features/lifecycle/pipeline.py` + `phase_workflow.py` own run sequencing and the
-per-step **Layer-2 worker harness** — the bounded worker each step drives behind
-`AgentRuntimePort`, selectable per step across the four worker runtimes (FAKE,
-CODEX_EXEC, CLAUDE_SDK, PI_HEADLESS); see constitution §0 "The two agentic
-layers". This skill no longer narrates that ordered procedure step by step.
+per-step **Layer-2 worker harness** — the bounded Codex or PI headless worker each step
+drives behind `AgentRuntimePort`; FAKE is the deterministic test adapter. Claude Code is
+Layer-1-only. See constitution §0 "The two agentic layers". This skill no longer narrates
+that ordered procedure step by step.
 
 What it keeps is the **orchestration judgment** the engine cannot make: who may dispatch
 (dispatcher purity), the persona inventory and routing, decision authority, mediation,
@@ -200,7 +199,7 @@ Stop and surface to the operator when:
 | Marking tasks DONE without validation evidence | Skips acceptance. |
 | Push, PR, merge, deploy, release closure, or `[x]` before QA/code/security approval | Bypasses the quality gate. |
 | Editing `specs/` outside product-engineer authority | Breaks SDD ownership. |
-| Editing production files without a `[-]` task reservation | Breaks task locking. |
+| Editing production files without a `[-]` task reservation | Breaks task traceability. |
 | Shipping private/project-specific details in public assets | Security and portability risk. |
 
 ## Generic Playbooks

@@ -46,7 +46,7 @@ que delega ao `pre_gate` em Python.
   da aplicacao do SDD gate, como o hook PreToolUse do Claude.
 - **Headless / one-shot (`pi --mode json`)**: usado como worker Layer-2 atras do
   `PiHeadlessAdapter`. Nesse caminho, a cobertura deterministica vem dos
-  **git chokepoints** (pre-commit lease gate + pre-push security-verdict gate), que
+  **git chokepoints** (pre-commit presence warning + pre-push security-verdict gate), que
   rodam como git hooks independentemente de qualquer hook de harness.
 
 Regra de ouro: nunca afirme "aplicacao por hook de harness no Pi" sem qualificar o
@@ -59,14 +59,16 @@ O motor de workflows do dadaia (`dadaia lifecycle`) escolhe o harness por etapa.
 rodar uma etapa (ou um pipeline) com o Pi como worker Layer-2:
 
 ```bash
-.dadaia/.venv/bin/dadaia lifecycle pipeline --harness pi
+.dadaia/.venv/bin/dadaia lifecycle implementation-reviews --harness pi
 ```
 
 A resolucao de harness segue a precedencia CLI > overlay > catalogo (governanca de
 modelo de workflow). Com `--harness pi`, o resolvedor seleciona os modelos do Pi
 (perfis com `harness: pi`) e o `PiHeadlessAdapter` executa cada etapa via
-`pi --mode json`. O Pi roda na assinatura Codex do operador (modelos GPT, ex.
-`gpt-5.5`), nao em modelos Claude.
+`pi --mode json`. O Pi roda na assinatura Codex do operador; todo perfil GPT usa
+o provedor explicito `openai-codex/` (por exemplo,
+`openai-codex/gpt-5.5`) para nunca cair implicitamente em OpenRouter. Modelos Claude
+nao sao workers Layer-2.
 
 ## Telemetria do Pi no painel (WS-PI-6)
 

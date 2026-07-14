@@ -1,43 +1,17 @@
-"""Session-identity consolidation — the single owner of "who is this session".
+"""Session identity and bind-epoch storage.
 
-WS-R3 / FR-R3-01..03 (release v0.1.10). Before this module, four fragmented
-identity/liveness artifacts answered "who is this session" with two key schemes and
-no single owner (arch F7):
+This module owns caller-scoped records at ``.dadaia/sessions/<id>.json`` and bind-epoch
+markers used for context injection. It has no context-global incumbent pointer and no
+concurrency authority: one session's bind can never change another session's mode.
 
-- ``.dadaia/states/ctx_locks/<ctx>.lock.json``    (the lease record — owned by ``lease.py``)
-- ``.dadaia/sessions/runtime/<ctx>.ptr``          (lease incumbent pointer)
-- ``.dadaia/sessions/<id>.json``                  (session record: id, mode, pid, …)
-
-This module is the **sole reader/writer** of the incumbent-pointer namespace and the
-session record. ``lease.py`` keeps ownership of the *lease record itself* (its
-acquire/CAS/liveness logic), but routes every pointer read/write through here.
-``hooks/sdd_post_gate.py``, the bind CLI, and the workspace doctor GC all consume this
-module instead of constructing those paths directly.
-
-The session-keyed ``<session_id>.ptr`` namespace (an old ctx_inject write hint) was
-removed in v0.1.10 rc-3: it had no production reader (``read_session_ptr`` had zero
-callers and the doctor PTR-GC swept it blind), so the write-only pointer and its
-``read_session_ptr``/``write_session_ptr``/``session_ptr_path``/``gc_orphan_session_ptr``
-surface were deleted (audit A2).
-
-Storage law (FR-R3-03): every artifact lives under PROTECTED ``.dadaia/sessions/`` or
-``.dadaia/states/ctx_locks/``. No new gate classes are introduced — the existing PROTECTED
-classification of ``.dadaia/sessions/`` already fences these from agent forgery.
-
-Coherence law (FR-R3-02): the lease-record holder, the incumbent pointer, and the session
-record may never name three different sessions for one context. :func:`coherence` reports
-any divergence; the doctor consumes it as a backstop.
-
-Migration law: stale legacy artifacts (older layouts, drifted ``.ptr`` files, expired
-session records) are **ignored-and-superseded**, never migrated and never fatal. Every
-read fails soft (returns ``None``/``""``) on malformed or absent input.
+Stale legacy artifacts and expired session records are ignored and superseded. Every
+read fails soft on malformed or absent input.
 
 Atomic writes use temp-file + ``os.replace`` (atomic over an existing target on both
-POSIX and Windows), matching the convention in ``hooks/_common.atomic_write_text`` and
-``lease._write_record``. No fcntl/os.kill/``/proc`` — Windows-safe.
+POSIX and Windows). No fcntl/os.kill/``/proc`` — Windows-safe.
 
-Bind-record liveness (T-011-04 / FR-W1-04, ADR-8 amended)
----------------------------------------------------------
+Bind-record liveness
+--------------------
 The session/bind record's ``last_seen_at`` is the GC liveness clock, refreshed by the
 PostToolUse heartbeat (``hooks/sdd_post_gate._refresh_session_record``) on every tool use.
 The workspace doctor's graveyard GC measures TTL against this field, so a still-active
@@ -46,7 +20,7 @@ session's bind expires after its ``ttl_seconds`` window. :func:`touch_last_seen_
 single accessor the heartbeat uses to stamp+persist the field; :func:`liveness_timestamp`
 is the single accessor the GC uses to read the effective liveness clock.
 
-**TTL-from-creation fallback.** A legacy/pre-heartbeat record that carries NO
+**TTL-from-creation fallback.** A record that carries no
 ``last_seen_at`` decays from its CREATION time instead — :func:`liveness_timestamp` falls
 back to ``bound_at`` (the bind-CLI creation field) and then ``created_at``. This preserves
 the original TTL-from-creation behavior for records written before this field existed; it
@@ -70,27 +44,20 @@ __all__ = [
     "SESSION_HEARTBEAT_FIELD",
     "bind_epoch_dir",
     "bind_epoch_path",
-    "coherence",
     "iter_bind_epochs",
-    "iter_ptr_files",
     "liveness_timestamp",
-    "ptr_path",
     "read_bind_epoch_pid",
     "read_bind_epoch_pids",
-    "read_incumbent_ptr",
     "read_session",
-    "resolve_identity",
     "session_record_path",
     "sessions_dir",
-    "set_incumbent",
     "touch_last_seen_at",
     "write_bind_epoch",
-    "write_incumbent_ptr",
     "write_session",
 ]
 
-#: Path-traversal allowlist (CWE-22/CWE-59) shared with ``lease._validate``. Context names
-#: and session ids are filename components and must never escape their directory.
+#: Path-traversal allowlist (CWE-22/CWE-59). Context names and session ids are filename
+#: components and must never escape their directory.
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 #: Session-record TTL/heartbeat field names. These match the keys the bind CLI and the
@@ -120,13 +87,6 @@ def _validate(name: str, *, field: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _runtime_dir(workspace: Path, *, create: bool = False) -> Path:
-    d = workspace / ".dadaia" / "sessions" / "runtime"
-    if create:
-        d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
 def _sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     d = workspace / ".dadaia" / "sessions"
     if create:
@@ -134,33 +94,10 @@ def _sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     return d
 
 
-def ptr_path(workspace: Path, ctx: str, *, create: bool = False) -> Path:
-    """Path of the lease-incumbent pointer ``sessions/runtime/<ctx>.ptr``."""
-    _validate(ctx, field="context")
-    return _runtime_dir(workspace, create=create) / f"{ctx}.ptr"
-
-
 def session_record_path(workspace: Path, session_id: str, *, create: bool = False) -> Path:
     """Path of the session record ``sessions/<id>.json``."""
     _validate(session_id, field="session_id")
     return _sessions_dir(workspace, create=create) / f"{session_id}.json"
-
-
-def session_record_pid(workspace: Path, session_id: str) -> int | None:
-    """Fail-soft ``pid`` field of a CLI session record (v0.1.50 FR1).
-
-    Lineage evidence for lease self-recognition: a rotated session id can prove
-    it belongs to the SAME harness process only when the replaced sid's session
-    record (written by ``dadaia context bind``) carries the same pid. Missing,
-    invalid, or corrupt records yield ``None`` — no evidence, no recognition.
-    """
-    try:
-        path = session_record_path(workspace, session_id)
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    pid = data.get("pid") if isinstance(data, dict) else None
-    return pid if isinstance(pid, int) else None
 
 
 def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
@@ -175,27 +112,12 @@ def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     return _sessions_dir(workspace, create=create)
 
 
-def iter_ptr_files(workspace: Path) -> list[Path]:
-    """Return all ``<ctx>.ptr`` files under the runtime dir (sorted, empty if absent).
-
-    Only the incumbent-pointer namespace remains after rc-3; the session-keyed
-    ``<sid>.ptr`` hint was removed. The doctor PTR-GC consumes this to sweep orphans.
-    """
-    runtime = _runtime_dir(workspace)
-    if not runtime.exists():
-        return []
-    return sorted(p for p in runtime.iterdir() if p.name.endswith(".ptr"))
-
-
 # ---------------------------------------------------------------------------
 # Bind-epoch marker — .dadaia/states/bind_epoch/<ctx>  (FR-W2-02, ADR-G5)
 # ---------------------------------------------------------------------------
 #
 # A standalone marker file written by ``dadaia context bind`` on every successful
-# bind. It is deliberately NOT a field in the lease incumbent ``<ctx>.ptr`` (the
-# ``.ptr`` is lease-incumbency, rewritten by ``lease.acquire`` on first MUTATING
-# write — overloading it would couple injection to the lease kernel and risk spurious
-# re-injection/clobber). The marker doubles as the ctx-inject hook's harness-real
+# bind. The marker doubles as the ctx-inject hook's harness-real
 # context-discovery source: the bind CLI mints its own sid, so a harness session's
 # ``read_session(harness_sid)`` is structurally None in the default flow, and the
 # marker's mtime + name (the slug) is what the hook scans to re-inject after a bind.
@@ -331,30 +253,6 @@ def _atomic_write_text(path: Path, text: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Incumbent pointer (lease) — <ctx>.ptr
-# ---------------------------------------------------------------------------
-
-
-def read_incumbent_ptr(workspace: Path, ctx: str) -> str | None:
-    """Read the lease incumbent pointer; returns the session_id or ``None`` (fail-soft)."""
-    try:
-        content = ptr_path(workspace, ctx).read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    return content or None
-
-
-def write_incumbent_ptr(workspace: Path, ctx: str, session_id: str) -> None:
-    """Write the lease incumbent pointer atomically. Raises on validation/OS error."""
-    _validate(session_id, field="session_id")
-    _atomic_write_text(ptr_path(workspace, ctx, create=True), session_id)
-
-
-#: Alias expressing the "set incumbent of a context" concept (PLAN §R3 vocabulary).
-set_incumbent = write_incumbent_ptr
-
-
-# ---------------------------------------------------------------------------
 # Session record — <id>.json
 # ---------------------------------------------------------------------------
 
@@ -425,7 +323,7 @@ def liveness_timestamp(record: dict[str, object]) -> str:
     falls back to the creation timestamp (``bound_at`` then ``created_at``) so GC decays
     such a record TTL-from-creation. Returns ``""`` when no timestamp is present at all.
     The consumer (``doctor.py`` graveyard-GC) feeds this string into
-    ``core.lock_liveness.is_stale`` as the record's ``heartbeat``, and that predicate
+    ``core.record_liveness.is_stale`` as the record's ``heartbeat``, and that predicate
     treats an empty/non-string heartbeat as **STALE** (fail-open) — so a record that
     carries no timestamp whatsoever is collected, not preserved. The ``pid`` field is never
     consulted here (ADR-8 amended: the bind-CLI pid is dead by construction).
@@ -438,84 +336,3 @@ def liveness_timestamp(record: dict[str, object]) -> str:
         if isinstance(candidate, str) and candidate:
             return candidate
     return ""
-
-
-# ---------------------------------------------------------------------------
-# Identity resolution — the union view a consumer needs.
-# ---------------------------------------------------------------------------
-
-
-def resolve_identity(workspace: Path, ctx: str) -> dict[str, str | None]:
-    """Resolve the identity view for a context: incumbent ptr + its session record mode.
-
-    Returns a dict with ``incumbent`` (session_id from ``<ctx>.ptr`` or ``None``) and
-    ``mode`` (the incumbent session record's ``mode`` if resolvable, else ``None``). Pure
-    read; never raises on missing/legacy artifacts.
-    """
-    sid = read_incumbent_ptr(workspace, ctx)
-    mode: str | None = None
-    if sid is not None:
-        rec = read_session(workspace, sid)
-        if rec is not None:
-            raw = rec.get("mode")
-            mode = str(raw) if raw is not None else None
-    return {"incumbent": sid, "mode": mode}
-
-
-# ---------------------------------------------------------------------------
-# Coherence contract (FR-R3-02): lease holder vs incumbent vs session record.
-# ---------------------------------------------------------------------------
-
-
-def coherence(
-    workspace: Path,
-    ctx: str,
-    *,
-    lock_holder: str | None,
-    holder_confirmed: bool = False,
-) -> str | None:
-    """Return a divergence message if the three identity sources disagree, else ``None``.
-
-    The three sources for one context:
-
-    * ``lock_holder``  — ``session_id`` from the live lease record (passed in; ``lease.py``
-      owns reading it, so this module does not duplicate the lock-record path).
-    * incumbent ptr    — ``<ctx>.ptr`` content.
-    * session record   — the ``id``/``session_id`` field of ``sessions/<incumbent>.json``.
-
-    Coherence (FR-R3-02): no two **present** sources may name different sessions. Absent
-    sources (``None``) are not a violation — partial state is legal during acquire/relaunch.
-    A drifted ptr that still has a matching session record but disagrees with a live lock
-    holder is the canonical incoherence the doctor backstop reports.
-    """
-    ptr = read_incumbent_ptr(workspace, ctx)
-
-    rec_id: str | None = None
-    if ptr is not None:
-        rec = read_session(workspace, ptr)
-        if rec is not None:
-            raw = rec.get("id") or rec.get("session_id")
-            rec_id = str(raw) if raw else None
-
-    present: list[tuple[str, str]] = []
-    if lock_holder:
-        present.append(("lock-holder", lock_holder))
-    if ptr:
-        present.append(("incumbent-ptr", ptr))
-    if rec_id:
-        present.append(("session-record", rec_id))
-
-    names = {value for _label, value in present}
-    if len(names) <= 1:
-        return None
-
-    # Holder-confirmation (v0.1.50 FR2, audit F-4): when the caller proved the
-    # lock-holder is the TRUE holder (its by-session index entry — written in the
-    # same CAS as the acquire — names this ctx), a divergent incumbent ``.ptr``
-    # (e.g. a later read-bind moved it) is DRIFT, not lease↔session forgery.
-    # Only an evidence-less live holder yields the incoherence message.
-    if holder_confirmed and lock_holder:
-        return None
-
-    detail = ", ".join(f"{label}={value!r}" for label, value in present)
-    return f"session-identity incoherence for context {ctx!r}: {detail}"

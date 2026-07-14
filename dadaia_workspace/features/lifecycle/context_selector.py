@@ -726,6 +726,28 @@ _SELECTORS: dict[str, _SelectorFn] = {
     "source_summary": ContextSelector.sel_source_summary,
     "git_diff": ContextSelector.sel_git_diff,
     "test_output": ContextSelector.sel_test_output,
+    # implementation_reviews vocabulary. These aliases deliberately reuse the
+    # canonical release/diff/handoff selectors so fragment language does not create
+    # a second data-access implementation.
+    "task_group": ContextSelector.sel_tasks_draft,
+    "declared_write_set": ContextSelector.sel_tasks_draft,
+    "spec_criteria": ContextSelector.sel_approved_spec,
+    "plan_slice": ContextSelector.sel_approved_plan,
+    "plan_test_strategy": ContextSelector.sel_approved_plan,
+    "relevant_source_files": ContextSelector.sel_source_summary,
+    "change_diff": ContextSelector.sel_git_diff,
+    "changed_paths": ContextSelector.sel_git_diff,
+    "dependency_changes": ContextSelector.sel_git_diff,
+    "test_evidence": ContextSelector.sel_test_output,
+    "verification_commands": ContextSelector.sel_test_output,
+    "implementation_result": ContextSelector.sel_prior_handoffs,
+    "release_artifacts": ContextSelector.sel_prior_handoffs,
+    "review_evidence": ContextSelector.sel_prior_handoffs,
+    "current_memory": ContextSelector.sel_memory_atoms,
+    # Shared-fragment vocabulary.
+    "available_evidence": ContextSelector.sel_source_summary,
+    "grill_subject": ContextSelector.sel_source_summary,
+    "selected_memory_atoms": ContextSelector.sel_memory_atoms,
 }
 
 

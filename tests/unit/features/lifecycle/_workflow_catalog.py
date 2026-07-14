@@ -62,5 +62,5 @@ def library_workflow_catalog() -> WorkflowCatalog:
             )
         )
     return WorkflowCatalog(
-        workflows=(CatalogWorkflow(workflow_id="implementation", steps=tuple(steps)),)
+        workflows=(CatalogWorkflow(workflow_id="implementation_reviews", steps=tuple(steps)),)
     )

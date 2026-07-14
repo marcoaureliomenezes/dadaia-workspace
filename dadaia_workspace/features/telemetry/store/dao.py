@@ -17,8 +17,6 @@ from dadaia_workspace.features.telemetry.store.models import (
     Event,
     ReaderState,
     Session,
-    Workflow,
-    WorkflowAgent,
 )
 
 
@@ -130,37 +128,6 @@ class TelemetryDao:
         )
         self._conn.commit()
 
-    def upsert_workflow(self, workflow: Workflow) -> None:
-        """Insert or replace a workflows row."""
-        self._conn.execute(
-            """
-            INSERT OR REPLACE INTO workflows
-                (name, source_path, description, apply_to,
-                 discovered_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                workflow.name,
-                workflow.source_path,
-                workflow.description,
-                workflow.apply_to,
-                workflow.discovered_at,
-                workflow.last_seen_at,
-            ),
-        )
-        self._conn.commit()
-
-    def upsert_workflow_agent(self, link: WorkflowAgent) -> None:
-        """Insert or ignore a workflow_agents link row."""
-        self._conn.execute(
-            """
-            INSERT OR IGNORE INTO workflow_agents (workflow_name, agent_name)
-            VALUES (?, ?)
-            """,
-            (link.workflow_name, link.agent_name),
-        )
-        self._conn.commit()
-
     # ------------------------------------------------------------------
     # Read methods — always return dataclass instances, never sqlite3.Row
     # ------------------------------------------------------------------
@@ -191,21 +158,6 @@ class TelemetryDao:
                 provider=r["provider"],
                 is_subagent=r["is_subagent"],
                 first_seen_at=r["first_seen_at"],
-                last_seen_at=r["last_seen_at"],
-            )
-            for r in rows
-        ]
-
-    def list_workflows(self) -> list[Workflow]:
-        """Return all workflows ordered by name."""
-        rows = self._conn.execute("SELECT * FROM workflows ORDER BY name").fetchall()
-        return [
-            Workflow(
-                name=r["name"],
-                source_path=r["source_path"],
-                description=r["description"],
-                apply_to=r["apply_to"],
-                discovered_at=r["discovered_at"],
                 last_seen_at=r["last_seen_at"],
             )
             for r in rows

@@ -19,8 +19,6 @@
     "[ok]   <WS>/.agents/skills/drift-detection/SKILL.md",
     "[ok]   <WS>/.agents/skills/harness-primitives/SKILL.md",
     "[ok]   <WS>/.agents/skills/project-orchestration/SKILL.md",
-    "[ok]   <WS>/.agents/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.agents/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.dadaia/AGENTS.md",
     "[ok]   <WS>/.dadaia/handoff/AGENTS.md",
     "[ok]   <WS>/.dadaia/reports/AGENTS.md",
@@ -42,8 +40,7 @@
     "[stage] <WS>/.dadaia/agentic/schemas",
     "[stage] <WS>/.dadaia/agentic/scripts",
     "[stage] <WS>/.dadaia/agentic/skills",
-    "[stage] <WS>/.dadaia/agentic/templates",
-    "[stage] <WS>/.dadaia/agentic/workflows"
+    "[stage] <WS>/.dadaia/agentic/templates"
   ],
   "all": [
     "[ok]   <WS>/.agents/skills/ai-context-engineering/SKILL.md",
@@ -65,8 +62,6 @@
     "[ok]   <WS>/.agents/skills/drift-detection/SKILL.md",
     "[ok]   <WS>/.agents/skills/harness-primitives/SKILL.md",
     "[ok]   <WS>/.agents/skills/project-orchestration/SKILL.md",
-    "[ok]   <WS>/.agents/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.agents/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.claude/agents/ai-engineer.md",
     "[ok]   <WS>/.claude/agents/code-reviewer.md",
     "[ok]   <WS>/.claude/agents/design-specialist.md",
@@ -107,8 +102,6 @@
     "[ok]   <WS>/.claude/skills/drift-detection/SKILL.md",
     "[ok]   <WS>/.claude/skills/harness-primitives/SKILL.md",
     "[ok]   <WS>/.claude/skills/project-orchestration/SKILL.md",
-    "[ok]   <WS>/.claude/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.claude/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.codex/agents/ai-engineer.toml",
     "[ok]   <WS>/.codex/agents/code-reviewer.toml",
     "[ok]   <WS>/.codex/agents/design-specialist.toml",
@@ -127,8 +120,6 @@
     "[ok]   <WS>/.codex/skills/design-ctx/SKILL.md",
     "[ok]   <WS>/.codex/skills/frontend-ctx/SKILL.md",
     "[ok]   <WS>/.codex/skills/memory-ctx/SKILL.md",
-    "[ok]   <WS>/.codex/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.codex/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.dadaia/AGENTS.md",
     "[ok]   <WS>/.dadaia/handoff/AGENTS.md",
     "[ok]   <WS>/.dadaia/hooks/codex-ctx-inject",
@@ -138,7 +129,7 @@
     "[ok]   <WS>/.dadaia/reports/AGENTS.md",
     "[ok]   <WS>/.dadaia/scripts/generate-memory-catalog.py",
     "[ok]   <WS>/.dadaia/scripts/lint-memory-atoms.py",
-    "[ok]   <WS>/.dadaia/scripts/pre-commit-lease-gate.sh",
+    "[ok]   <WS>/.dadaia/scripts/pre-commit-presence-gate.sh",
     "[ok]   <WS>/.dadaia/scripts/pre-push-ci-gate.sh",
     "[ok]   <WS>/.dadaia/states/AGENTS.md",
     "[ok]   <WS>/.dadaia/tmp/AGENTS.md",
@@ -167,8 +158,6 @@
     "[skip] <WS>/.agents/skills/drift-detection/SKILL.md",
     "[skip] <WS>/.agents/skills/harness-primitives/SKILL.md",
     "[skip] <WS>/.agents/skills/project-orchestration/SKILL.md",
-    "[skip] <WS>/.agents/workflows/audit-fanout.workflow.md",
-    "[skip] <WS>/.agents/workflows/release-ship.workflow.md",
     "[stage] <WS>/.dadaia/agentic/agents",
     "[stage] <WS>/.dadaia/agentic/agents.index.json",
     "[stage] <WS>/.dadaia/agentic/data",
@@ -183,8 +172,7 @@
     "[stage] <WS>/.dadaia/agentic/schemas",
     "[stage] <WS>/.dadaia/agentic/scripts",
     "[stage] <WS>/.dadaia/agentic/skills",
-    "[stage] <WS>/.dadaia/agentic/templates",
-    "[stage] <WS>/.dadaia/agentic/workflows"
+    "[stage] <WS>/.dadaia/agentic/templates"
   ],
   "claude": [
     "[ok]   <WS>/.claude/agents/ai-engineer.md",
@@ -227,14 +215,12 @@
     "[ok]   <WS>/.claude/skills/drift-detection/SKILL.md",
     "[ok]   <WS>/.claude/skills/harness-primitives/SKILL.md",
     "[ok]   <WS>/.claude/skills/project-orchestration/SKILL.md",
-    "[ok]   <WS>/.claude/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.claude/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.dadaia/AGENTS.md",
     "[ok]   <WS>/.dadaia/handoff/AGENTS.md",
     "[ok]   <WS>/.dadaia/reports/AGENTS.md",
     "[ok]   <WS>/.dadaia/scripts/generate-memory-catalog.py",
     "[ok]   <WS>/.dadaia/scripts/lint-memory-atoms.py",
-    "[ok]   <WS>/.dadaia/scripts/pre-commit-lease-gate.sh",
+    "[ok]   <WS>/.dadaia/scripts/pre-commit-presence-gate.sh",
     "[ok]   <WS>/.dadaia/scripts/pre-push-ci-gate.sh",
     "[ok]   <WS>/.dadaia/states/AGENTS.md",
     "[ok]   <WS>/.dadaia/tmp/AGENTS.md",
@@ -254,8 +240,7 @@
     "[stage] <WS>/.dadaia/agentic/schemas",
     "[stage] <WS>/.dadaia/agentic/scripts",
     "[stage] <WS>/.dadaia/agentic/skills",
-    "[stage] <WS>/.dadaia/agentic/templates",
-    "[stage] <WS>/.dadaia/agentic/workflows"
+    "[stage] <WS>/.dadaia/agentic/templates"
   ],
   "codex": [
     "[ok]   <WS>/.agents/skills/ai-context-engineering/SKILL.md",
@@ -277,8 +262,6 @@
     "[ok]   <WS>/.agents/skills/drift-detection/SKILL.md",
     "[ok]   <WS>/.agents/skills/harness-primitives/SKILL.md",
     "[ok]   <WS>/.agents/skills/project-orchestration/SKILL.md",
-    "[ok]   <WS>/.agents/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.agents/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.codex/agents/ai-engineer.toml",
     "[ok]   <WS>/.codex/agents/code-reviewer.toml",
     "[ok]   <WS>/.codex/agents/design-specialist.toml",
@@ -297,8 +280,6 @@
     "[ok]   <WS>/.codex/skills/design-ctx/SKILL.md",
     "[ok]   <WS>/.codex/skills/frontend-ctx/SKILL.md",
     "[ok]   <WS>/.codex/skills/memory-ctx/SKILL.md",
-    "[ok]   <WS>/.codex/workflows/audit-fanout.workflow.md",
-    "[ok]   <WS>/.codex/workflows/release-ship.workflow.md",
     "[ok]   <WS>/.dadaia/AGENTS.md",
     "[ok]   <WS>/.dadaia/handoff/AGENTS.md",
     "[ok]   <WS>/.dadaia/hooks/codex-ctx-inject",
@@ -308,7 +289,7 @@
     "[ok]   <WS>/.dadaia/reports/AGENTS.md",
     "[ok]   <WS>/.dadaia/scripts/generate-memory-catalog.py",
     "[ok]   <WS>/.dadaia/scripts/lint-memory-atoms.py",
-    "[ok]   <WS>/.dadaia/scripts/pre-commit-lease-gate.sh",
+    "[ok]   <WS>/.dadaia/scripts/pre-commit-presence-gate.sh",
     "[ok]   <WS>/.dadaia/scripts/pre-push-ci-gate.sh",
     "[ok]   <WS>/.dadaia/states/AGENTS.md",
     "[ok]   <WS>/.dadaia/tmp/AGENTS.md",
@@ -328,8 +309,7 @@
     "[stage] <WS>/.dadaia/agentic/schemas",
     "[stage] <WS>/.dadaia/agentic/scripts",
     "[stage] <WS>/.dadaia/agentic/skills",
-    "[stage] <WS>/.dadaia/agentic/templates",
-    "[stage] <WS>/.dadaia/agentic/workflows"
+    "[stage] <WS>/.dadaia/agentic/templates"
   ],
   "pi": [
     "[ok]   <WS>/.dadaia/AGENTS.md",
@@ -357,7 +337,6 @@
     "[stage] <WS>/.dadaia/agentic/schemas",
     "[stage] <WS>/.dadaia/agentic/scripts",
     "[stage] <WS>/.dadaia/agentic/skills",
-    "[stage] <WS>/.dadaia/agentic/templates",
-    "[stage] <WS>/.dadaia/agentic/workflows"
+    "[stage] <WS>/.dadaia/agentic/templates"
   ]
 }

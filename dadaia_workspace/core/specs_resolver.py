@@ -10,7 +10,7 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.core.lock_liveness import is_stale
+from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
@@ -67,7 +67,7 @@ def _record_context(record: dict[str, object] | None) -> str | None:
 def _session_record_live(record: dict[str, object]) -> bool:
     """FR4 staleness guard: a harness-keyed session record is live iff its heartbeat is fresh.
 
-    Reuses ``core.lock_liveness.is_stale`` (the canonical TTL predicate) by mapping the
+    Reuses ``core.record_liveness.is_stale`` (the canonical TTL predicate) by mapping the
     session record's ``last_seen_at`` / ``ttl_seconds`` onto its ``heartbeat`` / ``ttl``
     fields. ``pid_probe`` is intentionally ``None`` (TTL-only): the record's ``pid`` is the
     transient bind-CLI pid, dead by construction (ADR-8), so heartbeat-freshness — renewed by

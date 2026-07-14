@@ -37,6 +37,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -135,7 +136,7 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "v0166-fr1-repro",
@@ -187,6 +188,9 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
     reason.
     """
     accept_calls: list[object] = []
+    impl_rel = canonical_worker_output_ref(
+        "dadaia-workspace", "pipe-fr2-repro:implement:attempt-0"
+    )
     worker_payload = json.dumps(
         {
             "schema_version": "agent-run-result-v1",
@@ -194,13 +198,16 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
             "summary": "implemented via schema_version + singular artifact",
             "artifact": {
                 "type": "other",
-                "path": ".dadaia/handoff/dadaia-workspace/impl.handoff.json",
+                "path": impl_rel,
             },
         }
     )
 
     def fake_pi_run_accept(args: object, **kwargs: object) -> _subprocess.CompletedProcess[str]:
         accept_calls.append(args)
+        artifact = Path(kwargs.get("cwd") or Path.cwd()) / impl_rel
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(worker_payload, encoding="utf-8")
         return _subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -213,17 +220,11 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
 
     accept_workspace = _init_workspace(tmp_path / "accept-case")
     monkeypatch.chdir(accept_workspace)
-    # A REAL worker writes its artifact; the faked subprocess can't, so materialize it —
-    # the gate now verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
-    impl_ref = accept_workspace / ".dadaia" / "handoff" / "dadaia-workspace" / "impl.handoff.json"
-    impl_ref.parent.mkdir(parents=True, exist_ok=True)
-    impl_ref.write_text('{"fake": true}\n', encoding="utf-8")
-
     accept_result = _runner.invoke(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro",
@@ -266,7 +267,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro-negative",
@@ -278,7 +279,9 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
         ],
     )
 
-    assert len(negative_calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
+    assert len(negative_calls) == 2, (
+        "the structural gate must make exactly one bounded correction attempt"
+    )
     assert negative_result.exit_code == 3, negative_result.output
     negative_payload = json.loads(negative_result.output)
     assert negative_payload["status"] == "BLOCKED"
@@ -353,7 +356,7 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "v0166-fr8-repro",
@@ -365,7 +368,7 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
         ],
     )
 
-    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
+    assert len(calls) == 2, "the structural gate must make exactly one bounded correction attempt"
     assert result.exit_code == 3, result.output
     payload = json.loads(result.output)
     # The run is STILL blocked — the FR1 correction only removes the (mis)enrichment.

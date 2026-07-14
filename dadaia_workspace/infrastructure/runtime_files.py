@@ -163,6 +163,33 @@ class FilesystemRuntimeFileAdapter:
             return None
         return resolved.read_text(encoding="utf-8")
 
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        """Remove only exact canonical ``.step-output.json`` refs for a restart.
+
+        Callers derive each ref from workflow identity. This adapter performs no glob or
+        prefix deletion: every ref is confined beneath
+        ``.dadaia/tmp/lifecycle-worker`` and must name the canonical suffix.
+        """
+        worker_root = (self._dadaia_root / "tmp" / "lifecycle-worker").resolve()
+        removed = 0
+        for ref in dict.fromkeys(refs):
+            ref_path = Path(ref)
+            if ref_path.is_absolute() or ".." in ref_path.parts:
+                raise RuntimeFilePathError(f"unsafe worker output ref: {ref}")
+            target = (self._workspace_root / ref_path).resolve()
+            try:
+                target.relative_to(worker_root)
+            except ValueError as exc:
+                raise RuntimeFilePathError(
+                    f"worker output ref leaves canonical zone: {ref}"
+                ) from exc
+            if not target.name.endswith(".step-output.json"):
+                raise RuntimeFilePathError(f"worker output ref has invalid suffix: {ref}")
+            if target.is_file():
+                target.unlink()
+                removed += 1
+        return removed
+
     def write_hygiene_snapshot(self, snapshot: HygieneSnapshot) -> RuntimeFileRef:
         text = json.dumps(snapshot.to_dict(), indent=2, sort_keys=True) + "\n"
         path = self._canonical_path("runs", "lifecycle", snapshot.run_id, "hygiene-snapshot.json")

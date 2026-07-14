@@ -101,9 +101,7 @@ def _codex_hook_wrapper_command(name: str) -> str:
 # (match-all) form the ai audit flagged.
 _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 # Claude Code's canonical explicit match-all for tool-matching events. Used on
-# PostToolUse so the lease heartbeat (T-010-04) fires after *every* tool, including
-# Bash, not just write tools. Deliberately the explicit "*" form, NOT the empty
-# string the ai audit forbids.
+# PostToolUse so session/presence heartbeat fires after every tool, including Bash.
 _CLAUDE_MATCH_ALL = "*"
 
 
@@ -198,13 +196,8 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     ],
                 },
             ],
-            # N-2 (v0.1.10 rc-2): the lease heartbeat MUST fire after *every* tool,
-            # including Bash and read-only tools — otherwise a long non-write Codex
-            # call (e.g. a multi-minute pytest run) starves the heartbeat and the
-            # lease goes TTL-stale, the original lease-starvation incident's Codex
-            # flavor. Codex's canonical match-all is an *omitted* matcher (same form
-            # used by UserPromptSubmit), so the heartbeat block carries no matcher and
-            # thus runs on all tools, mirroring Claude's explicit "*".
+            # Session/presence heartbeat fires after every tool. Codex's canonical
+            # match-all is an omitted matcher, mirroring Claude's explicit "*".
             "PostToolUse": [
                 {
                     "hooks": [

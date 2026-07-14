@@ -40,5 +40,22 @@ triage findings.
 
 ## Output
 
-A scope handoff naming the audit question, the picked lenses, the bounded surfaces,
-and the acceptance rubric. This handoff is the drift-scan step's authoritative scope.
+Write one `agent-run-result-v1` object whose domain fields have this exact shape:
+
+```json
+{
+  "summary": "one sentence",
+  "audit_question": "one concrete soundness question",
+  "lenses": [
+    {"name": "architecture", "rationale": "why this lens is required"}
+  ],
+  "surfaces": ["exact/path/or/module"],
+  "acceptance_criteria": [
+    {"lens": "architecture", "pass_condition": "measurable pass condition"}
+  ]
+}
+```
+
+Every lens must appear exactly once in `acceptance_criteria`. Empty lists, generic
+summaries, and artifact-only transport objects fail the Python gate. This handoff is
+the drift-scan step's authoritative scope.

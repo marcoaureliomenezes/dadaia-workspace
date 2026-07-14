@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -69,7 +71,7 @@ def _approved() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -78,7 +80,7 @@ def _rejected() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="rejected",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
         structured_output={"verdict": "REJECTED"},
     )
 
@@ -93,7 +95,13 @@ def _specs_tree(tmp_path: Path) -> Path:
     (specs / "memory" / "quality-assurance.md").write_text("# qa\n", encoding="utf-8")
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     (specs / "releases" / _RELEASE / "SPEC.md").write_text("# spec\n", encoding="utf-8")
-    (specs / "releases" / _RELEASE / "PLAN.md").write_text("# plan\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# plan\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value | unit tests | None | None |\n",
+        encoding="utf-8",
+    )
     (specs / "releases" / _RELEASE / "TASKS.md").write_text("# tasks\n", encoding="utf-8")
     return specs
 
@@ -147,3 +155,137 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     assert result.steps[-1].accepted is False
     # The release never advanced to IMPLEMENTATION.
     assert result.final_phase is not LifecyclePhase.IMPLEMENTATION
+
+
+def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    workflow = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = (
+        workflow._selector.spec_context.specs_dir  # noqa: SLF001 - focused workflow contract test
+        / "releases"
+        / _RELEASE
+        / "PLAN.md"
+    )
+    plan.write_text(
+        "# plan\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value object | replay test | WS-3 | replay snapshot |\n",
+        encoding="utf-8",
+    )
+
+    result = workflow.run("rd-forward-dependency")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "plan_dependency_gate"
+    assert "depends on later workstream" in result.blocked.reason
+    assert [step.label for step in result.steps][-2:] == [
+        "plan_create",
+        "plan_dependency_gate",
+    ]
+
+
+def test_plan_dependency_gate_accepts_numbered_heading(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    workflow = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = (
+        workflow._selector.spec_context.specs_dir  # noqa: SLF001 - focused workflow contract test
+        / "releases"
+        / _RELEASE
+        / "PLAN.md"
+    )
+    plan.write_text(
+        "# plan\n\n## 5. Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value object | direct equality tests | None | None |\n"
+        "\n## 6. Other Section\n\n"
+        "| unrelated | table |\n|---|---|\n| must | be ignored |\n",
+        encoding="utf-8",
+    )
+
+    result = workflow.run("rd-numbered-plan-heading")
+
+    assert result.completed is True
+    assert result.blocked is None
+
+
+def test_tasks_command_hygiene_gate_rejects_cache_clear_as_no_cache_claim(
+    tmp_path: Path,
+) -> None:
+    store = _MemoryRunStore()
+    workflow = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    tasks = (
+        workflow._selector.spec_context.specs_dir  # noqa: SLF001 - focused workflow contract test
+        / "releases"
+        / _RELEASE
+        / "TASKS.md"
+    )
+    tasks.write_text(
+        "# tasks\n\nValidation: `python -m pytest -q --cache-clear`\n",
+        encoding="utf-8",
+    )
+
+    result = workflow.run("rd-cache-producing-pytest")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "tasks_command_hygiene_gate"
+    assert "missing '-p no:cacheprovider'" in result.blocked.reason
+    assert [step.label for step in result.steps][-2:] == [
+        "tasks_create",
+        "tasks_command_hygiene_gate",
+    ]
+
+
+def test_tasks_command_hygiene_gate_accepts_disabled_pytest_cache(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    workflow = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    tasks = (
+        workflow._selector.spec_context.specs_dir  # noqa: SLF001 - focused workflow contract test
+        / "releases"
+        / _RELEASE
+        / "TASKS.md"
+    )
+    tasks.write_text(
+        "# tasks\n\n```bash\npython -m pytest -p no:cacheprovider -q\n```\n",
+        encoding="utf-8",
+    )
+
+    result = workflow.run("rd-cache-disabled-pytest")
+
+    assert result.completed is True
+    assert result.blocked is None
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "# spec\n\nStatus: Draft\n\nBody.\n",
+        "# spec\n\nBody with no status.\n",
+        "---\nstatus: Draft\nrelease: r1\n---\n\n# spec\n\nBody.\n",
+    ],
+    ids=["plain", "missing", "frontmatter"],
+)
+def test_approved_spec_review_inserts_one_canonical_status(
+    tmp_path: Path,
+    body: str,
+) -> None:
+    store = _MemoryRunStore()
+    workflow = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    spec = (
+        workflow._selector.spec_context.specs_dir  # noqa: SLF001 - focused workflow contract test
+        / "releases"
+        / _RELEASE
+        / "SPEC.md"
+    )
+    spec.write_text(body, encoding="utf-8")
+
+    result = workflow.run(f"rd-status-{body[:3]}")
+
+    assert result.completed is True
+    normalized = spec.read_text(encoding="utf-8")
+    assert normalized.count("> **Status:** Aprovado") == 1
+    assert "Status: Draft" not in normalized
+    assert "status: Draft" not in normalized

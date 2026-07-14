@@ -12,6 +12,7 @@ dead post-v0.1.30 (``DEFERRED_WORKFLOWS`` has been permanently empty since the f
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -67,7 +68,16 @@ def _approved() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(".dadaia/handoff/dadaia-workspace/x.handoff.json",),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/x.step-output.json",),
+        structured_output={"verdict": "APPROVED"},
+    )
+
+
+def _approved_for(context: str) -> AgentRunResult:
+    return AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="ok",
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{context}/x.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -101,9 +111,10 @@ def test_pipeline_completes_full_ladder_and_mixes_harness_per_step() -> None:
         "review_qa",
         "review_security",
         "review_code",
+        "close",
     ]
     assert all(s.accepted for s in result.steps)
-    # One persisted run advancing through phases (start + 4 steps).
+    # One persisted run advancing through phases (start + 5 steps).
     assert store.saved["run-1"].phase is LifecyclePhase.CLOSURE
 
     mix_store = _MemoryRunStore()
@@ -128,6 +139,135 @@ def test_pipeline_completes_full_ladder_and_mixes_harness_per_step() -> None:
     assert mix_result.completed is True
     assert mix_result.steps[0].runtime_kind is AgentRuntimeKind.CLAUDE_SDK
     assert mix_result.steps[1].runtime_kind is AgentRuntimeKind.CODEX_EXEC
+
+
+def _task_specs(tmp_path: Path) -> Path:
+    specs = tmp_path / "specs"
+    release = specs / "releases" / "task-release"
+    release.mkdir(parents=True)
+    (release / "TASKS.md").write_text(
+        "# TASKS\n\n"
+        "- [ ] **T01 - First task.**\n"
+        "  - Validation: focused test.\n"
+        "- [ ] **T02 - Second task.**\n",
+        encoding="utf-8",
+    )
+    return specs
+
+
+def test_pipeline_python_owns_task_marker_completion(tmp_path: Path) -> None:
+    specs = _task_specs(tmp_path)
+    store = _MemoryRunStore()
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=store,
+        runtime_factory=lambda kind: _KindFake(kind, _approved_for("demo")),
+        specs_dir=specs,
+    )
+
+    result = pipe.run("task-markers-complete", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    tasks = (specs / "releases" / "task-release" / "TASKS.md").read_text(encoding="utf-8")
+    assert tasks.count("- [x] **T") == 2
+    assert "- [ ] **T" not in tasks
+    assert "- [-] **T" not in tasks
+
+
+@pytest.mark.parametrize(
+    ("task_lines", "done_markers"),
+    [
+        ("### [ ] T1 - First task\n### [ ] T2 - Second task\n", "### [x] T"),
+        ("### T-1 - First task `[ ]`\n### T-2 - Second task `[ ]`\n", "`[x]`"),
+        (
+            "[ ] T-1\n**T-1 - First task**\n[ ] T-2\n**T-2 - Second task**\n",
+            "[x] T-",
+        ),
+    ],
+)
+def test_pipeline_transitions_every_supported_release_task_grammar(
+    tmp_path: Path, task_lines: str, done_markers: str
+) -> None:
+    specs = tmp_path / "specs"
+    release = specs / "releases" / "task-release"
+    release.mkdir(parents=True)
+    (release / "TASKS.md").write_text(f"# TASKS\n\n{task_lines}", encoding="utf-8")
+    store = _MemoryRunStore()
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=store,
+        runtime_factory=lambda kind: _KindFake(kind, _approved_for("demo")),
+        specs_dir=specs,
+    )
+
+    result = pipe.run("task-marker-grammar", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    tasks = (release / "TASKS.md").read_text(encoding="utf-8")
+    assert tasks.count(done_markers) == 2
+    assert "[ ]" not in tasks
+    assert "[-]" not in tasks
+
+
+def test_pipeline_refuses_success_when_tasks_have_no_recognizable_markers(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    release = specs / "releases" / "task-release"
+    release.mkdir(parents=True)
+    (release / "TASKS.md").write_text("# TASKS\n\n### T1 - Missing marker\n", encoding="utf-8")
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=_MemoryRunStore(),
+        runtime_factory=lambda kind: _KindFake(kind, _approved_for("demo")),
+        specs_dir=specs,
+    )
+
+    with pytest.raises(RuntimeError, match="no recognizable task markers"):
+        pipe.run("task-marker-missing", implementation_ladder(AgentRuntimeKind.FAKE))
+
+
+def test_pipeline_keeps_tasks_reserved_when_review_blocks(tmp_path: Path) -> None:
+    specs = _task_specs(tmp_path)
+    store = _MemoryRunStore()
+    calls = 0
+
+    class _RejectReviewFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return _approved_for("demo")
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="review rejected",
+                artifact_refs=(
+                    ".dadaia/tmp/lifecycle-worker/demo/rejected.step-output.json",
+                ),
+                structured_output={"verdict": "REJECTED", "verdict_reason": "missing case"},
+            )
+
+    fake = _RejectReviewFake()
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=store,
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        specs_dir=specs,
+        max_review_retries=0,
+    )
+
+    result = pipe.run("task-markers-blocked", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    tasks = (specs / "releases" / "task-release" / "TASKS.md").read_text(encoding="utf-8")
+    assert tasks.count("- [-] **T") == 2
+    assert "- [ ] **T" not in tasks
+    assert "- [x] **T" not in tasks
 
 
 def test_pipeline_stops_at_first_blocked_step() -> None:
@@ -209,7 +349,7 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     result = pipe.run("run-pfx", implementation_ladder(AgentRuntimeKind.FAKE))
 
     assert result.completed is True
-    assert len(captured) == 4
+    assert len(captured) == 5
     # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
     assert all(req.prompt.startswith(prefix.text) for req in captured)
     # No "sonnet"/"opus" tier literals remain (LAW 2): the step model defaults from the
@@ -250,7 +390,7 @@ def _snapshot_for_implementation() -> object:
     from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
     resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
-    return resolver.resolve("implementation", context="default")
+    return resolver.resolve("implementation_reviews", context="default")
 
 
 def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
@@ -282,7 +422,7 @@ def test_pipeline_threads_resolved_model_and_persists_snapshot() -> None:
     # The persisted run carries the resolved-policy snapshot (LAW 6).
     persisted = store.saved["run-policy"]
     assert persisted.workflow_policy is not None
-    assert persisted.workflow_policy.workflow_id == "implementation"
+    assert persisted.workflow_policy.workflow_id == "implementation_reviews"
     assert persisted.workflow_policy.step("implement") is not None
 
 
@@ -299,7 +439,7 @@ def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def
     from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
     resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
-    return resolver.resolve("implementation", context="default", default_harness=default_harness)
+    return resolver.resolve("implementation_reviews", context="default", default_harness=default_harness)
 
 
 @pytest.mark.parametrize(
@@ -390,14 +530,55 @@ def test_scope_extra_allowed_paths_union_for_create_steps_ignored_for_review_ac7
     """
     create_step = _step_with("implement", is_review=False, extra_allowed_paths=("repos/x/src/**",))
     create_scope = _pipeline_for_scope()._scope(create_step, "run1")
-    assert ".dadaia/handoff/dadaia-workspace/**" in create_scope.allowed_paths
+    assert ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**" in create_scope.allowed_paths
     assert "repos/x/src/**" in create_scope.allowed_paths
 
     review_step = _step_with("review_qa", is_review=True, extra_allowed_paths=("repos/x/src/**",))
     review_scope = _pipeline_for_scope()._scope(review_step, "run1")
-    assert review_scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
+    assert review_scope.allowed_paths == (
+        ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",
+    )
     assert "repos/x/src/**" not in review_scope.allowed_paths
 
     no_extra_step = _step_with("implement", is_review=False, extra_allowed_paths=())
     no_extra_scope = _pipeline_for_scope()._scope(no_extra_step, "run1")
-    assert no_extra_scope.allowed_paths == (".dadaia/handoff/dadaia-workspace/**",)
+    assert no_extra_scope.allowed_paths == (
+        ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",
+    )
+
+    close_step = implementation_ladder(AgentRuntimeKind.FAKE)[-1]
+    close_scope = _pipeline(_MemoryRunStore(), lambda kind: _KindFake(kind, _approved()))._scope(
+        close_step, "close-scope"
+    )
+    assert "repos/dadaia-workspace/specs/releases/multiharness-engine-v0116/**" in (
+        close_scope.allowed_paths
+    )
+    assert all("{" not in path for path in close_scope.allowed_paths)
+
+
+def test_close_requires_real_closure_deliverable(tmp_path: Path) -> None:
+    handoff = (
+        tmp_path
+        / ".dadaia"
+        / "tmp"
+        / "lifecycle-worker"
+        / "dadaia-workspace"
+        / "x.step-output.json"
+    )
+    handoff.parent.mkdir(parents=True)
+    handoff.write_text("{}", encoding="utf-8")
+    store = _MemoryRunStore()
+    pipe = LifecyclePipeline(
+        context="dadaia-workspace",
+        release_id="multiharness-engine-v0116",
+        run_store=store,
+        runtime_factory=lambda kind: _KindFake(kind, _approved()),
+        artifact_root=tmp_path,
+    )
+
+    result = pipe.run("close-deliverable", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "close"
+    assert "no deliverable" in result.blocked.reason

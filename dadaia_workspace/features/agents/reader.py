@@ -86,7 +86,7 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "plugin",  # plugin STUB marker (constitution §14); excluded from panel roster
         "gate_role",  # §7 phase / review-gate role hint (panel lifecycle derivation)
         "activity_class",  # §1 activity class hint (not mapped to a DTO field yet)
-        "lease_relationship",  # lease note (not mapped to a DTO field yet)
+        "concurrency_relationship",  # advisory concurrency note (not mapped yet)
     }
 )
 

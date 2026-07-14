@@ -29,6 +29,12 @@ into a precise, testable specification.
 - The problem and the picked bug + backlog + audit set, each with its **acceptance
   criteria stated in testable terms** — a requirement with no defined way to verify
   it is not done.
+- A concrete verification path for every acceptance criterion. Public behavior must
+  name the observable input, output, or failure that proves it. Internal or negative
+  constraints (for example, "must not recompute", "must not call", or "contains no
+  duplicate rule") must name a controlled probe/fake, call-observation test,
+  structural/static inspection, or review evidence that can prove the claim. Do not
+  rely on equal end results to prove which internal path produced them.
 - Every subsumption link from the scope (which backlog item supersedes which bug),
   and confirmation that the superseding item's scope covers the bug's acceptance.
 - The sanitization outcomes carried from scope (what was deferred or rejected, why).
@@ -43,6 +49,10 @@ into a precise, testable specification.
   incomplete, surface that as an open question in your result — do not quietly widen
   or narrow it.
 - Specify behavior and acceptance; do not design the implementation or write code.
+- Verification design is part of acceptance, not implementation design: state enough
+  about the observable seam or evidence type that QA can decide whether the claim is
+  provable. If no proof mechanism exists, rewrite the requirement as observable
+  behavior or surface it as an unresolved question instead of asserting it.
 - Ground every requirement in a scoped item or current-truth memory; invented
   requirements are slop.
 

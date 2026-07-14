@@ -117,3 +117,18 @@ def test_openrouter_kimi_profile_is_a_governed_pi_option() -> None:
     assert option == HarnessModelOption("moonshotai/kimi-k2.5", "high")
     # It surfaces in the per-harness picker source (profiles_for drives the pi dropdown).
     assert profile in model_profiles.profiles_for("pi")
+
+
+def test_pi_gpt_profiles_use_codex_subscription_ids() -> None:
+    pi_gpt_profiles = [
+        profile
+        for profile in model_profiles.profiles_for("pi")
+        if "gpt" in profile.model_id.lower()
+    ]
+    assert pi_gpt_profiles
+    assert all(profile.model_id.startswith("openai-codex/") for profile in pi_gpt_profiles)
+    assert {profile.id for profile in pi_gpt_profiles} == {
+        "pi-implementation-standard",
+        "pi-reasoning-high",
+        "pi-reasoning-low",
+    }

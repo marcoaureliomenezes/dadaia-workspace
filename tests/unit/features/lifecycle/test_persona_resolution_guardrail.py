@@ -49,7 +49,7 @@ def test_guardrail_passes_on_current_tree_and_enumerates_multi_role_and_pipeline
     # The enumeration is the catalog/pipeline surface, not a fragment rglob: it must include
     # the multi-role plan_review and the pipeline implement step, and exclude python gates.
     assert roles["release_definition.plan_review"] == "qa-engineer, software-architect"
-    assert roles["pipeline.implement"] == "software-engineer"
+    assert roles["implementation_reviews.implement"] == "software-engineer"
     assert all(role != "python" for role in roles.values())
 
 

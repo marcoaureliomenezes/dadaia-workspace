@@ -26,7 +26,7 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
 )
 from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
-_WORKFLOW = "implementation"
+_WORKFLOW = "implementation_reviews"
 
 
 def _resolver(overlay: WorkflowModelPolicyOverlay | None = None) -> WorkflowExecutionPolicyResolver:
@@ -46,7 +46,7 @@ def _overlay(steps: dict[str, str]) -> WorkflowModelPolicyOverlay:
 def test_library_default_resolution_and_overlay_override() -> None:
     snapshot = _resolver().resolve(_WORKFLOW, context="default")
     labels = [entry.step for entry in snapshot.steps]
-    assert labels == ["implement", "review_qa", "review_security", "review_code"]
+    assert labels == ["implement", "review_qa", "review_security", "review_code", "close"]
     for entry in snapshot.steps:
         assert entry.source is PolicySource.LIBRARY_DEFAULT
         assert entry.model  # concrete model id resolved

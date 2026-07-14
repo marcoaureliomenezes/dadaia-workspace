@@ -3,7 +3,7 @@
 Event-sourced JSONL bug telemetry surface. Distinct from the legacy ``dadaia bug`` (singular)
 Markdown command — the two coexist this release; the rewritten guardrail rule points agents
 at ``dadaia bugs append``. Writes land under ``specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl`` — an
-ADDITIVE path (no lease taken).
+ADDITIVE path (never concurrency-blocked).
 
 ``append`` validates the event against the packaged ``bug-event-v1`` JSON Schema before it
 touches the store; ``status`` folds the stream to list open bugs; ``stats`` aggregates by
@@ -131,7 +131,7 @@ def bugs_append_cmd(
 ) -> None:
     """Validate a bug event against ``bug-event-v1`` and append it to the JSONL stream.
 
-    ADDITIVE — takes no lease. On a schema-validation failure nothing is written and the
+    ADDITIVE and never concurrency-blocked. On schema-validation failure nothing is written and the
     command exits non-zero with the validation message.
     """
     target = _resolve_append_specs_dir(specs_dir, context)

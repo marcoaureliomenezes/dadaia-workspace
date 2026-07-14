@@ -31,6 +31,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -56,7 +57,11 @@ def _implement_result_with_production_change() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake runtime: implement wrote a production file",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/implement.handoff.json",),
+        artifact_refs=(
+            canonical_worker_output_ref(
+                _CONTEXT, "pipe-write-scope:implement:attempt-0"
+            ),
+        ),
         structured_output={"changed_paths": _PRODUCTION_PATH},
     )
 
@@ -98,7 +103,7 @@ def test_implement_pipeline_write_scope_covers_reserved_task_production_path(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -142,7 +147,7 @@ def test_implement_pipeline_without_write_scope_still_blocks_out_of_scope(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",

@@ -43,15 +43,20 @@ _ANCHOR_C = "pkg/c.py#C"
 @dataclass(frozen=True)
 class _KindFake:
     kind: AgentRuntimeKind
+    root: Path
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
+        artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"
+        path = self.root / artifact_ref
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"fake": true}\n', encoding="utf-8")
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="ok",
-            artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+            artifact_refs=(artifact_ref,),
             structured_output={"verdict": "APPROVED"},
         )
 
@@ -100,7 +105,7 @@ def _workflow(
         "context": _CONTEXT,
         "release_id": _RELEASE,
         "run_store": _MemoryRunStore(),
-        "runtime_factory": lambda kind: _KindFake(kind),
+        "runtime_factory": lambda kind: _KindFake(kind, tmp_path),
         "context_selector": selector,
         "registry": registry,
     }
@@ -153,16 +158,21 @@ def test_operator_demand_reaches_every_model_step_prompt(tmp_path: Path) -> None
     @dataclass
     class _PromptCapturingFake:
         kind: AgentRuntimeKind
+        root: Path
 
         def runtime_kind(self) -> AgentRuntimeKind:
             return self.kind
 
         def run(self, request: AgentRunRequest) -> AgentRunResult:
             captured.append(request.prompt)
+            artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"
+            path = self.root / artifact_ref
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"fake": true}\n', encoding="utf-8")
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="ok",
-                artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+                artifact_refs=(artifact_ref,),
                 structured_output={"verdict": "APPROVED"},
             )
 
@@ -175,7 +185,7 @@ def test_operator_demand_reaches_every_model_step_prompt(tmp_path: Path) -> None
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=_MemoryRunStore(),  # type: ignore[arg-type]
-        runtime_factory=lambda kind: _PromptCapturingFake(kind),  # type: ignore[arg-type, return-value]
+        runtime_factory=lambda kind: _PromptCapturingFake(kind, tmp_path),  # type: ignore[arg-type, return-value]
         context_selector=selector,
         registry=_registry(tmp_path),
     )

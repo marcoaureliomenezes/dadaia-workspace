@@ -45,7 +45,7 @@ Security headers (T-AM-14, T8):
 
 404 body (T-2.3, constitution error contract — updated for T-AM-15):
   "Route not found. The panel exposes / /api/panel-status /api/contexts
-   /api/agents /api/agents/<id>/sessions /api/workflows
+   /api/agents /api/agents/<id>/sessions
    /api/sessions
    /health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>.
    Open / for the index."
@@ -119,8 +119,7 @@ _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
-    b"/api/workflows /api/workflows/<name> "
-    b"/api/sessions "
+    b"/api/sessions /api/workflow-catalog /api/workflow-catalog/<id> "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -198,20 +197,6 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete", AuthClass.BEARER),
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt", AuthClass.BEARER),
-    # /api/workflows/<name> before /api/workflows
-    (
-        r"^/api/workflows/(?P<workflow_name>[^/]+)$",
-        "api_workflow_detail",
-        AuthClass.BEARER,
-    ),
-    (r"^/api/workflows$", "api_workflows", AuthClass.BEARER),
-    # dadaia-workflow catalog (WS-8 / ADR-E): /api/dadaia-workflows/<name> before list
-    (
-        r"^/api/dadaia-workflows/(?P<workflow_name>[^/]+)$",
-        "api_dadaia_workflow_detail",
-        AuthClass.BEARER,
-    ),
-    (r"^/api/dadaia-workflows$", "api_dadaia_workflows", AuthClass.BEARER),
     # Workflow model-governance control plane (Wave C — T-28-C-01/02). The
     # /<id> detail pattern MUST precede the list pattern (more specific first).
     # The static /validate path MUST precede the catch-all policy route.
@@ -441,10 +426,6 @@ def make_handler_class(
         "api_report_mark_important",
         "api_report_unmark_important",
         "api_reports",
-        "api_workflows",
-        "api_workflow_detail",
-        "api_dadaia_workflows",
-        "api_dadaia_workflow_detail",
         "api_sessions",
     )
     telemetry_patterns: list[tuple[re.Pattern[str], str]] = [
@@ -731,24 +712,6 @@ def make_handler_class(
                     payload = {"sessions": [dataclasses.asdict(s) for s in sessions]}
                     body = json.dumps(payload).encode("utf-8")
                     self._respond(200, "application/json", body)
-
-                elif route_name == "api_workflows":
-                    # PR3-14: canonical workflow list (bearer-only, no telemetry needed).
-                    # The api_workflows view is always container-wired (the legacy telemetry
-                    # fallback was removed in v0.1.53).
-                    status, content_type, body = views["api_workflows"]()
-                    self._respond(status, content_type, body)
-
-                elif route_name == "api_workflow_detail":
-                    # PR3-15: workflow detail endpoint (bearer-only, no telemetry needed).
-                    workflow_name = groups.get("workflow_name", "")
-                    if "api_workflow_detail" in views:
-                        status, content_type, body = views["api_workflow_detail"](
-                            workflow_name=workflow_name,
-                        )
-                        self._respond(status, content_type, body)
-                    else:
-                        self._respond(404, "text/plain; charset=utf-8", _NOT_FOUND_BODY)
 
                 elif route_name == "api_sessions":
                     # PR5-B2: session list endpoint — requires telemetry.

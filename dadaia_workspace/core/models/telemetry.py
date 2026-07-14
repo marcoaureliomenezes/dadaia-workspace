@@ -81,26 +81,6 @@ class AgentListResult:
     agents: list[AgentSummary]
 
 
-@dataclass(frozen=True)
-class WorkflowSummary:
-    """One workflow card — no cost numbers (frontend D-01)."""
-
-    workflow_id: str
-    display_name: str
-    description: str | None
-    source: str  # ".claude/skills/" or ".agents/skills/"
-    agent_ids: list[str]
-
-
-@dataclass(frozen=True)
-class WorkflowListResult:
-    """Top-level response for GET /api/workflows."""
-
-    generated_at: str
-    source_hint: str
-    workflows: list[WorkflowSummary]
-
-
 # ---------------------------------------------------------------------------
 # Session-level dataclasses (panel-r5-v1 FR1)
 # ---------------------------------------------------------------------------

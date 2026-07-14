@@ -60,7 +60,6 @@ _CLOCK_MODULE_NAMES = (
 # spans all six families, and to prove the split preserved family provenance.
 _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-001": "coherence",
-    "D-OC-1": "coherence",
     "SPECS-VERSION": "coherence",
     "SPEC-DOC-028": "coherence",
     # SPEC-DOC-029 RETIRED (v0.1.76 T-4) — never emitted; omitted from this map.

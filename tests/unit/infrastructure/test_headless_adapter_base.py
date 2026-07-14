@@ -210,7 +210,7 @@ def test_changed_paths_override_parity_for_cli_adapters(
 # --------------------------------------------------------------------------- #
 
 
-def test_filter_env_and_build_prompt_envelope() -> None:
+def test_filter_env_and_build_prompt_envelope(tmp_path: Path) -> None:
     env = {"PATH": "/bin", "HOME": "/h", "DADAIA_PRIVATE": "leak"}
     out = filter_env(env, ("PATH", "HOME", "ANTHROPIC_API_KEY"))
     assert out == {"PATH": "/bin", "HOME": "/h"}
@@ -235,6 +235,11 @@ def test_filter_env_and_build_prompt_envelope() -> None:
     assert payload["allowed_paths"] == ["repos/dadaia-workspace/**"]
     # Stable, sorted serialization (byte-for-byte reproducible).
     assert build_prompt_envelope(request) == build_prompt_envelope(request)
+
+    rooted = json.loads(build_prompt_envelope(request, execution_root=tmp_path))
+    assert rooted["execution_root"] == str(tmp_path.resolve())
+    assert str(tmp_path.resolve()) in rooted["path_resolution"]
+    assert "another dadaia workspace" in rooted["path_resolution"]
 
 
 # ---------------------------------------------------------------------------

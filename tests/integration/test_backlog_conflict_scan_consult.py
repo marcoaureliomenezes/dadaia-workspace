@@ -54,6 +54,7 @@ class _RoutingFake:
 
     kind: AgentRuntimeKind
     consult_verdict: str
+    root: Path
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
@@ -66,10 +67,14 @@ class _RoutingFake:
                 artifact_refs=(),
                 structured_output={"verdict": self.consult_verdict},
             )
+        artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"
+        path = self.root / artifact_ref
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"fake": true}\n', encoding="utf-8")
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="ok",
-            artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+            artifact_refs=(artifact_ref,),
             structured_output={"verdict": "APPROVED", "proposed_intents": "[]"},
         )
 
@@ -123,7 +128,7 @@ def _workflow(
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=store,
-        runtime_factory=lambda k: _RoutingFake(k, consult_verdict),
+        runtime_factory=lambda k: _RoutingFake(k, consult_verdict, tmp_path),
         context_selector=selector,
         registry=registry,
         default_runtime_kind=kind,
@@ -214,7 +219,7 @@ def test_fake_offline_no_consult_and_injected_downgrade_precedence(tmp_path: Pat
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=store,
-        runtime_factory=lambda k: _RoutingFake(k, "overlap"),
+        runtime_factory=lambda k: _RoutingFake(k, "overlap", tmp_path),
         context_selector=selector,
         registry=registry,
         default_runtime_kind=AgentRuntimeKind.CLAUDE_SDK,
@@ -229,7 +234,7 @@ def test_fake_offline_no_consult_and_injected_downgrade_precedence(tmp_path: Pat
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=store,
-        runtime_factory=lambda k: _RoutingFake(k, "overlap"),
+        runtime_factory=lambda k: _RoutingFake(k, "overlap", tmp_path),
         context_selector=selector,
         registry=registry,
         default_runtime_kind=AgentRuntimeKind.CLAUDE_SDK,

@@ -106,11 +106,6 @@ def _build_server(token: str, telemetry: _FixtureTelemetry) -> ThreadingHTTPServ
         "index": lambda **kw: (200, "text/html; charset=utf-8", b"<html>ok</html>"),
         "api_panel_status": lambda **kw: (200, "application/json", b"{}"),
         "api_contexts": lambda **kw: (200, "application/json", b"{}"),
-        "api_workflows": lambda **kw: (
-            200,
-            "application/json; charset=utf-8",
-            b'{"generated_at":"2026-01-01T00:00:00+00:00","source_hint":".dadaia/agentic/workflows/","workflows":[]}',
-        ),
         "memory": lambda **kw: (200, "text/html; charset=utf-8", b"ok"),
         "memory_view": lambda **kw: (200, "text/html; charset=utf-8", b"ok"),
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),

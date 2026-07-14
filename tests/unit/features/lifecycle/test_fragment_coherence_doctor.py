@@ -91,9 +91,9 @@ def test_ac5_doctor_green_on_current_tree_and_red_first_sabotaged_loader() -> No
     clean_report = run_fragment_coherence_doctor()
     assert clean_report.ok is True
     assert [f for f in clean_report.findings if f.severity is Severity.ERROR] == []
-    # the ~inert shared/implementation inputs are FRAG-COH-2 WARN (not ERROR).
+    # Every canonical fragment input resolves through a registered selector.
     warns = [f for f in clean_report.findings if f.code is FragCohCode.FRAG_COH_2]
-    assert warns and all(f.severity is Severity.WARNING for f in warns)
+    assert warns == []
     # The coherence doctor does NOT re-implement or modify persona_doctor.
     assert persona_doctor.check_persona_resolution().ok is True
 
@@ -197,17 +197,14 @@ def test_w2_boundary_and_sel_constitution_indirection(tmp_path: Path) -> None:
     assert set(covered) == {
         "release_definition",
         "audit",
-        "research",
-        "bug_report",
-        "pipeline",
+        "implementation_reviews",
     }
 
     wired = fcd._selector_wired_sequences()
     assert "backlog_definition" in wired  # its main-fragment inputs ARE resolved (assembly mixin)
     main_ids = fcd._selector_wired_main_fragment_ids()
     assert "backlog_definition.backlog_authoring" in main_ids
-    # the selector-less implementation.* pipeline fragments are NOT selector-wired mains.
-    assert "implementation.qa_review" not in main_ids
+    assert "implementation.qa_review" in main_ids
 
     # sel_constitution (A4) — NOT dead: the selector stays registered under its named-atom key.
     assert "constitution.md" in known_dynamic_inputs()

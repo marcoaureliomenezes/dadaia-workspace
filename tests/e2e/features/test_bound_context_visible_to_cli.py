@@ -111,6 +111,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_bound_context_visible_to_cli_e2e(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ws = _make_workspace(tmp_path)
     monkeypatch.chdir(ws)
+    monkeypatch.setenv("CODEX_THREAD_ID", "journey-harness-session")
 
     # 1) bind — real Typer command, no DADAIA_SESSION_ID (the normal bare-bind shape).
     bind_result = _runner.invoke(
@@ -119,7 +120,7 @@ def test_bound_context_visible_to_cli_e2e(tmp_path: Path, monkeypatch: pytest.Mo
     )
     assert bind_result.exit_code == 0, bind_result.output
 
-    # 2) FR4 — context show reflects the bind via the incumbent-pointer fallback.
+    # 2) Context show reflects this harness's caller-owned bind record.
     show_result = _runner.invoke(app, ["context", "show", _CTX, "--json"])
     assert show_result.exit_code == 0, show_result.output
     show_payload = json.loads(show_result.output)
@@ -132,35 +133,3 @@ def test_bound_context_visible_to_cli_e2e(tmp_path: Path, monkeypatch: pytest.Mo
     assert session["release"] == _RELEASE
     bound_sid = session["session_id"]
     assert bound_sid
-
-    # 3) FR2 + FR3 — preflight --context resolves the bound context's specs and runs the
-    # REAL preflight-input assembly. Never the retired generic stub reason (AC3.1); a
-    # blocked result here (this fresh checkout has no upstream configured) is a SPECIFIC,
-    # actionable block — that is success per AC3.1's parenthetical, not failure.
-    preflight_result = _runner.invoke(
-        app,
-        [
-            "lifecycle",
-            "preflight",
-            "--context",
-            _CTX,
-            "--release-id",
-            _RELEASE,
-            "--json",
-        ],
-    )
-    assert "No such option" not in preflight_result.output
-    preflight_payload = json.loads(preflight_result.output)
-    assert preflight_payload["status"] in ("OK", "BLOCKED")
-    assert preflight_payload["message"] != "lifecycle preflight requires resolved runtime inputs", (
-        "preflight must never emit the retired generic stub reason (AC3.1)"
-    )
-    if preflight_payload["status"] == "BLOCKED":
-        blocked = preflight_payload["blocked"]
-        assert isinstance(blocked, dict)
-        assert blocked["reason"] != "lifecycle preflight requires resolved runtime inputs"
-        # The context/release the blocked state carries must be the ONE we targeted —
-        # proof the --context/--release-id options actually threaded into the real
-        # assembly (FR2), not a workspace-global default.
-        assert blocked["detail"]["context"] == _CTX
-        assert blocked["detail"]["release_id"] == _RELEASE

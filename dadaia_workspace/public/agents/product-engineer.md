@@ -3,7 +3,7 @@ name: product-engineer
 description: Spec author and memory guardian. Writes SPEC/PLAN/TASKS/CLOSURE; writes specs/memory/*.md in DEFINITION + CLOSURE phases. PM sub-agent. NEVER dispatches or implements code.
 dispatch_band: 2
 activity_class: MUTATING
-lease_relationship: "PM sub-agent — no independent acquire"
+concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"
 gate_role: "spec-author / memory-guardian"
 tools:
   - Read

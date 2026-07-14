@@ -49,7 +49,6 @@ from dadaia_workspace.core.models.agent import AgentDTO
 from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
-from dadaia_workspace.features.panel.views.api_workflows import render_api_workflows_list
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.golden_platform import (
     assert_golden,
@@ -90,8 +89,11 @@ class _FakeSpecContext:
 
 
 class _FakeWorkflows:
-    def list_summaries(self) -> list[Any]:
+    def list_dadaia_workflows(self) -> list[Any]:
         return []
+
+    def get_dadaia_workflow(self, name: str) -> None:
+        return None
 
 
 class _FakeTelemetry:
@@ -159,9 +161,9 @@ def _build_panel_service(tmp_path: Path) -> PanelService:
         spec_context=_FakeSpecContext(),  # type: ignore[arg-type]
         workspace_root=tmp_path,
         telemetry=_FakeTelemetry(),
+        workflows_service=_FakeWorkflows(),
     )
     svc._canonical_agents_override = _canonical_agents()  # type: ignore[attr-defined]
-    svc._workflows_service_override = _FakeWorkflows()  # type: ignore[attr-defined]
     return svc
 
 
@@ -183,11 +185,10 @@ def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
 
 def _capture_panel(tmp_path: Path) -> dict[str, dict[str, object]]:
     service = _build_panel_service(tmp_path)
-    workflows_view = render_api_workflows_list(service)
     agents_view = render_api_agents_canonical(service)
     result: dict[str, dict[str, object]] = {}
     for runtime in _RUNTIMES:
-        for name, view in (("api_workflows", workflows_view), ("api_agents", agents_view)):
+        for name, view in (("api_agents", agents_view),):
             status, content_type, body = view(qs={"runtime": [runtime]})
             result[f"{name}:{runtime}"] = {
                 "status": status,

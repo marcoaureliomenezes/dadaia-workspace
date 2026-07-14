@@ -51,7 +51,7 @@ def _as_effort(effort: str) -> CodexEffort:
 #
 # Each profile resolves to one discrete option in core.harness_models:
 #   codex: (gpt-5.5, high), (gpt-5.5, medium)
-#   pi:    (gpt-5.5, high), (gpt-5.5, low), (gpt-5.3-codex, medium)
+#   pi:    (openai-codex/gpt-5.5, high|medium|low)
 # Changing a profile's model is a one-line data edit here; the import-time assert ties it
 # back to the catalog (which itself ties back to model_registry.REGISTRY).
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
         id="pi-implementation-standard",
         harness="pi",
         label="PI — implementation (standard)",
-        model_id="gpt-5.3-codex",
+        model_id="openai-codex/gpt-5.5",
         effort="medium",
         purpose="Standard implementation/worker effort on PI.",
     ),
@@ -84,7 +84,7 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
         id="pi-reasoning-high",
         harness="pi",
         label="PI — reasoning (high)",
-        model_id="gpt-5.5",
+        model_id="openai-codex/gpt-5.5",
         effort="high",
         purpose="Deep-reasoning review/gate effort on PI.",
     ),
@@ -92,7 +92,7 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
         id="pi-reasoning-low",
         harness="pi",
         label="PI — reasoning (low)",
-        model_id="gpt-5.5",
+        model_id="openai-codex/gpt-5.5",
         effort="low",
         purpose="Low-cost mechanical effort on PI.",
     ),

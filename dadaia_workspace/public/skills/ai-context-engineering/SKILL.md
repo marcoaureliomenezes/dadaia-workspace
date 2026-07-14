@@ -185,7 +185,7 @@ protocol. Inconsistencies are bugs — file them in a refactor report.
 
 | # | Invariant | What must match |
 |---|---|---|
-| I1 | Frontmatter schema | Same keys, same order: `name`, `description`, `tier`, `model`, `activity_class`, `lease_relationship`, `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract` (`requires_inputs` + `produces_outputs`), `paths.write_allowlist` |
+| I1 | Frontmatter schema | Same keys, same order: `name`, `description`, `tier`, `model`, `activity_class`, `concurrency_relationship`, `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract` (`requires_inputs` + `produces_outputs`), `paths.write_allowlist` |
 | I2 | Body section order | The canonical 10-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Same shape: `[SCOPE ERROR]` opener, one-line identity, explicit redirect per foreign domain to the owning agent |
 | I4 | TDD / task-manager reservation flow | Implementer agents follow the identical `[ ]`→`[-]`→`[x]` reservation + commit flow, referenced (not restated) |

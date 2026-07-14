@@ -6,24 +6,15 @@ it delegates classification + decision to :func:`gate_policy.classify_path` and
 :func:`gate_policy.evaluate`, which is the single source of truth (avoids a third
 drifting copy alongside the bash gate).
 
-Parity invariants preserved verbatim from the rc-4 shell gate:
-
 1. **PATH-first context slug.** The context is derived from the write-target path
    (``repos/<slug>/...``); ``DADAIA_CONTEXT`` is consulted only as an override when the
    path is under no repo. A write under ``repos/B/...`` therefore never touches
-   ``repos/A``'s presence (fixes gate-cross-context-lock-contamination).
+   ``repos/A``'s presence.
 2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` writes are blocked
    unconditionally (SEC-01); every other class fails OPEN.
-3. **Fail-open posture.** No non-PROTECTED, non-self-READ write can BLOCK (v0.1.76
-   NO-LOCKS DOCTRINE): the gate never deadlocks, by construction — there is no
-   acquisition path left to fail into a block.
-
-v0.1.76 (NO-LOCKS DOCTRINE, SPEC ``specs/releases/v0.1.76/SPEC.md``): mode resolution
-is STRICTLY SELF-SCOPED (:func:`_resolve_mode`, FR4) — ``DADAIA_MODE`` env override →
-the session's OWN record → IMPLEMENTATION default. The former context-incumbent
-(rung 3) fallback is DELETED: a foreign session's bind can never change another
-session's resolved mode (kills audit finding P1-1). ``gate_policy.evaluate`` no longer
-acquires a lease; it upserts advisory presence.
+3. **Fail-open posture.** No non-PROTECTED, non-self-READ write blocks because of
+   another session. Mode is strictly self-scoped: ``DADAIA_MODE`` → this session's
+   own record → IMPLEMENTATION. Mutating writes upsert advisory presence.
 """
 
 from __future__ import annotations
@@ -106,24 +97,21 @@ def _context_slug(workspace: Path, fpath: Path) -> str:
 
 
 def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
-    """Resolve the session's bind mode — STRICTLY SELF-SCOPED (v0.1.76 FR4). First hit wins:
+    """Resolve the session's bind mode. First hit wins:
 
     1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
        sets this; it is honored only when the operator deliberately exports it).
     2. The CLI-owned session record keyed by the **resolved harness session id**
        (``session_identity.read_session``) — this session's OWN bind, if it bound itself.
-    3. Default ``IMPLEMENTATION`` (FR-R4-04 / D-3): no env, no self record ⇒
-       presence-taking.
+    3. Default ``IMPLEMENTATION``: no env and no self record.
 
-    The former rung 3 (context-incumbent pointer fallback, NF-2) is DELETED (v0.1.76
-    FR4, kills audit finding P1-1): a foreign session's ``dadaia context bind`` can
-    never change what THIS session's write resolves to. ``ctx`` is accepted for call-
-    site symmetry with the pre-doctrine signature but is no longer consulted.
+    A foreign session's bind can never change this result. ``ctx`` is accepted for
+    call-site compatibility but is not consulted.
 
     Fail-soft: every lookup returns ``None`` on missing/malformed input, so mode
     resolution never raises.
     """
-    del ctx  # v0.1.76 FR4: no longer consulted — mode is strictly self-scoped.
+    del ctx
     env_mode = os.environ.get("DADAIA_MODE")
     if env_mode:
         return env_mode
@@ -142,8 +130,7 @@ def _active_field(specs_dir: Path, field: str) -> str | None:
     ``str`` (readable; ``""`` when the field is missing), ``""`` when the file does
     not exist (a fresh context legitimately has no ACTIVE.md — "no release" truth),
     and ``None`` when the file exists but could NOT be read (a genuine I/O failure).
-    Callers must treat ``None`` as UNKNOWN, never as "none": an unreadable ACTIVE.md
-    must not weaken the lease pid-veto via the release-mismatch reclaim.
+    Callers must treat ``None`` as UNKNOWN, never as "none".
     """
     active = specs_dir / "releases" / "ACTIVE.md"
     try:

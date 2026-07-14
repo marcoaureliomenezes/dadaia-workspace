@@ -13,6 +13,10 @@ including a Wave-C trio that restated case (a) verbatim through the same ``_gate
 
 from __future__ import annotations
 
+import json
+from dataclasses import replace
+from pathlib import Path
+
 import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
@@ -29,10 +33,11 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
 )
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-_ARTIFACT = ".dadaia/handoff/dadaia-workspace/step.handoff.json"
+_ARTIFACT = ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json"
 _VERDICT_REASON = "agent result missing APPROVED verdict"
 _REJECTED_REASON = "review verdict REJECTED"
 _ARTIFACT_REASON = "agent result missing artifact evidence"
@@ -58,7 +63,7 @@ def _request() -> AgentRunRequest:
         runtime=AgentRuntimeKind.FAKE,
         context="dadaia-workspace",
         release_id="v0.1.31",
-        allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
+        allowed_paths=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
 
@@ -154,6 +159,176 @@ def test_missing_verdict_keeps_missing_wording() -> None:
     assert blocked is not None
     assert blocked.reason == _VERDICT_REASON
     assert "verdict" not in blocked.detail
+
+
+class _SequenceRuntime:
+    def __init__(self, results: list[AgentRunResult]) -> None:
+        self.results = results
+        self.requests: list[AgentRunRequest] = []
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return AgentRuntimeKind.FAKE
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        self.requests.append(request)
+        return self.results.pop(0)
+
+
+def test_missing_evidence_gets_one_bounded_structural_correction_attempt() -> None:
+    runtime = _SequenceRuntime(
+        [
+            _result(verdict=None, artifact_refs=()),
+            _result(verdict=None, artifact_refs=(_ARTIFACT,)),
+        ]
+    )
+    blocked = LifecycleAgentRunner(runtime=runtime).evaluate_gate(
+        _run(),
+        AgentRunnerInput(
+            request=_request(),
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="step",
+            is_review=False,
+        ),
+    )
+
+    assert blocked is None
+    assert len(runtime.requests) == 2
+    assert "Automatic structural correction attempt (2 of 2)" in runtime.requests[1].prompt
+    assert _ARTIFACT_REASON in runtime.requests[1].prompt
+
+
+def test_explicit_rejected_review_is_never_structurally_retried() -> None:
+    runtime = _SequenceRuntime([_result(verdict="REJECTED", artifact_refs=(_ARTIFACT,))])
+    blocked = LifecycleAgentRunner(runtime=runtime).evaluate_gate(
+        _run(),
+        AgentRunnerInput(
+            request=_request(),
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="step",
+            is_review=True,
+        ),
+    )
+
+    assert blocked is not None
+    assert blocked.reason == _REJECTED_REASON
+    assert len(runtime.requests) == 1
+
+
+@pytest.mark.parametrize("is_review", [False, True], ids=["create", "review"])
+def test_exact_python_assigned_handoff_recovers_empty_last_message(
+    tmp_path: Path, is_review: bool
+) -> None:
+    request = replace(_request(), task_id="run-1:step")
+    ref = canonical_worker_output_ref(request.context, request.task_id or "")
+    handoff = tmp_path / ref
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    document: dict[str, object] = {
+        "summary": "materialized exact handoff",
+        "handoff": {"summary": "substantive domain handoff", "picked": ["item-a"]},
+    }
+    if is_review:
+        document.update({"verdict": "APPROVED", "verdict_reason": "evidence passes"})
+    handoff.write_text(json.dumps(document), encoding="utf-8")
+    runtime = _SequenceRuntime([_result(verdict=None, artifact_refs=())])
+
+    result, blocked = LifecycleAgentRunner(
+        runtime=runtime, artifact_root=tmp_path
+    ).evaluate_gate_with_result(
+        _run(),
+        AgentRunnerInput(
+            request=request,
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="step",
+            is_review=is_review,
+        ),
+    )
+
+    assert blocked is None
+    assert result.artifact_refs == (ref,)
+    assert result.summary == "materialized exact handoff"
+    assert result.domain_payload == document
+    if is_review:
+        assert result.structured_output["verdict"] == "APPROVED"
+    assert len(runtime.requests) == 1
+
+
+def test_handoff_without_declared_deliverable_gets_one_correction_attempt(
+    tmp_path: Path,
+) -> None:
+    request = replace(
+        _request(),
+        task_id="run-1:spec_create",
+        allowed_paths=(
+            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",
+            "specs/releases/v1/**",
+        ),
+    )
+    handoff_ref = canonical_worker_output_ref(request.context, request.task_id or "")
+    handoff = tmp_path / handoff_ref
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(json.dumps({"summary": "handoff only"}), encoding="utf-8")
+    spec_ref = "specs/releases/v1/SPEC.md"
+    spec = tmp_path / spec_ref
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_text("# SPEC\n", encoding="utf-8")
+    runtime = _SequenceRuntime(
+        [
+            _result(verdict=None, artifact_refs=()),
+            _result(verdict=None, artifact_refs=(spec_ref,)),
+        ]
+    )
+
+    _result_value, blocked = LifecycleAgentRunner(
+        runtime=runtime, artifact_root=tmp_path
+    ).evaluate_gate_with_result(
+        _run(),
+        AgentRunnerInput(
+            request=request,
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="spec_create",
+            is_review=False,
+            deliverable_globs=("specs/releases/v1/**",),
+        ),
+    )
+
+    assert blocked is None
+    assert len(runtime.requests) == 2
+    assert "carries no deliverable" in runtime.requests[1].prompt
+
+
+def test_unique_existing_context_relative_spec_ref_is_normalized(tmp_path: Path) -> None:
+    workspace_ref = "repos/demo/specs/releases/v1/SPEC.md"
+    artifact = tmp_path / workspace_ref
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text("# SPEC\n", encoding="utf-8")
+    request = replace(
+        _request(),
+        task_id="run-1:spec_create",
+        allowed_paths=(
+            ".dadaia/handoff/dadaia-workspace/**",
+            "repos/demo/specs/releases/v1/**",
+        ),
+    )
+    runtime = _SequenceRuntime(
+        [_result(verdict=None, artifact_refs=("specs/releases/v1/SPEC.md",))]
+    )
+
+    result, blocked = LifecycleAgentRunner(
+        runtime=runtime, artifact_root=tmp_path
+    ).evaluate_gate_with_result(
+        _run(),
+        AgentRunnerInput(
+            request=request,
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="spec_create",
+            is_review=False,
+            deliverable_globs=("repos/demo/specs/releases/v1/**",),
+        ),
+    )
+
+    assert blocked is None
+    assert result.artifact_refs == (workspace_ref,)
+    assert len(runtime.requests) == 1
 
 
 # -- ①c review citations are not writes (bug review-step-out-of-scope-...-artifact) ------

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.2.2"
+version = "0.2.3"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and PI"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
@@ -104,8 +104,6 @@ ignore = ["E501", "B008"]
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
 "dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
 # Test files that place pytestmark before platform-gated imports (E402 is intentional).
-"tests/unit/infrastructure/test_file_lock_posix.py" = ["E402", "I001"]
-"tests/unit/infrastructure/test_file_lock_windows.py" = ["E402", "I001"]
 "tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
 "tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
 

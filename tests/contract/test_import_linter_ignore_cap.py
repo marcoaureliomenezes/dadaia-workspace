@@ -48,7 +48,7 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # composing via the container). W2 raised the cap 15 -> 28 (+13).
 #
 # W3 NOTE (v0.1.54 FR5): the two `markdown_*_store` direct-debt edges
-# (`workflows.service -> markdown_workflow_store`, `agents.reader -> markdown_agent_store`)
+# (for example `agents.reader -> markdown_agent_store`)
 # were removed via container `store_factory` DI completion, lowering the cap 28 -> 26 (-2)
 # and the features-no-infrastructure family 11 -> 9 in the same commit.
 #

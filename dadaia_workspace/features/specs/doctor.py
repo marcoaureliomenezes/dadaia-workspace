@@ -12,7 +12,7 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_release``      — ACTIVE.md, release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— archive closures, orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — backlog schema, bug status/JSONL, consumed-backlog drift
-  * ``doctor_coherence``    — constitution, orchestration registry, pattern-version coherence
+  * ``doctor_coherence``    — constitution and pattern-version coherence
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
 original interleaved sequence (families interleave — coherence→memory→release→…→governance→
@@ -51,7 +51,6 @@ class SpecsDoctor:
     Args:
         specs_dir: Path to the ``specs/`` directory.
         public_dir: Optional path to ``dadaia_workspace/public/``. When provided,
-            the D-OC-1 orchestration-registry coherence check is enabled, and
             the TREE-3/TREE-4/TREE-5 auto-fix + drift-detect features are available
             (templates loaded from ``public_dir/templates/``).
             When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
@@ -127,7 +126,6 @@ class SpecsDoctor:
         # checks 10 and 11 (HTML image-links / mermaid-script) retired with HTML atoms
         issues.extend(self._governance.check_backlog_schema())
         issues.extend(self._release.check_release_semver_naming())
-        issues.extend(self._coherence.check_orchestration_registry())
         # TREE invariants (spec-context-tree-v2)
         issues.extend(self._structural.check_tree1_foundation())
         issues.extend(self._structural.check_repo_dadaia1())

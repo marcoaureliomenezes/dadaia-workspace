@@ -71,9 +71,6 @@ class _FakeAggregator:
         self.list_agents_call_count += 1
         return []
 
-    def list_workflows(self) -> list[Any]:
-        return []
-
     def list_sessions_by_agent(self, agent_id: str, **kwargs: Any) -> list[Any]:
         return []
 

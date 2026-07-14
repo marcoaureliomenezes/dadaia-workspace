@@ -1,11 +1,14 @@
-"""WorkflowProvider Protocol — workflow summary enumeration for the panel."""
+"""WorkflowProvider Protocol for the governed Python lifecycle catalog."""
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
+if TYPE_CHECKING:
+    from dadaia_workspace.features.lifecycle.governed_catalog import DadaiaWorkflowDTO
 
 
 class WorkflowProvider(Protocol):
-    """Minimum read surface that PanelService requires from the workflows feature."""
+    """Read surface consumed by panel views."""
 
-    def list_summaries(self) -> list[WorkflowSummaryDTO]: ...
+    def list_dadaia_workflows(self) -> list["DadaiaWorkflowDTO"]: ...
+
+    def get_dadaia_workflow(self, name: str) -> "DadaiaWorkflowDTO | None": ...

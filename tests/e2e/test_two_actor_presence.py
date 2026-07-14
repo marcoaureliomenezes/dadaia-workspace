@@ -171,7 +171,7 @@ def test_stale_presence_excluded_from_advisory(tmp_path: Path) -> None:
 
     from dadaia_workspace.core import kernel_tunables
 
-    stale_ts = datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.LEASE_TTL_SECONDS + 30)
+    stale_ts = datetime.now(tz=UTC) - timedelta(seconds=kernel_tunables.PRESENCE_TTL_SECONDS + 30)
     data["last_seen_at"] = stale_ts.isoformat()
     record_path.write_text(json.dumps(data), encoding="utf-8")
 

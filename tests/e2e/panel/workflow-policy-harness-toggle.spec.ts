@@ -37,7 +37,7 @@ const EMPTY_OVERLAY = {
 // implement is a producing step that supports both harnesses, so a pi toggle is always
 // valid (release_definition steps may be single-harness).
 const IMPLEMENT_PICKER =
-  'details.dadaia-wf-card[data-workflow="implementation"] .wf-step-picker[data-wfp-step="implement"]';
+  'details.dadaia-wf-card[data-workflow="implementation_reviews"] .wf-step-picker[data-wfp-step="implement"]';
 
 async function restoreEmptyOverlay(request: any): Promise<void> {
   const res = await request.put(`${BASE_URL}/api/workflow-model-policy?context=default`, {
@@ -51,7 +51,7 @@ async function restoreEmptyOverlay(request: any): Promise<void> {
 async function openImplementPicker(page: any): Promise<void> {
   await gotoPanel(page);
   await activateTab(page, 'workflows');
-  await expandWorkflowCard(page, 'implementation');
+  await expandWorkflowCard(page, 'implementation_reviews');
   await page.waitForSelector(`${IMPLEMENT_PICKER} .wfp-picker`, {
     state: 'visible',
     timeout: 15000,
@@ -122,8 +122,8 @@ test('Harness toggle persists through PUT and the catalog diff reflects it', asy
   // deep access so a shape regression fails with a readable assertion, not a
   // TypeError inside the property chain.
   const workflows = polBody.policy?.contexts?.default?.workflows ?? {};
-  const impl = workflows.implementation;
-  expect(impl, 'persisted overlay must carry contexts.default.workflows.implementation').toBeTruthy();
+  const impl = workflows.implementation_reviews;
+  expect(impl, 'persisted overlay must carry contexts.default.workflows.implementation_reviews').toBeTruthy();
   expect(impl.harnesses.implement).toBe('pi');
 
   // The catalog default-vs-effective diff reflects the persisted harness change.
@@ -132,7 +132,7 @@ test('Harness toggle persists through PUT and the catalog diff reflects it', asy
   });
   expect(catRes.status()).toBe(200);
   const catBody = await catRes.json();
-  const implWf = catBody.workflows.find((wf: any) => wf.workflow_id === 'implementation');
+  const implWf = catBody.workflows.find((wf: any) => wf.workflow_id === 'implementation_reviews');
   const implStep = implWf.steps.find((s: any) => s.step === 'implement');
   expect(implStep.harness).toBe('pi');
   expect(implStep.default_harness).toBe('codex');

@@ -6,9 +6,9 @@ is assembled from a fragment bundle + the dynamically selected context + the out
 schema + a discrete ``(harness, model)`` selection. This replaces the generic
 ``"Run the {label} step"`` suffix for the migrated workflows.
 
-As of v0.1.30 Wave E (T-30-E-01..04) the ``audit`` / ``research`` / ``bug_report``
-workflows ship real fragment+gate bodies (mirroring ``release_definition``) and have left
-the deferred set — :data:`DEFERRED_WORKFLOWS` is now empty.
+The public workflow roster is backlog definition, release definition,
+implementation plus reviews, and audit. Research and bug intake are part of backlog
+definition; closure is part of implementation plus reviews.
 """
 
 from __future__ import annotations
@@ -24,20 +24,10 @@ from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     BacklogDemand,
     BacklogStepResult,
 )
-from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-    BugReportResult,
-    BugReportStepResult,
-    BugReportWorkflow,
-)
 from dadaia_workspace.features.lifecycle.workflows.release_definition import (
     ReleaseDefinitionResult,
     ReleaseDefinitionWorkflow,
     ReleaseStepResult,
-)
-from dadaia_workspace.features.lifecycle.workflows.research import (
-    ResearchResult,
-    ResearchStepResult,
-    ResearchWorkflow,
 )
 
 #: Deferred-workflow names, in catalog order. Empty since v0.1.30 Wave E — every workflow
@@ -56,13 +46,7 @@ __all__ = [
     "BacklogDefinitionWorkflow",
     "BacklogDemand",
     "BacklogStepResult",
-    "BugReportResult",
-    "BugReportStepResult",
-    "BugReportWorkflow",
     "ReleaseDefinitionResult",
     "ReleaseDefinitionWorkflow",
     "ReleaseStepResult",
-    "ResearchResult",
-    "ResearchStepResult",
-    "ResearchWorkflow",
 ]

@@ -174,6 +174,22 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
     return tuple(paths)
 
 
+def missing_artifact_refs(refs: tuple[str, ...], cwd: Path) -> tuple[str, ...]:
+    """Return declared workspace refs that are absent or escape the worker root."""
+    root = cwd.resolve()
+    missing: list[str] = []
+    for ref in refs:
+        candidate = (root / ref).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            missing.append(ref)
+            continue
+        if not candidate.is_file():
+            missing.append(ref)
+    return tuple(missing)
+
+
 def derive_result_summary(payload: dict[str, object]) -> str | None:
     """Best substantive one-line summary from a result payload — single-sourced for pi+codex.
 
@@ -265,6 +281,16 @@ class RedactionMixin:
                 redacted = redacted.replace(value, "[REDACTED]")
         return redacted
 
+    def _redact_json(self, value: object) -> object:
+        """Recursively redact strings before a worker document enters durable state."""
+        if isinstance(value, str):
+            return self._redact(value)
+        if isinstance(value, list):
+            return [self._redact_json(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._redact_json(item) for key, item in value.items()}
+        return value
+
 
 class ChangedPathsMixin:
     """Source ``changed_paths`` from ``git diff`` — the Ring-2 write boundary.
@@ -297,6 +323,7 @@ class ChangedPathsMixin:
             summary=result.summary,
             artifact_refs=result.artifact_refs,
             structured_output=structured,
+            domain_payload=result.domain_payload,
             error=result.error,
             # v0.1.78 T-D / FR-D: preserve a degraded/noncompliant result's diagnostic —
             # this rebuild must never silently discard the evidence the adapter attached.
@@ -315,7 +342,9 @@ _PERSONA_DIRECTIVE_PREAMBLE = (
 )
 
 
-def build_prompt_envelope(request: AgentRunRequest) -> str:
+def build_prompt_envelope(
+    request: AgentRunRequest, *, execution_root: Path | None = None
+) -> str:
     """Build the deterministic JSON prompt envelope handed to a headless worker.
 
     Fields: ``role``, ``prompt``, ``context``, ``release_id``, ``task_id``,
@@ -340,6 +369,14 @@ def build_prompt_envelope(request: AgentRunRequest) -> str:
         "expected_schema": request.expected_schema,
         "required_evidence": [kind.value for kind in request.required_evidence],
     }
+    if execution_root is not None:
+        root = str(execution_root.resolve())
+        payload["execution_root"] = root
+        payload["path_resolution"] = (
+            "Resolve every workspace-relative allowed path and artifact_ref beneath "
+            f"execution_root={root}. Tool calls may use the resulting absolute path. "
+            "Never redirect a relative artifact to a parent or another dadaia workspace."
+        )
     if request.persona:
         payload["persona"] = _PERSONA_DIRECTIVE_PREAMBLE + request.persona
     return json.dumps(payload, indent=2, sort_keys=True)
@@ -371,9 +408,8 @@ class SubprocessAdapterMixin(RedactionMixin, ChangedPathsMixin):
     def _env(self) -> dict[str, str]:
         return filter_env(self._environ, self._env_allowlist)
 
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return build_prompt_envelope(request)
+    def _prompt(self, request: AgentRunRequest) -> str:
+        return build_prompt_envelope(request, execution_root=self._cwd_for_diff)
 
     def _extract_result_payload(
         self,

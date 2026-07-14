@@ -46,7 +46,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
 from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.models.lifecycle import LifecycleRun
+from dadaia_workspace.core.models.lifecycle import AgentRunResult, LifecycleRun
 from dadaia_workspace.core.models.workflow_handoff import (
     RetentionMode,
     WorkflowStepConsumerRecord,
@@ -117,6 +117,10 @@ class WorkflowStepPayloadWriter(Protocol):
         *producer_steps* narrows the reclaim to the named steps (resume-from-step)."""
         ...
 
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        """Remove exact temporary worker outputs owned by restarted steps."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Named payload validators (A21 — per output_schema Python validators this release)
@@ -153,21 +157,183 @@ def _validate_generic_handoff(payload: dict[str, object]) -> list[str]:
     return reasons
 
 
+def _require_non_empty_string(
+    payload: dict[str, object], field: str, reasons: list[str]
+) -> str | None:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        reasons.append(f"{field} must be a non-empty string")
+        return None
+    return value.strip()
+
+
+def _validate_audit_scope_handoff(payload: dict[str, object]) -> list[str]:
+    """Require a bounded, executable audit scope rather than a fallback summary."""
+    reasons: list[str] = []
+    _require_non_empty_string(payload, "summary", reasons)
+    _require_non_empty_string(payload, "audit_question", reasons)
+
+    lenses = payload.get("lenses")
+    lens_names: list[str] = []
+    if not isinstance(lenses, list) or not lenses:
+        reasons.append("lenses must be a non-empty list")
+    else:
+        for index, lens in enumerate(lenses):
+            if not isinstance(lens, dict):
+                reasons.append(f"lenses[{index}] must be an object")
+                continue
+            name = _require_non_empty_string(lens, "name", reasons)
+            _require_non_empty_string(lens, "rationale", reasons)
+            if name is not None:
+                lens_names.append(name)
+        if len(lens_names) != len(set(lens_names)):
+            reasons.append("lens names must be unique")
+
+    surfaces = payload.get("surfaces")
+    if (
+        not isinstance(surfaces, list)
+        or not surfaces
+        or any(not isinstance(item, str) or not item.strip() for item in surfaces)
+    ):
+        reasons.append("surfaces must be a non-empty list of non-empty strings")
+
+    criteria = payload.get("acceptance_criteria")
+    criterion_lenses: list[str] = []
+    if not isinstance(criteria, list) or not criteria:
+        reasons.append("acceptance_criteria must be a non-empty list")
+    else:
+        for index, criterion in enumerate(criteria):
+            if not isinstance(criterion, dict):
+                reasons.append(f"acceptance_criteria[{index}] must be an object")
+                continue
+            lens = _require_non_empty_string(criterion, "lens", reasons)
+            _require_non_empty_string(criterion, "pass_condition", reasons)
+            if lens is not None:
+                criterion_lenses.append(lens)
+        if lens_names and set(criterion_lenses) != set(lens_names):
+            reasons.append("acceptance_criteria must cover every declared lens exactly")
+        if len(criterion_lenses) != len(set(criterion_lenses)):
+            reasons.append("acceptance_criteria lens names must be unique")
+    return reasons
+
+
+def _validate_audit_findings_handoff(payload: dict[str, object]) -> list[str]:
+    """Require measured lens results and structured, addressable findings."""
+    reasons = _validate_review_verdict(payload)
+    _require_non_empty_string(payload, "summary", reasons)
+    _require_non_empty_string(payload, "verdict_reason", reasons)
+
+    lens_results = payload.get("lens_results")
+    statuses: list[str] = []
+    if not isinstance(lens_results, list) or not lens_results:
+        reasons.append("lens_results must be a non-empty list")
+    else:
+        names: list[str] = []
+        for index, result in enumerate(lens_results):
+            if not isinstance(result, dict):
+                reasons.append(f"lens_results[{index}] must be an object")
+                continue
+            name = _require_non_empty_string(result, "lens", reasons)
+            status = result.get("status")
+            if status not in {"PASS", "FAIL"}:
+                reasons.append(f"lens_results[{index}].status must be PASS or FAIL")
+            elif isinstance(status, str):
+                statuses.append(status)
+            evidence = result.get("evidence")
+            if (
+                not isinstance(evidence, list)
+                or not evidence
+                or any(not isinstance(item, str) or not item.strip() for item in evidence)
+            ):
+                reasons.append(
+                    f"lens_results[{index}].evidence must be a non-empty list of strings"
+                )
+            if name is not None:
+                names.append(name)
+        if len(names) != len(set(names)):
+            reasons.append("lens_results lens names must be unique")
+
+    findings = payload.get("findings")
+    finding_ids: list[str] = []
+    if not isinstance(findings, list):
+        reasons.append("findings must be a list")
+        findings = []
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            reasons.append(f"findings[{index}] must be an object")
+            continue
+        finding_id = _require_non_empty_string(finding, "id", reasons)
+        severity = finding.get("severity")
+        if severity not in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}:
+            reasons.append(f"findings[{index}].severity is invalid")
+        _require_non_empty_string(finding, "message", reasons)
+        _require_non_empty_string(finding, "surface", reasons)
+        _require_non_empty_string(finding, "evidence", reasons)
+        if finding_id is not None:
+            finding_ids.append(finding_id)
+    if len(finding_ids) != len(set(finding_ids)):
+        reasons.append("finding ids must be unique")
+
+    verdict = payload.get("verdict")
+    has_failure = "FAIL" in statuses
+    has_findings = bool(findings)
+    if verdict == "APPROVED" and (has_failure or has_findings):
+        reasons.append("APPROVED requires all lenses PASS and zero findings")
+    if verdict == "REJECTED" and not (has_failure and has_findings):
+        reasons.append("REJECTED requires at least one failed lens and one finding")
+    return reasons
+
+
+def _validate_audit_disposition_handoff(payload: dict[str, object]) -> list[str]:
+    """Require an explicit routing decision for each upstream finding."""
+    reasons: list[str] = []
+    _require_non_empty_string(payload, "summary", reasons)
+    if payload.get("source_verdict") not in {"APPROVED", "REJECTED"}:
+        reasons.append("source_verdict must be APPROVED or REJECTED")
+    dispositions = payload.get("dispositions")
+    if not isinstance(dispositions, list):
+        reasons.append("dispositions must be a list")
+        return reasons
+    finding_ids: list[str] = []
+    for index, disposition in enumerate(dispositions):
+        if not isinstance(disposition, dict):
+            reasons.append(f"dispositions[{index}] must be an object")
+            continue
+        finding_id = _require_non_empty_string(disposition, "finding_id", reasons)
+        if disposition.get("disposition") not in {
+            "bug",
+            "backlog",
+            "accepted-risk",
+            "resolved",
+        }:
+            reasons.append(f"dispositions[{index}].disposition is invalid")
+        _require_non_empty_string(disposition, "route", reasons)
+        if disposition.get("severity") not in {
+            "CRITICAL",
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+            "INFO",
+        }:
+            reasons.append(f"dispositions[{index}].severity is invalid")
+        _require_non_empty_string(disposition, "evidence", reasons)
+        if finding_id is not None:
+            finding_ids.append(finding_id)
+    if len(finding_ids) != len(set(finding_ids)):
+        reasons.append("disposition finding_ids must be unique")
+    return reasons
+
+
 #: Registry of named payload schemas → Python validators (A21). New named schemas are
 #: registered here AT MODULE-IMPORT time (never mutated at runtime — Wave-E test-isolation
 #: nit). Per-schema JSON Schema files follow incrementally (Slice D). The Wave-E
-#: ``audit``/``research``/``bug_report`` workflow bodies (T-30-E-01..03) seed their
+#: ``audit`` workflow body seeds its
 #: output-schema validators here so a test never has to register them at runtime:
 #:
 #: - audit:      scope → ``audit-scope-handoff-v1`` (summary), drift-scan review →
 #:               ``audit-findings-handoff-v1`` (verdict), triage →
 #:               ``audit-disposition-handoff-v1`` (summary — disposition-ready output).
-#: - research:   scope → ``research-scope-handoff-v1`` (summary), synthesis →
-#:               ``research-findings-handoff-v1`` (summary).
-#: - bug_report: intake → ``bug-intake-handoff-v1`` (summary), dedupe review →
-#:               ``bug-dedupe-handoff-v1`` (verdict), bug_write →
-#:               ``bug-record-handoff-v1`` (summary — the ADDITIVE bug record).
-#: - pipeline (v0.1.78 T-B / FR-B): the full IMPLEMENTATION→QA→SECURITY→CODE ladder
+#: - implementation_reviews: the full implementation→review→closure ladder
 #:               (``LifecyclePipeline.run``) produces one payload per step through the
 #:               (additive-optional) wired ``handoff_resolver`` — ``implement`` (create) →
 #:               ``generic-step-handoff-v1`` (summary), ``review_qa`` → the existing
@@ -180,28 +346,118 @@ _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "plan-review-handoff-v1": _validate_review_verdict,
     "tasks-review-handoff-v1": _validate_review_verdict,
     "qa-review-handoff-v1": _validate_review_verdict,
-    "implementation-handoff-v1": _validate_generic_handoff,
     "generic-step-handoff-v1": _validate_generic_handoff,
     # Wave E — audit workflow body (T-30-E-01).
-    "audit-scope-handoff-v1": _validate_generic_handoff,
-    "audit-findings-handoff-v1": _validate_review_verdict,
-    "audit-disposition-handoff-v1": _validate_generic_handoff,
-    # Wave E — research workflow body (T-30-E-02).
-    "research-scope-handoff-v1": _validate_generic_handoff,
-    "research-findings-handoff-v1": _validate_generic_handoff,
-    # Wave E — bug_report workflow body (T-30-E-03).
-    "bug-intake-handoff-v1": _validate_generic_handoff,
-    "bug-dedupe-handoff-v1": _validate_review_verdict,
-    "bug-record-handoff-v1": _validate_generic_handoff,
+    "audit-scope-handoff-v1": _validate_audit_scope_handoff,
+    "audit-findings-handoff-v1": _validate_audit_findings_handoff,
+    "audit-disposition-handoff-v1": _validate_audit_disposition_handoff,
     # v0.1.78 T-B / FR-B — full-pipeline (``LifecyclePipeline.run``) step payloads.
     "security-review-handoff-v1": _validate_review_verdict,
     "code-review-handoff-v1": _validate_review_verdict,
+    "closure-handoff-v1": _validate_generic_handoff,
+    "backlog-demand-v1": _validate_generic_handoff,
+    "backlog-item-v1": _validate_generic_handoff,
 }
 
 
-def register_payload_validator(output_schema: str, validator: PayloadValidator) -> None:
-    """Register a named-payload validator (extension seam for Wave E workflow bodies)."""
-    _PAYLOAD_VALIDATORS[output_schema] = validator
+_TRANSPORT_ONLY_KEYS = frozenset(
+    {
+        "schema",
+        "schema_version",
+        "agent",
+        "context",
+        "task_id",
+        "release_id",
+        "produced_at",
+        "scope",
+        "self_pull",
+        "structured_output",
+        "artifact",
+        "artifact_refs",
+        "handoff",
+        "details",
+    }
+)
+_WORKER_OUTPUT_PREFIX = ".dadaia/tmp/lifecycle-worker/"
+
+
+def _first_domain_summary(value: object) -> str | None:
+    """Return the first substantive summary-like string from a JSON domain object."""
+    if not isinstance(value, dict):
+        return None
+    for key in ("summary", "core_problem", "verdict_reason"):
+        candidate = value.get(key)
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    for candidate in value.values():
+        nested = _first_domain_summary(candidate)
+        if nested is not None:
+            return nested
+    return None
+
+
+def durable_payload_from_result(
+    result: AgentRunResult, *, fallback_summary: str, is_review: bool
+) -> dict[str, object]:
+    """Extract the substantive, durable domain handoff from one worker result.
+
+    The transport document and its mandatory self-reference belong to the temporary
+    worker-output plane. The immutable ledger receives the nested domain handoff (when
+    present), or the transport document minus transport-only fields, plus only stable
+    artifact references.
+    """
+    document = result.domain_payload
+    nested = document.get("handoff")
+    if not isinstance(nested, dict):
+        nested = document.get("details")
+    if not isinstance(nested, dict):
+        nested = document.get("structured_output")
+    if isinstance(nested, dict):
+        payload: dict[str, object] = {str(key): value for key, value in nested.items()}
+    else:
+        payload = {
+            str(key): value
+            for key, value in document.items()
+            if key not in _TRANSPORT_ONLY_KEYS
+        }
+
+    summary = _first_domain_summary(payload) or _first_domain_summary(document)
+    if summary is None:
+        summary = result.summary or fallback_summary
+    payload["summary"] = summary
+
+    if is_review:
+        verdict = result.structured_output.get("verdict")
+        if isinstance(verdict, str):
+            payload["verdict"] = verdict
+        reason = result.structured_output.get("verdict_reason")
+        if isinstance(reason, str):
+            payload["verdict_reason"] = reason
+    findings_raw = result.structured_output.get("findings")
+    if "findings" not in payload and isinstance(findings_raw, str) and findings_raw.strip():
+        try:
+            findings = json.loads(findings_raw)
+        except json.JSONDecodeError:
+            findings = None
+        if isinstance(findings, list) and findings:
+            payload["findings"] = findings
+
+    stable_refs = [
+        ref for ref in result.artifact_refs if not ref.startswith(_WORKER_OUTPUT_PREFIX)
+    ]
+    artifact = document.get("artifact")
+    artifact_path = artifact.get("path") if isinstance(artifact, dict) else None
+    if (
+        isinstance(artifact_path, str)
+        and artifact_path
+        and not artifact_path.startswith(_WORKER_OUTPUT_PREFIX)
+    ):
+        stable_refs.append(artifact_path)
+    if stable_refs:
+        payload["artifact_refs"] = list(dict.fromkeys(stable_refs))
+    else:
+        payload.pop("artifact_refs", None)
+    return payload
 
 
 def known_payload_schemas() -> tuple[str, ...]:
@@ -247,6 +503,14 @@ class ResolvedHandoff:
     payload: dict[str, object]
 
 
+def _compact_digest_text(value: str, *, limit: int = 320) -> str:
+    """Collapse one domain value to a bounded single line for prompt injection."""
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."
+
+
 class WorkflowHandoffResolver:
     """Run-scoped workflow-step handoff queue over the ledger + immutable payload plane."""
 
@@ -266,9 +530,13 @@ class WorkflowHandoffResolver:
     # -- restart (bug rerun-of-run-id-collides-with-immutable-payload-zone) ---
 
     def reset_run_zone(
-        self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
+        self,
+        run_id: str,
+        producer_steps: frozenset[str] | set[str] | None = None,
+        *,
+        worker_output_refs: tuple[str, ...] = (),
     ) -> int:
-        """Reclaim *run_id*'s orphaned payload zone before a fresh run replaces the record.
+        """Reclaim a run's durable payloads and exact temporary worker outputs.
 
         Called by engines at run-creation time (fragment gate, pipeline, implement/review
         loop): the replaced run record discards the ledger that addressed these payloads,
@@ -277,7 +545,8 @@ class WorkflowHandoffResolver:
         *producer_steps* narrows the reclaim to the named steps (resume-from-step, bug
         blocked-definition-run-cannot-resume-from-step).
         """
-        return self._writer.purge_step_payloads(run_id, producer_steps)
+        removed = self._writer.purge_step_payloads(run_id, producer_steps)
+        return removed + self._writer.purge_worker_outputs(worker_output_refs)
 
     # -- produce (A18 / A21) -------------------------------------------------
 
@@ -427,14 +696,66 @@ class WorkflowHandoffResolver:
         summary = payload.get("summary")
         if isinstance(summary, str) and summary.strip():
             lines.append(f"- summary: {summary.strip()}")
+        audit_question = payload.get("audit_question")
+        if isinstance(audit_question, str) and audit_question.strip():
+            lines.append(f"- audit_question: {_compact_digest_text(audit_question)}")
+        lenses = payload.get("lenses")
+        if isinstance(lenses, list) and lenses:
+            names = [
+                item.get("name")
+                for item in lenses
+                if isinstance(item, dict) and isinstance(item.get("name"), str)
+            ]
+            if names:
+                lines.append(f"- lenses: {', '.join(names)}")
+        surfaces = payload.get("surfaces")
+        if isinstance(surfaces, list) and surfaces:
+            lines.append("- surfaces:")
+            lines.extend(
+                f"  - {_compact_digest_text(surface, limit=180)}"
+                for surface in surfaces[:30]
+                if isinstance(surface, str) and surface.strip()
+            )
+        criteria = payload.get("acceptance_criteria")
+        if isinstance(criteria, list) and criteria:
+            lines.append("- acceptance_criteria:")
+            for criterion in criteria[:20]:
+                if not isinstance(criterion, dict):
+                    continue
+                lens = criterion.get("lens")
+                condition = criterion.get("pass_condition")
+                if isinstance(lens, str) and isinstance(condition, str):
+                    lines.append(
+                        f"  - {lens}: {_compact_digest_text(condition, limit=280)}"
+                    )
         findings = payload.get("findings")
         if isinstance(findings, list) and findings:
             lines.append(f"- findings: {len(findings)}")
-            for finding in findings[:5]:
+            for finding in findings[:20]:
                 if isinstance(finding, dict):
                     sev = finding.get("severity", "?")
                     msg = finding.get("message", "")
-                    lines.append(f"  - [{sev}] {msg}")
+                    finding_id = finding.get("id")
+                    identity = (
+                        f" (id: {finding_id})"
+                        if isinstance(finding_id, str) and finding_id
+                        else ""
+                    )
+                    lines.append(
+                        f"  - [{sev}] {_compact_digest_text(str(msg), limit=240)}{identity}"
+                    )
+                    surface = finding.get("surface")
+                    evidence = finding.get("evidence")
+                    if isinstance(surface, str) and surface.strip():
+                        lines.append(
+                            f"    surface: {_compact_digest_text(surface, limit=180)}"
+                        )
+                    if isinstance(evidence, str) and evidence.strip():
+                        lines.append(
+                            f"    evidence: {_compact_digest_text(evidence, limit=300)}"
+                        )
+            if len(findings) > 20:
+                lines.append("  - read the authoritative payload ref for all findings")
         refs = payload.get("artifact_refs")
         if isinstance(refs, list) and refs:
             lines.append(f"- artifact_refs: {', '.join(str(r) for r in refs)}")
@@ -508,6 +829,6 @@ __all__ = [
     "WorkflowHandoffError",
     "WorkflowHandoffResolver",
     "WorkflowStepPayloadWriter",
+    "durable_payload_from_result",
     "known_payload_schemas",
-    "register_payload_validator",
 ]

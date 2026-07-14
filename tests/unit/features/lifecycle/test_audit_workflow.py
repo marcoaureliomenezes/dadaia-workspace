@@ -34,22 +34,94 @@ _RELEASE = "v0.1.30"
 @dataclass(frozen=True)
 class _KindFake:
     kind: AgentRuntimeKind
-    result: AgentRunResult
+    with_finding: bool = False
+    drop_disposition: bool = False
+    artifact_only_scope: bool = False
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
-        return self.result
-
-
-def _approved() -> AgentRunResult:
-    return AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="audit step ok",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
+        step = (request.task_id or "").rsplit(":", 1)[-1]
+        artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{step}.step-output.json"
+        if step == "audit_scope" and self.artifact_only_scope:
+            payload: dict[str, object] = {
+                "schema": "agent-run-result-v1",
+                "artifact_refs": [artifact_ref],
+            }
+        elif step == "audit_scope":
+            payload = {
+                "summary": "Bound architecture drift.",
+                "audit_question": "Does implementation match architecture memory?",
+                "lenses": [
+                    {"name": "architecture", "rationale": "Contract fidelity."}
+                ],
+                "surfaces": ["src/games.py"],
+                "acceptance_criteria": [
+                    {"lens": "architecture", "pass_condition": "No contract drift."}
+                ],
+            }
+        elif step == "drift_scan":
+            payload = {
+                "summary": "One drift found." if self.with_finding else "No drift found.",
+                "verdict": "REJECTED" if self.with_finding else "APPROVED",
+                "verdict_reason": (
+                    "Implementation differs from memory."
+                    if self.with_finding
+                    else "Every scoped lens passed."
+                ),
+                "lens_results": [
+                    {
+                        "lens": "architecture",
+                        "status": "FAIL" if self.with_finding else "PASS",
+                        "evidence": ["src/games.py:1"],
+                    }
+                ],
+                "findings": (
+                    [
+                        {
+                            "id": "architecture-drift",
+                            "severity": "HIGH",
+                            "message": "Implementation differs from memory.",
+                            "surface": "src/games.py",
+                            "evidence": "src/games.py:1",
+                        }
+                    ]
+                    if self.with_finding
+                    else []
+                ),
+            }
+        else:
+            payload = {
+                "summary": "Routed audit findings.",
+                "source_verdict": "REJECTED" if self.with_finding else "APPROVED",
+                "dispositions": (
+                    []
+                    if self.drop_disposition or not self.with_finding
+                    else [
+                        {
+                            "finding_id": "architecture-drift",
+                            "disposition": "bug",
+                            "route": "specs/bugs via dadaia bugs append",
+                            "severity": "HIGH",
+                            "evidence": "src/games.py:1",
+                        }
+                    ]
+                ),
+            }
+        verdict = payload.get("verdict")
+        structured: dict[str, str] = (
+            {"verdict": verdict} if isinstance(verdict, str) else {}
+        )
+        if isinstance(payload.get("verdict_reason"), str):
+            structured["verdict_reason"] = payload["verdict_reason"]
+        return AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary=str(payload.get("summary", step)),
+            artifact_refs=(artifact_ref,),
+            structured_output=structured,
+            domain_payload=payload,
+        )
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -73,7 +145,14 @@ def _resolver(tmp_path: Path) -> WorkflowHandoffResolver:
     )
 
 
-def _workflow(tmp_path: Path, resolver: WorkflowHandoffResolver | None) -> AuditWorkflow:
+def _workflow(
+    tmp_path: Path,
+    resolver: WorkflowHandoffResolver | None,
+    *,
+    with_finding: bool = False,
+    drop_disposition: bool = False,
+    artifact_only_scope: bool = False,
+) -> AuditWorkflow:
     specs = tmp_path / "repos" / _CONTEXT / "specs"
     selector = ContextSelector(
         SpecContext(
@@ -84,7 +163,12 @@ def _workflow(tmp_path: Path, resolver: WorkflowHandoffResolver | None) -> Audit
         context=_CONTEXT,
         release_id=_RELEASE,
         run_store=JsonLifecycleRunStore(tmp_path),
-        runtime_factory=lambda kind: _KindFake(kind, _approved()),  # type: ignore[arg-type]
+        runtime_factory=lambda kind: _KindFake(
+            kind,
+            with_finding=with_finding,
+            drop_disposition=drop_disposition,
+            artifact_only_scope=artifact_only_scope,
+        ),  # type: ignore[arg-type]
         context_selector=selector,
         handoff_resolver=resolver,
     )
@@ -130,3 +214,45 @@ def test_triage_produces_disposition_ready_output(tmp_path: Path) -> None:
     assert triage_record is not None
     assert triage_record.output_schema == "audit-disposition-handoff-v1"
     assert (tmp_path / triage_record.payload_ref).is_file()
+
+
+def test_artifact_only_scope_blocks_as_malformed_domain_output(tmp_path: Path) -> None:
+    _workspace(tmp_path)
+    result = _workflow(
+        tmp_path, _resolver(tmp_path), artifact_only_scope=True
+    ).run("aud-empty-scope")
+
+    assert not result.completed
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "audit_scope"
+    assert "audit-scope-handoff-v1" in result.blocked.reason
+
+
+def test_rejected_drift_is_triaged_and_can_complete(tmp_path: Path) -> None:
+    _workspace(tmp_path)
+    result = _workflow(tmp_path, _resolver(tmp_path), with_finding=True).run(
+        "aud-rejected"
+    )
+
+    assert result.completed
+    assert [step.label for step in result.steps] == [
+        "audit_scope",
+        "drift_scan",
+        "triage",
+        "audit_disposition_gate",
+    ]
+
+
+def test_disposition_gate_blocks_an_undisposed_finding(tmp_path: Path) -> None:
+    _workspace(tmp_path)
+    result = _workflow(
+        tmp_path,
+        _resolver(tmp_path),
+        with_finding=True,
+        drop_disposition=True,
+    ).run("aud-undisposed")
+
+    assert not result.completed
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "audit_disposition_gate"
+    assert "dispose every finding" in result.blocked.detail["violations"]

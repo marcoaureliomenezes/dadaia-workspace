@@ -2,7 +2,7 @@
 
 **Release origin:** v0.1.55 (Architecture Decomposition, FR2). This module graph is the
 canonical picture of the decomposed panel API surface: the former 1,279-line
-`features/panel/views/api.py` god module split into **eight per-domain view modules**, one
+`features/panel/views/api.py` god module split into **seven per-domain view modules**, one
 responsibility each. `api.py` is **deleted** — there is no facade, barrel, or re-export shim.
 `container.py` imports each `render_api_*` function from its per-domain module via explicit
 named imports (extending the incumbent named-import pattern shared with
@@ -33,13 +33,6 @@ classDiagram
         render_api_agents_canonical()
         render_api_agent_prompt()
     }
-    class api_workflows {
-        <<view module>>
-        render_api_workflows_list()
-        render_api_workflow_detail()
-        render_api_dadaia_workflows_list()
-        render_api_dadaia_workflow_detail()
-    }
     class api_sessions {
         <<view module>>
         render_api_sessions()
@@ -64,7 +57,6 @@ classDiagram
     container ..> api_servers : named import
     container ..> api_contexts : named import
     container ..> api_agents : named import
-    container ..> api_workflows : named import
     container ..> api_sessions : named import
     container ..> api_academy : named import
     container ..> api_reports : named import
@@ -72,7 +64,6 @@ classDiagram
     api_servers ..> PanelService
     api_contexts ..> PanelService
     api_agents ..> PanelService
-    api_workflows ..> PanelService
     api_sessions ..> PanelService
     api_academy ..> PanelService
     api_reports ..> PanelService

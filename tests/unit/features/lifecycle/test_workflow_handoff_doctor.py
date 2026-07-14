@@ -182,7 +182,7 @@ def test_promote_to_evidence_exempt_delete_after_consumed_control_still_flags(
     tmp_path: Path,
 ) -> None:
     """v0.1.71 FR4: reproduces bug ``handoffs-doctor-blocks-terminal-promote-to-evidence``:
-    a terminal APPROVED implement-review's review verdict payload has
+    a terminal APPROVED implementation-review verdict payload has
     retention_mode=PROMOTE_TO_EVIDENCE + declared_consumers=(implement) and is never
     consumed — because it is promoted to evidence, not consumed. It must NOT be flagged
     unconsumed_required (heals pre-fix runs on disk with no migration). FR4.2 control: the

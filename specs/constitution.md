@@ -112,19 +112,20 @@ composition root.
 
 Every action belongs to one of eight phases. This table is normative.
 
-| # | Phase | Owner | Writes to | Class | Lease |
-|---|-------|-------|-----------|-------|-------|
-| 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | none |
-| 2 | Bug filing | any agent | `specs/bugs/**` (JSONL events) | ADDITIVE | none |
-| 3 | Research | PM-dispatched | `.dadaia/reports/**` | ADDITIVE | none |
-| 4 | Audit | project-auditor | `specs/audits/<ts>-<sid8>/` | ADDITIVE | none |
-| 5 | Release definition | product-engineer | `specs/releases/<id>/**` | MUTATING | acquires |
-| 6 | Implementation | software-engineer | context production tree | MUTATING | holds |
-| 7 | Review gates | qa / security / code reviewers | handoffs + reports | ADDITIVE; gates transitions | none |
-| 8 | Closure | product-engineer | `specs/memory/**`, CLOSURE, ACTIVE | MUTATING | holds, then releases |
+| # | Phase | Owner | Writes to | Class | Concurrency |
+|---|-------|-------|-----------|-------|-------------|
+| 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | concurrent |
+| 2 | Bug filing | any agent | `specs/bugs/**` (JSONL events) | ADDITIVE | concurrent |
+| 3 | Research | PM-dispatched | `.dadaia/reports/**` | ADDITIVE | concurrent |
+| 4 | Audit | project-auditor | `specs/audits/<ts>-<sid8>/` | ADDITIVE | concurrent |
+| 5 | Release definition | product-engineer | `specs/releases/<id>/**` | MUTATING | advisory presence |
+| 6 | Implementation | software-engineer | context production tree | MUTATING | advisory presence |
+| 7 | Review gates | qa / security / code reviewers | handoffs + reports | ADDITIVE; gates transitions | concurrent |
+| 8 | Closure | product-engineer | `specs/memory/**`, CLOSURE, ACTIVE | MUTATING | advisory presence |
 
-Exactly one MUTATING actor per context at a time (5/6/8). ADDITIVE phases run in
-parallel and never touch the lease. Audit output is committed Markdown in
+MUTATING actors coordinate through workflow scope and task ownership. The workspace
+does not serialize them: concurrent writes are allowed and surfaced through advisory
+presence. Audit output is committed Markdown in
 `specs/audits/` (channel 3, §11) named with the `<ts>-<session_id_8chars>` collision
 convention; every audit generates exactly one remediation release that dispositions
 every finding (fixed / superseded / deferred-with-reason) — no finding is silently
@@ -132,30 +133,27 @@ dropped, and an audit archives only when fully dispositioned by an approved rele
 
 ## 8. Concurrency Invariants
 
-- At most ONE MUTATING lease per context; the lease serializes phases 5/6/8.
-- A live foreign holder is never stolen; a reclaimable (absent/stale-dead) lease never
-  blocks. The gate never instructs the operator to rebind, relaunch, or steal.
-- ADDITIVE writes never read or write lease state; concurrent additive sessions are
-  always allowed, with collision-safe naming where trees are parallel-writable.
-- A READ-mode session is non-acquiring: MUTATING writes are blocked before any lease
-  call; ADDITIVE writes flow. Bind is never a precondition for ADDITIVE work.
-- Deterministic enforcement is fail-open per policy, with the session store as the sole
-  fail-closed path; lifecycle outcomes are additionally gated at the git chokepoints
-  (pre-commit lease gate; pre-push CI + security-verdict gate), which run without any
-  harness hook. `--no-verify` bypass exists: the posture is
-  deterministic-at-the-chokepoint, not unbypassable; doctor coherence is the backstop.
-- Context memory injection follows the SESSION's own bind — never another session's.
-- Mechanism (lease record, TTL/probe, mode chain, classifier, hook order, tunables)
-  lives in [[sdd-gate-v3]], [[context-management]], and `core/kernel_tunables.py` —
-  not in this law.
+- No workspace lock, lease, acquisition, adoption, or steal operation exists.
+- Races are accepted and surfaced, never prevented. MUTATING writes upsert caller-owned
+  presence and may emit one throttled warning when another live session is present.
+- Presence I/O is fail-open and can never block a write, commit, or workflow.
+- ADDITIVE writes are always concurrency-independent, with collision-safe naming where
+  trees are parallel-writable.
+- READ mode is caller-local self-protection: it blocks only that caller's MUTATING file
+  writes. Another session's bind or presence can never change the caller's mode.
+- Pre-commit may warn about peer presence but always allows concurrency. Pre-push may
+  block on missing CI or security-review evidence; this is a quality gate, not a lock.
+- Context memory injection follows the session's own bind, never another session's.
+- Mechanism (presence record, TTL cleanup, caller mode, classifier, hook order, tunables)
+  lives in [[sdd-gate-v3]], [[context-management]], and `core/kernel_tunables.py`.
 
 ## 9. Coordinator + Sub-Agent Architecture
 
-project-manager acquires ONE lease for a release's MUTATING span and holds it through
-phases 5→6→8; product-engineer and software-engineer run as PM sub-agents under that
-lease — the lease never changes hands. Carve-out: outside a release span, ai-engineer
-may hold its own short MUTATING lease for surface fixes; the gate still enforces
-at-most-one-holder. **Dispatcher purity:** only project-manager and project-auditor
+project-manager coordinates a release's MUTATING span through workflow state, task
+ownership, and explicit write scopes. product-engineer and software-engineer run as PM
+sub-agents with caller-scoped binds; peer presence is advisory only. Outside a release
+span, ai-engineer may perform authorized surface fixes under the same no-lock model.
+**Dispatcher purity:** only project-manager and project-auditor
 dispatch sub-agents; every other persona is a worker that surfaces needs to its
 dispatcher and never spawns agents.
 
@@ -216,17 +214,17 @@ updates).
 
 Nine core agents; agents not listed are plugins.
 
-| Agent | Phase | Class | Lease |
-|-------|-------|-------|-------|
-| project-manager | 1–2 + coordinates MUTATING | ADDITIVE; coordinator | holds/routes/releases |
-| project-auditor | 4 | ADDITIVE | none |
-| product-engineer | 5 + 8 | MUTATING | PM sub-agent |
-| software-engineer | 6 | MUTATING | PM sub-agent |
-| qa-engineer | 7 → commit | ADDITIVE; votes | none |
-| security-reviewer | 7 → push | ADDITIVE; votes | none |
-| code-reviewer | 7 → PR | ADDITIVE; votes | none |
-| ai-engineer | AI-entity surface (`public/**`) | MUTATING | PM sub-agent; own short lease off-release |
-| software-architect | feeds 4/5 | ADDITIVE | none |
+| Agent | Phase | Class | Concurrency |
+|-------|-------|-------|-------------|
+| project-manager | 1–2 + coordinates MUTATING | ADDITIVE; coordinator | advisory presence |
+| project-auditor | 4 | ADDITIVE | concurrent |
+| product-engineer | 5 + 8 | MUTATING | caller-scoped bind |
+| software-engineer | 6 | MUTATING | caller-scoped bind |
+| qa-engineer | 7 → commit | ADDITIVE; votes | concurrent |
+| security-reviewer | 7 → push | ADDITIVE; votes | concurrent |
+| code-reviewer | 7 → PR | ADDITIVE; votes | concurrent |
+| ai-engineer | AI-entity surface (`public/**`) | MUTATING | caller-scoped bind |
+| software-architect | feeds 4/5 | ADDITIVE | concurrent |
 
 Plugins (stubs, behavior-less until their pack installs; exempt from §12.1):
 frontend-engineer, design-specialist, devops-engineer. Every core persona in

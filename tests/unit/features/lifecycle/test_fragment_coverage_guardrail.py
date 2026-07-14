@@ -15,7 +15,7 @@ discovers every workflow step sequence and asserts:
     shared discipline fragment must keep failing per-step.
 
 Item E: the discovered set of workflow ``_SEQUENCE`` modules is asserted equal to the known
-set (folded into the citation-set param as a derivation guard), so a future 7th workflow
+set (folded into the citation-set param as a derivation guard), so a future workflow
 cannot silently escape the guardrail.
 """
 
@@ -33,23 +33,19 @@ from dadaia_workspace.features.lifecycle import pipeline, workflows
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
     backlog_definition,
-    bug_report,
     release_definition,
-    research,
 )
 
 _FRAGMENT_ROOT = (
     Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "lifecycle_fragments"
 )
 
-#: The six workflow step sequences the guardrail iterates (SPEC WS-5).
+#: The four workflow step sequences the guardrail iterates (SPEC WS-5).
 _SEQUENCES = {
     "release_definition": release_definition._SEQUENCE,
     "audit": audit._SEQUENCE,
-    "bug_report": bug_report._SEQUENCE,
-    "research": research._SEQUENCE,
     "backlog_definition": backlog_definition._SEQUENCE,
-    "pipeline": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
+    "implementation_reviews": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
 }
 
 #: Workflow modules that define a module-level ``_SEQUENCE`` (pipeline is the ladder, not a
@@ -57,9 +53,7 @@ _SEQUENCES = {
 _KNOWN_SEQUENCE_MODULES = {
     "audit",
     "backlog_definition",
-    "bug_report",
     "release_definition",
-    "research",
 }
 
 # AC-2 — every create step + every substantive review step cites shared.anti_slop.
@@ -71,27 +65,23 @@ _REQUIRED_ANTI_SLOP = {
     "release_definition.spec_arch_review",
     "release_definition.plan_review",
     "backlog_definition.backlog_author",
-    "pipeline.implement",
-    "pipeline.review_security",
-    "pipeline.review_code",
+    "implementation_reviews.implement",
+    "implementation_reviews.review_security",
+    "implementation_reviews.review_code",
 }
 
-# AC-3 — every verdict-emitting review step + every audit/bug/research model step cites
+# AC-3 — every verdict-emitting review step and every audit model step cites
 # shared.output_handoff.
 _REQUIRED_OUTPUT_HANDOFF = {
     "release_definition.spec_arch_review",
     "release_definition.spec_qa_review",
     "release_definition.plan_review",
     "release_definition.tasks_implementability_review",
-    "pipeline.review_qa",
-    "pipeline.review_security",
-    "pipeline.review_code",
+    "implementation_reviews.review_qa",
+    "implementation_reviews.review_security",
+    "implementation_reviews.review_code",
     "audit.drift_scan",
     "audit.triage",
-    "bug_report.bug_intake",
-    "bug_report.dedupe",
-    "research.investigate",
-    "research.synthesis",
 }
 
 # WS-2c — shared.memory_selection is wired to the spec/plan/tasks create + review steps.

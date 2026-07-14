@@ -40,7 +40,7 @@ from dadaia_workspace.features.lifecycle.pipeline import (
 )
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-_PI_MODELS = {"gpt-5.3-codex", "gpt-5.5"}
+_PI_MODELS = {"openai-codex/gpt-5.5"}
 
 
 def _init_workspace(path: Path) -> Path:
@@ -57,12 +57,24 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(".dadaia/handoff/dadaia-workspace/step.handoff.json",),
+        artifact_refs=(
+            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
 
 def _run(workspace: Path, snapshot: object) -> tuple[FakeAgentRuntime, object]:
+    evidence = (
+        workspace
+        / ".dadaia"
+        / "tmp"
+        / "lifecycle-worker"
+        / "dadaia-workspace"
+        / "step.step-output.json"
+    )
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text('{"schema": "fake-test-evidence"}\n', encoding="utf-8")
     recorder = FakeAgentRuntime(result=_approving())
     store = container.build_lifecycle_run_store(workspace)
     pipe = LifecyclePipeline(
@@ -110,7 +122,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     1. Resolver kwarg path (``default_harness="pi"``): implement runs the PI standard
        profile, reviews the PI deep profile; every recorded model + persisted snapshot
        entry is on PI.
-    2. T-29-C-03 — the real ``dadaia lifecycle pipeline --harness pi --show-policy`` FLAG
+    2. The real ``dadaia lifecycle implementation-reviews --harness pi --show-policy`` flag
        (not just the resolver kwarg) threads through the CLI into the shared resolver, so
        the governed snapshot resolves harness=pi + a PI catalog model for every step.
        ``--show-policy`` resolves + emits the snapshot WITHOUT running an adapter, keeping
@@ -123,7 +135,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     # 1. Resolver kwarg path.
     kwarg_ws = _init_workspace(tmp_path / "kwarg-case")
     resolver = container.build_workflow_policy_resolver(kwarg_ws, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default", default_harness="pi")
+    snapshot = resolver.resolve("implementation_reviews", context="default", default_harness="pi")
     assert snapshot.step("implement").model_profile == "pi-implementation-standard"  # type: ignore[union-attr]
     assert snapshot.step("review_qa").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
     recorder, persisted = _run(kwarg_ws, snapshot)
@@ -136,7 +148,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--release-id",
             "v0.1.29",
             "--harness",
@@ -161,7 +173,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation": {"steps": {}, "default_harness": "pi"}}}
+                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
             },
         }
     )
@@ -169,7 +181,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     overlay_resolver = container.build_workflow_policy_resolver(
         overlay_ws, context="dadaia-workspace"
     )
-    overlay_snapshot = overlay_resolver.resolve("implementation", context="default")
+    overlay_snapshot = overlay_resolver.resolve("implementation_reviews", context="default")
     overlay_recorder, overlay_persisted = _run(overlay_ws, overlay_snapshot)
     _assert_all_pi(overlay_recorder, overlay_persisted)
 
@@ -182,14 +194,14 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                    "workflows": {"implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}}
                 }
             },
         }
     )
     step_store.save(step_overlay)
     step_resolver = container.build_workflow_policy_resolver(step_ws, context="dadaia-workspace")
-    step_snapshot = step_resolver.resolve("implementation", context="default")
+    step_snapshot = step_resolver.resolve("implementation_reviews", context="default")
     step_recorder, step_persisted = _run(step_ws, step_snapshot)
 
     step_models = step_recorder.received_models
@@ -233,7 +245,7 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation": {"steps": {}, "default_harness": "pi"}}}
+                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
             },
         }
     ).encode("utf-8")
@@ -244,6 +256,6 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
 
     # Fresh resolver reads the PUT-persisted overlay from disk — no CLI flag, no in-memory hint.
     resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
     recorder, persisted = _run(workspace, snapshot)
     _assert_all_pi(recorder, persisted)

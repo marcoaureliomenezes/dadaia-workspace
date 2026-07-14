@@ -93,7 +93,7 @@ def _approved() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -137,8 +137,16 @@ def _specs_tree(tmp_path: Path) -> Path:
         "---\nname: some-atom\n---\n\n# Some atom\n\nbody\n", encoding="utf-8"
     )
     (specs / "releases" / _RELEASE / "SPEC.md").write_text("# spec\n", encoding="utf-8")
-    (specs / "releases" / _RELEASE / "PLAN.md").write_text("# plan\n", encoding="utf-8")
-    (specs / "releases" / _RELEASE / "TASKS.md").write_text("# tasks\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# plan\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value | unit tests | None | None |\n",
+        encoding="utf-8",
+    )
+    (specs / "releases" / _RELEASE / "TASKS.md").write_text(
+        "# tasks\n\n### [ ] T1 - Fixture task\n", encoding="utf-8"
+    )
     return specs
 
 

@@ -1,19 +1,14 @@
 """Pure decision logic for the W1 chokepoint git-hook gates (v0.1.14; v0.1.76 FR3).
 
-This module is business logic: it imports ``core`` (the ``Ancestry`` port and the lease
-staleness predicate) and reads the lease/handoff files through plain ``pathlib`` reads, but
+This module is business logic: it imports ``core`` and reads presence/handoff files, but
 NEVER imports ``infrastructure`` and NEVER spawns a subprocess or calls ``os.kill``. The CLI
 (``cli/commands/ci.py``) wires the container's :class:`ProcessAncestry` adapter and the pid
 probe; the unit tests inject synthetic fakes.
 
 Two gates, one shared shape (:class:`Decision`):
 
-* :func:`pre_commit_decision` — v0.1.76 FR3 (NO-LOCKS DOCTRINE, WARN-only): ALWAYS returns
-  ``allowed=True``. It keeps the live-lease DETECTION (a residual/legacy lease record naming
-  another session may still exist — e.g. from ``adopt_if_own_lineage`` — or a foreign presence
-  record) so it can print exactly ONE advisory line naming the other session; it never blocks
-  a commit for that reason. The old DP-4 BLOCK verdict (rung 7) is deleted along with its
-  probe-chain degradation ladder; the identity signal survives purely as an advisory.
+* :func:`pre_commit_decision` — NO-LOCKS WARN-only: ALWAYS returns ``allowed=True`` and
+  reads only advisory presence records.
 * :func:`push_gate_decision` — FR-W1-02 / DP-5 security-verdict-per-pushed-sha check
   (UNCHANGED by v0.1.76 — quality gates are not concurrency locks and stay).
 """
@@ -26,8 +21,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core.lock_liveness import is_stale
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+from dadaia_workspace.features.spec_context import presence
 
 __all__ = [
     "Decision",
@@ -108,8 +103,7 @@ def context_slug_for_path(workspace: Path, repo_root: Path) -> str | None:
     """Return the context slug for a repo at ``repo_root`` under ``workspace``.
 
     A Spec Context repo lives at ``<workspace>/repos/<slug>``. The slug is that single path
-    component — derived from the path, never from the first-ALIVE registry entry (the
-    cross-context-contamination class the lease kernel forbids). Returns ``None`` when
+    component — derived from the path, never from the first-ALIVE registry entry. Returns ``None`` when
     ``repo_root`` is not directly under ``<workspace>/repos/`` (e.g. the library repo run
     standalone, or the workspace root itself).
     """
@@ -121,16 +115,6 @@ def context_slug_for_path(workspace: Path, repo_root: Path) -> str | None:
     if len(parts) != 1:
         return None
     return parts[0]
-
-
-def _lease_record(workspace: Path, ctx: str) -> dict[str, object] | None:
-    """Read the lease record for ``ctx`` (pure read; ``None`` if absent/unparseable)."""
-    path = workspace / ".dadaia" / "states" / "ctx_locks" / f"{ctx}.lock.json"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
 
 
 def _age_seconds(heartbeat: object, *, now: datetime) -> int | None:
@@ -147,7 +131,7 @@ def _age_seconds(heartbeat: object, *, now: datetime) -> int | None:
 
 
 def _advisory_message(ctx: str, holder_sid: str, age: int | None) -> str:
-    """The advisory WARN line for a live foreign-looking lease record (v0.1.76 FR3).
+    """The advisory WARN line for another live presence record.
 
     Per the forbidden-law canon (architecture "the message never instructs the operator to
     rebind, relaunch, or steal"), it states who else appears active and that the commit was
@@ -173,16 +157,9 @@ def pre_commit_decision(
 ) -> Decision:
     """Decide whether a commit into ``ctx`` may proceed (v0.1.76 FR3, WARN-only).
 
-    NO-LOCKS DOCTRINE: this ALWAYS returns ``allowed=True`` — a commit is never blocked
-    because of another session. The former DP-4 probe chain (env-sid / ancestry / pid-veto)
-    is kept ONLY as advisory DETECTION: when a lease record (legacy/residual — nothing
-    production writes fresh ones anymore, but ``adopt_if_own_lineage`` and pre-doctrine
-    installs may still leave one) names a session that is neither ``env_sid`` nor in the
-    caller's process ancestry, and whose pid is demonstrably alive, one advisory WARN line
-    is emitted naming that other session; the commit still proceeds unconditionally.
-
-    Consults the lease ONLY — never a handoff verdict (G6: a holder with zero security
-    handoffs still commits freely; review-gating happens at push, not commit).
+    NO-LOCKS DOCTRINE: this ALWAYS returns ``allowed=True``. Advisory detection reads the
+    same fail-soft presence records as the write gate. Retired lease files have no effect.
+    Legacy probe parameters remain accepted so installed git-hook callers do not break.
     """
     clock = now or datetime.now(tz=UTC)
 
@@ -190,82 +167,20 @@ def pre_commit_decision(
     if ctx is None:
         return Decision(allowed=True, message="[pre-commit] not a Spec Context repo; allow.")
 
-    record = _lease_record(workspace, ctx)
-
-    # No lease, or stale-dead lease ⇒ allow, no advisory. ``is_stale`` returns True for an
-    # absent/corrupt record and for a TTL-expired record whose holder pid is dead/absent.
-    if is_stale(record, clock=lambda: clock, pid_probe=pid_probe):
-        return Decision(allowed=True, message=f"[pre-commit] no live lease on '{ctx}'; allow.")
-
-    assert record is not None  # is_stale(None) is True, so a non-stale record exists here.
-    holder_sid = str(record.get("session_id", ""))
-    holder_pid_raw = record.get("pid")
-    holder_pid = holder_pid_raw if isinstance(holder_pid_raw, int) and holder_pid_raw > 0 else None
-    age = _age_seconds(record.get("heartbeat"), now=clock)
-
-    # env-sid match ⇒ this commit IS the recorded session — no advisory needed.
-    if env_sid and holder_sid and env_sid == holder_sid:
-        return Decision(allowed=True, message=f"[pre-commit] session holds '{ctx}'; allow.")
-
-    # Ancestry probe: the holder's own commit (same process tree) needs no advisory either.
-    if holder_pid is not None:
-        try:
-            verdict = ancestry(holder_pid, caller_pid)
-        except Exception:  # noqa: BLE001 — a probe bug must never block; treat as indeterminate.
-            verdict = Ancestry.UNKNOWN
-        if verdict is Ancestry.ANCESTOR:
-            return Decision(
-                allowed=True,
-                message="[pre-commit] commit is from the lease holder's process tree; allow.",
-            )
-        if verdict is Ancestry.UNKNOWN:
-            return Decision(
-                allowed=True,
-                message=f"[pre-commit] lease '{ctx}' held; ancestry indeterminate — allowing.",
-                warn=(
-                    f"[pre-commit] WARN: could not confirm this commit belongs to the holder "
-                    f"of '{ctx}' (held by '{holder_sid}'); allowing (advisory, NO-LOCKS "
-                    "DOCTRINE)."
-                ),
-            )
-    else:
-        # No holder pid recorded (legacy record): cannot verify identity ⇒ advisory allow.
+    own_sid = env_sid or "pre-commit-anonymous"
+    others = presence.others_alive(workspace, ctx, own_sid)
+    if not others:
         return Decision(
             allowed=True,
-            message=f"[pre-commit] lease '{ctx}' held but holder pid unknown — allowing.",
-            warn=(
-                f"[pre-commit] WARN: lease '{ctx}' held by '{holder_sid}' has no recorded "
-                f"pid; cannot verify identity — allowing (advisory, NO-LOCKS DOCTRINE)."
-            ),
+            message=f"[pre-commit] no other live presence on '{ctx}'; allow.",
         )
 
-    # holder pid is demonstrably dead ⇒ no genuinely-live other session to advise about.
-    if pid_probe is not None and holder_pid is not None:
-        try:
-            holder_alive = pid_probe(holder_pid)
-        except Exception:  # noqa: BLE001 — a probe bug must never block; assume indeterminate.
-            holder_alive = True
-        if not holder_alive:
-            return Decision(
-                allowed=True,
-                message=(
-                    f"[pre-commit] lease '{ctx}' held by '{holder_sid}' but its recorded "
-                    f"holder pid {holder_pid} is dead — allowing."
-                ),
-                warn=(
-                    f"[pre-commit] WARN: lease '{ctx}' records a dead holder pid {holder_pid} "
-                    f"(session '{holder_sid}') with a fresh heartbeat — the relaunched "
-                    "incumbent; allowing (advisory, NO-LOCKS DOCTRINE)."
-                ),
-            )
-
-    # A demonstrably OTHER, demonstrably LIVE session appears active on this context: commit
-    # still ALLOWS (v0.1.76 FR3) — this is the sole remaining advisory line, naming who else
-    # is active, never a block.
+    other = others[0]
+    age = _age_seconds(other.last_seen_at, now=clock)
     return Decision(
         allowed=True,
         message="[pre-commit] commit allowed.",
-        warn=_advisory_message(ctx, holder_sid, age),
+        warn=_advisory_message(ctx, other.session_id, age),
     )
 
 

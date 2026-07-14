@@ -3,8 +3,8 @@
 The Wave-E (v0.1.30 Item 6) real workflow body that replaced the fail-loud ``_deferred.audit``
 stub. As of v0.1.57 FR1 it is a thin subclass of
 :class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate.FragmentGateWorkflow` —
-the ONE prompt-assembly + Python-gate seam shared with ``release_definition`` / ``research`` /
-``bug_report``. This body declares the divergence hooks (the ``audit`` command, the QA_REVIEW
+the ONE prompt-assembly + Python-gate seam shared with ``release_definition``. This body
+declares the divergence hooks (the ``audit`` command, the QA_REVIEW
 initial phase, a terminal gate that COMPLETEs with no phase transition, and the ``AuditStep`` /
 ``AuditResult`` dataclass types) and keeps its module-global ``_SEQUENCE``.
 
@@ -30,8 +30,13 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
+    LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    MalformedHandoffError,
+    RequiredHandoffMissingError,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
     FragmentGateWorkflow,
     _StepOutcome,
@@ -71,6 +76,9 @@ class AuditStep:
     # to the request. Additive-optional, mirroring ``ReleaseStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
+    # A failed audit verdict is domain evidence that must still reach triage. Structural
+    # output failures block; REJECTED itself does not abort this workflow.
+    blocks_on_rejection: bool = True
 
 
 @dataclass(frozen=True)
@@ -113,6 +121,7 @@ _SEQUENCE: tuple[AuditStep, ...] = (
         fragment_id="audit.drift_scan",
         shared_fragment_ids=("shared.output_handoff",),
         is_review=True,
+        blocks_on_rejection=False,
         produces="audit-findings-handoff-v1",
         consumes=("audit_scope",),
     ),
@@ -169,6 +178,66 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
             final_phase=final_phase,
             steps=tuple(_to_step_result(outcome) for outcome in outcomes),
             blocked=blocked,
+        )
+
+    def _terminal_semantic_block(
+        self, run: LifecycleRun, step: AuditStep, sequence: tuple[AuditStep, ...]
+    ) -> BlockedState | None:
+        if self._handoff_resolver is None:
+            return None
+        try:
+            scope = self._handoff_resolver.resolve_required(
+                run, producer_step="audit_scope", attempt=0
+            ).payload
+            scan = self._handoff_resolver.resolve_required(
+                run, producer_step="drift_scan", attempt=0
+            ).payload
+            triage = self._handoff_resolver.resolve_required(
+                run, producer_step="triage", attempt=0
+            ).payload
+        except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
+            return BlockedState(
+                reason=f"audit disposition evidence is unavailable: {exc}",
+                blocked_at_step=step.label,
+            )
+
+        scope_lenses = {
+            item["name"]
+            for item in scope["lenses"]
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        }
+        result_lenses = {
+            item["lens"]
+            for item in scan["lens_results"]
+            if isinstance(item, dict) and isinstance(item.get("lens"), str)
+        }
+        findings = {
+            item["id"]: item
+            for item in scan["findings"]
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        dispositions = {
+            item["finding_id"]: item
+            for item in triage["dispositions"]
+            if isinstance(item, dict) and isinstance(item.get("finding_id"), str)
+        }
+        violations: list[str] = []
+        if result_lenses != scope_lenses:
+            violations.append("drift scan must report every scoped lens exactly")
+        if triage.get("source_verdict") != scan.get("verdict"):
+            violations.append("triage source_verdict must match the drift verdict")
+        if set(dispositions) != set(findings):
+            violations.append("triage must dispose every finding exactly once")
+        for finding_id, disposition in dispositions.items():
+            finding = findings.get(finding_id)
+            if finding is not None and disposition.get("severity") != finding.get("severity"):
+                violations.append(f"disposition severity differs for {finding_id}")
+        if not violations:
+            return None
+        return BlockedState(
+            reason="audit disposition contract is incomplete",
+            blocked_at_step=step.label,
+            detail={"violations": "; ".join(violations)},
         )
 
 

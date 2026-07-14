@@ -724,3 +724,191 @@ def next_(
         console.print(f"  Already completed: {completed}")
         console.print(f"  Pending: {pending}")
     raise typer.Exit(0)
+
+
+@app.command(name="workflow-doctor")
+def workflow_doctor(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Validate workflow policy, fragments, personas, and selector coherence."""
+    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
+        Severity as CoherenceSeverity,
+    )
+    from dadaia_workspace.features.lifecycle.fragment_coherence_doctor import (
+        run_fragment_coherence_doctor,
+    )
+    from dadaia_workspace.features.lifecycle.policy_doctor import Severity, run_policy_doctor
+
+    workspace_root = resolve_workspace_root()
+    findings = run_policy_doctor(
+        store=container.build_workflow_model_policy_store(workspace_root)
+    )
+    coherence = run_fragment_coherence_doctor()
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {
+                    "findings": [finding.to_dict() for finding in findings],
+                    "coherence": [finding.to_dict() for finding in coherence.findings],
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        if not findings:
+            console.print("[green]OK[/green] workflow model policy")
+        for finding in findings:
+            console.print(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
+        if coherence.ok and not coherence.findings:
+            console.print("[green]OK[/green] fragment coherence")
+        for finding in coherence.findings:
+            console.print(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
+    has_error = any(finding.severity is Severity.ERROR for finding in findings) or any(
+        finding.severity is CoherenceSeverity.ERROR for finding in coherence.findings
+    )
+    raise typer.Exit(1 if has_error else 0)
+
+
+@app.command(name="workflow-handoffs-doctor")
+def workflow_handoffs_doctor(
+    context: str | None = typer.Option(None, "--context", help="Filter by Spec Context."),
+    release_id: str | None = typer.Option(None, "--release-id", help="Filter by release."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Reconcile lifecycle step handoff ledgers with their persisted payloads."""
+    workspace_root = resolve_workspace_root()
+    result = container.build_workflow_handoff_doctor(
+        workspace_root, context=context, release_id=release_id
+    ).run()
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                {"status": "ok" if result.ok else "blocked", **result.to_dict()},
+                sort_keys=True,
+            )
+        )
+    elif result.ok:
+        console.print("[green]OK[/green] workflow handoff ledger")
+    else:
+        for finding in result.findings:
+            console.print(f"[{finding.kind.value}] {finding.ref}: {finding.message}")
+    raise typer.Exit(0 if result.ok else 3)
+
+
+@app.command(name="workflow-hygiene-status")
+def workflow_hygiene_status(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Inspect lifecycle runtime hygiene without creating a workflow run."""
+    workspace_root = resolve_workspace_root()
+    counters = container.build_lifecycle_hygiene_service(workspace_root).status()
+    payload = counters.to_dict()
+    if json_output:
+        typer.echo(_json.dumps(payload, sort_keys=True))
+    else:
+        for key, value in payload.items():
+            console.print(f"{key}: {value}")
+    raise typer.Exit(0)
+
+
+@app.command(name="workflow-status")
+def workflow_status(
+    context: str | None = typer.Option(None, "--context", help="Filter by Spec Context."),
+    release_id: str | None = typer.Option(None, "--release-id", help="Filter by release."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Show lifecycle run and hygiene status as a diagnostic utility."""
+    workspace_root = resolve_workspace_root()
+    counters = container.build_lifecycle_hygiene_service(workspace_root).status()
+    runs = container.build_lifecycle_run_store(workspace_root).list_runs()
+    matched = [
+        run
+        for run in runs
+        if (context is None or run.context == context)
+        and (release_id is None or run.release_id == release_id)
+    ]
+    by_status: dict[str, int] = {}
+    for run in matched:
+        key = run.status.value
+        by_status[key] = by_status.get(key, 0) + 1
+    payload = {
+        "status": "OK",
+        "counters": counters.to_dict(),
+        "runs": {
+            "context": context,
+            "release_id": release_id,
+            "matched": len(matched),
+            "by_status": by_status,
+        },
+    }
+    if json_output:
+        typer.echo(_json.dumps(payload, sort_keys=True))
+    else:
+        console.print(
+            f"OK cleanup_candidates={counters.cleanup_candidate_count} "
+            f"runs_matched={len(matched)}"
+        )
+    raise typer.Exit(0)
+
+
+@app.command(name="workflow-profiles")
+def workflow_profiles(
+    harness: str | None = typer.Option(
+        None, "--harness", help="Filter profiles by Layer-2 harness (codex or pi)."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """List governed Layer-2 model profiles without creating a workflow run."""
+    from dadaia_workspace.features.lifecycle import model_profiles
+
+    if harness not in (None, "codex", "pi"):
+        raise typer.BadParameter("--harness must be 'codex' or 'pi'")
+    workspace_root = resolve_workspace_root()
+    container.load_operator_model_profiles(workspace_root)
+    profiles = model_profiles.list_profiles()
+    if harness is not None:
+        profiles = tuple(profile for profile in profiles if profile.harness == harness)
+    payload = {"profiles": [profile.to_dict() for profile in profiles]}
+    if json_output:
+        typer.echo(_json.dumps(payload, sort_keys=True))
+    else:
+        for profile in profiles:
+            console.print(
+                f"{profile.id}: {profile.harness} {profile.model_id}:{profile.effort}"
+            )
+    raise typer.Exit(0)
+
+
+@app.command(name="workflow-hygiene-clean")
+def workflow_hygiene_clean(
+    apply: bool = typer.Option(False, "--apply", help="Delete eligible candidates."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List candidates only."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Reclaim eligible lifecycle runtime artifacts; dry-run unless ``--apply`` is set."""
+    if apply and dry_run:
+        raise typer.BadParameter("--apply and --dry-run are mutually exclusive")
+    workspace_root = resolve_workspace_root()
+    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(
+        dry_run=not apply
+    )
+    payload = {
+        "dry_run": result.dry_run,
+        "candidate_count": len(result.candidates),
+        "deleted_count": len(result.deleted_paths),
+        "skipped_count": len(result.skipped_paths),
+        "pruned_dir_count": len(result.pruned_dirs),
+        "candidates": [candidate.to_dict() for candidate in result.candidates],
+        "deleted_paths": [str(path) for path in result.deleted_paths],
+        "skipped_paths": [str(path) for path in result.skipped_paths],
+        "pruned_dirs": [str(path) for path in result.pruned_dirs],
+    }
+    if json_output:
+        typer.echo(_json.dumps(payload, sort_keys=True))
+    else:
+        action = "would delete" if result.dry_run else "deleted"
+        count = payload["candidate_count"] if result.dry_run else payload["deleted_count"]
+        console.print(f"{action}: {count}")
+        for candidate in result.candidates:
+            console.print(f"- {candidate.path}: {candidate.reason}")
+    raise typer.Exit(0)

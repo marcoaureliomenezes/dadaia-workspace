@@ -10,22 +10,16 @@ directly): after a bare ``dadaia context bind ctx-b`` (no ``DADAIA_SESSION_ID`` 
 the normal harness-shell shape), every probed verb resolves ``ctx-b``, never ``ctx-a``
 and never a hardcoded/no-op fallback.
 
-Probed verbs (one per command module, matching the SPEC's example list):
+Probed resolver-driven verbs:
   - ``context show`` (no positional name) — context.py
   - ``bugs status`` (no ``--specs-dir``) — bugs.py
   - ``specs doctor --json`` (no ``--specs-dir``/``--context``) — specs.py
-  - ``lifecycle preflight`` (no ``--context``) — lifecycle.py (the read-only probe verb;
-    ``lifecycle status``'s ``--context`` is a documented optional RUN FILTER, not a
-    resolution input — see the dynamic-walk module's classifier docstring — so it is not
-    a valid bind-visibility probe target).
 
-RED at HEAD (T-1): ``bugs status`` and ``specs doctor`` already pass (they consume the
-pre-existing partial seam, ``resolve_specs_dir_for_cli``); ``lifecycle preflight``
-FAILS — its ``--context`` defaults to the hardcoded literal ``"dadaia-workspace"`` and is
-passed as if explicit, so the bind is never consulted (this is the exact FR1 defect this
-release fixes). ``context show`` no-arg already passes (v0.1.71/v0.1.76 fixed its private
-incumbent-pointer algorithm) — kept here as a regression-guard once it, too, formally
-folds into the seam in T-2.
+Reports commands accept optional run filters, not bound-context resolution inputs, so
+they are intentionally covered by the structural classifier rather than this executed
+bind-visibility probe.
+
+The test protects the current shared bind-resolution seam across command groups.
 """
 
 from __future__ import annotations
@@ -200,19 +194,3 @@ def test_specs_doctor_resolves_bound_context(two_ctx_workspace: Path) -> None:
     payload = json.loads(result.output)
     resolved = Path(payload["specs_dir"])
     assert resolved == (two_ctx_workspace / "repos" / _CTX_B / "specs").resolve(), payload
-
-
-def test_lifecycle_preflight_resolves_bound_context(two_ctx_workspace: Path) -> None:
-    """RED at HEAD (T-1): ``--context`` defaults to the hardcoded literal
-    ``"dadaia-workspace"`` (never ctx-b), so ``blocked.detail.context`` reports the wrong
-    (nonexistent) context — the exact FR1 defect."""
-    result = _runner.invoke(app, ["lifecycle", "preflight", "--json"])
-    assert "No such option" not in result.output
-    payload = json.loads(result.output)
-    assert payload["status"] in ("OK", "BLOCKED")
-    if payload["status"] == "BLOCKED":
-        detail = payload["blocked"].get("detail", {})
-        assert detail.get("context") == _CTX_B, (
-            f"lifecycle preflight with no --context must resolve the BOUND context "
-            f"({_CTX_B!r}) through the seam, not the hardcoded literal default; got: {payload}"
-        )

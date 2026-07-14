@@ -71,7 +71,7 @@ def _doctor(workspace: Path, *, catalog: WorkflowCatalog | None = None) -> list[
 # ---------------------------------------------------------------------------
 
 
-def test_clean_tree_zero_errors_and_closure_present(tmp_path: Path) -> None:
+def test_clean_tree_zero_errors_and_closure_merged(tmp_path: Path) -> None:
     """The built-in catalog + profiles + no overlay must produce zero ERROR findings across
     every WMP invariant (WMP-1..5, WMP-7, WMP-PERSONA), a valid overlay stays clean too, and
     the completed catalog (T-29-D-01 AC-8) includes closure."""
@@ -95,7 +95,7 @@ def test_clean_tree_zero_errors_and_closure_present(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 }
             },
         },
@@ -105,7 +105,9 @@ def test_clean_tree_zero_errors_and_closure_present(tmp_path: Path) -> None:
 
     from dadaia_workspace.features.workflows.dadaia_catalog import governed_workflow_catalog
 
-    assert governed_workflow_catalog().workflow("closure") is not None
+    implementation = governed_workflow_catalog().workflow("implementation_reviews")
+    assert implementation is not None
+    assert implementation.step("close") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +138,7 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "contexts": {
                     "default": {
                         "workflows": {
-                            "implementation": {"steps": {"no_such_step": "codex-review-deep"}}
+                            "implementation_reviews": {"steps": {"no_such_step": "codex-review-deep"}}
                         }
                     }
                 },
@@ -151,7 +153,7 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "contexts": {
                     "default": {
                         "workflows": {
-                            "implementation": {"steps": {"implement": "pi-implementation-standard"}}
+                            "implementation_reviews": {"steps": {"implement": "pi-implementation-standard"}}
                         }
                     }
                 },
@@ -165,7 +167,7 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "policy_id": "default",
                 "contexts": {
                     "default": {
-                        "workflows": {"implementation": {"steps": {"implement": "not-a-profile"}}}
+                        "workflows": {"implementation_reviews": {"steps": {"implement": "not-a-profile"}}}
                     }
                 },
             },
@@ -247,7 +249,7 @@ def test_state_file_hard_errors_matrix(tmp_path: Path, case_id: str) -> None:
         }
     elif case_id == "forbidden-step-harness":
         _write_overlay(
-            workspace, _harness_overlay("implementation", step="implement", harness="claude")
+            workspace, _harness_overlay("implementation_reviews", step="implement", harness="claude")
         )
         findings = _doctor(workspace)  # must not raise
         codes = {f.code for f in findings if f.severity is Severity.ERROR}
@@ -262,7 +264,7 @@ def test_state_file_hard_errors_matrix(tmp_path: Path, case_id: str) -> None:
                 "schema_version": "workflow-model-policy-v1",
                 "policy_id": "default",
                 "contexts": {
-                    "default": {"workflows": {"implementation": {"default_harness": "claude"}}},
+                    "default": {"workflows": {"implementation_reviews": {"default_harness": "claude"}}},
                 },
             },
         )
@@ -407,7 +409,9 @@ def test_pi_harness_only_overlay_auto_profile_valid_and_persona_failure_surfaces
     persona atom is surfaced by the aggregated doctor as a WMP-PERSONA ERROR (AC-4
     anti-regression)."""
     workspace = _workspace(tmp_path)
-    _write_overlay(workspace, _harness_overlay("implementation", step="implement", harness="pi"))
+    _write_overlay(
+        workspace, _harness_overlay("implementation_reviews", step="implement", harness="pi")
+    )
     findings = _doctor(workspace)
     assert [f for f in findings if f.severity is Severity.ERROR] == [], [
         f.to_dict() for f in findings if f.severity is Severity.ERROR

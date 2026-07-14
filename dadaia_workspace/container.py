@@ -37,11 +37,9 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         BacklogDefinitionWorkflow,
     )
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportWorkflow
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
     )
-    from dadaia_workspace.features.lifecycle.workflows.research import ResearchWorkflow
     from dadaia_workspace.infrastructure.json_local_model_profile_store import (
         JsonLocalModelProfileStore,
     )
@@ -56,6 +54,7 @@ from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -91,12 +90,6 @@ from dadaia_workspace.features.panel.views.api_reports import (
 )
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.panel.views.api_workflows import (
-    render_api_dadaia_workflow_detail,
-    render_api_dadaia_workflows_list,
-    render_api_workflow_detail,
-    render_api_workflows_list,
-)
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
@@ -130,7 +123,6 @@ from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
-from dadaia_workspace.infrastructure.markdown_workflow_store import MarkdownWorkflowStore
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
     LinuxProcAncestry,
     PsProcessAncestry,
@@ -168,28 +160,6 @@ def _build_permission_setter() -> Any:
     )
 
     return WindowsFilePermissionSetter()
-
-
-def _select_lock_adapter() -> Any:
-    """Return the appropriate file-lock adapter module for the current platform.
-
-    Reads ``PLATFORM.has_fcntl`` (the sole authorized platform capability flag)
-    and returns the POSIX adapter on platforms that provide ``fcntl``, or the
-    Windows adapter otherwise.  The import is lazy so that importing
-    ``container`` never triggers the Windows module's guard on Linux/macOS.
-
-    Returns:
-        The adapter module: ``infrastructure.file_lock_posix`` when
-        ``PLATFORM.has_fcntl`` is ``True``, or
-        ``infrastructure.file_lock_windows`` when ``False``.
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-
-    if PLATFORM.has_fcntl:
-        import dadaia_workspace.infrastructure.file_lock_posix as _adapter
-    else:
-        import dadaia_workspace.infrastructure.file_lock_windows as _adapter  # type: ignore[no-redef]
-    return _adapter
 
 
 def build_shutdown_handler() -> Any:
@@ -442,32 +412,6 @@ def build_agent_runtime(
     raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
-def _agent_catalog(workspace_root: Path) -> tuple[str, ...]:
-    agents_dir = workspace_root / ".dadaia" / "agentic" / "agents"
-    if not agents_dir.exists():
-        return ()
-    return tuple(sorted(p.stem for p in agents_dir.glob("*.md")))
-
-
-def build_orchestration_catalog_service(workspace_root: Path) -> WorkflowsService:
-    """Compose the read-only orchestration catalog surface for ``dadaia orchestrate``.
-
-    Since v0.1.53 the retired ``features/orchestration`` package (whose
-    ``start_run``/``resume_run`` were honest no-ops and whose ``run``/``status``/``resume``
-    verbs are gone) is replaced by a ``WorkflowsService`` accessor over the shared
-    ``MarkdownWorkflowStore``. The service returns raw ``WorkflowDefinition`` objects
-    (gate-kind preserving) so the ``list``/``show`` ``--json`` contract is unchanged. The
-    workflow files are validated against the projected agent catalog exactly as the old
-    surface did. Guards initialization so an uninitialized workspace still exits non-zero.
-    """
-    _guard_initialized(workspace_root)
-    return WorkflowsService(
-        workspace_root,
-        agent_catalog=_agent_catalog(workspace_root),
-        store_factory=MarkdownWorkflowStore,
-    )
-
-
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -479,7 +423,7 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 
 def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
     """Compose a ``WorkflowsService`` for the given workspace root."""
-    return WorkflowsService(workspace_root, store_factory=MarkdownWorkflowStore)
+    return WorkflowsService(workspace_root)
 
 
 def build_panel_service(
@@ -750,7 +694,7 @@ def build_lifecycle_preflight_input(
     """Compose the real preflight-input probe assembly (v0.1.69 FR3).
 
     ``LifecyclePreflightInput``'s state classes (``ActiveReleaseState``,
-    ``GitPreflightState``, ``SpecsDoctorState``, ``LeaseModeState``, ``HygieneCounters``)
+    ``GitPreflightState``, ``SpecsDoctorState``, ``PresenceState``, ``HygieneCounters``)
     had ZERO production producers before this builder — only
     ``test_preflight_service.py`` hand-fed them. This composes each from an EXISTING
     reader (never a second/forked implementation):
@@ -762,8 +706,7 @@ def build_lifecycle_preflight_input(
       ``repos/<context>``.
     * ``specs_doctor`` ← a real ``SpecsDoctor(specs_dir).check()`` run (the same doctor
       ``dadaia specs doctor`` invokes); ``ok`` is true iff no ERROR-severity issue fired.
-    * ``lease``/``binding`` ← ``features.spec_context.{lease, session_identity}`` — the
-      same incumbent-pointer + lease-record readers ``context show``/``bind`` use.
+    * ``presence``/``binding`` ← caller-owned session identity plus advisory presence.
     * ``hygiene`` ← ``build_lifecycle_hygiene_service(workspace_root).status()``
       (unchanged, reused directly).
     * ``expected_phase``/``required_mode`` ← a small policy derived from the ACTIVE.md
@@ -779,12 +722,11 @@ def build_lifecycle_preflight_input(
         ActiveReleaseState,
         BoundContext,
         GitPreflightState,
-        LeaseModeState,
+        PresenceState,
         LifecyclePreflightInput,
         SpecsDoctorState,
     )
-    from dadaia_workspace.features.spec_context import lease as _lease
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.features.spec_context import presence, session_identity
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
     from dadaia_workspace.features.specs.doctor_common import read_active_md
     from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -835,48 +777,27 @@ def build_lifecycle_preflight_input(
         ),
     )
 
-    # --- binding + lease/mode ← session_identity / lease ----------------------------
-    identity = session_identity.resolve_identity(workspace_root, context)
-    incumbent_sid = identity.get("incumbent")
-    incumbent_mode = identity.get("mode")
+    # --- caller-owned binding + advisory sibling presence ----------------------------
+    # Never consult context-global state here. Another session's bind must not change this
+    # caller's mode or make a workflow fail preflight.
+    own_sid = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
     binding: BoundContext | None = None
-    if incumbent_sid:
-        rec = session_identity.read_session(workspace_root, incumbent_sid)
+    if own_sid:
+        rec = session_identity.read_session(workspace_root, own_sid)
         if rec is not None:
             binding = BoundContext(
                 context=str(rec.get("context") or context),
                 release_id=str(rec.get("release") or resolved_release_id),
-                mode=str(rec.get("mode") or incumbent_mode or ""),
-                session_id=incumbent_sid,
+                mode=str(rec.get("mode") or ""),
+                session_id=own_sid,
             )
 
-    lease_record = _lease.read_record(workspace_root, context)
-    live_foreign_holder = False
-    holder_session_id: str | None = None
-    if lease_record is not None:
-        holder_session_id = str(lease_record.get("session_id") or "") or None
-        # is_held() is the single canonical liveness verdict (core.lock_liveness.is_stale,
-        # wrapped) — never a forked liveness check.
-        #
-        # v0.1.72 FR2 (bug `rebind-does-not-adopt-same-process-lease`): a record whose
-        # holder pid is in THIS process's ancestry chain is never a foreign holder — a
-        # session rotation inside the same harness process leaves the record naming an
-        # old sid while the pid IS our lineage (acquire's rung-1 `.ptr` semantics would
-        # RENEW it, so preflight must not call it foreign — the old forked identity
-        # check contradicted the canon and permanently blocked rebinds).
-        own_lineage = _lease.holder_in_lineage(
-            lease_record, frozenset(build_ancestry_pid_chain(os.getpid()))
-        )
-        if (
-            _lease.is_held(workspace_root, context)
-            and holder_session_id != incumbent_sid
-            and not own_lineage
-        ):
-            live_foreign_holder = True
-    lease_state = LeaseModeState(
-        mode=str(incumbent_mode or ""),
+    others = presence.others_alive(workspace_root, context, own_sid or "preflight")
+    holder_session_id = others[0].session_id if others else None
+    presence_state = PresenceState(
+        mode=binding.mode if binding else "",
         holder_session_id=holder_session_id,
-        live_foreign_holder=live_foreign_holder,
+        live_foreign_holder=bool(others),
     )
 
     # --- hygiene ← the existing lifecycle hygiene service ---------------------------
@@ -892,7 +813,7 @@ def build_lifecycle_preflight_input(
         active_release=active_release,
         git=git_state,
         specs_doctor=specs_doctor_state,
-        lease=lease_state,
+        presence=presence_state,
         hygiene=hygiene_counters,
     )
 
@@ -1172,7 +1093,7 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     Lets a CLI verb resolve the same context→``specs/`` mapping the pipeline container
     already uses internally — e.g. so ``lifecycle pipeline`` can derive the implement
     step's write scope from the release's ``TASKS.md`` (see
-    :func:`dadaia_workspace.features.lifecycle.tasks_write_scope.write_scope_from_tasks`)
+    :func:`dadaia_workspace.features.lifecycle.tasks_write_scope.write_scope_from_release_tasks`)
     without duplicating the resolution logic.
     """
     return _context_specs_dir(workspace_root, context)
@@ -1234,6 +1155,7 @@ def build_lifecycle_pipeline(
     models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
     policy_snapshot: "WorkflowPolicySnapshot | None" = None,
     runtime_factory: "Callable[[AgentRuntimeKind], AgentRuntimePort] | None" = None,
+    max_review_retries: int = 2,
 ) -> LifecyclePipeline:
     """Compose the multi-step lifecycle pipeline with a per-step harness factory.
 
@@ -1251,12 +1173,24 @@ def build_lifecycle_pipeline(
     CLI verb used to build a pipeline with no resolver, so every full-ladder run's
     ``workflow_steps`` ledger stayed permanently empty). Every real ``build_lifecycle_pipeline``
     caller now gets the same run-scoped per-step handoff-ledger payloads
-    ``run_implement_review_loop`` already produced; only a direct, fixture-level
+    the implementation workflow consumes; only a direct, fixture-level
     ``LifecyclePipeline(...)`` construction (tests) can still omit it.
     """
+    from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
+
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     model_by_kind = models or {}
+    context_name = resolve_bound_context_name(context) or context
+    specs_dir = _context_specs_dir(workspace_root, context_name)
+    selector = ContextSelector(
+        SpecContext(
+            specs_dir=specs_dir,
+            release_id=release_id,
+            handoff_dir=workspace_root / ".dadaia" / "handoff" / context_name,
+            phase=_active_phase(specs_dir),
+        )
+    )
     return LifecyclePipeline(
         context=context,
         release_id=release_id,
@@ -1268,15 +1202,17 @@ def build_lifecycle_pipeline(
         prefix=prefix,
         policy_snapshot=policy_snapshot,
         handoff_resolver=build_workflow_handoff_resolver(workspace_root),
+        context_selector=selector,
         # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
         artifact_root=workspace_root,
         # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
         # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
-        specs_dir=_context_specs_dir(workspace_root, context),
+        specs_dir=specs_dir,
         # v0.1.78 T-D / FR-D: same canonical runtime-file writer as the phase workflow —
         # a noncompliant worker attempt persists its diagnostic under the run's
         # step-artifact zone.
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        max_review_retries=max_review_retries,
     )
 
 
@@ -1319,7 +1255,10 @@ def _release_definition_runtime_factory(
 
         def run(self, request: AgentRunRequest) -> AgentRunResult:
             label = (request.task_id or "").rsplit(":", 1)[-1]
-            refs = [f".dadaia/handoff/{context}/release-definition-step.handoff.json"]
+            refs = [
+                f".dadaia/tmp/lifecycle-worker/{context}/"
+                "release-definition-step.step-output.json"
+            ]
             deliverable = _CREATE_DELIVERABLES.get(label)
             if deliverable is not None and release_id is not None:
                 specs_prefix = (
@@ -1417,6 +1356,7 @@ def build_release_definition_workflow(
         handoff_resolver=build_workflow_handoff_resolver(workspace_root),
         # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
         artifact_root=workspace_root,
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
     )
 
 
@@ -1430,7 +1370,7 @@ def _backlog_definition_runtime_factory(
     Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
     model reaches each adapter through ``request.resolved_model`` (threaded from the step's
     ``resolved_model``), not a construction-time model; ``FAKE`` resolves to a *driving*
-    fake that returns an APPROVED handoff with an in-scope artifact_ref, so ``--harness
+    fake that returns an APPROVED step output with an in-scope artifact_ref, so ``--harness
     fake`` walks the whole §4 sequence deterministically (mirrors the release-definition
     fake factory).
     """
@@ -1443,7 +1383,10 @@ def _backlog_definition_runtime_factory(
     approving = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake backlog-definition worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/backlog-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{context}/"
+            "backlog-definition-step.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -1529,21 +1472,23 @@ def build_backlog_definition_workflow(
         policy_snapshot=policy_snapshot,
         # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
         artifact_root=workspace_root,
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
     )
 
 
-def _handoff_driving_fake_factory(
+def _step_output_driving_fake_factory(
     *,
     context: str,
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Build a per-step runtime factory whose FAKE returns one in-scope handoff APPROVED result.
+    """Build a runtime factory whose FAKE returns one in-scope raw step output.
 
     Shared by the ``audit`` and ``research`` builders (v0.1.56 / FR2): every step of those
-    workflows scopes writes to ``.dadaia/handoff/<ctx>/**``, so a single APPROVED handoff ref
-    is in-scope for the whole sequence and ``--harness fake`` walks it end-to-end. Real
+    workflows scope raw results to ``.dadaia/tmp/lifecycle-worker/<ctx>/**``, so one
+    APPROVED step-output ref is in-scope for the sequence. Real
     harnesses (pi/codex) resolve to their live adapters; the policy-resolved concrete model
     reaches each adapter through ``request.resolved_model`` (threaded from the step's
     ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
@@ -1616,11 +1561,13 @@ def build_audit_workflow(
         context=context,
         release_id=release_id,
         run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_handoff_driving_fake_factory(
+        runtime_factory=_step_output_driving_fake_factory(
             context=context,
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
-            artifact_ref=f".dadaia/handoff/{context}/audit-step.handoff.json",
+            artifact_ref=(
+                f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"
+            ),
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
@@ -1630,180 +1577,7 @@ def build_audit_workflow(
         handoff_resolver=build_workflow_handoff_resolver(workspace_root),
         # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
         artifact_root=workspace_root,
-    )
-
-
-def build_research_workflow(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-) -> "ResearchWorkflow":
-    """Compose the fragment-driven research workflow (v0.1.56 / FR2), born resolver-governed.
-
-    Mirrors :func:`build_release_definition_workflow`: ``FAKE`` drives the
-    scope→investigate→synthesis sequence end-to-end with an in-scope handoff ref;
-    ``policy_snapshot`` is frozen onto the run before the first step.
-    """
-    from dadaia_workspace.features.lifecycle.context_selector import (
-        ContextSelector,
-        SpecContext,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.research import ResearchWorkflow
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=handoff_dir,
-            phase=_active_phase(specs_dir),
-        )
-    )
-    return ResearchWorkflow(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_handoff_driving_fake_factory(
-            context=context,
-            run_cwd=run_cwd,
-            summary="fake research worker: APPROVED",
-            artifact_ref=f".dadaia/handoff/{context}/research-step.handoff.json",
-        ),
-        context_selector=selector,
-        default_runtime_kind=default_runtime_kind,
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-    )
-
-
-def _bug_report_runtime_factory(
-    *,
-    context: str,
-    run_cwd: Path,
-) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Build the per-step runtime factory for the bug-report workflow (v0.1.56 / FR2).
-
-    Unlike audit/research, the bug-report ``bug_write`` step scopes writes to the ADDITIVE
-    ``specs/bugs/`` channel ONLY (A29), while its other steps scope to ``.dadaia/handoff/``.
-    A single uniform handoff ref would out-of-scope-BLOCK at ``bug_write``; a uniform
-    ``specs/bugs/`` ref would out-of-scope-BLOCK at the handoff-only steps. So the driving
-    FAKE is **step-aware** (mirroring the ``_StepAwareFake`` in
-    ``tests/unit/features/lifecycle/test_bug_report_workflow.py``): it returns an in-scope
-    ``specs/bugs/`` ref for the ``bug_write`` step and an in-scope handoff ref for every other
-    step, so ``--harness fake`` walks the whole intake→dedupe→bug_write sequence to COMPLETED.
-    Real harnesses (pi/codex) resolve to their live adapters.
-    """
-    from dadaia_workspace.core.models.lifecycle import (
-        AgentRunRequest,
-        AgentRunResult,
-        AgentRunStatus,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import _BUG_WRITE_STEP
-
-    class _BugReportDrivingFake:
-        """A driving FAKE whose in-scope artifact ref depends on the current step (A29)."""
-
-        def __init__(self, kind: AgentRuntimeKind) -> None:
-            self._kind = kind
-
-        def runtime_kind(self) -> AgentRuntimeKind:
-            return self._kind
-
-        def run(self, request: AgentRunRequest) -> AgentRunResult:
-            if (request.task_id or "").endswith(f":{_BUG_WRITE_STEP}"):
-                ref = f"repos/{context}/specs/bugs/fake-bug-report-record.md"
-            else:
-                ref = f".dadaia/handoff/{context}/bug-report-step.handoff.json"
-            # Gate now verifies refs EXIST (bug gate-accepts-phantom-artifact-evidence):
-            # materialize the stub like FakeAgentRuntime's driving mode does.
-            target = run_cwd / ref
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(
-                    '{"fake": true, "summary": "driving-fake stub artifact"}\n',
-                    encoding="utf-8",
-                )
-            return AgentRunResult(
-                status=AgentRunStatus.SUCCEEDED,
-                summary="fake bug-report worker: APPROVED",
-                artifact_refs=(ref,),
-                structured_output={"verdict": "APPROVED"},
-            )
-
-    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
-            return _BugReportDrivingFake(kind)
-        return build_agent_runtime(kind, cwd=run_cwd)
-
-    return factory
-
-
-def build_bug_report_workflow(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-) -> "BugReportWorkflow":
-    """Compose the fragment-driven bug-report workflow (v0.1.56 / FR2), born resolver-governed.
-
-    Mirrors :func:`build_release_definition_workflow`, except the driving FAKE is **step-aware**
-    (:func:`_bug_report_runtime_factory`) so the ADDITIVE ``bug_write`` step stays in-scope and
-    ``--harness fake`` reaches COMPLETED. ``policy_snapshot`` is frozen onto the run before the
-    first step; the per-step model reaches the adapter through the step's ``resolved_model``.
-    """
-    from dadaia_workspace.features.lifecycle.context_selector import (
-        ContextSelector,
-        SpecContext,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportWorkflow
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=handoff_dir,
-            phase=_active_phase(specs_dir),
-        )
-    )
-    return BugReportWorkflow(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_bug_report_runtime_factory(context=context, run_cwd=run_cwd),
-        context_selector=selector,
-        default_runtime_kind=default_runtime_kind,
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
+        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
     )
 
 
@@ -1891,7 +1665,6 @@ def build_panel_views(
         telemetry data on the canonical agent catalog (PR3-08).
     """
     academy = build_academy_service(workspace_root)
-    workflows_service = build_workflow_catalog_service(workspace_root)
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
 
     # Workflow model-governance control plane (Wave C). The panel reads the SAME governed
@@ -1926,10 +1699,6 @@ def build_panel_views(
         "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
-        "api_workflows": render_api_workflows_list(service),
-        "api_workflow_detail": render_api_workflow_detail(workflows_service),
-        "api_dadaia_workflows": render_api_dadaia_workflows_list(workflows_service),
-        "api_dadaia_workflow_detail": render_api_dadaia_workflow_detail(workflows_service),
         # Workflow model-governance control plane (Wave C — T-28-C-01/02).
         "api_workflow_catalog": render_api_workflow_catalog(wf_catalog, _resolver_factory),
         "api_workflow_catalog_detail": render_api_workflow_catalog_detail(

@@ -104,7 +104,17 @@ class _KindReportingFake:
             target = Path.cwd() / ref
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text('{"fake": true}\n', encoding="utf-8")
+                body = '{"fake": true}\n'
+                if target.name == "PLAN.md":
+                    body = (
+                        "# PLAN\n\n"
+                        "## Validation Dependency Table\n\n"
+                        "| Workstream | Produces by end | Direct validation | "
+                        "Validation dependencies | Deferred integration evidence |\n"
+                        "|---|---|---|---|---|\n"
+                        "| WS-1 | fake artifact | focused test | None | None |\n"
+                    )
+                target.write_text(body, encoding="utf-8")
         return replace(self.result, artifact_refs=tuple(refs))
 
 
@@ -112,7 +122,10 @@ def _approving_result() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
+            "release-definition-step.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -121,7 +134,10 @@ def _rejecting_result() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: REJECTED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
+            "release-definition-step.step-output.json",
+        ),
         structured_output={"verdict": "REJECTED"},
     )
 
@@ -160,14 +176,73 @@ def _define(args: list[str]) -> Result:
         app,
         [
             "lifecycle",
-            "release",
-            "define",
+            "release-definition",
             "--release-id",
             _RELEASE,
             "--json",
             *args,
         ],
     )
+
+
+def test_release_scope_consumes_exact_backlog_author_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dadaia_workspace.cli.commands.lifecycle import _authoritative_backlog_prefix
+    from dadaia_workspace.core.models.lifecycle import (
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    handoff_ref = f".dadaia/handoff/{_CONTEXT}/author.handoff.json"
+    handoff = workspace / handoff_ref
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(
+        json.dumps(
+            {
+                "artifact": {
+                    "type": "other",
+                    "path": "specs/backlog/deterministic-tetris-engine.md",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    run = LifecycleRun(
+        run_id="tetris-backlog-run",
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        command="backlog_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.COMPLETED,
+        current_step="backlog_review_gate",
+        idempotency_key="tetris-backlog-run",
+    )
+    store = container.build_lifecycle_run_store(workspace)
+    store.save(run)
+    resolver = container.build_workflow_handoff_resolver(workspace)
+    resolver.produce(
+        run,
+        producer_step="backlog_author",
+        attempt=0,
+        output_schema="backlog-item-v1",
+        payload={"summary": "authored tetris", "artifact_refs": [handoff_ref]},
+    )
+
+    prefix = _authoritative_backlog_prefix(
+        workspace,
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        backlog_run_id="tetris-backlog-run",
+    )
+
+    assert prefix is not None
+    assert "Exact producer run: `tetris-backlog-run`" in prefix.text
+    assert "`specs/backlog/deterministic-tetris-engine.md`" in prefix.text
+    assert "must not substitute a different candidate" in prefix.text
 
 
 # 3 -- rejected review blocks advancement -----------------------------------

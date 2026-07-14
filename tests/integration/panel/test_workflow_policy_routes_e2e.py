@@ -120,10 +120,10 @@ def test_get_routes_reachable(tmp_path: Path) -> None:
     handler = make_handler_class(_views(tmp_path))
     status, body = _get(handler, "/api/workflow-catalog?context=default")
     assert status == 200
-    assert any(w["workflow_id"] == "implementation" for w in body["workflows"])
+    assert any(w["workflow_id"] == "implementation_reviews" for w in body["workflows"])
 
-    s1, b1 = _get(handler, "/api/workflow-catalog/implementation")
-    assert s1 == 200 and b1["workflow_id"] == "implementation"
+    s1, b1 = _get(handler, "/api/workflow-catalog/implementation_reviews")
+    assert s1 == 200 and b1["workflow_id"] == "implementation_reviews"
     s2, b2 = _get(handler, "/api/workflow-model-profiles")
     assert s2 == 200 and any(p["id"] == "codex-review-deep" for p in b2["profiles"])
     s3, b3 = _get(handler, "/api/lifecycle-runs?workflow=implementation&context=default")
@@ -139,7 +139,7 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 }
             },
         }
@@ -150,12 +150,12 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
 
     get_status, get_body = _get(handler, "/api/workflow-model-policy?context=default")
     assert get_status == 200 and get_body["exists"] is True
-    steps = get_body["policy"]["contexts"]["default"]["workflows"]["implementation"]["steps"]
+    steps = get_body["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"]["steps"]
     assert steps["implement"] == "codex-review-deep"
 
     # The catalog now reports the override as the effective profile (default-vs-effective).
     _cs, cat = _get(handler, "/api/workflow-catalog?context=default")
-    impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation")
+    impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation_reviews")
     implement = next(s for s in impl["steps"] if s["step"] == "implement")
     assert implement["effective_profile"] == "codex-review-deep"
     assert implement["is_overridden"] is True
@@ -167,7 +167,7 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                    "workflows": {"implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}}
                 }
             },
         }
@@ -180,11 +180,11 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
 
     get_status, get_body = _get(handler, "/api/workflow-model-policy?context=default")
     assert get_status == 200 and get_body["exists"] is True
-    wf = get_body["policy"]["contexts"]["default"]["workflows"]["implementation"]
+    wf = get_body["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"]
     assert wf["harnesses"]["implement"] == "pi"
 
     _cs, cat = _get(handler, "/api/workflow-catalog?context=default")
-    impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation")
+    impl = next(w for w in cat["workflows"] if w["workflow_id"] == "implementation_reviews")
     implement = next(s for s in impl["steps"] if s["step"] == "implement")
     assert implement["harness"] == "pi"
     assert implement["default_harness"] == "codex"
@@ -197,7 +197,7 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation": {"steps": {"implement": "ghost"}}}}
+                "default": {"workflows": {"implementation_reviews": {"steps": {"implement": "ghost"}}}}
             },
         }
     ).encode("utf-8")

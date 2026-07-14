@@ -1,7 +1,6 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
 import json
-import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
@@ -17,7 +16,6 @@ _DADAIA_DURABLE_DIRS = [
     "reports",
     "scripts",
     "states",
-    "src",
 ]
 
 # Ephemeral directories — can be recreated or cleared at any time
@@ -103,9 +101,6 @@ class WorkspaceService:
             installed.extend(self._public_assets.stage(workspace_root))
             installed.extend(self._install_for_harnesses(workspace_root, chosen))
 
-        # Install repos.xlsx catalog (idempotent — never overwrite)
-        self._install_repos_catalog(workspace)
-
         # Configure the ctx-inject hook only when Claude is scaffolded — its hook lives in
         # .claude/settings.json (Python module command; the legacy ctx-inject.sh script was
         # retired in v0.1.10, Decision D-1).
@@ -161,13 +156,6 @@ class WorkspaceService:
     def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
         if not path.exists():
             path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
-
-    def _install_repos_catalog(self, workspace: Workspace) -> None:
-        dest = workspace.dadaia_dir / "src" / "repos.xlsx"
-        if not dest.exists():
-            src = Path(__file__).parent.parent.parent / "public" / "data" / "repos.xlsx"
-            if src.exists():
-                shutil.copy2(src, dest)
 
     def _configure_hook(self, workspace: Workspace) -> None:
         # T-018-17: emit the Python hook command instead of the .sh path.

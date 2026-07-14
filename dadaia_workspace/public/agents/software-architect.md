@@ -3,7 +3,7 @@ name: software-architect
 description: "Anti-slop / anti-spaghetti architecture specialist + architecture feed. The workspace's primary defense against AI-generated slop. 3 modes: DRAFT (new project), REVIEW (audit existing), ONBOARD (scan repos/). Enforces root-cause and architecture-fidelity gates on every spec/release review. ADDITIVE. NEVER writes production code."
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
+concurrency_relationship: "always concurrent; advisory presence only"
 gate_role: "architecture-feed (SPEC/PLAN phases) + root-cause & architecture-fidelity review gates"
 tools:
   - Read

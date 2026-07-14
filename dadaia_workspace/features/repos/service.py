@@ -10,5 +10,5 @@ class ReposService:
         self._reader = excel_reader
 
     def list_known(self, workspace_root: Path) -> list[dict[str, str]]:
-        catalog = workspace_root / ".dadaia" / "src" / "repos.xlsx"
+        catalog = workspace_root / ".dadaia" / "agentic" / "data" / "repos.xlsx"
         return self._reader.read_rows(catalog)

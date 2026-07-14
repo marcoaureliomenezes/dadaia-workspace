@@ -50,7 +50,9 @@ from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
 )
+from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.features.backlog.classifier import (
     BoundItem,
     Classification,
@@ -73,8 +75,13 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
     PromptPrefix,
     build_fragment_suffix,
+    canonical_worker_output_ref,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    WorkflowHandoffResolver,
+    durable_payload_from_result,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import _FragmentAssemblyMixin
 
 __all__ = [
@@ -271,6 +278,8 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         state_machine: LifecycleStateMachine | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         artifact_root: Path | None = None,
+        runtime_files: RuntimeFilePort | None = None,
+        handoff_resolver: WorkflowHandoffResolver | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -291,6 +300,8 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # Bug gate-accepts-phantom-artifact-evidence: when wired, declared artifact refs
         # must EXIST under this root or the step BLOCKs.
         self._artifact_root = artifact_root
+        self._runtime_files = runtime_files
+        self._handoff_resolver = handoff_resolver
 
     # -- public entrypoint ----------------------------------------------
 
@@ -312,6 +323,15 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             raise ValueError("backlog-definition workflow requires at least one step")
         self._operator_demand = operator_demand
         self._prefix = self._prefix_with_static_inputs(sequence)
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(
+                run_id,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
+                    for step in sequence
+                    if step.fragment_id is not None
+                ),
+            )
         run = LifecycleRun(
             run_id=run_id,
             context=self._context,
@@ -472,7 +492,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         because a downgrade adjudication extracts a content verdict, not an APPROVED/REJECTED
         gate decision — there is no artifact to gate on.
         """
-        audit = self._select_context(step, fragment)
+        audit = self._select_context(step, (fragment, *shared))
         pair_context = (
             f"### conflict_pair\n- new change: {new_change}\n- existing change: {existing_change}"
         )
@@ -566,7 +586,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         fragment = self._loader.load_fragment(step.fragment_id)
         shared = tuple(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids)
 
-        audit = self._select_context(step, fragment)
+        audit = self._select_context(step, (fragment, *shared))
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
@@ -586,9 +606,8 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         runtime = self._runtime_factory(kind)
         scope = self._scope(step, run.run_id, suffix)
         if step.label == "backlog_author":
-            # Bug backlog-author-write-scope-excludes-backlog: the author step's whole
-            # job is writing the ADDITIVE specs/backlog item — mirror the bug_report
-            # bug_write step-aware scope (A29) so the real deliverable is in-scope.
+            # The author step writes the ADDITIVE specs/backlog item, so include that
+            # real deliverable in the step-aware scope.
             scope = replace(
                 scope,
                 allowed_paths=(
@@ -604,8 +623,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             runtime=runtime,
             state_machine=self._state_machine,
             artifact_root=self._artifact_root,
+            runtime_files=self._runtime_files,
         )
-        blocked = runner.evaluate_gate(
+        worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
                 request=built.request,
@@ -616,6 +636,22 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 is_review=False,
             ),
         )
+        if blocked is None and self._handoff_resolver is not None:
+            payload = durable_payload_from_result(
+                worker_result, fallback_summary=step.label, is_review=False
+            )
+            run, _ = self._handoff_resolver.produce(
+                run,
+                producer_step=step.label,
+                attempt=0,
+                output_schema=fragment.output_schema,
+                payload=payload,
+                retention_mode=(
+                    RetentionMode.PROMOTE_TO_EVIDENCE
+                    if step.label == "backlog_author"
+                    else RetentionMode.DELETE_AFTER_CONSUMED
+                ),
+            )
         run = (
             self._with_block(run, step.label, blocked)
             if blocked

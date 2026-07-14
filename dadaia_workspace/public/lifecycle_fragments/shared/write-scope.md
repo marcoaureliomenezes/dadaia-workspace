@@ -38,7 +38,8 @@ When the step operates on a release task, the task carries a state marker:
 | `[-]` | reserved — this step took it |
 | `[x]` | done — implemented AND reviewed/approved |
 
-Reserve the task (`[ ]` → `[-]`) before editing, and leave it `[-]` until the
-review evidence the workflow requires has cleared. Never flip a task to `[x]`
-yourself on the strength of your own work; completion is a gate decision made from
-review evidence, not a self-grant.
+The workflow's Python body reserves every incomplete task (`[ ]` → `[-]`) before
+this worker starts. Confirm the supplied tasks are reserved, but do not edit
+`TASKS.md`: it is intentionally outside the implementation write set. Python leaves
+the markers `[-]` through correction retries or a blocked result and changes them to
+`[x]` only after QA, security, code review, and closure all succeed.

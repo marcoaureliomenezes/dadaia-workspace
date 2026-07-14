@@ -203,10 +203,7 @@ def test_profile_scoped_doctor_is_green(
     else:  # pi-only
         assert any(r.startswith("[ok] pi:") for r in reports)
 
-    # classify_workflows still emits its harness-independent [ok] claude:workflows/* lines
-    # (non-blockers) even for a non-claude profile — scoping must not have removed those.
-    if install_tree is _install_codex_only_tree:
-        assert any(r.startswith("[ok] claude:workflows/") for r in reports)
+    assert not any(":workflows/" in report for report in reports)
 
 
 @pytest.mark.parametrize(

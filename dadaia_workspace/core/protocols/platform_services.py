@@ -11,8 +11,8 @@ Security tiers (SPEC §5):
     MUST apply TOCTOU mitigation option (a) — restrict the parent directory ACL
     BEFORE the file is created.  On failure it raises ``PlatformSecurityError``
     immediately (never a warn-and-continue path).
-  TIER 2 — telemetry state dir / ctx_locks dir: catch ``PlatformSecurityError``
-    from the setter, degrade to None/503, emit an INFO log.
+  TIER 2 — telemetry state directories: catch ``PlatformSecurityError``, degrade to
+    None/503, and emit an INFO log.
 """
 
 from pathlib import Path

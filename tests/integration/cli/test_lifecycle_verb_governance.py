@@ -1,4 +1,4 @@
-"""v0.1.56 FR1 — every run-a-worker verb is governed by the shared policy resolver.
+"""Every one of the four workflows is governed by the shared policy resolver.
 
 AC-1 (RED-first, all 7 exact verb ids): each verb run under ``--harness fake`` persists a
 ``LifecycleRun.workflow_policy`` snapshot in the run-store record whose per-step
@@ -42,7 +42,7 @@ _CONTEXT = "dadaia-workspace"
 _VERBS: list[tuple[str, list[str], str, str, str, str]] = [
     (
         "release-define",
-        ["release", "define"],
+        ["release-definition"],
         "gov-reldef",
         "release_definition",
         "release_scope",
@@ -50,31 +50,28 @@ _VERBS: list[tuple[str, list[str], str, str, str, str]] = [
     ),
     (
         "backlog-define",
-        ["backlog", "define"],
+        ["backlog-definition"],
         "gov-bldef",
         "backlog_definition",
         "intake_grill",
         "intake_grill",
     ),
-    ("implement", ["implement"], "gov-impl", "implementation", "implement", "implement"),
-    ("review-qa", ["review", "qa"], "gov-rqa", "implementation", "review_qa", "review_qa"),
     (
-        "review-security",
-        ["review", "security"],
-        "gov-rsec",
-        "implementation",
-        "review_security",
-        "review_security",
+        "implementation-reviews",
+        ["implementation-reviews"],
+        "gov-implementation-reviews",
+        "implementation_reviews",
+        "implement",
+        "implement",
     ),
     (
-        "review-code",
-        ["review", "code"],
-        "gov-rcode",
-        "implementation",
-        "review_code",
-        "review_code",
+        "audit",
+        ["audit"],
+        "gov-audit",
+        "audit",
+        "audit_scope",
+        "audit_scope",
     ),
-    ("close", ["close"], "gov-close", "closure", "close", "close"),
 ]
 
 _IDS = [row[0] for row in _VERBS]
@@ -117,7 +114,7 @@ def test_verb_persists_resolver_derived_snapshot(
     the standalone resolved-model-in-request test): the built request's
     ``resolved_model.profile_id`` equals the resolver's derived profile."""
     recording: FakeAgentRuntime | None = None
-    if subcmd == ["release", "define"]:
+    if subcmd == ["release-definition"]:
         # AC-2(c) extra case: capture every request via a recording FAKE adapter (the
         # release-definition factory seam) so we can assert resolved_model afterward.
         recording = FakeAgentRuntime(
@@ -144,19 +141,22 @@ def test_verb_persists_resolver_derived_snapshot(
 
         monkeypatch.setattr(container, "_release_definition_runtime_factory", factory_builder)
 
+    argv = [
+        "lifecycle",
+        *subcmd,
+        "--release-id",
+        _RELEASE,
+        "--run-id",
+        run_id,
+        "--harness",
+        "fake",
+        "--json",
+    ]
+    if subcmd == ["implementation-reviews"]:
+        argv.append("--skip-preflight")
     result = _runner.invoke(
         app,
-        [
-            "lifecycle",
-            *subcmd,
-            "--release-id",
-            _RELEASE,
-            "--run-id",
-            run_id,
-            "--harness",
-            "fake",
-            "--json",
-        ],
+        argv,
     )
 
     # AC-1: the persisted run carries a resolver-derived workflow_policy (None pre-wire).

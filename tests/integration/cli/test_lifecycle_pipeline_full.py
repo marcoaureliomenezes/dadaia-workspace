@@ -61,13 +61,16 @@ def _init_workspace(path: Path) -> Path:
     return path
 
 
-def _passing_result(label: str) -> AgentRunResult:
+def _passing_result(label: str, *, artifact_ref: str | None = None) -> AgentRunResult:
     """A green worker result the gate accepts: SUCCEEDED + APPROVED verdict + an
-    in-scope handoff artifact_ref (under ``.dadaia/handoff/<context>/**``)."""
+    in-scope raw step-output artifact ref."""
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary=f"fake runtime: {label} APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/{label}.handoff.json",),
+        artifact_refs=(
+            artifact_ref
+            or f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{label}.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED", "task_group": "rc-1"},
     )
 
@@ -120,6 +123,12 @@ def test_pipeline_runs_to_closure_on_fake(
             "1": _passing_result("review_qa"),
             "2": _passing_result("review_security"),
             "3": _passing_result("review_code"),
+            "4": _passing_result(
+                    "close",
+                    artifact_ref=(
+                        "specs/releases/multiharness-engine-v0116/CLOSURE.md"
+                    ),
+            ),
         },
     )
 
@@ -130,7 +139,7 @@ def test_pipeline_runs_to_closure_on_fake(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -151,7 +160,7 @@ def test_pipeline_runs_to_closure_on_fake(
     assert payload["blocked"] is None
     # Every step ran on the fake harness and was accepted, in ladder order.
     labels = [step["label"] for step in payload["steps"]]
-    assert labels == ["implement", "review_qa", "review_security", "review_code"]
+    assert labels == ["implement", "review_qa", "review_security", "review_code", "close"]
     assert all(step["accepted"] is True for step in payload["steps"])
     assert all(step["runtime"] == "fake" for step in payload["steps"])
     # The last accepted step landed the run in CLOSURE.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.core.scope_match import out_of_scope_paths
 from dadaia_workspace.features.lifecycle.context_selector import SelectionAudit
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.lifecycle.state_machine import (
     LifecycleStateMachine,
     TransitionDecision,
@@ -174,8 +176,8 @@ class LifecycleAgentRunner:
         field. The pass/block logic is the same as :meth:`run` so reviews gate
         identically whether or not a transition follows.
         """
-        result = self._runtime.run(data.request)
-        return self._blocked_result(lifecycle_run, data, result)
+        _result, blocked = self._execute_with_structural_retry(lifecycle_run, data)
+        return blocked
 
     def evaluate_gate_with_result(
         self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
@@ -188,8 +190,7 @@ class LifecycleAgentRunner:
         worker once and returning both avoids a double execution while keeping the gate
         logic identical to :meth:`evaluate_gate`.
         """
-        result = self._runtime.run(data.request)
-        return result, self._blocked_result(lifecycle_run, data, result)
+        return self._execute_with_structural_retry(lifecycle_run, data)
 
     def run(self, lifecycle_run: LifecycleRun, data: AgentRunnerInput) -> TransitionDecision:
         decision, _result = self.run_with_result(lifecycle_run, data)
@@ -204,12 +205,11 @@ class LifecycleAgentRunner:
         now a thin delegator so every existing caller is byte-identical. A caller that also
         needs the worker's ``AgentRunResult`` (e.g. :class:`LifecyclePipeline` to build a
         run-scoped handoff-ledger payload — the full-pipeline analogue of what
-        ``run_implement_review_loop`` already gets from
+        the implementation workflow gets from
         :meth:`evaluate_gate_with_result`) uses this instead of running the worker a second
         time.
         """
-        result = self._runtime.run(data.request)
-        blocked = self._blocked_result(lifecycle_run, data, result)
+        result, blocked = self._execute_with_structural_retry(lifecycle_run, data)
         if blocked is not None:
             decision = self._state_machine.transition(
                 lifecycle_run,
@@ -232,6 +232,157 @@ class LifecycleAgentRunner:
             ),
         )
         return decision, result
+
+    def _execute_with_structural_retry(
+        self, lifecycle_run: LifecycleRun, data: AgentRunnerInput
+    ) -> tuple[AgentRunResult, BlockedState | None]:
+        """Run once, then make one bounded correction attempt for shape/evidence defects.
+
+        A model can finish a turn without materializing its handoff even though tools are
+        available.  That is not a substantive review verdict and should not require an
+        operator restart.  The first failed attempt keeps its immutable diagnostic; the
+        second receives the exact Python gate reason.  Scope violations, explicit
+        REJECTED verdicts, runtime failures, and security findings are never retried here.
+        """
+        result = self._normalize_context_spec_refs(
+            self._recover_exact_worker_output(self._runtime.run(data.request), data.request),
+            data.request,
+        )
+        blocked = self._blocked_result(lifecycle_run, data, result)
+        if blocked is None or blocked.reason not in {
+            "agent result missing artifact evidence",
+            "agent result references nonexistent artifact(s)",
+            "agent result missing APPROVED verdict",
+            "agent result carries no deliverable in the step's declared zone",
+        }:
+            return result, blocked
+        detail = "\n".join(f"- {key}: {value}" for key, value in sorted(blocked.detail.items()))
+        correction = (
+            "## Automatic structural correction attempt (2 of 2)\n"
+            f"The Python gate rejected the first attempt: {blocked.reason}.\n"
+            f"{detail}\n"
+            "Complete the original step now. Materialize and read back the exact assigned "
+            "evidence path, then return one compliant result object. Do not return prose, "
+            "a plan, or another unmaterialized reference."
+        )
+        retry_request = replace(
+            data.request,
+            prompt=f"{data.request.prompt}\n\n{correction}",
+        )
+        retry_data = replace(data, request=retry_request)
+        retry_result = self._normalize_context_spec_refs(
+            self._recover_exact_worker_output(self._runtime.run(retry_request), retry_request),
+            retry_request,
+        )
+        return retry_result, self._blocked_result(lifecycle_run, retry_data, retry_result)
+
+    def _recover_exact_worker_output(
+        self, result: AgentRunResult, request: AgentRunRequest
+    ) -> AgentRunResult:
+        """Promote the exact assigned raw output into the parsed worker result.
+
+        The on-disk document is authoritative even when the harness final message only
+        reports its path. Reading only the Python-assigned path keeps recovery exact;
+        recursively redacting secret-named environment values keeps the credential
+        boundary intact before the document can enter durable workflow state.
+        """
+        if self._artifact_root is None or not request.task_id:
+            return result
+        ref = canonical_worker_output_ref(request.context, request.task_id)
+        target = self._artifact_root / ref
+        if not target.is_file():
+            return result
+        try:
+            document = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return result
+        if not isinstance(document, dict):
+            return result
+
+        secret_values = tuple(
+            value
+            for key, value in os.environ.items()
+            if value
+            and any(
+                part in key.upper()
+                for part in ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
+            )
+        )
+
+        def redact(value: object) -> object:
+            if isinstance(value, str):
+                for secret in secret_values:
+                    value = value.replace(secret, "[REDACTED]")
+                return value
+            if isinstance(value, list):
+                return [redact(item) for item in value]
+            if isinstance(value, dict):
+                return {str(key): redact(item) for key, item in value.items()}
+            return value
+
+        domain_payload = redact(document)
+        assert isinstance(domain_payload, dict)
+        structured = dict(result.structured_output)
+        for key in ("verdict", "verdict_reason", "commit_sha", "task_group"):
+            value = domain_payload.get(key)
+            if isinstance(value, str) and value.strip():
+                structured[key] = value.strip()
+        findings = domain_payload.get("findings")
+        if isinstance(findings, list) and findings:
+            structured["findings"] = json.dumps(findings, sort_keys=True)
+        summary = domain_payload.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            handoff = domain_payload.get("handoff")
+            summary = handoff.get("summary") if isinstance(handoff, dict) else None
+        if not isinstance(summary, str) or not summary.strip():
+            summary = result.summary
+        return replace(
+            result,
+            summary=summary,
+            artifact_refs=tuple(dict.fromkeys((*result.artifact_refs, ref))),
+            structured_output=structured,
+            domain_payload=domain_payload,
+            diagnostic=None,
+        )
+
+    def _normalize_context_spec_refs(
+        self, result: AgentRunResult, request: AgentRunRequest
+    ) -> AgentRunResult:
+        """Map context-relative ``specs/`` refs to one existing allowed workspace ref.
+
+        Workers operating on a context repo commonly report ``specs/releases/...``
+        even though the workflow contract is workspace-relative.  Rewriting is allowed
+        only when the request's allowlist yields exactly one existing in-scope candidate;
+        this cannot widen scope or make phantom evidence pass.
+        """
+        if self._artifact_root is None or not result.artifact_refs:
+            return result
+        normalized: list[str] = []
+        changed = False
+        for ref in result.artifact_refs:
+            if not ref.startswith("specs/") or (self._artifact_root / ref).exists():
+                normalized.append(ref)
+                continue
+            candidates: set[str] = set()
+            for allowed in request.allowed_paths:
+                marker = allowed.find("specs/")
+                if marker < 0:
+                    continue
+                candidate = f"{allowed[:marker]}{ref}"
+                if (self._artifact_root / candidate).exists() and not out_of_scope_paths(
+                    (candidate,),
+                    allowed=request.allowed_paths,
+                    forbidden=request.forbidden_paths,
+                ):
+                    candidates.add(candidate)
+            if len(candidates) == 1:
+                normalized.append(next(iter(candidates)))
+                changed = True
+            else:
+                normalized.append(ref)
+        if not changed:
+            return result
+        return replace(result, artifact_refs=tuple(dict.fromkeys(normalized)))
 
     def _blocked_result(
         self,

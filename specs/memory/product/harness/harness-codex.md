@@ -12,7 +12,7 @@ tags:
 - layer-1
 - layer-2
 - projection
-token_estimate: 680
+token_estimate: 930
 last_updated: '2026-07-08'
 release_origin: v0.1.66
 ---

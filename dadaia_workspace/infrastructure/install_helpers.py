@@ -47,27 +47,6 @@ def build_agents_index(agentic_dir: Path) -> dict[str, list[str]]:
     return index
 
 
-def validate_workflows(agentic_dir: Path) -> None:
-    """Validate all staged workflow files via MarkdownWorkflowStore."""
-    workflows_dir = agentic_dir / "workflows"
-    if not workflows_dir.exists():
-        return
-    from dadaia_workspace.core.exceptions import PublicAssetError, WorkflowSchemaError
-    from dadaia_workspace.infrastructure.markdown_workflow_store import (
-        MarkdownWorkflowStore,
-    )
-
-    agent_catalog: list[str] = sorted(p.stem for p in (agentic_dir / "agents").glob("*.md"))
-    store = MarkdownWorkflowStore(workflows_dir, agent_catalog=agent_catalog or None)
-    try:
-        store.list()
-    except WorkflowSchemaError as e:
-        raise PublicAssetError(
-            "workflow schema validation failed during `dadaia public stage`: "
-            f"{e}. Fix the offending workflow file in public/workflows/ and rerun."
-        ) from e
-
-
 def build_manifest(
     agentic_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
@@ -154,7 +133,7 @@ def install_universal_skills(
     installed: list[str],
     iter_files_fn: Callable[[Path], Iterable[Path]],
 ) -> None:
-    """Install skills and workflows into .agents/ for all runtimes."""
+    """Install universal skills into ``.agents/`` for all runtimes."""
     copy_tree(
         agentic_dir / "skills",
         workspace_root / ".agents" / "skills",
@@ -162,13 +141,26 @@ def install_universal_skills(
         installed,
         iter_files_fn,
     )
-    copy_tree(
-        agentic_dir / "workflows",
-        workspace_root / ".agents" / "workflows",
-        force,
-        installed,
-        iter_files_fn,
-    )
+
+
+def remove_legacy_workflow_projections(
+    workspace_root: Path,
+    installed: list[str],
+) -> None:
+    """Remove retired Markdown workflow projections without touching operator files."""
+    for harness_dir in (".agents", ".claude", ".codex"):
+        legacy_dir = workspace_root / harness_dir / "workflows"
+        if not legacy_dir.is_dir():
+            continue
+        for path in sorted(legacy_dir.glob("*.workflow.md")):
+            path.unlink()
+            installed.append(f"[rm] {path}")
+        try:
+            legacy_dir.rmdir()
+        except OSError:
+            # Preserve a non-empty directory: non-workflow/operator files are outside
+            # this migration's ownership.
+            pass
 
 
 # ---------------------------------------------------------------------------

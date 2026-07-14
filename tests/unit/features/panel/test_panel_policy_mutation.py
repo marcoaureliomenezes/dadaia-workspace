@@ -82,7 +82,7 @@ def _valid_policy_body() -> bytes:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
                 }
             },
         }
@@ -137,7 +137,7 @@ def _valid_policy_body() -> bytes:
                     "contexts": {
                         "default": {
                             "workflows": {
-                                "implementation": {"steps": {"implement": "pi-reasoning-high"}}
+                                "implementation_reviews": {"steps": {"implement": "pi-reasoning-high"}}
                             }
                         }
                     },
@@ -195,7 +195,7 @@ def test_put_persists_valid_policy_atomically_with_last_good_backup(tmp_path: Pa
         WorkflowModelPolicyOverlay(
             policy_id="default",
             contexts={
-                "default": {"implementation": {"implement": "codex-implementation-standard"}}
+                "default": {"implementation_reviews": {"implement": "codex-implementation-standard"}}
             },
         )
     )
@@ -208,10 +208,10 @@ def test_put_persists_valid_policy_atomically_with_last_good_backup(tmp_path: Pa
     assert payload["saved"] is True
     overlay = store.load()
     assert overlay is not None
-    assert overlay.step_profile("default", "implementation", "implement") == "codex-review-deep"
+    assert overlay.step_profile("default", "implementation_reviews", "implement") == "codex-review-deep"
     assert store.last_good_path.exists()
     backup = json.loads(store.last_good_path.read_text(encoding="utf-8"))
-    seeded = backup["contexts"]["default"]["workflows"]["implementation"]["steps"]["implement"]
+    seeded = backup["contexts"]["default"]["workflows"]["implementation_reviews"]["steps"]["implement"]
     assert seeded == "codex-implementation-standard"
 
     # Validate view accepts the same valid body without ever writing.
@@ -234,7 +234,7 @@ def test_put_invalid_candidate_never_overwrites_a_good_file(tmp_path: Path) -> N
     store.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
+            contexts={"default": {"implementation_reviews": {"implement": "codex-review-deep"}}},
         )
     )
     before = store.path.read_text(encoding="utf-8")
@@ -243,7 +243,7 @@ def test_put_invalid_candidate_never_overwrites_a_good_file(tmp_path: Path) -> N
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation": {"steps": {"implement": "ghost"}}}}
+                "default": {"workflows": {"implementation_reviews": {"steps": {"implement": "ghost"}}}}
             },
         }
     ).encode("utf-8")
@@ -278,7 +278,7 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
             "contexts": {
                 "default": {
                     "workflows": {
-                        "implementation": {
+                        "implementation_reviews": {
                             "default_harness": "pi",
                             "steps": {"implement": "pi-openrouter-kimi-high"},
                         }
@@ -295,11 +295,11 @@ def test_kimi_profile_round_trips_through_put_get_and_resolver(tmp_path: Path) -
     get = render_api_workflow_model_policy(store)
     status, got = _decode(get(qs={}))
     assert status == 200
-    persisted = got["policy"]["contexts"]["default"]["workflows"]["implementation"]
+    persisted = got["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"]
     assert persisted["steps"]["implement"] == "pi-openrouter-kimi-high"
 
     resolver = factory("default")
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
     entry = snapshot.step("implement")
     assert entry is not None
     assert entry.harness == "pi"

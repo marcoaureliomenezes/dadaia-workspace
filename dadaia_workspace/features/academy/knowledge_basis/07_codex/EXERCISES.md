@@ -41,15 +41,15 @@ Expected answers:
 You inspect a Codex projection and find:
 
 ```text
-.codex/workflows/audit-fanout.workflow.md
 .codex/agents/project-auditor.toml
+.codex/skills/dadaia-cli/SKILL.md
 ```
 
 The operator says: "Why did the audit not fan out automatically?"
 
-Answer: the workflow file and custom agent file make context and roles available.
-They do not trigger execution. Codex needs an explicit request to spawn/delegate to
-subagents, or a separate workflow executor that calls those agents.
+Answer: projected agents and skills make roles and operating guidance available; they
+do not trigger execution. Run `dadaia lifecycle audit` for the Python-gated workflow,
+or explicitly ask Codex to spawn/delegate when ad-hoc parallel review is intended.
 
 ## 4. Review a Rule
 

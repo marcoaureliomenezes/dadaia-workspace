@@ -40,6 +40,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     changed_paths_csv,
     derive_result_summary,
     findings_json,
+    missing_artifact_refs,
     normalize_artifact_refs,
     salvage_result_from_handoff,
 )
@@ -63,8 +64,10 @@ _MAX_DIAGNOSTIC_TAIL = 4096
 class PiHeadlessConfig:
     """Explicit controls for one headless PI adapter instance.
 
-    ``model`` is the discrete Layer-2 GPT id (LAW 2 / ADR-B) PI runs against its Codex
-    subscription; it is passed verbatim as ``pi --model <id>``. ``reasoning_effort``
+    ``model`` is the provider-qualified Layer-2 model id (LAW 2 / ADR-B). GPT ids must
+    use the ``openai-codex/`` provider backed by the operator's Codex subscription; the
+    adapter rejects ambiguous or other-provider GPT ids before spawning PI. The id is
+    passed verbatim as ``pi --model <id>``. ``reasoning_effort``
     carries the chosen option's effort — ``low``/``medium``/``high`` — and is forwarded
     verbatim as ``pi --thinking <level>`` (v0.1.78 T-D / FR-D: installed PI >= 0.80.3
     supports ``--thinking``; the prior "no verified flag" limitation is resolved).
@@ -131,7 +134,14 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                 error=f"unsupported runtime: {request.runtime.value}",
             )
 
-        args = self._command(request)
+        try:
+            args = self._command(request)
+        except ValueError as exc:
+            return AgentRunResult(
+                status=AgentRunStatus.FAILED,
+                summary="pi headless rejected unsafe model provider",
+                error=self._redact(str(exc)),
+            )
         try:
             proc = self._resolve_runner()(
                 args,
@@ -186,11 +196,17 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             self._config.pi_bin,
             "--mode",
             "json",
+            # Lifecycle prompts already carry their complete persona, fragments, bounded
+            # context, and execution root. Loading parent/global AGENTS.md files here can
+            # redirect a nested disposable worker into another workspace, including writes
+            # outside the adapter's Ring-2 boundary.
+            "--no-context-files",
             "--tools",
             ",".join(self._config.tools),
         ]
         model = self._resolve_model(request)
         if model is not None:
+            self._validate_model_provider(model)
             args += ["--model", model]
         reasoning = self._resolve_reasoning(request)
         if reasoning is not None:
@@ -207,6 +223,15 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
         if request.resolved_model is not None:
             return request.resolved_model.model
         return self._config.model
+
+    @staticmethod
+    def _validate_model_provider(model: str) -> None:
+        """Prevent GPT calls from escaping the operator's Codex subscription."""
+        if "gpt" in model.lower() and not model.startswith("openai-codex/"):
+            raise ValueError(
+                "PI GPT models must use the explicit openai-codex/ provider; "
+                f"refusing ambiguous or non-subscription model {model!r}"
+            )
 
     def _resolve_reasoning(self, request: AgentRunRequest) -> str | None:
         """Resolve the requested reasoning effort — mirrors :meth:`_resolve_model`'s
@@ -271,11 +296,27 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
             changed = changed_paths_csv(verdict_payload)
             if changed is not None and "changed_paths" not in structured:
                 structured["changed_paths"] = self._redact(changed)
+            missing_refs = missing_artifact_refs(refs, self._config.cwd)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(summary or "pi headless completed"),
                 artifact_refs=tuple(self._redact(path) for path in refs),
                 structured_output=structured,
+                domain_payload=self._redact_json(verdict_payload),  # type: ignore[arg-type]
+                diagnostic=(
+                    None
+                    if refs and not missing_refs
+                    else self._diagnostic(
+                        request,
+                        exit_code=returncode,
+                        parser_classification=(
+                            "referenced-artifact-missing"
+                            if missing_refs
+                            else "result-without-artifact-refs"
+                        ),
+                        output_tail=assistant_text or stdout or "",
+                    )
+                ),
             )
 
         # SALVAGE (bug prose-worker-with-valid-handoff-loses-verdict): a prose message
@@ -299,6 +340,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                     self._redact(path) for path in normalize_artifact_refs(salvaged)
                 ),
                 structured_output=structured,
+                domain_payload=self._redact_json(salvaged),  # type: ignore[arg-type]
             )
 
         # Noncompliant: a real message_end arrived but carried no recognizable result

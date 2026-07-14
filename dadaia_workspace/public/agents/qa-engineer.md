@@ -3,7 +3,7 @@ name: qa-engineer
 description: QA + E2E specialist + pre-commit checkpoint. Multi-language E2E owner across repos. Audits test pyramid, validates deploys. ADDITIVE evidence only. Pairs with software-engineer to define E2E criteria before implementation.
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
+concurrency_relationship: "always concurrent; advisory presence only"
 gate_role: checkpoint-pre-commit
 tools:
   - Read

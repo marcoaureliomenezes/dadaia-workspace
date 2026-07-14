@@ -92,8 +92,12 @@ class _RecordingFake:
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         self.received_requests.append(request)
-        allowed = request.allowed_paths[0] if request.allowed_paths else ".dadaia/handoff/x/**"
-        artifact = allowed.replace("**", "step.handoff.json")
+        allowed = (
+            request.allowed_paths[0]
+            if request.allowed_paths
+            else ".dadaia/tmp/lifecycle-worker/x/**"
+        )
+        artifact = allowed.replace("**", "step.step-output.json")
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="role-atom step ok",
@@ -103,7 +107,8 @@ class _RecordingFake:
 
     def request_for(self, step_label: str) -> AgentRunRequest:
         for req in self.received_requests:
-            if (req.task_id or "").endswith(f":{step_label}"):
+            task_id = req.task_id or ""
+            if task_id.endswith(f":{step_label}") or f":{step_label}:attempt-" in task_id:
                 return req
         raise AssertionError(f"no request captured for step {step_label!r}")
 
@@ -130,8 +135,19 @@ def _seed_specs(tmp_path: Path, *, active_phase: str | None = "IMPLEMENTATION") 
     (specs / "memory" / "product" / "catalog.json").write_text(
         '{"features": [{"slug": "demo", "tldr": "FIXTURE CATALOG BODY"}]}\n', encoding="utf-8"
     )
-    for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / _RELEASE / art).write_text(f"# {art}\n\nBody.\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text(
+        "# SPEC.md\n\nBody.\n", encoding="utf-8"
+    )
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# PLAN.md\n\nBody.\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value | unit tests | None | None |\n",
+        encoding="utf-8",
+    )
+    (specs / "releases" / _RELEASE / "TASKS.md").write_text(
+        "# TASKS.md\n\n### [ ] T1 - Fixture task\n", encoding="utf-8"
+    )
     if active_phase is not None:
         (specs / "releases" / "ACTIVE.md").write_text(
             f"release: {_RELEASE}\nphase: {active_phase}\n", encoding="utf-8"
@@ -357,7 +373,7 @@ def test_ac3_phase_workflow_grounding_and_production_builders_wire_real_specs_di
         release_id=_RELEASE,
         task_id="pw",
         prompt="Run the qa step.",
-        allowed_paths=(f".dadaia/handoff/{_CONTEXT}/**",),
+        allowed_paths=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
     result = wf.run(
@@ -392,8 +408,6 @@ _BUILDERS = (
     "build_release_definition_workflow",
     "build_backlog_definition_workflow",
     "build_audit_workflow",
-    "build_research_workflow",
-    "build_bug_report_workflow",
 )
 
 
@@ -407,6 +421,7 @@ def test_each_builder_threads_phase_present_and_fails_open_when_absent(
     _seed_specs(present_root, active_phase="IMPLEMENTATION")
     present_wf = builder(present_root, context=_CONTEXT, release_id=_RELEASE)
     assert present_wf._selector.spec_context.phase == "IMPLEMENTATION"
+    assert present_wf._runtime_files is not None
 
     absent_root = tmp_path / "absent"
     _seed_specs(absent_root, active_phase=None)  # no ACTIVE.md → phase must be None

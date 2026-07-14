@@ -29,9 +29,9 @@ catalog:
     keywords: ["init", "bootstrap", "workspace", "venv", "hooks"]
   - slug: "context-management"
     title: "context-management"
-    summary: "Multi-context lifecycle ALIVE/DEAD; session binding; three-layer locking; scaffold canonical tree v2."
+    summary: "Multi-context lifecycle ALIVE/DEAD; caller-local session binding; advisory presence; scaffold canonical tree v2."
     rank: 2
-    keywords: ["context", "lifecycle", "locking", "session", "bind", "ALIVE", "DEAD"]
+    keywords: ["context", "lifecycle", "presence", "session", "bind", "ALIVE", "DEAD"]
   - slug: "agent-orchestration"
     title: "agent-orchestration"
     summary: "DAG runner dispatching specialist agents with parallel_groups + gates. Two-tier PM router."

@@ -54,7 +54,9 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(".dadaia/handoff/dadaia-workspace/step.handoff.json",),
+        artifact_refs=(
+            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -64,7 +66,7 @@ def _overlay_dict(profile: str) -> dict[str, object]:
         "schema_version": "workflow-model-policy-v1",
         "policy_id": "default",
         "contexts": {
-            "default": {"workflows": {"implementation": {"steps": {"implement": profile}}}}
+            "default": {"workflows": {"implementation_reviews": {"steps": {"implement": profile}}}}
         },
     }
 
@@ -81,7 +83,7 @@ def test_pipeline_e2e_persists_snapshot_threads_model_and_invalid_overlay_blocks
     model-call with the last-good backup left intact — merged per plan-integration.md."""
     workspace = _init_workspace(tmp_path)
     resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
 
     recorder = FakeAgentRuntime(result=_approving())
     store = container.build_lifecycle_run_store(workspace)
@@ -143,7 +145,7 @@ def test_pipeline_ac6_in_flight_ignores_later_overlay_edit(tmp_path: Path) -> No
     policy_store = container.build_workflow_model_policy_store(workspace)
     # Start with NO overlay (defaults): implement → codex-implementation-standard.
     resolver = container.build_workflow_policy_resolver(workspace, context="dadaia-workspace")
-    snapshot = resolver.resolve("implementation", context="default")
+    snapshot = resolver.resolve("implementation_reviews", context="default")
 
     seen_models: list[str] = []
 
@@ -181,7 +183,7 @@ def test_pipeline_ac6_in_flight_ignores_later_overlay_edit(tmp_path: Path) -> No
     # A FRESH resolution now (after the run) DOES see the mutated overlay — proving the
     # mutation actually landed on disk and only the in-flight run was shielded.
     fresh = container.build_workflow_policy_resolver(workspace).resolve(
-        "implementation", context="default"
+        "implementation_reviews", context="default"
     )
     fresh_impl = fresh.step("implement")
     assert fresh_impl is not None and fresh_impl.model_profile == "codex-review-deep"

@@ -66,16 +66,14 @@ def test_export_refreshes_persists_branch_lists_in_manifest_and_excludes_lib_onl
 ) -> None:
     """T80: export reads HEAD branch, persists it in spec_contexts.json (part 1), and
     the archive's export-manifest.json records it too (part 2) — one export run.
-    T81: the same artifact must not include .dadaia/scripts/, .dadaia/agentic/,
-    .dadaia/src/ (lib-only dirs trimmed from the export)."""
+    T81: the same artifact must not include .dadaia/scripts/ or .dadaia/agentic/
+    (lib-originated dirs trimmed from the export)."""
     workspace, repo, store = workspace_with_active_repo
     # Create the lib-only dirs that must be trimmed.
     (workspace / ".dadaia" / "scripts").mkdir(parents=True)
     (workspace / ".dadaia" / "scripts" / "ctx-inject.sh").write_text("#!/bin/sh")
     (workspace / ".dadaia" / "agentic").mkdir(parents=True)
     (workspace / ".dadaia" / "agentic" / "manifest.json").write_text("{}")
-    (workspace / ".dadaia" / "src").mkdir(parents=True)
-    (workspace / ".dadaia" / "src" / "repos.xlsx").write_text("placeholder")
 
     svc = ExportService(
         context_store=store,
@@ -102,6 +100,6 @@ def test_export_refreshes_persists_branch_lists_in_manifest_and_excludes_lib_onl
     alpha = next(c for c in manifest["contexts"] if c["name"] == "alpha")
     assert alpha["current_branch"] == "feature/test"
 
-    for forbidden in (".dadaia/scripts", ".dadaia/agentic", ".dadaia/src"):
+    for forbidden in (".dadaia/scripts", ".dadaia/agentic"):
         leaks = [n for n in names if n.startswith(forbidden)]
         assert not leaks, f"trim leaked: {forbidden} → {leaks}"

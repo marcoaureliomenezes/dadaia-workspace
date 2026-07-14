@@ -265,6 +265,33 @@ def _codex_run_with_message(tmp_path: Path, last_message_text: str) -> Any:
     )
 
 
+def test_codex_schema_shaped_result_without_refs_carries_diagnostic(tmp_path: Path) -> None:
+    payload = json.dumps(
+        {"schema": "agent-run-result-v1", "summary": "no evidence", "artifact_refs": []}
+    )
+    result = _codex_run_with_message(tmp_path, payload)
+
+    assert result.artifact_refs == ()
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "result-without-artifact-refs"
+    assert payload in result.diagnostic.output_tail
+
+
+def test_codex_schema_shaped_result_with_missing_ref_carries_diagnostic(tmp_path: Path) -> None:
+    payload = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "summary": "claimed only",
+            "artifact_refs": [".dadaia/handoff/missing.json"],
+        }
+    )
+    result = _codex_run_with_message(tmp_path, payload)
+
+    assert result.artifact_refs == (".dadaia/handoff/missing.json",)
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "referenced-artifact-missing"
+
+
 @pytest.mark.parametrize(
     ("payload_text", "expected_summary", "expected_refs"),
     [

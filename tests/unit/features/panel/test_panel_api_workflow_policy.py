@@ -96,8 +96,8 @@ def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     status_a, payload_a = _decode(view_a(qs={}))
     assert status_a == 200
     ids = {w["workflow_id"] for w in payload_a["workflows"]}
-    assert "implementation" in ids
-    impl_a = next(w for w in payload_a["workflows"] if w["workflow_id"] == "implementation")
+    assert "implementation_reviews" in ids
+    impl_a = next(w for w in payload_a["workflows"] if w["workflow_id"] == "implementation_reviews")
     step_a = impl_a["steps"][0]
     assert step_a["default_profile"] == step_a["effective_profile"]
     assert step_a["is_overridden"] is False
@@ -108,12 +108,12 @@ def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     store_b.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
+            contexts={"default": {"implementation_reviews": {"implement": "codex-review-deep"}}},
         )
     )
     view_b = render_api_workflow_catalog(catalog, _resolver_factory(store_b))
     _status_b, payload_b = _decode(view_b(qs={}))
-    impl_b = next(w for w in payload_b["workflows"] if w["workflow_id"] == "implementation")
+    impl_b = next(w for w in payload_b["workflows"] if w["workflow_id"] == "implementation_reviews")
     implement_b = next(s for s in impl_b["steps"] if s["step"] == "implement")
     assert implement_b["effective_profile"] == "codex-review-deep"
     assert implement_b["is_overridden"] is True
@@ -124,12 +124,12 @@ def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     store_c.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={"default": {"implementation": {"no_such_step": "codex-review-deep"}}},
+            contexts={"default": {"implementation_reviews": {"no_such_step": "codex-review-deep"}}},
         )
     )
     view_c = render_api_workflow_catalog(catalog, _resolver_factory(store_c))
     _status_c, payload_c = _decode(view_c(qs={}))
-    impl_c = next(w for w in payload_c["workflows"] if w["workflow_id"] == "implementation")
+    impl_c = next(w for w in payload_c["workflows"] if w["workflow_id"] == "implementation_reviews")
     assert "error" in impl_c
     step_c = impl_c["steps"][0]
     assert step_c["default_harness"] == "codex"
@@ -150,7 +150,7 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     view_default = render_api_workflow_catalog(catalog, _resolver_factory(store_default))
     _status, payload_default = _decode(view_default(qs={}))
     impl_default = next(
-        w for w in payload_default["workflows"] if w["workflow_id"] == "implementation"
+        w for w in payload_default["workflows"] if w["workflow_id"] == "implementation_reviews"
     )
     step_default = impl_default["steps"][0]
     assert step_default["default_harness"] == "codex"
@@ -164,13 +164,13 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     store_pi.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={"default": {"implementation": {}}},
-            step_harness_overlay={"default": {"implementation": {"implement": "pi"}}},
+            contexts={"default": {"implementation_reviews": {}}},
+            step_harness_overlay={"default": {"implementation_reviews": {"implement": "pi"}}},
         )
     )
     view_pi = render_api_workflow_catalog(catalog, _resolver_factory(store_pi))
     _status_pi, payload_pi = _decode(view_pi(qs={}))
-    impl_pi = next(w for w in payload_pi["workflows"] if w["workflow_id"] == "implementation")
+    impl_pi = next(w for w in payload_pi["workflows"] if w["workflow_id"] == "implementation_reviews")
     implement_pi = next(s for s in impl_pi["steps"] if s["step"] == "implement")
     assert implement_pi["default_harness"] == "codex"
     assert implement_pi["harness"] == "pi"
@@ -187,7 +187,7 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("workflow_id", "expected_status", "expected_error"),
     [
-        pytest.param("implementation", 200, None, id="detail-known-workflow-200"),
+        pytest.param("implementation_reviews", 200, None, id="detail-known-workflow-200"),
         pytest.param("nope", 404, "not_found", id="detail-unknown-workflow-404"),
         pytest.param("../etc", 400, "invalid_workflow_id", id="detail-traversal-id-400"),
     ],
@@ -203,7 +203,7 @@ def test_catalog_detail(
 
     assert status == expected_status
     if expected_status == 200:
-        assert payload["workflow_id"] == "implementation"
+        assert payload["workflow_id"] == "implementation_reviews"
         assert len(payload["steps"]) > 0
     else:
         assert payload["error"] == expected_error
@@ -229,17 +229,17 @@ def test_profiles_registry_and_pi_model_choices() -> None:
     pi_values = [c["value"] for c in choices["pi"]]
     assert "moonshotai/kimi-k2.5:high" in pi_values
     assert set(pi_values) == {
-        "gpt-5.5:high",
-        "gpt-5.5:low",
-        "gpt-5.3-codex:medium",
+        "openai-codex/gpt-5.5:high",
+        "openai-codex/gpt-5.5:low",
+        "openai-codex/gpt-5.5:medium",
         "moonshotai/kimi-k2.5:high",
     }
 
     kimi = next(c for c in choices["pi"] if c["value"] == "moonshotai/kimi-k2.5:high")
     assert kimi["label"] == "OpenRouter — moonshotai/kimi-k2.5 (high)"
 
-    gpt = next(c for c in choices["pi"] if c["value"] == "gpt-5.5:high")
-    assert gpt["label"] == "gpt-5.5 (high)"
+    gpt = next(c for c in choices["pi"] if c["value"] == "openai-codex/gpt-5.5:high")
+    assert gpt["label"] == "openai-codex/gpt-5.5 (high)"
     assert "moonshotai/kimi-k2.5:high" not in [c["value"] for c in choices["codex"]]
 
 
@@ -250,7 +250,7 @@ def test_profiles_registry_and_pi_model_choices() -> None:
 
 
 def _run_with_snapshot(
-    run_id: str, *, profile: str, workflow_id: str = "implementation"
+    run_id: str, *, profile: str, workflow_id: str = "implementation_reviews"
 ) -> LifecycleRun:
     snapshot = WorkflowPolicySnapshot(
         workflow_id=workflow_id,
@@ -320,13 +320,13 @@ def test_policy_state_and_runs_and_ledger(tmp_path: Path) -> None:
     store.save(
         WorkflowModelPolicyOverlay(
             policy_id="default",
-            contexts={"default": {"implementation": {"implement": "codex-review-deep"}}},
+            contexts={"default": {"implementation_reviews": {"implement": "codex-review-deep"}}},
         )
     )
     status_persisted, payload_persisted = _decode(view_policy(qs={}))
     assert status_persisted == 200
     assert payload_persisted["exists"] is True
-    steps = payload_persisted["policy"]["contexts"]["default"]["workflows"]["implementation"][
+    steps = payload_persisted["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"][
         "steps"
     ]
     assert steps["implement"] == "codex-review-deep"
@@ -354,7 +354,7 @@ def test_policy_state_and_runs_and_ledger(tmp_path: Path) -> None:
     run_store.save(
         _run_with_snapshot("run-b", profile="codex-review-deep", workflow_id="release_definition")
     )
-    status_wf, payload_wf = _decode(view_runs(qs={"workflow": ["implementation"]}))
+    status_wf, payload_wf = _decode(view_runs(qs={"workflow": ["implementation_reviews"]}))
     assert status_wf == 200
     assert [r["run_id"] for r in payload_wf["runs"]] == ["run-1"]
     status_ctx, payload_ctx = _decode(view_runs(qs={"context": ["other-ctx"]}))

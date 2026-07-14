@@ -30,11 +30,29 @@ provable against the SPEC's acceptance.
 | Angle | Check | Pass condition |
 |---|---|---|
 | Architecture | Boundary fidelity | No workstream crosses a forbidden layer boundary or invents a parallel seam. |
-| Architecture | Sequencing | Dependencies between workstreams are correct and ordered; nothing depends on work scheduled later. |
+| Architecture | Sequencing | Dependencies between workstreams are correct and ordered; neither implementation nor validation depends on work scheduled later. |
 | Architecture | Prior art | The plan reuses existing mechanisms where they fit rather than building bespoke. |
+| Architecture | Public contract bound | Every new or changed caller-facing value/API names its exact symbol, signature, fields, and module/export path; no public design decision is deferred to TASKS or implementation. |
 | QA | SPEC coverage | Every SPEC requirement maps to at least one workstream; nothing is orphaned. |
 | QA | Test-first | Each workstream names how it is verified, with the test strategy stated before the build. |
 | QA | Risk | Regression and failure-mode coverage is planned, not assumed. |
+
+Treat validation as a real dependency, not prose attached to a workstream. For every
+workstream, verify that every named command, API, fixture, snapshot, integration path,
+or other evidence source exists by the end of that workstream. Reject when an earlier
+workstream can pass only after a later workstream creates the evidence surface, even if
+the implementation dependencies themselves look ordered.
+
+The PLAN must include the exact `## Validation Dependency Table` contract from the
+create step. Cross-check its claims against the detailed workstreams: a row that says
+`None` while its direct validation actually needs a later fixture, replay surface,
+adapter, orchestrator, UI, or snapshot is a rejection. Foundational values must have
+direct contract tests; later end-to-end evidence belongs to the workstream that first
+makes that complete path available.
+
+Reject a PLAN that says only "add a value", "add an API", or equivalent generic
+language for a caller-facing surface. The implementer must not have to choose the
+public name, signature, field contract, or import path after PLAN approval.
 
 ## Output
 
