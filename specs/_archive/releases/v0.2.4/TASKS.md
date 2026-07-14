@@ -23,7 +23,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T2 - Verify and close
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** product-engineer
 - **Preconditions:** T1 complete and committed.
 - **Files modified:** bug ledger, `CLOSURE.md`, `ACTIVE.md`.
