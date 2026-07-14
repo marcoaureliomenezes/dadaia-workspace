@@ -22,6 +22,8 @@ no fs/subprocess needed there.
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -104,6 +106,7 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     assert ext.exists()
     body = ext.read_text(encoding="utf-8")
     assert "dadaia_workspace.hooks.pre_gate" in body
+    assert '["-B", "-m", "dadaia_workspace.hooks.pre_gate"]' in body
     assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
     assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
     assert '"decision":"block"' in body or "decision" in body
@@ -152,8 +155,25 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     # path, not just the manager API).
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+    from dadaia_workspace.core.platform import PLATFORM
 
     cli_workspace = tmp_path / "cli-ws"
+    # The suite-wide venv fixture intentionally creates only the directory. Public init
+    # renders absolute hook commands and public doctor executes Codex wrappers, so provide
+    # the temp interpreter before init without constructing or installing a real venv.
+    python_bin = (
+        cli_workspace
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"python{PLATFORM.venv_exe_suffix}"
+    )
+    python_bin.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        python_bin.symlink_to(Path(sys.executable))
+    except OSError:
+        shutil.copy2(sys.executable, python_bin)
+
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),

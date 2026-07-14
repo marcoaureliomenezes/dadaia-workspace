@@ -10,10 +10,11 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T1 - Suppress hook-runtime bytecode
 
-- [-] **Status:** IN PROGRESS
+- [x] **Status:** DONE
 - **Owner:** software-engineer
 - **Preconditions:** v0.2.3 archived; bug `hook-runtimes-create-repo-bytecode` reported.
 - **Files modified:** `dadaia_workspace/infrastructure/runtime_config.py`,
+  `dadaia_workspace/features/workspace/service.py`,
   `dadaia_workspace/public/pi/extensions/dadaia-sdd-gate.ts`, focused projection tests.
 - **Changes:** add Python `-B` to Claude, Codex, and PI hook launches; add an executed
   repository-hygiene regression; restage projections.
@@ -22,7 +23,7 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## T2 - Verify and close
 
-- [ ] **Status:** OPEN
+- [-] **Status:** IN PROGRESS
 - **Owner:** product-engineer
 - **Preconditions:** T1 complete and committed.
 - **Files modified:** bug ledger, `CLOSURE.md`, `ACTIVE.md`.

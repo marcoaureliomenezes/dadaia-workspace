@@ -213,7 +213,7 @@ class WorkspaceService:
             python_bin = sys.executable
         else:
             python_bin = "python"
-        return f"{python_bin} -m {_CTX_INJECT_MODULE}"
+        return f"{python_bin} -B -m {_CTX_INJECT_MODULE}"
 
     @staticmethod
     def _supersede_stale_sh(
@@ -276,15 +276,18 @@ class WorkspaceService:
 
 
 def _is_stale_sh_entry(entry: dict) -> bool:  # type: ignore[type-arg]
-    """Return True if *entry* references the legacy ctx-inject.sh command."""
+    """Return True for superseded shell or bytecode-writing Python hook commands."""
+    def stale(command: object) -> bool:
+        cmd = str(command or "")
+        if cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd:
+            return True
+        return _CTX_INJECT_MODULE in cmd and " -B -m " not in cmd
+
     # Check nested schema (canonical)
     nested = entry.get("hooks")
     if isinstance(nested, list):
         for h in nested:
-            if isinstance(h, dict):
-                cmd = str(h.get("command", ""))
-                if cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd:
-                    return True
+            if isinstance(h, dict) and stale(h.get("command")):
+                return True
     # Check legacy flat schema
-    cmd = str(entry.get("command", ""))
-    return cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd
+    return stale(entry.get("command"))

@@ -2,7 +2,8 @@
 
 > **Status:** Aprovado
 
-1. Change the shared Claude hook command builder to emit `python -B -m`.
+1. Change both Claude hook command builders to emit `python -B -m` and replace stale
+   Python registrations that omit `-B`.
 2. Change all generated Codex wrappers to execute `python -B -m`.
 3. Change the PI extension subprocess arguments to `-B -m`.
 4. Add static assertions for all three projections and an executed Codex-wrapper test that

@@ -4,7 +4,7 @@ Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
 that module under 600 lines.  Each function takes explicit arguments instead of
 ``self``, so there are no circular imports.
 
-T-018-17: hook commands are emitted as ``<python> -m dadaia_workspace.hooks.<name>``
+T-018-17: hook commands are emitted as ``<python> -B -m dadaia_workspace.hooks.<name>``
 using the venv-aware ``_python_bin()`` helper (Windows-safe fallbacks: Scripts/python.exe
 → sys.executable → bare python). The ``.sh`` scripts are superseded, not appended.
 """
@@ -42,8 +42,8 @@ def _python_bin(workspace_root: Path) -> str:
 
 
 def _hook_cmd(workspace_root: Path, module: str) -> str:
-    """Return ``<python_bin> -m <module>`` for *workspace_root*."""
-    return f"{_python_bin(workspace_root)} -m {module}"
+    """Return a bytecode-suppressed Python module command for *workspace_root*."""
+    return f"{_python_bin(workspace_root)} -B -m {module}"
 
 
 _CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
@@ -83,7 +83,7 @@ def codex_hook_wrapper_contents() -> dict[str, str]:
             "  exit 127\n"
             "fi\n"
             f"{exports}"
-            f'exec "$PYTHON_BIN" -m {module} "$@"\n'
+            f'exec "$PYTHON_BIN" -B -m {module} "$@"\n'
         )
     return wrappers
 

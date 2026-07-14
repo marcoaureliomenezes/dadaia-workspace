@@ -168,7 +168,7 @@ const factory = (pi: ExtensionAPI): void => {
       // Invoke the merged Python gate directly (no bash). Run from the workspace root so
       // the hook's workspace-resolver and relative-path handling behave identically to
       // the Claude/Codex PreToolUse hook.
-      const result = spawnSync(python, ["-m", "dadaia_workspace.hooks.pre_gate"], {
+      const result = spawnSync(python, ["-B", "-m", "dadaia_workspace.hooks.pre_gate"], {
         cwd: ws,
         input: payload,
         encoding: "utf-8",

@@ -26,11 +26,11 @@ artifacts. The implementation is drifting from that current contract.
 
 ## Root cause
 
-`runtime_config._hook_cmd()` emits `<python> -m <module>`, generated Codex wrappers emit
-`exec "$PYTHON_BIN" -m <module>`, and the PI extension invokes Python with `-m`. None uses
-Python's `-B` flag or an equivalent bytecode suppression environment. Python therefore
-writes import bytecode relative to the source package whenever the repository is first on
-`sys.path`.
+`runtime_config._hook_cmd()` and `WorkspaceService._canonical_hook_command()` emit
+`<python> -m <module>`, generated Codex wrappers emit `exec "$PYTHON_BIN" -m <module>`,
+and the PI extension invokes Python with `-m`. None uses Python's `-B` flag or an
+equivalent bytecode suppression environment. Python therefore writes import bytecode
+relative to the source package whenever the repository is first on `sys.path`.
 
 ## Fix scope
 
@@ -48,9 +48,9 @@ changing hook payloads, state schemas, or gate semantics.
 
 ## Acceptance + smoke test
 
-- [ ] Claude hook commands contain `python -B -m`.
-- [ ] Every Codex hook wrapper executes `python -B -m`.
-- [ ] The PI extension invokes Python with `-B`, `-m`, and the same hook module.
-- [ ] Executing the Codex pre-gate wrapper from a source-shaped repo creates no
+- [x] Claude hook commands contain `python -B -m`.
+- [x] Every Codex hook wrapper executes `python -B -m`.
+- [x] The PI extension invokes Python with `-B`, `-m`, and the same hook module.
+- [x] Executing the Codex pre-gate wrapper from a source-shaped repo creates no
   `__pycache__` directory or `.pyc` file.
-- [ ] Focused projection tests, public doctor, and repository hygiene scans pass.
+- [x] Focused projection tests, public doctor, and repository hygiene scans pass.

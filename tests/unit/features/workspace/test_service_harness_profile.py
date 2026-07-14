@@ -104,3 +104,4 @@ def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
         if "dadaia_workspace.hooks.ctx_inject" in h.get("command", "")
     ]
     assert len(ctx_inject) == 1, entries
+    assert " -B -m dadaia_workspace.hooks.ctx_inject" in ctx_inject[0]["command"]
