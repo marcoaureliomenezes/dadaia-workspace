@@ -246,7 +246,7 @@ class PanelService:
 
     def list_dadaia_workflows(self) -> list[Any]:
         """Return the authoritative Python-governed workflow catalog."""
-        return self._workflows_svc().list_dadaia_workflows()
+        return list(self._workflows_svc().list_dadaia_workflows())
 
     def _agents(self) -> AgentsProvider:
         """Return the injected AgentsProvider.

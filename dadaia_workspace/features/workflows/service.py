@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from dadaia_workspace.features.workflows.dag import StageDTO
 
 if TYPE_CHECKING:
-    from dadaia_workspace.features.lifecycle.governed_catalog import DadaiaWorkflowDTO
+    from dadaia_workspace.features.workflows.dadaia_catalog import DadaiaWorkflowDTO
 
 
 class WorkflowsService:
