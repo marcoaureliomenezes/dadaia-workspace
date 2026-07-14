@@ -540,10 +540,20 @@ class LifecycleAgentRunner:
             clean = pattern.strip().lstrip("/")
             if not clean or ".." in clean.split("/"):
                 continue
-            try:
-                matches = self._artifact_root.glob(clean)
-            except (OSError, ValueError):
-                continue
+            # Python 3.13 changed ``**`` to also match files (3.12 matches only
+            # directories) — expand explicitly so the disk-truth check is
+            # deterministic across interpreter versions.
+            variants = {clean}
+            if clean.endswith("**"):
+                variants.add(clean + "/*")
+                variants.add(clean.removesuffix("**") + "*")
+            matches_iter: list[Path] = []
+            for variant in variants:
+                try:
+                    matches_iter.extend(self._artifact_root.glob(variant))
+                except (OSError, ValueError):
+                    continue
+            matches = matches_iter
             for path in matches:
                 try:
                     if path.is_file():

@@ -191,7 +191,7 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     [
         pytest.param("implementation_reviews", 200, None, id="detail-known-workflow-200"),
         pytest.param("nope", 404, "not_found", id="detail-unknown-workflow-404"),
-        pytest.param("../etc", 400, "invalid_workflow_id", id="detail-traversal-id-400"),
+        pytest.param("../etc", 404, "not_found", id="detail-traversal-id-404"),
     ],
 )
 def test_catalog_detail(

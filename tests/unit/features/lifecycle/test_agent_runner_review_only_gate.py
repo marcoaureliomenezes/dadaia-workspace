@@ -267,11 +267,19 @@ def test_handoff_without_declared_deliverable_gets_one_correction_attempt(
     handoff = tmp_path / handoff_ref
     handoff.parent.mkdir(parents=True, exist_ok=True)
     handoff.write_text(json.dumps({"summary": "handoff only"}), encoding="utf-8")
+    # Disk truth: the zone must be EMPTY on attempt 1 (an existing zone file counts as
+    # delivered); the corrected attempt materializes the deliverable itself.
     spec_ref = "specs/releases/v1/SPEC.md"
-    spec = tmp_path / spec_ref
-    spec.parent.mkdir(parents=True, exist_ok=True)
-    spec.write_text("# SPEC\n", encoding="utf-8")
-    runtime = _SequenceRuntime(
+
+    class _DeliverOnRetryRuntime(_SequenceRuntime):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            if len(self.requests) == 1:  # the correction attempt delivers for real
+                spec = tmp_path / spec_ref
+                spec.parent.mkdir(parents=True, exist_ok=True)
+                spec.write_text("# SPEC\n", encoding="utf-8")
+            return super().run(request)
+
+    runtime = _DeliverOnRetryRuntime(
         [
             _result(verdict=None, artifact_refs=()),
             _result(verdict=None, artifact_refs=(spec_ref,)),

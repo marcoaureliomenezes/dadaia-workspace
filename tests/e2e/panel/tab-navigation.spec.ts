@@ -21,7 +21,9 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
-  const tabs = await page.$$eval('[role="tab"]', (els) =>
+  // Scope to the primary nav tablist: the Games tab hosts its own game-switch
+  // tablist (Snake/Tetris/Pong/Breakout choice buttons also carry role="tab").
+  const tabs = await page.$$eval('.nav-tab[role="tab"]', (els) =>
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
@@ -38,6 +40,7 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     'Reports',
     'Academy',
     'Servers',
+    'Games',
   ]);
 
   await page.screenshot({
