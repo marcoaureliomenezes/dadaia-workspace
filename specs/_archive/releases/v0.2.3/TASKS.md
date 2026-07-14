@@ -23,7 +23,7 @@
   definition, release definition, implementation plus reviews, and audit from
   the CLI for four disposable releases; fix and restart any failing workflow.
   **Write set:** phantom release/backlog/audit artifacts and workflow bug fixes.
-- [-] **T06 - Final verification and closure.** Run full CI, workflow/handoff
+- [x] **T06 - Final verification and closure.** Run full CI, workflow/handoff
   doctors, panel browser checks, disposition all findings, update current memory,
   and close/archive the release. **Write set:** verification evidence, memory,
   `CLOSURE.md`, `ACTIVE.md`.
