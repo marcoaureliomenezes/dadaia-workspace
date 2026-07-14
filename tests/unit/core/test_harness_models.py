@@ -1,7 +1,7 @@
 """Unit tests for the discrete per-harness Layer-2 model catalog (T-24-04, WS-2).
 
-LAW 2 (v0.1.44, supersedes ADR-B): pi → 4 discrete options (incl. OpenRouter
-``moonshotai/kimi-k2.5``), codex → 2; both allowlist-validated; never
+LAW 2 (v0.1.44, supersedes ADR-B): pi → 4 discrete options (Codex-subscription GPT
+models plus governed OpenRouter Kimi), codex → 2; both allowlist-validated; never
 ``claude-*``. Every catalog id resolves via the union of ``model_registry.REGISTRY``
 codex ids and the curated Layer-2 allowlist (``LAYER2_EXTRA_MODEL_IDS``).
 """
@@ -53,21 +53,24 @@ def test_catalog_golden() -> None:
     assert len(options_for(CODEX_HARNESS)) == 2
 
     assert options_for(PI_HARNESS) == (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "low"),
-        HarnessModelOption("gpt-5.3-codex", "medium"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
         HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     )
     assert options_for(CODEX_HARNESS) == (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     )
 
-    assert model_choices(CODEX_HARNESS) == ("gpt-5.5:high", "gpt-5.5:medium")
+    assert model_choices(CODEX_HARNESS) == (
+        "gpt-5.3-codex-spark:high",
+        "gpt-5.3-codex-spark:medium",
+    )
     assert model_choices(PI_HARNESS) == (
-        "gpt-5.5:high",
-        "gpt-5.5:low",
-        "gpt-5.3-codex:medium",
+        "openai-codex/gpt-5.3-codex-spark:high",
+        "openai-codex/gpt-5.3-codex-spark:low",
+        "openai-codex/gpt-5.3-codex-spark:medium",
         "moonshotai/kimi-k2.5:high",
     )
 
@@ -85,13 +88,31 @@ def test_catalog_golden() -> None:
 @pytest.mark.parametrize(
     ("harness", "model", "expected"),
     [
-        (PI_HARNESS, "gpt-5.5:high", HarnessModelOption("gpt-5.5", "high")),
-        (PI_HARNESS, "gpt-5.5:low", HarnessModelOption("gpt-5.5", "low")),
-        (PI_HARNESS, "gpt-5.3-codex:medium", HarnessModelOption("gpt-5.3-codex", "medium")),
-        (CODEX_HARNESS, "gpt-5.5:high", HarnessModelOption("gpt-5.5", "high")),
-        (CODEX_HARNESS, "gpt-5.5:medium", HarnessModelOption("gpt-5.5", "medium")),
-        # A bare id with a single effort resolves without the ":effort" suffix.
-        (PI_HARNESS, "gpt-5.3-codex", HarnessModelOption("gpt-5.3-codex", "medium")),
+        (
+            PI_HARNESS,
+            "openai-codex/gpt-5.3-codex-spark:high",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
+        ),
+        (
+            PI_HARNESS,
+            "openai-codex/gpt-5.3-codex-spark:low",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
+        ),
+        (
+            PI_HARNESS,
+            "openai-codex/gpt-5.3-codex-spark:medium",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
+        ),
+        (
+            CODEX_HARNESS,
+            "gpt-5.3-codex-spark:high",
+            HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        ),
+        (
+            CODEX_HARNESS,
+            "gpt-5.3-codex-spark:medium",
+            HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+        ),
         # The OpenRouter id validates via the union, both suffixed and bare.
         (
             PI_HARNESS,
@@ -111,11 +132,11 @@ def test_validate_accept_table(harness: str, model: str, expected: HarnessModelO
 
 
 def test_ambiguous_bare_model_id_is_rejected() -> None:
-    """``gpt-5.5`` has two efforts for codex, so a bare id must not silently pick one."""
+    """``gpt-5.3-codex-spark`` has two efforts for codex, so a bare id must not silently pick one."""
     with pytest.raises(ValueError) as exc:
-        validate(CODEX_HARNESS, "gpt-5.5")
-    assert "gpt-5.5:high" in str(exc.value)
-    assert "gpt-5.5:medium" in str(exc.value)
+        validate(CODEX_HARNESS, "gpt-5.3-codex-spark")
+    assert "gpt-5.3-codex-spark:high" in str(exc.value)
+    assert "gpt-5.3-codex-spark:medium" in str(exc.value)
 
     with pytest.raises(ValueError) as exc2:
         validate(PI_HARNESS, "gpt-9.9:high")
@@ -124,7 +145,7 @@ def test_ambiguous_bare_model_id_is_rejected() -> None:
         assert choice in message
 
     with pytest.raises(ValueError) as exc3:
-        validate("fake", "gpt-5.5:high")
+        validate("fake", "gpt-5.3-codex-spark:high")
     assert "no discrete model catalog" in str(exc3.value)
 
     assert options_for("nonexistent") == ()
@@ -137,7 +158,8 @@ def test_ambiguous_bare_model_id_is_rejected() -> None:
 
 def test_layer2_allowlist_law() -> None:
     # The allowlist is a minimal, explicitly-named set (no wildcard) — this release:
-    # moonshotai/kimi-k2.5.
+    # Only the explicitly governed non-GPT OpenRouter id is allowed. PI GPT ids
+    # carry the explicit Codex-subscription provider prefix.
     assert set(harness_models.LAYER2_EXTRA_MODEL_IDS) == {"moonshotai/kimi-k2.5"}
 
     # The single public membership helper unions registry codex ids with the allowlist.
@@ -145,7 +167,13 @@ def test_layer2_allowlist_law() -> None:
     for entry in REGISTRY:
         assert entry.codex_id in known
     assert "moonshotai/kimi-k2.5" in known
-    assert known == frozenset(e.codex_id for e in REGISTRY) | harness_models.LAYER2_EXTRA_MODEL_IDS
+    assert "openai/gpt-5.3-codex-spark" not in known
+    assert "openai/gpt-oss-120b:free" not in known
+    assert known == (
+        frozenset(e.codex_id for e in REGISTRY)
+        | harness_models.pi_codex_subscription_model_ids()
+        | harness_models.LAYER2_EXTRA_MODEL_IDS
+    )
 
     # R6: the OpenRouter ids are NOT inserted into model_registry.REGISTRY.
     codex_ids = {entry.codex_id for entry in REGISTRY}

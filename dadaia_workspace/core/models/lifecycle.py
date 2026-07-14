@@ -72,7 +72,12 @@ TRANSITIONS: dict[LifecyclePhase, frozenset[LifecyclePhase]] = {
     # FR4 (v0.1.56): the review phases advance forward or block only. The three
     # review->implementation backtrack edges were unused table entries (no production
     # path took them); the operator-driven rework path is BLOCKED -> IMPLEMENTATION.
-    LifecyclePhase.QA_REVIEW: frozenset({LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}),
+    # QA_REVIEW -> CLOSURE: the combined single-review ladder (v0.2.x simplification)
+    # runs one tri-angle review under QA_REVIEW and advances straight to CLOSURE; the
+    # SECURITY_REVIEW edge stays for any legacy three-review sequence.
+    LifecyclePhase.QA_REVIEW: frozenset(
+        {LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}
+    ),
     LifecyclePhase.SECURITY_REVIEW: frozenset({LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}),
     LifecyclePhase.CODE_REVIEW: frozenset({LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}),
     LifecyclePhase.CLOSURE: frozenset({LifecyclePhase.BLOCKED}),
@@ -488,6 +493,10 @@ class AgentRunResult:
     summary: str
     artifact_refs: tuple[str, ...] = ()
     structured_output: dict[str, str] = field(default_factory=dict)
+    # The validated transport document emitted by a real worker. Adapters retain it so
+    # Python can promote the substantive domain handoff into the immutable workflow
+    # ledger instead of reducing it to a generic summary plus a temporary-file ref.
+    domain_payload: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     # Additive-optional (v0.1.78 T-D / FR-D): diagnostic evidence for a degraded/noncompliant
     # attempt. ``None`` for a normal compliant result — every existing caller/fixture stays
@@ -495,7 +504,7 @@ class AgentRunResult:
     diagnostic: WorkerDiagnostic | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "status": self.status.value,
             "summary": self.summary,
             "artifact_refs": list(self.artifact_refs),
@@ -503,13 +512,18 @@ class AgentRunResult:
             "error": self.error,
             "diagnostic": self.diagnostic.to_dict() if self.diagnostic else None,
         }
+        if self.domain_payload:
+            payload["domain_payload"] = dict(self.domain_payload)
+        return payload
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> AgentRunResult:
         artifact_refs = data.get("artifact_refs", [])
         structured_output = data.get("structured_output", {})
+        domain_payload = data.get("domain_payload", {})
         assert isinstance(artifact_refs, list)
         assert isinstance(structured_output, dict)
+        assert isinstance(domain_payload, dict)
         diagnostic_raw = data.get("diagnostic")
         assert diagnostic_raw is None or isinstance(diagnostic_raw, dict)
         return cls(
@@ -517,6 +531,7 @@ class AgentRunResult:
             summary=str(data["summary"]),
             artifact_refs=tuple(str(ref) for ref in artifact_refs),
             structured_output={str(k): str(v) for k, v in structured_output.items()},
+            domain_payload={str(k): v for k, v in domain_payload.items()},
             error=_optional_str(data.get("error")),
             diagnostic=(WorkerDiagnostic.from_dict(diagnostic_raw) if diagnostic_raw else None),
         )

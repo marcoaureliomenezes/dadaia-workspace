@@ -109,3 +109,7 @@ class RuntimeFilePort(Protocol):
     def read_step_payload(self, payload_ref: str) -> str | None:
         """Return the raw step payload envelope JSON at ``payload_ref``, or ``None``."""
         ...
+
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        """Remove exact canonical temporary worker outputs before a fresh restart."""
+        ...

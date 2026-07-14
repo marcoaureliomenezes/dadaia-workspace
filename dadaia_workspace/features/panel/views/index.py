@@ -45,6 +45,7 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
+from dadaia_workspace.features.panel.views.games import render_games_section
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
@@ -71,6 +72,7 @@ def render_index(
         academy_section = render_academy_section()
         reports_section = render_reports_section()
         workflows_section = render_workflows_first_class_section()
+        games_section = render_games_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -89,6 +91,7 @@ def render_index(
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
+  <link rel="stylesheet" href="/static/games.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -129,6 +132,7 @@ def render_index(
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
+    <button class="nav-tab" data-section="games" aria-selected="false" role="tab" id="tab-games">Games</button>
   </nav>
   <main class="main" role="main">
 
@@ -166,6 +170,8 @@ def render_index(
 
     {reports_section}
 
+    {games_section}
+
   </main>
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
@@ -175,6 +181,7 @@ def render_index(
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
+  <script src="/static/games.js"></script>
   <!--
     The dadaia-workflow catalog renders each step-sequence diagram as a
     server-rendered SVG DAG (.dadaia-wf-diagram-svg) plus the raw mermaid source

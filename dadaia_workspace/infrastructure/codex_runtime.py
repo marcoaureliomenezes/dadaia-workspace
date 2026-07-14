@@ -25,6 +25,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRunStatus,
     AgentRuntimeKind,
+    WorkerDiagnostic,
 )
 from dadaia_workspace.infrastructure.headless_adapter_base import (
     Runner,
@@ -33,11 +34,13 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
     changed_paths_csv,
     derive_result_summary,
     findings_json,
+    missing_artifact_refs,
     normalize_artifact_refs,
     salvage_result_from_handoff,
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
+    "PYTHONDONTWRITEBYTECODE",
     "PATH",
     "HOME",
     "CODEX_HOME",
@@ -62,6 +65,7 @@ _VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
 #: ``sandbox=`` value; an explicit caller value always wins over the env var.
 _DADAIA_CODEX_SANDBOX_ENV = "DADAIA_CODEX_SANDBOX"
 _DEFAULT_CODEX_SANDBOX = "read-only"
+_MAX_DIAGNOSTIC_TAIL = 4_000
 
 
 def _as_codex_effort(effort: str) -> CodexEffort:
@@ -198,6 +202,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         with tempfile.TemporaryDirectory(prefix="dadaia-codex-exec-") as tmp:
             output_path = Path(tmp) / "last-message.json"
             args = self._command(request, output_path)
+            before_snapshot = self._snapshot_changed_paths()
             try:
                 proc = self._resolve_runner()(
                     args,
@@ -231,7 +236,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                     error=self._redact(error),
                 )
             result = self._result_from_output(request, output_path, proc)
-            return self._with_changed_paths(result)
+            return self._with_changed_paths(result, before_snapshot)
 
     @staticmethod
     def _classify_failure(stderr_text: str) -> tuple[str, str]:
@@ -353,11 +358,24 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             changed = changed_paths_csv(payload)
             if changed is not None and "changed_paths" not in structured:
                 structured["changed_paths"] = self._redact(changed)
+            missing_refs = missing_artifact_refs(refs, self._config.cwd)
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(derive_result_summary(payload) or "codex exec completed"),
                 artifact_refs=tuple(self._redact(path) for path in refs),
                 structured_output=structured,
+                domain_payload=self._redact_json(payload),  # type: ignore[arg-type]
+                diagnostic=(
+                    None
+                    if refs and not missing_refs
+                    else self._diagnostic(
+                        request,
+                        raw,
+                        "referenced-artifact-missing"
+                        if missing_refs
+                        else "result-without-artifact-refs",
+                    )
+                ),
             )
 
         # SALVAGE (bug prose-worker-with-valid-handoff-loses-verdict): a prose message
@@ -381,6 +399,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                     self._redact(path) for path in normalize_artifact_refs(salvaged)
                 ),
                 structured_output=structured,
+                domain_payload=self._redact_json(salvaged),  # type: ignore[arg-type]
             )
 
         # FALLBACK: no result object was accepted — degrade safely (never crash, no
@@ -392,18 +411,37 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary=self._redact(raw.strip() or "codex exec completed"),
+                diagnostic=self._diagnostic(request, raw, "unparseable-output"),
             )
         if not isinstance(parsed, dict):
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="codex exec completed",
                 structured_output={"value": self._redact(str(parsed))},
+                diagnostic=self._diagnostic(request, raw, "non-object-output"),
             )
         # A parsed dict that is NOT this step's result object: keep a redacted summary if
         # present, but emit NO artifact_refs / verdict (reject-guard parity with pi).
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary=self._redact(str(parsed.get("summary", "codex exec completed"))),
+            diagnostic=self._diagnostic(request, raw, "no-artifact-refs"),
+        )
+
+    def _diagnostic(
+        self, request: AgentRunRequest, output: str, classification: str
+    ) -> WorkerDiagnostic:
+        """Describe a successful subprocess response that violated the result contract."""
+        model, effort = self._model_and_effort(request)
+        tail = self._redact((output or "").strip())[-_MAX_DIAGNOSTIC_TAIL:]
+        return WorkerDiagnostic(
+            runtime=AgentRuntimeKind.CODEX_EXEC.value,
+            model=model,
+            requested_reasoning=effort,
+            actual_reasoning=None,
+            exit_code=0,
+            parser_classification=classification,
+            output_tail=tail,
         )
 
     def _structured_from_payload(self, payload: dict[str, object]) -> dict[str, str]:

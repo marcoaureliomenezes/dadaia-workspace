@@ -1,17 +1,12 @@
-"""Tests for ``core/kernel_tunables.py`` — the single home for lifecycle-kernel constants.
+"""Tests for the pure lifecycle-kernel timing constants.
 
-T-014-01 (FR-W4-05, DP-1). The module is a pure-constant home (zero I/O) that every
-kernel module (lease, gate_policy, doctor, hooks) imports its tunables from. These tests
-assert three things:
+These tests assert three things:
 
 1. **Single-home (AST/import check, NOT a digit grep).** Each kernel module that consumes a
    tunable imports its name from ``core.kernel_tunables`` rather than redeclaring the magic
    number inline. We parse the module source and assert the import edge exists.
-2. **Behavioral observation.** Re-stamping ``kernel_tunables.LEASE_TTL_SECONDS`` is observed
-   by the lease's own liveness predicate — the constant is a live single source, not a copy.
-
-The lease-local ``lease.LEASE_TTL_SECONDS`` re-export (a one-release deprecation shim) was
-removed in v0.1.53; ``LEASE_TTL_SECONDS`` is imported from ``core.kernel_tunables`` directly.
+2. **Behavioral observation.** Re-stamping ``PRESENCE_TTL_SECONDS`` is observed by
+   advisory presence expiry.
 """
 
 from __future__ import annotations
@@ -74,12 +69,9 @@ def _imports_name_from_kernel_tunables(source: str, name: str) -> bool:
 
 
 def test_tunables_are_pure_constants_with_no_io_imports() -> None:
-    assert isinstance(kernel_tunables.LEASE_TTL_SECONDS, int)
-    assert isinstance(kernel_tunables.SENTINEL_ORPHAN_AGE_SECONDS, float)
+    assert isinstance(kernel_tunables.PRESENCE_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SENTINEL_GC_TTL_SECONDS, int)
     assert isinstance(kernel_tunables.SESSION_GC_TTL_SECONDS, int)
-    assert isinstance(kernel_tunables.CAS_MAX_RETRIES, int)
-    assert isinstance(kernel_tunables.CAS_INITIAL_BACKOFF_SECONDS, float)
     assert isinstance(kernel_tunables.RECONCILER_THROTTLE_TTL_SECONDS, int)
 
     # The module must be a zero-I/O constant home (no os/subprocess/pathlib/open).
@@ -103,7 +95,7 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
     ("module", "name"),
     [
         ("dadaia_workspace.hooks.ctx_inject", "SENTINEL_GC_TTL_SECONDS"),
-        ("dadaia_workspace.features.spec_context.doctor", "SENTINEL_ORPHAN_AGE_SECONDS"),
+        ("dadaia_workspace.features.spec_context.presence", "PRESENCE_TTL_SECONDS"),
     ],
 )
 def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) -> None:
@@ -116,25 +108,16 @@ def test_kernel_module_imports_tunable_from_single_home(module: str, name: str) 
 # --------------------------------------------------------------------------- #
 
 
-def test_lock_liveness_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The liveness predicate path observes the centralized ``kernel_tunables`` TTL constant.
-
-    v0.1.76 T-3: ``lease.py`` no longer imports ``kernel_tunables`` at all (the acquisition
-    machinery that consumed ``LEASE_TTL_SECONDS``/``CAS_MAX_RETRIES`` as defaults —
-    ``acquire``/``steal`` — is deleted; the presence module carries the live TTL contract
-    now). This test re-baselines to the surviving single source: a record's own ``ttl``
-    field, judged by ``core.lock_liveness.is_stale`` against the SAME
-    ``kernel_tunables.LEASE_TTL_SECONDS`` a caller reads to stamp that field — proving the
-    constant is a live single source, not a copy, without depending on any acquisition API.
-    """
+def test_record_liveness_observes_kernel_constant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The generic TTL predicate observes the same value stamped by its caller."""
     from datetime import UTC, datetime, timedelta
 
-    from dadaia_workspace.core import lock_liveness
+    from dadaia_workspace.core import record_liveness
 
-    monkeypatch.setattr(kernel_tunables, "LEASE_TTL_SECONDS", 7)
-    assert kernel_tunables.LEASE_TTL_SECONDS == 7
-    ttl = kernel_tunables.LEASE_TTL_SECONDS
+    monkeypatch.setattr(kernel_tunables, "PRESENCE_TTL_SECONDS", 7)
+    assert kernel_tunables.PRESENCE_TTL_SECONDS == 7
+    ttl = kernel_tunables.PRESENCE_TTL_SECONDS
     old_hb = (datetime.now(tz=UTC) - timedelta(seconds=ttl + 10)).isoformat()
     fresh_hb = datetime.now(tz=UTC).isoformat()
-    assert lock_liveness.is_stale({"heartbeat": old_hb, "ttl": ttl}) is True
-    assert lock_liveness.is_stale({"heartbeat": fresh_hb, "ttl": ttl}) is False
+    assert record_liveness.is_stale({"heartbeat": old_hb, "ttl": ttl}) is True
+    assert record_liveness.is_stale({"heartbeat": fresh_hb, "ttl": ttl}) is False

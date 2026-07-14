@@ -67,23 +67,3 @@ class Event:
     cost_micro_usd: int | None  # NULL when model unknown or Codex aggregated
     pricing_version: str | None
     suspect: int  # 0 | 1 — devops T7 bounds check
-
-
-@dataclass(frozen=True)
-class Workflow:
-    """Workflow discovered from SKILL.md frontmatter."""
-
-    name: str
-    source_path: str
-    description: str | None
-    apply_to: str | None
-    discovered_at: str
-    last_seen_at: str
-
-
-@dataclass(frozen=True)
-class WorkflowAgent:
-    """Many-to-many link between a workflow and an agent name."""
-
-    workflow_name: str
-    agent_name: str

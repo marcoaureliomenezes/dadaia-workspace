@@ -166,17 +166,11 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
 
     # AC-T10c-5: primary_context.json removed.
     assert not primary.exists()
-    # AC-T10c-6: required dirs created.
+    # Session identity remains; retired lock namespaces and audit logs are not recreated.
     assert (ws / ".dadaia" / "sessions").is_dir()
-    assert (ws / ".dadaia" / "locks" / "implementation").is_dir()
-    assert (ws / ".dadaia" / "states" / "ctx_locks").is_dir()
-    # Audit event appended.
-    log_file = ws / ".dadaia" / "logs" / "lock-events.jsonl"
-    assert log_file.exists()
-    lines = [ln for ln in log_file.read_text().splitlines() if ln.strip()]
-    assert len(lines) >= 1
-    event = json.loads(lines[0])
-    assert event["event"] in ("MIGRATION_COMPLETE", "MIGRATION_SKIPPED")
+    assert not (ws / ".dadaia" / "locks").exists()
+    assert not (ws / ".dadaia" / "states" / "ctx_locks").exists()
+    assert not (ws / ".dadaia" / "logs" / "lock-events.jsonl").exists()
 
     # Migrating an already-v2 file is a no-op (content unchanged).
     ws2, states2 = _workspace(tmp_path / "v2-noop")

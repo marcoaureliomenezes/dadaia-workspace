@@ -53,4 +53,4 @@ contracts:
 runtime_state:
   - ".dadaia/states/spec_contexts.json — context store (JSON)"
   - ".dadaia/agentic/manifest.json — staged asset manifest with SHA256 hashes"
-  - ".dadaia/sessions/sess_*.json — per-session lock files"
+  - ".dadaia/sessions/sess_*.json — caller-owned session records"

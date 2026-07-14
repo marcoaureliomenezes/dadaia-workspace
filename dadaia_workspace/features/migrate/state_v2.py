@@ -1,6 +1,6 @@
 """State-file migration: spec_contexts.json v1 → v2.
 
-This module implements the 12 ordered migration actions defined in T-10c.
+This module implements the v1-to-v2 context-record migration.
 It is called by ``dadaia migrate [--dry-run] [--yes]``.
 
 Migration is idempotent on v2 workspaces (no-op).
@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -25,10 +24,6 @@ class MigrationPlan:
     primary_context_exists: bool
     dirs_to_create: list[str] = field(default_factory=list)
     already_v2: bool = False
-
-
-def _now_iso() -> str:
-    return datetime.now(tz=UTC).isoformat()
 
 
 def _detect_schema_version(data: dict) -> str:  # type: ignore[type-arg]
@@ -94,12 +89,7 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
         contexts_to_migrate.append(entry)
 
     dirs_to_create = []
-    for rel in (
-        ".dadaia/sessions",
-        ".dadaia/locks/implementation",
-        ".dadaia/states/ctx_locks",
-        ".dadaia/logs",
-    ):
+    for rel in (".dadaia/sessions",):
         dirs_to_create.append(rel)
 
     return MigrationPlan(
@@ -112,7 +102,7 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
 
 
 def execute_migration(states_dir: Path, workspace_root: Path) -> None:
-    """Execute all 12 migration actions atomically.
+    """Execute the migration atomically.
 
     Actions (in spec order):
     1.  Detect schema_version.
@@ -124,16 +114,12 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
     2f. Write atomically (tmp → os.replace()).
     2g. Delete primary_context.json if exists.
     2h. Create .dadaia/sessions/ directory.
-    2i. Create .dadaia/locks/implementation/ directory.
-    2j. Create .dadaia/states/ctx_locks/ directory.
-    2k. Append migration event to .dadaia/logs/lock-events.jsonl.
     """
     ctx_file = states_dir / "spec_contexts.json"
     primary_file = states_dir / "primary_context.json"
 
     if not ctx_file.exists():
         _create_dirs(workspace_root)
-        _append_migration_event(workspace_root, skipped=True)
         return
 
     raw = json.loads(ctx_file.read_text(encoding="utf-8"))
@@ -188,34 +174,8 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
     # Create required directories
     _create_dirs(workspace_root)
 
-    # Append migration event to lock-events.jsonl
-    _append_migration_event(workspace_root, skipped=False)
-
 
 def _create_dirs(workspace_root: Path) -> None:
     """Create the new directories required by v2."""
-    for rel in (
-        ".dadaia/sessions",
-        ".dadaia/locks/implementation",
-        ".dadaia/states/ctx_locks",
-        ".dadaia/logs",
-    ):
+    for rel in (".dadaia/sessions",):
         (workspace_root / rel).mkdir(parents=True, exist_ok=True)
-
-
-def _append_migration_event(workspace_root: Path, *, skipped: bool) -> None:
-    """Append a migration event to .dadaia/logs/lock-events.jsonl."""
-    log_file = workspace_root / ".dadaia" / "logs" / "lock-events.jsonl"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    event: dict[str, object] = {
-        "ts": _now_iso(),
-        "event": "MIGRATION_SKIPPED" if skipped else "MIGRATION_COMPLETE",
-        "context": None,
-        "release": None,
-        "session_id": None,
-        "runtime": "dadaia-migrate",
-        "pid": os.getpid(),
-        "reason": "spec_contexts.json migrated from v1 to v2" if not skipped else "already v2",
-    }
-    with log_file.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(event) + "\n")

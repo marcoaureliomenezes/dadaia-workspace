@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-09T20:27:48Z",
+  "generated_at": "2026-07-14T04:42:54Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -49,8 +49,8 @@
       "title": "agent-orchestration",
       "category": "product",
       "area": "agents",
-      "tldr": "9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas.",
-      "summary": "Defines the public default 9-core agent topology with coordinator+sub-agent architecture (constitution §9), dispatcher-purity (only PM and project-auditor dispatch), per-agent phase ownership and lease relationships (constitution §14 + §7), the SDD step-0 read order and memory-format law, ADDITIVE vs MUTATING activity classes, the 3 plugin agents carrying real behavior on the plugin/sonnet tier once their pack installs, the two independent tier axes (numeric dispatch band vs registry model-cost Tier), the panel-managed Layer-1 agent model governance (model-agnostic sources + 3 templates + overlay + single resolver + render-at-install, never-Fable-on-security), and the Layer-2 persona surface.",
+      "tldr": "Nine core Layer-1 roles, eight Layer-2 personas, two dispatchers, four workflows, and advisory-only concurrency.",
+      "summary": "Defines role ownership, dispatch purity, memory bootstrap, task discipline, review checkpoints, model governance, and the relationship between Layer-1 agents and Layer-2 workflow personas. No role acquires or coordinates a concurrency lock.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -58,13 +58,12 @@
         "workflows",
         "dispatch"
       ],
-      "token_estimate": 1700,
+      "token_estimate": 526,
       "depends_on": [
-        "plugin-packs",
-        "tech-stack",
-        "panel",
-        "architecture",
         "dadaia-workflows",
+        "lifecycle-foundation",
+        "sdd-gate-v3",
+        "agent-comms",
         "harness-codex",
         "harness-pi"
       ]
@@ -128,7 +127,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1880,
+      "token_estimate": 2524,
       "depends_on": [
         "plugin-packs",
         "agent-orchestration",
@@ -189,7 +188,7 @@
       "category": "product",
       "area": "harness",
       "tldr": "Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.",
-      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, model catalog, and what a Codex-only workspace installation contains.",
+      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, content-delta changed-path attribution, bytecode-suppression environment preservation, model catalog, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
@@ -198,7 +197,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 680,
+      "token_estimate": 980,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -210,11 +209,11 @@
     {
       "rank": 10,
       "slug": "harness-pi",
-      "title": "Harness — PI (pi-coding-agent)",
+      "title": "Harness - PI (pi-coding-agent)",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator's Codex subscription.",
-      "summary": "Capability and scaffold truth for the PI harness at both agentic layers — the post-trust Ring-1 extension, the PI_HEADLESS worker transport and auth, the model set including the OpenRouter allowlist, telemetry posture, and what a PI-only workspace installation contains.",
+      "tldr": "Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles.",
+      "summary": "PI can enter the workspace interactively after explicit trust and can execute bounded Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified Codex-subscription ids; optional OpenRouter profiles remain explicit; headless attempts preserve bytecode-suppression env and report content-delta changed paths.",
       "path": "specs/memory/product/harness/harness-pi.md",
       "tags": [
         "harness",
@@ -223,14 +222,13 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 740,
+      "token_estimate": 380,
       "depends_on": [
-        "workspace-init",
-        "tech-stack",
+        "dadaia-workflows",
         "lifecycle-foundation",
-        "sdd-gate-v3",
+        "multi-platform-parity",
         "agent-monitoring",
-        "public-asset-distribution"
+        "sdd-gate-v3"
       ]
     },
     {
@@ -259,28 +257,23 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "local control surface (dadaia panel); 7 tabs incl. Sub-agents (L1 agent model governance); Workflows leads with server-SVG diagram-cards + model pickers.",
-      "summary": "local control surface at http://127.0.0.1:4999/ via dadaia panel; 7 tabs (Projects / Workflows / Sub-agents / Sessions / Reports / Academy / Servers) — the old Agentic tab (Agents + personas + Kanban) does not exist. Sub-agents (v0.1.65) is the Layer-1 agent model-governance surface: a roster of per-agent model + effort pickers + template selector + explicit Apply (validate → save the agent-model-policy overlay → re-render both L1 projections → G-2 post-apply pop-up); endpoints GET/PUT /api/agent-model-policy, GET /api/agent-model-templates, POST /api/agent-model-policy/validate. Workflows LEADS the surface: a catalog of server-SVG diagram-cards (render_dag_svg + optional node_meta carrying role/gate/harness/model) default-visible at the top, expand = FLOW strip + formatted per-step cards + inline per-step model pickers (codex/pi toggle + profile dropdown incl. pi-openrouter-kimi-high → kimi-2.7:high; default/reset), policy matrix in a collapsed disclosure. Sessions is an aggregated-cost DASHBOARD ONLY (v0.1.52: 4 stat cards + cost-unknown banner from the server-side /api/sessions aggregate; the list/drawer/detail endpoint are gone), 3-palette theme switcher, PI telemetry via reader/pi.py + PiRuntimeAdapter, memory .md rendered in-memory via mistune; telemetry SQLite through the pragma'd factory (WAL+busy_timeout, per-call ro connections). NO authentication: the guards are the loopback-only bind + Host-header allowlist (403 to a foreign Host), the same for mutations; strict CSP + nosniff. /api/personas does NOT exist; /api/agents served for telemetry; /api/kanban DELETED in v0.1.52 (view+route+CSS+tokens+container wiring); /api/lifecycle-runs served with no dedicated UI.",
+      "tldr": "Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris.",
+      "summary": "`dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. The Games tab includes wall-wrapping Snake plus Tetris. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
         "ui",
         "http",
-        "dashboard"
+        "dashboard",
+        "games"
       ],
-      "token_estimate": 5275,
+      "token_estimate": 394,
       "depends_on": [
+        "dadaia-workflows",
         "agent-orchestration",
-        "architecture",
-        "lifecycle-foundation",
         "agent-monitoring",
-        "brand-identity",
         "server-registry",
-        "context-management",
-        "public-asset-distribution",
-        "academy",
-        "specs-doctor",
-        "sdd-gate-v3"
+        "brand-identity"
       ]
     },
     {
@@ -289,8 +282,8 @@
       "title": "product-vision",
       "category": "product",
       "area": "philosophy",
-      "tldr": "Identity, pillars, users, capability map, known limits, and anti-slop stance — the normative §13 shape of dadaia-workspace (docs/01_medium_codex.md).",
-      "summary": "Current-truth distillation of the normative Product Vision (docs/01_medium_codex.md). Covers the workspace identity (what it is and is not), the five design pillars, the canonical scaffold and operational layout, the development lifecycle phases, the concurrency model, the nine-core agent model, and the anti-slop operating stance. Constitution §0 operationalizes this vision into binding law; this atom cites, does not duplicate, constitution sections.",
+      "tldr": "A strict, portable SDD workspace that gives agents current context, four reliable workflows, visible concurrency, and strong anti-slop boundaries.",
+      "summary": "Defines dadaia-workspace as a local-first environment for context-bound agent work. It combines canonical specs and memory, deterministic safety gates, four executable lifecycle workflows, cross-harness projections, auditable evidence, and explicit workspace/repository hygiene.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
         "vision",
@@ -299,29 +292,13 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 1700,
+      "token_estimate": 358,
       "depends_on": [
         "spec-context-project",
-        "tech-stack",
-        "plugin-packs",
-        "architecture",
-        "lifecycle-foundation",
         "dadaia-workflows",
-        "context-management",
         "sdd-gate-v3",
-        "specs-doctor",
-        "workspace-doctor",
-        "sdd-bug-backlog-governance",
-        "public-asset-distribution",
-        "multi-platform-parity",
-        "panel",
-        "agent-monitoring",
-        "agent-comms",
-        "workspace-init",
-        "workspace-portability",
-        "cross-platform-portability",
-        "server-registry",
-        "agent-orchestration"
+        "architecture",
+        "public-asset-distribution"
       ]
     },
     {
@@ -330,8 +307,8 @@
       "title": "spec-context-project",
       "category": "product",
       "area": "philosophy",
-      "tldr": "The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0).",
-      "summary": "Defines the Spec Context Project — the central organizing unit of dadaia-workspace. One canonical specs folder bound to one repository. Session binding triggers the bind→inject→enforce→parallel-multi-project value chain that lets a generic agent fleet build real projects safely and concurrently. Constitution §0 is the single source of truth for this concept.",
+      "tldr": "One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work.",
+      "summary": "The central unit of dadaia-workspace. Binding selects the project and injects its current memory for the caller; the SDD gate and workflows constrain writes while advisory presence surfaces concurrent sessions without locking them out.",
       "path": "specs/memory/product/philosophy/spec-context-project.md",
       "tags": [
         "spec-context",
@@ -339,12 +316,12 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 900,
+      "token_estimate": 185,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
-        "agent-orchestration",
-        "public-asset-distribution"
+        "dadaia-workflows",
+        "architecture"
       ]
     },
     {
@@ -353,23 +330,21 @@
       "title": "context-management",
       "category": "product",
       "area": "platform",
-      "tldr": "multi-context ALIVE/DEAD; bind persists mode and writes the bind-epoch marker; TTL+PID-veto lease; `context release` drops the lease; dead() needs a clean tree.",
-      "summary": "multi-context ALIVE/DEAD lifecycle (no global primary); `dadaia context bind` (--mode optional, default read) persists context/mode/pid in the CLI-owned session record via session_identity, refreshes the incumbent pointer AND writes the `.dadaia/states/bind_epoch/<ctx>` marker — the ONLY context-memory injection trigger (first-ALIVE deleted from the injection chain; an unbound session receives only the generic preflight + list of ALIVE contexts); READ sessions are non-acquiring in the gate; locking = ONE cross-platform TTL-lease per context (`.dadaia/states/ctx_locks/<ctx>.lock.json`; acquire/liveness/heartbeat/steal-GC mechanics owned by sdd-gate-v3) plus port/adapter Lock-1 (workspace) and Lock-2 (per-context git ops); `dadaia context release` drops the session's lease(s) (eval flow by sid; default flow by bound-context + dead-pid-or-ancestry, never drops a live foreign holder) and the heartbeat never resurrects a released session's lease; bind records renewed by heartbeat (last_seen_at, TTL GC); repo_url lifecycle (create --url, back-fill via origin on alive/dead, context update --url, CTX-URL-1); dead() refuses untracked files without --commit and runs a secret scan before the push; dadaia migrate (v1→v2); scaffold canonical tree v2; CLIs dadaia release/backlog new, dadaia memory product add; bug intake is exclusively the event-sourced `dadaia bugs append` (there is no Markdown bug scaffolder).",
+      "tldr": "ALIVE/DEAD context registry, caller-owned session binding, bind-driven memory injection, and advisory presence with no concurrency locks.",
+      "summary": "Manages Spec Context Projects and their repositories. Bind persists context and mode only for the caller, writes the bind-epoch injection marker, and never acquires a lock. Concurrent work is allowed and surfaced through expiring presence records.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
         "lifecycle",
         "session",
-        "locking"
+        "no-locks"
       ],
-      "token_estimate": 3560,
+      "token_estimate": 424,
       "depends_on": [
-        "sdd-bug-backlog-governance",
-        "public-asset-distribution",
+        "spec-context-project",
         "sdd-gate-v3",
-        "workspace-init",
         "workspace-doctor",
-        "agent-orchestration"
+        "workspace-init"
       ]
     },
     {
@@ -378,8 +353,8 @@
       "title": "cross-platform-portability",
       "category": "product",
       "area": "platform",
-      "tldr": "dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash).",
-      "summary": "Establishes the cross-platform foundation for dadaia-workspace v0.1.8 — a PLATFORM singleton (sole sys.platform call site), typed platform exceptions, 4 protocol ports, 9 infrastructure adapters, a Python governance hooks package, and a hard-gated 3-OS CI matrix. Defines the 3-tier resilience contract (fail-loud for security, degrade-with-log for non-security, unsupported-platform at construction). As of 0.1.8 rc-2 the Windows + macOS CI legs are GREEN and HARD-GATED (no continue-on-error; branch-protection required); classifier is POSIX::Linux + MacOS + Microsoft::Windows.",
+      "tldr": "Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests.",
+      "summary": "`core/platform.py` owns platform detection. OS-sensitive behavior is behind ports and infrastructure adapters; security failures are loud, non-security features degrade explicitly, and unsupported capabilities fail at construction.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -387,17 +362,14 @@
         "portability",
         "windows",
         "macos",
-        "linux",
-        "hooks",
-        "security"
+        "linux"
       ],
-      "token_estimate": 1750,
+      "token_estimate": 213,
       "depends_on": [
-        "public-asset-distribution",
         "workspace-init",
-        "context-management",
         "sdd-gate-v3",
-        "architecture"
+        "architecture",
+        "multi-platform-parity"
       ]
     },
     {
@@ -406,8 +378,8 @@
       "title": "multi-platform-parity",
       "category": "product",
       "area": "platform",
-      "tldr": "Claude Code, Codex, and PI get honest runtime-specific projections from one public source (9 core agents / 18 skills / 2 reference workflow docs).",
-      "summary": "Codex uses native config, shared and Codex-specific skills, interactive-only hook execution (codex exec never fires hooks — headless posture is chokepoints-only), native Starlark .rules command policy with venv-path prefix_rule patterns, workflow docs that do not auto-execute, read-only sandbox for evidence-only reviewers, and registry-derived Codex-native model tiering (model id × model_reasoning_effort). All harnesses are protected by the git chokepoints (pre-commit lease gate + pre-push security-verdict gate), which fire independently of harness hooks. The Layer-1 entry-harness set is exactly {claude, codex, pi}. PI projects a minimal `.pi/` surface and is Layer-1-governed via AGENTS.md natively plus a post-trust Ring-1 SDD-gate extension (.pi/extensions/dadaia-sdd-gate.ts → pre_gate). Public surface is 9 core agents + 3 plugin stubs, 18 skills, 2 reference workflow docs.",
+      "tldr": "Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source.",
+      "summary": "Defines Layer-1 projection parity without pretending the harnesses have identical primitives. Codex and PI also provide Layer-2 workflow workers; Claude remains Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
@@ -416,14 +388,13 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 1675,
+      "token_estimate": 271,
       "depends_on": [
-        "tech-stack",
-        "architecture",
         "public-asset-distribution",
-        "lifecycle-foundation",
-        "dadaia-workflows",
-        "plugin-packs"
+        "harness-claude-code",
+        "harness-codex",
+        "harness-pi",
+        "sdd-gate-v3"
       ]
     },
     {
@@ -473,8 +444,8 @@
       "title": "workspace-doctor",
       "category": "product",
       "area": "platform",
-      "tldr": "workspace-state diagnosis + repair; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix runs SENTINEL/PTR/GRAVEYARD-GC.",
-      "summary": "diagnosis + repair of workspace-state invariants with optional --fix. Emitted checks: context ALIVE/DEAD (INV-4, INV-5), invalid TTL-lease (LOCK-NEW), stale lease of a dead/unprobeable holder (LOCK-GC — never reclaims a live pid), production-write without task_id in the audit log (LOCK-4), BLOCKED_ATTEMPT in the audit log (LOCK-5, signal), ALIVE context with empty repo_url (CTX-URL-1), root whitelist + forbidden caches + tool configs + .dadaia/ subdirs (ROOT-1..4), venv health (VENV-1). Fix-only actions (appear only under --fix, not as issues): SENTINEL-GC, PTR-GC, GRAVEYARD-GC. Bind/session records decay by TTL against heartbeat-renewed last_seen_at. Known limitation: the command exits 0 even with issues.",
+      "tldr": "Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state.",
+      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, stale presence, and legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -482,11 +453,11 @@
         "health",
         "repair"
       ],
-      "token_estimate": 1300,
+      "token_estimate": 184,
       "depends_on": [
-        "workspace-init",
-        "specs-doctor",
-        "context-management"
+        "context-management",
+        "sdd-gate-v3",
+        "workspace-init"
       ]
     },
     {
@@ -495,8 +466,8 @@
       "title": "workspace-init",
       "category": "product",
       "area": "platform",
-      "tldr": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure.",
-      "summary": "entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure; `dadaia init --harness <set>` scaffolds only the chosen harnesses and persists the selection to harness_profile.json (absent ⇒ all-four back-compat); PreToolUse registered as ONE Python command (python -m dadaia_workspace.hooks.pre_gate), not bash; no legacy ctx-inject.sh is shipped or installed.",
+      "tldr": "Idempotent bootstrap of workspace state, Python venv, selected harness projections, and governance hooks.",
+      "summary": "`dadaia init` creates the canonical `.dadaia/` runtime, provisions `.dadaia/.venv`, records the harness profile, stages/installs public assets, and configures runtime hooks without creating repository-local state.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
         "workspace",
@@ -504,10 +475,11 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 930,
+      "token_estimate": 208,
       "depends_on": [
         "public-asset-distribution",
-        "sdd-gate-v3"
+        "multi-platform-parity",
+        "workspace-doctor"
       ]
     },
     {
@@ -537,8 +509,8 @@
       "title": "dadaia-workflows",
       "category": "product",
       "area": "sdd",
-      "tldr": "The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona.",
-      "summary": "The roster and invocability truth of the dadaia-workflows: 7 workflows defined in the governed catalog (release_definition, implementation, backlog_definition, closure, audit, research, bug_report), now ALL operator-invocable (v0.1.56), surfaced by these CLI verbs: release define, backlog define, pipeline, implement, review qa|security|code, close, audit, research, bug_report, implement-review (~12 verbs on 7 workflows — implement-review is a verb on the implementation workflow, not a new workflow). audit/research/bug_report gained container builders + CLI verbs, born resolver-governed on the shared policy seam (no second raw id:effort path). Every model-driven step prompt on every verb carries its fragment AND its persona. Engine mechanics live in lifecycle-foundation.",
+      "tldr": "Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit.",
+      "summary": "The complete executable workflow surface. Each workflow has one CLI command, a Python-owned ordered body, fragment-plus-persona worker prompts, semantic gates, immutable per-attempt payloads, and an auditable handoff graph. Codex and PI are the supported real Layer-2 workers; fake is the deterministic test adapter.",
       "path": "specs/memory/product/sdd/dadaia-workflows.md",
       "tags": [
         "sdd",
@@ -546,13 +518,14 @@
         "lifecycle",
         "layer-2"
       ],
-      "token_estimate": 900,
+      "token_estimate": 649,
       "depends_on": [
         "lifecycle-foundation",
-        "agent-orchestration",
-        "tech-stack",
+        "agent-comms",
         "sdd-gate-v3",
-        "panel"
+        "harness-codex",
+        "harness-pi",
+        "agent-orchestration"
       ]
     },
     {
@@ -561,8 +534,8 @@
       "title": "lifecycle-foundation",
       "category": "product",
       "area": "sdd",
-      "tldr": "Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort.",
-      "summary": "`dadaia lifecycle` is the deterministic, multi-harness lifecycle engine. The CLI stays thin and calls procedural Python services in `features/lifecycle`; Python owns lifecycle state transitions, canonical runtime files, hygiene status/cleanup, semantic handoff gates, blocked/resume states, and scoped worker prompts. Each lifecycle step drives a bounded agent worker behind `AgentRuntimePort`, with the harness selectable per step via `build_agent_runtime(kind, *, cwd, model)` (the runtime-kind roster — single source [[tech-stack]]). LAW 1: the selectable Layer-2 workflow harnesses are {pi, codex, fake} (claude rejected as a workflow harness; the Claude SDK adapter kept/tested for Layer-1). LAW 2: a discrete per-harness model catalog selected on the CLI (--step-model, profile-ids-only). The verbs are dadaia-workflows — Python bodies that import prompt fragments, select dynamic context, call workers, and advance Python-validated gates (workflow roster and invocability: the dadaia-workflows atom). The 4 handoff-ledger bodies share ONE FragmentGateWorkflow base + assembly mixin; a declarative role→memory-atom map grounds each step's role at assembly, the active ACTIVE.md phase threads into SpecContext, and a fragment_coherence_doctor (FRAG-COH-1..4) guards fragment/selector/role-map coherence. Single-step verbs run `LifecyclePhaseWorkflow`; the multi-step `LifecyclePipeline` threads one run through the IMPLEMENTATION→QA→SECURITY→CODE→CLOSURE ladder with per-step harness mixing. The Claude SDK adapter enforces a real Ring-1 write boundary via the shared `core/scope_match` classifier; a cacheable hashed `PromptPrefix` is reused across steps. Model AND harness selection are governed by one control plane: a built-in + operator-local WorkflowModelProfile registry over harness_models, an atomic validated operator overlay with per-context `extends` inheritance (missing != invalid), one shared WorkflowExecutionPolicyResolver (effective-harness precedence CLI step > CLI default > overlay step > overlay default_harness > catalog default; apply_entry_to_step as the single per-step runtime_kind author), a per-run policy snapshot frozen before step 1, and WMP-* governance doctor checks. Workflow steps communicate over a run-scoped producer→consumer handoff ledger (LifecycleRun.workflow_steps control plane + immutable run-scoped step payloads + resolver + retention + attempt loop + handoffs doctor). Layer-2 emitters produce handoff-v1.2 with self_pull.refs from InjectedContext refs (role-map fallback → honest v1.1 on zero refs); the role→atom map data lives in core/role_atom_map.py (same-object re-export via role_atoms.py). Anti-slop self-governance is built in: a directory-aware slop metric and a boundary-safe retention sweep.",
+      "tldr": "Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence.",
+      "summary": "The runtime foundation beneath the four dadaia-workflows. Python owns sequencing, context selection, policy resolution, task-marker and artifact gates, advisory Git preflight warnings, run state, retries, diagnostics, and retention. Codex and PI workers run behind AgentRuntimePort with content-delta changed-path attribution.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",
@@ -571,14 +544,13 @@
         "hygiene",
         "gates"
       ],
-      "token_estimate": 7560,
+      "token_estimate": 655,
       "depends_on": [
-        "harness-pi",
-        "architecture",
-        "tech-stack",
         "dadaia-workflows",
         "agent-comms",
-        "panel"
+        "sdd-gate-v3",
+        "harness-codex",
+        "harness-pi"
       ]
     },
     {
@@ -587,25 +559,22 @@
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "tldr": "Event-sourced JSONL bug store + backlog-consistency engine + bug/backlog → release governance (grill, disposition, audit-disposition law, security-gated push).",
-      "summary": "Owns the bug + backlog governance mechanism: the event-sourced JSONL bug store (bug-event-v1; dadaia bugs append|status|stats; reported + one terminal event), the backlog-consistency engine (subject registry, fail-closed classifier, backlog doctor BL-*, consumed_backlog ledger + removal-on-release), the bug/backlog → release protocol (PM-dispatched pick, sanitize, mandatory grill, bug-always-solved/supersession), the audit-disposition law, the alpha-N/rc-N maturation model, and the mechanically gated push boundary.",
+      "tldr": "Event-sourced JSONL bugs, duplicate-safe backlog definition, release consumption, audit dispositions, and exact-commit security-gated push.",
+      "summary": "Bugs are append-only events; backlog definition binds canonical subjects and prevents duplicate/conflicting intake; release definition consumes explicit items; closure and audit require terminal dispositions. Intake is additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
         "governance",
         "release-lifecycle",
         "backlog",
-        "bugs",
-        "alpha-rc-model",
-        "backlog-ownership"
+        "bugs"
       ],
-      "token_estimate": 1720,
+      "token_estimate": 309,
       "depends_on": [
+        "dadaia-workflows",
         "specs-doctor",
         "sdd-gate-v3",
-        "lifecycle-foundation",
-        "dadaia-workflows",
-        "public-asset-distribution"
+        "agent-comms"
       ]
     },
     {
@@ -614,21 +583,22 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition.",
-      "summary": "Two-layer enforcement. (1) Python hooks: PreToolUse runs through ONE merged entrypoint — `dadaia_workspace.hooks.pre_gate` — which reads stdin once and evaluates the policies in fixed order root-whitelist → venv-guard → SDD gate, first-block-wins, each policy fail-open (PROTECTED is the only fail-closed path). The SDD classifier is context-relative (ADDITIVE allows with no lease, MEMORY gated by phase, FROZEN blocks — incl. the per-artifact _archives matched BEFORE ADDITIVE (R-2), MUTATING acquires the TTL-lease via O_EXCL CAS with PID veto); a multi-file apply_patch classifies ALL headers (most restrictive verdict wins); READ is non-acquiring. PostToolUse renews the heartbeat via the by-session index (no full scan) and runs the advisory reconciler (never blocks). (2) Git chokepoints: the pre-commit lease gate (DP-4 chain, zero-false-block, advisory ALLOW+WARN degradation) and the mechanical pre-push security-verdict gate (metrics.commit_sha per pushed sha) — they run independently of harness hooks. Tunables in core/kernel_tunables.py; hook latency in .dadaia/logs/hook-latency.jsonl.",
+      "tldr": "No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces CI and an approved security handoff for every pushed commit.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
         "gate",
         "hooks",
         "enforcement",
-        "chokepoints"
+        "no-locks"
       ],
-      "token_estimate": 3425,
+      "token_estimate": 552,
       "depends_on": [
-        "sdd-bug-backlog-governance",
         "context-management",
-        "agent-orchestration"
+        "dadaia-workflows",
+        "workspace-doctor",
+        "architecture"
       ]
     },
     {
@@ -637,8 +607,8 @@
       "title": "specs-doctor",
       "category": "product",
       "area": "sdd",
-      "tldr": "Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034.",
-      "summary": "SDD structural checks: non-sequential SPEC-DOC IDs (001..009, 012, 016; 022/023 embedded in backlog check 012) covering memory .md via LINT-1 + CAT-1, ACTIVE.md, CLOSURE evidence triples, D-OC-1; ledger invariants 024 (phase↔markers), 026/027 (release ids/naming), 028 (constitution refs), 029 (lease↔session coherence in 3 states), 030 (audit naming), 031/035 (backlog disposition), 032 (legacy bug status), 033 (bug JSONL event store), 034 (_archive dirs, auto-fix), 036 (archived audit names its release), 037 (constitution does not enumerate runtime kinds), 038 (loose undispositioned audit, WARN); SPECS-VERSION (pattern-version staleness); TREE-1..7 + TREE-5M. --fix repairs TREE-4 AND SPEC-DOC-034.",
+      "tldr": "Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence.",
+      "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance, and coherence validators. `--fix` performs only deterministic repairs.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -646,13 +616,11 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 2320,
+      "token_estimate": 212,
       "depends_on": [
+        "dadaia-workflows",
         "sdd-bug-backlog-governance",
-        "tech-stack",
-        "workspace-doctor",
-        "context-management",
-        "sdd-gate-v3"
+        "workspace-doctor"
       ]
     }
   ]

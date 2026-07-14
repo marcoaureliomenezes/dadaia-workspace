@@ -4,21 +4,27 @@ The operator's two-layer model (v0.1.24 ADR-B) makes the Layer-2 worker model a
 **discrete choice on the CLI call**, not a tier abstraction. Each Layer-2 harness
 exposes an ordered, finite set of ``(model_id, reasoning_effort)`` options:
 
-- **pi → 4 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, low)``, ``(gpt-5.3-codex, medium)``,
+- **pi → 4 options:** ``(openai-codex/gpt-5.3-codex-spark, high)``,
+  ``(openai-codex/gpt-5.3-codex-spark, low)``,
+  ``(openai-codex/gpt-5.3-codex-spark, medium)``,
   ``(moonshotai/kimi-k2.5, high)``
-- **codex → 2 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, medium)``
+- **codex → 2 options:** ``(gpt-5.3-codex-spark, high)``, ``(gpt-5.3-codex-spark, medium)``
 
 **Allowlist-validated invariant (ADR-B, opened v0.1.44).** PI runs on the operator's
-*Codex* subscription but its model set is **allowlist-validated**, not GPT-only: a
-curated set of Layer-2-native OpenRouter worker ids (:data:`LAYER2_EXTRA_MODEL_IDS`,
-e.g. ``moonshotai/kimi-k2.5``) is permitted alongside the registry codex ids. The retained safety
+*Codex* subscription for GPT models, while a curated non-GPT Layer-2-native
+OpenRouter worker id (:data:`LAYER2_EXTRA_MODEL_IDS`, currently
+``moonshotai/kimi-k2.5``) is permitted alongside the registry Codex ids. Provider-
+qualified ``openai-codex`` ids are mandatory so PI cannot resolve an ambiguous GPT
+name through another provider. OpenRouter GPT ids are deliberately excluded so a GPT
+workflow cannot silently bypass the operator's Codex subscription. The retained safety
 bound is **no ``claude-*`` id** (including the region-restricted ``claude-fable-5``)
 can ever appear at Layer 2 — claude is never a Layer-2 worker. Layer-1 Claude (the
 ``CLAUDE_SDK`` adapter) is unaffected — this catalog governs Layer-2 worker selection
 only.
 
 **Single source of truth, no second drifting table.** Every model id named here MUST
-be in :func:`known_layer2_model_ids` — the registry ``codex_id`` set UNION the curated
+be in :func:`known_layer2_model_ids` — the registry ``codex_id`` set, its
+provider-qualified ``openai-codex/`` projection for PI, UNION the curated
 Layer-2-native allowlist. The catalog is validated against that union at import time
 (:func:`_assert_ids_known`), so a registry id rename, or an OpenRouter id missing from
 the allowlist, surfaces here loudly instead of silently drifting. The catalog itself is
@@ -49,8 +55,8 @@ class HarnessModelOption:
 
     ``model_id`` is an allowlist-validated Layer-2 worker id (never ``claude-*`` — see
     module docstring) that MUST be in :func:`known_layer2_model_ids` (a registry
-    ``codex_id`` or a curated OpenRouter id). ``effort`` is the Codex reasoning-effort
-    axis the worker runs at.
+    ``codex_id``, its provider-qualified PI projection, or a curated OpenRouter id).
+    ``effort`` is the Codex reasoning-effort axis the worker runs at.
     """
 
     model_id: str
@@ -69,14 +75,14 @@ class HarnessModelOption:
 # ---------------------------------------------------------------------------
 _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
     PI_HARNESS: (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "low"),
-        HarnessModelOption("gpt-5.3-codex", "medium"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
         HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     ),
     CODEX_HARNESS: (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     ),
 }
 
@@ -104,17 +110,22 @@ def _known_codex_ids() -> frozenset[str]:
     return frozenset(entry.codex_id for entry in REGISTRY)
 
 
+def pi_codex_subscription_model_ids() -> frozenset[str]:
+    """Provider-qualified PI model ids backed by the Codex subscription."""
+    return frozenset(f"openai-codex/{model_id}" for model_id in _known_codex_ids())
+
+
 def known_layer2_model_ids() -> frozenset[str]:
     """The full set of model ids a Layer-2 worker selection may name.
 
     The single source of truth for Layer-2 model-id membership: the registry
-    ``codex_id`` set UNION the Layer-2-native allowlist
-    (:data:`LAYER2_EXTRA_MODEL_IDS`). Both the catalog invariant
+    ``codex_id`` set, its provider-qualified PI Codex-subscription projection, UNION
+    the Layer-2-native allowlist (:data:`LAYER2_EXTRA_MODEL_IDS`). Both the catalog invariant
     (:func:`_assert_ids_known`) and the operator-overlay store validate against
     this one public helper, so neither leaks the private ``_known_codex_ids``
     across the layer boundary nor drifts from the other.
     """
-    return _known_codex_ids() | LAYER2_EXTRA_MODEL_IDS
+    return _known_codex_ids() | pi_codex_subscription_model_ids() | LAYER2_EXTRA_MODEL_IDS
 
 
 def _assert_ids_known() -> None:
@@ -170,7 +181,7 @@ def model_choices(harness: str) -> tuple[str, ...]:
     """Return the human-facing CLI ``--model`` choices for *harness*.
 
     Each choice is ``"<model_id>:<effort>"`` so the two distinct codex profiles of the
-    same model id remain individually selectable (``gpt-5.5:high`` vs ``gpt-5.5:medium``).
+    same model id remain individually selectable (``gpt-5.3-codex-spark:high`` vs ``gpt-5.3-codex-spark:medium``).
     Order matches :func:`options_for`.
     """
     return tuple(f"{opt.model_id}:{opt.effort}" for opt in options_for(harness))
@@ -182,8 +193,8 @@ def validate(harness: str, model: str) -> HarnessModelOption:
     *model* is matched against each option's ``"<model_id>:<effort>"`` choice string
     (the canonical CLI form) and, as a convenience, against a bare ``model_id`` **only
     when that id is unambiguous** for the harness (exactly one effort). This keeps the
-    common ``gpt-5.3-codex`` case ergonomic while forcing the ambiguous ``gpt-5.5`` to
-    be disambiguated by effort.
+    unambiguous ids ergonomic while forcing ``openai-codex/gpt-5.3-codex-spark`` to be
+    disambiguated by effort.
 
     Args:
         harness: the Layer-2 harness name (e.g. ``"pi"``, ``"codex"``).

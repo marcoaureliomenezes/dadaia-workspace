@@ -51,8 +51,7 @@ from dadaia_workspace.features.lifecycle.governed_catalog import (
 from dadaia_workspace.features.lifecycle.governed_catalog import (
     _assert_catalog_defaults_resolve as _assert_catalog_defaults_resolve,
 )
-from dadaia_workspace.features.workflows.dag import NodeMeta, render_dag_svg
-from dadaia_workspace.features.workflows.service import StageDTO
+from dadaia_workspace.features.workflows.dag import NodeMeta, StageDTO, render_dag_svg
 
 # ---------------------------------------------------------------------------
 # Card fluxogram enrichment (server-rendered SVG is the single diagram source)

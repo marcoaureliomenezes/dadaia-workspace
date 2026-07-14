@@ -21,8 +21,8 @@ def test_list_known_rows_absent_catalog_empty_and_canonical_path(tmp_path: Path)
     empty_svc = ReposService(excel_reader=FakeExcelReader())
     assert empty_svc.list_known(tmp_path) == []
 
-    # ReposService must read repos.xlsx from .dadaia/src/ (canonical path).
-    expected_path = tmp_path / ".dadaia" / "src" / "repos.xlsx"
+    # ReposService reads the staged canonical asset; no duplicate .dadaia/src exists.
+    expected_path = tmp_path / ".dadaia" / "agentic" / "data" / "repos.xlsx"
     captured_paths: list[Path] = []
 
     class CapturingReader:

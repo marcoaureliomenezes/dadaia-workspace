@@ -1,11 +1,4 @@
-"""Unit tests for T-017-06: WorkflowsService injected into PanelService.
-
-Keeps only the executed-path assertion: list_workflow_summaries() delegates to
-the injected workflows_service. The ``inspect.signature``/``getsource``
-introspection tests (constructor-parameter presence, source-string
-non-construction) were DELETED — they assert on implementation strings, not
-executed behavior.
-"""
+"""PanelService delegates workflow reads to its governed catalog provider."""
 
 from __future__ import annotations
 
@@ -18,7 +11,7 @@ from dadaia_workspace.features.panel.service import PanelService
 pytestmark = pytest.mark.unit
 
 
-class _FakeWorkflowSummary:
+class _FakeWorkflow:
     def __init__(self, name: str) -> None:
         self.name = name
 
@@ -28,13 +21,13 @@ class _FakeWorkflowsService:
 
     def __init__(self, names: list[str]) -> None:
         self._names = names
-        self.list_summaries_called = 0
+        self.list_called = 0
 
-    def list_summaries(self) -> list[_FakeWorkflowSummary]:
-        self.list_summaries_called += 1
-        return [_FakeWorkflowSummary(n) for n in self._names]
+    def list_dadaia_workflows(self) -> list[_FakeWorkflow]:
+        self.list_called += 1
+        return [_FakeWorkflow(n) for n in self._names]
 
-    def get_detail(self, name: str) -> None:
+    def get_dadaia_workflow(self, name: str) -> None:
         return None
 
 
@@ -60,13 +53,12 @@ def _build_service(
     )
 
 
-def test_list_workflow_summaries_uses_injected_service() -> None:
-    """list_workflow_summaries() must delegate to the injected workflows_service."""
+def test_list_dadaia_workflows_uses_injected_service() -> None:
     fake = _FakeWorkflowsService(["workflow-a", "workflow-b"])
     service = _build_service(workflows_service=fake)
 
-    summaries = service.list_workflow_summaries()
+    workflows = service.list_dadaia_workflows()
 
-    assert fake.list_summaries_called == 1
-    assert len(summaries) == 2
-    assert summaries[0].name == "workflow-a"
+    assert fake.list_called == 1
+    assert len(workflows) == 2
+    assert workflows[0].name == "workflow-a"

@@ -4,11 +4,10 @@
 stores. This contract greps the active product surface for the two forbidden idioms:
 
   1. **Pointer-namespace construction** — building a ``sessions/runtime/*.ptr`` path.
-     This namespace is FULLY collapsed by R3: only ``session_identity`` may construct it.
-     The grep is ratchet-free and MUST be 0 outside the owner.
+     This retired namespace must not be constructed anywhere.
 
   2. **Session-record open** — building a ``sessions/<id>.json`` path to read/write the
-     record. R3 routes the in-scope consumers (lease, ctx_inject, spec_context.doctor,
+     record. R3 routes the in-scope consumers (ctx_inject, spec_context.doctor,
      hooks/sdd_post_gate) through the owner. One consumer remains NOT migrated and carries an
      explicit, documented allowlist disposition:
        - ``core/specs_resolver.py`` — a core-layer READER that cannot import the
@@ -29,8 +28,7 @@ from pathlib import Path
 
 OWNER_RELPATH = "dadaia_workspace/features/spec_context/session_identity.py"
 
-#: Idiom for the pointer namespace ``sessions/runtime/*.ptr`` — code that builds the
-#: runtime pointer directory. Ratchet-free: 0 hits allowed outside the owner.
+#: Idiom for the retired pointer namespace ``sessions/runtime/*.ptr``.
 POINTER_IDIOMS: tuple[str, ...] = (
     '"sessions" / "runtime"',
     '"runtime" / f"{',
@@ -92,18 +90,15 @@ def test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only() -> 
     for path in _iter_py_files(repo / ACTIVE_PRODUCT_ROOT):
         relpath = path.relative_to(repo).as_posix()
         text = path.read_text(encoding="utf-8")
-        if relpath != OWNER_RELPATH:
-            for idiom in POINTER_IDIOMS:
-                if idiom in text:
-                    pointer_failures.append(
-                        f"{relpath}: constructs pointer-namespace path ({idiom!r})"
-                    )
+        for idiom in POINTER_IDIOMS:
+            if idiom in text:
+                pointer_failures.append(f"{relpath}: constructs pointer-namespace path ({idiom!r})")
         if relpath != OWNER_RELPATH and relpath not in allowed:
             for idiom in RECORD_IDIOMS:
                 if idiom in text:
                     record_failures.append(f"{relpath}: constructs session-record path ({idiom!r})")
     assert pointer_failures == [], (
-        f"pointer-namespace residue must be 0 outside the owner: {pointer_failures}"
+        f"retired pointer-namespace residue must be 0: {pointer_failures}"
     )
     assert record_failures == [], (
         f"unexpected session-record opener (not owner/allowlisted): {record_failures}"

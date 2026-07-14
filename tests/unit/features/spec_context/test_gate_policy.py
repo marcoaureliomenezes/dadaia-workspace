@@ -1,22 +1,4 @@
-"""T-010-03 / WS-R1: classifier re-root — full class×location taxonomy.
-
-The 2026-06-10 audit (CONF-1 CRITICAL, arch F1, sec F-1) proved the gate's class
-taxonomy was computed on the **workspace-root-relative** path, so every in-repo write
-(``repos/<slug>/...``) matched MUTATING first: in-repo bugs/backlog/audits acquired or
-stole the per-context lease (the lease-theft incident), in-repo ``specs/memory`` bypassed
-the PE phase lock, and in-repo ``specs/_archive`` was writable. All real Spec Context
-artifacts live under ``repos/<slug>/specs/``, so the ADDITIVE/MEMORY/FROZEN classes were
-dead for every compliant workspace.
-
-This matrix asserts ``classify_path`` applies the ordered ``specs/`` taxonomy
-**context-relatively**: every class × {workspace-root, in-repo} × {default slug,
-non-default slug}, plus the two no-class-match MUTATING rows the audit named explicitly —
-in-repo production source and in-repo ``specs/constitution.md``. An in-repo remainder that
-matches no class is MUTATING (FR-R1-04), **never** UNGATED.
-
-CRITICAL path-class taxonomy: never-UNGATED and the _archive/-FROZEN boundary are
-gate-integrity and stay named.
-"""
+"""Current path taxonomy and advisory-presence behavior of the SDD gate."""
 
 from __future__ import annotations
 
@@ -43,7 +25,7 @@ def _in_repo(slug: str, ctx_rel: str) -> str:
 
 # (row_id, ctx_rel_or_root_suffix, expected_class)
 _SPEC_RELATIVE_CASES: tuple[tuple[str, str, PathClass], ...] = (
-    ("additive_bugs", "specs/bugs/lease-stolen.md", PathClass.ADDITIVE),
+    ("additive_bugs", "specs/bugs/concurrency-warning.md", PathClass.ADDITIVE),
     ("additive_backlog", "specs/backlog/epic.md", PathClass.ADDITIVE),
     ("additive_audits", "specs/audits/2026-01-01T000000Z-abc12345/index.md", PathClass.ADDITIVE),
     ("memory_atom", "specs/memory/architecture.md", PathClass.MEMORY),
@@ -182,7 +164,7 @@ def test_archive_prefix_boundary_and_ordering() -> None:
     for rel_path in (
         "specs/backlog/_archive/epic.md",
         "specs/audits/_archive/2026-01-01T000000Z-abc12345/audit.md",
-        "specs/bugs/_archive/lease-stolen.md",
+        "specs/bugs/_archive/concurrency-warning.md",
     ):
         assert classify_path(rel_path) == PathClass.FROZEN
 
@@ -249,20 +231,11 @@ def test_evaluate_archive_block_and_additive_allow(
 
 
 # ---------------------------------------------------------------------------
-# v0.1.76 T-4 (FR7): PRESENCE_UPSERT/PRESENCE_WARN audit-log events.
+# Advisory presence is caller-owned state and never blocks.
 # ---------------------------------------------------------------------------
 
 
-def _events(workspace: Path) -> list[dict[str, object]]:
-    import json as _json
-
-    log = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
-    if not log.exists():
-        return []
-    return [_json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
-
-
-def test_evaluate_mutating_write_emits_presence_upsert_event(tmp_path: Path) -> None:
+def test_evaluate_mutating_write_upserts_presence(tmp_path: Path) -> None:
     decision, _ = evaluate(
         tmp_path,
         "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
@@ -275,13 +248,11 @@ def test_evaluate_mutating_write_emits_presence_upsert_event(tmp_path: Path) -> 
         pid=1234,
     )
     assert decision == Decision.ALLOW
-    events = [e for e in _events(tmp_path) if e.get("event") == "PRESENCE_UPSERT"]
-    assert events, "expected a PRESENCE_UPSERT event on a MUTATING write"
-    assert events[0]["session_id"] == "sess-solo"
-    assert events[0]["context"] == "dadaia-workspace"
+    record = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace" / "sess-solo.json"
+    assert record.is_file()
 
 
-def test_evaluate_advisory_fire_emits_presence_warn_event(tmp_path: Path) -> None:
+def test_evaluate_peer_presence_warns_but_allows(tmp_path: Path) -> None:
     from dadaia_workspace.features.spec_context import presence
 
     presence.upsert(tmp_path, "dadaia-workspace", "owner-A", runtime="claude", pid=1)
@@ -300,11 +271,6 @@ def test_evaluate_advisory_fire_emits_presence_warn_event(tmp_path: Path) -> Non
     assert decision == Decision.ALLOW
     assert "owner-A" in message
 
-    events = [e for e in _events(tmp_path) if e.get("event") == "PRESENCE_WARN"]
-    assert events, "expected a PRESENCE_WARN event when the advisory fires"
-    assert events[0]["session_id"] == "intruder"
-    assert "owner-A" in events[0].get("reason", "")
-
 
 def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
     decision, _ = evaluate(
@@ -317,4 +283,5 @@ def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
         mode="IMPLEMENTATION",
     )
     assert decision == Decision.ALLOW
-    assert _events(tmp_path) == []
+    presence_dir = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace"
+    assert not presence_dir.exists()

@@ -4,7 +4,7 @@ description: UX/UI designer, design-spec author, and visual-review checkpoint. O
 dispatch_band: 3
 model: claude-sonnet-5
 activity_class: MUTATING
-lease_relationship: "PM sub-agent — no independent acquire"
+concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"
 gate_role: "design-spec author + visual-review checkpoint (UI)"
 tools:
   - Read

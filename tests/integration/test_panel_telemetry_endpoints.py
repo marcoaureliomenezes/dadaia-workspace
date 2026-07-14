@@ -27,8 +27,6 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
     ContextBreakdown,
     RecentSession,
     TokenTotals,
-    WorkflowListResult,
-    WorkflowSummary,
 )
 
 _CANNED_AGENT = AgentSummary(
@@ -73,20 +71,6 @@ _CANNED_AGENTS_RESULT = AgentListResult(
     agents=[_CANNED_AGENT],
 )
 
-_CANNED_WORKFLOWS_RESULT = WorkflowListResult(
-    generated_at="2026-05-17T10:00:00Z",
-    source_hint=".claude/skills/, .agents/skills/",
-    workflows=[
-        WorkflowSummary(
-            workflow_id="test-skill",
-            display_name="test-skill",
-            description="A test skill",
-            source=".claude/skills/",
-            agent_ids=["test-agent"],
-        )
-    ],
-)
-
 _CANNED_SESSIONS: list[RecentSession] = [
     RecentSession(
         session_id_prefix="s1s2s3s4",
@@ -122,9 +106,6 @@ class StubTelemetryService:
         }
         return _CANNED_AGENTS_RESULT
 
-    def list_workflows(self) -> WorkflowListResult:
-        return _CANNED_WORKFLOWS_RESULT
-
     def list_sessions_by_agent(
         self,
         agent_id: str,
@@ -144,21 +125,10 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
     def _stub_json(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "application/json", b"{}")
 
-    def _stub_workflows_list(**kw: Any) -> tuple[int, str, bytes]:
-        import datetime as _dt
-
-        payload = {
-            "generated_at": _dt.datetime.now(tz=_dt.UTC).isoformat(),
-            "source_hint": ".dadaia/agentic/workflows/",
-            "workflows": [],
-        }
-        return (200, "application/json; charset=utf-8", json.dumps(payload).encode("utf-8"))
-
     stub_views = {
         "index": _stub_view,
         "api_panel_status": _stub_json,
         "api_contexts": _stub_json,
-        "api_workflows": _stub_workflows_list,
         "memory": _stub_view,
         "memory_view": _stub_view,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
@@ -216,15 +186,6 @@ def test_endpoints_no_auth_window_days_forwarding_404_body_and_security_headers(
     assert "agents" in data
     assert "generated_at" in data
 
-    status, _, _ = _get(f"{base}/api/workflows")
-    assert status == 200
-
-    status, _, body = _get(f"{base}/api/workflows", token=token)
-    assert status == 200
-    data = json.loads(body)
-    assert "workflows" in data
-    assert "generated_at" in data
-
     status, _, body = _get(f"{base}/api/agents/foo/sessions")
     assert status == 200
     data = json.loads(body)
@@ -241,7 +202,7 @@ def test_endpoints_no_auth_window_days_forwarding_404_body_and_security_headers(
     assert status == 404
     body_text = body.decode("utf-8", errors="replace")
     assert "/api/agents" in body_text
-    assert "/api/workflows" in body_text
+    assert "/api/workflow-catalog" in body_text
 
     # Security headers: CSP on HTML, nosniff on JSON.
     status, headers, _ = _get(f"{base}/")
@@ -283,10 +244,6 @@ class TestPrivacyT1ForbiddenFieldScan:
         status, _, body = _get(f"{base}/api/agents", token=token)
         assert status == 200
         self._check_no_forbidden_fields(json.loads(body), "/api/agents")
-
-        status, _, body = _get(f"{base}/api/workflows", token=token)
-        assert status == 200
-        self._check_no_forbidden_fields(json.loads(body), "/api/workflows")
 
         status, _, body = _get(f"{base}/api/agents/foo/sessions", token=token)
         assert status == 200

@@ -3,9 +3,8 @@
 
 Covers: the ``_compare``/``_compare_content`` primitives, ``doctor()`` status matrix
 (missing-manifest raises / [ok] / [drift] / CLAUDE.md-stub check), the git-dirty check
-(dirty lines / no-dirty / not-a-repo / git-not-found / timeout), doctor finding
-persistence (actionable → ``report_doctor_finding``, [ok]/[not-applicable] → not),
-``list_all()``, ``_classify_workflows``, ``_runtime_expectations`` (incl. the FR9
+(dirty lines / no-dirty / not-a-repo / git-not-found / timeout), read-only doctor
+behavior, ``list_all()``, ``_runtime_expectations`` (including the
 no-consumer-yield regression), and the D-CX-1..6 doctor-check matrix (one function per
 check, each already carrying its own accept/reject param table).
 """
@@ -213,11 +212,8 @@ def test_doctor_status_matrix(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_doctor_git_dirty_states_and_finding_persistence(tmp_path: Path) -> None:
-    """git-dirty [warn] lines for real dirty paths, no [warn] when clean, explicit
-    status lines for not-a-repo/git-missing/timeout, AND doctor() persists every
-    actionable ([missing]/[drift]/[fail]/[warn]) finding via report_doctor_finding
-    (never an [ok] line) — driven off the same clean-git fixture."""
+def test_doctor_git_dirty_states_are_reported_without_side_effects(tmp_path: Path) -> None:
+    """Doctor reports dirty/not-applicable states and remains a read-only diagnostic."""
     import subprocess
 
     public_dir, workspace_root = _make_minimal_workspace(tmp_path)
@@ -267,27 +263,10 @@ def test_doctor_git_dirty_states_and_finding_persistence(tmp_path: Path) -> None
             reports_case = manager.doctor(workspace_root)
         assert expected in reports_case
 
-    with (
-        patch("subprocess.run", return_value=clean_result),
-        patch("dadaia_workspace.infrastructure.public_assets.report_doctor_finding") as mock_report,
-    ):
-        reports_persist = manager.doctor(workspace_root)
-
-    actionable = [
-        r.strip()
-        for r in reports_persist
-        if r.strip().startswith(("[missing]", "[drift]", "[fail]", "[warn]"))
-    ]
-    assert len(actionable) > 0, "Expected at least one actionable finding"
-    assert mock_report.call_count == len(actionable)
-    for call_args in mock_report.call_args_list:
-        assert call_args[0][1] == "doctor-public"
-    reported_messages = [call_args[0][2] for call_args in mock_report.call_args_list]
-    for msg in reported_messages:
-        assert not msg.startswith("[ok]"), f"[ok] line should not be reported: {msg}"
+    assert not (workspace_root / ".dadaia" / "bugs").exists()
 
 
-def test_list_all_and_classify_workflows(tmp_path: Path) -> None:
+def test_list_all_reports_current_public_asset_categories(tmp_path: Path) -> None:
     manager_empty = FileSystemPublicAssetManager()
     manager_empty._public_dir = tmp_path / "nonexistent"
     assert manager_empty.list_all() == {}
@@ -310,23 +289,6 @@ def test_list_all_and_classify_workflows(tmp_path: Path) -> None:
     assert "my-skill" in result["skills"]
     assert "my-rule.md" in result["rules"]
     assert "README.md" not in result  # non-directories at root are skipped
-
-    agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
-    assert manager._classify_workflows(agentic_dir) == []
-
-    wf_dir = agentic_dir / "workflows"
-    wf_dir.mkdir()
-    (wf_dir / "simple.workflow.md").write_text(
-        "# Simple WF\nNo parallel_group.\n", encoding="utf-8"
-    )
-    (wf_dir / "parallel.workflow.md").write_text(
-        "---\nparallel_group: alpha\n---\n# WF\n", encoding="utf-8"
-    )
-    out = manager._classify_workflows(agentic_dir)
-    assert any(line == "[ok] claude:workflows/simple.workflow.md" for line in out)
-    assert any("[reference-only]" in line and "simple.workflow.md" in line for line in out)
-    assert any(line == "[ok] claude:workflows/parallel.workflow.md" for line in out)
-    assert any("[reference-only]" in line and "parallel.workflow.md" in line for line in out)
 
 
 # ---------------------------------------------------------------------------
@@ -458,35 +420,6 @@ def test_dcx1_dcx2_dcx3(tmp_path: Path) -> None:
     no_agents_codex = no_agents_ws / ".codex"
     no_agents_codex.mkdir()
     assert manager._dcx2_config_toml_entries(no_agents_agentic, no_agents_codex) == []
-
-    # D-CX-3: workflow drift — missing / extra / in-sync.
-    dcx3_agentic, dcx3_ws = _build_minimal_agentic_dir(tmp_path / "dcx3")
-    dcx3_wf_dir = dcx3_agentic / "workflows"
-    dcx3_wf_dir.mkdir()
-    (dcx3_wf_dir / "my-workflow.workflow.md").write_text("# WF\n", encoding="utf-8")
-    dcx3_codex_dir = dcx3_ws / ".codex"
-    dcx3_codex_dir.mkdir()
-    dcx3_out = manager._dcx3_workflow_drift(dcx3_agentic, dcx3_codex_dir)
-    assert any("my-workflow.workflow.md" in line and "[missing]" in line for line in dcx3_out)
-
-    extra_agentic, extra_ws = _build_minimal_agentic_dir(tmp_path / "extra")
-    (extra_agentic / "workflows").mkdir()
-    extra_codex_dir = extra_ws / ".codex"
-    extra_codex_wf = extra_codex_dir / "workflows"
-    extra_codex_wf.mkdir(parents=True)
-    (extra_codex_wf / "extra.workflow.md").write_text("# extra\n", encoding="utf-8")
-    extra_out = manager._dcx3_workflow_drift(extra_agentic, extra_codex_dir)
-    assert any("extra.workflow.md" in line and "[extra]" in line for line in extra_out)
-
-    sync_agentic, sync_ws = _build_minimal_agentic_dir(tmp_path / "sync")
-    sync_wf_dir = sync_agentic / "workflows"
-    sync_wf_dir.mkdir()
-    (sync_wf_dir / "my.workflow.md").write_text("# WF\n", encoding="utf-8")
-    sync_codex_dir = sync_ws / ".codex"
-    sync_codex_wf = sync_codex_dir / "workflows"
-    sync_codex_wf.mkdir(parents=True)
-    (sync_codex_wf / "my.workflow.md").write_text("# WF\n", encoding="utf-8")
-    assert manager._dcx3_workflow_drift(sync_agentic, sync_codex_dir) == []
 
 
 def _dcx4_clean_gpt_toml(tmp_path: Path) -> Path:

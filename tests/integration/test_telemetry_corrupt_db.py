@@ -4,7 +4,7 @@ permission hardening (T-AM-20, folded in — same TelemetryService target, same 
 Merged per plan-integration.md (11 -> 2), plus the T-AM-20 permissions fn folded in:
   1. corruption: integrity-check -> quarantine rename (+wal/shm siblings) -> is_degraded;
      healthy negative.
-  2. degraded HTTP: agents/sessions 503 + body message, workflows 200 unaffected,
+  2. degraded HTTP: agents/sessions 503 with an actionable body,
      non-telemetry route unaffected (table).
   3. permission hardening: state_dir 0o700 + db 0o600, idempotent on drift (POSIX-only).
 
@@ -61,9 +61,6 @@ class _StubAggregator:
     def list_agents(self, **kwargs: Any) -> list:
         return []
 
-    def list_workflows(self) -> list:
-        return []
-
     def list_sessions_by_agent(self, agent_id: str, **kwargs: Any) -> list:
         return []
 
@@ -107,7 +104,6 @@ def _build_panel_server(token: str, svc: TelemetryService) -> ThreadingHTTPServe
         "index": _stub_view,
         "api_panel_status": _stub_json,
         "api_contexts": _stub_json,
-        "api_workflows": _stub_json,
         "memory": _stub_view,
         "memory_view": _stub_view,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
@@ -248,7 +244,6 @@ class TestHandlerDegradedResponses:
         [
             ("/api/agents", True, 503),
             ("/api/agents", False, 503),  # no-auth: degraded check gates, not auth
-            ("/api/workflows", True, 200),  # canonical WorkflowsService, unaffected
             ("/api/agents/some-agent/sessions", True, 503),
             ("/api/agents/some-agent/sessions", False, 503),
             ("/", False, 200),  # non-telemetry route stays up

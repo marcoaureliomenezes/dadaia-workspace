@@ -26,7 +26,7 @@ from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
 )
 from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
-_WORKFLOW = "implementation"
+_WORKFLOW = "implementation_reviews"
 
 
 def _resolver(overlay: WorkflowModelPolicyOverlay | None = None) -> WorkflowExecutionPolicyResolver:
@@ -46,7 +46,7 @@ def _overlay(steps: dict[str, str]) -> WorkflowModelPolicyOverlay:
 def test_library_default_resolution_and_overlay_override() -> None:
     snapshot = _resolver().resolve(_WORKFLOW, context="default")
     labels = [entry.step for entry in snapshot.steps]
-    assert labels == ["implement", "review_qa", "review_security", "review_code"]
+    assert labels == ["implement", "review_combined", "close"]
     for entry in snapshot.steps:
         assert entry.source is PolicySource.LIBRARY_DEFAULT
         assert entry.model  # concrete model id resolved
@@ -56,10 +56,10 @@ def test_library_default_resolution_and_overlay_override() -> None:
     assert impl is not None
     assert impl.model_profile == "codex-implementation-standard"
     assert impl.harness == "codex"
-    assert impl.model == "gpt-5.5"
+    assert impl.model == "gpt-5.3-codex-spark"
     assert impl.reasoning == "medium"
 
-    qa = snapshot.step("review_qa")
+    qa = snapshot.step("review_combined")
     assert qa is not None
     assert qa.model_profile == "codex-review-deep"
     assert qa.reasoning == "high"
@@ -75,7 +75,7 @@ def test_library_default_resolution_and_overlay_override() -> None:
     assert overridden_impl.model_profile == "codex-review-deep"
     assert overridden_impl.source is PolicySource.DEFAULT_OVERLAY
     # untouched steps stay library default
-    assert overridden.step("review_qa").source is PolicySource.LIBRARY_DEFAULT  # type: ignore[union-attr]
+    assert overridden.step("review_combined").source is PolicySource.LIBRARY_DEFAULT  # type: ignore[union-attr]
 
     # CLI beats overlay: the same overlay override is superseded by an explicit CLI pin.
     cli_snapshot = _resolver(overlay).resolve(

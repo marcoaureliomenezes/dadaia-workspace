@@ -5,10 +5,8 @@ supports PreToolUse hooks — ``codex exec`` headless and any non-hooked runtime
 (bug ``codex-exec-hooks-do-not-fire-headless``). The chokepoints close that gap at the two
 git boundaries every workflow must cross:
 
-* **pre-commit lease gate** (:func:`pre_commit_decision`, FR-W1-01 / DP-4) — a commit into a
-  Spec Context repo from a session that does NOT hold the context's MUTATING lease is
-  blocked; the holder's own commits flow; commits while no lease exists flow
-  (zero-false-block).
+* **pre-commit presence check** (:func:`pre_commit_decision`) — warns when another live
+  session is present and always allows the commit on concurrency grounds.
 * **push-gate verdict check** (:func:`push_gate_decision`, FR-W1-02 / DP-5) — a push is
   blocked unless a ``security-reviewer`` APPROVE handoff covers every pushed commit sha.
 

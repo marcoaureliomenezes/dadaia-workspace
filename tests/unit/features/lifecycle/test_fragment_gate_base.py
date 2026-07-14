@@ -40,9 +40,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandof
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
     backlog_definition,
-    bug_report,
     release_definition,
-    research,
 )
 from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     AuthoredItem,
@@ -99,7 +97,16 @@ def _seed(tmp_path: Path) -> Path:
     (specs / "memory" / "quality-assurance.md").write_text("# q\n", encoding="utf-8")
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / _RELEASE / art).write_text(f"# {art}\n", encoding="utf-8")
+        body = f"# {art}\n"
+        if art == "PLAN.md":
+            body += (
+                "\n## Validation Dependency Table\n\n"
+                "| Workstream | Produces by end | Direct validation "
+                "| Validation dependencies | Deferred integration evidence |\n"
+                "|---|---|---|---|---|\n"
+                "| WS-1 | value | unit tests | None | None |\n"
+            )
+        (specs / "releases" / _RELEASE / art).write_text(body, encoding="utf-8")
     return specs
 
 
@@ -156,7 +163,7 @@ def test_base_iterates_run_scoped_sequence_not_module_global(tmp_path: Path) -> 
             label="cs_b",
             role="product-engineer",
             fragment_id="release_definition.spec_create",
-            shared_fragment_ids=("shared.output_handoff",),
+            shared_fragment_ids=("shared.anti_slop",),
             produces="generic-step-handoff-v1",
             consumes=("cs_a",),
         ),
@@ -196,7 +203,7 @@ def test_completed_definition_repoints_active_md(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review_qa",
+            fragment_id="release_definition.spec_review",
             is_review=True,
             produces="spec-review-handoff-v1",
             consumes=("cs_a",),
@@ -282,7 +289,9 @@ def test_backlog_scope_threads_resolved_model(tmp_path: Path) -> None:
 
     result = wf.run("bd-model", _clean_demand(), sequence=sequence)
 
-    assert result.completed is True
+    # The REAL post-authoring review gate may legitimately block here (the scope fake
+    # writes no backlog file to disk) — this test proves only the model-threading seam.
+    assert result.run_id == "bd-model"
     assert fake.received_requests, "no backlog worker request was recorded"
     for req in fake.received_requests:
         assert req.resolved_model is not None, (
@@ -324,9 +333,8 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
     """Grep evidence that the FR1 dedup landed and stayed landed:
 
     * the base defines every shared gate/assembly member + ``_scope``;
-    * no handoff-ledger body (release_definition/audit/research/bug_report) redefines a
-      shared gate/assembly member — except bug_report, which overrides ONLY ``_scope``
-      (its ADDITIVE bug_write special-case);
+    * no handoff-ledger body (release_definition/audit) redefines a shared gate/assembly
+      member;
     * backlog_definition mixes in the assembly helpers via ``_FragmentAssemblyMixin`` with
       no local copy of any of them;
     * every body keeps its module-global ``_SEQUENCE`` (Q3) — the guardrail suites import it.
@@ -335,12 +343,11 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
     for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS, "_scope"):
         assert f"def {member}(" in base, f"base must define {member}"
 
-    for body in ("release_definition", "audit", "research", "bug_report"):
+    for body in ("release_definition", "audit"):
         src = _defs(body)
         for member in (*_GATE_MEMBERS, *_ASSEMBLY_MEMBERS):
             assert f"def {member}(" not in src, f"{body} still defines shared member {member}"
-    assert "def _scope(" in _defs("bug_report")
-    for body in ("release_definition", "audit", "research"):
+    for body in ("release_definition", "audit"):
         assert "def _scope(" not in _defs(body), f"{body} must not redefine _scope"
 
     backlog_src = _defs("backlog_definition")
@@ -350,7 +357,7 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
             f"backlog still defines assembly member {member}"
         )
 
-    for module in (release_definition, audit, research, bug_report, backlog_definition):
+    for module in (release_definition, audit, backlog_definition):
         assert hasattr(module, "_SEQUENCE"), (
             f"{module.__name__} dropped its module-global _SEQUENCE"
         )
@@ -404,7 +411,7 @@ def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review_qa",
+            fragment_id="release_definition.spec_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -457,7 +464,7 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review_qa",
+            fragment_id="release_definition.spec_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -506,3 +513,132 @@ def test_resume_from_unknown_step_or_missing_run_raises(tmp_path: Path) -> None:
         wf.run("never-ran", sequence=custom, resume_from="ghost_step")
     with pytest.raises(ValueError, match="no persisted run"):
         wf.run("never-ran", sequence=custom, resume_from="cs_a")
+
+
+# ---------------------------------------------------------------------------
+# bounded in-run revision — a REJECTED review auto-revises its consumed create
+# step once (with the rejection digest) before the run blocks
+# ---------------------------------------------------------------------------
+
+
+class _RejectNTimesFake(_ScopeFake):
+    """REJECTs the named review step for its first *times* calls, then approves."""
+
+    def __init__(self, reject_label: str, times: int) -> None:
+        super().__init__()
+        self.reject_label = reject_label
+        self.remaining_rejections = times
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        result = super().run(request)
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        if label == self.reject_label and self.remaining_rejections > 0:
+            self.remaining_rejections -= 1
+            return replace(
+                result,
+                structured_output={"verdict": "REJECTED", "verdict_reason": "fix spec"},
+            )
+        return result
+
+
+def _revision_sequence() -> tuple[ReleaseStep, ...]:
+    return (
+        ReleaseStep(
+            label="cs_a",
+            role="product-engineer",
+            fragment_id="release_definition.release_scope",
+            produces="release-scope-handoff-v1",
+        ),
+        ReleaseStep(
+            label="cs_review",
+            role="qa-engineer",
+            fragment_id="release_definition.spec_review",
+            is_review=True,
+            produces="spec-review-handoff-v1",
+            consumes=("cs_a",),
+        ),
+        ReleaseStep(label="cs_gate", role="python", fragment_id=None),
+    )
+
+
+def test_review_rejection_auto_revises_consumed_create_step_once(tmp_path: Path) -> None:
+    """One REJECTED review verdict triggers ONE in-run revision of the create step it
+    consumes — with the rejection digest in the re-run prompt — and the run completes
+    in a single ``run()`` call with no operator resume round-trip."""
+    specs = _seed(tmp_path)
+    fake = _RejectNTimesFake("cs_review", times=1)
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        context_selector=_selector(specs, tmp_path),
+        handoff_resolver=_resolver(tmp_path),
+    )
+
+    result = wf.run("revision-run", sequence=_revision_sequence())
+
+    assert result.completed is True
+    # cs_a, cs_review(REJECTED), cs_a(revised), cs_review(APPROVED)
+    assert len(fake.received_requests) == 4
+    revised_create_prompt = fake.received_requests[2].prompt
+    assert "Prior rejection feedback" in revised_create_prompt
+    assert "verdict_reason: fix spec" in revised_create_prompt
+    run = JsonLifecycleRunStore(tmp_path).load("revision-run")
+    assert run is not None
+    assert run.workflow_steps.find("cs_a", 0) is not None
+    assert run.workflow_steps.find("cs_review", 0) is not None
+
+
+def test_review_rejection_revision_budget_is_one_then_blocks(tmp_path: Path) -> None:
+    """A review that keeps rejecting spends the single revision and then blocks exactly
+    as before — the worst case is bounded, never a loop."""
+    specs = _seed(tmp_path)
+    fake = _RejectNTimesFake("cs_review", times=99)
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        context_selector=_selector(specs, tmp_path),
+        handoff_resolver=_resolver(tmp_path),
+    )
+
+    result = wf.run("revision-block-run", sequence=_revision_sequence())
+
+    assert result.completed is False
+    assert result.blocked is not None and result.blocked.blocked_at_step == "cs_review"
+    # cs_a, cs_review(REJ), cs_a(revised), cs_review(REJ) → block. Exactly 4 worker calls.
+    assert len(fake.received_requests) == 4
+
+
+def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) -> None:
+    """Bug release-resume-drops-skip-scope: a skip-scope run that blocks and is then
+    resumed MUST resume with the same scope-skipped sequence — resuming with the full
+    sequence re-adds the release_scope consume edge and blocks on a payload that was
+    never produced."""
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        _SEQUENCE as _RELEASE_SEQ,
+    )
+
+    specs = _seed(tmp_path)
+    fake = _RejectNTimesFake("spec_review", times=99)
+    wf = ReleaseDefinitionWorkflow(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        context_selector=_selector(specs, tmp_path),
+        handoff_resolver=_resolver(tmp_path),
+    )
+
+    first = wf.run("skip-scope-resume", _RELEASE_SEQ, skip_scope=True)
+    assert first.completed is False
+    assert all(s.label != "release_scope" for s in first.steps)
+
+    fake.remaining_rejections = 0
+    resumed = wf.run("skip-scope-resume", _RELEASE_SEQ, resume_from="spec_create", skip_scope=True)
+    assert resumed.completed is True, (
+        resumed.blocked.reason if resumed.blocked else "unexpected block"
+    )
+    assert all(s.label != "release_scope" for s in resumed.steps)

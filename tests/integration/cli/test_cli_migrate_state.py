@@ -88,10 +88,10 @@ def test_migrate_dry_run_unchanged_then_yes_v2_dirs_and_primary_gone_then_noop(
     assert "is_primary" not in row
     assert "activated_at" not in row
 
-    # AC-T10c-6: sessions/, locks/implementation/, states/ctx_locks/ created.
+    # Only caller-scoped session storage is created. Lock directories are retired.
     assert (v1_workspace / ".dadaia" / "sessions").is_dir()
-    assert (v1_workspace / ".dadaia" / "locks" / "implementation").is_dir()
-    assert (v1_workspace / ".dadaia" / "states" / "ctx_locks").is_dir()
+    assert not (v1_workspace / ".dadaia" / "locks").exists()
+    assert not (v1_workspace / ".dadaia" / "states" / "ctx_locks").exists()
 
     # AC-T10c-5: primary_context.json must not exist after migration.
     assert not primary.exists()

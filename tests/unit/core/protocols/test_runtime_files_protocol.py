@@ -115,6 +115,13 @@ class FakeRuntimeFiles:
     def read_step_payload(self, payload_ref: str) -> str | None:
         return self.step_payloads.get(payload_ref)
 
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        removed = 0
+        for ref in refs:
+            if self.step_payloads.pop(ref, None) is not None:
+                removed += 1
+        return removed
+
 
 def test_fake_runtime_files_satisfies_runtime_file_port_one_write_per_kind() -> None:
     files = FakeRuntimeFiles()

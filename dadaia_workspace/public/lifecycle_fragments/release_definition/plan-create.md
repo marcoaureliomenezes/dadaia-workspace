@@ -33,15 +33,44 @@ PLAN says in what order and by what strategy.
   work lands. The PLAN names the validation each piece must pass.
 - The structural approach for each workstream, consistent with the architecture
   memory — where the change lives and which seams it uses.
+- For every new or changed caller-facing surface, an explicit contract binding:
+  exact public type/function/method names, parameter and return signatures, field
+  names/types, and module/export path. These are PLAN design decisions derived from
+  the approved behavior; do not leave them for TASKS or implementation to invent.
 - A mapping from each SPEC requirement to the workstream(s) that deliver it, so the
   PLAN demonstrably covers the SPEC with nothing orphaned.
+- A `## Validation Dependency Table` section — MANDATORY, a Python lint blocks the
+  step without it. Copy this skeleton verbatim into the PLAN and fill one row per
+  workstream (canonical ids `WS-1`, `WS-2`, …; write `None` for an empty cell; the
+  validation-dependencies cell may name only the current or an earlier workstream):
+
+  ```markdown
+  ## Validation Dependency Table
+
+  | Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |
+  |---|---|---|---|---|
+  | WS-1 | <deliverable> | <command or check> | None | None |
+  ```
 
 ## Rules
 
 - Do not expand scope beyond the approved SPEC. If the SPEC is missing something the
   plan needs, surface it as an open question rather than inventing the requirement.
+- Naming and binding the implementation contract for an approved public behavior is
+  required planning, not scope expansion. If existing source determines the naming
+  convention, follow it; if no defensible binding can be derived, surface the gap as
+  an open question and do not present the PLAN as implementable.
 - Plan the verification, not just the build — every workstream carries how it is
   proven done.
+- Keep validation dependency-safe: a workstream's own validation may use only the
+  product surfaces created before or within that workstream. When end-to-end evidence
+  needs a later integration/orchestration surface, assign that evidence to the later
+  workstream and validate the earlier unit through its direct public or internal
+  contract. Never require an earlier workstream to prove behavior through work that has
+  not been built yet.
+- Foundational value objects and data contracts must be validated through direct
+  construction, equality, serialization, or invariant tests. Do not validate them
+  through an orchestration, replay, UI, or integration surface scheduled later.
 - Respect the architecture; a plan that crosses a forbidden boundary is rejected at
   plan review.
 

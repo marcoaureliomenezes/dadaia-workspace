@@ -19,7 +19,7 @@ flow_steps:
   - "CLI creates the idempotent tree under .dadaia/ and tools runtime dirs."
   - "PythonEnvironmentManager provisions the .venv Python environment."
   - "Runs public stage and public install automatically (unless --skip-assets)."
-  - "Installs repos.xlsx catalog in .dadaia/src/ and the ctx-inject.sh script."
+  - "Stages the repos.xlsx catalog under .dadaia/agentic/data/."
   - "Registers the hook entry in .claude/settings.json."
 
 diagram: |
@@ -42,7 +42,7 @@ differential: >-
 runtime_state:
   - ".dadaia/states/spec_contexts.json — contexts list (empty until first creation)"
   - ".dadaia/academy/academy.json — courses list (empty)"
-  - ".dadaia/src/repos.xlsx — static catalog of known repos"
+  - ".dadaia/agentic/data/repos.xlsx — static catalog of known repos"
   - ".dadaia/scripts/ctx-inject.sh — context injection bash hook"
   - ".venv/ — Python virtualenv"
   - ".claude/settings.json — UserPromptSubmit hook entry"

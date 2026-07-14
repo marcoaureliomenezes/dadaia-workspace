@@ -23,8 +23,7 @@ documented operator-shell convenience var). In particular the harness never sets
   (``dadaia_workspace/hooks/_common.py:resolve_session_id``). ``DADAIA_SESSION_ID`` is an
   *operator override only*, never a harness-supplied value.
 - ``DADAIA_PERSONA`` / ``*_AGENT_PERSONA`` — no harness exposes the dispatched persona to
-  a hook subprocess (this is why the rc-3 persona write-allowlist was a "lock with no
-  key" and was removed). Tests must never plant it.
+  a hook subprocess. Tests must never plant it.
 - ``DADAIA_MODE`` — bind mode is read from the on-disk session record, not a hook env var
   (WS-R4). A hook env never carries it from the harness.
 
@@ -46,7 +45,7 @@ Usage
     result = run_hook_subprocess("sdd_gate", payload, env)
     assert result.returncode == 0
 
-The behavior of every hook/gate/lease test must flow through these helpers: a contract
+The behavior of every hook/gate test must flow through these helpers: a contract
 test (``tests/contract/test_harness_env_contract.py``) HARD-FAILS (no baseline) any test
 that ``setenv``s a non-allowlisted ``DADAIA_*`` outside this module, or imports a hook
 behavior module AND patches ``sys.stdin`` in-process to drive its ``main()`` instead of
@@ -142,12 +141,6 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 #:   - ``DADAIA_MODE`` — the operator-shell mode escape, order (1) of
 #:     ``hooks/sdd_gate._resolve_mode``. Harness-never-set (scrubbed from subprocess env)
 #:     but read from the environment by design when an operator exports it.
-#:   - ``DADAIA_TESTING`` — the test-fixture flag the ``lease._before_write`` TOCTOU seam
-#:     guard reads at import time (``features/spec_context/lease.py:112`` —
-#:     ``os.environ.get("DADAIA_TESTING") == "1"``): the only sanctioned way to install the
-#:     test-only ``_before_write`` interleave hook. Production code reads it by design (the
-#:     assert is the named production reader), so a unit test ``setenv``-ing it exercises a
-#:     real env-read path, not harness-fiction.
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
@@ -156,7 +149,6 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         "DADAIA_AGENT_RUNTIME",
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
-        "DADAIA_TESTING",
         # Operator/test path-override knob read by production in
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR/DADAIA_WORKFLOWS_DIR above.

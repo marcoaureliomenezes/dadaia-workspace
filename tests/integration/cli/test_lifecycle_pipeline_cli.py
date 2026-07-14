@@ -64,7 +64,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -73,7 +73,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
             "--harness",
             "fake",
             "--step-harness",
-            "review_qa=codex",
+            "review_combined=codex",
             "--json",
         ],
     )
@@ -166,7 +166,7 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -184,7 +184,9 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     assert payload["completed"] is False
     # `calls` proves the FAKE was invoked — a real-binary run leaves this list empty
     # (F3 correction: the fake-derivation proof, not the fixed block-reason constant).
-    assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
+    assert len(calls) == 2, (
+        "the faked pi subprocess seam must run once plus the bounded structural correction"
+    )
     # The CLI resolved `--harness pi` -> PI_HEADLESS -> PiHeadlessAdapter, which ran
     # the injected stream; the engine recorded the worker runtime as pi_headless.
     assert payload["steps"][0]["label"] == "implement"
@@ -280,7 +282,7 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
         app,
         [
             "lifecycle",
-            "pipeline",
+            "implementation-reviews",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -413,7 +415,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
             app,
             [
                 "lifecycle",
-                "pipeline",
+                "implementation-reviews",
                 "--skip-preflight",
                 "--release-id",
                 "multiharness-engine-v0116",

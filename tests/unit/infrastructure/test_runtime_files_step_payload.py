@@ -138,3 +138,33 @@ def test_purge_step_payloads_matrix(tmp_path: Path, case: str) -> None:
     else:  # purge-rejects-traversal-in-run-id
         with pytest.raises(RuntimeFilePathError):
             adapter.purge_step_payloads("../escape")
+
+
+def test_purge_worker_outputs_removes_only_exact_confined_refs(tmp_path: Path) -> None:
+    adapter = FilesystemRuntimeFileAdapter(tmp_path)
+    worker = (
+        tmp_path / ".dadaia" / "tmp" / "lifecycle-worker" / "demo" / "run-step.step-output.json"
+    )
+    worker.parent.mkdir(parents=True)
+    worker.write_text("{}", encoding="utf-8")
+    sibling = worker.with_name("keep.txt")
+    sibling.write_text("keep", encoding="utf-8")
+    ref = worker.relative_to(tmp_path).as_posix()
+
+    assert adapter.purge_worker_outputs((ref, ref)) == 1
+    assert not worker.exists()
+    assert sibling.read_text(encoding="utf-8") == "keep"
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        ".dadaia/handoff/not-worker.step-output.json",
+        ".dadaia/tmp/lifecycle-worker/demo/not-json.txt",
+        "../../escape.step-output.json",
+    ],
+)
+def test_purge_worker_outputs_rejects_unconfined_refs(tmp_path: Path, ref: str) -> None:
+    adapter = FilesystemRuntimeFileAdapter(tmp_path)
+    with pytest.raises(RuntimeFilePathError):
+        adapter.purge_worker_outputs((ref,))

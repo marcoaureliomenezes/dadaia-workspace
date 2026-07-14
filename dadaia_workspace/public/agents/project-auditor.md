@@ -3,7 +3,7 @@ name: project-auditor
 description: Tier-1 peer coordinator / drift anchor. Audits spec/memory vs code, finds dead/stale code, dispatches evidence agents (code-reviewer/security-reviewer/software-architect/qa-engineer/ai-engineer). Emits scorecard. NEVER fixes drift.
 dispatch_band: 1
 activity_class: ADDITIVE
-lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
+concurrency_relationship: "always concurrent; advisory presence only"
 gate_role: "none (peer coordinator / drift anchor)"
 tools:
   - Read
@@ -288,10 +288,8 @@ Stop and alert the operator when:
 
 ## Collaboration
 
-**Triggered by:** the operator (on a schedule or on demand). The `audit-fanout`
-workflow is top-level orchestration, not PM nesting the auditor as a leaf sub-agent —
-PM and the auditor are both Tier-1 dispatchers and do not nest (§9 dispatcher
-purity). You are a peer to `project-manager`, not a leaf specialist.
+**Triggered by:** the operator through `dadaia lifecycle audit`. You are a peer to
+`project-manager`, not a leaf specialist.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,
 `software-engineer` (code-surface drift evidence), and `ai-engineer` (prompt-efficiency /

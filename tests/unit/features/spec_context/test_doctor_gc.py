@@ -1,11 +1,4 @@
-"""Unit tests for DoctorService GC operations (T-016-06).
-
-Acceptance criteria (SPEC §8 AC-08):
-    - Stale ctx_locks/<ctx>.lock.json absent after doctor --fix.
-    - TTL-expired .dadaia/sessions/<id>.json absent after doctor --fix.
-    - Orphan ctx_locks/<ctx>.lock.sentinel (mtime > 30s) absent after doctor --fix.
-    - Invalid/missing-fields lock files deleted by --fix.
-    - No stale records: doctor --fix exits 0, nothing deleted.
+"""Doctor cleanup for retired concurrency state and caller-owned sessions.
 
 Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
 semantics now measure against the heartbeat-renewed ``last_seen_at`` (with TTL-from-creation
@@ -25,7 +18,6 @@ pytest.importorskip("fcntl")
 
 import json  # noqa: E402
 import os  # noqa: E402
-import time  # noqa: E402
 from datetime import UTC, datetime, timedelta  # noqa: E402
 from pathlib import Path  # noqa: E402
 
@@ -38,7 +30,6 @@ def _make_workspace(tmp_path: Path) -> Path:
     ws.mkdir()
     (ws / ".dadaia" / "states").mkdir(parents=True)
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws
 
@@ -65,16 +56,17 @@ def _fresh_iso() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Stale/invalid artifact deletion matrix — lock, session, sentinel, invalid, missing-fields
+# Retired context-global state plus expired session record
 # ---------------------------------------------------------------------------
 
 
 def test_gc_deletion_matrix(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
+    ctx_locks_dir.mkdir(parents=True)
     sessions_dir = ws / ".dadaia" / "sessions"
 
-    # (a) stale ctx_locks/<ctx>.lock.json → LOCK-GC (probe-aware reclaim).
+    # Any pre-doctrine content is inert and removed as a directory.
     lock_file = ctx_locks_dir / "myctx.lock.json"
     stale_rec = {
         "context": "myctx",
@@ -100,11 +92,9 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     }
     sess_file.write_text(json.dumps(expired_sess, indent=2), encoding="utf-8")
 
-    # (c) orphan sentinel (mtime > 30s) → SENTINEL-GC.
+    # Additional legacy shapes do not receive individual semantics.
     sentinel = ctx_locks_dir / "myctx.lock.sentinel"
     sentinel.write_text("", encoding="utf-8")
-    old_mtime = time.time() - 60.0
-    os.utime(str(sentinel), (old_mtime, old_mtime))
 
     # (d) invalid JSON lock file → LOCK-NEW.
     bad_lock = ctx_locks_dir / "badctx.lock.json"
@@ -119,39 +109,25 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     actions = doctor.fix()
 
     assert not lock_file.exists()
-    assert any("LOCK-GC" in a and "myctx.lock.json" in a for a in actions), actions
+    assert not ctx_locks_dir.exists()
+    assert any("RETIRED-LOCK-STATE" in a for a in actions), actions
     assert not sess_file.exists()
     assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
     assert not sentinel.exists()
-    assert any("SENTINEL-GC" in a and "myctx.lock.sentinel" in a for a in actions), actions
     assert not bad_lock.exists()
-    assert any("LOCK-NEW" in a and "badctx.lock.json" in a for a in actions), actions
     assert not incomplete_lock.exists()
-    assert any("LOCK-NEW" in a and "incompletectx.lock.json" in a for a in actions), actions
 
 
 # ---------------------------------------------------------------------------
-# Clean-exit + TTL-from-creation fallback — 1 param
+# Clean-exit + TTL-from-creation fallback
 # ---------------------------------------------------------------------------
 
 
 def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
-    ctx_locks_dir = ws / ".dadaia" / "states" / "ctx_locks"
     sessions_dir = ws / ".dadaia" / "sessions"
 
-    # No stale records: doctor fix exits clean, nothing deleted.
-    lock_file = ctx_locks_dir / "freshctx.lock.json"
-    fresh_rec = {
-        "context": "freshctx",
-        "release": "v0.1.6",
-        "session_id": "live-sess",
-        "mode": "BOUND_IMPLEMENTATION",
-        "acquired_at": _fresh_iso(),
-        "heartbeat": _fresh_iso(),
-        "ttl": 1800,
-    }
-    lock_file.write_text(json.dumps(fresh_rec, indent=2), encoding="utf-8")
+    # A fresh caller-owned session survives.
     sess_file = sessions_dir / "live-sess.json"
     fresh_sess = {
         "session_id": "live-sess",
@@ -163,16 +139,11 @@ def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None
         "ttl_seconds": 1800,
     }
     sess_file.write_text(json.dumps(fresh_sess, indent=2), encoding="utf-8")
-    sentinel = ctx_locks_dir / "freshctx.lock.sentinel"
-    sentinel.write_text("", encoding="utf-8")
-
     doctor = _make_doctor(ws)
     actions = doctor.fix()
 
-    assert lock_file.exists()
     assert sess_file.exists()
-    assert sentinel.exists()
-    gc_actions = [a for a in actions if "GC" in a or "LOCK-NEW" in a]
+    gc_actions = [a for a in actions if "GC" in a]
     assert gc_actions == [], f"Expected no GC actions for fresh records, got: {gc_actions}"
 
     # TTL-from-creation fallback: a record WITHOUT last_seen_at uses bound_at for GC;
@@ -238,6 +209,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
     )
     saved_env = {k: os.environ.pop(k, None) for k in override_vars}
     saved_ws = os.environ.get("WORKSPACE_ROOT")

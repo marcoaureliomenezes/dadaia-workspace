@@ -96,15 +96,8 @@ class SpecsDoctorState:
 
 
 @dataclass(frozen=True)
-class LeaseModeState:
-    """Resolved lifecycle lease and mode state.
-
-    v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): ``live_foreign_holder`` can no longer BLOCK a
-    lifecycle verb — see :meth:`LifecyclePreflightService._check_lease`, which surfaces
-    it as an advisory warning only. The field is kept as an input (the composition root
-    still detects a live foreign-looking residual lease record) but the doctrine forbids
-    ever converting it into a :class:`~dadaia_workspace.core.models.lifecycle.BlockedState`.
-    """
+class PresenceState:
+    """Caller mode plus advisory sibling presence used by lifecycle preflight."""
 
     mode: str
     holder_session_id: str | None = None
@@ -136,7 +129,7 @@ class LifecyclePreflightInput:
     active_release: ActiveReleaseState
     git: GitPreflightState
     specs_doctor: SpecsDoctorState
-    lease: LeaseModeState
+    presence: PresenceState
     hygiene: HygieneCounters
     required_handoffs: tuple[RequiredHandoff, ...] = ()
 
@@ -190,7 +183,6 @@ class LifecyclePreflightService:
         checks = (
             self._check_binding,
             self._check_active_release,
-            self._check_git,
             self._check_specs_doctor,
             self._check_hygiene,
         )
@@ -199,9 +191,8 @@ class LifecyclePreflightService:
             if blocked is not None:
                 return LifecyclePreflightResult(ok=False, blocked=blocked)
 
-        # v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): lease/presence state is advisory-only —
-        # it can NEVER block a lifecycle verb. See ``_check_lease``.
-        warnings = self._check_lease(data)
+        # Git cleanliness and sibling presence are advisory only.
+        warnings = self._check_git(data) + self._check_presence(data)
 
         handoff_result = self._check_handoffs(data)
         if handoff_result.blocked is not None:
@@ -375,38 +366,36 @@ class LifecyclePreflightService:
             )
         if not self._phase_matches(data.active_release.phase, data.expected_phase):
             # v0.1.78 T-C / FR-C: ACTIVE.md's phase does not match what this step expects —
-            # `dadaia lifecycle status` is the read-only command that surfaces the current
+            # `dadaia reports workflow-status` is the read-only command that surfaces the current
             # release/phase/step so the operator can see exactly where the ladder actually
             # is before deciding the next move.
             return self._blocked(
                 data,
                 "active release phase mismatch",
-                operator_command="dadaia lifecycle status --json",
+                operator_command="dadaia reports workflow-status --json",
             )
         return None
 
-    def _check_git(self, data: LifecyclePreflightInput) -> BlockedState | None:
+    def _check_git(self, data: LifecyclePreflightInput) -> tuple[str, ...]:
+        warnings: list[str] = []
         if data.git.dirty_paths:
-            return self._blocked(
-                data,
-                "dirty worktree",
-                operator_command="git status --short",
-                detail={"dirty_paths": ",".join(data.git.dirty_paths)},
+            warnings.append(
+                "[GIT] dirty worktree is advisory for lifecycle preflight; "
+                f"paths={','.join(data.git.dirty_paths)}; authoritative commit/review "
+                "and push-security gates still apply."
             )
         if data.git.upstream_branch is None:
-            return self._blocked(
-                data,
-                "missing upstream branch",
-                operator_command="git push --set-upstream origin HEAD",
+            warnings.append(
+                "[GIT] missing upstream branch is advisory for lifecycle preflight; "
+                "set one with git push --set-upstream origin HEAD before relying on push gates."
             )
         if data.git.unpushed_commit_count > 0:
-            return self._blocked(
-                data,
-                "unpushed commits pending",
-                operator_command="git push",
-                detail={"unpushed_commit_count": str(data.git.unpushed_commit_count)},
+            warnings.append(
+                "[GIT] unpushed commits are advisory for lifecycle preflight; "
+                f"count={data.git.unpushed_commit_count}; push-security and CI gates "
+                "remain authoritative."
             )
-        return None
+        return tuple(warnings)
 
     def _check_specs_doctor(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if not data.specs_doctor.ok:
@@ -418,23 +407,14 @@ class LifecyclePreflightService:
             )
         return None
 
-    def _check_lease(self, data: LifecyclePreflightInput) -> tuple[str, ...]:
+    def _check_presence(self, data: LifecyclePreflightInput) -> tuple[str, ...]:
         """Presence-advisory only (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE).
 
-        Neither a resolved-mode mismatch against the CONTEXT-INCUMBENT pointer nor a
-        live foreign holder may block a lifecycle verb — races between sessions are
-        accepted and surfaced, never prevented. ``data.lease.mode`` is deliberately NOT
-        re-checked against ``data.required_mode`` here: that field is sourced from the
-        context's incumbent pointer (``session_identity.resolve_identity``), which can
-        legitimately name a DIFFERENT session than the caller's own binding — the exact
-        foreign-mode-imposition shape the doctrine forbids. The caller's own self-scoped
-        mode is already validated in ``_check_binding`` (``data.binding.mode``), which
-        stays a legitimate BLOCKING check (opt-in self-protection, never foreign).
-        A live foreign lease holder still produces a one-line advisory naming the
-        holder session id — informational only, never a reason to fail the gate.
+        A live sibling session may not block a lifecycle verb. The caller's own mode is
+        validated separately by ``_check_binding``; presence is informational only.
         """
-        if data.lease.live_foreign_holder:
-            holder = data.lease.holder_session_id or "unknown"
+        if data.presence.live_foreign_holder:
+            holder = data.presence.holder_session_id or "unknown"
             return (
                 f"[PRESENCE] another session ({holder!r}) has a live presence on this "
                 "context. Races between sessions are accepted and surfaced, never "
@@ -460,7 +440,7 @@ class LifecyclePreflightService:
             return self._blocked(
                 data,
                 "hygiene cleanup candidates present",
-                operator_command="dadaia lifecycle hygiene clean --dry-run",
+                operator_command="dadaia reports workflow-hygiene-clean --dry-run",
                 detail={
                     "cleanup_candidate_count": str(data.hygiene.cleanup_candidate_count),
                     "protected_residual_count": str(data.hygiene.protected_residual_count),
@@ -470,7 +450,7 @@ class LifecyclePreflightService:
             return self._blocked(
                 data,
                 "malformed handoffs present",
-                operator_command="dadaia lifecycle hygiene status --json",
+                operator_command="dadaia reports workflow-hygiene-status --json",
                 detail={"malformed_handoff_count": str(data.hygiene.malformed_handoff_count)},
             )
         return None
@@ -499,7 +479,9 @@ class LifecyclePreflightService:
                     blocked=self._blocked(
                         data,
                         "required handoff gate failed",
-                        operator_command=f"dadaia lifecycle status --json  # inspect {required.source}",
+                        operator_command=(
+                            f"dadaia reports workflow-status --json  # inspect {required.source}"
+                        ),
                         detail={
                             "handoff": required.source,
                             "reasons": ",".join(validation.reasons),

@@ -19,6 +19,18 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter, CodexExecConfig
 
 
+class _SequenceGit:
+    def __init__(self, *states: tuple[str, ...]) -> None:
+        self._states = list(states)
+        self.calls: list[Path] = []
+
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        self.calls.append(path)
+        if len(self._states) > 1:
+            return self._states.pop(0)
+        return self._states[0]
+
+
 def _request(*, model_profile: str | None = "dispatch") -> AgentRunRequest:
     return AgentRunRequest(
         role="software-engineer",
@@ -33,6 +45,52 @@ def _request(*, model_profile: str | None = "dispatch") -> AgentRunRequest:
         expected_schema="agent-run-result-v1",
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
+
+
+def test_codex_changed_paths_are_content_delta_from_attempt_not_preexisting_dirt(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "preexisting-clean.txt").write_text("same", encoding="utf-8")
+    (tmp_path / "preexisting-changed.txt").write_text("before", encoding="utf-8")
+    (tmp_path / "preexisting-removed.txt").write_text("before", encoding="utf-8")
+    git = _SequenceGit(
+        ("preexisting-clean.txt", "preexisting-changed.txt", "preexisting-removed.txt"),
+        (
+            "preexisting-clean.txt",
+            "preexisting-changed.txt",
+            "preexisting-removed.txt",
+            "new.txt",
+        ),
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        (tmp_path / "preexisting-changed.txt").write_text("after", encoding="utf-8")
+        (tmp_path / "preexisting-removed.txt").unlink()
+        (tmp_path / "new.txt").write_text("new", encoding="utf-8")
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text(
+            json.dumps(
+                {
+                    "schema": "agent-run-result-v1",
+                    "summary": "done",
+                    "artifact_refs": [".dadaia/handoff/dadaia-workspace/codex.handoff.json"],
+                    "changed_paths": ["model-lie.txt"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    result = CodexExecAdapter(
+        CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}, git=git
+    ).run(_request())
+
+    assert result.structured_output["changed_paths"] == (
+        "new.txt,preexisting-changed.txt,preexisting-removed.txt"
+    )
+    assert len(git.calls) == 2
 
 
 def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
@@ -68,6 +126,7 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
             "PATH": "/bin",
             "HOME": "/home/operator",
             "OPENAI_API_KEY": "secret-key",
+            "PYTHONDONTWRITEBYTECODE": "1",
             "DADAIA_PRIVATE": "private",
         },
     )
@@ -94,7 +153,11 @@ def test_codex_exec_adapter_builds_controlled_command_and_env(tmp_path: Path) ->
     assert 'model_reasoning_effort="medium"' in argv
     assert argv[-1] == "-"
     assert call["kwargs"]["cwd"] == tmp_path
-    assert call["kwargs"]["env"] == {"PATH": "/bin", "HOME": "/home/operator"}
+    assert call["kwargs"]["env"] == {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PATH": "/bin",
+        "HOME": "/home/operator",
+    }
     assert "secret-key" not in str(call["kwargs"])
 
 
@@ -130,11 +193,11 @@ def test_codex_model_precedence(tmp_path: Path, case: str) -> None:
             environ={},
         ).run(_request(model_profile="fast"))
         assert result.status is AgentRunStatus.SUCCEEDED
-        assert captured["argv"][captured["argv"].index("-m") + 1] == "gpt-5.4-mini"
+        assert captured["argv"][captured["argv"].index("-m") + 1] == "gpt-5.3-codex-spark"
         assert 'model_reasoning_effort="medium"' in captured["argv"]
 
     elif case == "discrete-verbatim":
-        option = validate("codex", "gpt-5.5:medium")
+        option = validate("codex", "gpt-5.3-codex-spark:medium")
         adapter = container.build_agent_runtime(
             AgentRuntimeKind.CODEX_EXEC, cwd=tmp_path, model=option
         )
@@ -146,7 +209,7 @@ def test_codex_model_precedence(tmp_path: Path, case: str) -> None:
         # discrete model.
         adapter.run(_request(model_profile="deep"))
         argv = captured["argv"]
-        assert argv[argv.index("-m") + 1] == "gpt-5.5"
+        assert argv[argv.index("-m") + 1] == "gpt-5.3-codex-spark"
         assert 'model_reasoning_effort="medium"' in argv
 
     elif case == "no-discrete-uses-tier":
@@ -158,7 +221,7 @@ def test_codex_model_precedence(tmp_path: Path, case: str) -> None:
         adapter.run(_request(model_profile="fast"))
         argv = captured["argv"]
         # 'fast' tier resolves to gpt-5.4-mini via codex_tier_views().
-        assert argv[argv.index("-m") + 1] == "gpt-5.4-mini"
+        assert argv[argv.index("-m") + 1] == "gpt-5.3-codex-spark"
 
     else:  # resolved-wins-over-config-and-tier
         from dadaia_workspace.core.models.workflow_execution import (
@@ -166,27 +229,27 @@ def test_codex_model_precedence(tmp_path: Path, case: str) -> None:
             ResolvedModelConfig,
         )
 
-        # Construction-time config model is gpt-5.5:medium ...
-        option = validate("codex", "gpt-5.5:medium")
+        # Construction-time config model is gpt-5.3-codex-spark:medium ...
+        option = validate("codex", "gpt-5.3-codex-spark:medium")
         adapter = CodexExecAdapter(
             CodexExecConfig(cwd=tmp_path, model=option.model_id, reasoning_effort=option.effort),
             runner=fake_runner,
             environ={},
         )
-        # ... but the resolved_model says gpt-5.5:high — which must win.
+        # ... but the resolved_model says gpt-5.3-codex-spark:high — which must win.
         request = dataclasses.replace(
             _request(model_profile="deep"),
             resolved_model=ResolvedModelConfig(
                 profile_id="codex-review-deep",
                 harness="codex",
-                model="gpt-5.5",
+                model="gpt-5.3-codex-spark",
                 reasoning="high",
                 source=PolicySource.CLI,
             ),
         )
         adapter.run(request)
         argv = captured["argv"]
-        assert argv[argv.index("-m") + 1] == "gpt-5.5"
+        assert argv[argv.index("-m") + 1] == "gpt-5.3-codex-spark"
         assert 'model_reasoning_effort="high"' in argv
 
 
@@ -263,6 +326,33 @@ def _codex_run_with_message(tmp_path: Path, last_message_text: str) -> Any:
     return CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
         _request()
     )
+
+
+def test_codex_schema_shaped_result_without_refs_carries_diagnostic(tmp_path: Path) -> None:
+    payload = json.dumps(
+        {"schema": "agent-run-result-v1", "summary": "no evidence", "artifact_refs": []}
+    )
+    result = _codex_run_with_message(tmp_path, payload)
+
+    assert result.artifact_refs == ()
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "result-without-artifact-refs"
+    assert payload in result.diagnostic.output_tail
+
+
+def test_codex_schema_shaped_result_with_missing_ref_carries_diagnostic(tmp_path: Path) -> None:
+    payload = json.dumps(
+        {
+            "schema": "agent-run-result-v1",
+            "summary": "claimed only",
+            "artifact_refs": [".dadaia/handoff/missing.json"],
+        }
+    )
+    result = _codex_run_with_message(tmp_path, payload)
+
+    assert result.artifact_refs == (".dadaia/handoff/missing.json",)
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "referenced-artifact-missing"
 
 
 @pytest.mark.parametrize(

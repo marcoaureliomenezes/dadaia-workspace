@@ -65,14 +65,23 @@ def _approved_message_end() -> str:
     return json.dumps({"type": "message_end", "message": {"content": fenced}})
 
 
-def _adapter(changed: tuple[str, ...]) -> PiHeadlessAdapter:
+def _adapter(changed: tuple[str, ...], cwd: Path) -> PiHeadlessAdapter:
+    """Snapshot semantics (v0.2.x): only paths that CHANGE DURING the attempt count.
+
+    The fake runner therefore materializes each git-reported path mid-run, so the
+    before/after content snapshot registers it as changed-by-this-attempt."""
+
     def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0]
         assert isinstance(argv, list)
+        for rel in changed:
+            target = cwd / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("written during the worker attempt\n", encoding="utf-8")
         return subprocess.CompletedProcess(argv, 0, stdout=_approved_message_end())
 
     return PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=Path("/repo")),
+        PiHeadlessConfig(cwd=cwd),
         runner=fake_runner,
         environ={},
         git=_FakeGit(changed=changed),
@@ -95,8 +104,8 @@ def _request() -> AgentRunRequest:
     )
 
 
-def test_pi_out_of_scope_changed_paths_blocks_transition() -> None:
-    adapter = _adapter(changed=("secrets/leak.txt",))
+def test_pi_out_of_scope_changed_paths_blocks_transition(tmp_path: Path) -> None:
+    adapter = _adapter(changed=("secrets/leak.txt",), cwd=tmp_path)
     decision = LifecycleAgentRunner(runtime=adapter).run(
         _run(),
         AgentRunnerInput(
@@ -112,8 +121,8 @@ def test_pi_out_of_scope_changed_paths_blocks_transition() -> None:
     assert "secrets/leak.txt" in decision.run.blocked.detail.get("out_of_scope", "")
 
 
-def test_pi_in_scope_changed_paths_advances() -> None:
-    adapter = _adapter(changed=("src/feature.py",))
+def test_pi_in_scope_changed_paths_advances(tmp_path: Path) -> None:
+    adapter = _adapter(changed=("src/feature.py",), cwd=tmp_path)
     decision = LifecycleAgentRunner(runtime=adapter).run(
         _run(),
         AgentRunnerInput(

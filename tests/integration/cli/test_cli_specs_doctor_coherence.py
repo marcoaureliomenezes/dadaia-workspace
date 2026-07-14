@@ -18,7 +18,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 _runner = CliRunner()
@@ -76,9 +75,6 @@ def test_cli_doctor_never_emits_retired_spec_doc_029(
     ctx = "ctx-a"
 
     _seed_lock_record(tmp_path, ctx, "sessForged")
-    session_identity.set_incumbent(tmp_path, ctx, "sessS2")
-    session_identity.write_session(tmp_path, "sessS2", {"session_id": "sessS2"})
-
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
     assert "SPEC-DOC-029" not in result.output, result.output

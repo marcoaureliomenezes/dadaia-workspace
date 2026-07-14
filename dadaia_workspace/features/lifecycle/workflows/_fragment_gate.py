@@ -1,7 +1,7 @@
 """``FragmentGateWorkflow`` base + ``_FragmentAssemblyMixin`` — the ONE prompt-assembly seam.
 
-v0.1.57 FR1 (golden-first) folds the four near-byte-identical handoff-ledger workflow bodies
-(``release_definition`` / ``audit`` / ``research`` / ``bug_report``) onto a single generic
+v0.1.57 FR1 folds the handoff-ledger workflow bodies
+(``release_definition`` / ``audit``) onto a single generic
 base, and shares the pure prompt-assembly helpers with the structurally-outlying
 ``backlog_definition`` body via a thin mixin. Before this dedup a role-grounding or
 assembly fix had to land five times or land by luck; now it lands once.
@@ -16,14 +16,13 @@ Two collaborators live here:
   full base, per Ruling C). The converged ``_scope`` threads ``model_profile`` /
   ``resolved_model`` so backlog's ``PromptScope`` no longer drops the resolved model (the
   grill Problem #8 fix).
-* :class:`FragmentGateWorkflow` — the full base for the four handoff-ledger bodies. It owns
+* :class:`FragmentGateWorkflow` — the full base for the handoff-ledger bodies. It owns
   the run loop, the model-step assembly + Python-owned gate, the run-scoped workflow-step
   handoff data plane, and the terminal Python gate. The five legitimate divergence axes are
   parameterized: the ``_COMMAND`` string, the ``_INITIAL_PHASE``, the terminal ``_TERMINAL_PHASE``
   (``release_definition`` transitions → IMPLEMENTATION; the others COMPLETE with no
   transition), the Step/Result dataclass types (generic ``StepT`` / ``ResultT`` + the
-  ``_make_result`` factory), and ``_scope`` (``bug_report`` overrides it for its ADDITIVE
-  ``bug_write`` special-case). The empty-sequence ``ValueError`` message is derived from the
+  ``_make_result`` factory). The empty-sequence ``ValueError`` message is derived from the
   class ``_WORKFLOW_LABEL`` so each body keeps its exact current text.
 
 **Refactor trap — sequence-scoped iteration (the exact single-seam defect the dedup removes).**
@@ -35,7 +34,6 @@ Two collaborators live here:
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import ClassVar, Protocol
@@ -56,6 +54,7 @@ from dadaia_workspace.core.models.workflow_execution import (
 )
 from dadaia_workspace.core.models.workflow_handoff import RetentionMode, WorkflowStepLedger
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
@@ -66,6 +65,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
     MaxContextPolicy,
     SelectionAudit,
+    SelectionResult,
     StaticInput,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
@@ -77,13 +77,18 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     PromptPrefix,
     PromptScope,
     build_fragment_suffix,
+    canonical_worker_output_ref,
+    filter_context_spec_paths,
+    worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    _NO_RELEASE_CONTEXT_COMMANDS,
     MalformedHandoffError,
     RequiredHandoffMissingError,
     WorkflowHandoffResolver,
+    durable_payload_from_result,
 )
 
 
@@ -146,6 +151,15 @@ class _StepOutcome:
     blocked: BlockedState | None = None
 
 
+def _is_rejected_verdict(blocked: BlockedState | None) -> bool:
+    """True when a block carries an explicit reviewer REJECTED verdict (never transport noise)."""
+    if blocked is None:
+        return False
+    if str(blocked.detail.get("verdict", "")).upper() == "REJECTED":
+        return True
+    return "rejected" in blocked.reason.lower()
+
+
 class _FragmentAssemblyMixin:
     """Pure fragment-assembly helpers shared by the base and ``BacklogDefinitionWorkflow``.
 
@@ -196,13 +210,17 @@ class _FragmentAssemblyMixin:
         for step in sequence:
             if step.fragment_id is None:
                 continue
-            fragment = self._loader.load_fragment(step.fragment_id)
-            for declared in fragment.static_inputs:
-                ref = declared.strip().lstrip("/")
-                if ref in seen:
-                    continue
-                seen.add(ref)
-                out.append(self._selector.resolve_static_input(declared))
+            fragments = (
+                self._loader.load_fragment(step.fragment_id),
+                *(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids),
+            )
+            for fragment in fragments:
+                for declared in fragment.static_inputs:
+                    ref = declared.strip().lstrip("/")
+                    if ref in seen:
+                        continue
+                    seen.add(ref)
+                    out.append(self._selector.resolve_static_input(declared))
         return tuple(out)
 
     # -- assembly helpers ------------------------------------------------
@@ -219,14 +237,28 @@ class _FragmentAssemblyMixin:
             shared_ids=tuple(frag.id for frag in shared),
         )
 
-    def _select_context(self, step: AssemblyStep, fragment: Fragment) -> SelectionAudit:
-        """Resolve the fragment's dynamic inputs, bounded by its max_context_policy."""
-        policy = MaxContextPolicy.parse(fragment.max_context_policy)
-        return self._selector.select_all(
-            step.label,
-            fragment.dynamic_inputs,
-            policy,
-            fragment_ids=(fragment.id, *step.shared_fragment_ids),
+    def _select_context(
+        self, step: AssemblyStep, fragments: tuple[Fragment, ...]
+    ) -> SelectionAudit:
+        """Resolve main and shared fragment inputs under their declared policies."""
+        results: list[SelectionResult] = []
+        seen: set[str] = set()
+        for fragment in fragments:
+            names = tuple(name for name in fragment.dynamic_inputs if name not in seen)
+            seen.update(names)
+            if not names:
+                continue
+            selected = self._selector.select_all(
+                step.label,
+                names,
+                MaxContextPolicy.parse(fragment.max_context_policy),
+                fragment_ids=(fragment.id,),
+            )
+            results.extend(selected.results)
+        return SelectionAudit(
+            step=step.label,
+            results=tuple(results),
+            fragment_ids=tuple(fragment.id for fragment in fragments),
         )
 
     @staticmethod
@@ -256,13 +288,18 @@ class _FragmentAssemblyMixin:
             pattern.format(context=self._context, release_id=self._release_id)
             for pattern in getattr(step, "extra_allowed_paths", ())
         )
+        extra = filter_context_spec_paths(
+            extra,
+            workspace_root=getattr(self, "_artifact_root", None),
+            specs_dir=self._selector.spec_context.specs_dir,
+        )
         return PromptScope(
             role=step.role,
             context=self._context,
             release_id=self._release_id,
             task_id=f"{run_id}:{step.label}",
             prompt=suffix,
-            allowed_paths=(f".dadaia/handoff/{self._context}/**", *extra),
+            allowed_paths=(worker_output_glob(self._context), *extra),
             required_evidence=(GateEvidenceKind.HANDOFF,),
             model_profile=step.model_profile,
             resolved_model=step.resolved_model,
@@ -290,15 +327,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
     #: ``LifecycleRun.command`` for this workflow (e.g. ``"release_definition"``).
     _COMMAND: ClassVar[str]
     #: The label used to derive the empty-sequence ``ValueError`` message so each body keeps
-    #: its exact current text (``"release-definition"`` / ``"audit"`` / ``"research"`` /
-    #: ``"bug_report"`` — note the hyphen vs underscore differs per body, hence a dedicated
+    #: its exact current text (``"release-definition"`` / ``"audit"``), hence a dedicated
     #: label rather than reusing ``_COMMAND``).
     _WORKFLOW_LABEL: ClassVar[str]
     #: The phase the run starts in.
     _INITIAL_PHASE: ClassVar[LifecyclePhase]
     #: The phase the terminal gate transitions to on success, or ``None`` to COMPLETE in place
-    #: with no transition (``release_definition`` → IMPLEMENTATION; audit/research/bug_report
-    #: keep their phase).
+    #: with no transition (``release_definition`` → IMPLEMENTATION; audit keeps its phase).
     _TERMINAL_PHASE: ClassVar[LifecyclePhase | None] = None
 
     def __init__(
@@ -317,6 +352,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         handoff_resolver: WorkflowHandoffResolver | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         artifact_root: Path | None = None,
+        runtime_files: RuntimeFilePort | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -342,22 +378,30 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # the workspace root), the structural gate additionally requires every declared
         # artifact ref to EXIST under this root.
         self._artifact_root = artifact_root
+        self._runtime_files = runtime_files
         # Bug resumed-definition-step-blind-to-rejecting-review-feedback: on a resume of a
         # run that blocked on a review rejection, the resume-point step's prompt carries a
         # compact digest of that prior BlockedState (the definition-sequence analogue of
-        # run_implement_review_loop's FR3 rejection digest). Keyed by step label; consumed
+        # implementation retry rejection digest). Keyed by step label; consumed
         # exactly once by the first re-run of that step.
         self._resume_feedback: dict[str, str] = {}
 
     # -- post-acceptance hook (divergence axis) --------------------------
 
-    def _on_step_accepted(self, step: StepT) -> None:
-        """Called after a step is accepted and persisted. Default: no-op.
+    def _on_step_accepted(self, step: StepT) -> BlockedState | None:
+        """Run a deterministic post-step check; return a block when it fails.
 
         ``release_definition`` overrides this to flip the reviewed artifact's canonical
-        ``> **Status:**`` token to ``Aprovado`` when its review gate approves (bug
-        approved-review-never-flips-artifact-status).
+        ``> **Status:**`` token to ``Aprovado`` when its review gate approves and to
+        validate plan dependency structure before model review. The default accepts.
         """
+        return None
+
+    def _terminal_semantic_block(
+        self, run: LifecycleRun, step: StepT, sequence: tuple[StepT, ...]
+    ) -> BlockedState | None:
+        """Validate workflow-specific cross-step semantics after graph completeness."""
+        return None
 
     # -- result factory (divergence hook) -------------------------------
 
@@ -392,15 +436,25 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         """
         if not sequence:
             raise ValueError(f"{self._WORKFLOW_LABEL} workflow requires at least one step")
-        # Fold each fragment's declared static_inputs into the cacheable prefix once.
-        self._prefix = self._prefix_with_static_inputs(sequence)
+        # Static inputs are folded PER STEP at model-step time (each step pays only for
+        # the static inputs its own fragments declare) — never unioned across the whole
+        # sequence, which taxed every step with every other step's inputs.
         if resume_from is None:
             # Restart semantics: a fresh run over an existing run_id replaces the record
             # (and its ledger), so reclaim the orphaned payload zone first — otherwise the
             # prior generation's immutable attempt-0 files block this run's produce() (bug
             # rerun-of-run-id-collides-with-immutable-payload-zone).
             if self._handoff_resolver is not None:
-                self._handoff_resolver.reset_run_zone(run_id)
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
+                        for step in sequence
+                        if step.fragment_id is not None
+                    ),
+                    context=self._context,
+                    release_id=self._zone_release_id(),
+                )
             run = LifecycleRun(
                 run_id=run_id,
                 context=self._context,
@@ -436,7 +490,17 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             if self._handoff_resolver is not None:
                 # Reclaim only the resume-point-onward payloads; the kept upstream
                 # payloads stay addressable through the preserved ledger entries.
-                self._handoff_resolver.reset_run_zone(run_id, producer_steps=resumed_labels)
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    producer_steps=resumed_labels,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
+                        for step in sequence[index:]
+                        if step.fragment_id is not None
+                    ),
+                    context=self._context,
+                    release_id=self._zone_release_id(),
+                )
             kept = tuple(
                 record
                 for record in prior.workflow_steps.records
@@ -454,7 +518,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         self._run_store.save(run)
 
         outcomes: list[_StepOutcome] = []
-        for step in remaining:
+        revisions_used: dict[str, int] = {}
+        steps_seq = list(remaining)
+        idx = 0
+        while idx < len(steps_seq):
+            step = steps_seq[idx]
             if step.fragment_id is None:
                 run, outcome = self._run_terminal_gate(run, step, sequence)
             else:
@@ -462,17 +530,67 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             self._run_store.save(run)
             outcomes.append(outcome)
             if outcome.accepted:
-                # Post-acceptance hook (bug approved-review-never-flips-artifact-status):
-                # bodies override to flip the reviewed artifact's canonical Status token.
-                self._on_step_accepted(step)
-            if not outcome.accepted:
-                return self._make_result(
-                    run_id=run_id,
-                    completed=False,
-                    final_phase=run.phase,
-                    outcomes=tuple(outcomes),
-                    blocked=run.blocked,
-                )
+                post_accept_block = self._on_step_accepted(step)
+                if post_accept_block is not None:
+                    run = self._with_step_outcome(
+                        run, post_accept_block.blocked_at_step, post_accept_block
+                    )
+                    self._run_store.save(run)
+                    outcomes.append(
+                        _StepOutcome(
+                            label=post_accept_block.blocked_at_step,
+                            accepted=False,
+                            is_gate=True,
+                            blocked=post_accept_block,
+                        )
+                    )
+                    # Deterministic post-accept lint: revise the SAME create step once
+                    # with the lint digest instead of blocking the whole run (the
+                    # release-definition-lint-restart-advice fix, in-run half).
+                    revised = self._begin_revision(
+                        run,
+                        target_label=step.label,
+                        blocked=post_accept_block,
+                        steps_seq=steps_seq,
+                        revisions_used=revisions_used,
+                        budget_key=f"lint:{step.label}",
+                    )
+                    if revised is not None:
+                        run, idx = revised
+                        continue
+                    return self._make_result(
+                        run_id=run_id,
+                        completed=False,
+                        final_phase=run.phase,
+                        outcomes=tuple(outcomes),
+                        blocked=post_accept_block,
+                    )
+                idx += 1
+                continue
+            # Review REJECTED verdict: one bounded in-run revision of the create step
+            # this review consumes, with the rejection digest injected — the automatic
+            # replacement for a block-and-manual-resume round-trip.
+            if step.is_review and run.blocked is not None and _is_rejected_verdict(run.blocked):
+                target = self._revision_target(step, steps_seq)
+                if target is not None:
+                    revised = self._begin_revision(
+                        run,
+                        target_label=target,
+                        blocked=run.blocked,
+                        steps_seq=steps_seq,
+                        revisions_used=revisions_used,
+                        budget_key=f"review:{step.label}",
+                    )
+                    if revised is not None:
+                        run, idx = revised
+                        continue
+            return self._make_result(
+                run_id=run_id,
+                completed=False,
+                final_phase=run.phase,
+                outcomes=tuple(outcomes),
+                blocked=run.blocked,
+            )
         # Post-completion hook (bug definition-commit-gate-never-repoints-active-md):
         # bodies override to apply their deterministic Python-owned completion effects
         # (e.g. release_definition rewrites ACTIVE.md). Runs only on a FULLY completed
@@ -488,6 +606,84 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
 
     def _on_sequence_completed(self) -> None:
         """Called once after every step of the sequence is accepted. Default: no-op."""
+
+    def _zone_release_id(self) -> str | None:
+        """The release-aware handoff zone this workflow's payloads live in.
+
+        Mirrors ``workflow_handoffs._zone_release_id`` for reclaim-time callers that
+        have no run object yet: a no-release-context command (backlog definition)
+        routes to the shared backlog zone (``None``); everything else to its release.
+        """
+        return None if self._COMMAND in _NO_RELEASE_CONTEXT_COMMANDS else self._release_id
+
+    # -- bounded in-run revision -----------------------------------------
+
+    @staticmethod
+    def _revision_target(step: StepT, steps_seq: list[StepT]) -> str | None:
+        """The create step a rejected review revises: its first consumed non-review model step."""
+        by_label = {s.label: s for s in steps_seq}
+        for producer in step.consumes:
+            candidate = by_label.get(producer)
+            if (
+                candidate is not None
+                and candidate.fragment_id is not None
+                and not candidate.is_review
+            ):
+                return producer
+        return None
+
+    def _begin_revision(
+        self,
+        run: LifecycleRun,
+        *,
+        target_label: str,
+        blocked: BlockedState,
+        steps_seq: list[StepT],
+        revisions_used: dict[str, int],
+        budget_key: str,
+    ) -> tuple[LifecycleRun, int] | None:
+        """Rewind the run to *target_label* once, feeding the block digest into its re-run.
+
+        Returns the reset run + the loop index to continue from, or ``None`` when the
+        revision budget for *budget_key* is spent (at most one revision per gate) — the
+        caller then blocks exactly as before, so worst-case behavior is unchanged.
+        """
+        if revisions_used.get(budget_key, 0) >= 1:
+            return None
+        labels = [s.label for s in steps_seq]
+        if target_label not in labels:
+            return None
+        revisions_used[budget_key] = 1
+        target_idx = labels.index(target_label)
+        resumed_labels = set(labels[target_idx:])
+        self._resume_feedback[target_label] = self._render_prior_block_digest(blocked)
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(
+                run.run_id,
+                producer_steps=resumed_labels,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(self._context, f"{run.run_id}:{s.label}")
+                    for s in steps_seq[target_idx:]
+                    if s.fragment_id is not None
+                ),
+                context=self._context,
+                release_id=self._zone_release_id(),
+            )
+        kept = tuple(
+            record
+            for record in run.workflow_steps.records
+            if record.producer_step not in resumed_labels
+        )
+        run = replace(
+            run,
+            phase=self._INITIAL_PHASE,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=target_label,
+            blocked=None,
+            workflow_steps=WorkflowStepLedger(records=kept),
+        )
+        self._run_store.save(run)
+        return run, target_idx
 
     # -- model step ------------------------------------------------------
 
@@ -514,7 +710,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 blocked=upstream_block,
             )
 
-        audit = self._select_context(step, fragment)
+        audit = self._select_context(step, (fragment, *shared))
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
@@ -543,8 +739,10 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)
         scope = self._scope(step, run.run_id, suffix)
+        # Per-step prefix: only THIS step's declared static inputs ride along.
+        step_prefix = self._prefix_with_static_inputs((step,))
         built = self._prompt_builder.build(
-            scope, runtime=runtime.runtime_kind(), prefix=self._prefix
+            scope, runtime=runtime.runtime_kind(), prefix=step_prefix
         )
 
         # Python owns the gate, REVIEW-ONLY for the verdict (v0.1.31 / L1). A review step runs
@@ -556,6 +754,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             runtime=runtime,
             state_machine=self._state_machine,
             artifact_root=self._artifact_root,
+            runtime_files=self._runtime_files,
         )
         # Deliverable-zone requirement (bug
         # create-step-gate-accepts-refusal-handoff-as-success): a create step that
@@ -570,15 +769,24 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 request=built.request,
                 target_phase=run.phase,
                 current_step=step.label,
-                is_review=step.is_review,
+                is_review=step.is_review and getattr(step, "blocks_on_rejection", True),
                 deliverable_globs=deliverable_globs,
             ),
         )
-        # Record consumption of every upstream the step declared (A22) and write this step's
-        # produced payload (A18/A21) — only on a passing step, only when wired.
+        # Write the produced payload before acknowledging upstream consumption. A worker can
+        # satisfy the generic transport gate yet still violate its domain handoff schema; that
+        # is a deterministic BLOCK, not an exception and not a consumed upstream message.
         if blocked is None:
-            run = self._record_consumptions(run, step)
-            run = self._produce_payload(run, step, worker_result, sequence)
+            try:
+                run = self._produce_payload(run, step, worker_result, sequence)
+            except MalformedHandoffError as exc:
+                blocked = BlockedState(
+                    reason=f"worker output violates {step.produces}: {exc}",
+                    blocked_at_step=step.label,
+                    detail={"output_schema": str(step.produces)},
+                )
+            else:
+                run = self._record_consumptions(run, step)
         run = self._with_step_outcome(run, step.label, blocked)
         run = record_prompt_composition(
             run,
@@ -715,28 +923,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
 
     @staticmethod
     def _payload_from_result(step: StepT, worker_result: AgentRunResult) -> dict[str, object]:
-        verdict = worker_result.structured_output.get("verdict")
-        payload: dict[str, object] = {"summary": worker_result.summary or step.label}
-        if step.is_review and isinstance(verdict, str):
-            payload["verdict"] = verdict
-            reason = worker_result.structured_output.get("verdict_reason")
-            if isinstance(reason, str):
-                payload["verdict_reason"] = reason
-        # Bug step-payload-drops-worker-findings: the worker's substantive output survives
-        # into the persisted payload — findings (JSON-encoded by the adapters) and the
-        # declared artifact refs — so render_digest hands the CONSUMER step real content,
-        # not a bare generic summary.
-        findings_raw = worker_result.structured_output.get("findings")
-        if isinstance(findings_raw, str) and findings_raw.strip():
-            try:
-                findings = json.loads(findings_raw)
-            except json.JSONDecodeError:
-                findings = None
-            if isinstance(findings, list) and findings:
-                payload["findings"] = findings
-        if worker_result.artifact_refs:
-            payload["artifact_refs"] = list(worker_result.artifact_refs)
-        return payload
+        return durable_payload_from_result(
+            worker_result, fallback_summary=step.label, is_review=step.is_review
+        )
 
     # -- terminal Python gate (no model) --------------------------------
 
@@ -748,7 +937,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         This step runs no model. The sequence only reaches it when every prior step passed;
         defensively, if the run is already blocked the gate refuses to finish. On success the
         run advances to ``_TERMINAL_PHASE`` (``release_definition``) or COMPLETEs in place with
-        no phase transition (audit/research/bug_report).
+        no phase transition (audit).
         """
         if run.blocked is not None:
             return run, _StepOutcome(
@@ -759,6 +948,15 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             blocked_run = self._with_step_outcome(run, step.label, graph_block)
             return blocked_run, _StepOutcome(
                 label=step.label, accepted=False, is_gate=True, blocked=graph_block
+            )
+        semantic_block = self._terminal_semantic_block(run, step, sequence)
+        if semantic_block is not None:
+            blocked_run = self._with_step_outcome(run, step.label, semantic_block)
+            return blocked_run, _StepOutcome(
+                label=step.label,
+                accepted=False,
+                is_gate=True,
+                blocked=semantic_block,
             )
         if self._TERMINAL_PHASE is not None:
             completed = replace(

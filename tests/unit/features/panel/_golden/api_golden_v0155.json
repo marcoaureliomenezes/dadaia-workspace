@@ -24,7 +24,7 @@
     "status": 404
   },
   "api_agents": {
-    "body": "{\"generated_at\": \"<TS>\", \"status_window_days\": 30, \"window_days\": 180, \"pricing_age_days\": 12, \"pricing_model_date\": \"2026-05-01\", \"agents\": [{\"agent_id\": \"software-engineer\", \"display_name\": \"software-engineer\", \"description\": \"A software engineer agent.\", \"dispatch_band\": 3, \"status\": \"inactive\", \"skills\": [\"dadaia-task-manager\"], \"tools\": [\"Read\", \"Write\"], \"model\": \"claude-opus-4-8\", \"model_inherited\": false, \"max_turns\": 60, \"input_contract\": null, \"gate_role\": \"implementer\", \"phases\": [\"Implementation\"], \"workflows\": [\"TDD Cycle\"], \"telemetry\": {\"session_count\": 3, \"total_cost_usd\": 1.5, \"total_cost_30d_usd\": null, \"cost_known\": true, \"last_activity_at\": null, \"providers\": [\"claude\"], \"dominant_model\": \"claude-opus-4-8\", \"is_subagent\": false, \"suspect_count\": 0, \"token_totals\": {\"input\": 100, \"cache_creation\": 20, \"cache_read\": 80, \"output\": 40}, \"context_breakdown\": [], \"recent_sessions\": []}}]}",
+    "body": "{\"generated_at\": \"<TS>\", \"status_window_days\": 30, \"window_days\": 180, \"pricing_age_days\": 12, \"pricing_model_date\": \"2026-05-01\", \"agents\": [{\"agent_id\": \"software-engineer\", \"display_name\": \"software-engineer\", \"description\": \"A software engineer agent.\", \"dispatch_band\": 3, \"status\": \"inactive\", \"skills\": [\"dadaia-task-manager\"], \"tools\": [\"Read\", \"Write\"], \"model\": \"claude-opus-4-8\", \"model_inherited\": false, \"max_turns\": 60, \"input_contract\": null, \"gate_role\": \"implementer\", \"phases\": [\"Implementation\"], \"workflows\": [], \"telemetry\": {\"session_count\": 3, \"total_cost_usd\": 1.5, \"total_cost_30d_usd\": null, \"cost_known\": true, \"last_activity_at\": null, \"providers\": [\"claude\"], \"dominant_model\": \"claude-opus-4-8\", \"is_subagent\": false, \"suspect_count\": 0, \"token_totals\": {\"input\": 100, \"cache_creation\": 20, \"cache_read\": 80, \"output\": 40}, \"context_breakdown\": [], \"recent_sessions\": []}}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "agents",
     "status": 200
@@ -39,18 +39,6 @@
     "body": "{\"contexts\": [{\"slug\": \"dadaia-workspace\", \"name\": \"dadaia-workspace\", \"repo_path\": \"<WS>/repos/dadaia-workspace\", \"branch\": \"main\", \"status\": \"alive\"}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "contexts",
-    "status": 200
-  },
-  "api_dadaia_workflow_detail": {
-    "body": "{\"name\": \"release_definition\", \"display_name\": \"Release Definition\", \"purpose\": \"Author SPEC/PLAN/TASKS.\", \"availability\": \"available\", \"step_count\": 1, \"steps\": [{\"order\": 1, \"label\": \"Define\", \"role\": \"product-engineer\", \"purpose\": \"Author SPEC.\", \"is_gate\": false, \"harness_options\": [\"claude\"], \"model_options\": {\"claude\": [\"claude-opus-4-8\"]}, \"runtime_kind\": \"model\", \"fragment_id\": \"release_definition/define\"}], \"diagram_svg\": \"<svg role='img'><g/></svg>\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "workflows",
-    "status": 200
-  },
-  "api_dadaia_workflows": {
-    "body": "{\"generated_at\": \"<TS>\", \"source_hint\": \"dadaia-workflows (Python-owned lifecycle workflows)\", \"workflows\": [{\"name\": \"release_definition\", \"display_name\": \"Release Definition\", \"purpose\": \"Author SPEC/PLAN/TASKS.\", \"availability\": \"available\", \"step_count\": 1}]}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "workflows",
     "status": 200
   },
   "api_reports": {
@@ -77,26 +65,8 @@
     "domain": "sessions",
     "status": 503
   },
-  "api_workflow_detail": {
-    "body": "{\"name\": \"tdd-cycle\", \"display_name\": \"TDD Cycle\", \"description\": \"Red/green/refactor.\", \"version\": \"<VER>\", \"schema_version\": \"1\", \"stage_count\": 1, \"agent_ids\": [\"qa-engineer\"], \"has_parallel\": false, \"has_gates\": false, \"lifecycle_phase\": \"Implementation\", \"inputs\": [{\"name\": \"context\", \"type\": \"string\", \"required\": true}], \"stages\": [{\"id\": \"red\", \"agent\": \"qa-engineer\", \"needs\": [], \"parallel_group\": null, \"gate\": false, \"expected_output_path\": null, \"must_include\": null, \"on_failure\": \"stop\"}], \"diagram_svg\": \"<svg role='img'><g/></svg>\", \"source_path\": \".dadaia/agentic/workflows/tdd-cycle.workflow.md\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "workflows",
-    "status": 200
-  },
-  "api_workflow_detail_400": {
-    "body": "{\"error\": \"invalid_workflow_name\", \"message\": \"Invalid workflow name format or path traversal attempt.\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "workflows",
-    "status": 400
-  },
-  "api_workflow_detail_404": {
-    "body": "{\"error\": \"not_found\", \"message\": \"Workflow 'nope' not found.\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "workflows",
-    "status": 404
-  },
-  "api_workflows": {
-    "body": "{\"generated_at\": \"<TS>\", \"source_hint\": \".dadaia/agentic/workflows/\", \"workflows\": [{\"name\": \"tdd-cycle\", \"display_name\": \"TDD Cycle\", \"description\": \"Red/green/refactor.\", \"version\": \"<VER>\", \"schema_version\": \"1\", \"stage_count\": 3, \"agent_ids\": [\"qa-engineer\", \"software-engineer\"], \"has_parallel\": false, \"has_gates\": true, \"lifecycle_phase\": \"Implementation\", \"source_path\": \".dadaia/agentic/workflows/tdd-cycle.workflow.md\"}]}",
+  "api_workflow_catalog": {
+    "body": "{\"generated_at\": \"<TS>\", \"context\": \"default\", \"workflows\": [{\"workflow_id\": \"release_definition\", \"steps\": [{\"step\": \"release_scope\", \"role\": \"product-engineer\", \"harness\": \"codex\", \"default_harness\": \"codex\", \"default_profile\": \"codex-implementation-standard\", \"default_profiles\": {\"codex\": \"codex-implementation-standard\"}, \"effective_profile\": \"codex-implementation-standard\", \"model\": \"gpt-5.5\", \"reasoning\": \"medium\", \"source\": \"library-default\", \"fragments\": [\"release_definition.release_scope\"], \"output_schema\": \"agent-run-result-v1\", \"is_overridden\": false, \"harness_overridden\": false}]}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "workflows",
     "status": 200

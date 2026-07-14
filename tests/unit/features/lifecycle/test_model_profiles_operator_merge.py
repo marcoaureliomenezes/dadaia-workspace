@@ -36,7 +36,7 @@ def _operator_profile(profile_id: str = "pi-operator-fast", **over: object) -> W
         "id": profile_id,
         "harness": "pi",
         "label": "PI — operator fast",
-        "model_id": "gpt-5.5",
+        "model_id": "openai-codex/gpt-5.3-codex-spark",
         "effort": "low",
         "purpose": "Operator's low-cost PI profile.",
         "source": "operator-local",

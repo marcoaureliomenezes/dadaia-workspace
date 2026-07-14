@@ -8,8 +8,7 @@
  * plus one `.dadaia-wf-step` card per step, each model-driven step carrying an inline
  * `.wf-step-picker` model dropdown. There is no old DAG modal / detail-view any more.
  *
- * The legacy `/api/workflows` + `/api/workflows/<name>` DAG endpoints are still served
- * (declarative *.workflow.md DAGs); their contract is asserted here at the API level.
+ * `/api/workflow-catalog` is the sole catalog API and carries the effective model policy.
  */
 
 import { test, expect } from '@playwright/test';
@@ -56,8 +55,8 @@ test('Expanding a card reveals the flow strip (SVG fluxogram) and per-step cards
   await openWorkflowsTab(page);
 
   // The `implementation` workflow has model-driven steps → its expand hydrates pickers.
-  await expandWorkflowCard(page, 'implementation');
-  const card = page.locator('details.dadaia-wf-card[data-workflow="implementation"]');
+  await expandWorkflowCard(page, 'implementation_reviews');
+  const card = page.locator('details.dadaia-wf-card[data-workflow="implementation_reviews"]');
 
   // The flow strip carries a server-rendered SVG fluxogram (no client Mermaid).
   const flux = card.locator('.dadaia-wf-flux');
@@ -81,8 +80,8 @@ test('Expanding a card reveals the flow strip (SVG fluxogram) and per-step cards
   await expect(card.locator('.wf-step-picker .wfp-picker').first()).toBeVisible();
 });
 
-test('Workflows API returns the current legacy workflow envelope', async ({ request }) => {
-  const response = await request.get(`${BASE_URL}/api/workflows`, { headers: authHeaders() });
+test('Workflow catalog API returns all governed workflows', async ({ request }) => {
+  const response = await request.get(`${BASE_URL}/api/workflow-catalog`, { headers: authHeaders() });
   expect(response.status()).toBe(200);
 
   const body = await response.json();
@@ -90,27 +89,26 @@ test('Workflows API returns the current legacy workflow envelope', async ({ requ
   expect(body.workflows.length).toBeGreaterThan(0);
 
   for (const workflow of body.workflows) {
-    expect(typeof workflow.name).toBe('string');
-    expect(workflow.name.length).toBeGreaterThan(0);
-    expect(typeof workflow.stage_count).toBe('number');
-    expect(workflow.stage_count).toBeGreaterThan(0);
-    expect(Array.isArray(workflow.agent_ids)).toBe(true);
+    expect(typeof workflow.workflow_id).toBe('string');
+    expect(workflow.workflow_id.length).toBeGreaterThan(0);
+    expect(Array.isArray(workflow.steps)).toBe(true);
+    expect(workflow.steps.length).toBeGreaterThan(0);
   }
 });
 
-test('Workflow detail API returns SVG for a listed workflow', async ({ request }) => {
-  const list = await request.get(`${BASE_URL}/api/workflows`, { headers: authHeaders() });
+test('Workflow catalog detail returns effective step policy', async ({ request }) => {
+  const list = await request.get(`${BASE_URL}/api/workflow-catalog`, { headers: authHeaders() });
   const body = await list.json();
   const workflow = body.workflows[0];
 
-  const detail = await request.get(`${BASE_URL}/api/workflows/${workflow.name}`, {
+  const detail = await request.get(`${BASE_URL}/api/workflow-catalog/${workflow.workflow_id}`, {
     headers: authHeaders(),
   });
   expect(detail.status()).toBe(200);
   const detailBody = await detail.json();
-  expect(Array.isArray(detailBody.stages)).toBe(true);
-  expect(detailBody.stages.length).toBeGreaterThan(0);
-  expect(detailBody.diagram_svg ?? detailBody.dag_svg).toContain('<svg');
+  expect(Array.isArray(detailBody.steps)).toBe(true);
+  expect(detailBody.steps.length).toBeGreaterThan(0);
+  expect(typeof detailBody.steps[0].effective_profile).toBe('string');
 });
 
 test('Workflows tab does not load Mermaid', async ({ page }) => {
@@ -122,7 +120,7 @@ test('Workflows tab does not load Mermaid', async ({ page }) => {
   });
 
   await openWorkflowsTab(page);
-  await expandWorkflowCard(page, 'implementation');
+  await expandWorkflowCard(page, 'implementation_reviews');
 
   expect(mermaidRequests).toHaveLength(0);
   expect(await page.evaluate(() => typeof (window as any).mermaid !== 'undefined')).toBe(false);

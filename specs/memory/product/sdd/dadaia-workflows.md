@@ -2,119 +2,91 @@
 slug: dadaia-workflows
 title: dadaia-workflows
 category: product
-tldr: The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona.
+tldr: "Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit."
 summary: >-
-  The roster and invocability truth of the dadaia-workflows: 7 workflows defined in
-  the governed catalog (release_definition, implementation, backlog_definition,
-  closure, audit, research, bug_report), now ALL operator-invocable (v0.1.56),
-  surfaced by these CLI verbs: release define, backlog define, pipeline, implement,
-  review qa|security|code, close, audit, research, bug_report, implement-review
-  (~12 verbs on 7 workflows — implement-review is a verb on the implementation
-  workflow, not a new workflow). audit/research/bug_report gained container builders
-  + CLI verbs, born resolver-governed on the shared policy seam (no second raw
-  id:effort path). Every model-driven step prompt on every verb carries its fragment
-  AND its persona. Engine mechanics live in lifecycle-foundation.
+  The complete executable workflow surface. Each workflow has one CLI command, a
+  Python-owned ordered body, fragment-plus-persona worker prompts, semantic gates,
+  immutable per-attempt payloads, and an auditable handoff graph. Codex and PI are
+  the supported real Layer-2 workers; fake is the deterministic test adapter.
 tags:
 - sdd
 - workflows
 - lifecycle
 - layer-2
-token_estimate: 900
-last_updated: '2026-07-07'
-release_origin: v0.1.64
+token_estimate: 649
+last_updated: '2026-07-14'
+release_origin: v0.2.3
 ---
 
 ## Purpose
 
-A **dadaia-workflow** is a Python body that drives Layer-2 workers through steps: it
-imports the step's **fragment** (the single-step instruction: inputs, task, output
-contract), injects the role's **persona** (the operative "who you are" directive),
-selects dynamic context, calls a discrete `(harness, model)` worker, and advances
-**Python-validated gates** — the model recommends, Python decides the legality of the
-transition. This atom is the single source of the ROSTER and of INVOCABILITY; the
-engine mechanics (pipeline, gates, run store, data plane) are [[lifecycle-foundation]].
+`dadaia lifecycle` exposes exactly four workflows and no aliases:
 
-**The 7 workflows of the governed catalog** (defined in
-`features/lifecycle/governed_catalog.py` — `governed_workflow_catalog()`; re-exported for
-presentation on the stable public path `features/workflows/dadaia_catalog.py`):
+| CLI command | Workflow id | Ordered responsibility |
+|---|---|---|
+| `backlog-definition` | `backlog_definition` | ONE author model call writes the item; the Python review gate validates what actually landed on disk (registry bind, duplicate/conflict classification). `--grill` opts into an evidence-first intake step whose digest feeds the author. |
+| `release-definition` | `release_definition` | Author and review SPEC (one merged architecture+QA review), PLAN, and TASKS; a consumed backlog pick skips the scope model step; deterministic lints and reviews auto-revise their create step once in-run; the commit gate advances the approved release to implementation. |
+| `implementation-reviews` | `implementation_reviews` | Reserve and implement approved tasks, judge with ONE combined tri-angle review (QA + security + code) over injected diff + executed-test evidence, bounded correction, close only when tasks and the review are complete. |
+| `audit` | `audit` | ONE audit_report model pass (question, lenses, findings, dispositions routed bug/backlog/accepted-risk/resolved); the terminal Python gate checks referential integrity only — severity/lens are derived by finding id, never byte-copied. |
 
-| Workflow | Body | Availability | CLI verb |
-|----------|------|--------------|----------|
-| `release_definition` | `workflows/release_definition.py` | available | `dadaia lifecycle release define` |
-| `backlog_definition` | `workflows/backlog_definition.py` | available | `dadaia lifecycle backlog define` |
-| `implementation` | `pipeline.py` / `phase_workflow.py` | PARTIAL | `dadaia lifecycle pipeline` (+ single-step verbs `implement`, `review qa\|security\|code`, and the `implement-review` loop verb) |
-| `closure` | step `close` + `closure_removal_gate` | PARTIAL | `dadaia lifecycle close` |
-| `audit` | `workflows/audit.py` (real, fragment+gate) | available | `dadaia lifecycle audit` |
-| `research` | `workflows/research.py` (real, fragment+gate) | available | `dadaia lifecycle research` |
-| `bug_report` | `workflows/bug_report.py` (real, fragment+gate) | available | `dadaia lifecycle bug_report` |
+Research and bug intake are activities inside backlog definition or audit. Closure is
+the terminal part of implementation plus reviews. Resume, hygiene, status, handoff
+inspection, and model governance are services or diagnostics, not workflows.
 
-**All 7 workflows are invocable (v0.1.56).** They are surfaced by these CLI verbs:
-`release define`, `backlog define`, `pipeline`, `implement`,
-`review qa|security|code`, `close`, `audit`, `research`, `bug_report`,
-`implement-review` — ~12 verbs on 7 workflows. Keep the two counts distinct: the
-**workflow** count is 7; the **verb** roster is larger because `implementation`
-carries several verbs. `implement-review` is a **verb on the `implementation`
-workflow** (the digest-injecting, runner-gated implement/review loop), **not** a new
-workflow. `audit`/`research`/`bug_report` gained container builders + CLI verbs in
-v0.1.56, each **born resolver-governed** on the shared policy seam (no second raw
-`<id>:<effort>` path). Availability labels come from the governed catalog's ADR-E
-vocabulary (`governed_catalog.py`): 5 workflows are `available` (fully fragment-driven
-end-to-end) and `implementation` + `closure` carry the `partial` label — they run, but
-only some of their steps are fragment-driven (the rest are generic). Invocability is
-independent of that label: v0.1.56 closed the invocability gap for all 7.
+## Execution Contract
 
-## Usage flow
+- Python owns sequence, branching, retries, task-marker validation, state transitions,
+  and terminal gates.
+- Every model step receives its own fragment from
+  `public/lifecycle_fragments/<workflow>/<step>.md` plus the role persona from
+  `public/personas/<role>.md`.
+- Supported real worker harnesses are `codex` and `pi`. `--harness auto` prefers the
+  entry harness when it is Layer-2-capable; an explicit harness or per-step override wins.
+- Model selection resolves through governed profiles. PI GPT profiles use explicit
+  `openai-codex/...` ids; optional OpenRouter profiles remain explicit and never satisfy
+  a Codex-subscription profile by fuzzy matching.
+- A run freezes its effective policy before step one. Later policy edits cannot alter
+  an in-flight run.
 
-1. An entry harness (or the operator) invokes a verb:
-   `dadaia lifecycle <verb> --release-id <id> [--harness {auto|pi|codex|fake}] [--step-model <step>=<profile-id>]`
-   (the legacy `--model <id>:<effort>` flag was hard-removed in v0.1.57 —
-   `--step-model <profile-id>` is the sole model-selection surface).
-   **`--harness` defaults to `auto` (v0.1.64):** resolved via
-   `core/session_env.entry_harness()` — `DADAIA_ENTRY_HARNESS` pin (codex|pi) >
-   `CODEX_SESSION_ID` ⇒ codex > `fake` (Claude entry / plain shells / CI). An explicit flag
-   always wins, and any real-worker auto-default prints one loud
-   `[harness] auto-default: <name> (from entry session; pass --harness to override)` line on
-   stderr — never silent; the test envelope + CI are hermetically scrubbed of the entry-signal
-   vars.
-2. The policy resolver freezes the per-step `(harness, profile, model)` snapshot before
-   step 1 ([[lifecycle-foundation]] — control plane).
-3. For each model-driven step, the prompt is assembled as **persona (role directive) +
-   fragment bundle + dynamic context + output contract** — persona injection applies
-   to ALL verbs (a shared helper threaded through the 5 workflow bodies AND the CLI's
-   `_run_phase_step`), not just the pipeline.
-4. The worker replies with the `schema: agent-run-result-v1` payload; the typed gate
-   decides the advance (gate mechanics: [[lifecycle-foundation]] §"Gating note").
-5. Steps communicate via the workflow-step handoff ledger ([[lifecycle-foundation]]
-   §"Workflow-step handoff data plane"); a missing required upstream BLOCKS.
+## Handoffs
 
-## Typical trigger
+Each model attempt produces one immutable run-scoped step payload. The payload records
+the attempt, role, runtime, model profile, artifact references, verdict, metrics, and
+the exact upstream payload ids consumed by that step. A consumer may advance only when
+all declared producer payloads exist, validate, and match the current run/attempt graph.
 
-Release or backlog-item definition in a Codex/PI entry harness (where
-dadaia-workflows are the preferred execution path); the implementation→review
-pipeline in a release; the close at the end.
+Worker files are first written in a run-scoped temporary worker directory, validated,
+then materialized into the lifecycle run ledger. Rejected or malformed attempts remain
+available as evidence; a retry creates a new payload instead of overwriting the old one.
+Terminal cleanup may purge expendable worker output, but never the accepted step ledger
+or the evidence needed by closure and audit.
 
-## Differentiator
+The human/agent communication boundary remains handoff-first:
+`.dadaia/handoff/<context>/...handoff.json`. HTML is optional and only exists for a
+human target or an explicit operator request.
 
-Workflow authority stays in Python (step order, gates, ledger), not in free-form agent
-text — a worker cannot "approve itself" outside the contract. Fragment and persona
-separate the step's WHAT from the role's WHO, each with a single home
-(`public/lifecycle_fragments/`, `public/personas/`).
+## Validation Status
 
-## Runtime state touched
+All four workflows are certified end-to-end on BOTH real harnesses with zero errors
+(2026-07-14): the codex chain in 4m43 and the pi chain in 14m06 on
+`gpt-5.3-codex-spark`, each running backlog → release → implementation → audit with no
+resume and no operator intervention. Two production releases (panel Pong and Breakout)
+were additionally shipped through the full chains. Failures found during the journeys
+were root-caused and fixed in evidence path framing, unique-suffix anchor binding,
+Python-side payload materialization, disk-truth deliverable checks, and lint/marker
+grammar tolerance.
 
-- `.dadaia/states/lifecycle/<run_id>.json` — run records (policy snapshot + step
-  ledger).
-- `.dadaia/runs/lifecycle/<run_id>/steps/*.step-payload.json` — immutable payloads.
-- `.dadaia/states/workflow_model_policy.json` — policy overlay (panel/CLI).
-- The context's `specs/` — the artifacts each workflow produces (SPEC/PLAN/TASKS,
-  backlog item, CLOSURE), under the normal SDD gate.
+## Runtime State
+
+- `.dadaia/runs/lifecycle/<run-id>/` - run state records.
+- `specs/releases/<release-id>/handoffs/<run-id>/steps/` - immutable step payloads,
+  REGISTERED IN THE RELEASE FOLDER (backlog runs: `specs/backlog/handoffs/<run-id>/`).
+- `.dadaia/tmp/lifecycle-worker/<context>/` - bounded worker staging area.
+- `.dadaia/handoff/<context>/` - validated cross-agent handoffs.
+- `.dadaia/states/workflow_model_policy.json` - operator workflow policy overlay.
+- `.dadaia/states/model_profiles.json` - optional operator model profiles.
 
 ## Dependencies
 
-- [[lifecycle-foundation]] — the engine (pipeline, gates, run store, data plane,
-  model/harness governance).
-- [[agent-orchestration]] — the Layer-2 persona surface.
-- [[tech-stack]] — the harness/model roster the verbs accept.
-- [[sdd-gate-v3]] — the gate and chokepoints the workers' writes fall under.
-- [[panel]] — the operator surface (diagram-cards + model pickers) over the same
-  governed catalog.
+[[lifecycle-foundation]], [[agent-comms]], [[sdd-gate-v3]], [[harness-codex]],
+[[harness-pi]], [[agent-orchestration]].

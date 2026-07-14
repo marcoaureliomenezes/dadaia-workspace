@@ -11,7 +11,9 @@ and persists progress at every step (resumable).
 
 from __future__ import annotations
 
-import json
+import os
+import re
+import uuid
 from collections.abc import Callable
 from dataclasses import Field, dataclass, replace
 from pathlib import Path
@@ -24,6 +26,7 @@ from dadaia_workspace.core.harness_models import (
 )
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
+    AgentRunStatus,
     AgentRuntimeKind,
     BlockedState,
     GateEvidenceKind,
@@ -37,7 +40,6 @@ from dadaia_workspace.core.models.workflow_execution import (
     WorkflowPolicySnapshot,
     WorkflowPolicyStepEntry,
 )
-from dadaia_workspace.core.models.workflow_handoff import RetentionMode
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
@@ -49,6 +51,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
     MaxContextPolicy,
     SelectionAudit,
+    SelectionResult,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
@@ -64,10 +67,16 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     PromptPrefix,
     PromptScope,
     build_fragment_suffix,
+    canonical_worker_output_ref,
+    filter_context_spec_paths,
+    worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
-from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
+from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    WorkflowHandoffResolver,
+    durable_payload_from_result,
+)
 
 #: ``kind -> adapter`` — injected so tests can supply fakes per harness.
 RuntimeFactory = Callable[[AgentRuntimeKind], AgentRuntimePort]
@@ -89,7 +98,7 @@ class PipelineStep:
     label: str
     role: str
     from_phase: LifecyclePhase
-    target_phase: LifecyclePhase
+    target_phase: LifecyclePhase | None
     runtime_kind: AgentRuntimeKind
     requirements: tuple[GateRequirement, ...] = ()
     model_profile: str | None = None
@@ -123,6 +132,7 @@ class PipelineStepResult:
     accepted: bool
     phase: LifecyclePhase
     blocked: BlockedState | None = None
+    attempt: int = 0
 
 
 @dataclass(frozen=True)
@@ -142,29 +152,21 @@ class PipelineResult:
 #: generic verdict shape) rather than raising — the ladder's 4 canonical labels are always
 #: covered; a future custom review step still produces *a* valid payload.
 _REVIEW_OUTPUT_SCHEMA_BY_LABEL: dict[str, str] = {
+    "review_combined": "combined-review-handoff-v1",
     "review_qa": "qa-review-handoff-v1",
     "review_security": "security-review-handoff-v1",
     "review_code": "code-review-handoff-v1",
 }
 
-
-@dataclass(frozen=True)
-class ImplementReviewRound:
-    """One implement→review round of the bounded retry loop (T-30-D-06)."""
-
-    attempt: int
-    review_verdict: str
-
-
-@dataclass(frozen=True)
-class ImplementReviewLoopResult:
-    """Typed outcome of the implement/review attempt loop (A24)."""
-
-    run_id: str
-    completed: bool
-    attempts: int
-    rounds: tuple[ImplementReviewRound, ...] = ()
-    blocked: BlockedState | None = None
+_TASK_MARKER_LINE_RES = (
+    # Checklist grammar: ``- [ ] **T01 - title**`` (bold optional: ``- [ ] T1 - ...``).
+    re.compile(r"^\s*-\s*\[(?P<marker>[ x-])\]\s+(?:\*\*\s*)?T-?[0-9]"),
+    # H3 grammar, with the marker before or after the task id/title:
+    # ``### [ ] T1 - title`` and ``### T-1 - title `[ ]```.
+    re.compile(r"^\s*###\s+(?=.*\bT-?[0-9])[^\n]*?\[(?P<marker>[ x-])\]"),
+    # Consumer grammar: a standalone marker associated with a bold task heading.
+    re.compile(r"^\s*\[(?P<marker>[ x-])\]\s+T-?[0-9][0-9A-Za-z.\-]*\s*$"),
+)
 
 
 class LifecyclePipeline:
@@ -260,11 +262,27 @@ class LifecyclePipeline:
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
         if not steps:
             raise ValueError("pipeline requires at least one step")
+        # Python owns task-marker state because the implementation worker's write scope
+        # deliberately excludes TASKS.md. Reservations survive retries and blocked runs;
+        # completion happens only after the entire review + close ladder succeeds.
+        self._rewrite_task_markers(" ", "-")
+        self._require_task_markers(("-", "x"), boundary="implementation start")
         # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
         # replacing the run record discards its ledger, so reclaim the orphaned payload
         # zone before the new generation's attempt-0 writes.
         if self._handoff_resolver is not None:
-            self._handoff_resolver.reset_run_zone(run_id)
+            self._handoff_resolver.reset_run_zone(
+                run_id,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(
+                        self._context, f"{run_id}:{step.label}:attempt-{attempt}"
+                    )
+                    for step in steps
+                    for attempt in range(self._max_review_retries + 1)
+                ),
+                context=self._context,
+                release_id=self._release_id,
+            )
         run = LifecycleRun(
             run_id=run_id,
             context=self._context,
@@ -279,60 +297,119 @@ class LifecyclePipeline:
         self._run_store.save(run)
 
         results: list[PipelineStepResult] = []
-        for step in steps:
-            runtime = self._runtime_factory(step.runtime_kind)
-            # FR2 (A1): resolve the step role's mapped atom(s), append them to the prompt, and
-            # record the atom refs on the run BEFORE the worker call — the state machine's
-            # ``replace``-based transition preserves ``injected_context`` onto ``decision.run``.
-            run, scope = self._inject_role_atoms(run, step, self._scope(step, run_id))
-            built = self._prompt_builder.build(
-                scope,
-                runtime=runtime.runtime_kind(),
-                prefix=self._prefix,
-            )
-            runner = LifecycleAgentRunner(
-                runtime=runtime,
-                state_machine=self._state_machine,
-                runtime_files=self._runtime_files,
-                artifact_root=self._artifact_root,
-            )
-            # v0.1.78 T-B / FR-B: run the worker ONCE and get back both the phase-transition
-            # decision AND the raw result — the latter is what lets this ladder produce a
-            # run-scoped handoff-ledger payload per step (below), exactly as
-            # ``run_implement_review_loop`` already does via ``evaluate_gate_with_result``.
-            decision, worker_result = runner.run_with_result(
-                run,
-                AgentRunnerInput(
+        attempt = 0
+        retry_source: tuple[str, int] | None = None
+        while True:
+            retry_requested = False
+            for step in steps:
+                digest: str | None = None
+                if step.label == "implement" and retry_source is not None:
+                    assert self._handoff_resolver is not None
+                    producer_step, producer_attempt = retry_source
+                    resolved = self._handoff_resolver.resolve_required(
+                        run, producer_step=producer_step, attempt=producer_attempt
+                    )
+                    run = self._handoff_resolver.record_consumption(
+                        run,
+                        producer_step=producer_step,
+                        producer_attempt=producer_attempt,
+                        consumer_step=step.label,
+                        consumer_attempt=attempt,
+                    )
+                    digest = WorkflowHandoffResolver.render_digest(resolved)
+                    retry_source = None
+
+                runtime = self._runtime_factory(step.runtime_kind)
+                run, scope = self._inject_role_atoms(
+                    run,
+                    step,
+                    self._scope(step, run_id, attempt=attempt, digest_suffix=digest),
+                )
+                built = self._prompt_builder.build(
+                    scope, runtime=runtime.runtime_kind(), prefix=self._prefix
+                )
+                runner = LifecycleAgentRunner(
+                    runtime=runtime,
+                    state_machine=self._state_machine,
+                    runtime_files=self._runtime_files,
+                    artifact_root=self._artifact_root,
+                )
+                runner_input = AgentRunnerInput(
                     request=built.request,
-                    target_phase=step.target_phase,
+                    target_phase=step.target_phase or run.phase,
                     requirements=step.requirements,
                     current_step=step.label,
                     is_review=step.is_review,
-                ),
-            )
-            run = decision.run
-            # FR5 (A5): the accept signal is the state machine's dual-signal contract, NOT
-            # ``run.blocked is None`` — the latter read ``True`` on an illegal transition
-            # (run unchanged, no blocked state) and wrongly advanced the ladder.
-            accepted = decision.advanced
-            if accepted and self._handoff_resolver is not None:
-                # FR-B: every accepted step produces its run-scoped step payload — additive
-                # optional (a fixture pipeline with no wired resolver behaves exactly as
-                # before: no payload, no doctor/ledger coverage). A structurally-blocked step
-                # never reaches here, matching the loop's structural-block-skips-produce
-                # behavior.
-                run = self._produce_step_payload(run, step, worker_result)
-            self._run_store.save(run)
-            results.append(
-                PipelineStepResult(
-                    label=step.label,
-                    runtime_kind=step.runtime_kind,
-                    accepted=accepted,
-                    phase=run.phase,
-                    blocked=run.blocked,
+                    deliverable_globs=(
+                        (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
+                        f"specs/releases/{self._release_id}/CLOSURE.md",
+                    )
+                    if step.label == "close"
+                    else (),
                 )
-            )
-            if not accepted:
+                if step.target_phase is None:
+                    worker_result, blocked = runner.evaluate_gate_with_result(run, runner_input)
+                    if blocked is None:
+                        run = replace(run, current_step=step.label)
+                        accepted = True
+                    else:
+                        decision = self._state_machine.transition(
+                            run,
+                            TransitionInput(
+                                target_phase=LifecyclePhase.BLOCKED,
+                                blocked_state=blocked,
+                                current_step=step.label,
+                            ),
+                        )
+                        run = decision.run
+                        accepted = False
+                else:
+                    decision, worker_result = runner.run_with_result(run, runner_input)
+                    run = decision.run
+                    accepted = decision.advanced
+
+                verdict = worker_result.structured_output.get("verdict")
+                rejected_review = (
+                    step.is_review
+                    and worker_result.status is AgentRunStatus.SUCCEEDED
+                    and bool(worker_result.artifact_refs)
+                    and verdict == "REJECTED"
+                )
+                will_retry = rejected_review and attempt < self._max_review_retries
+                if (accepted or rejected_review) and self._handoff_resolver is not None:
+                    run = self._produce_step_payload(
+                        run,
+                        step,
+                        worker_result,
+                        attempt=attempt,
+                        declared_consumers=("implement",) if will_retry else (),
+                    )
+                self._run_store.save(run)
+                results.append(
+                    PipelineStepResult(
+                        label=step.label,
+                        runtime_kind=step.runtime_kind,
+                        accepted=accepted,
+                        phase=run.phase,
+                        blocked=run.blocked,
+                        attempt=attempt,
+                    )
+                )
+                if accepted:
+                    continue
+                if will_retry:
+                    retry_source = (step.label, attempt)
+                    attempt += 1
+                    run = replace(
+                        run,
+                        phase=LifecyclePhase.IMPLEMENTATION,
+                        status=LifecycleRunStatus.RUNNING,
+                        current_step=steps[0].label,
+                        blocked=None,
+                    )
+                    self._run_store.save(run)
+                    retry_requested = True
+                    break
                 return PipelineResult(
                     run_id=run_id,
                     completed=False,
@@ -340,12 +417,15 @@ class LifecyclePipeline:
                     steps=tuple(results),
                     blocked=run.blocked,
                 )
+            if not retry_requested:
+                break
         # FR-B: the terminal ATOMIC save — CLI-reported success and the persisted run must
-        # agree. Mirrors ``run_implement_review_loop``'s terminal
-        # ``replace(run, status=COMPLETED)`` + save (pipeline.py, APPROVED branch). A save
+        # agree. A save
         # failure propagates (the run store raises), which fails the command rather than
         # silently reporting success over an unpersisted terminal state.
         run = replace(run, status=LifecycleRunStatus.COMPLETED)
+        self._rewrite_task_markers("-", "x")
+        self._require_task_markers(("x",), boundary="implementation completion")
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,
@@ -354,11 +434,81 @@ class LifecyclePipeline:
             steps=tuple(results),
         )
 
+    def _rewrite_task_markers(self, source: str, target: str) -> int:
+        """Atomically rewrite generated checklist task markers in active TASKS.md."""
+        if self._specs_dir is None:
+            return 0
+        path = self._specs_dir / "releases" / self._release_id / "TASKS.md"
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return 0
+
+        count = 0
+        updated_lines: list[str] = []
+        for line in text.splitlines(keepends=True):
+            updated = line
+            for pattern in _TASK_MARKER_LINE_RES:
+                match = pattern.match(line.rstrip("\r\n"))
+                if match is None:
+                    continue
+                if match.group("marker") == source:
+                    start, end = match.span("marker")
+                    updated = f"{line[:start]}{target}{line[end:]}"
+                    count += 1
+                break
+            updated_lines.append(updated)
+
+        updated = "".join(updated_lines)
+        if not count:
+            return 0
+        tmp = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
+        tmp.write_text(updated, encoding="utf-8")
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            tmp.unlink(missing_ok=True)
+            raise
+        return count
+
+    def _require_task_markers(self, allowed: tuple[str, ...], *, boundary: str) -> None:
+        """Fail closed when TASKS marker state does not match a pipeline boundary."""
+        if self._specs_dir is None:
+            return
+        path = self._specs_dir / "releases" / self._release_id / "TASKS.md"
+        try:
+            text = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            # ``--skip-preflight`` diagnostic/test pipelines may deliberately omit SDD
+            # artifacts. The normal CLI preflight owns the missing-file gate.
+            return
+        except OSError as exc:
+            raise RuntimeError(f"cannot validate task markers at {boundary}: {path}") from exc
+
+        markers: list[str] = []
+        for line in text.splitlines():
+            for pattern in _TASK_MARKER_LINE_RES:
+                match = pattern.match(line)
+                if match is not None:
+                    markers.append(match.group("marker"))
+                    break
+        if not markers:
+            raise RuntimeError(f"no recognizable task markers at {boundary}: {path}")
+        unexpected = sorted({marker for marker in markers if marker not in allowed})
+        if unexpected:
+            rendered = ", ".join(f"[{marker}]" for marker in unexpected)
+            raise RuntimeError(
+                f"invalid task marker state at {boundary}: found {rendered} in {path}"
+            )
+
     def _produce_step_payload(
         self,
         run: LifecycleRun,
         step: PipelineStep,
         result: AgentRunResult,
+        *,
+        attempt: int = 0,
+        declared_consumers: tuple[str, ...] = (),
     ) -> LifecycleRun:
         """Write *step*'s run-scoped handoff-ledger payload through the wired resolver.
 
@@ -372,252 +522,31 @@ class LifecyclePipeline:
         loop's per-attempt payloads.
         """
         assert self._handoff_resolver is not None
-        if step.is_review:
-            verdict = result.structured_output.get("verdict")
-            output_schema = _REVIEW_OUTPUT_SCHEMA_BY_LABEL.get(step.label, "qa-review-handoff-v1")
-            payload: dict[str, object] = {
-                "verdict": verdict if isinstance(verdict, str) else "APPROVED",
-                "verdict_reason": result.summary or step.label,
-            }
-        else:
-            output_schema = "generic-step-handoff-v1"
-            payload = {"summary": result.summary or f"{step.label} complete"}
-        # Bug step-payload-drops-worker-findings: substantive worker output survives.
-        findings_raw = result.structured_output.get("findings")
-        if isinstance(findings_raw, str) and findings_raw.strip():
-            try:
-                findings = json.loads(findings_raw)
-            except json.JSONDecodeError:
-                findings = None
-            if isinstance(findings, list) and findings:
-                payload["findings"] = findings
-        if result.artifact_refs:
-            payload["artifact_refs"] = list(result.artifact_refs)
+        payload = durable_payload_from_result(
+            result, fallback_summary=step.label, is_review=step.is_review
+        )
+        output_schema = (
+            _REVIEW_OUTPUT_SCHEMA_BY_LABEL.get(step.label, "qa-review-handoff-v1")
+            if step.is_review
+            else ("closure-handoff-v1" if step.label == "close" else "generic-step-handoff-v1")
+        )
         run, _record = self._handoff_resolver.produce(
             run,
             producer_step=step.label,
-            attempt=0,
+            attempt=attempt,
             output_schema=output_schema,
             payload=payload,
+            declared_consumers=declared_consumers,
         )
         return run
 
-    # -- implement/review attempt loop (T-30-D-06 / A24) ---------------------
-
-    def run_implement_review_loop(
+    def _scope(
         self,
+        step: PipelineStep,
         run_id: str,
         *,
-        implement_step: PipelineStep,
-        review_step: PipelineStep,
-    ) -> ImplementReviewLoopResult:
-        """Run implement → review with run-scoped attempt tracking + bounded retry (A24).
-
-        Each round writes immutable per-attempt payloads through the handoff resolver:
-        ``implement#N`` then ``review#N``. On a REJECTED review the next implement attempt
-        consumes the EXACT ``review#N`` rejection by (run, producer step, attempt) — never
-        ``review#0`` / latest-by-filename. After ``max_review_retries`` rejected rounds the
-        loop BLOCKS for operator intervention rather than retrying forever.
-
-        Requires a wired ``handoff_resolver`` — the loop's whole point is the attempt
-        ledger. The two steps run on their declared harnesses via the runtime factory.
-        """
-        if self._handoff_resolver is None:
-            raise ValueError("run_implement_review_loop requires a wired handoff_resolver")
-        resolver = self._handoff_resolver
-        # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone).
-        resolver.reset_run_zone(run_id)
-
-        run = LifecycleRun(
-            run_id=run_id,
-            context=self._context,
-            release_id=self._release_id,
-            command="implement_review_loop",
-            phase=implement_step.from_phase,
-            status=LifecycleRunStatus.RUNNING,
-            current_step=implement_step.label,
-            idempotency_key=run_id,
-            workflow_policy=self._policy_snapshot,
-        )
-        self._run_store.save(run)
-
-        rounds: list[ImplementReviewRound] = []
-        # attempt 0 is the first try; up to max_review_retries additional attempts follow.
-        for attempt in range(self._max_review_retries + 1):
-            # implement#attempt — from attempt 1 it consumes the prior review rejection, whose
-            # COMPACT digest is injected into the implement prompt (FR3 — the l.309 drop is
-            # replaced). The digest reaches the built request the implement worker receives.
-            digest: str | None = None
-            if attempt > 0:
-                resolved = resolver.resolve_required(
-                    run, producer_step=review_step.label, attempt=attempt - 1
-                )
-                run = resolver.record_consumption(
-                    run,
-                    producer_step=review_step.label,
-                    producer_attempt=attempt - 1,
-                    consumer_step=implement_step.label,
-                    consumer_attempt=attempt,
-                )
-                digest = WorkflowHandoffResolver.render_digest(resolved)
-            impl_result, impl_blocked = self._run_loop_worker(
-                run, implement_step, attempt, digest=digest
-            )
-            # Structural runner gate (evidence only, is_review=False): a non-SUCCEEDED /
-            # evidence-less / out-of-scope implement worker BLOCKS the loop — it is a broken
-            # worker, never a rejected review to retry.
-            if impl_blocked is not None:
-                return self._finalize_structural_block(run, impl_blocked, rounds, attempt)
-            run, _ = resolver.produce(
-                run,
-                producer_step=implement_step.label,
-                attempt=attempt,
-                output_schema="implementation-handoff-v1",
-                payload={"summary": impl_result.summary or "implementation"},
-                declared_consumers=(review_step.label,),
-            )
-
-            # review#attempt — consumes implement#attempt, produces its verdict. The review
-            # worker is gated on EVIDENCE ONLY (is_review=False): a REJECTED verdict must NOT
-            # block the loop (is_review=True would block the first REJECTED and destroy the
-            # retry model — agent_runner l.196). The verdict is read from the returned result
-            # to drive the attempt ledger; only a STRUCTURAL failure blocks here.
-            run = resolver.record_consumption(
-                run,
-                producer_step=implement_step.label,
-                producer_attempt=attempt,
-                consumer_step=review_step.label,
-                consumer_attempt=attempt,
-            )
-            review_result, review_blocked = self._run_loop_worker(run, review_step, attempt)
-            if review_blocked is not None:
-                return self._finalize_structural_block(run, review_blocked, rounds, attempt)
-            verdict = review_result.structured_output.get("verdict")
-            # FR2 (v0.1.68): the verdict is already known HERE, before produce() — a
-            # terminal APPROVED round must declare NO consumer, since no further
-            # implement attempt will ever run to consume it (the loop returns COMPLETED
-            # immediately below). Declaring `(implement_step.label,)` unconditionally on
-            # every round (the pre-fix behavior) left that consumer structurally
-            # unfulfillable on the terminal round, which the doctor's unconsumed-required
-            # gate correctly flags. A REJECTED round still declares the implement
-            # consumer: the next attempt's implement#N genuinely consumes this exact
-            # rejection digest (see resolver.resolve_required above, attempt > 0).
-            run, _ = resolver.produce(
-                run,
-                producer_step=review_step.label,
-                attempt=attempt,
-                output_schema="qa-review-handoff-v1",
-                payload={
-                    "verdict": verdict if isinstance(verdict, str) else "REJECTED",
-                    "verdict_reason": review_result.summary or "review",
-                },
-                declared_consumers=() if verdict == "APPROVED" else (implement_step.label,),
-                retention_mode=RetentionMode.PROMOTE_TO_EVIDENCE,
-            )
-            rounds.append(ImplementReviewRound(attempt=attempt, review_verdict=str(verdict)))
-            if verdict == "APPROVED":
-                run = replace(run, status=LifecycleRunStatus.COMPLETED)
-                self._run_store.save(run)
-                return ImplementReviewLoopResult(
-                    run_id=run_id, completed=True, attempts=attempt + 1, rounds=tuple(rounds)
-                )
-
-        # Exhausted the retry budget on well-formed REJECTED rounds — BLOCK for operator
-        # intervention. This is retry EXHAUSTION, distinct from a structural evidence block.
-        blocked = BlockedState(
-            reason=(
-                f"implement/review loop exceeded the bounded retry count "
-                f"({self._max_review_retries}); operator intervention required"
-            ),
-            blocked_at_step=review_step.label,
-            detail={"attempts": str(self._max_review_retries + 1)},
-        )
-        run = replace(
-            run, phase=LifecyclePhase.BLOCKED, status=LifecycleRunStatus.BLOCKED, blocked=blocked
-        )
-        self._run_store.save(run)
-        return ImplementReviewLoopResult(
-            run_id=run_id,
-            completed=False,
-            attempts=self._max_review_retries + 1,
-            rounds=tuple(rounds),
-            blocked=blocked,
-        )
-
-    def _finalize_structural_block(
-        self,
-        run: LifecycleRun,
-        blocked: BlockedState,
-        rounds: list[ImplementReviewRound],
-        attempt: int,
-    ) -> ImplementReviewLoopResult:
-        """Persist a structural (evidence) BLOCK on either loop worker and return the result.
-
-        A structural block — non-SUCCEEDED, empty ``artifact_refs``, or out-of-scope paths
-        (the runner's evidence-only decision, ``is_review=False``) — stops the loop
-        immediately: a broken worker is not a rejected review to retry. ``attempts`` counts
-        the current 1-based attempt, since the block occurred during it.
-        """
-        run = replace(
-            run,
-            phase=LifecyclePhase.BLOCKED,
-            status=LifecycleRunStatus.BLOCKED,
-            blocked=blocked,
-        )
-        self._run_store.save(run)
-        return ImplementReviewLoopResult(
-            run_id=run.run_id,
-            completed=False,
-            attempts=attempt + 1,
-            rounds=tuple(rounds),
-            blocked=blocked,
-        )
-
-    def _run_loop_worker(
-        self,
-        run: LifecycleRun,
-        step: PipelineStep,
-        attempt: int,
-        *,
-        digest: str | None = None,
-    ) -> tuple[AgentRunResult, BlockedState | None]:
-        """Run one implement/review worker for *attempt* through the STRUCTURAL runner gate.
-
-        Both workers route through :meth:`LifecycleAgentRunner.evaluate_gate_with_result`
-        with ``is_review=False`` (gate WITHOUT a phase transition, as ``release_definition`` /
-        ``audit`` do) — the gate decides on EVIDENCE ONLY (non-SUCCEEDED / empty
-        ``artifact_refs`` / out-of-scope paths BLOCK), never on the review verdict. Gating the
-        review ``is_review=True`` would return a block on the first REJECTED verdict
-        (``agent_runner`` l.196) and destroy the retry-with-digest model; the caller reads the
-        APPROVED/REJECTED verdict from the returned result to drive the attempt ledger
-        instead. When *digest* is present (the ``implement#N``, N ≥ 1 case) it trails the scope
-        prompt so the built request the worker receives carries the ``review#N-1`` rejection.
-        """
-        runtime = self._runtime_factory(step.runtime_kind)
-        built = self._prompt_builder.build(
-            self._scope(step, f"{run.run_id}#a{attempt}", digest_suffix=digest),
-            runtime=runtime.runtime_kind(),
-            prefix=self._prefix,
-        )
-        runner = LifecycleAgentRunner(
-            runtime=runtime,
-            state_machine=self._state_machine,
-            runtime_files=self._runtime_files,
-            artifact_root=self._artifact_root,
-        )
-        return runner.evaluate_gate_with_result(
-            run,
-            AgentRunnerInput(
-                request=built.request,
-                target_phase=step.target_phase,
-                requirements=step.requirements,
-                current_step=step.label,
-                is_review=False,
-            ),
-        )
-
-    def _scope(
-        self, step: PipelineStep, run_id: str, *, digest_suffix: str | None = None
+        attempt: int = 0,
+        digest_suffix: str | None = None,
     ) -> PromptScope:
         prompt = (
             self._fragment_prompt(step)
@@ -628,20 +557,27 @@ class LifecyclePipeline:
             # The prior review rejection digest (FR3) trails the step prompt so it reaches the
             # built request verbatim; the multi-step ``run`` path passes no digest (default).
             prompt = f"{prompt}\n\n{digest_suffix}"
-        handoff_glob = f".dadaia/handoff/{self._context}/**"
-        # FR7 (T-66-08): the handoff-dir glob is unioned with the step's
+        output_glob = worker_output_glob(self._context)
+        # FR7 (T-66-08): the raw-output glob is unioned with the step's
         # extra_allowed_paths for NON-REVIEW steps only. Gated on step.is_review is False
         # (ARCHITECT MEDIUM-2) — never a label string match — so review steps
         # (review_qa/review_security/review_code, is_review=True) ALWAYS stay
         # handoff-only regardless of what extra_allowed_paths carries.
-        allowed_paths = (
-            (handoff_glob, *step.extra_allowed_paths) if not step.is_review else (handoff_glob,)
+        expanded_paths = tuple(
+            path.format(context=self._context, release_id=self._release_id)
+            for path in step.extra_allowed_paths
         )
+        expanded_paths = filter_context_spec_paths(
+            expanded_paths,
+            workspace_root=self._artifact_root,
+            specs_dir=self._specs_dir,
+        )
+        allowed_paths = (output_glob, *expanded_paths) if not step.is_review else (output_glob,)
         return PromptScope(
             role=step.role,
             context=self._context,
             release_id=self._release_id,
-            task_id=f"{run_id}:{step.label}",
+            task_id=f"{run_id}:{step.label}:attempt-{attempt}",
             prompt=prompt,
             allowed_paths=allowed_paths,
             required_evidence=(GateEvidenceKind.HANDOFF,),
@@ -674,14 +610,15 @@ class LifecyclePipeline:
         )
         if step.is_review:
             tail = (
-                " Because this is a REVIEW step, emit a handoff whose "
+                " Because this is a REVIEW step, emit a structured result whose "
                 "structured_output.verdict is APPROVED or REJECTED, with an artifact_ref "
-                "pointing at the handoff document."
+                "pointing at the assigned step-output artifact."
             )
         else:
             tail = (
-                " Because this is a CREATE step, emit a handoff with the produced artifact "
-                "in artifact_refs pointing at the handoff document; do NOT self-judge — the "
+                " Because this is a CREATE step, emit a structured result with the produced "
+                "artifact in artifact_refs pointing at the assigned step-output; do NOT "
+                "self-judge — the "
                 "review gate owns the APPROVED/REJECTED decision."
             )
         return lead + tail
@@ -698,27 +635,37 @@ class LifecyclePipeline:
         assert step.fragment_id is not None
         fragment = self._fragment_loader.load_fragment(step.fragment_id)
         shared = tuple(self._fragment_loader.load_fragment(fid) for fid in step.shared_fragment_ids)
-        selected = self._select_context(step, fragment)
+        selected = self._select_context(step, (fragment, *shared))
         return build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=self._render_selection(selected),
             is_review=step.is_review,
         )
 
-    def _select_context(self, step: PipelineStep, fragment: Fragment) -> SelectionAudit:
-        """Resolve the fragment's dynamic inputs, bounded by its ``max_context_policy``.
-
-        Returns an empty audit when no context selector is wired — the fragment material
-        still carries the prompt; only the dynamically resolved files are omitted.
-        """
+    def _select_context(
+        self, step: PipelineStep, fragments: tuple[Fragment, ...]
+    ) -> SelectionAudit:
+        """Resolve main and shared fragment inputs under each fragment's own policy."""
         if self._context_selector is None:
             return SelectionAudit(step=step.label)
-        policy = MaxContextPolicy.parse(fragment.max_context_policy)
-        return self._context_selector.select_all(
-            step.label,
-            fragment.dynamic_inputs,
-            policy,
-            fragment_ids=(fragment.id, *step.shared_fragment_ids),
+        results: list[SelectionResult] = []
+        seen: set[str] = set()
+        for fragment in fragments:
+            names = tuple(name for name in fragment.dynamic_inputs if name not in seen)
+            seen.update(names)
+            if not names:
+                continue
+            selected = self._context_selector.select_all(
+                step.label,
+                names,
+                MaxContextPolicy.parse(fragment.max_context_policy),
+                fragment_ids=(fragment.id,),
+            )
+            results.extend(selected.results)
+        return SelectionAudit(
+            step=step.label,
+            results=tuple(results),
+            fragment_ids=tuple(fragment.id for fragment in fragments),
         )
 
     @staticmethod
@@ -759,7 +706,7 @@ def implementation_ladder(
     *,
     model: HarnessModelOption | None = None,
 ) -> tuple[PipelineStep, ...]:
-    """The canonical release-implementation pipeline: implement → qa → security → code.
+    """The canonical release pipeline: implement → reviews → bounded correction → close.
 
     Each step defaults to ``default_kind`` (override per step for harness mixing). The
     discrete Layer-2 model defaults from the catalog (LAW 2 / ADR-B) — no ``sonnet``/
@@ -778,55 +725,47 @@ def implementation_ladder(
             runtime_kind=default_kind,
             model_profile=effort,
             # WS-6: the implementation step runs on the fragment library. Its bundle is
-            # the TDD implement fragment, citing the shared write-scope / anti-slop /
-            # output-handoff disciplines plus the self-verify fragment.
+            # the TDD implement fragment, citing the shared write-scope / anti-slop
+            # disciplines plus the self-verify fragment. The output contract is stated
+            # once by the engine's Required-output section — no shared restatement.
             fragment_id="implementation.implement_tdd",
             shared_fragment_ids=(
                 "shared.write_scope",
                 "shared.anti_slop",
-                "shared.output_handoff",
                 "implementation.self_verify",
             ),
         ),
         PipelineStep(
-            label="review_qa",
-            role="qa-engineer",
+            label="review_combined",
+            role="qa-engineer, security-reviewer, code-reviewer",
             from_phase=LifecyclePhase.QA_REVIEW,
-            target_phase=LifecyclePhase.SECURITY_REVIEW,
-            runtime_kind=default_kind,
-            model_profile=effort,
-            is_review=True,
-            # WS-6: the QA review step is the second fragment-driven pipeline step.
-            # WS-2b (v0.1.43): cite the shared output-handoff verdict contract.
-            fragment_id="implementation.qa_review",
-            shared_fragment_ids=("shared.output_handoff",),
-        ),
-        PipelineStep(
-            label="review_security",
-            role="security-reviewer",
-            from_phase=LifecyclePhase.SECURITY_REVIEW,
-            target_phase=LifecyclePhase.CODE_REVIEW,
-            runtime_kind=default_kind,
-            model_profile=effort,
-            is_review=True,
-            # WS-1a: the security review step runs on the fragment library — an OWASP-style
-            # rubric over the change diff. This step mechanically gates every push, so it
-            # must never fall back to the generic placeholder.
-            fragment_id="implementation.security_review",
-            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
-        ),
-        PipelineStep(
-            label="review_code",
-            role="code-reviewer",
-            from_phase=LifecyclePhase.CODE_REVIEW,
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
             model_profile=effort,
             is_review=True,
-            # WS-1b: the code review step runs on the fragment library — a correctness /
-            # code-quality rubric over the change diff.
-            fragment_id="implementation.code_review",
-            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
+            # v0.2.x simplification: ONE tri-angle review (QA + security + code) replaces
+            # the three sequential single-angle reviews — same rubric coverage, one
+            # worker session. This step still mechanically gates the release toward the
+            # push boundary and must never fall back to the generic placeholder.
+            fragment_id="implementation.combined_review",
+        ),
+        PipelineStep(
+            label="close",
+            role="product-engineer",
+            from_phase=LifecyclePhase.CLOSURE,
+            target_phase=None,
+            runtime_kind=default_kind,
+            model_profile=effort,
+            fragment_id="implementation.close_release",
+            shared_fragment_ids=("shared.memory_selection",),
+            extra_allowed_paths=(
+                "repos/{context}/specs/releases/{release_id}/**",
+                "specs/releases/{release_id}/**",
+                "repos/{context}/specs/releases/ACTIVE.md",
+                "specs/releases/ACTIVE.md",
+                "repos/{context}/specs/memory/**",
+                "specs/memory/**",
+            ),
         ),
     )
 
@@ -931,7 +870,7 @@ def apply_resolved_policy[StepT: PolicyApplicableStep](
     **Fake dry-run is preserved (architect MEDIUM).** ``fake`` is never a *resolved*
     harness; a step built on :data:`AgentRuntimeKind.FAKE` keeps ``FAKE`` while the governed
     model is still threaded for auditability. Seeding each base step's ``runtime_kind`` to
-    the run's default kind BEFORE calling this (mirroring the pipeline verb) is what keeps a
+    the run's default kind before calling this is what keeps a
     ``None``-kind definition step from mapping ``None -> codex/pi`` and driving a live
     adapter on ``--harness fake`` (R-3).
 
@@ -964,8 +903,6 @@ def apply_resolved_policy[StepT: PolicyApplicableStep](
 
 # Re-exported for callers assembling custom ladders.
 __all__ = [
-    "ImplementReviewLoopResult",
-    "ImplementReviewRound",
     "LifecyclePipeline",
     "PipelineResult",
     "PipelineStep",

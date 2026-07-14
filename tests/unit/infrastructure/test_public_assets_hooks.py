@@ -10,7 +10,12 @@ force-rm-stale + omits-inert-config-keys checks.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
@@ -139,6 +144,7 @@ def test_claude_settings_contract(tmp_path: Path) -> None:
         assert entry["matcher"] != "", "write gate must not use the empty match-all"
     pre_cmds = [str(h["command"]) for e in pre for h in e["hooks"]]
     assert any("dadaia_workspace.hooks.pre_gate" in c for c in pre_cmds)
+    assert all(" -B -m " in c for c in pre_cmds)
     assert not any("dadaia_workspace.hooks.sdd_gate" in c for c in pre_cmds)
     assert not any("dadaia_workspace.hooks.root_whitelist" in c for c in pre_cmds)
 
@@ -147,12 +153,14 @@ def test_claude_settings_contract(tmp_path: Path) -> None:
     assert post[0]["matcher"] == "*"
     post_cmds = [str(h["command"]) for h in post[0]["hooks"]]
     assert any("dadaia_workspace.hooks.sdd_post_gate" in c for c in post_cmds)
+    assert all(" -B -m " in c for c in post_cmds)
 
     ups = hooks["UserPromptSubmit"]
     assert isinstance(ups, list) and len(ups) == 1
     assert ups[0]["matcher"] == ""
     ups_cmds = [str(h["command"]) for h in ups[0]["hooks"]]
     assert any("dadaia_workspace.hooks.ctx_inject" in c for c in ups_cmds)
+    assert all(" -B -m " in c for c in ups_cmds)
 
     # T-SANI-01 + T-014-05: root-whitelist policy registered via merged pre_gate.
     all_pre_commands = [str(hook["command"]) for entry in pre for hook in entry.get("hooks", [])]
@@ -196,9 +204,50 @@ def test_wrapper_contents_and_inert_config_keys_omitted(tmp_path: Path) -> None:
     assert "dadaia_workspace.hooks.sdd_post_gate" in wrappers["codex-post-gate"]
     assert 'DADAIA_HOOK_OUTPUT="codex-json"' in wrappers["codex-ctx-inject"]
     assert 'DADAIA_HOOK_EVENT="SessionStart"' in wrappers["codex-ctx-inject-session-start"]
+    assert all('exec "$PYTHON_BIN" -B -m ' in body for body in wrappers.values())
 
     agentic_dir, _ = _build_minimal_agentic_dir(tmp_path)
     manager = FileSystemPublicAssetManager()
     config_text = manager._codex_config(agentic_dir)
     assert "approved_commands" not in config_text
     assert "[skills]" not in config_text
+
+
+@pytest.mark.skipif(os.name == "nt", reason="generated Codex hook wrappers are POSIX shell")
+def test_codex_pre_gate_wrapper_never_creates_repo_bytecode(tmp_path: Path) -> None:
+    """The projected wrapper is repository-clean even when cwd shadows the package."""
+    from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+    workspace = tmp_path / "workspace"
+    repo = workspace / "repos" / "sample"
+    package = repo / "dadaia_workspace" / "hooks"
+    package.mkdir(parents=True)
+    (package.parent / "__init__.py").write_text("", encoding="utf-8")
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "pre_gate.py").write_text(
+        "import json, sys\njson.load(sys.stdin)\n",
+        encoding="utf-8",
+    )
+
+    python_bin = workspace / ".dadaia" / ".venv" / "bin" / "python"
+    python_bin.parent.mkdir(parents=True)
+    python_bin.symlink_to(Path(sys.executable))
+    hook = workspace / ".dadaia" / "hooks" / "codex-pre-gate"
+    hook.parent.mkdir(parents=True)
+    hook.write_text(codex_hook_wrapper_contents()["codex-pre-gate"], encoding="utf-8")
+    hook.chmod(0o755)
+
+    env = dict(os.environ)
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    subprocess.run(
+        [str(hook)],
+        cwd=repo,
+        input="{}",
+        text=True,
+        capture_output=True,
+        check=True,
+        env=env,
+    )
+
+    assert list(repo.rglob("__pycache__")) == []
+    assert list(repo.rglob("*.pyc")) == []

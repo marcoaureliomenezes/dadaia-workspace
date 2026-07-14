@@ -11,7 +11,7 @@
 |------|-------|------|
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
-| `agent-orchestration` | agent-orchestration | 9-core + 3-plugin agent topology; two dispatchers; coordinator+sub-agent architecture; phase ownership; SDD step-0 read order; Layer-2 personas. |
+| `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, eight Layer-2 personas, two dispatchers, four workflows, and advisory-only concurrency. |
 
 ### distribution
 
@@ -28,41 +28,41 @@
 |------|-------|------|
 | `harness-claude-code` | Harness — Claude Code | Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks). |
 | `harness-codex` | Harness — Codex | Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection. |
-| `harness-pi` | Harness — PI (pi-coding-agent) | Dual-layer harness: post-trust Ring-1 entry + DADAIA_ENTRY_HARNESS pi pin + PI_HEADLESS worker; auths on the operator's Codex subscription. |
+| `harness-pi` | Harness - PI (pi-coding-agent) | Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles. |
 
 ### panel
 
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | local control surface (dadaia panel); 7 tabs incl. Sub-agents (L1 agent model governance); Workflows leads with server-SVG diagram-cards + model pickers. |
+| `panel` | panel | Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris. |
 
 ### philosophy
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | Identity, pillars, users, capability map, known limits, and anti-slop stance — the normative §13 shape of dadaia-workspace (docs/01_medium_codex.md). |
-| `spec-context-project` | spec-context-project | The keystone concept — one canonical specs folder + one repo, session-bindable, enabling safe parallel multi-project work (constitution §0). |
+| `product-vision` | product-vision | A strict, portable SDD workspace that gives agents current context, four reliable workflows, visible concurrency, and strong anti-slop boundaries. |
+| `spec-context-project` | spec-context-project | One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work. |
 
 ### platform
 
 | slug | title | tldr |
 |------|-------|------|
-| `context-management` | context-management | multi-context ALIVE/DEAD; bind persists mode and writes the bind-epoch marker; TTL+PID-veto lease; `context release` drops the lease; dead() needs a clean tree. |
-| `cross-platform-portability` | cross-platform-portability | dadaia-workspace runs on Linux/macOS/Windows via a core/platform.py seam + port/adapter boundary + 3-tier resilience; governance hooks are Python (no bash). |
-| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI get honest runtime-specific projections from one public source (9 core agents / 18 skills / 2 reference workflow docs). |
+| `context-management` | context-management | ALIVE/DEAD context registry, caller-owned session binding, bind-driven memory injection, and advisory presence with no concurrency locks. |
+| `cross-platform-portability` | cross-platform-portability | Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests. |
+| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
 | `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |
-| `workspace-doctor` | workspace-doctor | workspace-state diagnosis + repair; checks LOCK-NEW/LOCK-GC/LOCK-4/5/CTX-URL-1/INV-4/5/ROOT-1..4/VENV-1; --fix runs SENTINEL/PTR/GRAVEYARD-GC. |
-| `workspace-init` | workspace-init | entry point; creates .dadaia/, .venv, Python governance hooks and an idempotent structure. |
+| `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state. |
+| `workspace-init` | workspace-init | Idempotent bootstrap of workspace state, Python venv, selected harness projections, and governance hooks. |
 | `workspace-portability` | workspace-portability | export/import of the whole workspace as a tar.gz for backup or migration between machines. |
 
 ### sdd
 
 | slug | title | tldr |
 |------|-------|------|
-| `dadaia-workflows` | dadaia-workflows | The 7 governed Layer-2 workflows via ~12 CLI verbs; --harness auto-defaults from the entry session (v0.1.64); every model step gets fragment + persona. |
-| `lifecycle-foundation` | lifecycle-foundation | Multi-harness procedural lifecycle engine: Python-owned state/gates/hygiene plus per-step harness-selectable agent workers behind AgentRuntimePort. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bug store + backlog-consistency engine + bug/backlog → release governance (grill, disposition, audit-disposition law, security-gated push). |
-| `sdd-gate-v3` | sdd-gate-v3 | SDD gate: merged pre_gate PreToolUse (root-whitelist→venv-guard→SDD); git chokepoints pre-commit/pre-push; lease O_EXCL CAS + pid veto + self-recognition. |
-| `specs-doctor` | specs-doctor | Validates SDD invariants SPEC-DOC 001..009/012/016 (022/023 live in 012), 024, 026..038, SPECS-VERSION, TREE-1..7+5M, LINT-1, CAT-1, D-OC-1; --fix: TREE-4+034. |
+| `dadaia-workflows` | dadaia-workflows | Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit. |
+| `lifecycle-foundation` | lifecycle-foundation | Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, duplicate-safe backlog definition, release consumption, audit dispositions, and exact-commit security-gated push. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary. |
+| `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |

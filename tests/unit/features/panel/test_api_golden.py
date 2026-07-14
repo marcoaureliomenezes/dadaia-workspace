@@ -46,7 +46,6 @@ from dadaia_workspace.core.models.agent import (
 )
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
 from dadaia_workspace.features.panel.service import PanelService
 
 # --- render functions under lock (per-domain modules post-FR2-split; the bytes do not move) ---
@@ -66,12 +65,7 @@ from dadaia_workspace.features.panel.views.api_reports import (
 )
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.panel.views.api_workflows import (
-    render_api_dadaia_workflow_detail,
-    render_api_dadaia_workflows_list,
-    render_api_workflow_detail,
-    render_api_workflows_list,
-)
+from dadaia_workspace.features.panel.views.workflow_policy import render_api_workflow_catalog
 from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary, TokenTotals
 
@@ -192,63 +186,8 @@ class _FakeAgentsProvider:
         )
 
 
-class _FakeWorkflows:
-    """Backs list_workflow_summaries (list route) + agent-membership derivation."""
-
-    def list_summaries(self) -> list[WorkflowSummaryDTO]:
-        return [
-            WorkflowSummaryDTO(
-                name="tdd-cycle",
-                display_name="TDD Cycle",
-                description="Red/green/refactor.",
-                version="0.1.0",
-                schema_version="1",
-                stage_count=3,
-                agent_ids=["qa-engineer", "software-engineer"],
-                has_parallel=False,
-                has_gates=True,
-                source_path=".dadaia/agentic/workflows/tdd-cycle.workflow.md",
-                lifecycle_phase="Implementation",
-            )
-        ]
-
-
-class _FakeWorkflowDetailService:
-    """Backs render_api_workflow_detail (get_detail)."""
-
-    def get_detail(self, name: str) -> Any:
-        if name != "tdd-cycle":
-            return None
-        stage = SimpleNamespace(
-            id="red",
-            agent="qa-engineer",
-            needs=[],
-            parallel_group=None,
-            gate=False,
-            expected_output_path=None,
-            must_include=None,
-            on_failure="stop",
-        )
-        return SimpleNamespace(
-            name="tdd-cycle",
-            display_name="TDD Cycle",
-            description="Red/green/refactor.",
-            version="0.1.0",
-            schema_version="1",
-            stage_count=1,
-            agent_ids=["qa-engineer"],
-            has_parallel=False,
-            has_gates=False,
-            lifecycle_phase="Implementation",
-            inputs=[{"name": "context", "type": "string", "required": True}],
-            stages=[stage],
-            diagram_svg="<svg role='img'><g/></svg>",
-            source_path=".dadaia/agentic/workflows/tdd-cycle.workflow.md",
-        )
-
-
 class _FakeDadaiaWorkflowsService:
-    """Backs render_api_dadaia_workflows_list + detail."""
+    """Backs governed workflow membership in the agents catalog."""
 
     def _wf(self) -> SimpleNamespace:
         step = SimpleNamespace(
@@ -277,6 +216,35 @@ class _FakeDadaiaWorkflowsService:
 
     def get_dadaia_workflow(self, name: str) -> SimpleNamespace | None:
         return self._wf() if name == "release_definition" else None
+
+
+class _FakeWorkflowCatalog:
+    def __init__(self) -> None:
+        step = SimpleNamespace(
+            label="release_scope",
+            role="product-engineer",
+            default_harness="codex",
+            default_profile="codex-implementation-standard",
+            default_profiles={"codex": "codex-implementation-standard"},
+        )
+        self.workflows = (SimpleNamespace(workflow_id="release_definition", steps=(step,)),)
+
+    def workflow(self, workflow_id: str) -> SimpleNamespace | None:
+        return self.workflows[0] if workflow_id == "release_definition" else None
+
+
+class _FakeWorkflowResolver:
+    def resolve(self, workflow_id: str, *, context: str) -> SimpleNamespace:
+        entry = SimpleNamespace(
+            harness="codex",
+            model_profile="codex-implementation-standard",
+            model="gpt-5.5",
+            reasoning="medium",
+            source=SimpleNamespace(value="library-default"),
+            fragments=("release_definition.release_scope",),
+            output_schema="agent-run-result-v1",
+        )
+        return SimpleNamespace(step=lambda label: entry)
 
 
 def _make_entry() -> tuple[PortEntry, PortStatus]:
@@ -331,9 +299,9 @@ def _build_service(tmp_path: Path, *, telemetry: Any) -> PanelService:
         academy=_FakeAcademy(),
         report_retention=ReportRetentionService(tmp_path),
         agents_provider=_FakeAgentsProvider(),
+        workflows_service=_FakeDadaiaWorkflowsService(),
     )
     svc._canonical_agents_override = [_make_dto()]  # type: ignore[attr-defined]
-    svc._workflows_service_override = _FakeWorkflows()  # type: ignore[attr-defined]
     return svc
 
 
@@ -385,8 +353,7 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
     _seed_report_tree(tmp_path)
     service = _build_service(tmp_path, telemetry=_FakeTelemetry())
     service_no_tel = _build_service(tmp_path, telemetry=None)
-    wf_detail = _FakeWorkflowDetailService()
-    dwf = _FakeDadaiaWorkflowsService()
+    workflow_catalog = _FakeWorkflowCatalog()
 
     rpath = "ctx/qa-engineer/report.html"
     plan: list[tuple[str, str, Any, dict[str, object]]] = [
@@ -398,6 +365,12 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
             "api_agents_400",
             render_api_agents_canonical(service),
             {"active_window_days": 0},
+        ),
+        (
+            "workflows",
+            "api_workflow_catalog",
+            render_api_workflow_catalog(workflow_catalog, lambda context: _FakeWorkflowResolver()),
+            {},
         ),
         (
             "agents",
@@ -416,32 +389,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
             "api_agent_prompt_404",
             render_api_agent_prompt(service),
             {"agent_id": "ghost-agent"},
-        ),
-        ("workflows", "api_workflows", render_api_workflows_list(service), {"qs": {}}),
-        (
-            "workflows",
-            "api_workflow_detail",
-            render_api_workflow_detail(wf_detail),
-            {"workflow_name": "tdd-cycle"},
-        ),
-        (
-            "workflows",
-            "api_workflow_detail_400",
-            render_api_workflow_detail(wf_detail),
-            {"workflow_name": "../x"},
-        ),
-        (
-            "workflows",
-            "api_workflow_detail_404",
-            render_api_workflow_detail(wf_detail),
-            {"workflow_name": "nope"},
-        ),
-        ("workflows", "api_dadaia_workflows", render_api_dadaia_workflows_list(dwf), {}),
-        (
-            "workflows",
-            "api_dadaia_workflow_detail",
-            render_api_dadaia_workflow_detail(dwf),
-            {"workflow_name": "release_definition"},
         ),
         ("sessions", "api_sessions", render_api_sessions(service), {"qs": {"runtime": ["claude"]}}),
         ("sessions", "api_sessions_503", render_api_sessions(service_no_tel), {"qs": {}}),

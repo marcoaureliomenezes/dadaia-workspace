@@ -104,7 +104,17 @@ class _KindReportingFake:
             target = Path.cwd() / ref
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text('{"fake": true}\n', encoding="utf-8")
+                body = '{"fake": true}\n'
+                if target.name == "PLAN.md":
+                    body = (
+                        "# PLAN\n\n"
+                        "## Validation Dependency Table\n\n"
+                        "| Workstream | Produces by end | Direct validation | "
+                        "Validation dependencies | Deferred integration evidence |\n"
+                        "|---|---|---|---|---|\n"
+                        "| WS-1 | fake artifact | focused test | None | None |\n"
+                    )
+                target.write_text(body, encoding="utf-8")
         return replace(self.result, artifact_refs=tuple(refs))
 
 
@@ -112,7 +122,9 @@ def _approving_result() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -121,7 +133,9 @@ def _rejecting_result() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: REJECTED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
+        ),
         structured_output={"verdict": "REJECTED"},
     )
 
@@ -160,8 +174,7 @@ def _define(args: list[str]) -> Result:
         app,
         [
             "lifecycle",
-            "release",
-            "define",
+            "release-definition",
             "--release-id",
             _RELEASE,
             "--json",
@@ -170,22 +183,83 @@ def _define(args: list[str]) -> Result:
     )
 
 
+def test_release_scope_consumes_exact_backlog_author_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dadaia_workspace.cli.commands.lifecycle import _authoritative_backlog_prefix
+    from dadaia_workspace.core.models.lifecycle import (
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    handoff_ref = f".dadaia/handoff/{_CONTEXT}/author.handoff.json"
+    handoff = workspace / handoff_ref
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(
+        json.dumps(
+            {
+                "artifact": {
+                    "type": "other",
+                    "path": "specs/backlog/deterministic-tetris-engine.md",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    run = LifecycleRun(
+        run_id="tetris-backlog-run",
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        command="backlog_definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.COMPLETED,
+        current_step="backlog_review_gate",
+        idempotency_key="tetris-backlog-run",
+    )
+    store = container.build_lifecycle_run_store(workspace)
+    store.save(run)
+    resolver = container.build_workflow_handoff_resolver(workspace)
+    resolver.produce(
+        run,
+        producer_step="backlog_author",
+        attempt=0,
+        output_schema="backlog-item-v1",
+        payload={"summary": "authored tetris", "artifact_refs": [handoff_ref]},
+    )
+
+    prefix = _authoritative_backlog_prefix(
+        workspace,
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        backlog_run_id="tetris-backlog-run",
+    )
+
+    assert prefix is not None
+    assert "Exact producer run: `tetris-backlog-run`" in prefix.text
+    assert "`specs/backlog/deterministic-tetris-engine.md`" in prefix.text
+    assert "must not substitute a different candidate" in prefix.text
+
+
 # 3 -- rejected review blocks advancement -----------------------------------
 
 
 def test_rejected_review_blocks_before_commit_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A REJECTED verdict at spec_arch_review stops the run before the commit gate."""
+    """A REJECTED verdict at spec_review stops the run before the commit gate
+    (after the single bounded in-run revision of spec_create is spent)."""
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    # Drive spec_arch_review on a distinct harness (codex) and make that kind reject;
+    # Drive spec_review on a distinct harness (codex) and make that kind reject;
     # every other step (on the default pi harness, also fake-backed) approves. Python —
     # not the model — decides the block.
     _install_fake_factory(monkeypatch, reject_kind=AgentRuntimeKind.CODEX_EXEC)
 
-    result = _define(["--harness", "pi", "--step-harness", "spec_arch_review=codex"])
+    result = _define(["--harness", "pi", "--step-harness", "spec_review=codex"])
 
     assert result.exit_code == 3, result.output
     payload = _payload(result.output)
@@ -196,7 +270,7 @@ def test_rejected_review_blocks_before_commit_gate(
     steps = payload["steps"]
     assert isinstance(steps, list)
     labels = [step["label"] for step in steps]
-    assert labels[-1] == "spec_arch_review"
+    assert labels[-1] == "spec_review"
     assert "definition_commit_gate" not in labels
     assert steps[-1]["accepted"] is False
     blocked = payload["blocked"]
@@ -221,7 +295,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
       (b) both harnesses pass through the same Python gate logic (both accepted);
       (c) the mixed-harness run completes identically to the single-harness path.
 
-    The single-harness baseline below IS the full happy-path proof (all 8 model steps +
+    The single-harness baseline below IS the full happy-path proof (all 7 model steps +
     terminal Python commit gate, release advances to IMPLEMENTATION) — absorbing the
     former standalone happy-path test. Fragment-scoped (non-generic) prompt assertions
     are folded in as this fn already builds workflow objects directly.
@@ -232,7 +306,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     monkeypatch.chdir(workspace)
     _install_fake_factory(monkeypatch)
 
-    # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 8
+    # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 7
     # model steps + the terminal Python commit gate ran, release advances to IMPLEMENTATION.
     baseline = _define(["--harness", "pi"])
     assert baseline.exit_code == 0, baseline.output
@@ -244,8 +318,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_labels == [
         "release_scope",
         "spec_create",
-        "spec_arch_review",
-        "spec_qa_review",
+        "spec_review",
         "plan_create",
         "plan_review",
         "tasks_create",

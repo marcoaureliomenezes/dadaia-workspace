@@ -92,9 +92,9 @@ def test_per_step_default_invariants() -> None:
                 assert step.default_profiles == {}
 
     # review/gate worker steps default to a deep-reasoning profile; worker steps to standard.
-    impl = get_dadaia_workflow("implementation")
+    impl = get_dadaia_workflow("implementation_reviews")
     assert impl is not None
-    review = next(s for s in impl.steps if s.label == "review_qa")
+    review = next(s for s in impl.steps if s.label == "review_combined")
     implement = next(s for s in impl.steps if s.label == "implement")
     assert review.default_harness is not None
     assert implement.default_harness is not None
@@ -112,10 +112,10 @@ def test_governed_catalog_and_resolver_contract() -> None:
     assert isinstance(catalog, WorkflowCatalog)
     assert catalog.workflows, "governed catalog has no workflows"
 
-    impl = catalog.workflow("implementation")
+    impl = catalog.workflow("implementation_reviews")
     assert impl is not None
     labels = {s.label for s in impl.steps}
-    assert {"implement", "review_qa", "review_security", "review_code"} <= labels
+    assert {"implement", "review_combined", "close"} <= labels
 
     # every governed step's default profile resolves and matches the harness.
     for workflow in catalog.workflows:
@@ -132,8 +132,8 @@ def test_governed_catalog_and_resolver_contract() -> None:
 
     # the resolver consumes the governed catalog (one source).
     resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
-    snapshot = resolver.resolve("implementation")
-    assert snapshot.workflow_id == "implementation"
+    snapshot = resolver.resolve("implementation_reviews")
+    assert snapshot.workflow_id == "implementation_reviews"
     assert snapshot.steps, "snapshot has no steps"
     for entry in snapshot.steps:
         profile = model_profiles.resolve(entry.model_profile)
@@ -143,7 +143,7 @@ def test_governed_catalog_and_resolver_contract() -> None:
     # the resolver rejects an override targeting an unknown step.
     with pytest.raises(PolicyResolutionError):
         resolver.resolve(
-            "implementation",
+            "implementation_reviews",
             cli_overrides=(StepOverride(step="no_such_step", profile_id="codex-review-deep"),),
         )
 
@@ -152,88 +152,57 @@ def test_governed_catalog_and_resolver_contract() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Closure block + Wave-E trio + seven-workflows enumeration — 1 test
+# Exact four-workflow roster and merged closure — 1 test
 # ---------------------------------------------------------------------------
 
 
-#: The three workflows that became real fragment+gate bodies in v0.1.30 Wave E, with their
-#: expected step labels (model steps + the terminal Python gate).
-_WAVE_E_BODIES: dict[str, list[str]] = {
-    "audit": ["audit_scope", "drift_scan", "triage", "audit_disposition_gate"],
-    "research": ["research_scope", "investigate", "synthesis", "research_synthesis_gate"],
-    "bug_report": ["bug_intake", "dedupe", "bug_write", "bug_record_gate"],
-}
-
-
-def test_seven_workflows_closure_and_wave_e_bodies() -> None:
-    # AC-7: every dadaia-workflow is enumerable in the catalog.
+def test_exact_four_workflows_and_merged_closure() -> None:
     names = {w.name for w in list_dadaia_workflows()}
     assert names == {
-        "release_definition",
-        "implementation",
         "backlog_definition",
-        "closure",
+        "release_definition",
+        "implementation_reviews",
         "audit",
-        "research",
-        "bug_report",
     }
 
-    # closure carries the real close worker step + the removal gate as a Python gate.
-    closure = get_dadaia_workflow("closure")
-    assert closure is not None
-    labels = [s.label for s in closure.steps]
+    implementation = get_dadaia_workflow("implementation_reviews")
+    assert implementation is not None
+    labels = [s.label for s in implementation.steps]
     assert "close" in labels
-    close_step = next(s for s in closure.steps if s.label == "close")
+    close_step = next(s for s in implementation.steps if s.label == "close")
     assert close_step.role == "product-engineer"
     assert close_step.harness_options
     assert close_step.default_harness in close_step.default_profiles
-    assert close_step.fragment_id is None  # generic worker — no fragment (WMP-5)
+    assert close_step.fragment_id == "implementation.close_release"
 
-    gate = next((s for s in closure.steps if s.label == "closure_removal_gate"), None)
+    gate = next((s for s in implementation.steps if s.label == "closure_removal_gate"), None)
     assert gate is not None
     assert gate.is_gate is True
     assert gate.harness_options == []
     assert gate.default_harness is None
     assert gate.default_profiles == {}
 
-    assert closure.availability == dadaia_catalog.AVAILABILITY_PARTIAL
+    assert implementation.availability == dadaia_catalog.AVAILABILITY_AVAILABLE
 
     catalog = governed_workflow_catalog()
-    governed_closure = catalog.workflow("closure")
-    assert governed_closure is not None
-    governed_close_step = governed_closure.step("close")
+    governed_implementation = catalog.workflow("implementation_reviews")
+    assert governed_implementation is not None
+    governed_close_step = governed_implementation.step("close")
     assert governed_close_step is not None
-    assert governed_close_step.output_schema is None  # WMP-5 exemption
+    assert governed_close_step.output_schema == "agent-run-result-v1"
 
-    closure_resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
-    closure_snapshot = closure_resolver.resolve("closure")
-    assert closure_snapshot.workflow_id == "closure"
+    closure_resolver = WorkflowExecutionPolicyResolver(catalog=catalog)
+    closure_snapshot = closure_resolver.resolve("implementation_reviews")
+    assert closure_snapshot.workflow_id == "implementation_reviews"
     closure_labels = {e.step for e in closure_snapshot.steps}
     assert "close" in closure_labels
     for entry in closure_snapshot.steps:
         profile = model_profiles.resolve(entry.model_profile)
         assert entry.harness == profile.harness
 
-    # Wave E bodies: available, real steps, terminal Python gate, governed+resolvable.
-    for name, expected_labels in _WAVE_E_BODIES.items():
-        workflow = get_dadaia_workflow(name)
-        assert workflow is not None
-        assert workflow.availability == dadaia_catalog.AVAILABILITY_AVAILABLE
-        assert [s.label for s in workflow.steps] == expected_labels
-        assert workflow.step_count == len(expected_labels)
-
-        terminal_gate = workflow.steps[-1]
-        assert terminal_gate.is_gate is True
-        assert terminal_gate.harness_options == []
-        assert terminal_gate.default_harness is None
-        assert terminal_gate.default_profiles == {}
-
-        wave_e_governed = catalog.workflow(name)
-        assert wave_e_governed is not None
-        wave_e_resolver = WorkflowExecutionPolicyResolver(catalog=governed_workflow_catalog())
-        wave_e_snapshot = wave_e_resolver.resolve(name)
-        assert wave_e_snapshot.workflow_id == name
-        assert wave_e_snapshot.steps, "snapshot has no governed steps"
-        for entry in wave_e_snapshot.steps:
-            profile = model_profiles.resolve(entry.model_profile)
-            assert entry.harness == profile.harness
+    audit = get_dadaia_workflow("audit")
+    assert audit is not None
+    assert [s.label for s in audit.steps] == [
+        "audit_report",
+        "audit_disposition_gate",
+    ]

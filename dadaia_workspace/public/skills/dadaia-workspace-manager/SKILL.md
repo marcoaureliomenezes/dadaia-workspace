@@ -100,7 +100,7 @@ as opt-in self-protection, and a foreign session's bind can never change your mo
 harness pid** (hook payload pid when present, else the hook's parent process). The
 heartbeat (`last_seen_at`) renews on every PostToolUse hook firing (match-all on both
 harnesses; harness-native session id from the hook stdin payload). Presence with a
-`last_seen_at` older than `LEASE_TTL_SECONDS` (`= 120`, tunable retained with renamed
+`last_seen_at` older than `PRESENCE_TTL_SECONDS` (`= 120`, tunable retained with renamed
 "presence TTL" semantics) is stale and GC'd by doctor (PRESENCE-GC) or opportunistically
 on upsert.
 

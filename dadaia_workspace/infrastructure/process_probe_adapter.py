@@ -126,28 +126,15 @@ class OsProcessProbe:
 
 
 def build_pid_probe() -> Callable[[int], bool] | None:
-    """Single public composition-root factory for the PID-liveness probe (FR6, v0.1.54).
-
-    Wires this module's platform-seamed :class:`OsProcessProbe` and adapts it to the
-    lease's ``(pid) -> alive?`` callable — the ONE builder every composition root reaches
-    for: the PreToolUse gate (``hooks/sdd_gate``), ``lease._main`` (the lease side door),
-    the container's ``DoctorService`` wiring, ``specs doctor``, ``lock steal``, and
-    ``context release``. It lives in the adapter module (not ``container``) so the hook and
-    lease hot paths reach it without importing the heavy composition root.
+    """Return the platform-seamed PID-liveness probe used by presence/state cleanup.
 
     ``OsProcessProbe`` is itself platform-seamed (``PLATFORM.has_os_kill_liveness`` selects
     ``os.kill`` vs the Windows ``OpenProcess`` existence check), so a single probe instance
     is correct on every host. The concrete probe is wired lazily here so any construction
-    failure fails **open**: ``None`` ⇒ the lease/doctor degrades to TTL-only liveness
-    (Windows-safe, legacy-record-safe), never a hard error and never a gate deadlock.
-
-    This is the sole successor to the three deleted private probe-builder wrappers (formerly
-    in ``hooks/sdd_gate``, ``container``, and ``cli/commands/specs``); ``features`` reaches it
-    via a dynamic ``importlib`` lookup so the static import graph carries zero
-    ``features -> infrastructure`` edge (no new import-linter ignore).
+    failure fails open: ``None`` lets callers use timestamp-only liveness.
     """
     try:
         probe = OsProcessProbe()
         return lambda pid: probe.is_pid_alive(pid)
-    except Exception:  # noqa: BLE001 — never let probe wiring break a caller; TTL fallback.
+    except Exception:  # noqa: BLE001 — never let probe wiring break a caller.
         return None

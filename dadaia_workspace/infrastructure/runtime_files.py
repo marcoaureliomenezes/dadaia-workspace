@@ -146,22 +146,154 @@ class FilesystemRuntimeFileAdapter:
     def read_step_payload(self, payload_ref: str) -> str | None:
         """Return the raw step payload envelope JSON at *payload_ref*, or ``None`` if absent.
 
-        ``payload_ref`` is a workspace-relative path. It is resolved and confined to the
-        ``.dadaia/runs/lifecycle`` zone before any read — a ref pointing outside the zone
-        (traversal / absolute) returns ``None`` rather than reading an arbitrary file.
+        ``payload_ref`` is a workspace-relative path. It is resolved and confined to a
+        canonical step-payload zone before any read — the legacy
+        ``.dadaia/runs/lifecycle`` zone or a release-aware
+        ``…/specs/releases/<id>/handoffs/…`` / ``…/specs/backlog/handoffs/…`` zone. A ref
+        pointing outside every zone (traversal / absolute) returns ``None`` rather than
+        reading an arbitrary file.
         """
         ref_path = Path(payload_ref)
         if ref_path.is_absolute() or ".." in ref_path.parts:
             return None
         resolved = (self._workspace_root / ref_path).resolve()
-        runs_root = (self._dadaia_root / "runs" / "lifecycle").resolve()
         try:
-            resolved.relative_to(runs_root)
+            resolved.relative_to(self._workspace_root)
         except ValueError:
+            return None
+        runs_root = (self._dadaia_root / "runs" / "lifecycle").resolve()
+        in_legacy_zone = runs_root in resolved.parents
+        if not in_legacy_zone and not self._in_release_zone(resolved):
             return None
         if not resolved.is_file():
             return None
         return resolved.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _in_release_zone(resolved: Path) -> bool:
+        """True when *resolved* sits in a release-aware step-payload zone.
+
+        Zones (operator mandate — durable workflow handoffs live in the release folder):
+        ``…/specs/releases/<release_id>/handoffs/<run_id>/steps/*.step-payload.json`` and
+        ``…/specs/backlog/handoffs/<run_id>/steps/*.step-payload.json``.
+        """
+        if not resolved.name.endswith(".step-payload.json"):
+            return False
+        parts = resolved.parts
+        for index, part in enumerate(parts):
+            if part != "specs":
+                continue
+            tail = parts[index + 1 :]
+            if len(tail) >= 5 and tail[0] == "releases" and tail[2] == "handoffs":
+                return True
+            if len(tail) >= 4 and tail[0] == "backlog" and tail[1] == "handoffs":
+                return True
+        return False
+
+    def _specs_dir_for_context(self, context: str) -> Path:
+        """Resolve *context*'s ``specs/`` tree (mirrors ``container._context_specs_dir``)."""
+        specs_dir = self._workspace_root / "repos" / self._safe_segment(context) / "specs"
+        if not specs_dir.is_dir():
+            specs_dir = self._workspace_root / "specs"
+        return specs_dir
+
+    def _release_zone_dir(self, run_id: str, *, context: str, release_id: str | None) -> Path:
+        """The release-aware steps zone for one run, confined under the context specs dir."""
+        specs_dir = self._specs_dir_for_context(context)
+        if release_id is None:
+            zone = specs_dir / "backlog" / "handoffs" / self._safe_segment(run_id) / "steps"
+        else:
+            zone = (
+                specs_dir
+                / "releases"
+                / self._safe_segment(release_id)
+                / "handoffs"
+                / self._safe_segment(run_id)
+                / "steps"
+            )
+        resolved = zone.resolve()
+        try:
+            resolved.relative_to(self._workspace_root)
+        except ValueError as exc:
+            raise RuntimeFilePathError(f"release handoff zone escapes workspace: {zone}") from exc
+        return resolved
+
+    def write_release_scoped_step_payload(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        content: str,
+        context: str,
+        release_id: str | None,
+    ) -> StepPayloadRef:
+        """Write the immutable envelope under the release-aware zone; return its ref.
+
+        Same immutability contract as :meth:`write_step_payload` — a payload for an
+        existing ``(run_id, producer_step, attempt)`` is never overwritten.
+        """
+        if attempt < 0:
+            raise RuntimeFilePathError("step payload attempt must be non-negative")
+        zone = self._release_zone_dir(run_id, context=context, release_id=release_id)
+        filename = f"{self._safe_segment(producer_step)}-attempt-{attempt}.step-payload.json"
+        path = zone / filename
+        if path.exists():
+            raise RuntimeFilePathError(
+                f"step payload already exists (immutable): {self._workspace_ref(path)}"
+            )
+        ref = self._write_text(RuntimeFileKind.RUN_ARTIFACT, path, content)
+        assert ref.content_hash is not None
+        return StepPayloadRef(payload_ref=ref.path, content_hash=ref.content_hash)
+
+    def purge_release_scoped_step_payloads(
+        self,
+        run_id: str,
+        producer_steps: frozenset[str] | set[str] | None,
+        *,
+        context: str,
+        release_id: str | None,
+    ) -> int:
+        """Reclaim the run's release-aware step-payload zone for a RESTART."""
+        zone = self._release_zone_dir(run_id, context=context, release_id=release_id)
+        if not zone.is_dir():
+            return 0
+        removed = 0
+        for entry in zone.glob("*.step-payload.json"):
+            if producer_steps is not None:
+                producer = entry.name.rsplit("-attempt-", 1)[0]
+                if producer not in producer_steps:
+                    continue
+            entry.unlink()
+            removed += 1
+        return removed
+
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        """Remove only exact canonical ``.step-output.json`` refs for a restart.
+
+        Callers derive each ref from workflow identity. This adapter performs no glob or
+        prefix deletion: every ref is confined beneath
+        ``.dadaia/tmp/lifecycle-worker`` and must name the canonical suffix.
+        """
+        worker_root = (self._dadaia_root / "tmp" / "lifecycle-worker").resolve()
+        removed = 0
+        for ref in dict.fromkeys(refs):
+            ref_path = Path(ref)
+            if ref_path.is_absolute() or ".." in ref_path.parts:
+                raise RuntimeFilePathError(f"unsafe worker output ref: {ref}")
+            target = (self._workspace_root / ref_path).resolve()
+            try:
+                target.relative_to(worker_root)
+            except ValueError as exc:
+                raise RuntimeFilePathError(
+                    f"worker output ref leaves canonical zone: {ref}"
+                ) from exc
+            if not target.name.endswith(".step-output.json"):
+                raise RuntimeFilePathError(f"worker output ref has invalid suffix: {ref}")
+            if target.is_file():
+                target.unlink()
+                removed += 1
+        return removed
 
     def write_hygiene_snapshot(self, snapshot: HygieneSnapshot) -> RuntimeFileRef:
         text = json.dumps(snapshot.to_dict(), indent=2, sort_keys=True) + "\n"

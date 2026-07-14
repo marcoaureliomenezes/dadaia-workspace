@@ -107,32 +107,3 @@ def test_model_cannot_downgrade_unrelated_or_duplicate() -> None:
     # DUPLICATE stays DUPLICATE.
     dup = classify(_item("n", {"a#X": "c"}), [_item("o", {"a#X": "c"})], downgrade=downgrade)
     assert dup[0].verdict is Verdict.DUPLICATE
-
-
-# ---------------------------------------------------------------------------
-# Relocated from tests/integration/test_backlog_conflict_scan_consult.py (T-7, v0.1.75):
-# _parse_downgrade_verdict is a pure function — no fs/subprocess/model call.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("raw", "expected"),
-    [
-        ("overlap", Verdict.OVERLAP),
-        ("OVERLAP", Verdict.OVERLAP),
-        (" supersedes ", Verdict.SUPERSEDES),
-        ("depends_on", None),  # wrapper is stricter than the clamp on purpose
-        ("divergent_conflict", None),
-        ("unrelated", None),
-        ("duplicate", None),
-        ("garbage", None),
-        ("", None),
-        (None, None),
-    ],
-)
-def test_parse_downgrade_verdict(raw: str | None, expected: Verdict | None) -> None:
-    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
-        _parse_downgrade_verdict,
-    )
-
-    assert _parse_downgrade_verdict(raw) is expected

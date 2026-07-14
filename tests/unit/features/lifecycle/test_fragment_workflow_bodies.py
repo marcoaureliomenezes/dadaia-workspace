@@ -1,6 +1,6 @@
 """Shared workflow-body suite over the ``FragmentGateWorkflow`` base (v0.1.57 FR1).
 
-``release_definition`` / ``audit`` / ``research`` / ``bug_report`` are thin subclasses of the
+``release_definition`` / ``audit`` are thin subclasses of the
 same base — role -> fragments -> dynamic selector -> output schema -> Python gate, wired to the
 same Wave-D handoff ledger. Before the FR1 dedup each body carried its own copy-paste suite
 proving these four behaviors; they are now ONE parametrized suite over the four workflow
@@ -8,7 +8,7 @@ classes, replacing ~19 near-identical functions (T-5, plan-lifecycle.md).
 
 Each param case supplies: the workflow class, its module (for ``_SEQUENCE`` + step type +
 fixture setup), a ``_workspace`` seeder, and the expected step labels. Workflow-specific
-behavior (audit's graph-completeness BLOCK branch, bug_report's ADDITIVE scope pair,
+behavior (audit's graph-completeness BLOCK branch and
 release_definition's rejected-review-blocks-advancement) stays in each slim per-workflow file.
 """
 
@@ -31,20 +31,13 @@ from dadaia_workspace.features.lifecycle.context_selector import ContextSelector
 from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
-    bug_report,
     release_definition,
-    research,
 )
 from dadaia_workspace.features.lifecycle.workflows.audit import AuditStep, AuditWorkflow
-from dadaia_workspace.features.lifecycle.workflows.bug_report import (
-    BugReportStep,
-    BugReportWorkflow,
-)
 from dadaia_workspace.features.lifecycle.workflows.release_definition import (
     ReleaseDefinitionWorkflow,
     ReleaseStep,
 )
-from dadaia_workspace.features.lifecycle.workflows.research import ResearchStep, ResearchWorkflow
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 
@@ -52,6 +45,12 @@ pytestmark = pytest.mark.unit
 
 _CONTEXT = "dadaia-workspace"
 _RELEASE = "v0.1.30"
+_VALIDATION_DEPENDENCY_TABLE = (
+    "## Validation Dependency Table\n\n"
+    "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+    "|---|---|---|---|---|\n"
+    "| WS-1 | value | unit tests | None | None |\n"
+)
 
 
 @dataclass(frozen=True)
@@ -70,16 +69,48 @@ def _approved() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="step ok",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
+
+
+@dataclass(frozen=True)
+class _AuditFake:
+    kind: AgentRuntimeKind
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return self.kind
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        step = (request.task_id or "").rsplit(":", 1)[-1]
+        payloads: dict[str, dict[str, object]] = {
+            "audit_report": {
+                "summary": "No drift found.",
+                "question": "Does implementation match architecture memory?",
+                "lenses": ["architecture"],
+                "findings": [],
+                "dispositions": [],
+            },
+        }
+        payload = payloads[step]
+        artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{step}.step-output.json"
+        verdict = payload.get("verdict")
+        structured: dict[str, str] = {"verdict": verdict} if isinstance(verdict, str) else {}
+        if isinstance(payload.get("verdict_reason"), str):
+            structured["verdict_reason"] = payload["verdict_reason"]
+        return AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary=str(payload["summary"]),
+            artifact_refs=(artifact_ref,),
+            structured_output=structured,
+            domain_payload=payload,
+        )
 
 
 def _workspace(tmp_path: Path) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     (tmp_path / "repos").mkdir()
-    (tmp_path / "dadaia_workspace").mkdir()  # source-map / source-summary root (research needs it)
     specs = tmp_path / "repos" / _CONTEXT / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "bugs").mkdir(parents=True)
@@ -89,7 +120,10 @@ def _workspace(tmp_path: Path) -> Path:
     (specs / "memory" / "quality-assurance.md").write_text("# q\n", encoding="utf-8")
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / _RELEASE / art).write_text(f"# {art}\n", encoding="utf-8")
+        body = f"# {art}\n"
+        if art == "PLAN.md":
+            body += f"\n{_VALIDATION_DEPENDENCY_TABLE}"
+        (specs / "releases" / _RELEASE / art).write_text(body, encoding="utf-8")
     return tmp_path
 
 
@@ -108,29 +142,6 @@ def _selector(tmp_path: Path) -> ContextSelector:
             specs_dir=specs, release_id=_RELEASE, handoff_dir=tmp_path / ".dadaia" / "handoff"
         )
     )
-
-
-@dataclass(frozen=True)
-class _BugReportStepAwareFake:
-    """bug_report's bug_write step must emit into specs/bugs/ to stay in-scope; every
-    other step emits a normal handoff (mirrors the production worker's real behavior)."""
-
-    kind: AgentRuntimeKind
-
-    def runtime_kind(self) -> AgentRuntimeKind:
-        return self.kind
-
-    def run(self, request: AgentRunRequest) -> AgentRunResult:
-        if request.task_id.endswith(":bug_write"):
-            ref = f"repos/{_CONTEXT}/specs/bugs/new-symptom.md"
-        else:
-            ref = f".dadaia/handoff/{_CONTEXT}/step.handoff.json"
-        return AgentRunResult(
-            status=AgentRunStatus.SUCCEEDED,
-            summary="bug step ok",
-            artifact_refs=(ref,),
-            structured_output={"verdict": "APPROVED"},
-        )
 
 
 @dataclass(frozen=True)
@@ -159,30 +170,13 @@ class _WorkflowCase:
         return self.workflow_cls(**kwargs)
 
 
-# bug_report needs a step-aware fake so bug_write's artifact stays inside specs/bugs/.
-def _bug_report_factory(kind: AgentRuntimeKind) -> _BugReportStepAwareFake:
-    return _BugReportStepAwareFake(kind)
-
-
 _CASES = (
     _WorkflowCase(
         "audit",
         AuditWorkflow,
         audit,
-        ("audit_scope", "drift_scan", "triage", "audit_disposition_gate"),
-    ),
-    _WorkflowCase(
-        "research",
-        ResearchWorkflow,
-        research,
-        ("research_scope", "investigate", "synthesis", "research_synthesis_gate"),
-    ),
-    _WorkflowCase(
-        "bug_report",
-        BugReportWorkflow,
-        bug_report,
-        ("bug_intake", "dedupe", "bug_write", "bug_record_gate"),
-        runtime_factory=_bug_report_factory,
+        ("audit_report", "audit_disposition_gate"),
+        runtime_factory=lambda kind: _AuditFake(kind),
     ),
     _WorkflowCase(
         "release_definition",
@@ -191,8 +185,7 @@ _CASES = (
         (
             "release_scope",
             "spec_create",
-            "spec_arch_review",
-            "spec_qa_review",
+            "spec_review",
             "plan_create",
             "plan_review",
             "tasks_create",
@@ -236,6 +229,28 @@ def test_body_completes_end_to_end_with_recorded_fragments(
         assert seq_by_label[label].fragment_id in by_step[label].fragment_ids
 
 
+def test_release_definition_approves_yaml_frontmatter_statuses(tmp_path: Path) -> None:
+    wf = _CASES[1].build(tmp_path, resolver=_resolver(tmp_path))
+    release_dir = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE
+    for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        plan_contract = f"\n{_VALIDATION_DEPENDENCY_TABLE}" if artifact == "PLAN.md" else ""
+        (release_dir / artifact).write_text(
+            f"---\nrelease: {_RELEASE}\nstatus: Draft\n---\n\n# {artifact}\n\n"
+            f"**Status:** Draft\n{plan_contract}",
+            encoding="utf-8",
+        )
+
+    result = wf.run("release-definition-yaml-status")
+
+    assert result.completed is True
+    for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        text = (release_dir / artifact).read_text(encoding="utf-8")
+        assert "status:" not in text
+        assert "status: Draft" not in text
+        assert text.count("> **Status:** Aprovado") == 1
+        assert "**Status:** Draft" not in text
+
+
 # ---------------------------------------------------------------------------
 # ② downstream consumes EXACT upstream payload by (run, step, attempt)
 # ---------------------------------------------------------------------------
@@ -249,14 +264,18 @@ def test_downstream_consumes_exact_upstream_payload(tmp_path: Path, case: _Workf
 
     run = JsonLifecycleRunStore(tmp_path).load(f"{case.case_id}-consume")
     assert run is not None
-    producer_label, consumer_label = case.labels[0], case.labels[1]
+    model_labels = [s.label for s in case.module._SEQUENCE if s.fragment_id is not None]
+    if len(model_labels) < 2:
+        pytest.skip("workflow has a single model step — no consume edge to prove")
+    producer_label, consumer_label = model_labels[0], model_labels[1]
     producer_record = run.workflow_steps.find(producer_label, 0)
     assert producer_record is not None
     consumers = {(c.consumer_step, c.consumer_attempt) for c in producer_record.consumptions}
     assert (consumer_label, 0) in consumers
-    # A18: the payload artifact is immutable and lands under the workspace-root runs zone.
+    # Operator mandate: the payload artifact is immutable and lands in the RELEASE
+    # folder (the release-aware zone), never an aleatory path under .dadaia.
     assert producer_record.payload_ref.startswith(
-        f".dadaia/runs/lifecycle/{case.case_id}-consume/steps/"
+        f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/handoffs/{case.case_id}-consume/steps/"
     )
     assert (tmp_path / producer_record.payload_ref).is_file()
 
@@ -268,26 +287,21 @@ def test_downstream_consumes_exact_upstream_payload(tmp_path: Path, case: _Workf
 
 def _broken_sequence(case: _WorkflowCase) -> tuple[Any, ...]:
     """A 2-step sequence whose only model step CONSUMES a producer that never ran."""
-    consumer_label, gate_label = case.labels[1], case.labels[-1]
+    gate_label = case.labels[-1]
+    first_model = next(s for s in case.module._SEQUENCE if s.fragment_id is not None)
     step_cls: type
     kwargs: dict[str, Any]
     if case.case_id == "audit":
         step_cls = AuditStep
         kwargs = {"role": "project-auditor", "is_review": True}
-    elif case.case_id == "research":
-        step_cls = ResearchStep
-        kwargs = {"role": "software-architect"}
     elif case.case_id == "release_definition":
         step_cls = ReleaseStep
         kwargs = {"role": "product-engineer", "is_review": True}
-    else:
-        step_cls = BugReportStep
-        kwargs = {"role": "product-engineer", "is_review": True}
     consumer = step_cls(
-        label=consumer_label,
-        fragment_id=f"{case.module.__name__.rsplit('.', 1)[-1]}.{consumer_label}",
+        label=first_model.label,
+        fragment_id=first_model.fragment_id,
         produces="generic-step-handoff-v1",
-        consumes=(case.labels[0],),  # producer never ran in this sequence
+        consumes=("phantom_producer",),  # producer never ran in this sequence
         **kwargs,
     )
     gate = step_cls(label=gate_label, role="python", fragment_id=None)

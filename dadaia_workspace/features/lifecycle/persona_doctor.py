@@ -26,9 +26,7 @@ from dadaia_workspace.features.lifecycle.personas.loader import PersonaLoader
 from dadaia_workspace.features.lifecycle.workflows import (
     audit,
     backlog_definition,
-    bug_report,
     release_definition,
-    research,
 )
 
 #: Step ``role`` values that are NOT Layer-2 worker personas and are excluded from the
@@ -71,10 +69,8 @@ def model_driven_step_roles() -> dict[str, str]:
     sequences: dict[str, tuple[object, ...]] = {
         "release_definition": release_definition._SEQUENCE,
         "audit": audit._SEQUENCE,
-        "bug_report": bug_report._SEQUENCE,
-        "research": research._SEQUENCE,
         "backlog_definition": backlog_definition._SEQUENCE,
-        "pipeline": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
+        "implementation_reviews": pipeline.implementation_ladder(AgentRuntimeKind.FAKE),
     }
     out: dict[str, str] = {}
     for name, seq in sequences.items():

@@ -31,18 +31,23 @@ and bound; you do not write the SPEC.
    now) or rejected (invalid), each with a one-line reason. Nothing is ever deleted.
 2. **Pick the set.** Select the bugs, audits, and backlog items this release will
    address. This is selection within the open pool — not wide-codebase discovery.
+   When the prompt carries an `authoritative-backlog-definition` block, its exact
+   producer-run artifact paths are mandatory scope inputs: pick those items and do
+   not replace them with another candidate from the pool. Sanitize neighboring stale
+   items normally, but never let pool order override the exact workflow handoff.
 3. **Apply bug-always-solved.** Every picked bug is solved in this release, with one
    exception: a picked backlog item may supersede a bug with a more complete
    solution — then record the subsumption (mark the bug superseded by that item and
    require the item's tasks to cover the bug's acceptance). A bug is never silently
    dropped; if it is neither fixed nor subsumed, it is not picked.
-4. **Grill the picked set.** Run the grill questionnaire over the picked set to
-   surface inconsistencies, scope gaps, ambiguous acceptance, and stale assumptions
-   before the SPEC exists. This is mandatory even when the scope looks obvious.
+4. **Challenge the picked set from evidence.** Check the picked items for
+   inconsistencies, scope gaps, ambiguous acceptance, and stale assumptions using
+   the inputs above. Resolve what the evidence resolves; anything genuinely
+   unresolvable goes into `open_questions` — never invent an answer and never stall.
 
 ## Output
 
 A scope handoff naming: the picked items (bugs, audits, backlog), every subsumption
 link, the sanitization outcomes (what was deferred or rejected and why), the
-explicit exclusions, and the open questions the grill could not close. This handoff
-is the SPEC step's authoritative scope.
+explicit exclusions, and the `open_questions` the evidence could not close. This
+handoff is the SPEC step's authoritative scope.

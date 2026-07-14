@@ -1,9 +1,7 @@
-"""Harness-real behavior tests for the PostToolUse heartbeat (v0.1.76 T-3, presence-only).
+"""Harness-real behavior tests for the presence-only PostToolUse heartbeat.
 
-Re-baselined from the pre-v0.1.76 lease-heartbeat suite (R2a, FR-R2-01/02 / AC-R2-01):
-the lease-renewal path this file exercised (``lease.renew_heartbeat`` over the by-session
-index) is DELETED — ``presence.renew`` is now the ONLY renewal PostToolUse performs. These
-tests drive ``sdd_post_gate`` exactly as a real Claude Code harness does: a subprocess
+``presence.renew`` is the only renewal PostToolUse performs. These tests drive
+``sdd_post_gate`` exactly as a real Claude Code harness does: a subprocess
 spawned with :func:`claude_hook_env` (pinned-minimal env, **no** hand-planted ``DADAIA_*``
 session/persona/mode vars — the harness never sets them) and a Bash ``PostToolUse`` payload
 piped to stdin. The session id flows through the stdin ``session_id`` field, which is the

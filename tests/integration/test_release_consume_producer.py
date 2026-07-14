@@ -67,11 +67,13 @@ class _KindReportingFake:
         # delivers INSIDE its declared zone (bugs gate-accepts-phantom-artifact-evidence
         # / create-step-gate-accepts-refusal-handoff-as-success): be step-aware and
         # materialize like the production driving fake.
-        label = (request.task_id or "").rsplit(":", 1)[-1]
+        parts = (request.task_id or "").split(":")
+        label = parts[-2] if parts and parts[-1].startswith("attempt-") else parts[-1]
         deliverable = {
             "spec_create": "SPEC.md",
             "plan_create": "PLAN.md",
             "tasks_create": "TASKS.md",
+            "close": "CLOSURE.md",
         }.get(label)
         refs = list(self.result.artifact_refs)
         if deliverable is not None:
@@ -82,7 +84,21 @@ class _KindReportingFake:
             target = Path.cwd() / ref
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text('{"fake": true}\n', encoding="utf-8")
+                content = '{"fake": true}\n'
+                if target.name == "PLAN.md":
+                    content = (
+                        "# PLAN\n\n**Status:** Aprovado\n\n"
+                        "## Validation Dependency Table\n\n"
+                        "| Workstream | Produces by end | Direct validation | "
+                        "Validation dependencies | Deferred integration evidence |\n"
+                        "|---|---|---|---|---|\n"
+                        "| WS-1 | fixture | focused pytest | None | None |\n"
+                    )
+                elif target.name == "TASKS.md":
+                    content = "# TASKS\n\n**Status:** Aprovado\n\n### [ ] T1 - Verify fixture\n"
+                elif target.name == "CLOSURE.md":
+                    content = "# CLOSURE\n\n**Status:** Aprovado\n"
+                target.write_text(content, encoding="utf-8")
         return replace(self.result, artifact_refs=tuple(refs))
 
 
@@ -90,7 +106,9 @@ def _install_fake_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     approving = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/release-definition-step.handoff.json",),
+        artifact_refs=(
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition.step-output.json",
+        ),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -119,7 +137,7 @@ def _install_approving_phase_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     approving = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake phase worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/phase-step.handoff.json",),
+        artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/phase.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -176,14 +194,22 @@ Body that goes to the archive copy.
 def _define(args: list[str]) -> Result:
     return _runner.invoke(
         app,
-        ["lifecycle", "release", "define", "--release-id", _RELEASE, "--json", *args],
+        ["lifecycle", "release-definition", "--release-id", _RELEASE, "--json", *args],
     )
 
 
 def _close(args: list[str]) -> Result:
     return _runner.invoke(
         app,
-        ["lifecycle", "close", "--release-id", _RELEASE, "--json", *args],
+        [
+            "lifecycle",
+            "implementation-reviews",
+            "--skip-preflight",
+            "--release-id",
+            _RELEASE,
+            "--json",
+            *args,
+        ],
     )
 
 

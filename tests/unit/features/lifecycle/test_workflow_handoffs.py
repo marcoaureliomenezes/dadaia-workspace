@@ -23,6 +23,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.lifecycle import (
+    AgentRunResult,
+    AgentRunStatus,
     LifecyclePhase,
     LifecycleRun,
     LifecycleRunStatus,
@@ -37,6 +39,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     RequiredHandoffMissingError,
     StepPayloadRef,
     WorkflowHandoffResolver,
+    durable_payload_from_result,
 )
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 
@@ -46,6 +49,7 @@ class _FakeWriter:
 
     def __init__(self) -> None:
         self.files: dict[str, str] = {}
+        self.worker_outputs: set[str] = set()
 
     def write_step_payload(
         self, *, run_id: str, producer_step: str, attempt: int, content: str
@@ -75,6 +79,14 @@ class _FakeWriter:
         for ref in doomed:
             del self.files[ref]
         return len(doomed)
+
+    def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
+        removed = 0
+        for ref in refs:
+            if ref in self.worker_outputs:
+                self.worker_outputs.remove(ref)
+                removed += 1
+        return removed
 
 
 _T = "2026-06-27T12:00:00Z"
@@ -352,6 +364,172 @@ def test_failure_matrix_raises_table(tmp_path: Path) -> None:
     with pytest.raises(MalformedHandoffError):
         tamper_resolver.resolve_required(tamper_run, producer_step="qa", attempt=0)
 
+
+@pytest.mark.parametrize(
+    ("output_schema", "payload"),
+    [
+        ("audit-scope-handoff-v1", {"summary": "audit_scope"}),
+        (
+            "audit-findings-handoff-v1",
+            {
+                "summary": "looks fine",
+                "verdict": "APPROVED",
+                "verdict_reason": "looks fine",
+                "findings": [],
+            },
+        ),
+        ("audit-disposition-handoff-v1", {"summary": "triage"}),
+    ],
+)
+def test_audit_payload_schemas_reject_transport_only_fallbacks(
+    tmp_path: Path, output_schema: str, payload: dict[str, object]
+) -> None:
+    resolver = _resolver(tmp_path / output_schema, _FakeWriter())
+
+    with pytest.raises(MalformedHandoffError):
+        resolver.produce(
+            _run(),
+            producer_step="audit",
+            attempt=0,
+            output_schema=output_schema,
+            payload=payload,
+        )
+
+
+def test_audit_payload_schemas_accept_complete_domain_contracts(tmp_path: Path) -> None:
+    resolver = _resolver(tmp_path, _FakeWriter())
+    run = _run()
+    run, _ = resolver.produce(
+        run,
+        producer_step="audit_scope",
+        attempt=0,
+        output_schema="audit-scope-handoff-v1",
+        payload={
+            "summary": "Bound architecture drift.",
+            "audit_question": "Does the replay API match its memory contract?",
+            "lenses": [{"name": "architecture", "rationale": "Contract fidelity."}],
+            "surfaces": ["src/games.py"],
+            "acceptance_criteria": [
+                {"lens": "architecture", "pass_condition": "No duplicated rules."}
+            ],
+        },
+    )
+    run, _ = resolver.produce(
+        run,
+        producer_step="drift_scan",
+        attempt=0,
+        output_schema="audit-findings-handoff-v1",
+        payload={
+            "summary": "One drift found.",
+            "verdict": "REJECTED",
+            "verdict_reason": "The implementation duplicates a rule.",
+            "lens_results": [
+                {
+                    "lens": "architecture",
+                    "status": "FAIL",
+                    "evidence": ["src/games.py:10"],
+                }
+            ],
+            "findings": [
+                {
+                    "id": "duplicate-rule",
+                    "severity": "HIGH",
+                    "message": "Rule duplicated.",
+                    "surface": "src/games.py",
+                    "evidence": "src/games.py:10",
+                }
+            ],
+        },
+    )
+    run, _ = resolver.produce(
+        run,
+        producer_step="triage",
+        attempt=0,
+        output_schema="audit-disposition-handoff-v1",
+        payload={
+            "summary": "Routed the finding.",
+            "source_verdict": "REJECTED",
+            "dispositions": [
+                {
+                    "finding_id": "duplicate-rule",
+                    "disposition": "bug",
+                    "route": "specs/bugs via dadaia bugs append",
+                    "severity": "HIGH",
+                    "evidence": "src/games.py:10",
+                }
+            ],
+        },
+    )
+
+    assert len(run.workflow_steps) == 3
+
+
+def test_audit_scope_digest_preserves_bounded_execution_contract(tmp_path: Path) -> None:
+    resolver = _resolver(tmp_path, _FakeWriter())
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="audit_scope",
+        attempt=0,
+        output_schema="audit-scope-handoff-v1",
+        payload={
+            "summary": "Bound replay drift.",
+            "audit_question": "Does replay preserve engine rules?",
+            "lenses": [{"name": "architecture", "rationale": "Rule ownership."}],
+            "surfaces": ["src/games.py", "tests/test_games.py"],
+            "acceptance_criteria": [
+                {"lens": "architecture", "pass_condition": "One transition path."}
+            ],
+        },
+    )
+
+    digest = WorkflowHandoffResolver.render_digest(
+        resolver.resolve_required(run, producer_step="audit_scope", attempt=0)
+    )
+
+    assert "audit_question: Does replay preserve engine rules?" in digest
+    assert "lenses: architecture" in digest
+    assert "src/games.py" in digest
+    assert "architecture: One transition path." in digest
+
+
+def test_audit_findings_digest_preserves_identity_surface_and_evidence(tmp_path: Path) -> None:
+    resolver = _resolver(tmp_path, _FakeWriter())
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="drift_scan",
+        attempt=0,
+        output_schema="audit-findings-handoff-v1",
+        payload={
+            "summary": "One drift found.",
+            "verdict": "REJECTED",
+            "verdict_reason": "Architecture drift.",
+            "lens_results": [
+                {
+                    "lens": "architecture",
+                    "status": "FAIL",
+                    "evidence": ["src/games.py:10"],
+                }
+            ],
+            "findings": [
+                {
+                    "id": "duplicate-rule",
+                    "severity": "HIGH",
+                    "message": "Rule duplicated.",
+                    "surface": "src/games.py",
+                    "evidence": "src/games.py:10",
+                }
+            ],
+        },
+    )
+
+    digest = WorkflowHandoffResolver.render_digest(
+        resolver.resolve_required(run, producer_step="drift_scan", attempt=0)
+    )
+
+    assert "[HIGH] Rule duplicated. (id: duplicate-rule)" in digest
+    assert "surface: src/games.py" in digest
+    assert "evidence: src/games.py:10" in digest
+
     missing_producer_resolver = _resolver(tmp_path / "missing-producer", _FakeWriter())
     with pytest.raises(RequiredHandoffMissingError):
         missing_producer_resolver.record_consumption(
@@ -361,3 +539,154 @@ def test_failure_matrix_raises_table(tmp_path: Path) -> None:
             consumer_step="spec_create",
             consumer_attempt=0,
         )
+
+
+def test_durable_payload_promotes_domain_handoff_without_temp_self_ref() -> None:
+    temp_ref = ".dadaia/tmp/lifecycle-worker/demo/release-scope.step-output.json"
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="codex exec completed",
+        artifact_refs=(temp_ref,),
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "artifact_refs": [temp_ref],
+            "artifact": {"type": "report", "path": temp_ref},
+            "handoff": {
+                "summary": "Bound one authoritative backlog item.",
+                "picked_items": {"backlog": ["specs/backlog/replay.md"]},
+                "open_questions": [],
+            },
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="release_scope", is_review=False)
+
+    assert payload == {
+        "summary": "Bound one authoritative backlog item.",
+        "picked_items": {"backlog": ["specs/backlog/replay.md"]},
+        "open_questions": [],
+    }
+    assert temp_ref not in json.dumps(payload)
+
+
+def test_durable_payload_keeps_real_artifact_and_review_verdict() -> None:
+    temp_ref = ".dadaia/tmp/lifecycle-worker/demo/review.step-output.json"
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="review complete",
+        artifact_refs=(temp_ref,),
+        structured_output={
+            "verdict": "REJECTED",
+            "verdict_reason": "coverage gap",
+            "findings": json.dumps(
+                [{"severity": "HIGH", "message": "missing replay rejection case"}]
+            ),
+        },
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "artifact": {"type": "report", "path": "specs/reviews/qa.json"},
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="review_qa", is_review=True)
+
+    assert payload["verdict"] == "REJECTED"
+    assert payload["verdict_reason"] == "coverage gap"
+    assert payload["artifact_refs"] == ["specs/reviews/qa.json"]
+    assert payload["findings"] == [{"severity": "HIGH", "message": "missing replay rejection case"}]
+
+
+def test_durable_payload_summarizes_top_level_domain_and_drops_temp_artifact() -> None:
+    temp_ref = ".dadaia/tmp/lifecycle-worker/demo/scope.step-output.json"
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="codex exec completed",
+        artifact_refs=(temp_ref,),
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "artifact": {"type": "report", "path": temp_ref},
+            "release_scope": {
+                "core_problem": "Replay outcomes need an explicit adapter contract.",
+                "picked_items": {"backlog": ["specs/backlog/replay.md"]},
+            },
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="release_scope", is_review=False)
+
+    assert payload["summary"] == "Replay outcomes need an explicit adapter contract."
+    assert "artifact" not in payload
+    assert temp_ref not in json.dumps(payload)
+
+
+def test_durable_payload_prefers_structured_domain_contract_over_transport_findings() -> None:
+    temp_ref = ".dadaia/tmp/lifecycle-worker/demo/drift.step-output.json"
+    exact_finding = {
+        "id": "memory-drift",
+        "severity": "MEDIUM",
+        "message": "Memory is stale.",
+        "surface": "specs/memory/architecture.md",
+        "evidence": "specs/memory/architecture.md:10",
+    }
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="audit rejected",
+        artifact_refs=(temp_ref,),
+        structured_output={
+            "verdict": "REJECTED",
+            "verdict_reason": "Memory drift.",
+        },
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "artifact_refs": [temp_ref],
+            "verdict": "REJECTED",
+            "findings": [{"severity": "MEDIUM", "message": "presentation-only finding"}],
+            "structured_output": {
+                "summary": "One memory drift found.",
+                "verdict": "REJECTED",
+                "verdict_reason": "Memory drift.",
+                "lens_results": [
+                    {
+                        "lens": "architecture",
+                        "status": "FAIL",
+                        "evidence": ["specs/memory/architecture.md:10"],
+                    }
+                ],
+                "findings": [exact_finding],
+            },
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="drift_scan", is_review=True)
+
+    assert payload["summary"] == "One memory drift found."
+    assert payload["lens_results"] == [
+        {
+            "lens": "architecture",
+            "status": "FAIL",
+            "evidence": ["specs/memory/architecture.md:10"],
+        }
+    ]
+    assert payload["findings"] == [exact_finding]
+    assert "presentation-only" not in json.dumps(payload)
+
+
+def test_reset_run_zone_purges_ledger_and_exact_worker_outputs(tmp_path: Path) -> None:
+    writer = _FakeWriter()
+    resolver = _resolver(tmp_path, writer)
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="release_scope",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "old scope"},
+    )
+    assert run.workflow_steps.find("release_scope", 0) is not None
+    worker_ref = ".dadaia/tmp/lifecycle-worker/demo/scope.step-output.json"
+    writer.worker_outputs.add(worker_ref)
+
+    removed = resolver.reset_run_zone("run-1", worker_output_refs=(worker_ref,))
+
+    assert removed == 2
+    assert writer.files == {}
+    assert writer.worker_outputs == set()

@@ -4,7 +4,7 @@ description: CI/CD and deployment engineer. Owns GitHub Actions workflows, gitfl
 dispatch_band: 3
 model: claude-sonnet-5
 activity_class: MUTATING
-lease_relationship: "PM sub-agent — no independent acquire"
+concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"
 gate_role: implementer
 tools:
   - Read

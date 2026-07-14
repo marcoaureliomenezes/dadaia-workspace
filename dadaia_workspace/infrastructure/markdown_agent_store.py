@@ -1,7 +1,7 @@
 """MarkdownAgentStore — reads *.md agent files and returns raw frontmatter dicts.
 
 This is the filesystem adapter consumed by features/agents/reader.py.
-It mirrors the pattern established by MarkdownWorkflowStore but is intentionally
+It parses projected agent Markdown and is intentionally
 simpler: agent files have a flat frontmatter structure (no nested stage graphs),
 so there is no validation or coercion here — that is the reader's responsibility.
 

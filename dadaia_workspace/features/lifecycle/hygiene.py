@@ -84,9 +84,9 @@ class LifecycleHygieneService:
         # v0.1.78 T-C / FR-C: additive-optional. When wired, ``cleanup()`` ALSO reclaims
         # stale, cleanup-eligible workflow-step handoff-ledger payloads under
         # ``.dadaia/runs/lifecycle/`` — the ONE canonical cleanup contract that closes the
-        # split-cleanup-engines hole (``dadaia lifecycle hygiene clean``, the command
+        # split-cleanup-engines hole (``dadaia reports workflow-hygiene-clean``, the command
         # preflight's remediation prints, used to be blind to that zone; only the
-        # DIFFERENT ``dadaia lifecycle clean`` / RetentionSweep command covered it). When
+        # DIFFERENT top-level ``dadaia clean`` / RetentionSweep command covered it). When
         # absent (the pre-v0.1.78 default construction), behavior is byte-identical to
         # before — no step-payload candidates are discovered.
         self._run_store = run_store

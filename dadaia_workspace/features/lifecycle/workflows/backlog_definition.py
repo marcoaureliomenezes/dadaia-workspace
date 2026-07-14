@@ -1,4 +1,4 @@
-"""Backlog-definition workflow body — the epic §4 sequence on fragments + Python gates (R2).
+"""Backlog-definition workflow body — a real post-authoring gate over minimal model calls.
 
 Shares the pure fragment-assembly helpers with the four handoff-ledger bodies via
 :class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate._FragmentAssemblyMixin`
@@ -7,27 +7,35 @@ Shares the pure fragment-assembly helpers with the four handoff-ledger bodies vi
 :func:`build_fragment_suffix`, runs the worker on the injected :class:`RuntimeFactory`, reads
 the Python-owned typed gate, and advances only on success.
 
-What is different from the handoff-ledger bodies is the **Python-disposing** steps this
-workflow owns directly (the linchpin of the epic) — so it is a *structural outlier* that mixes
-in only the assembly helpers rather than joining the full ``FragmentGateWorkflow`` base
-(Ruling C: it has no handoff-ledger data plane). Python decides these gates with the R1
-machinery, never on model say-so:
+**Default path — ONE model call.** ``backlog_author`` (role product-engineer) receives the
+operator demand + the ``backlog_index`` dynamic context and writes exactly one backlog item
+(NEW file or an in-place EDIT). ``backlog_review_gate`` (Python, no worker) then does the real
+work of validating that write: it re-loads ``specs/backlog/*.md`` from disk, binds every
+resolved item's ``intents[]`` through the R1 canonical-subject registry, diffs the authored
+slug(s) against a pre-authoring snapshot, and runs the R1 set-intersection ``classify()`` over
+the authored item against the rest of the real backlog. This single gate folds what the four
+former pre-authoring Python steps (``subject_bind`` / ``existing_backlog_review`` /
+``reconcile_decision`` / the conditional ``conflict_resolution_grill``) used to decide on an
+always-empty CLI-supplied :class:`BacklogDemand`, so those checks now run on the one thing that
+matters: what the author actually wrote to disk (bug backlog-definition-empty-demand-wiring).
 
-* **1b ``subject_bind``** — binds every proposed subject through the R1 canonical-subject
-  registry; HALTs on any UNRESOLVED/AMBIGUOUS subject (no silent NEW).
-* **2 ``existing_backlog_review``** — runs the R1 ``classify`` over the bound intents vs every
-  existing item's bound intents (model OFFLINE by default; the downgrade seam adjudicates a
-  same-anchor differing-change pair, fail-closed — T-26-06).
-* **3 ``reconcile_decision``** — blocks a NEW item unless every existing item is ``UNRELATED``.
-* **4 ``conflict_resolution_grill``** — a model grill, but **conditional**: it runs only when
-  step 2 reported a ``DIVERGENT_CONFLICT``; otherwise it is recorded skipped (not blocked).
-* **6 ``backlog_review_gate``** — re-runs ``classify`` over the authored result against the rest
-  of the backlog; blocks on any ``DUPLICATE``/``DIVERGENT_CONFLICT`` in the result.
+**Opt-in grill.** ``intake_grill`` stays in :data:`_SEQUENCE` (``optional=True``) but only
+executes when the caller passes ``grill=True`` to :meth:`BacklogDefinitionWorkflow.run`;
+otherwise it is recorded ``skipped`` and costs zero model calls. When it does run, its produced
+payload is not decorative: :meth:`BacklogDefinitionWorkflow._intake_grill_digest` resolves it
+from the run-scoped handoff ledger (the same ledger every model step already writes to via
+``WorkflowHandoffResolver.produce``) and renders a compact digest
+(:meth:`WorkflowHandoffResolver.render_digest`) that is injected into ``backlog_author``'s
+prompt — a *local* digest pass, not a join onto the full ``consumes``/``produces`` graph
+machinery of :mod:`_fragment_gate` (Ruling C: backlog has no handoff-ledger data plane).
 
-The model steps (1 ``intake_grill``, 4 ``conflict_resolution_grill`` when it runs, 5
-``backlog_author``) run a worker through the injected runtime and read the same typed gate as
-the handoff-ledger bodies. A blocked step stops the sequence with a ``BlockedState``; the
-terminal success advances the run to RELEASE_DEFINITION (the next lifecycle phase).
+**Resume.** :meth:`BacklogDefinitionWorkflow.run` accepts ``resume_from`` and re-executes an
+existing run from the named step onward without re-running completed model steps or wiping
+their ledger payloads — the definition-sequence analogue of
+:meth:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate.FragmentGateWorkflow._run_sequence`'s
+resume semantics, implemented locally and kept simple (Ruling C — backlog keeps its own loop).
+A resumed step whose prior attempt blocked receives a one-shot digest of that
+:class:`~dadaia_workspace.core.models.lifecycle.BlockedState` in its prompt.
 """
 
 from __future__ import annotations
@@ -38,7 +46,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
-    AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
     GateVerdict,
@@ -50,16 +57,17 @@ from dadaia_workspace.core.models.workflow_execution import (
     ResolvedModelConfig,
     WorkflowPolicySnapshot,
 )
+from dadaia_workspace.core.models.workflow_handoff import RetentionMode, WorkflowStepLedger
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
+from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.features.backlog.classifier import (
     BoundItem,
     Classification,
-    Downgrade,
     Verdict,
     classify,
-    no_downgrade,
 )
-from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry
+from dadaia_workspace.features.backlog.preview import bound_anchor_changes, load_backlog_items
+from dadaia_workspace.features.backlog.subject_registry import Registry
 from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
@@ -67,14 +75,21 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     record_prompt_composition,
 )
 from dadaia_workspace.features.lifecycle.context_selector import ContextSelector
-from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
+from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
 from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
     PromptPrefix,
     build_fragment_suffix,
+    canonical_worker_output_ref,
 )
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    MalformedHandoffError,
+    RequiredHandoffMissingError,
+    WorkflowHandoffResolver,
+    durable_payload_from_result,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import _FragmentAssemblyMixin
 
 __all__ = [
@@ -90,40 +105,21 @@ __all__ = [
 ]
 
 
-def _parse_downgrade_verdict(raw: str | None) -> Verdict | None:
-    """Map a model's verdict string to a *safe* downgrade ``Verdict`` (WS-3 wrapper).
-
-    Returns a :class:`Verdict` **only** for a parsed ``OVERLAP``/``SUPERSEDES`` (the compatible
-    -merge verdicts ``conflict_scan`` may emit). Anything else — ``DIVERGENT_CONFLICT``,
-    ``UNRELATED``, ``DUPLICATE``, ``DEPENDS_ON``, garbage, empty, or ``None`` — maps to ``None``
-    so the classifier keeps the fail-closed ``DIVERGENT_CONFLICT``. Deliberately stricter than
-    the classifier clamp (T-43-6b): the consult can never upgrade an UNRELATED or mask a
-    conflict, and the two guards are independent (defence-in-depth).
-    """
-    if not raw:
-        return None
-    normalized = raw.strip().lower()
-    if normalized == Verdict.OVERLAP.value:
-        return Verdict.OVERLAP
-    if normalized == Verdict.SUPERSEDES.value:
-        return Verdict.SUPERSEDES
-    return None
-
-
 class BacklogStepKind(StrEnum):
     """What kind of step this is — selects the model-vs-Python handler."""
 
     MODEL = "model"
-    SUBJECT_BIND = "subject_bind"
-    EXISTING_REVIEW = "existing_backlog_review"
-    RECONCILE = "reconcile_decision"
-    CONFLICT_GRILL = "conflict_resolution_grill"
     REVIEW_GATE = "backlog_review_gate"
 
 
 @dataclass(frozen=True)
 class ProposedIntent:
-    """One proposed ``(subject -> change)`` from step 1, pre-binding (a raw ref)."""
+    """One proposed ``(subject -> change)`` — kept for back-compat call sites.
+
+    No longer consumed by the workflow's control flow (the post-authoring gate reads the
+    authored file from disk instead); retained so existing imports/constructions elsewhere
+    keep working.
+    """
 
     kind: SubjectKind
     ref: str
@@ -132,33 +128,34 @@ class ProposedIntent:
 
 @dataclass(frozen=True)
 class AuthoredItem:
-    """The step-5 authoring output (the backlog item the workflow would write)."""
+    """A caller-supplied authored-item description — kept for back-compat call sites.
+
+    No longer consumed by the workflow's control flow (see :class:`ProposedIntent`).
+    """
 
     slug: str
     is_new: bool
     bound: BoundItem
-    #: The rest of the backlog the review gate re-validates the result against.
     rest_of_backlog: tuple[BoundItem, ...] = ()
 
 
 @dataclass(frozen=True)
 class BacklogDemand:
-    """The structured demand threaded through the §4 sequence (Python-step inputs).
+    """A caller-supplied demand description — kept for back-compat call sites.
 
-    Carries the model-produced structured outputs the Python gates dispose on: the proposed
-    intents (step 1 output → step 1b binds), every existing item's bound intents (the
-    ``backlog_index`` → step 2 classifies), and the authored result (step 5 output → step 6
-    re-validates).
+    Historically threaded the model-produced structured outputs the Python gates disposed
+    on. The post-authoring gate now reads real disk state instead, so every field here is
+    optional and unused by the control flow; the type stays for import back-compat.
     """
 
-    proposed_intents: tuple[ProposedIntent, ...]
+    proposed_intents: tuple[ProposedIntent, ...] = ()
     existing: tuple[BoundItem, ...] = ()
     authored: AuthoredItem | None = None
 
 
 @dataclass(frozen=True)
 class BacklogStep:
-    """One step of the §4 backlog-definition sequence."""
+    """One step of the backlog-definition sequence."""
 
     label: str
     role: str
@@ -172,6 +169,9 @@ class BacklogStep:
     # ``PipelineStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
+    #: True for a step that only runs when the caller opts in (``run(..., grill=True)``);
+    #: otherwise it is recorded ``skipped`` and never reaches the runtime.
+    optional: bool = False
 
 
 @dataclass(frozen=True)
@@ -196,13 +196,17 @@ class BacklogDefinitionResult:
     completed: bool
     final_phase: LifecyclePhase
     steps: tuple[BacklogStepResult, ...] = field(default_factory=tuple)
+    #: The post-authoring gate's classify() verdicts for the authored item(s) against the
+    #: rest of the real backlog (populated by ``backlog_review_gate``; empty when the gate
+    #: never ran).
     overlap: tuple[Classification, ...] = field(default_factory=tuple)
     blocked: BlockedState | None = None
 
 
-#: The §4 seven-step sequence. Model steps name a fragment id; the conditional grill names a
-#: fragment but is skipped unless step 2 found a DIVERGENT_CONFLICT. Pure Python steps carry
-#: ``fragment_id=None``.
+#: The declarative backlog-definition sequence. ``intake_grill`` is present but ``optional`` —
+#: it is skipped by default and only executes when the caller passes ``grill=True``.
+#: ``backlog_author`` is the one model step the default path always runs. ``backlog_review_gate``
+#: is a pure Python step (no fragment) that validates the real file ``backlog_author`` wrote.
 _SEQUENCE: tuple[BacklogStep, ...] = (
     BacklogStep(
         label="intake_grill",
@@ -210,48 +214,26 @@ _SEQUENCE: tuple[BacklogStep, ...] = (
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.intake_grill",
         shared_fragment_ids=("shared.grill_questionnaire",),
-    ),
-    BacklogStep(label="subject_bind", role="python", kind=BacklogStepKind.SUBJECT_BIND),
-    BacklogStep(
-        label="existing_backlog_review",
-        role="python",
-        kind=BacklogStepKind.EXISTING_REVIEW,
-        # Python owns the conflict boundary; this fragment is consulted ONLY on the
-        # shared-anchor differing-change branch (via the `downgrade` seam) and may narrow
-        # DIVERGENT_CONFLICT -> OVERLAP/SUPERSEDES on proven-compatible evidence — never
-        # upgrade, never mask (T-43-6; classifier clamp T-43-6b is the boundary guard). The
-        # citation also makes `conflict_scan` a non-orphan fragment (WS-5 orphan check).
-        fragment_id="backlog_definition.conflict_scan",
-    ),
-    BacklogStep(label="reconcile_decision", role="python", kind=BacklogStepKind.RECONCILE),
-    BacklogStep(
-        label="conflict_resolution_grill",
-        role="product-engineer",
-        kind=BacklogStepKind.CONFLICT_GRILL,
-        fragment_id="backlog_definition.conflict_resolution_grill",
-        shared_fragment_ids=("shared.grill_questionnaire",),
+        optional=True,
     ),
     BacklogStep(
         label="backlog_author",
         role="product-engineer",
         kind=BacklogStepKind.MODEL,
         fragment_id="backlog_definition.backlog_authoring",
-        # T-43-3 anti_slop citation done here (this file is software-engineer's for T-43-6;
-        # wiring it inline avoids a write race with the release_definition.py T-43-3 work).
-        shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
+        shared_fragment_ids=("shared.anti_slop",),
     ),
     BacklogStep(label="backlog_review_gate", role="python", kind=BacklogStepKind.REVIEW_GATE),
 )
 
 
 class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
-    """Run the epic §4 backlog-definition sequence with fragment prompts + Python gates.
+    """Run the backlog-definition sequence: minimal model calls, a real post-authoring gate.
 
     Mixes in :class:`_FragmentAssemblyMixin` for the pure fragment-assembly helpers (v0.1.57
-    FR1) and keeps its own kind-based dispatch + Python-disposing steps. The converged mixin
-    ``_scope`` now threads ``model_profile`` / ``resolved_model`` — before FR1 this body's
-    ``_scope`` dropped both although ``BacklogStep`` carries them (grill Problem #8), so its
-    worker ran on the wrong model.
+    FR1) and keeps its own kind-based dispatch + Python-disposing gate. The converged mixin
+    ``_scope`` threads ``model_profile`` / ``resolved_model`` so its worker requests run on the
+    policy-selected model.
     """
 
     def __init__(
@@ -264,13 +246,14 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         context_selector: ContextSelector,
         registry: Registry,
         default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-        downgrade: Downgrade = no_downgrade,
         fragment_loader: FragmentLoader | None = None,
         prefix: PromptPrefix | None = None,
         prompt_builder: LifecyclePromptBuilder | None = None,
         state_machine: LifecycleStateMachine | None = None,
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         artifact_root: Path | None = None,
+        runtime_files: RuntimeFilePort | None = None,
+        handoff_resolver: WorkflowHandoffResolver | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -279,7 +262,6 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         self._selector = context_selector
         self._registry = registry
         self._default_kind = default_runtime_kind
-        self._downgrade = downgrade
         self._loader = fragment_loader or FragmentLoader()
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
@@ -291,57 +273,66 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # Bug gate-accepts-phantom-artifact-evidence: when wired, declared artifact refs
         # must EXIST under this root or the step BLOCKs.
         self._artifact_root = artifact_root
+        self._runtime_files = runtime_files
+        self._handoff_resolver = handoff_resolver
+        # One-shot resume digest, keyed by step label — mirrors
+        # ``FragmentGateWorkflow._resume_feedback`` (bug
+        # resumed-definition-step-blind-to-rejecting-review-feedback), implemented locally
+        # per Ruling C (backlog keeps its own loop, no full base join).
+        self._resume_feedback: dict[str, str] = {}
 
     # -- public entrypoint ----------------------------------------------
 
     def run(
         self,
         run_id: str,
-        demand: BacklogDemand,
+        demand: BacklogDemand | None = None,
         *,
+        grill: bool = False,
         sequence: tuple[BacklogStep, ...] = _SEQUENCE,
         operator_demand: str | None = None,
+        resume_from: str | None = None,
     ) -> BacklogDefinitionResult:
-        """Execute the §4 sequence; stop at the first blocked gate; advance on success.
+        """Execute the sequence; stop at the first blocked gate; advance on success.
 
-        *operator_demand* is the raw demand text the intake grill exists to interrogate
-        (bug backlog-define-has-no-demand-input-channel); when set it is injected into
-        every model step's prompt as an "## Operator demand" block.
+        *demand* is accepted for call-site back-compat (see :class:`BacklogDemand`) but no
+        longer drives the gates — the post-authoring gate reads the real
+        ``specs/backlog/*.md`` state instead. *grill* opts into running ``intake_grill``
+        (default: skipped, zero extra model calls). *operator_demand* is the raw demand text
+        injected into every executed model step's prompt as an "## Operator demand" block
+        (bug backlog-define-has-no-demand-input-channel). *resume_from* re-executes an
+        existing run from the named step onward without re-running completed model steps or
+        discarding their ledger payloads.
         """
         if not sequence:
             raise ValueError("backlog-definition workflow requires at least one step")
+        del demand  # accepted for back-compat only; the real gate reads disk state.
         self._operator_demand = operator_demand
         self._prefix = self._prefix_with_static_inputs(sequence)
-        run = LifecycleRun(
-            run_id=run_id,
-            context=self._context,
-            release_id=self._release_id,
-            command="backlog_definition",
-            phase=LifecyclePhase.BACKLOG_DEFINITION,
-            status=LifecycleRunStatus.RUNNING,
-            current_step=sequence[0].label,
-            idempotency_key=run_id,
-            workflow_policy=self._policy_snapshot,
-        )
-        self._run_store.save(run)
 
-        # Mutable per-run state threaded between Python steps.
-        bound_new: BoundItem | None = None
+        if resume_from is None:
+            run, remaining = self._start_run(run_id, sequence)
+        else:
+            run, remaining = self._resume_run(run_id, sequence, resume_from)
+
+        # The pre-authoring snapshot of every real backlog item's bound intents (captured
+        # ONCE, before any step in THIS call runs). ``backlog_review_gate`` diffs the
+        # post-authoring snapshot against this to find what ``backlog_author`` actually wrote.
+        before = self._backlog_snapshot()
+
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
-
-        for step in sequence:
-            if step.kind is BacklogStepKind.SUBJECT_BIND:
-                bound_new, run, sr = self._run_subject_bind(run, step, demand)
-            elif step.kind is BacklogStepKind.EXISTING_REVIEW:
-                overlap_list, run, sr = self._run_existing_review(run, step, demand, bound_new)
+        for step in remaining:
+            if step.kind is BacklogStepKind.REVIEW_GATE:
+                overlap_list, run, sr = self._run_review_gate(run, step, before)
                 overlap = overlap_list
-            elif step.kind is BacklogStepKind.RECONCILE:
-                run, sr = self._run_reconcile(run, step, demand, overlap)
-            elif step.kind is BacklogStepKind.CONFLICT_GRILL:
-                run, sr = self._run_conflict_grill(run, step, overlap)
-            elif step.kind is BacklogStepKind.REVIEW_GATE:
-                run, sr = self._run_review_gate(run, step, demand)
+            elif step.optional and not grill:
+                run, sr = (
+                    self._still_running(run, step.label),
+                    BacklogStepResult(
+                        label=step.label, accepted=True, kind=step.kind, skipped=True
+                    ),
+                )
             else:
                 run, sr = self._run_model_step(run, step)
             self._run_store.save(run)
@@ -366,198 +357,222 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             overlap=tuple(overlap),
         )
 
-    # -- Python step 1b: subject_bind -----------------------------------
+    # -- run start / resume ----------------------------------------------
 
-    def _run_subject_bind(
-        self, run: LifecycleRun, step: BacklogStep, demand: BacklogDemand
-    ) -> tuple[BoundItem | None, LifecycleRun, BacklogStepResult]:
-        anchor_changes: dict[str, str] = {}
-        for proposed in demand.proposed_intents:
-            result = self._registry.bind(proposed.ref, proposed.kind)
-            if result.status is not BindStatus.RESOLVED or result.anchor is None:
-                blocked = BlockedState(
-                    reason=(
-                        f"subject_bind HALT: {result.message or proposed.ref} "
-                        f"(status={result.status.value})"
-                    ),
-                    blocked_at_step=step.label,
-                    resume_token=run.idempotency_key,
-                )
-                return (
-                    None,
-                    self._with_block(run, step.label, blocked),
-                    self._blocked_sr(step, blocked),
-                )
-            anchor_changes[result.anchor.id] = proposed.change
-        bound = BoundItem(
-            slug=demand.authored.slug if demand.authored else "new", anchor_changes=anchor_changes
+    def _start_run(
+        self, run_id: str, sequence: tuple[BacklogStep, ...]
+    ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(
+                run_id,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
+                    for step in sequence
+                    if step.fragment_id is not None
+                ),
+                context=self._context,
+                release_id=None,
+            )
+        run = LifecycleRun(
+            run_id=run_id,
+            context=self._context,
+            release_id=self._release_id,
+            command="backlog_definition",
+            phase=LifecyclePhase.BACKLOG_DEFINITION,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=sequence[0].label,
+            idempotency_key=run_id,
+            workflow_policy=self._policy_snapshot,
         )
-        return bound, self._still_running(run, step.label), self._ok_sr(step)
+        return run, sequence
 
-    # -- Python step 2: existing_backlog_review -------------------------
+    def _resume_run(
+        self, run_id: str, sequence: tuple[BacklogStep, ...], resume_from: str
+    ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
+        labels = tuple(step.label for step in sequence)
+        if resume_from not in labels:
+            raise ValueError(
+                f"resume_from step {resume_from!r} is not in the backlog-definition "
+                f"sequence {labels}"
+            )
+        prior = self._run_store.load(run_id)
+        if prior is None:
+            raise ValueError(f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run")
+        index = labels.index(resume_from)
+        resumed_labels = set(labels[index:])
+        if prior.blocked is not None:
+            self._resume_feedback[resume_from] = self._render_prior_block_digest(prior.blocked)
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(
+                run_id,
+                producer_steps=resumed_labels,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
+                    for step in sequence[index:]
+                    if step.fragment_id is not None
+                ),
+                context=self._context,
+                release_id=None,
+            )
+        kept = tuple(
+            record
+            for record in prior.workflow_steps.records
+            if record.producer_step not in resumed_labels
+        )
+        run = replace(
+            prior,
+            phase=LifecyclePhase.BACKLOG_DEFINITION,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=resume_from,
+            blocked=None,
+            workflow_steps=WorkflowStepLedger(records=kept),
+        )
+        return run, sequence[index:]
 
-    def _run_existing_review(
-        self,
-        run: LifecycleRun,
-        step: BacklogStep,
-        demand: BacklogDemand,
-        bound_new: BoundItem | None,
+    @staticmethod
+    def _render_prior_block_digest(blocked: BlockedState) -> str:
+        lines = [
+            "## Prior rejection feedback (resumed run)",
+            f"The previous run of this workflow blocked at step "
+            f"'{blocked.blocked_at_step}': {blocked.reason}",
+        ]
+        for key, value in sorted(blocked.detail.items()):
+            lines.append(f"- {key}: {value}")
+        lines.append("Revise the artifact so every point above is addressed.")
+        return "\n".join(lines)
+
+    # -- real disk state: the backlog snapshot ---------------------------
+
+    def _backlog_snapshot(self) -> dict[str, BoundItem]:
+        """Every real ``specs/backlog/*.md`` item, reduced to slug -> bound anchor changes.
+
+        Reads live disk state via the same loader the panel/doctor use
+        (:func:`load_backlog_items`) and binds each item's ``intents[]`` through the R1
+        canonical-subject registry (:func:`bound_anchor_changes`). An item with an unresolved
+        subject still contributes whatever DID resolve here; the post-authoring gate reports
+        unresolved subjects separately for the authored item(s) only.
+        """
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        snapshot: dict[str, BoundItem] = {}
+        for item in load_backlog_items(backlog_dir):
+            anchor_changes, _unresolved = bound_anchor_changes(item, self._registry)
+            snapshot[item.slug] = BoundItem(slug=item.slug, anchor_changes=anchor_changes)
+        return snapshot
+
+    # -- Python step: backlog_review_gate (the real post-authoring gate) ---
+
+    def _run_review_gate(
+        self, run: LifecycleRun, step: BacklogStep, before: dict[str, BoundItem]
     ) -> tuple[list[Classification], LifecycleRun, BacklogStepResult]:
-        if bound_new is None:  # defensive: bind step must have produced a bound item.
+        """Validate what ``backlog_author`` actually wrote to disk — folds four former gates.
+
+        1. Diff the post-authoring backlog snapshot against *before*: any slug that is new or
+           whose bound anchor-changes differ is "authored" this run (folds ``subject_bind``'s
+           and ``backlog_review_gate``'s old "was anything produced" checks into one real
+           disk-grounded diff). No changed slug -> BLOCK (nothing to validate).
+        2. Any authored item carrying an unresolved subject -> BLOCK (folds ``subject_bind``'s
+           HALT-on-unresolved).
+        3. Run the R1 ``classify()`` for each authored item against the rest of the real
+           backlog (folds ``existing_backlog_review``). A NEW item may not overlap any
+           existing item at all (folds ``reconcile_decision``'s NEW-only-if-every-existing-
+           UNRELATED rule); an EDIT may not introduce a DUPLICATE/DIVERGENT_CONFLICT (folds
+           the former ``backlog_review_gate``).
+        """
+        after = self._backlog_snapshot()
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        unresolved_by_slug: dict[str, tuple[str, ...]] = {}
+        for item in load_backlog_items(backlog_dir):
+            _anchor_changes, unresolved = bound_anchor_changes(item, self._registry)
+            if unresolved:
+                unresolved_by_slug[item.slug] = tuple(unresolved)
+
+        changed = sorted(
+            slug
+            for slug, bound in after.items()
+            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        )
+        if not changed:
             blocked = BlockedState(
-                reason="existing_backlog_review: no bound intents from subject_bind",
+                reason=(
+                    "backlog_review_gate: no new/changed item found under specs/backlog/ — "
+                    "backlog_author must write a NEW item or edit an existing one"
+                ),
                 blocked_at_step=step.label,
                 resume_token=run.idempotency_key,
             )
             return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
-        downgrade = self._resolve_downgrade(step, run.run_id)
-        overlap = classify(bound_new, demand.existing, downgrade=downgrade)
+
+        overlap: list[Classification] = []
+        for slug in changed:
+            if slug in unresolved_by_slug:
+                blocked = BlockedState(
+                    reason=(
+                        f"backlog_review_gate: authored item {slug!r} carries unresolved "
+                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}"
+                    ),
+                    blocked_at_step=step.label,
+                    resume_token=run.idempotency_key,
+                    detail={"slug": slug},
+                )
+                return (
+                    overlap,
+                    self._with_block(run, step.label, blocked),
+                    self._blocked_sr(step, blocked),
+                )
+
+            rest = tuple(bound for other, bound in after.items() if other != slug)
+            verdicts = classify(after[slug], rest)
+            overlap.extend(verdicts)
+            is_new = slug not in before
+            if is_new:
+                offending = [c for c in verdicts if c.verdict is not Verdict.UNRELATED]
+                reason_kind = "is a NEW item but overlaps existing item(s)"
+            else:
+                offending = [
+                    c
+                    for c in verdicts
+                    if c.verdict in {Verdict.DUPLICATE, Verdict.DIVERGENT_CONFLICT}
+                ]
+                reason_kind = "introduces a DUPLICATE/DIVERGENT_CONFLICT"
+            if offending:
+                classes = ", ".join(f"{c.other_slug}:{c.verdict.value}" for c in offending)
+                blocked = BlockedState(
+                    reason=f"backlog_review_gate: {slug!r} {reason_kind} ({classes})",
+                    blocked_at_step=step.label,
+                    resume_token=run.idempotency_key,
+                    detail={"slug": slug},
+                )
+                return (
+                    overlap,
+                    self._with_block(run, step.label, blocked),
+                    self._blocked_sr(step, blocked),
+                )
+
         return overlap, self._still_running(run, step.label), self._ok_sr(step)
 
-    # -- conflict_scan downgrade-only model consult (T-43-6, SPEC §3 WS-3) ---
+    # -- opt-in grill digest (item 2: consumed, not decorative) ----------
 
-    def _resolve_downgrade(self, step: BacklogStep, run_id: str) -> Downgrade:
-        """Pick the ``downgrade`` seam ``classify`` consults on the differing-change branch.
+    def _intake_grill_digest(self, run: LifecycleRun) -> str | None:
+        """Resolve ``intake_grill``'s produced payload (when it ran) and render a digest.
 
-        Precedence, fail-closed by default:
-
-        * an explicitly injected ``downgrade`` (operator/test override) always wins;
-        * else, the default offline/``FAKE`` path keeps :func:`no_downgrade` — no model call,
-          a shared-anchor differing-change pair stays ``DIVERGENT_CONFLICT`` (existing
-          behavior, existing tests unchanged);
-        * else (a real model runtime is wired AND the step names ``conflict_scan``), return the
-          model-backed consult. ``classify`` calls it ONLY on the differing-change branch, so
-          the worker is consulted on exactly the shared-anchor differing-change pairs.
+        A *simple local digest pass* (Ruling C): reuses the exact ledger-lookup +
+        :meth:`WorkflowHandoffResolver.render_digest` rendering every model step already
+        writes through via ``produce()``, without joining ``_fragment_gate``'s declarative
+        ``consumes``/``produces`` graph-completeness machinery. Returns ``None`` when no
+        resolver is wired or ``intake_grill`` never produced a payload (it did not run, or
+        this call resumed past it) — absence is never an error here, the grill is optional.
         """
-        if self._downgrade is not no_downgrade:
-            return self._downgrade
-        if step.fragment_id is None or self._default_kind is AgentRuntimeKind.FAKE:
-            return no_downgrade
-        return self._conflict_scan_downgrade(step, run_id)
-
-    def _conflict_scan_downgrade(self, step: BacklogStep, run_id: str) -> Downgrade:
-        """Return a model-backed ``downgrade`` callable that consults ``conflict_scan``.
-
-        The returned callable runs the worker on the ``conflict_scan`` fragment for the one
-        differing shared anchor and maps **only** a parsed ``OVERLAP``/``SUPERSEDES`` verdict to
-        a :class:`Verdict`; anything else or unparseable -> ``None`` (the WS-3 wrapper). Combined
-        with the classifier clamp (T-43-6b) this is defence-in-depth: the consult can narrow a
-        conflict's name but can never upgrade an ``UNRELATED`` or mask a conflict.
-        """
-        assert step.fragment_id is not None
-        fragment = self._loader.load_fragment(step.fragment_id)
-        shared = tuple(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids)
-
-        def _downgrade(new_change: str, existing_change: str) -> Verdict | None:
-            result = self._run_consult_worker(
-                step, fragment, shared, run_id, new_change, existing_change
+        if self._handoff_resolver is None:
+            return None
+        try:
+            resolved = self._handoff_resolver.resolve_required(
+                run, producer_step="intake_grill", attempt=0
             )
-            return _parse_downgrade_verdict(result.structured_output.get("verdict"))
+        except (RequiredHandoffMissingError, MalformedHandoffError):
+            return None
+        return WorkflowHandoffResolver.render_digest(resolved)
 
-        return _downgrade
-
-    def _run_consult_worker(
-        self,
-        step: BacklogStep,
-        fragment: Fragment,
-        shared: tuple[Fragment, ...],
-        run_id: str,
-        new_change: str,
-        existing_change: str,
-    ) -> AgentRunResult:
-        """Build the ``conflict_scan`` prompt for one differing pair and run the worker once.
-
-        Reuses the same context-selection + suffix + prompt-builder machinery as
-        :meth:`_run_model_step`; it calls the runtime port directly (not the gate runner)
-        because a downgrade adjudication extracts a content verdict, not an APPROVED/REJECTED
-        gate decision — there is no artifact to gate on.
-        """
-        audit = self._select_context(step, fragment)
-        pair_context = (
-            f"### conflict_pair\n- new change: {new_change}\n- existing change: {existing_change}"
-        )
-        rendered = self._render_selection(audit)
-        selected = f"{rendered}\n\n{pair_context}" if rendered else pair_context
-        suffix = build_fragment_suffix(
-            self._fragment_bundle(step, fragment, shared),
-            selected_context=selected,
-            is_review=False,
-        )
-        kind = step.runtime_kind or self._default_kind
-        runtime = self._runtime_factory(kind)
-        scope = self._scope(step, run_id, suffix)
-        built = self._prompt_builder.build(
-            scope, runtime=runtime.runtime_kind(), prefix=self._prefix
-        )
-        return runtime.run(built.request)
-
-    # -- Python step 3: reconcile_decision ------------------------------
-
-    def _run_reconcile(
-        self,
-        run: LifecycleRun,
-        step: BacklogStep,
-        demand: BacklogDemand,
-        overlap: list[Classification],
-    ) -> tuple[LifecycleRun, BacklogStepResult]:
-        wants_new = demand.authored is None or demand.authored.is_new
-        non_unrelated = [c for c in overlap if c.verdict is not Verdict.UNRELATED]
-        if wants_new and non_unrelated:
-            classes = ", ".join(f"{c.other_slug}:{c.verdict.value}" for c in non_unrelated)
-            blocked = BlockedState(
-                reason=(
-                    "reconcile_decision blocks NEW: a non-UNRELATED class exists "
-                    f"({classes}); fold into the existing item instead of filing a new file"
-                ),
-                blocked_at_step=step.label,
-                resume_token=run.idempotency_key,
-            )
-            return self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
-        return self._still_running(run, step.label), self._ok_sr(step)
-
-    # -- Python+model step 4: conflict_resolution_grill (conditional) ---
-
-    def _run_conflict_grill(
-        self, run: LifecycleRun, step: BacklogStep, overlap: list[Classification]
-    ) -> tuple[LifecycleRun, BacklogStepResult]:
-        has_conflict = any(c.verdict is Verdict.DIVERGENT_CONFLICT for c in overlap)
-        if not has_conflict:
-            # Clean overlap report → skip the grill (recorded skipped, not blocked).
-            return self._still_running(run, step.label), BacklogStepResult(
-                label=step.label, accepted=True, kind=step.kind, skipped=True
-            )
-        return self._run_model_step(run, step)
-
-    # -- Python step 6: backlog_review_gate -----------------------------
-
-    def _run_review_gate(
-        self, run: LifecycleRun, step: BacklogStep, demand: BacklogDemand
-    ) -> tuple[LifecycleRun, BacklogStepResult]:
-        if demand.authored is None:
-            blocked = BlockedState(
-                reason="backlog_review_gate: no authored result to validate",
-                blocked_at_step=step.label,
-                resume_token=run.idempotency_key,
-            )
-            return self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
-        verdicts = classify(demand.authored.bound, demand.authored.rest_of_backlog)
-        dirty = [
-            c for c in verdicts if c.verdict in {Verdict.DUPLICATE, Verdict.DIVERGENT_CONFLICT}
-        ]
-        if dirty:
-            classes = ", ".join(f"{c.other_slug}:{c.verdict.value}" for c in dirty)
-            blocked = BlockedState(
-                reason=(
-                    "backlog_review_gate: authored result introduces a "
-                    f"DUPLICATE/DIVERGENT_CONFLICT ({classes})"
-                ),
-                blocked_at_step=step.label,
-                resume_token=run.idempotency_key,
-            )
-            return self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
-        return self._still_running(run, step.label), self._ok_sr(step)
-
-    # -- model step (mirrors the handoff-ledger bodies) -----------------
+    # -- model step (intake_grill / backlog_author) -----------------------
 
     def _run_model_step(
         self, run: LifecycleRun, step: BacklogStep
@@ -566,7 +581,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         fragment = self._loader.load_fragment(step.fragment_id)
         shared = tuple(self._loader.load_fragment(fid) for fid in step.shared_fragment_ids)
 
-        audit = self._select_context(step, fragment)
+        audit = self._select_context(step, (fragment, *shared))
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
@@ -575,20 +590,29 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         demand_text = getattr(self, "_operator_demand", None)
         if demand_text:
             selected = "\n\n".join(filter(None, (f"## Operator demand\n\n{demand_text}", selected)))
+        if step.label == "backlog_author":
+            # Item 2: when intake_grill ran (grill=True), its output must be CONSUMED, not
+            # merely produced — inject a compact digest into the author's prompt.
+            digest = self._intake_grill_digest(run)
+            if digest:
+                selected = "\n\n".join(filter(None, (selected, digest)))
+        # One-shot resume-rejection digest for the resume-point step.
+        resume_digest = self._resume_feedback.pop(step.label, None)
+        if resume_digest:
+            selected = "\n\n".join(filter(None, (selected, resume_digest)))
         suffix = build_fragment_suffix(
             self._fragment_bundle(step, fragment, shared),
             selected_context=selected,
-            # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
-            # field) — it emits an artifact, never a self-verdict (D-2 / A4).
+            # Every backlog model step is a CREATE step (BacklogStep is kind-based, no
+            # is_review field) — it emits an artifact, never a self-verdict (D-2 / A4).
             is_review=False,
         )
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)
         scope = self._scope(step, run.run_id, suffix)
         if step.label == "backlog_author":
-            # Bug backlog-author-write-scope-excludes-backlog: the author step's whole
-            # job is writing the ADDITIVE specs/backlog item — mirror the bug_report
-            # bug_write step-aware scope (A29) so the real deliverable is in-scope.
+            # The author step writes the ADDITIVE specs/backlog item, so include that
+            # real deliverable in the step-aware scope.
             scope = replace(
                 scope,
                 allowed_paths=(
@@ -604,18 +628,35 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             runtime=runtime,
             state_machine=self._state_machine,
             artifact_root=self._artifact_root,
+            runtime_files=self._runtime_files,
         )
-        blocked = runner.evaluate_gate(
+        worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
                 request=built.request,
                 target_phase=run.phase,
                 current_step=step.label,
-                # backlog_author is a CREATE step (BacklogStep is kind-based, no is_review
-                # boolean): it must pass on a schema-valid payload, never a verdict (L1).
+                # Every backlog model step is a CREATE step: it must pass on a schema-valid
+                # payload, never a verdict (L1).
                 is_review=False,
             ),
         )
+        if blocked is None and self._handoff_resolver is not None:
+            payload = durable_payload_from_result(
+                worker_result, fallback_summary=step.label, is_review=False
+            )
+            run, _ = self._handoff_resolver.produce(
+                run,
+                producer_step=step.label,
+                attempt=0,
+                output_schema=fragment.output_schema,
+                payload=payload,
+                retention_mode=(
+                    RetentionMode.PROMOTE_TO_EVIDENCE
+                    if step.label == "backlog_author"
+                    else RetentionMode.DELETE_AFTER_CONSUMED
+                ),
+            )
         run = (
             self._with_block(run, step.label, blocked)
             if blocked
@@ -648,8 +689,6 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
     def _still_running(run: LifecycleRun, step_label: str) -> LifecycleRun:
         # ``replace`` (not a manual reconstruction) preserves every additive-optional field —
         # notably the ``workflow_policy`` snapshot (FR1) — across the Python-step transition.
-        from dataclasses import replace
-
         return replace(
             run,
             phase=run.phase,
@@ -660,8 +699,6 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
     @staticmethod
     def _with_block(run: LifecycleRun, step_label: str, blocked: BlockedState) -> LifecycleRun:
-        from dataclasses import replace
-
         return replace(
             run,
             phase=LifecyclePhase.BLOCKED,
@@ -672,8 +709,6 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
     @staticmethod
     def _advance(run: LifecycleRun) -> LifecycleRun:
-        from dataclasses import replace
-
         return replace(
             run,
             phase=LifecyclePhase.RELEASE_DEFINITION,

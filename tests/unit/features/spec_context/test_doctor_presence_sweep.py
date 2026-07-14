@@ -1,12 +1,4 @@
-"""DoctorService PRESENCE-GC: stale advisory presence-record GC (v0.1.76 T-4, FR7).
-
-The lease's ``ctx_locks/*.lock.json`` heartbeat is no longer the concurrency signal —
-``features/spec_context/presence.py`` (``.dadaia/states/presence/<ctx>/<sid>.json``) is
-the ONLY concurrency-signal surface post-doctrine (FR2). ``presence.sweep()`` (T-2) already
-implements the GC predicate (TTL-only staleness, corrupt-record removal) but had zero
-production consumers until this task wires it into the workspace doctor's ``check()``/
-``fix()`` — the doctor's documented GC surface (LOCK-GC/SENTINEL-GC/GRAVEYARD-GC/PTR-GC
-siblings).
+"""DoctorService cleanup for stale advisory presence records.
 
 ``check()`` reports ``PRESENCE-GC`` for every stale/corrupt presence record found (WARN-
 severity by construction — presence is advisory, never a security concern); ``--fix``
@@ -27,13 +19,13 @@ from dadaia_workspace.core import kernel_tunables  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
-TTL = kernel_tunables.LEASE_TTL_SECONDS
+TTL = kernel_tunables.PRESENCE_TTL_SECONDS
 
 
 def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    (ws / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
+    (ws / ".dadaia" / "states").mkdir(parents=True)
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws

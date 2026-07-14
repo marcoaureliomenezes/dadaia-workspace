@@ -37,18 +37,6 @@ class GitSyncError(DadaiaError):
     """Raised when committing or pushing changes before deactivate fails."""
 
 
-class WorkflowSchemaError(DadaiaError):
-    """Raised when a workflow file fails schema validation."""
-
-
-class WorkflowCycleError(WorkflowSchemaError):
-    """Raised when stage dependencies form a cycle."""
-
-
-class WorkflowNotFoundError(DadaiaError):
-    """Raised when a workflow name is not present in the workflow store."""
-
-
 class PortConflictError(DadaiaError):
     """Raised when a port is already registered as active by a different project."""
 
@@ -104,47 +92,10 @@ class SchemaVersionError(DadaiaError):
     """
 
 
-class ContextLockedError(DadaiaError):
-    """Raised when an operation on a context is blocked because a lock is held.
-
-    E.g. calling dead() on a context that has an active implementation lock.
-    """
-
-
-class LockConflictError(DadaiaError):
-    """Base class for all lock-conflict errors.
-
-    Raised when two sessions attempt mutually-exclusive operations on the same
-    context/release pair.
-    """
-
-
-class LockHeldError(LockConflictError):
-    """Raised when a second bind --mode implementation is attempted while a lock is already HELD.
-
-    The message includes the owner session_id and last_seen_at.
-    """
-
-
-class WorkspaceLockTimeoutError(DadaiaError):
-    """Raised when the workspace-wide fcntl lock cannot be acquired within the timeout.
-
-    Includes the holder PID if discoverable from the lock file content.
-    """
-
-
 class ContextNotAliveError(DadaiaError):
     """Raised when bind is attempted on a context whose state is DEAD.
 
     AC-T11-5: bind on a DEAD context must raise this instead of proceeding.
-    """
-
-
-class LockActiveError(DadaiaError):
-    """Raised when a forced reclaim is attempted on a HELD (non-stale) lock.
-
-    AC-T12-3 (T-12): reclaim() on a fresh HELD lock raises this.
-    Also used in T-11 reclaim path.
     """
 
 

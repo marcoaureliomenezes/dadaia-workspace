@@ -29,6 +29,7 @@ import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -174,6 +175,22 @@ def normalize_artifact_refs(payload: dict[str, object]) -> tuple[str, ...]:
     return tuple(paths)
 
 
+def missing_artifact_refs(refs: tuple[str, ...], cwd: Path) -> tuple[str, ...]:
+    """Return declared workspace refs that are absent or escape the worker root."""
+    root = cwd.resolve()
+    missing: list[str] = []
+    for ref in refs:
+        candidate = (root / ref).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            missing.append(ref)
+            continue
+        if not candidate.is_file():
+            missing.append(ref)
+    return tuple(missing)
+
+
 def derive_result_summary(payload: dict[str, object]) -> str | None:
     """Best substantive one-line summary from a result payload — single-sourced for pi+codex.
 
@@ -245,6 +262,17 @@ class _GitDiffPort(Protocol):
     def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
 
 
+@dataclass(frozen=True)
+class _PathContentState:
+    """Content/existence state for a git-reported changed path before a worker attempt."""
+
+    exists: bool
+    content: bytes | None
+
+
+GitChangedPathSnapshot = dict[str, _PathContentState]
+
+
 class RedactionMixin:
     """Secret-scrub surfaced output using the host environment.
 
@@ -265,6 +293,16 @@ class RedactionMixin:
                 redacted = redacted.replace(value, "[REDACTED]")
         return redacted
 
+    def _redact_json(self, value: object) -> object:
+        """Recursively redact strings before a worker document enters durable state."""
+        if isinstance(value, str):
+            return self._redact(value)
+        if isinstance(value, list):
+            return [self._redact_json(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._redact_json(item) for key, item in value.items()}
+        return value
+
 
 class ChangedPathsMixin:
     """Source ``changed_paths`` from ``git diff`` — the Ring-2 write boundary.
@@ -279,17 +317,38 @@ class ChangedPathsMixin:
     _git: _GitDiffPort | None
     _cwd_for_diff: Path
 
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
+    def _snapshot_changed_paths(self) -> GitChangedPathSnapshot | None:
+        if self._git is None:
+            return None
+        return {
+            path: self._path_content_state(path)
+            for path in self._git.diff_name_only(self._cwd_for_diff)
+        }
+
+    def _path_content_state(self, path: str) -> _PathContentState:
+        target = self._cwd_for_diff / path
+        if not target.is_file():
+            return _PathContentState(exists=False, content=None)
+        try:
+            return _PathContentState(exists=True, content=target.read_bytes())
+        except OSError:
+            return _PathContentState(exists=False, content=None)
+
+    def _with_changed_paths(
+        self,
+        result: AgentRunResult,
+        before_snapshot: GitChangedPathSnapshot | None = None,
+    ) -> AgentRunResult:
         if self._git is None:
             return result
-        changed = self._git.diff_name_only(self._cwd_for_diff)
-        if not changed:
-            # An empty diff must not clobber a worker-reported changed_paths with ""
-            # (bug result-contract-drops-singular-artifact-ref-and-changed-paths-list):
-            # the diff root is the run cwd (typically the WORKSPACE root, which is not
-            # the context's git repo), so an empty answer is structurally blind, not
-            # proof of a no-op. Git truth still wins whenever it actually sees changes.
-            return result
+        if before_snapshot is None:
+            changed = self._git.diff_name_only(self._cwd_for_diff)
+            if not changed:
+                # Legacy direct-call behaviour for callers that did not snapshot an
+                # attempt: an empty diff is structurally blind, not proof of a no-op.
+                return result
+        else:
+            changed = self._changed_paths_since(before_snapshot)
         structured = dict(result.structured_output)
         structured["changed_paths"] = ",".join(changed)
         return AgentRunResult(
@@ -297,11 +356,22 @@ class ChangedPathsMixin:
             summary=result.summary,
             artifact_refs=result.artifact_refs,
             structured_output=structured,
+            domain_payload=result.domain_payload,
             error=result.error,
             # v0.1.78 T-D / FR-D: preserve a degraded/noncompliant result's diagnostic —
             # this rebuild must never silently discard the evidence the adapter attached.
             diagnostic=result.diagnostic,
         )
+
+    def _changed_paths_since(self, before_snapshot: GitChangedPathSnapshot) -> tuple[str, ...]:
+        after_paths = set(self._git.diff_name_only(self._cwd_for_diff)) if self._git else set()
+        changed: list[str] = []
+        for path in sorted(after_paths | set(before_snapshot)):
+            before = before_snapshot.get(path)
+            after = self._path_content_state(path)
+            if before is None or before != after:
+                changed.append(path)
+        return tuple(changed)
 
 
 #: Preamble that turns a persona mandate into an OPERATIVE DIRECTIVE (v0.1.44 / AC-2). The
@@ -315,7 +385,7 @@ _PERSONA_DIRECTIVE_PREAMBLE = (
 )
 
 
-def build_prompt_envelope(request: AgentRunRequest) -> str:
+def build_prompt_envelope(request: AgentRunRequest, *, execution_root: Path | None = None) -> str:
     """Build the deterministic JSON prompt envelope handed to a headless worker.
 
     Fields: ``role``, ``prompt``, ``context``, ``release_id``, ``task_id``,
@@ -340,6 +410,14 @@ def build_prompt_envelope(request: AgentRunRequest) -> str:
         "expected_schema": request.expected_schema,
         "required_evidence": [kind.value for kind in request.required_evidence],
     }
+    if execution_root is not None:
+        root = str(execution_root.resolve())
+        payload["execution_root"] = root
+        payload["path_resolution"] = (
+            "Resolve every workspace-relative allowed path and artifact_ref beneath "
+            f"execution_root={root}. Tool calls may use the resulting absolute path. "
+            "Never redirect a relative artifact to a parent or another dadaia workspace."
+        )
     if request.persona:
         payload["persona"] = _PERSONA_DIRECTIVE_PREAMBLE + request.persona
     return json.dumps(payload, indent=2, sort_keys=True)
@@ -371,9 +449,8 @@ class SubprocessAdapterMixin(RedactionMixin, ChangedPathsMixin):
     def _env(self) -> dict[str, str]:
         return filter_env(self._environ, self._env_allowlist)
 
-    @staticmethod
-    def _prompt(request: AgentRunRequest) -> str:
-        return build_prompt_envelope(request)
+    def _prompt(self, request: AgentRunRequest) -> str:
+        return build_prompt_envelope(request, execution_root=self._cwd_for_diff)
 
     def _extract_result_payload(
         self,

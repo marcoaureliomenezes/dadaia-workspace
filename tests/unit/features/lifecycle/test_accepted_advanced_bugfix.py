@@ -70,7 +70,7 @@ def _success(verdict: str = "APPROVED") -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(".dadaia/handoff/dadaia-workspace/x.handoff.json",),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/x.step-output.json",),
         structured_output={"verdict": verdict},
     )
 
@@ -184,7 +184,7 @@ def _scope(role: str = "software-engineer") -> PromptScope:
         release_id="v0.1.57",
         task_id="step",
         prompt="run the step",
-        allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
+        allowed_paths=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
 

@@ -22,8 +22,9 @@ remit.
 **Two agentic layers** (constitution §0 "The two agentic layers"). dadaia runs agents at
 **Layer 1** — the entry harness a human launches in a terminal (`claude`, `codex`,
 `pi`) — and **Layer 2** — a bounded worker driven inside a Python
-`dadaia lifecycle` workflow behind the `AgentRuntimePort` seam, selectable per step
-(worker runtimes: FAKE, CODEX_EXEC, CLAUDE_SDK, PI_HEADLESS). This literacy
+`dadaia lifecycle` workflow behind the `AgentRuntimePort` seam, selectable per step as
+Codex headless or PI headless. FAKE is an internal test adapter; Claude Code is
+Layer-1-only. This literacy
 skill describes the Layer-1 entry-harness primitives; the Layer-2 worker-runtime model is
 deep harness depth — defer to `ai-engineer`.
 
@@ -88,9 +89,9 @@ dadaia_workspace/public/<type>/<file>     # canonical source — the ONLY editab
         │
         ▼  dadaia public install --target all
         │
-        ├─ .claude/    (agents, rules, skills, workflows)
+        ├─ .claude/    (agents, rules, skills)
         ├─ .agents/    (skills)
-        ├─ .codex/     (agents .toml, config, hooks, rules, workflow refs, Codex-only skills)
+        ├─ .codex/     (agents .toml, config, hooks, rules, Codex-only skills)
         └─ .pi/        (SYSTEM.md, settings.json, prompts — post-trust executable)
         │
         ▼  dadaia public doctor            # verifies every projection matches the staged SHA256

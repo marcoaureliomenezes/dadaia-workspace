@@ -2,10 +2,10 @@
 ``split-cleanup-engines-strand-stale-step-payloads``).
 
 Before the fix, ``LifecycleHygieneService.cleanup()`` (the engine behind both
-``dadaia lifecycle hygiene clean`` AND the preflight remediation printed for
+``dadaia reports workflow-hygiene-clean`` and the preflight remediation printed for
 ``"hygiene cleanup candidates present"``) scanned ONLY ``SlopPolicy.safe_zones``
 (reports/handoff/tmp) — it never saw ``.dadaia/runs/lifecycle/<run>/steps/`` payloads.
-``RetentionSweep`` (``dadaia lifecycle clean``, a DIFFERENT command) DOES cover
+``RetentionSweep`` (the top-level ``dadaia clean`` command) also covers
 ``.dadaia/runs`` via ``_swept_zones``. So a workflow-step payload the handoffs doctor
 flagged as STALE (past its consumed-TTL) survived the operator's OFFICIAL, printed
 remediation — the classic "doctor says X, remediation cannot fix X" hole.

@@ -7,12 +7,13 @@ applyTo: "specs/backlog/**"
 # dadaia-release-definition
 
 > **Not the lifecycle enforcement mechanism.** Ordered release-definition execution is
-> owned by the **`release define` dadaia-workflow** (`dadaia lifecycle release define`) —
+> owned by the **release-definition dadaia-workflow**
+> (`dadaia lifecycle release-definition`) —
 > a Python workflow body that assembles fragment-scoped per-step prompts
 > (`release_scope → spec_create → spec_*_review → plan_create → … → definition_commit_gate`)
 > and advances Python-validated gates. This skill is reference / manual-operator guidance
-> only; it does not enforce the sequence. See **`dadaia panel` → Agentic →
-> dadaia-workflows** for the live workflow description.
+> only; it does not enforce the sequence. See **`dadaia panel` → 2º Agentic Layer**
+> for the live workflow description.
 
 ## When to invoke
 
@@ -24,7 +25,7 @@ steps 1–4 below are complete.
 
 ## Inputs
 
-- `specs/bugs/*.md` — open bug reports (read `specs/bugs/*.md` directly).
+- `specs/bugs/*.jsonl` — event-sourced bug records, inspected through `dadaia bugs`.
 - `specs/backlog/*.md` + `candidates.md` / `ideas.md` — backlog (read `specs/backlog/*.md` directly).
 - The operator's intent for the release (theme, urgency).
 
@@ -77,10 +78,11 @@ machine-readable bold-key line in the SPEC, alongside `**Status:**` / `**Release
 **Consumes:** slug-a, slug-b
 ```
 
-This is the producer half of removal-on-release. At `dadaia lifecycle release define`,
+This is the producer half of removal-on-release. At `dadaia lifecycle release-definition`,
 a guarded post-step parses this line, binds each declared slug's `intents[]` through the
 canonical-subject registry → the verified **shipped-anchor set**, and writes
-`specs/_archive/<release-id>/consumed_backlog.json`. At `dadaia lifecycle close`, the
+`specs/_archive/<release-id>/consumed_backlog.json`. At
+`dadaia lifecycle implementation-reviews`, the
 residual-aware removal hook reads that ledger and drops each fully-consumed item from the
 live `specs/backlog/` SET (archiving a copy first), so `backlog doctor` reports zero
 BL-STALE. Rules:

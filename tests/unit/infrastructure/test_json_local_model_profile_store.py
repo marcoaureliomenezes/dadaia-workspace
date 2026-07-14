@@ -50,7 +50,7 @@ def _valid_profile() -> dict[str, object]:
         "id": "pi-operator-fast",
         "harness": "pi",
         "label": "PI — operator fast",
-        "model_id": "gpt-5.5",
+        "model_id": "openai-codex/gpt-5.5",
         "effort": "low",
         "purpose": "Operator's low-cost PI profile.",
     }
@@ -195,14 +195,20 @@ def test_l8_secret_field_rejected_never_echoes_value(
 @pytest.mark.parametrize(
     ("model_id", "should_load"),
     [
+        pytest.param(
+            "openai-codex/gpt-5.5",
+            True,
+            id="codex-subscription-gpt-id-accepted",
+        ),
         pytest.param("moonshotai/kimi-k2.5", True, id="allowlisted-openrouter-id-accepted"),
+        pytest.param("gpt-5.5", False, id="ambiguous-gpt-id-rejected"),
+        pytest.param("openai/gpt-5.5", False, id="api-key-gpt-provider-rejected"),
         pytest.param("totally-unknown-9.9", False, id="outside-allowlist-union-rejected"),
         pytest.param("claude-opus-4-8", False, id="claude-model-id-rejected-by-allowlist"),
     ],
 )
 def test_ac5_model_id_allowlist(tmp_path: Path, model_id: str, should_load: bool) -> None:
-    """AC-5 (v0.1.44): an operator pi profile's model_id must be in the registry OR
-    Layer-2 allowlist union; claude is never in that union."""
+    """PI GPT profiles require openai-codex; curated non-GPT ids stay selectable."""
     candidate = _valid_profile()
     candidate["model_id"] = model_id
     store = _write(_workspace(tmp_path), _valid_store([candidate]))

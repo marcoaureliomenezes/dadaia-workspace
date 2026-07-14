@@ -92,8 +92,12 @@ class _RecordingFake:
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         self.received_requests.append(request)
-        allowed = request.allowed_paths[0] if request.allowed_paths else ".dadaia/handoff/x/**"
-        artifact = allowed.replace("**", "step.handoff.json")
+        allowed = (
+            request.allowed_paths[0]
+            if request.allowed_paths
+            else ".dadaia/tmp/lifecycle-worker/x/**"
+        )
+        artifact = allowed.replace("**", "step.step-output.json")
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="role-atom step ok",
@@ -103,7 +107,8 @@ class _RecordingFake:
 
     def request_for(self, step_label: str) -> AgentRunRequest:
         for req in self.received_requests:
-            if (req.task_id or "").endswith(f":{step_label}"):
+            task_id = req.task_id or ""
+            if task_id.endswith(f":{step_label}") or f":{step_label}:attempt-" in task_id:
                 return req
         raise AssertionError(f"no request captured for step {step_label!r}")
 
@@ -130,8 +135,17 @@ def _seed_specs(tmp_path: Path, *, active_phase: str | None = "IMPLEMENTATION") 
     (specs / "memory" / "product" / "catalog.json").write_text(
         '{"features": [{"slug": "demo", "tldr": "FIXTURE CATALOG BODY"}]}\n', encoding="utf-8"
     )
-    for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / _RELEASE / art).write_text(f"# {art}\n\nBody.\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text("# SPEC.md\n\nBody.\n", encoding="utf-8")
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# PLAN.md\n\nBody.\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | value | unit tests | None | None |\n",
+        encoding="utf-8",
+    )
+    (specs / "releases" / _RELEASE / "TASKS.md").write_text(
+        "# TASKS.md\n\n### [ ] T1 - Fixture task\n", encoding="utf-8"
+    )
     if active_phase is not None:
         (specs / "releases" / "ACTIVE.md").write_text(
             f"release: {_RELEASE}\nphase: {active_phase}\n", encoding="utf-8"
@@ -286,14 +300,14 @@ def test_ac3_base_records_and_injects_each_mapped_role(tmp_path: Path) -> None:
     # product-engineer step records the catalog ref; software-architect → architecture.md;
     # qa-engineer → quality-assurance.md; the multi-role plan_review records BOTH.
     assert _CATALOG_REF in _refs_for(run, "release_scope")
-    assert _ARCH_REF in _refs_for(run, "spec_arch_review")
-    assert _QA_REF in _refs_for(run, "spec_qa_review")
+    assert _ARCH_REF in _refs_for(run, "spec_review")
+    assert _QA_REF in _refs_for(run, "spec_review")
     assert _QA_REF in _refs_for(run, "plan_review")
     assert _ARCH_REF in _refs_for(run, "plan_review")
 
     # the atom CONTENT appears in the assembled prompt for the mapped steps.
-    assert "FIXTURE QA BODY." in fake.request_for("spec_qa_review").prompt
-    assert "FIXTURE ARCH BODY." in fake.request_for("spec_arch_review").prompt
+    assert "FIXTURE QA BODY." in fake.request_for("spec_review").prompt
+    assert "FIXTURE ARCH BODY." in fake.request_for("spec_review").prompt
     assert "FIXTURE CATALOG BODY" in fake.request_for("release_scope").prompt
 
 
@@ -320,10 +334,10 @@ def test_ac3_pipeline_review_qa_grounding_and_red_anchor_when_unwired(tmp_path: 
     pipe, fake = _pipeline(tmp_path, specs)
     assert pipe.run("pl", implementation_ladder(AgentRuntimeKind.FAKE)).completed is True
 
-    review_qa = fake.request_for("review_qa")
+    review_qa = fake.request_for("review_combined")
     assert "FIXTURE QA BODY." in review_qa.prompt
     assert f"<!-- role-atom:qa-engineer:{_QA_REF} -->" in review_qa.prompt
-    assert _QA_REF in _refs_for(_run_from_store(tmp_path, "pl"), "review_qa")
+    assert _QA_REF in _refs_for(_run_from_store(tmp_path, "pl"), "review_combined")
     # an unmapped step (implement → software-engineer) is NOT grounded.
     assert "FIXTURE QA BODY." not in fake.request_for("implement").prompt
 
@@ -333,7 +347,7 @@ def test_ac3_pipeline_review_qa_grounding_and_red_anchor_when_unwired(tmp_path: 
     # carries no ``quality-assurance.md`` grounding.
     unwired_pipe, unwired_fake = _pipeline(tmp_path, None)  # no specs_dir → map inert
     assert unwired_pipe.run("pl0", implementation_ladder(AgentRuntimeKind.FAKE)).completed is True
-    assert "FIXTURE QA BODY." not in unwired_fake.request_for("review_qa").prompt
+    assert "FIXTURE QA BODY." not in unwired_fake.request_for("review_combined").prompt
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +371,7 @@ def test_ac3_phase_workflow_grounding_and_production_builders_wire_real_specs_di
         release_id=_RELEASE,
         task_id="pw",
         prompt="Run the qa step.",
-        allowed_paths=(f".dadaia/handoff/{_CONTEXT}/**",),
+        allowed_paths=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/**",),
         required_evidence=(GateEvidenceKind.HANDOFF,),
     )
     result = wf.run(
@@ -366,11 +380,11 @@ def test_ac3_phase_workflow_grounding_and_production_builders_wire_real_specs_di
         from_phase=LifecyclePhase.IMPLEMENTATION,
         target_phase=LifecyclePhase.QA_REVIEW,
         scope=scope,
-        current_step="review_qa",
+        current_step="review_combined",
     )
     assert result.accepted is True
     assert "FIXTURE QA BODY." in fake.received_requests[0].prompt
-    assert _QA_REF in _refs_for(_run_from_store(tmp_path, "pw"), "review_qa")
+    assert _QA_REF in _refs_for(_run_from_store(tmp_path, "pw"), "review_combined")
 
     # AC-3 (A1) — the PRODUCTION builders wire the resolver with a REAL specs_dir.
     pipe = container.build_lifecycle_pipeline(tmp_path, context=_CONTEXT, release_id=_RELEASE)
@@ -392,8 +406,6 @@ _BUILDERS = (
     "build_release_definition_workflow",
     "build_backlog_definition_workflow",
     "build_audit_workflow",
-    "build_research_workflow",
-    "build_bug_report_workflow",
 )
 
 
@@ -407,6 +419,7 @@ def test_each_builder_threads_phase_present_and_fails_open_when_absent(
     _seed_specs(present_root, active_phase="IMPLEMENTATION")
     present_wf = builder(present_root, context=_CONTEXT, release_id=_RELEASE)
     assert present_wf._selector.spec_context.phase == "IMPLEMENTATION"
+    assert present_wf._runtime_files is not None
 
     absent_root = tmp_path / "absent"
     _seed_specs(absent_root, active_phase=None)  # no ACTIVE.md → phase must be None

@@ -1,28 +1,17 @@
-"""PostToolUse session-heartbeat hook (the canonical, cross-platform gate surface).
+"""PostToolUse advisory presence, session heartbeat, and reconciler hook.
 
-Runs after every tool call. Its sole purpose (v0.1.76 FR2): renew this session's advisory
-:mod:`presence` record(s) — the ONLY concurrency signal left — and (best-effort) refresh
-``last_seen_at`` in the CLI session record. It NEVER blocks a tool call; it always returns 0.
-
-v0.1.76 T-3 (NO-LOCKS DOCTRINE): the old lease-heartbeat renewal (``lease.renew_heartbeat``
-over the by-session index, ``_iter_lease_contexts``/``_renew_held_leases``) is DELETED —
-nothing acquires a lease anymore (T-2 decoupled the gate from ``lease.py`` entirely; T-3
-deleted the by-session index those helpers walked), so there is no lease left to renew in
-the steady-state case. ``presence.renew`` is the sole renewal call, unconditional (no
-session-file-existence guard — a presence record renews as long as it exists, mirroring the
-prior lease renewal's "runs outside any guard" invariant).
+Runs after every tool call. It renews this session's advisory presence record(s),
+best-effort refreshes ``last_seen_at`` in the CLI session record, and flags dirty
+mutating paths. It always returns zero and never blocks a tool call.
 
 Session id resolution (unchanged, FR-R2-01): via :func:`_common.resolve_session_id` — the
 harness-native id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the stdin
 ``session_id`` field. ``DADAIA_SESSION_ID`` is honored only as an *operator override* (it
 sits first in ``resolve_session_id``'s order).
 
-Parity invariants preserved verbatim from the rc-4 shell hook:
-
 - Session ids are sanitized to ``[A-Za-z0-9_-]`` (CWE-22) before use as a filename
   component (``resolve_session_id`` sanitizes).
 - Session-record renewal is ATOMIC via ``os.replace`` (atomic on POSIX *and* Windows).
-- The HEARTBEAT append uses ``encoding='utf-8'``.
 - Fail-open: any exception ⇒ exit 0. The hook must never break the harness.
 """
 
@@ -58,62 +47,25 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
     ``sessions/<id>.json`` namespace constructs the path, reads the record, and writes it
     atomically. This hook no longer builds the session-record path itself, so it drops off
     the session-store ownership allowlist. Returns ``None`` (no-op) when the record is absent
-    or unreadable — unlike the lease renewal above, this is gated on the record existing,
-    because there is nothing to refresh otherwise.
+    or unreadable because there is nothing to refresh otherwise.
 
     This ``last_seen_at`` refresh is the bind-record liveness renewal (T-011-04 / FR-W1-04,
     ADR-8 amended): the workspace doctor's graveyard GC measures TTL against ``last_seen_at``,
-    so a still-active session — including a READ-mode bind that takes no lease — renews on
+    so a still-active session — including a READ-mode bind — renews on
     every tool use and never silently decays.
     """
     now = datetime.now(tz=UTC).isoformat()
     return session_identity.touch_last_seen_at(workspace, sess_id, now=now)
 
 
-def _append_heartbeat_event(
-    workspace: Path,
-    sess_id: str,
-    record: dict[str, object] | None,
-    *,
-    presence_renewed: int,
-) -> None:
-    """Append a HEARTBEAT event to ``.dadaia/logs/lock-events.jsonl`` (best-effort).
-
-    ``presence_renewed`` (v0.1.76 T-3, renamed from ``leases_renewed``): the count of
-    advisory presence records this session's :func:`presence.renew` refreshed — there is
-    no lease left to renew, so the field now honestly names what actually happened.
-    """
-    now = datetime.now(tz=UTC).isoformat()
-    rec = record or {}
-    event = {
-        "ts": now,
-        "event": "HEARTBEAT",
-        "context": rec.get("context", ""),
-        "release": rec.get("release", "") or "",
-        "session_id": sess_id,
-        "runtime": rec.get("runtime", "unknown"),
-        "pid": rec.get("pid", 0),
-        "presence_renewed": presence_renewed,
-    }
-    audit_path = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
-    try:
-        audit_path.parent.mkdir(parents=True, exist_ok=True)
-        with audit_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(event) + "\n")
-    except OSError:
-        return
-
-
 # ---------------------------------------------------------------------------------------
 # Advisory working-tree reconciler (FR-W1-03, T-014-16) — NEVER blocks, always exit 0.
 #
 # Flags the case where the bound context's repo has dirty MUTATING paths while this session
-# holds NO lease for that context: an out-of-lease production edit landed (e.g. a Bash-tool
-# write the deterministic gate cannot see, Decision D-2). It only ever appends a
-# ``RECONCILER_FLAG`` event to the lock-events log — it never mutates a lease, never raises,
-# and never changes the hook's exit code. The four never-blocks acceptance criteria are:
-# (1) always exit-allow, (2) advisory output only, (3) fail-open on error, (4) no lease
-# mutation.
+# has dirty mutating paths (for example, a Bash write the file-tool gate cannot see). It
+# only ever appends a
+# ``RECONCILER_FLAG`` event to the reconciler log — it never changes session state, never raises,
+# and never changes the hook's exit code.
 # ---------------------------------------------------------------------------------------
 def _throttle_marker(workspace: Path, sess_id: str) -> Path:
     """Per-session throttle marker path (``.dadaia/tmp/reconciler-last-<sid>``)."""
@@ -204,9 +156,9 @@ def _append_reconciler_flag(workspace: Path, sess_id: str, ctx: str, count: int)
         "context": ctx,
         "session_id": sess_id,
         "dirty_mutating_paths": count,
-        "note": "out-of-lease dirty MUTATING path(s); advisory only, no action taken",
+        "note": "dirty MUTATING path(s); advisory only, no action taken",
     }
-    audit_path = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
+    audit_path = workspace / ".dadaia" / "logs" / "reconciler-events.jsonl"
     try:
         audit_path.parent.mkdir(parents=True, exist_ok=True)
         with audit_path.open("a", encoding="utf-8") as fh:
@@ -223,13 +175,6 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
       2. no bound context ⇒ nothing to reconcile.
       3. ``git status --porcelain`` of the context repo fails ⇒ no event (fail-open).
       4. any dirty path classifies MUTATING ⇒ append RECONCILER_FLAG.
-
-    v0.1.76 T-3 (NO-LOCKS DOCTRINE): the former "session holds the lease ⇒ in-lease, never
-    flag" short-circuit is DELETED along with the by-session index it read — nothing is
-    ever "in-lease" anymore (there is no lease to hold), so every dirty MUTATING path in the
-    bound repo is now advisory-flagged regardless of who is writing. This is consistent with
-    the doctrine: the reconciler was always advisory-only (never blocks), so widening its
-    trigger set is a pure signal increase, not a behavior change in severity.
 
     Every branch stamps the throttle marker on exit so the next call inside the window is a
     no-op. Any exception is swallowed by the caller's ``main`` try/except (fail-open).
@@ -260,12 +205,7 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
 
 
 def main() -> int:
-    """Renew this session's advisory presence record(s). Never blocks (exit 0).
-
-    v0.1.76 T-3: ``presence.renew`` is now the sole renewal call — there is no lease left
-    to renew (the by-session index and ``lease.renew_heartbeat`` call this hook used are
-    both deleted; nothing acquires a lease anymore since T-2).
-    """
+    """Renew this session's advisory presence record(s). Never blocks (exit 0)."""
     payload = _common.read_stdin_json()
     sess_id = _common.resolve_session_id(payload)
     if not sess_id:
@@ -276,11 +216,9 @@ def main() -> int:
     except Exception:  # noqa: BLE001 — fail-open: never block a tool call
         return 0
 
-    presence_renewed = 0
     try:
-        presence_renewed = presence.renew(workspace, sess_id)
-        record = _refresh_session_record(workspace, sess_id)
-        _append_heartbeat_event(workspace, sess_id, record, presence_renewed=presence_renewed)
+        presence.renew(workspace, sess_id)
+        _refresh_session_record(workspace, sess_id)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0
 

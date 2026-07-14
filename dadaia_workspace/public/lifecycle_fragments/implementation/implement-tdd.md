@@ -11,17 +11,17 @@ max_context_policy: exact-files-only
 
 # Implement (TDD) — minimal code that makes a test pass
 
-You implement exactly the `task_group` reserved for this step, against the
-`spec_criteria` it must satisfy and the `plan_slice` that governs how. You write the
-behavior and the test that proves it — nothing wider. The cited write-scope, anti-slop,
-and output-handoff fragments carry the disciplines this step builds the test-first
-procedure on top of.
+You implement the approved release task set in dependency order, against its
+`spec_criteria` and governing `plan_slice`. Finish each incomplete task before moving to
+its dependents, and write the behavior and tests that prove the full release — nothing
+wider. The cited write-scope, anti-slop, and output-handoff fragments carry the
+disciplines this step builds the test-first procedure on top of.
 
 ## Inputs you reason over
 
 | Input | Use |
 |---|---|
-| `task_group` | The reserved unit of work and its declared write set — the only paths you may touch. |
+| `task_group` | The approved TASKS set; execute incomplete groups in dependency order within their declared write sets. |
 | `spec_criteria` | The acceptance criteria this code must satisfy; each one needs a test that asserts it. |
 | `plan_slice` | The portion of the plan that dictates approach, ordering, and test strategy for this group. |
 | `relevant_source_files` | The exact existing source you extend or call into — do not assume code outside this set. |
@@ -39,8 +39,8 @@ procedure on top of.
 3. **Run the tests and record the commands.** Execute the relevant test plus the
    surrounding suite the change can affect, and capture the exact commands and results
    as evidence — claims without recorded commands do not count.
-4. **Repeat per criterion** until every acceptance criterion in `spec_criteria` for
-   this `task_group` has a passing test.
+4. **Repeat per criterion and task group** until every release acceptance criterion has
+   a passing test and every approved task is implemented.
 
 ## Discipline
 

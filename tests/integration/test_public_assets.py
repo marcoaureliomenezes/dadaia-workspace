@@ -6,13 +6,13 @@ Merged per plan-integration.md (39 -> ~8):
   - Merge: stage (manifest + codex adapters) -> 1; install-all + pi projection block
     (ring-1, tree, idempotent, system-note markers, doctor pi-ok) -> 1;
     overwrite-stale/skip-canonical/force -> 1; codex projection (config omits/emits +
-    workflows dir + legacy overwrite + native-rules-only) -> 1; model-governance
+    legacy workflow cleanup + native-rules-only) -> 1; model-governance
     overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
     doctor rerender-drift/invalid-vs-missing) -> 2.
   - Delete -> unit (already covered by tests/unit/infrastructure/test_public_assets_*.py,
     T-2's per-concern split): ``_render_agent_toml_block`` quoting/escaping,
     ``_parse_agent_frontmatter`` param cases, ``_render_codex_agent_toml`` field/tier
-    cases, command-policy prefix rules, ``_classify_workflows`` quadrants, and the
+    cases, command-policy prefix rules, and the
     skill-frontmatter static-lint fn (moved to unit/features/public).
 
 Privacy gate is CRITICAL (public-boundary). Renderer fns keep coverage as unit tests —
@@ -22,6 +22,8 @@ no fs/subprocess needed there.
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -104,6 +106,7 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     assert ext.exists()
     body = ext.read_text(encoding="utf-8")
     assert "dadaia_workspace.hooks.pre_gate" in body
+    assert '["-B", "-m", "dadaia_workspace.hooks.pre_gate"]' in body
     assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
     assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
     assert '"decision":"block"' in body or "decision" in body
@@ -150,10 +153,27 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     # isolated temp workspace, then `dadaia public doctor` — assert the `.pi/` tree
     # lands and doctor reports the pi projection green (proving the operator-facing
     # path, not just the manager API).
+    from dadaia_workspace.core.platform import PLATFORM
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
     cli_workspace = tmp_path / "cli-ws"
+    # The suite-wide venv fixture intentionally creates only the directory. Public init
+    # renders absolute hook commands and public doctor executes Codex wrappers, so provide
+    # the temp interpreter before init without constructing or installing a real venv.
+    python_bin = (
+        cli_workspace
+        / ".dadaia"
+        / ".venv"
+        / PLATFORM.venv_scripts_dir
+        / f"python{PLATFORM.venv_exe_suffix}"
+    )
+    python_bin.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        python_bin.symlink_to(Path(sys.executable))
+    except OSError:
+        shutil.copy2(sys.executable, python_bin)
+
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
@@ -299,39 +319,9 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
 
 
 # ---------------------------------------------------------------------------
-# Codex projection: config omits inert keys / still emits agent blocks; workflows dir
-# projection + legacy overwrite; native .rules only (no markdown protocol copy).
+# Codex projection: config omits inert keys, legacy workflow references are removed,
+# and only native .rules command policy is installed.
 # ---------------------------------------------------------------------------
-
-_MINIMAL_WORKFLOW_CROSS_CUTTING = """\
----
-name: cross-cutting-feature
-description: "Minimal test workflow."
-version: 0.1.0
-schema_version: "1"
-stages:
-  - id: step1
-    agent: product-engineer
-    expected_output:
-      path: specs/releases/X/SPEC.md
----
-# cross-cutting-feature workflow body
-"""
-
-_MINIMAL_WORKFLOW_HOTFIX = """\
----
-name: hotfix-release
-description: "Minimal test workflow."
-version: 0.1.0
-schema_version: "1"
-stages:
-  - id: step1
-    agent: product-engineer
-    expected_output:
-      path: specs/releases/X/SPEC.md
----
-# hotfix-release workflow body
-"""
 
 
 def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetManager, Path]:
@@ -350,7 +340,7 @@ def _make_codex_install_manager(tmp_path: Path) -> tuple[FileSystemPublicAssetMa
     return manager, workspace_root
 
 
-def test_codex_projection_config_workflows_and_native_rules(tmp_path: Path) -> None:
+def test_codex_projection_config_legacy_cleanup_and_native_rules(tmp_path: Path) -> None:
     # W1-2 — _codex_config() emits neither the [skills] table nor approved_commands,
     # for both a no-agents and a real-agents source dir; the real dir still emits
     # [agents.*] blocks.
@@ -367,39 +357,23 @@ def test_codex_projection_config_workflows_and_native_rules(tmp_path: Path) -> N
     assert "[agents." in real_output, "Expected at least one [agents.*] block in output"
     assert real_output.startswith('# Generated by "dadaia public install --target codex".')
 
-    # T-16 (FR9/ADR-4): canonical workflows are projected to .codex/workflows/.
+    # The retired Markdown workflow source is not projected.
     manager, workspace_root = _make_codex_install_manager(tmp_path)
-    public_dir = manager._public_dir  # noqa: SLF001
-    workflows_src = public_dir / "workflows"
-    workflows_src.mkdir(parents=True)
-    (workflows_src / "cross-cutting-feature.workflow.md").write_text(
-        _MINIMAL_WORKFLOW_CROSS_CUTTING, encoding="utf-8"
-    )
     manager.install(workspace_root, target="codex", force=True)
-    workflows_dir = workspace_root / ".codex" / "workflows"
-    assert workflows_dir.exists(), ".codex/workflows/ should exist after install"
-    assert (workflows_dir / "cross-cutting-feature.workflow.md").exists(), (
-        "Canonical workflow should be projected to .codex/workflows/"
-    )
+    assert not (workspace_root / ".codex" / "workflows").exists()
 
-    # T-16 addendum — a pre-existing (legacy) workflow file is overwritten by the
-    # canonical source.
+    # Installation removes only retired workflow files and preserves unrelated
+    # operator-owned content in the directory.
     legacy_manager, legacy_ws = _make_codex_install_manager(tmp_path / "legacy-case")
     legacy_workflows_dir = legacy_ws / ".codex" / "workflows"
     legacy_workflows_dir.mkdir(parents=True)
     (legacy_workflows_dir / "hotfix-release.workflow.md").write_text(
         "stale content\n", encoding="utf-8"
     )
-    legacy_public_dir = legacy_manager._public_dir  # noqa: SLF001
-    legacy_workflows_src = legacy_public_dir / "workflows"
-    legacy_workflows_src.mkdir(parents=True)
-    (legacy_workflows_src / "hotfix-release.workflow.md").write_text(
-        _MINIMAL_WORKFLOW_HOTFIX, encoding="utf-8"
-    )
+    (legacy_workflows_dir / "operator-note.txt").write_text("keep\n", encoding="utf-8")
     legacy_manager.install(legacy_ws, target="codex", force=True)
-    assert (legacy_workflows_dir / "hotfix-release.workflow.md").read_text(
-        encoding="utf-8"
-    ) == _MINIMAL_WORKFLOW_HOTFIX
+    assert not (legacy_workflows_dir / "hotfix-release.workflow.md").exists()
+    assert (legacy_workflows_dir / "operator-note.txt").read_text(encoding="utf-8") == "keep\n"
 
     # Markdown behavioral protocols are not projected as Codex Rules — only the
     # native .rules command policy is.

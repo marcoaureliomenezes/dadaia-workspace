@@ -3,7 +3,7 @@ name: code-reviewer
 description: PR/branch reviewer + pre-PR checkpoint. 6-axis review (architecture/patterns/tests/security/perf/dead code) via gh CLI. ADDITIVE evidence only. Emits report with severity + recommendation. NEVER edits code or approves PRs.
 dispatch_band: 3
 activity_class: ADDITIVE
-lease_relationship: "no lock — always concurrent (NO-LOCKS DOCTRINE, v0.1.76)"
+concurrency_relationship: "always concurrent; advisory presence only"
 gate_role: checkpoint-pre-PR
 tools:
   - Read

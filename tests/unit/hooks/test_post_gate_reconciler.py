@@ -47,7 +47,7 @@ def _bind_session(workspace: Path, ctx: str = _CTX) -> None:
 
 
 def _events(workspace: Path) -> list[dict[str, Any]]:
-    log = workspace / ".dadaia" / "logs" / "lock-events.jsonl"
+    log = workspace / ".dadaia" / "logs" / "reconciler-events.jsonl"
     if not log.exists():
         return []
     return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]

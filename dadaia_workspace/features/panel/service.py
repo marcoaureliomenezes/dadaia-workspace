@@ -29,7 +29,6 @@ from typing import Any
 from dadaia_workspace.core.models.agent import AgentDTO, AgentPromptResult
 from dadaia_workspace.core.models.server_registry import PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.models.workflow import WorkflowSummaryDTO
 from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
 from dadaia_workspace.core.protocols.context_project_provider import ContextProjectProvider
 from dadaia_workspace.core.protocols.server_registry_provider import ServerRegistryProvider
@@ -245,20 +244,9 @@ class PanelService:
             for ctx in self._active_contexts()
         ]
 
-    def list_workflow_summaries(self) -> list[WorkflowSummaryDTO]:
-        """Return card summaries for all canonical workflow files.
-
-        Delegates to WorkflowsService.list_summaries(). Returns an empty list
-        when no workflows directory is found.
-
-        For testing, inject a fake WorkflowsService via the constructor's
-        ``workflows_service`` parameter (T-017-06).  The legacy
-        ``_workflows_service_override`` attribute escape-hatch is still honoured
-        for backward compatibility with existing tests.
-        """
-        override = getattr(self, "_workflows_service_override", None)
-        svc = override if override is not None else self._workflows_svc()
-        return svc.list_summaries()
+    def list_dadaia_workflows(self) -> list[Any]:
+        """Return the authoritative Python-governed workflow catalog."""
+        return list(self._workflows_svc().list_dadaia_workflows())
 
     def _agents(self) -> AgentsProvider:
         """Return the injected AgentsProvider.

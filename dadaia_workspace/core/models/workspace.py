@@ -25,10 +25,6 @@ class Workspace:
         return self.dadaia_dir / "states"
 
     @property
-    def src_dir(self) -> Path:
-        return self.dadaia_dir / "src"
-
-    @property
     def academy_dir(self) -> Path:
         return self.dadaia_dir / "academy"
 

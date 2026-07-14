@@ -20,8 +20,6 @@ from dadaia_workspace.core.models.telemetry import (
     SessionRow,
     TokenTotals,
     TopAgent,
-    WorkflowListResult,
-    WorkflowSummary,
 )
 
 __all__ = [
@@ -35,6 +33,4 @@ __all__ = [
     "SessionRow",
     "TokenTotals",
     "TopAgent",
-    "WorkflowListResult",
-    "WorkflowSummary",
 ]

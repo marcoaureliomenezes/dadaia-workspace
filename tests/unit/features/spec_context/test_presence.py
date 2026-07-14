@@ -9,7 +9,7 @@ does not exist yet — every test below FAILS at collection/import until T-2 imp
 Doctrine invariants asserted here (SPEC AC4 successor list):
   * ``upsert`` never raises — even when the presence directory is unwritable.
   * ``others_alive`` excludes self, excludes stale (heartbeat older than
-    ``LEASE_TTL_SECONDS``), and skips corrupt records.
+    ``PRESENCE_TTL_SECONDS``), and skips corrupt records.
   * ``renew`` touches the heartbeat of every record the session owns.
   * ``clear`` removes only the caller's own records and is idempotent.
   * ``sweep`` GCs stale records workspace-wide (doctor path).
@@ -153,7 +153,7 @@ def test_others_alive_excludes_stale_heartbeats(tmp_path: Path) -> None:
         tmp_path,
         _CTX,
         "sess-stale",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 60,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 60,
     )
     others = presence.others_alive(tmp_path, _CTX, "sess-me")
     assert others == []
@@ -165,7 +165,7 @@ def test_others_alive_boundary_fresh_just_under_ttl_counts(tmp_path: Path) -> No
         tmp_path,
         _CTX,
         "sess-fresh",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS - 5,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS - 5,
     )
     others = presence.others_alive(tmp_path, _CTX, "sess-me")
     assert [o.session_id for o in others] == ["sess-fresh"]
@@ -184,7 +184,7 @@ def test_others_alive_opportunistically_gcs_stale_sibling(tmp_path: Path) -> Non
         tmp_path,
         _CTX,
         "sess-stale",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 60,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 60,
     )
     presence.others_alive(tmp_path, _CTX, "sess-me")
     assert not stale_path.exists(), "stale sibling must be swept opportunistically"
@@ -269,13 +269,13 @@ def test_sweep_removes_stale_records_workspace_wide(tmp_path: Path) -> None:
         tmp_path,
         _CTX,
         "sess-stale-a",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 100,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
     )
     _write_raw_presence(
         tmp_path,
         "other-ctx",
         "sess-stale-b",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 100,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
     )
     removed = presence.sweep(tmp_path)
     assert set(removed) == {"sess-stale-a", "sess-stale-b"}
@@ -306,7 +306,7 @@ def test_stale_records_reports_without_deleting(tmp_path: Path) -> None:
         tmp_path,
         _CTX,
         "sess-stale",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 100,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
     )
     refs = presence.stale_records(tmp_path)
     assert [(r.context, r.session_id) for r in refs] == [(_CTX, "sess-stale")]
@@ -330,13 +330,13 @@ def test_stale_records_and_sweep_agree(tmp_path: Path) -> None:
         tmp_path,
         _CTX,
         "sess-stale-a",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 100,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
     )
     _write_raw_presence(
         tmp_path,
         "other-ctx",
         "sess-stale-b",
-        heartbeat_age_s=kernel_tunables.LEASE_TTL_SECONDS + 100,
+        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
     )
     reported = {(r.context, r.session_id) for r in presence.stale_records(tmp_path)}
     removed = set(presence.sweep(tmp_path))

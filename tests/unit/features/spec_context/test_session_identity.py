@@ -1,15 +1,4 @@
-"""Unit tests for the session_identity consolidation module (T-010-07, WS-R3).
-
-Covers FR-R3-01 (single owner: read/write of both pointer namespaces + session record),
-FR-R3-02 (coherence contract), FR-R3-03 (PROTECTED storage paths), and the
-ignored-and-superseded legacy-artifact law. No real time.sleep; tmp_path workspace.
-
-CRITICAL bind attribution (v0.1.47 W1-7/8): the ancestry-chain content contract
-(nearest-first, 8-cap, garbage-tolerant) is preserved as a dedicated kept pair (write +
-read), since ctx-inject attribution parses this exact format. The three-way coherence
-incoherence report is the other CRITICAL kept test — the operator-facing diagnostic for
-lock-holder / incumbent-ptr / session-record disagreement.
-"""
+"""Caller-scoped session identity and bind-epoch storage tests."""
 
 from __future__ import annotations
 
@@ -23,13 +12,12 @@ from dadaia_workspace.features.spec_context import session_identity as si
 
 CTX = "myctx"
 SID = "my-session-id"
-OTHER = "foreign-session-id"
 
 
 def _ws(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
-    (ws / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
-    (ws / ".dadaia" / "sessions" / "runtime").mkdir(parents=True)
+    (ws / ".dadaia" / "states").mkdir(parents=True)
+    (ws / ".dadaia" / "sessions").mkdir(parents=True)
     return ws
 
 
@@ -44,37 +32,25 @@ def test_path_validation_rejects_traversal(tmp_path: Path, bad_name: str) -> Non
     """FR-R3-03: every artifact lives under PROTECTED .dadaia/sessions/, and any name
     carrying a path separator or traversal segment is rejected (CWE-22)."""
     ws = _ws(tmp_path)
-    for path in (si.ptr_path(ws, CTX), si.session_record_path(ws, SID)):
-        rel = path.relative_to(ws).as_posix()
-        assert rel.startswith(".dadaia/sessions/"), rel
-    with pytest.raises(ValueError, match="CWE-22"):
-        si.ptr_path(ws, bad_name)
+    path = si.session_record_path(ws, SID)
+    assert path.relative_to(ws).as_posix().startswith(".dadaia/sessions/")
     with pytest.raises(ValueError, match="CWE-22"):
         si.session_record_path(ws, bad_name)
 
 
-# --------------------------------------------------------------------------- ptr + record: roundtrip/atomic/fail-soft
+# --------------------------------------------------------------------------- record: roundtrip/atomic/fail-soft
 
 
-def test_ptr_and_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
+def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-
-    # incumbent ptr: absent -> None, write -> read roundtrip.
-    assert si.read_incumbent_ptr(ws, CTX) is None
-    si.write_incumbent_ptr(ws, CTX, SID)
-    assert si.read_incumbent_ptr(ws, CTX) == SID
-
-    # a second write overwrites atomically and leaves no .tmp residue.
-    si.write_incumbent_ptr(ws, CTX, OTHER)
-    assert si.read_incumbent_ptr(ws, CTX) == OTHER
-    runtime = ws / ".dadaia" / "sessions" / "runtime"
-    assert [p.name for p in runtime.iterdir() if p.name.endswith(".tmp")] == []
 
     # session record: absent -> None, write -> read roundtrip.
     assert si.read_session(ws, SID) is None
     record = {"id": SID, "mode": "READ", "pid": 4242, "context": CTX}
     si.write_session(ws, SID, record)
     assert si.read_session(ws, SID) == record
+    sessions = ws / ".dadaia" / "sessions"
+    assert [p.name for p in sessions.iterdir() if p.name.endswith(".tmp")] == []
 
     # fail-soft: corrupt JSON, non-dict content, and an invalid id all yield None.
     si.session_record_path(ws, "corrupt", create=True).write_text("{not json", encoding="utf-8")
@@ -83,87 +59,11 @@ def test_ptr_and_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> Non
     assert si.read_session(ws, "nondict") is None
     assert si.read_session(ws, "../bad") is None
 
-    # legacy/garbage .ptr and pre-existing session json are ignored-and-superseded, never fatal.
-    (runtime / "legacy.ptr").write_text("", encoding="utf-8")  # empty → None
-    assert si.read_incumbent_ptr(ws, "legacy") is None
+    # Pre-existing session JSON remains fail-soft.
     (ws / ".dadaia" / "sessions" / "old-layout.json").write_text(
         json.dumps({"legacy": True}), encoding="utf-8"
     )
-    assert si.resolve_identity(ws, "unrelated-ctx") == {"incumbent": None, "mode": None}
-
-    # iter_ptr_files: collects the incumbent namespace; empty when the dir is absent.
-    names = {p.name for p in si.iter_ptr_files(ws)}
-    assert f"{CTX}.ptr" in names
-    bare_ws = tmp_path / "bare"
-    bare_ws.mkdir()
-    assert si.iter_ptr_files(bare_ws) == []
-
-
-# --------------------------------------------------------------------------- resolve_identity states
-
-
-def _write_ptr_and_session(ws: Path) -> None:
-    si.write_incumbent_ptr(ws, CTX, SID)
-    si.write_session(ws, SID, {"id": SID, "mode": "IMPLEMENTATION"})
-
-
-@pytest.mark.parametrize(
-    ("setup", "expected"),
-    [
-        pytest.param(
-            _write_ptr_and_session,
-            {"incumbent": SID, "mode": "IMPLEMENTATION"},
-            id="incumbent-and-mode-present",
-        ),
-        pytest.param(
-            lambda ws: None,
-            {"incumbent": None, "mode": None},
-            id="no-state-returns-nones",
-        ),
-        pytest.param(
-            lambda ws: si.write_incumbent_ptr(ws, CTX, SID),
-            {"incumbent": SID, "mode": None},
-            id="ptr-without-record-yields-no-mode",
-        ),
-    ],
-)
-def test_resolve_identity_states(tmp_path: Path, setup, expected: dict[str, str | None]) -> None:  # type: ignore[no-untyped-def]
-    ws = _ws(tmp_path)
-    setup(ws)
-    assert si.resolve_identity(ws, CTX) == expected
-
-
-# --------------------------------------------------------------------------- coherence (FR-R3-02) — CRITICAL, kept
-
-
-def test_coherence_three_way_incoherence_report(tmp_path: Path) -> None:
-    """The canonical incoherence: lock holder, ptr, and record name disagreeing
-    sessions must be reported by name; agreement and partial-absence are non-violations."""
-    ws = _ws(tmp_path)
-
-    # All agree -> no report.
-    si.write_incumbent_ptr(ws, CTX, SID)
-    si.write_session(ws, SID, {"id": SID})
-    assert si.coherence(ws, CTX, lock_holder=SID) is None
-
-    # Only the lock holder present (partial state during acquire) -> not a violation.
-    ws2 = _ws(tmp_path.parent / (tmp_path.name + "-partial"))
-    assert si.coherence(ws2, CTX, lock_holder=SID) is None
-
-    # Three disagreeing sessions -> reported by name.
-    ws3 = _ws(tmp_path.parent / (tmp_path.name + "-disagree"))
-    si.write_incumbent_ptr(ws3, CTX, OTHER)
-    si.write_session(ws3, OTHER, {"id": "third-session"})
-    msg = si.coherence(ws3, CTX, lock_holder=SID)
-    assert msg is not None
-    assert CTX in msg
-    assert SID in msg and OTHER in msg
-
-    # Holder vs incumbent disagree (two-way) -> also reported.
-    ws4 = _ws(tmp_path.parent / (tmp_path.name + "-holder-vs-incumbent"))
-    si.write_incumbent_ptr(ws4, CTX, OTHER)
-    msg2 = si.coherence(ws4, CTX, lock_holder=SID)
-    assert msg2 is not None and SID in msg2 and OTHER in msg2
+    assert si.read_session(ws, "old-layout") == {"legacy": True}
 
 
 # --------------------------------------------------------------------------- last_seen_at / liveness_timestamp (T-011-04)

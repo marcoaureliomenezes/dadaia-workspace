@@ -9,7 +9,6 @@ token FAILS, naming the surface. The 16 surfaces (file-enumerated, never glob-on
 * the ``dadaia-handoff-emitter`` skill's TWO JSON examples (each counted as its own
   surface — both must model the v1.2 + ``self_pull`` shape);
 * ``public/data/handoff-AGENTS.md``;
-* ``public/lifecycle_fragments/shared/output-handoff.md``.
 
 A roster-completeness assert backs the enumeration: a renamed/removed agent body or a
 new plugin agent body not added here fails loudly instead of silently shrinking the
@@ -66,10 +65,7 @@ _PLUGIN_AGENT_BODIES: tuple[str, ...] = (
     "plugins/frontend-design/agents/frontend-engineer.md",
 )
 
-_DOC_SURFACES: tuple[str, ...] = (
-    "data/handoff-AGENTS.md",
-    "lifecycle_fragments/shared/output-handoff.md",
-)
+_DOC_SURFACES: tuple[str, ...] = ("data/handoff-AGENTS.md",)
 
 _EMITTER_SKILL = "skills/dadaia-handoff-emitter/SKILL.md"
 
@@ -118,7 +114,7 @@ def test_roster_completeness_and_sixteen_surface_v12_self_pull_adoption() -> Non
     assert len(examples) == 2, (
         f"the emitter skill must carry exactly TWO JSON examples, found {len(examples)}"
     )
-    assert len(_FILE_SURFACES) + len(examples) == 16
+    assert len(_FILE_SURFACES) + len(examples) == 15
 
     for surface in _FILE_SURFACES:
         text = _read(surface)

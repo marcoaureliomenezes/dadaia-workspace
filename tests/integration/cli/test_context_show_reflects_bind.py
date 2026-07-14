@@ -1,22 +1,4 @@
-"""T-69-08/T-69-09 (FR4, bug ``context-bind-success-not-reflected-in-context-show``, MEDIUM).
-
-``bind`` mints a session id, persists the record, and refreshes the incumbent pointer
-(``session_identity.set_incumbent``) — but only *prints* the sid. ``show`` resolves the
-session SOLELY from ``os.environ.get("DADAIA_SESSION_ID")``; when unset (the normal case
-after a bare ``dadaia context bind``, no ``eval $(...)``), ``session`` is ``None`` — a
-successful bind is invisible to ``show``.
-
-Pre-fix (T-69-08 RED, superseded here to its GREEN form matching the T-69-04/T-69-06
-pattern): with ``DADAIA_SESSION_ID`` unset, a real ``context bind`` followed by
-``context show --json`` reported ``session: null`` despite the bind having just
-succeeded and written the incumbent pointer.
-
-Post-fix (T-69-09 GREEN): ``show`` falls back to
-``session_identity.read_incumbent_ptr(workspace, ctx)``, loads + stale-checks that
-record, and populates ``session`` with sid/mode/release/context (AC4.1). Resolution
-order stays env first, then the incumbent pointer; a stale/absent pointer still yields
-``session: null`` (AC4.2, unchanged).
-"""
+"""Caller-scoped bind state is visible to context show without global pointers."""
 
 from __future__ import annotations
 
@@ -112,15 +94,8 @@ def _make_two_context_workspace(root: Path) -> Path:
 
 
 def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """CRITICAL (minimal merge only, v0.1.76 rewrites the bind-resolution cluster).
-
-    AC4.1: bind -> named `show --json` reflects the session (sid/mode/release/context)
-    via the incumbent-pointer fallback, despite DADAIA_SESSION_ID never being set.
-    AC4.2: no bind at all -> named show still reports session: null (unchanged).
-    FR3: after a bare bind, no-arg `show --json` resolves to the BOUND context (not
-    first-ALIVE); with no bound session anywhere, no-arg show falls back to first-ALIVE
-    (unchanged prior behaviour) — the exact remote symptom against 574a84bd.
-    """
+    """Bind/show resolves through this harness's own record only."""
+    monkeypatch.setenv("CODEX_THREAD_ID", "test-harness-session")
     # AC4.1 — named show reflects a just-completed bind.
     named_ws = _make_workspace(tmp_path)
     monkeypatch.chdir(named_ws)
@@ -135,8 +110,8 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert named_show_result.exit_code == 0, named_show_result.output
     named_payload = json.loads(named_show_result.output)
     assert named_payload["session"] is not None, (
-        "context show --json must reflect the just-completed bind via the incumbent "
-        f"pointer fallback (FR4); got session=None. Full payload: {named_payload}"
+        "context show --json must reflect the caller-owned harness session; "
+        f"got session=None. Full payload: {named_payload}"
     )
     named_session = named_payload["session"]
     assert named_session["context"] == _CTX

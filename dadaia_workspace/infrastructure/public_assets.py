@@ -21,17 +21,14 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
 from dadaia_workspace.core.protocols.plugin_store import PluginStore
-from dadaia_workspace.infrastructure.bug_reporter import report_doctor_finding
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
     check_codex_rule_corpus_reachable,
     check_memory_phase_single_source,
-    classify_workflows,
     codex_trust_boundary_info,
     dcx1_missing_toml,
     dcx2_config_toml_entries,
-    dcx3_workflow_drift,
     dcx4_claude_strings,
     dcx5_empty_developer_instructions,
     dcx6_codex_runtime_adapters,
@@ -49,11 +46,10 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_handoff_agents_md,
     install_reports_agents_md,
     install_universal_skills,
-    remove_stale_files,
+    remove_legacy_workflow_projections,
     render_claude_agent,
     resolve_codex_agent_model,
     runtime_expectations,
-    validate_workflows,
     write_generated,
 )
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -212,9 +208,6 @@ class FileSystemPublicAssetManager:
     def _dcx2_config_toml_entries(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
         return dcx2_config_toml_entries(agentic_dir, codex_dir)
 
-    def _dcx3_workflow_drift(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
-        return dcx3_workflow_drift(agentic_dir, codex_dir)
-
     def _dcx4_claude_strings(self, codex_dir: Path) -> list[str]:
         return dcx4_claude_strings(codex_dir)
 
@@ -223,9 +216,6 @@ class FileSystemPublicAssetManager:
 
     def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[str]:
         return dcx6_codex_runtime_adapters(workspace_root, self._public_dir)
-
-    def _classify_workflows(self, agentic_dir: Path) -> list[str]:
-        return classify_workflows(agentic_dir)
 
     def _claude_settings(self, workspace_root: Path) -> dict[str, object]:
         return _build_claude_settings(workspace_root)
@@ -651,8 +641,6 @@ class FileSystemPublicAssetManager:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
 
-        validate_workflows(agentic_dir)
-
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
         # not pick up Windows CRLF translation (FR-RC2-2).
         manifest_path = agentic_dir / "manifest.json"
@@ -780,6 +768,10 @@ class FileSystemPublicAssetManager:
         self._project_installed_plugins(
             agentic_dir, workspace_root, active_harnesses, force, installed, overlay=overlay
         )
+
+        # Markdown workflow projections were retired in v0.2.3. Remove only their
+        # canonical file shape; preserve any unrelated/operator-owned directory content.
+        remove_legacy_workflow_projections(workspace_root, installed)
 
         return installed
 
@@ -965,11 +957,9 @@ class FileSystemPublicAssetManager:
         elif pi_projected.exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="pi"))
 
-        # Harness-independent checks stay unconditional (classify_workflows emits
-        # [reference-only] codex lines that are not blockers; the rule-corpus check
-        # early-returns on an absent .codex/agents; the skill/memory/privacy checks read the
-        # package public dir, not any runtime projection).
-        reports.extend(classify_workflows(agentic_dir))
+        # Harness-independent checks stay unconditional. The rule-corpus check
+        # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
+        # package public dir, not a runtime projection.
         # Codex-parity drift (D-CX-1..10) + trust-boundary info are codex-specific and MUST
         # gate on `codex in profile` (Q1): check_codex_drift iterates the staged agents and
         # emits `[missing] codex:agents/<name>.toml (D-CX-1)` ×12 for ANY codex-absent tree,
@@ -1002,11 +992,12 @@ class FileSystemPublicAssetManager:
         except subprocess.TimeoutExpired:
             reports.append("[warn] git-dirty check timed out")
 
-        _PERSIST_PREFIXES = ("[missing]", "[drift]", "[fail]", "[warn]")
-        for line in reports:
-            stripped = line.strip()
-            if any(stripped.startswith(p) for p in _PERSIST_PREFIXES):
-                report_doctor_finding(workspace_root, "doctor-public", stripped)
+        for harness_dir in (".agents", ".claude", ".codex"):
+            legacy_dir = workspace_root / harness_dir / "workflows"
+            for legacy in sorted(legacy_dir.glob("*.workflow.md")):
+                reports.append(
+                    f"[extra] retired-workflow-projection:{legacy.relative_to(workspace_root)}"
+                )
 
         return reports
 
@@ -1076,21 +1067,6 @@ class FileSystemPublicAssetManager:
             )
         if only is None or only == "rules":
             self._install_codex_rules(agentic_dir, workspace_root, force, installed)
-        if only is None or only == "workflows":
-            if force:
-                remove_stale_files(
-                    agentic_dir / "workflows",
-                    codex_dir / "workflows",
-                    "*.workflow.md",
-                    installed,
-                )
-            copy_tree(
-                agentic_dir / "workflows",
-                codex_dir / "workflows",
-                force,
-                installed,
-                self._iter_files,
-            )
         if only is None or only == "skills":
             install_universal_skills(
                 agentic_dir, workspace_root, force, installed, self._iter_files

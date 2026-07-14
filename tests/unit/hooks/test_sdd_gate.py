@@ -8,26 +8,21 @@ Two test layers, each driven through its harness-real channel:
   simulated-stdin pattern the harness-env contract bans).
 * **White-box** unit tests target the pure helper ``sdd_gate._resolve_mode`` and the
   fail-safe contract of ``gate_policy.evaluate`` directly. These never simulate harness
-  stdin; the lease fault-injection (arbitrary error ⇒ ALLOW; live-foreign ⇒ BLOCK) is a
-  property of the *policy* layer, so it is asserted there rather than through the hook.
+  stdin.
 
-Mandatory rc-4 parity invariants covered:
-  (a) PATH-first context slug: a write under repos/B never acquires repos/A's lease.
-  (b) Fail-open: any non-PROTECTED, non-live-foreign error -> ALLOW.
+Mandatory invariants covered:
+  (a) PATH-first context slug: a write under repos/B records presence only for B.
+  (b) Presence failures never block a mutating write.
   (c) PROTECTED (.dadaia/sessions/) is the sole fail-CLOSED path (kept as a standalone
       test AND as a param row under mode=READ — CRIT, never weakened).
 
-CRIT: this file is the core of the SDD gate — path-class x lease x phase x mode,
-pid-lineage (long-lived holder pid), and anti-downgrade liveness (NF-2/NF-4). Every one
-of the 6 anti-downgrade decisions survives below as a named param row in the
-liveness x precedence matrix — this matrix is the workspace's concurrency law.
+CRIT: this file covers path class, phase, caller-local mode, and advisory presence.
 """
 
 from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -77,13 +72,6 @@ def _run(
 def _write_session_record(ws: Path, session_id: str, mode: str) -> None:
     """Persist a minimal session record (id + mode) the way the bind CLI does."""
     session_identity.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
-
-
-def _write_lease_record(ws: Path, ctx: str, record: dict[str, object]) -> None:
-    """Plant a raw lease record on disk (bypasses acquire so heartbeat/pid are controllable)."""
-    lock_dir = ws / ".dadaia" / "states" / "ctx_locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    (lock_dir / f"{ctx}.lock.json").write_text(json.dumps(record), encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- #
@@ -300,7 +288,7 @@ def _setup_session_record_path(ws: Path, mp: pytest.MonkeyPatch) -> None:
 
 
 def _setup_default_implementation_when_absent(ws: Path, mp: pytest.MonkeyPatch) -> None:
-    # Order (3): no env, no record → IMPLEMENTATION (FR-R4-04 / D-3, lease-capable).
+    # Order (3): no env, no record → IMPLEMENTATION (FR-R4-04 / D-3).
     mp.delenv("DADAIA_MODE", raising=False)
 
 
@@ -331,7 +319,7 @@ def test_resolve_mode_precedence(
 
 
 # --------------------------------------------------------------------------- #
-# Behavior: WS-R4 READ non-acquiring + BOUND_REVIEW/missing acquire, via subprocess.
+# Behavior: caller-local READ/review mode at the subprocess boundary.
 # --------------------------------------------------------------------------- #
 
 
@@ -511,74 +499,38 @@ def test_resolve_holder_pid(
 
 
 # --------------------------------------------------------------------------- #
-# White-box: v0.1.76 FR4 — mode resolution is STRICTLY SELF-SCOPED. The former
-# context-incumbent (rung 3) anti-downgrade matrix is DELETED (kills audit P1-1): a
-# foreign session's bind/incumbent pointer/lease residue can NEVER change what THIS
-# session's own mode resolves to. Every row below proves the incumbent pointer (and any
-# lease-record residue) is now INERT to _resolve_mode.
+# White-box: mode resolution is strictly self-scoped. Another session's record can never
+# change what this session resolves to.
 # --------------------------------------------------------------------------- #
 
 
-def _setup_self_record_wins_no_incumbent_needed(ws: Path) -> tuple[str, str]:
-    # A record keyed to the harness sid resolves regardless of any incumbent pointer.
+def _setup_self_record_wins(ws: Path) -> tuple[str, str]:
     impl_sid = "harness-impl"
     _write_session_record(ws, impl_sid, "BOUND_IMPLEMENTATION")
     return impl_sid, "BOUND_IMPLEMENTATION"
 
 
-def _setup_foreign_incumbent_never_imposes_read(ws: Path) -> tuple[str, str]:
-    # v0.1.76 FR4: a foreign session's READ bind sets the incumbent pointer, but a
-    # DIFFERENT harness sid (no self record) must resolve its OWN default
-    # (IMPLEMENTATION) — the incumbent rung is deleted, not merely overridden.
+def _setup_foreign_read_never_imposes_read(ws: Path) -> tuple[str, str]:
     bind_sid = "sess_bind01"
     _write_session_record(ws, bind_sid, "READ")
-    session_identity.set_incumbent(ws, "a", bind_sid)
     return "harness-sid-xyz", "IMPLEMENTATION"
 
 
-def _setup_foreign_incumbent_never_imposes_implementation(ws: Path) -> tuple[str, str]:
-    # Symmetric: a foreign IMPLEMENTATION incumbent must not upgrade a DIFFERENT
-    # session with no self record either — the default (IMPLEMENTATION) is reached
-    # independently, not "inherited" from the incumbent.
+def _setup_foreign_implementation_never_changes_default(ws: Path) -> tuple[str, str]:
     bind_sid = "sess_bind02"
     _write_session_record(ws, bind_sid, "BOUND_IMPLEMENTATION")
-    session_identity.set_incumbent(ws, "a", bind_sid)
     return "harness-other-sid", "IMPLEMENTATION"
-
-
-def _setup_dead_lease_residue_never_consulted(ws: Path) -> tuple[str, str]:
-    # A dead lease-record residue (the old anti-downgrade NF-4 scenario) is now
-    # completely inert to mode resolution: my own self record is all that matters.
-    stale_hb = (datetime.now(tz=UTC) - timedelta(seconds=10_000)).isoformat()
-    _write_lease_record(
-        ws, "a", {"session_id": "old-impl", "heartbeat": stale_hb, "ttl": 120, "pid": 0}
-    )
-    my_sid = "harness-reviewer"
-    _write_session_record(ws, my_sid, "READ")
-    return my_sid, "READ"
-
-
-def _setup_live_lease_residue_never_consulted(ws: Path) -> tuple[str, str]:
-    # A TTL-fresh lease-record residue for a DIFFERENT session is also inert — mode
-    # resolution never reads the lease record at all anymore.
-    fresh_hb = datetime.now(tz=UTC).isoformat()
-    _write_lease_record(
-        ws, "a", {"session_id": "live-impl", "heartbeat": fresh_hb, "ttl": 120, "pid": 0}
-    )
-    return "harness-no-self-record", "IMPLEMENTATION"
 
 
 @pytest.mark.parametrize(
     ("name", "setup_fn"),
     [
-        ("self_record_wins_no_incumbent_needed", _setup_self_record_wins_no_incumbent_needed),
-        ("foreign_incumbent_never_imposes_read", _setup_foreign_incumbent_never_imposes_read),
+        ("self_record_wins", _setup_self_record_wins),
+        ("foreign_read_never_imposes_read", _setup_foreign_read_never_imposes_read),
         (
-            "foreign_incumbent_never_imposes_implementation",
-            _setup_foreign_incumbent_never_imposes_implementation,
+            "foreign_implementation_never_changes_default",
+            _setup_foreign_implementation_never_changes_default,
         ),
-        ("dead_lease_residue_never_consulted", _setup_dead_lease_residue_never_consulted),
-        ("live_lease_residue_never_consulted", _setup_live_lease_residue_never_consulted),
     ],
 )
 def test_resolve_mode_self_scoped_matrix(
@@ -591,14 +543,10 @@ def test_resolve_mode_self_scoped_matrix(
 
 
 def test_resolve_mode_foreign_read_bind_end_to_end_never_blocks_my_write(tmp_path: Path) -> None:
-    """End-to-end companion (successor to the deleted NF-4 anti-downgrade test): the SAME
-    foreign-READ-incumbent setup, driven through the real hook subprocess, ALLOWS a
-    MUTATING write from a DIFFERENT harness session — the doctrine's mode self-scope,
-    proven at the hook boundary, not just in ``_resolve_mode`` isolation."""
+    """A foreign READ record cannot block another caller at the hook boundary."""
     ws2 = _mk_workspace(tmp_path, "a")
     bind_sid2 = "sess_freshread2"
     _write_session_record(ws2, bind_sid2, "READ")
-    session_identity.set_incumbent(ws2, "a", bind_sid2)
     target2 = ws2 / "repos" / "a" / "src" / "mod.py"
     payload2 = {
         "tool_name": "Write",

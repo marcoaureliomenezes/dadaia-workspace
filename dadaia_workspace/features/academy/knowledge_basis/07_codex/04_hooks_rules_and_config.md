@@ -15,7 +15,7 @@ Useful events for dadaia:
 |---|---|
 | `SessionStart` | Inject workspace memory/context once per session |
 | `PreToolUse` | Block unauthorized file writes through SDD/root hooks |
-| `PostToolUse` | Refresh lease heartbeat |
+| `PostToolUse` | Refresh caller session and advisory presence heartbeat |
 | `SubagentStart` / `SubagentStop` | Future bookkeeping for explicit delegation |
 | `Stop` | Final validation or handoff checks |
 

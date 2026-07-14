@@ -18,10 +18,10 @@ from dadaia_workspace.features.lifecycle.service import (
     ActiveReleaseState,
     BoundContext,
     GitPreflightState,
-    LeaseModeState,
     LifecycleCommandStatus,
     LifecyclePreflightInput,
     LifecyclePreflightService,
+    PresenceState,
     RequiredHandoff,
     SpecsDoctorState,
 )
@@ -76,7 +76,7 @@ def _input(**overrides: object) -> LifecyclePreflightInput:
         ),
         "git": GitPreflightState(upstream_branch="origin/feature/v0.1.15"),
         "specs_doctor": SpecsDoctorState(ok=True),
-        "lease": LeaseModeState(mode="implementation", holder_session_id="sess-1"),
+        "presence": PresenceState(mode="implementation", holder_session_id="sess-1"),
         "hygiene": HygieneCounters(),
         "required_handoffs": (),
     }
@@ -111,7 +111,7 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
                 mode="BOUND_IMPLEMENTATION",
                 session_id="sess-1",
             ),
-            lease=LeaseModeState(mode="BOUND_IMPLEMENTATION", holder_session_id="sess-1"),
+            presence=PresenceState(mode="BOUND_IMPLEMENTATION", holder_session_id="sess-1"),
         ),
     )
 
@@ -167,22 +167,7 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.15", phase="definition")},
             "active release phase mismatch",
-            "dadaia lifecycle status",
-        ),
-        (
-            {"git": GitPreflightState(dirty_paths=("file.py",), upstream_branch="origin/main")},
-            "dirty worktree",
-            "git status --short",
-        ),
-        (
-            {"git": GitPreflightState(upstream_branch=None)},
-            "missing upstream branch",
-            "git push --set-upstream origin HEAD",
-        ),
-        (
-            {"git": GitPreflightState(upstream_branch="origin/main", unpushed_commit_count=2)},
-            "unpushed commits pending",
-            "git push",
+            "dadaia reports workflow-status",
         ),
         (
             {"specs_doctor": SpecsDoctorState(ok=False, summary="SPEC missing")},
@@ -192,19 +177,19 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
         (
             {"hygiene": HygieneCounters(cleanup_candidate_count=1)},
             "hygiene cleanup candidates present",
-            "dadaia lifecycle hygiene clean --dry-run",
+            "dadaia reports workflow-hygiene-clean --dry-run",
         ),
         (
             # v0.1.72 FR3: 13 candidates but only 12 protected — the ONE unprotected
             # candidate still blocks (the gate keeps its teeth for reclaimable waste).
             {"hygiene": HygieneCounters(cleanup_candidate_count=13, protected_residual_count=12)},
             "hygiene cleanup candidates present",
-            "dadaia lifecycle hygiene clean --dry-run",
+            "dadaia reports workflow-hygiene-clean --dry-run",
         ),
         (
             {"hygiene": HygieneCounters(malformed_handoff_count=1)},
             "malformed handoffs present",
-            "dadaia lifecycle hygiene status --json",
+            "dadaia reports workflow-hygiene-status --json",
         ),
     ],
 )
@@ -234,26 +219,23 @@ def test_preflight_failures_return_typed_blocked_state(
 
 
 # ---------------------------------------------------------------------------
-# v0.1.76 T-4 (FR7, NO-LOCKS DOCTRINE): lease mode mismatch / live foreign lease
-# holder can NEVER block a lifecycle verb — no path may block an agent or operator
-# because of another session. Both former BLOCKED rows above become presence-advisory:
-# ALLOW, with at most a warning line surfaced on the result.
+# Sibling presence can never block a lifecycle verb.
 # ---------------------------------------------------------------------------
 
 
-def test_preflight_never_blocks_on_foreign_lease_mode_mismatch() -> None:
+def test_preflight_never_blocks_on_sibling_mode() -> None:
     result = LifecyclePreflightService().preflight(
-        _input(lease=LeaseModeState(mode="read", holder_session_id="sess-1")),
+        _input(presence=PresenceState(mode="read", holder_session_id="sess-1")),
     )
 
     assert result.ok is True, result.blocked
     assert result.blocked is None
 
 
-def test_preflight_never_blocks_on_live_foreign_lease_holder_but_warns() -> None:
+def test_preflight_never_blocks_on_live_sibling_but_warns() -> None:
     result = LifecyclePreflightService().preflight(
         _input(
-            lease=LeaseModeState(
+            presence=PresenceState(
                 mode="implementation",
                 holder_session_id="sess-2",
                 live_foreign_holder=True,
@@ -271,6 +253,40 @@ def test_preflight_no_warning_when_no_foreign_holder() -> None:
 
     assert result.ok is True
     assert result.warnings == ()
+
+
+@pytest.mark.parametrize(
+    ("git", "expected"),
+    [
+        (
+            GitPreflightState(
+                dirty_paths=("specs/releases/v0.2.5/SPEC.md",),
+                upstream_branch="origin/main",
+            ),
+            (
+                "[GIT] dirty worktree is advisory for lifecycle preflight; "
+                "paths=specs/releases/v0.2.5/SPEC.md"
+            ),
+        ),
+        (
+            GitPreflightState(upstream_branch=None),
+            "[GIT] missing upstream branch is advisory for lifecycle preflight",
+        ),
+        (
+            GitPreflightState(upstream_branch="origin/main", unpushed_commit_count=2),
+            "[GIT] unpushed commits are advisory for lifecycle preflight; count=2",
+        ),
+    ],
+)
+def test_git_non_clean_states_warn_instead_of_blocking(
+    git: GitPreflightState,
+    expected: str,
+) -> None:
+    result = LifecyclePreflightService().preflight(_input(git=git))
+
+    assert result.ok is True
+    assert result.blocked is None
+    assert any(warning.startswith(expected) for warning in result.warnings)
 
 
 def test_preflight_blocks_when_required_handoff_gate_fails() -> None:
@@ -293,7 +309,7 @@ def test_preflight_blocks_when_required_handoff_gate_fails() -> None:
     assert result.blocked.detail["handoff"] == ".dadaia/handoff/dadaia-workspace/qa.handoff.json"
     # v0.1.78 T-C / FR-C: this site used to default operator_command=None.
     assert result.blocked.operator_command is not None
-    assert result.blocked.operator_command.startswith("dadaia lifecycle")
+    assert result.blocked.operator_command.startswith("dadaia reports")
 
 
 # ---------------------------------------------------------------------------

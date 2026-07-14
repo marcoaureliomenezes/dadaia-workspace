@@ -23,6 +23,7 @@ from dadaia_workspace.cli.anchors import derive_cli_anchors
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.subject_registry import (
     BindStatus,
+    Registry,
     build_registry,
 )
 
@@ -315,3 +316,37 @@ def test_live_derivation_reflects_source_changes(tmp_path: Path) -> None:
     # Cleanup (scoped test owns its file).
     target.unlink()
     assert build().bind("pkg/live.py#OtherThing", SubjectKind.CODE).status is BindStatus.UNRESOLVED
+
+
+def test_unique_suffix_ref_binds_and_ambiguous_suffix_halts() -> None:
+    """A ref missing its leading directories binds when it suffix-matches EXACTLY ONE
+    known anchor (the common weak-model slip); multiple suffix matches stay AMBIGUOUS
+    with candidates named — never a silent wrong bind."""
+    reg = Registry(
+        anchors={
+            SubjectKind.CODE: {
+                "src/snake.py#move",
+                "src/board.py#move",
+                "src/game/loop.py#tick",
+            }
+        },
+        aliases={},
+    )
+    unique = reg.bind("loop.py#tick", SubjectKind.CODE)
+    assert unique.status is BindStatus.RESOLVED
+    assert unique.anchor is not None and unique.anchor.id == "src/game/loop.py#tick"
+
+    ambiguous = reg.bind("snake.py#move", SubjectKind.CODE)
+    assert (
+        ambiguous.status is BindStatus.RESOLVED
+    )  # only src/snake.py#move ends with /snake.py#move
+    assert ambiguous.anchor is not None and ambiguous.anchor.id == "src/snake.py#move"
+
+    # Same trailing file name on two anchors -> AMBIGUOUS, both candidates named.
+    reg2 = Registry(
+        anchors={SubjectKind.CODE: {"a/util.py#run", "b/util.py#run"}},
+        aliases={},
+    )
+    halted = reg2.bind("util.py#run", SubjectKind.CODE)
+    assert halted.status is BindStatus.AMBIGUOUS
+    assert set(halted.candidates) == {"a/util.py#run", "b/util.py#run"}

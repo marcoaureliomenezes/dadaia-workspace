@@ -22,6 +22,11 @@ releases/<release-id>/TASKS.md
 Use `_archive/` only for history. Use `backlog/` and `bugs/` for intake and
 triage; they are not approval gates.
 
+Run ordered work through exactly one of the four `dadaia lifecycle` workflows:
+`backlog-definition`, `release-definition`, `implementation-reviews`, or `audit`.
+Concurrent sessions are allowed and surfaced through advisory presence; never wait for
+or create a workspace concurrency lock.
+
 ## Release Gate
 
 Implementation is allowed only when:

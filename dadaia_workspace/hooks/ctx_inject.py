@@ -10,9 +10,7 @@ Bind-driven injection state machine (FR-W2-01 / FR-W2-02, v0.1.14)
 -----------------------------------------------------------------
 Context resolution chain (``_resolve_context``): ``DADAIA_CONTEXT`` env → self-keyed
 session record (bound context) → newest bind-epoch marker newer than this session's
-sentinel → ``""``. **The first-ALIVE fallback is DELETED from injection** (it closes bug
-``ctx-inject-ignores-session-bind-first-alive-proxy``); first-ALIVE remains valid only
-inside the SDD gate's lease-context resolution, a different job.
+sentinel → ``""``. There is no first-ALIVE fallback.
 
 Re-injection rules:
 
@@ -79,13 +77,10 @@ Before acting on a request in this workspace:
    SPEC/PLAN/TASKS -> product-engineer; hooks/agents/skills/rules/
    workflows (the AI surface) -> ai-engineer audit; production code ->
    software-engineer; reviews -> code/security/qa reviewers.
-2. Ownership is a COORDINATION CONVENTION, not a gate. No workflow
-   (research, backlog/release definition, implementation+review,
-   audits) is ever lock-blocked, and project-manager always spawns
-   and writes freely. Route changes through the owning role by
-   discipline. The ONLY deterministic lock is the single-session
-   lease (one bound session per Spec Context for release-definition
-   / implementation+review).
+2. Ordered lifecycle work uses exactly four Python workflows:
+   backlog-definition, release-definition, implementation-reviews,
+   and audit. Ownership is a coordination convention; concurrent
+   sessions are surfaced through advisory presence and never blocked.
 3. If the operator asks for multi-agent / deep / AI-surface work and a
    subagent or dispatch tool is not in your active tool set, DISCOVER it
    first (e.g. tool_search for the agent/dispatch tool) BEFORE starting
@@ -193,7 +188,7 @@ def _resolve_context(
 def _resolve_harness_pid(payload: dict[str, object]) -> int:
     """Resolve this session's long-lived harness pid (W1-7 / T-47-16).
 
-    Reuses the SDD gate's lease-layer resolution (``sdd_gate._resolve_holder_pid``): a
+    Reuses the SDD gate's long-lived process resolution (``sdd_gate._resolve_holder_pid``): a
     payload-provided ``harness_pid``/``parent_pid``/``ppid`` wins, else ``os.getppid()``
     (this hook child's parent — the harness process). ``dadaia context bind`` stamps the
     bind-epoch marker with the bind process's ancestry chain, which contains this same
@@ -410,8 +405,8 @@ def main() -> int:
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
     sentinel_exists = sentinel_mtime is not None
 
-    # W1-7 (T-47-16): the harness pid this session runs under — the SAME resolution the SDD
-    # gate uses for the lease layer (payload harness_pid → os.getppid()). A bind-epoch
+    # The harness pid this session runs under uses the same resolution as the SDD gate
+    # (payload harness_pid → os.getppid()). A bind-epoch
     # marker is honored only when its recorded pid matches this, so a concurrent session's
     # bind cannot steal this session's context.
     harness_pid = _resolve_harness_pid(payload)

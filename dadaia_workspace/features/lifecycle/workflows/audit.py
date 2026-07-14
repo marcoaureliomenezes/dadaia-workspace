@@ -1,25 +1,26 @@
-"""Audit workflow body — the audit scope→drift-scan→triage sequence on fragments + gates.
+"""Audit workflow body — one scoped model pass + a Python disposition gate.
 
-The Wave-E (v0.1.30 Item 6) real workflow body that replaced the fail-loud ``_deferred.audit``
-stub. As of v0.1.57 FR1 it is a thin subclass of
-:class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate.FragmentGateWorkflow` —
-the ONE prompt-assembly + Python-gate seam shared with ``release_definition`` / ``research`` /
-``bug_report``. This body declares the divergence hooks (the ``audit`` command, the QA_REVIEW
-initial phase, a terminal gate that COMPLETEs with no phase transition, and the ``AuditStep`` /
-``AuditResult`` dataclass types) and keeps its module-global ``_SEQUENCE``.
+The Wave-E three-step ladder (scope → drift-scan → triage) collapsed to a single
+``audit_report`` model step (v0.2.x simplification): the old triage step was ~90%
+mechanical copying that Python then re-verified byte-for-byte AFTER all sessions were
+spent — the design maximized weak-model failure modes instead of absorbing them. Now
+the model does the judgment work once (question, lenses, findings, routing) and
+Python owns the bookkeeping:
 
-The sequence is:
+1. ``audit_report`` (project-auditor) — states the audit question, scans the lenses,
+   emits findings, and routes each finding to a disposition
+   (``bug``/``backlog``/``accepted-risk``/``resolved``). Produces ``audit-report-v1``.
+2. ``audit_disposition_gate`` (python, no model) — the terminal Python gate. Checks
+   REFERENTIAL INTEGRITY only (every finding disposed exactly once; every disposition
+   references a real finding — the audit-disposition law: route, never drop) and
+   COMPLETEs the run with no phase transition (A29). Severity/lens live on the
+   finding; Python derives them by id wherever needed — a disposition never has to
+   byte-copy them and can never block the run over a copy slip.
 
-1. ``audit_scope`` (project-auditor) — bounds the audit question, lenses, surfaces, and
-   acceptance rubric. Produces ``audit-scope-handoff-v1``.
-2. ``drift_scan`` (project-auditor, **review**) — runs the lenses over the bounded surfaces and
-   returns a verdict + findings. Consumes ``audit_scope``; produces ``audit-findings-handoff-v1``.
-   A REJECTED verdict (blocking drift) BLOCKS the run.
-3. ``triage`` (project-auditor) — disposes every finding into **disposition-ready** output
-   (A29). Consumes ``drift_scan``; produces ``audit-disposition-handoff-v1``.
-4. ``audit_disposition_gate`` (python, no model) — the terminal Python gate. COMPLETEs the run
-   (no phase transition; A29 — the audit deletes nothing and advances no release phase) only
-   when every prior gate passed and the workflow-step handoff graph is complete.
+Thin subclass of
+:class:`~dadaia_workspace.features.lifecycle.workflows._fragment_gate.FragmentGateWorkflow`
+(the ONE prompt-assembly + Python-gate seam shared with ``release_definition``);
+``resume_from`` comes from the base.
 """
 
 from __future__ import annotations
@@ -30,8 +31,13 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
+    LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
+from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    MalformedHandoffError,
+    RequiredHandoffMissingError,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
     FragmentGateWorkflow,
     _StepOutcome,
@@ -71,6 +77,9 @@ class AuditStep:
     # to the request. Additive-optional, mirroring ``ReleaseStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
+    # A failed audit verdict is domain evidence that must still be routed. Structural
+    # output failures block; REJECTED itself does not abort this workflow.
+    blocks_on_rejection: bool = True
 
 
 @dataclass(frozen=True)
@@ -97,32 +106,15 @@ class AuditResult:
     blocked: BlockedState | None = None
 
 
-#: The audit sequence. ``runtime_kind=None`` on a model step means the workflow's default
-#: harness is used; the terminal gate carries no fragment and no model. Fragment ids match the
-#: shipped ``audit/*`` bundle.
+#: The audit sequence: ONE model step + the terminal Python gate. ``runtime_kind=None``
+#: on the model step means the workflow's default harness is used; the terminal gate
+#: carries no fragment and no model. The fragment id matches the shipped ``audit/*`` bundle.
 _SEQUENCE: tuple[AuditStep, ...] = (
     AuditStep(
-        label="audit_scope",
+        label="audit_report",
         role="project-auditor",
-        fragment_id="audit.audit_scope",
-        produces="audit-scope-handoff-v1",
-    ),
-    AuditStep(
-        label="drift_scan",
-        role="project-auditor",
-        fragment_id="audit.drift_scan",
-        shared_fragment_ids=("shared.output_handoff",),
-        is_review=True,
-        produces="audit-findings-handoff-v1",
-        consumes=("audit_scope",),
-    ),
-    AuditStep(
-        label="triage",
-        role="project-auditor",
-        fragment_id="audit.triage",
-        shared_fragment_ids=("shared.output_handoff",),
-        produces="audit-disposition-handoff-v1",
-        consumes=("drift_scan",),
+        fragment_id="audit.audit_report",
+        produces="audit-report-v1",
     ),
     AuditStep(
         label="audit_disposition_gate",
@@ -133,7 +125,7 @@ _SEQUENCE: tuple[AuditStep, ...] = (
 
 
 class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
-    """Run the audit sequence with fragment prompts + Python gates.
+    """Run the audit sequence with a fragment prompt + Python gates.
 
     Thin subclass of :class:`FragmentGateWorkflow`. The terminal gate COMPLETEs the audit with
     no phase transition (``_TERMINAL_PHASE`` unset) — the audit produces disposition-ready
@@ -169,6 +161,57 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
             final_phase=final_phase,
             steps=tuple(_to_step_result(outcome) for outcome in outcomes),
             blocked=blocked,
+        )
+
+    def _terminal_semantic_block(
+        self, run: LifecycleRun, step: AuditStep, sequence: tuple[AuditStep, ...]
+    ) -> BlockedState | None:
+        """Referential integrity only — Python derives, never re-verifies, copied fields.
+
+        The audit-disposition law: every finding is routed exactly once and no
+        disposition may reference a phantom finding. Severity/lens are read from the
+        finding by id wherever needed — a copy mismatch can no longer exist, so it can
+        no longer block a completed model session.
+        """
+        if self._handoff_resolver is None:
+            return None
+        try:
+            report = self._handoff_resolver.resolve_required(
+                run, producer_step="audit_report", attempt=0
+            ).payload
+        except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
+            return BlockedState(
+                reason=f"audit disposition evidence is unavailable: {exc}",
+                blocked_at_step=step.label,
+            )
+
+        findings_raw = report.get("findings")
+        dispositions_raw = report.get("dispositions")
+        finding_ids = [
+            item["id"]
+            for item in (findings_raw if isinstance(findings_raw, list) else [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        ]
+        disposed_ids = [
+            item["finding_id"]
+            for item in (dispositions_raw if isinstance(dispositions_raw, list) else [])
+            if isinstance(item, dict) and isinstance(item.get("finding_id"), str)
+        ]
+        violations: list[str] = []
+        undisposed = sorted(set(finding_ids) - set(disposed_ids))
+        if undisposed:
+            violations.append(f"findings never disposed: {', '.join(undisposed)}")
+        phantom = sorted(set(disposed_ids) - set(finding_ids))
+        if phantom:
+            violations.append(f"dispositions reference unknown findings: {', '.join(phantom)}")
+        if len(disposed_ids) != len(set(disposed_ids)):
+            violations.append("a finding is disposed more than once")
+        if not violations:
+            return None
+        return BlockedState(
+            reason="audit disposition contract is incomplete",
+            blocked_at_step=step.label,
+            detail={"violations": "; ".join(violations)},
         )
 
 

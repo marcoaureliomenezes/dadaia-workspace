@@ -4,7 +4,7 @@ description: Browser frontend implementer (HTML/CSS/JS/TS/React and other compon
 dispatch_band: 3
 model: claude-sonnet-5
 activity_class: MUTATING
-lease_relationship: "PM sub-agent — no independent acquire"
+concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"
 gate_role: implementer
 tools:
   - Read

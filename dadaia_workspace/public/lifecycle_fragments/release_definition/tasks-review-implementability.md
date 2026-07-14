@@ -29,11 +29,27 @@ here is cheap; ambiguity caught mid-implementation is rework.
 | Check | Pass condition |
 |---|---|
 | Actionable | Each task says specifically what to build; no task hides a decision the implementer would have to guess. |
+| Public contract carried | Tasks creating/changing caller-facing surfaces name the exact approved symbol, signature, fields, and module/export path. |
 | Write set correct | Each task's declared write set actually contains the files the task must touch — neither too narrow (forcing out-of-scope edits) nor too wide. |
 | Validation present | Each task names how it is verified; none leaves "how do I know it's done" unanswered. |
-| Dependencies sound | Preconditions match the PLAN's order; no task depends on work scheduled after it. |
+| Validation is repository-clean | Every repository-local pytest invocation includes `-p no:cacheprovider`; `--cache-clear` alone fails because pytest may recreate `.pytest_cache/`. Other validation tools disable or redirect their caches and generated artifacts outside the repository. |
+| Dependencies sound | Preconditions match the PLAN's order; neither implementation nor validation depends on work scheduled after it. |
 | Disjoint where parallel | Tasks meant to run in parallel have genuinely disjoint write sets. |
 | Plan coverage | The task set realizes the whole PLAN; nothing the PLAN required is missing. |
+
+Validation is a dependency. Check every named API, command, fixture, snapshot,
+integration path, and evidence source against the task order. Reject if it is first
+created by a later task; moving the cross-component assertion to that later task is the
+normal fix.
+
+Validation hygiene is also an implementability requirement. Reject any task set whose
+commands can create repository-local cache, coverage, report, or state artifacts. In
+particular, reject every pytest command missing the literal `-p no:cacheprovider`, even
+when it uses `--cache-clear`.
+
+Reject generic caller-facing instructions such as "add one immutable value" or "add
+one public API" when the task omits its exact name, signature, fields, or export path.
+The TASKS must carry the PLAN's approved binding, not defer it to the implementer.
 
 ## Output
 

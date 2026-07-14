@@ -290,14 +290,18 @@ def test_per_selector_expectations(context: SpecContext) -> None:
     assert all("closed-bug-one.md" not in ref for ref in open_bugs.refs)
 
     selected_bugs = selector.select("selected_bugs", MaxContextPolicy.SUMMARY)
-    assert len(selected_bugs.refs) == 2
+    # Open-only selection (the simplification mandate): a closed bug is never "selected".
+    assert len(selected_bugs.refs) == 1
+    assert all("closed-bug-one.md" not in ref for ref in selected_bugs.refs)
 
     candidate = selector.select("candidate_backlog", MaxContextPolicy.SUMMARY)
     assert any("candidate.md" in ref for ref in candidate.refs)
     assert all("deferred.md" not in ref for ref in candidate.refs)
 
     selected_backlog = selector.select("selected_backlog_items", MaxContextPolicy.SUMMARY)
-    assert len(selected_backlog.refs) == 2
+    # Open/candidate items only — deferred/closed items are not selectable scope.
+    assert len(selected_backlog.refs) == 1
+    assert all("deferred.md" not in ref for ref in selected_backlog.refs)
 
     open_audits = selector.select("open_audits", MaxContextPolicy.EXACT_FILES_ONLY)
     assert any("index.md" in ref for ref in open_audits.refs)

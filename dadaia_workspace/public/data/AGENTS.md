@@ -20,6 +20,15 @@ take precedence.
 - Public defaults must stay generic: no private repo names, hostnames, IPs,
   customer names, operator-local paths, or optional domain-pack assumptions.
 
+## Credential Boundary
+
+**Always no:** credential material is allowed only in the operator-managed
+workspace-root `.env`. Never create, copy, persist, commit, print, or report
+tokens, passwords, private keys, cookies, auth payloads, or secret files in a
+repository, runtime mount, image, generated configuration, cache, report, or
+handoff. Runtime processes may receive only the minimum required values from
+that root `.env`; they must not write a second credential store.
+
 ## Workspace Root Law
 
 The workspace **root** may contain **only**:
@@ -227,8 +236,9 @@ the canonical SDD status tokens — do not translate or change them.)
 **Ordered lifecycle is owned by the dadaia-workflows, not by this file.** The ordered
 ritual — reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition →
 implementation → review → closure sequence — is executed by the **dadaia-workflows**
-(the `dadaia lifecycle` verbs: `release define`, the implementation pipeline, `close`,
-…). Each is a Python workflow body that assembles fragment-scoped per-step prompts,
+(the four `dadaia lifecycle` commands: `backlog-definition`, `release-definition`,
+`implementation-reviews`, and `audit`). Each is a Python workflow body that assembles
+fragment-scoped per-step prompts,
 selects dynamic context, calls worker agents, and advances **Python-validated gates**.
 Each model-driven worker step prompt is assembled from its **fragment**
 (`public/lifecycle_fragments/<workflow>/<step>.md` — the step-specific instruction:
@@ -250,7 +260,7 @@ Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary
 (write-scope, presence, and phase) — there is no procedural check that a given
 workflow verb was actually run. For the full per-workflow description — purpose,
 ordered steps, per-step harness/model, flow diagram, and availability — open the
-**`dadaia panel` Workflows tab**.
+**`dadaia panel` → 2º Agentic Layer**.
 
 ## Memory
 

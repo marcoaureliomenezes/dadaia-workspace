@@ -32,7 +32,7 @@ def test_init_creates_dirs_state_files_and_is_idempotent(
     assert (workspace_root / ".dadaia" / "agentic").is_dir()
     assert (workspace_root / ".dadaia" / "reports").is_dir()
     assert (workspace_root / ".dadaia" / "scripts").is_dir()
-    assert (workspace_root / ".dadaia" / "src").is_dir()
+    assert not (workspace_root / ".dadaia" / "src").exists()
     assert (workspace_root / ".dadaia" / "tmp" / "python").is_dir()
     assert (workspace_root / ".dadaia" / "tmp" / "json").is_dir()
     assert (workspace_root / ".agents" / "skills").is_dir()

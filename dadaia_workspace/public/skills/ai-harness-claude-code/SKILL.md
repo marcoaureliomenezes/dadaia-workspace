@@ -282,9 +282,9 @@ Must it hold EVERY time, regardless of what the model decides?
 ```
 
 F6 / F7 as standing reminders: prune stale/dead permission entries and machine-specific
-paths from settings before they mislead (F6); `.claude/workflows/*.workflow.md` is **not**
-the native `Workflow` tool — same word, different thing; Claude Code does not auto-load that
-directory (F7).
+paths from settings before they mislead (F6); do not project a `.claude/workflows/`
+reference directory. The four Python-backed `dadaia lifecycle` commands are the sole
+workflow authority; Claude Code remains a Layer-1 entry harness, never a Layer-2 worker (F7).
 
 ---
 

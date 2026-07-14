@@ -1,10 +1,7 @@
-"""ProcessAncestry Protocol — read-only process-ancestry probe (DP-4 / FR-W1-01).
+"""ProcessAncestry Protocol — read-only process-ancestry probe.
 
-The chokepoint gates (pre-commit lease gate, FR-W1-01) must answer one question
-without ever touching the target process: *is ``ancestor_pid`` an ancestor of
-``descendant_pid``?* A holder's own ``git commit`` arrives as a Bash descendant of
-the harness pid carrying no env session id, so ancestry — never ``os.kill`` — is the
-harness-real allow path.
+Bind attribution and legacy-compatible chokepoint call sites may need to answer whether
+one process is an ancestor of another without touching the target process.
 
 Three concrete adapters implement this port (T-014-06):
 
@@ -17,8 +14,7 @@ Contract red lines (verified by contract tests):
 * The probe NEVER calls ``os.kill`` (no destructive signal anywhere).
 * Indeterminate ancestry (unreadable ``/proc``, ``ps`` failure, snapshot failure,
   a chain that exceeds the hop budget, or a missing pid) returns the explicit
-  sentinel :data:`UNKNOWN` — the ALLOW+WARN policy decision lives in the *caller*
-  (the gate), never in the adapter. The adapter is a pure fact source.
+  sentinel :data:`UNKNOWN`; policy remains in the caller.
 
 ``core/`` is zero-I/O; only the Protocol and the sentinel value live here.
 """

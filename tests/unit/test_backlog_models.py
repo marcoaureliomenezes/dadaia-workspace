@@ -39,7 +39,7 @@ def test_subject_kind_members_valid_construction_and_intent_is_frozen() -> None:
         (SubjectKind.CATALOG, "panel"),
         (SubjectKind.DOC, "SPEC-DOC-031"),
         (SubjectKind.INVARIANT, "INV-no-claude-at-L2"),
-        (SubjectKind.PANEL, "panel:/api/dadaia-workflows"),
+        (SubjectKind.PANEL, "panel:/api/workflow-catalog"),
         (SubjectKind.API, "api:/api/kanban"),
     ]
     for kind, ref in valid:

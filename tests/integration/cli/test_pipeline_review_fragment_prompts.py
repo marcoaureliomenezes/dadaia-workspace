@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -43,10 +44,15 @@ def _init_workspace(path: Path) -> Path:
 
 
 def _passing_result(label: str) -> AgentRunResult:
+    artifact_ref = (
+        f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/CLOSURE.md"
+        if label == "close"
+        else canonical_worker_output_ref(_CONTEXT, f"pipe-review-prompts:{label}:attempt-0")
+    )
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary=f"fake runtime: {label} APPROVED",
-        artifact_refs=(f".dadaia/handoff/{_CONTEXT}/{label}.handoff.json",),
+        artifact_refs=(artifact_ref,),
         structured_output={"verdict": "APPROVED", "task_group": "rc-1"},
     )
 
@@ -62,7 +68,8 @@ class _RecordingFake:
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         task_id = request.task_id or ""
-        label = task_id.rsplit(":", 1)[-1]
+        parts = task_id.rsplit(":", 2)
+        label = parts[-2] if parts[-1].startswith("attempt-") else parts[-1]
         self.captured[label] = request.prompt
         result = _passing_result(label)
         # Gate verifies declared refs EXIST (bug gate-accepts-phantom-artifact-evidence).
@@ -92,8 +99,7 @@ def _install_recording_fake(monkeypatch: pytest.MonkeyPatch) -> _RecordingFake:
 @pytest.mark.parametrize(
     ("label", "marker"),
     [
-        ("review_security", "<!-- fragment:implementation.security_review -->"),
-        ("review_code", "<!-- fragment:implementation.code_review -->"),
+        ("review_combined", "<!-- fragment:implementation.combined_review -->"),
     ],
 )
 def test_pipeline_review_prompt_is_fragment_scoped_not_generic(
@@ -111,7 +117,8 @@ def test_pipeline_review_prompt_is_fragment_scoped_not_generic(
         context=_CONTEXT,
         release_id=_RELEASE,
     )
-    ladder = implementation_ladder(AgentRuntimeKind.FAKE)
+    # Closure delivery is outside this prompt-composition test; stop after code review.
+    ladder = implementation_ladder(AgentRuntimeKind.FAKE)[:-1]
     result = pipeline.run("pipe-review-prompts", ladder)
 
     assert result.completed is True, result.blocked

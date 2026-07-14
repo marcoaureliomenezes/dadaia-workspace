@@ -23,7 +23,7 @@ app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoint
 # .../dadaia_workspace/cli/commands/ci.py -> parents[2] == .../dadaia_workspace
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "public" / "scripts"
 _HOOK_SOURCE = _SCRIPTS_DIR / "pre-push-ci-gate.sh"
-_PRE_COMMIT_HOOK_SOURCE = _SCRIPTS_DIR / "pre-commit-lease-gate.sh"
+_PRE_COMMIT_HOOK_SOURCE = _SCRIPTS_DIR / "pre-commit-presence-gate.sh"
 
 
 def _repo_root() -> Path:
@@ -92,12 +92,9 @@ def _resolve_workspace_root(repo_root: Path) -> Path:
 
 @app.command("pre-commit-check")
 def pre_commit_check() -> None:
-    """Pre-commit lease gate (FR-W1-01): block a commit not from the context's lease holder.
+    """Warn about other live context presence, then run scoped backlog checks.
 
-    Consults the per-context MUTATING lease ONLY (never a review handoff). The holder's own
-    commit flows (env-sid match or process-ancestry); a commit while no live lease exists
-    flows (zero-false-block); a live foreign holder blocks. Indeterminate ancestry degrades
-    to ALLOW + a logged WARN (the chokepoint is advisory on that platform).
+    Concurrent-session detection is advisory and always allows the commit.
     """
     from dadaia_workspace.container import build_process_ancestry
     from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
@@ -252,7 +249,7 @@ def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
 ) -> None:
-    """Install the pre-commit lease gate AND the pre-push CI+security gate for this repo."""
+    """Install the pre-commit presence check and pre-push CI/security gate."""
     root = _repo_root()
     hooks_dir = root / ".git" / "hooks"
     if not hooks_dir.is_dir():
@@ -260,7 +257,7 @@ def install_hook(
     _install_one(
         _PRE_COMMIT_HOOK_SOURCE,
         hooks_dir / "pre-commit",
-        label="pre-commit lease gate",
+        label="pre-commit presence check",
         force=force,
     )
     _install_one(

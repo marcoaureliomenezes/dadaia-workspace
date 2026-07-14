@@ -55,12 +55,14 @@ Deterministic, Python-gated. Pass `--context <ctx> --release-id <id>` on every w
 
 | Verb | Purpose |
 |---|---|
-| `release define` / `backlog define` | Author a release / a backlog item |
-| `pipeline` | Full release pipeline (implement→qa→security→code) |
-| `implement` / `implement-review` | Implementation step / bounded implement↔review loop |
-| `audit` / `research` / `bug_report` | Fragment-driven audit / research / bug workflows |
-| `close` | Release closure |
-| `preflight` / `status` / `handoffs doctor` | Diagnostics (accept `--context`/`--release-id`) |
+| `backlog-definition` | Research/grill a demand or bug and author one consistent backlog item |
+| `release-definition` | Author and review SPEC, PLAN, and TASKS |
+| `implementation-reviews` | Implement, self-verify, run QA/security/code review, correct, and close |
+| `audit` | Scope, inspect, disposition findings, and verify handoff coherence |
+
+These are the only workflow commands. Status, cleanup, report validation, model policy,
+and handoff doctors are diagnostics under their owning top-level command groups; they are
+not workflows.
 
 Full per-verb detail (steps, harness/model, diagrams): the panel **Workflows** tab.
 

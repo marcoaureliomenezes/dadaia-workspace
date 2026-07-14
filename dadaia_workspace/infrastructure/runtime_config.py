@@ -4,7 +4,7 @@ Extracted from ``FileSystemPublicAssetManager`` in ``public_assets.py`` to keep
 that module under 600 lines.  Each function takes explicit arguments instead of
 ``self``, so there are no circular imports.
 
-T-018-17: hook commands are emitted as ``<python> -m dadaia_workspace.hooks.<name>``
+T-018-17: hook commands are emitted as ``<python> -B -m dadaia_workspace.hooks.<name>``
 using the venv-aware ``_python_bin()`` helper (Windows-safe fallbacks: Scripts/python.exe
 → sys.executable → bare python). The ``.sh`` scripts are superseded, not appended.
 """
@@ -42,8 +42,8 @@ def _python_bin(workspace_root: Path) -> str:
 
 
 def _hook_cmd(workspace_root: Path, module: str) -> str:
-    """Return ``<python_bin> -m <module>`` for *workspace_root*."""
-    return f"{_python_bin(workspace_root)} -m {module}"
+    """Return a bytecode-suppressed Python module command for *workspace_root*."""
+    return f"{_python_bin(workspace_root)} -B -m {module}"
 
 
 _CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
@@ -83,7 +83,7 @@ def codex_hook_wrapper_contents() -> dict[str, str]:
             "  exit 127\n"
             "fi\n"
             f"{exports}"
-            f'exec "$PYTHON_BIN" -m {module} "$@"\n'
+            f'exec "$PYTHON_BIN" -B -m {module} "$@"\n'
         )
     return wrappers
 
@@ -101,9 +101,7 @@ def _codex_hook_wrapper_command(name: str) -> str:
 # (match-all) form the ai audit flagged.
 _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 # Claude Code's canonical explicit match-all for tool-matching events. Used on
-# PostToolUse so the lease heartbeat (T-010-04) fires after *every* tool, including
-# Bash, not just write tools. Deliberately the explicit "*" form, NOT the empty
-# string the ai audit forbids.
+# PostToolUse so session/presence heartbeat fires after every tool, including Bash.
 _CLAUDE_MATCH_ALL = "*"
 
 
@@ -198,13 +196,8 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     ],
                 },
             ],
-            # N-2 (v0.1.10 rc-2): the lease heartbeat MUST fire after *every* tool,
-            # including Bash and read-only tools — otherwise a long non-write Codex
-            # call (e.g. a multi-minute pytest run) starves the heartbeat and the
-            # lease goes TTL-stale, the original lease-starvation incident's Codex
-            # flavor. Codex's canonical match-all is an *omitted* matcher (same form
-            # used by UserPromptSubmit), so the heartbeat block carries no matcher and
-            # thus runs on all tools, mirroring Claude's explicit "*".
+            # Session/presence heartbeat fires after every tool. Codex's canonical
+            # match-all is an omitted matcher, mirroring Claude's explicit "*".
             "PostToolUse": [
                 {
                     "hooks": [

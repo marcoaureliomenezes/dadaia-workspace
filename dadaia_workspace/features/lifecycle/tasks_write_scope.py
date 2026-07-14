@@ -62,9 +62,6 @@ _CHECKLIST_HEADING_RE = re.compile(r"^-\s+\[(?P<marker>[ x-])\]\s+\S")
 _BULLET_RE = re.compile(
     r"^-\s+(?:\*\*(?P<bkey>[^*]+):\*\*|(?P<pkey>[A-Za-z][\w ]*?):)\s*(?P<rest>.*)$"
 )
-# The write-set continuation stops at the next bullet (``- ``), any heading (``#`` /
-# ``**T-x``), or a blank line.
-_NEXT_BLOCK_RE = re.compile(r"^(-\s|#{1,6}\s|\*\*\s*T-)")
 _BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
 _PARENTHETICAL_RE = re.compile(r"\([^()]*\)")
 
@@ -90,6 +87,78 @@ def write_scope_from_tasks(specs_dir: Path, release_id: str) -> tuple[str, ...]:
     if write_set_line is None:
         return ()
     return _extract_globs(write_set_line)
+
+
+def write_scope_from_release_tasks(specs_dir: Path, release_id: str) -> tuple[str, ...]:
+    """Return the stable union of write sets for every incomplete release task.
+
+    ``implementation_reviews`` is a release-scoped workflow: its implementation worker
+    executes the approved task set in dependency order before the release-wide reviews
+    and closure. Open and reserved tasks therefore contribute scope; completed tasks do
+    not. The narrower :func:`write_scope_from_tasks` remains available for task-scoped
+    callers that require exactly one reservation.
+    """
+    tasks_path = specs_dir / "releases" / release_id / "TASKS.md"
+    if not tasks_path.is_file():
+        return ()
+    globs: list[str] = []
+    seen: set[str] = set()
+    for block in _incomplete_task_blocks(tasks_path.read_text(encoding="utf-8")):
+        value = _write_set_line(block)
+        if value is None:
+            continue
+        for path in _extract_globs(value):
+            if path not in seen:
+                seen.add(path)
+                globs.append(path)
+    return tuple(globs)
+
+
+def _incomplete_task_blocks(text: str) -> tuple[str, ...]:
+    """Extract body blocks for ``[ ]`` and ``[-]`` tasks in every supported grammar."""
+    lines = text.splitlines()
+    boundaries: list[int] = []
+    task_markers: dict[int, str] = {}
+    bold_ids: dict[str, int] = {}
+    standalone_markers: dict[str, str] = {}
+
+    for idx, raw in enumerate(lines):
+        line = raw.rstrip()
+        standalone = _STANDALONE_MARKER_RE.match(line.strip())
+        if standalone is not None:
+            standalone_markers[standalone.group("id")] = standalone.group("marker")
+        checklist = _CHECKLIST_HEADING_RE.match(line)
+        if checklist is not None:
+            boundaries.append(idx)
+            task_markers[idx] = checklist.group("marker")
+            continue
+        if _H3_HEADING_RE.match(line):
+            boundaries.append(idx)
+            markers = _INLINE_MARKER_RE.findall(line)
+            if len(markers) == 1:
+                task_markers[idx] = markers[0]
+            continue
+        if _ANY_HEADING_RE.match(line):
+            boundaries.append(idx)
+            continue
+        bold = _BOLD_HEADING_RE.match(line)
+        if bold is not None:
+            boundaries.append(idx)
+            bold_ids[bold.group("id")] = idx
+
+    for task_id, marker in standalone_markers.items():
+        bold_idx = bold_ids.get(task_id)
+        if bold_idx is not None:
+            task_markers[bold_idx] = marker
+
+    ordered = sorted(set(boundaries))
+    blocks: list[str] = []
+    for start, marker in sorted(task_markers.items()):
+        if marker == "x":
+            continue
+        end = next((idx for idx in ordered if idx > start), len(lines))
+        blocks.append("\n".join(lines[start + 1 : end]))
+    return tuple(blocks)
 
 
 def _reserved_task_block(text: str) -> str | None:
@@ -164,6 +233,7 @@ def _write_set_line(block: str) -> str | None:
     lines = block.splitlines()
     start_idx: int | None = None
     first_rest = ""
+    key_indent = 0
     for idx, line in enumerate(lines):
         match = _BULLET_RE.match(line.strip())
         if match is None:
@@ -172,6 +242,7 @@ def _write_set_line(block: str) -> str | None:
         if key.strip().lower() == _WRITE_SET_KEY:
             start_idx = idx
             first_rest = match.group("rest")
+            key_indent = len(line) - len(line.lstrip())
             break
     if start_idx is None:
         # Third real grammar (bug write-scope-parser-rejects-own-tasks-grammar — the
@@ -183,8 +254,15 @@ def _write_set_line(block: str) -> str | None:
     for line in lines[start_idx + 1 :]:
         stripped = line.strip()
         if not stripped:
+            if any(part.strip() for part in parts):
+                break
+            continue
+        indent = len(line) - len(line.lstrip())
+        # Sibling bullets end the property. More-indented bullets are the generated
+        # grammar's path list and belong to the Write set value.
+        if stripped.startswith("- ") and indent <= key_indent:
             break
-        if _NEXT_BLOCK_RE.match(stripped):
+        if _ANY_HEADING_RE.match(stripped) or _BOLD_HEADING_RE.match(stripped):
             break
         parts.append(stripped)
     return " ".join(parts).strip()

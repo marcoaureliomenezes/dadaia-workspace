@@ -67,12 +67,13 @@ production file:
 
 ## 2. Context discovery and injection
 When you need to resolve specs_dir yourself, use this priority order:
-1. `DADAIA_CONTEXT` env var → `repos/<slug>/specs/`
-2. `.dadaia/states/spec_contexts.json` — find the first ALIVE entry and derive `repos/<slug>/specs/`
-3. `dadaia context show --json`
+1. `DADAIA_CONTEXT` env var → `repos/<slug>/specs/`.
+2. The current harness session's own binding record.
+3. The repository containing the current working directory.
+4. `dadaia context show --json` to inspect the caller-resolved result.
 
-(The first-ALIVE fallback above is agent-side discovery discipline; the SDD gate's
-presence-context resolution also uses it. It is NOT how injection works.)
+Never select the first ALIVE context as an implicit fallback. A foreign session's bind
+must not change the caller's context or mode.
 
 **Injection is bind-driven.** `dadaia context bind` writes a bind-epoch marker
 (`.dadaia/states/bind_epoch/<ctx>`) and is the **sole trigger** for context-memory
@@ -85,9 +86,9 @@ marker never binds a fresh session. There is no first-ALIVE injection fallback.
 **Bind stays non-blocking.** **Never halt the flow to ask the operator to bind or
 rebind a context.** ADDITIVE work (bugs, backlog, audits, reports, handoffs) needs no
 bind at all. A `context bind` selects which context's memory is injected and refreshes
-the incumbent pointer; it is never a precondition for doing work. Only when the
-workspace has *no* ALIVE context at all should you tell the operator there is nothing
-to work on.
+the caller-owned session record plus bind-epoch marker; it is never a precondition for
+doing work. Only when the workspace has *no* ALIVE context at all should you tell the
+operator there is nothing to work on. There is no incumbent pointer.
 
 ## 3. Task lifecycle
 1. Read ACTIVE.md → confirm release + phase.

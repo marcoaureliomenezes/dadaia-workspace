@@ -3,7 +3,7 @@ name: project-manager
 description: Tier-1 coordinator + sole dispatch authority. Receives operator demand, runs grill-me, dispatches sub-agents via Agent tool, enforces the review checkpoint. Sole backlog owner. NEVER writes code/specs/memory/tests/CI.
 dispatch_band: 1
 activity_class: MUTATING
-lease_relationship: "no lease — sole dispatch authority (NO-LOCKS DOCTRINE, v0.1.76)"
+concurrency_relationship: "sole dispatch authority; advisory presence only"
 gate_role: coordinator
 tools:
   - Read
@@ -121,16 +121,10 @@ existing spec or source files.
 
 ## Playbook routers
 
-#### Tier-1 (workflow files)
+#### Tier-1 (dadaia-workflows)
 
-Exactly 2 workflow files ship in the default installation (see the
-`project-orchestration` skill's Workflow Inventory — these are dispatch-reference
-documents you load as context; neither harness auto-executes them):
-
-| Demand pattern | Workflow file |
-|---|---|
-| Operator elects to ship an rc-N | `release-ship.workflow.md` |
-| Operator requests audit, or CLOSURE checkpoint | `audit-fanout.workflow.md` |
+Use the four Python workflows listed by `dadaia lifecycle --help`. Do not load or
+invent Markdown workflow files.
 
 #### Tier-2 (playbook routers — entry agent in the demand cell)
 

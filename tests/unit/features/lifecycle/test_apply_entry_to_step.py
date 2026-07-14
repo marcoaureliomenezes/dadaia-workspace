@@ -2,7 +2,7 @@
 
 A **non-fake** unit test of the harness->kind mapping (``codex -> CODEX_EXEC``,
 ``pi -> PI_HEADLESS``) + FAKE preservation, plus structural proof that ``ReleaseStep``,
-``BacklogStep``, ``AuditStep``, ``ResearchStep``, and ``BugReportStep`` all satisfy the
+``BacklogStep`` and ``AuditStep`` all satisfy the
 ``PolicyApplicableStep`` Protocol so the ONE generic ``apply_resolved_policy`` governs them
 with no per-type union — FAKE-preserve (dry-run keeps FAKE while threading the governed
 model) is harness-sandbox governance.
@@ -27,9 +27,7 @@ from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
     BacklogStep,
     BacklogStepKind,
 )
-from dadaia_workspace.features.lifecycle.workflows.bug_report import BugReportStep
 from dadaia_workspace.features.lifecycle.workflows.release_definition import ReleaseStep
-from dadaia_workspace.features.lifecycle.workflows.research import ResearchStep
 
 
 def _entry(step: str, harness: str, profile: str) -> WorkflowPolicyStepEntry:
@@ -143,32 +141,6 @@ _STRUCTURAL_CASES = (
             runtime_kind=AgentRuntimeKind.FAKE,
         ),
         "audit_scope",
-        "codex",
-        "codex-implementation-standard",
-        AgentRuntimeKind.FAKE,
-    ),
-    (
-        "research",
-        ResearchStep(
-            label="research_scope",
-            role="product-engineer",
-            fragment_id="research.research_scope",
-            runtime_kind=AgentRuntimeKind.FAKE,
-        ),
-        "research_scope",
-        "codex",
-        "codex-implementation-standard",
-        AgentRuntimeKind.FAKE,
-    ),
-    (
-        "bug_report",
-        BugReportStep(
-            label="bug_intake",
-            role="project-auditor",
-            fragment_id="bug_report.bug_intake",
-            runtime_kind=AgentRuntimeKind.FAKE,
-        ),
-        "bug_intake",
         "codex",
         "codex-implementation-standard",
         AgentRuntimeKind.FAKE,

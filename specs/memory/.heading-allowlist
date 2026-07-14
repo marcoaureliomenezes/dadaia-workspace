@@ -1,16 +1,62 @@
-# Workspace heading allowlist (lint-memory-atoms.py — merged as a union with the
-# curated groups; one exact heading per line; `#` comments ignored).
-# MEMORY-class file: edited by product-engineer in DEFINITION/CLOSURE phase only.
-# Entries below allowlist legitimate, stable current-canon headings flagged by
-# LINT-1 at the 2026-07-06 audit (dispositioned v0.1.61).
-Model assignments (9 core agents + 3 plugin agents)
-Harness profiles
-Prompt-assembly canon (v0.1.57)
-Public surface counts (v0.2.1)
-# v0.1.64 closure: tech-stack heading renamed from "Schema handoff-v1.1" (stale token) to
-# the version-stable family name; the lint script's Group-C entry keeps the old string,
-# so the new canon heading is allowlisted here.
-Schema handoff-v1 family
-# v0.1.65 closure: panel.md gained the Sub-agents (Layer-1 agent model governance) control
-# plane; its H2 section heading is a new legitimate current-canon heading.
-Sub-agents control plane (v0.1.65)
+# dadaia-workspace self-hosting memory headings
+Adapter Boundaries
+Agent Runtimes
+Agentic Layers
+Anti-Slop
+Backlog
+Binding
+Bootstrap
+Browser Validation
+Bugs
+CI
+Canonical Commands
+Checks
+Concurrency
+Context And Concurrency
+Context Injection
+Core Services
+Design Pillars
+Evidence Model
+Execution Contract
+Games
+Git Chokepoints
+HTTP Boundary
+Handoffs
+Harness Model
+Hooks
+Hygiene
+Independent Boundaries
+Language And Packaging
+Layer 1
+Layer 1 And Layer 2
+Layer 2
+Lifecycle
+Model Governance
+Non-Goals
+Operating Chain
+Operating Rules
+PreToolUse
+Presence
+Primary Subsystems
+Prohibitions
+Projection Validation
+Prompt And Artifact Contract
+Quality Toolchain
+Release And Audit
+Repair
+Review And Retry
+Review Sequence
+Runtime Boundary
+Runtime Dependencies
+Runtime State
+Security And Credentials
+Tabs
+Telemetry
+Usage
+Validation
+Validation Status
+Validator Families
+Workflow Surface
+Workflow Use
+Workflow Validation
+Adoption (16 instruction surfaces)

@@ -9,42 +9,42 @@ output_schema: grill-refinement-v1
 max_context_policy: summary
 ---
 
-# Grill questionnaire — interrogate until shared understanding
+# Grill questionnaire — evidence-first readiness checklist
 
-Before a scope, SPEC, or demand is accepted, interrogate it. The goal is to surface
-and resolve the defects that quietly destroy specs — inconsistencies, scope gaps,
-ambiguous acceptance, undeclared dependencies, divergent naming, and assumptions
-that turn out to be answered already. Resolve everything that the evidence can
-resolve; bring to the operator only what evidence cannot.
+You run headless. There is no operator on the other end of this turn, so an interview
+posture that waits for an answer is a dead end — resolve everything the evidence can answer,
+and record everything it cannot as `open_questions` for the next step to see. This is a
+checklist you run against `grill_subject`, not a conversation.
 
-## Defect taxonomy to hunt for
+## What must be known before the subject is ready
 
-| Defect | Signature |
+For each row, check `available_evidence` first; resolve silently when it answers, record how.
+
+| Check | Evidence-answerable when |
 |---|---|
-| Inconsistency between artifacts | Two artifacts describe the same thing in conflicting terms. |
-| Artifact vs reality drift | What an artifact claims diverges from the actual current state. |
-| Already-answered open question | A "decision needed" whose answer is present in the available evidence. |
-| Divergent naming | One concept carried under two different names. |
-| Ambiguous acceptance | A requirement with no testable "how do we know it is done". |
-| Undeclared dependency | This work needs another item finished first, and nobody said so. |
-| Wrong category / stale truth | An item filed under the wrong concept, or a "current truth" that a later change already invalidated. |
+| Internal consistency | Two artifacts describing the same thing agree, or the conflict is resolved by the newer/authoritative one. |
+| Artifact vs reality | What an artifact claims matches the actual current state. |
+| Already-answered questions | A "decision needed" whose answer already exists in `available_evidence`. |
+| Naming | One canonical name is used, not two synonyms for the same concept. |
+| Acceptance | Every requirement has a testable "how do we know it is done". |
+| Dependencies | Anything this subject needs finished first is declared, not assumed. |
+| Category / staleness | The subject is filed under the right concept and reflects the current truth, not an invalidated prior state. |
 
-## Protocol
+## Procedure
 
-1. **Inspect before asking.** Never ask what the `available_evidence` can answer.
-   Build an internal findings list, classify each by the taxonomy above, and resolve
-   every evidence-answerable finding yourself — recording how you resolved it.
-2. **Interview only on the unanswerable.** One question per turn, each anchored to a
-   specific artifact and the exact conflicting or missing text, each carrying your
-   recommended resolution. Never bundle two questions. Prioritize defects that would
-   block or cause rework first; never ask about cosmetics or already-settled choices.
-3. **Synthesize.** For the subject, state the core problem resolved, the post-grill
-   readiness, the required changes, any newly declared dependencies, and the
-   decisions recorded.
+1. **Resolve from evidence.** Work the checklist above against `available_evidence`. Every row
+   the evidence settles is resolved here, with the resolution recorded — never surfaced as a
+   question.
+2. **List what evidence cannot settle.** Anything left open after step 1 becomes one entry in
+   `open_questions`: a precise, evidence-anchored statement of what is unknown and why the
+   evidence does not settle it, each carrying your recommended resolution. Never a vague "it
+   depends" — state the actual fork and your recommendation.
+3. **Synthesize.** State the core problem resolved, the post-grill readiness, the required
+   changes, any newly declared dependencies, and the decisions recorded.
 
 ## Output
 
-A refinement result listing every defect found, how each was resolved (by evidence
-or by operator answer), the pending edits, and a readiness verdict for the subject.
-Do not accept "it depends" as an answer — drive the decision tree to an actionable
-resolution. The output is refinement, never an implementation proposal.
+A refinement result: every checklist row and how it was resolved (by evidence), the
+`open_questions` list for anything evidence could not settle, the pending edits, and a
+readiness verdict for the subject. The output is refinement, never an implementation
+proposal.

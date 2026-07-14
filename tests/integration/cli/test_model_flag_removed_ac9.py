@@ -29,27 +29,19 @@ from tests.helpers.golden_platform import norm_stderr
 _runner = CliRunner()
 _RELEASE = "v0.1.57"
 
-# All 12 lifecycle run verbs (Q7): the exact CLI verb argv that reaches each command.
+# The exact CLI argv for the four lifecycle workflows.
 _RUN_VERBS: list[tuple[str, list[str]]] = [
-    ("release-define", ["release", "define"]),
-    ("backlog-define", ["backlog", "define"]),
-    ("implement", ["implement"]),
-    ("review-qa", ["review", "qa"]),
-    ("review-security", ["review", "security"]),
-    ("review-code", ["review", "code"]),
-    ("close", ["close"]),
-    ("pipeline", ["pipeline"]),
+    ("release-definition", ["release-definition"]),
+    ("backlog-definition", ["backlog-definition"]),
+    ("implementation-reviews", ["implementation-reviews"]),
     ("audit", ["audit"]),
-    ("research", ["research"]),
-    ("bug_report", ["bug_report"]),
-    ("implement-review", ["implement-review"]),
 ]
 _IDS = [row[0] for row in _RUN_VERBS]
 
 
 @pytest.mark.parametrize("subcmd", [row[1] for row in _RUN_VERBS], ids=_IDS)
 def test_model_flag_is_unknown_option_on_every_run_verb(subcmd: list[str]) -> None:
-    """AC-9: ``--model X`` is an unknown option on all 12 verbs — exit 2, stderr, empty stdout.
+    """AC-9: ``--model X`` is unknown on all four workflows.
 
     The unknown-option ``UsageError`` fires at parse time (before the command body / any
     workspace resolution), so no workspace fixture is needed.

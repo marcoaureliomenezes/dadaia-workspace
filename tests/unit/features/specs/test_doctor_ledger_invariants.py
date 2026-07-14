@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\
@@ -591,9 +590,6 @@ def test_doc029_retired_never_fires_and_seam_removed(tmp_path: Path) -> None:
 
     # A residual, genuinely-diverged lock record on disk must not resurrect SPEC-DOC-029.
     _seed_lock_record(tmp_path, "ctx-retired", "sessForgedLive")
-    session_identity.set_incumbent(tmp_path, "ctx-retired", "sessOther")
-    session_identity.write_session(tmp_path, "sessOther", {"session_id": "sessOther"})
-
     issues = SpecsDoctor(specs).check()
     assert "SPEC-DOC-029" not in _codes(issues)
 
