@@ -43,7 +43,7 @@ def _bundle() -> FragmentBundle:
         body="Author the SPEC.",
         output_schema=_DOMAIN_SCHEMA,
         shared_bodies=("Emit a structured handoff.",),
-        shared_ids=("shared.output_handoff",),
+        shared_ids=("shared.anti_slop",),
     )
 
 

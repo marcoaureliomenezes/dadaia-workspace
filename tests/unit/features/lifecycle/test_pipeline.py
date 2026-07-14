@@ -108,13 +108,11 @@ def test_pipeline_completes_full_ladder_and_mixes_harness_per_step() -> None:
     assert result.final_phase is LifecyclePhase.CLOSURE
     assert [s.label for s in result.steps] == [
         "implement",
-        "review_qa",
-        "review_security",
-        "review_code",
+        "review_combined",
         "close",
     ]
     assert all(s.accepted for s in result.steps)
-    # One persisted run advancing through phases (start + 5 steps).
+    # One persisted run advancing through phases (start + 3 steps).
     assert store.saved["run-1"].phase is LifecyclePhase.CLOSURE
 
     mix_store = _MemoryRunStore()
@@ -245,9 +243,7 @@ def test_pipeline_keeps_tasks_reserved_when_review_blocks(tmp_path: Path) -> Non
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="review rejected",
-                artifact_refs=(
-                    ".dadaia/tmp/lifecycle-worker/demo/rejected.step-output.json",
-                ),
+                artifact_refs=(".dadaia/tmp/lifecycle-worker/demo/rejected.step-output.json",),
                 structured_output={"verdict": "REJECTED", "verdict_reason": "missing case"},
             )
 
@@ -349,7 +345,7 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     result = pipe.run("run-pfx", implementation_ladder(AgentRuntimeKind.FAKE))
 
     assert result.completed is True
-    assert len(captured) == 5
+    assert len(captured) == 3
     # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
     assert all(req.prompt.startswith(prefix.text) for req in captured)
     # No "sonnet"/"opus" tier literals remain (LAW 2): the step model defaults from the
@@ -439,7 +435,9 @@ def _resolve(default_harness: str | None = None):  # type: ignore[no-untyped-def
     from tests.unit.features.lifecycle._workflow_catalog import library_workflow_catalog
 
     resolver = WorkflowExecutionPolicyResolver(catalog=library_workflow_catalog())
-    return resolver.resolve("implementation_reviews", context="default", default_harness=default_harness)
+    return resolver.resolve(
+        "implementation_reviews", context="default", default_harness=default_harness
+    )
 
 
 @pytest.mark.parametrize(
@@ -535,16 +533,12 @@ def test_scope_extra_allowed_paths_union_for_create_steps_ignored_for_review_ac7
 
     review_step = _step_with("review_qa", is_review=True, extra_allowed_paths=("repos/x/src/**",))
     review_scope = _pipeline_for_scope()._scope(review_step, "run1")
-    assert review_scope.allowed_paths == (
-        ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",
-    )
+    assert review_scope.allowed_paths == (".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",)
     assert "repos/x/src/**" not in review_scope.allowed_paths
 
     no_extra_step = _step_with("implement", is_review=False, extra_allowed_paths=())
     no_extra_scope = _pipeline_for_scope()._scope(no_extra_step, "run1")
-    assert no_extra_scope.allowed_paths == (
-        ".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",
-    )
+    assert no_extra_scope.allowed_paths == (".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",)
 
     close_step = implementation_ladder(AgentRuntimeKind.FAKE)[-1]
     close_scope = _pipeline(_MemoryRunStore(), lambda kind: _KindFake(kind, _approved()))._scope(

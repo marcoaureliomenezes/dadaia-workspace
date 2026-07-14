@@ -7,6 +7,7 @@ the class delegates to; they take explicit Path arguments instead of ``self``.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import shutil
 from collections.abc import Callable, Iterable, Mapping
@@ -155,12 +156,10 @@ def remove_legacy_workflow_projections(
         for path in sorted(legacy_dir.glob("*.workflow.md")):
             path.unlink()
             installed.append(f"[rm] {path}")
-        try:
+        # Preserve a non-empty directory: non-workflow/operator files are outside
+        # this migration's ownership.
+        with contextlib.suppress(OSError):
             legacy_dir.rmdir()
-        except OSError:
-            # Preserve a non-empty directory: non-workflow/operator files are outside
-            # this migration's ownership.
-            pass
 
 
 # ---------------------------------------------------------------------------

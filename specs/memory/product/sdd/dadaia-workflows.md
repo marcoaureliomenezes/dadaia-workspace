@@ -14,7 +14,7 @@ tags:
 - lifecycle
 - layer-2
 token_estimate: 649
-last_updated: '2026-07-13'
+last_updated: '2026-07-14'
 release_origin: v0.2.3
 ---
 
@@ -24,10 +24,10 @@ release_origin: v0.2.3
 
 | CLI command | Workflow id | Ordered responsibility |
 |---|---|---|
-| `backlog-definition` | `backlog_definition` | Refine one demand, bind canonical subjects, reconcile duplicates/conflicts, author one consistent backlog item, validate it. |
-| `release-definition` | `release_definition` | Scope selected intake, author and review SPEC, PLAN, and TASKS, then advance an approved release to implementation. |
-| `implementation-reviews` | `implementation_reviews` | Reserve and implement approved tasks, run QA/security/code review with bounded correction, close only when tasks and reviews are complete. |
-| `audit` | `audit` | Bound an audit, scan for drift, triage every finding, and validate complete dispositions. |
+| `backlog-definition` | `backlog_definition` | ONE author model call writes the item; the Python review gate validates what actually landed on disk (registry bind, duplicate/conflict classification). `--grill` opts into an evidence-first intake step whose digest feeds the author. |
+| `release-definition` | `release_definition` | Author and review SPEC (one merged architecture+QA review), PLAN, and TASKS; a consumed backlog pick skips the scope model step; deterministic lints and reviews auto-revise their create step once in-run; the commit gate advances the approved release to implementation. |
+| `implementation-reviews` | `implementation_reviews` | Reserve and implement approved tasks, judge with ONE combined tri-angle review (QA + security + code) over injected diff + executed-test evidence, bounded correction, close only when tasks and the review are complete. |
+| `audit` | `audit` | ONE audit_report model pass (question, lenses, findings, dispositions routed bug/backlog/accepted-risk/resolved); the terminal Python gate checks referential integrity only — severity/lens are derived by finding id, never byte-copied. |
 
 Research and bug intake are activities inside backlog definition or audit. Closure is
 the terminal part of implementation plus reviews. Resume, hygiene, status, handoff
@@ -67,16 +67,21 @@ human target or an explicit operator request.
 
 ## Validation Status
 
-All four workflows have completed real phantom journeys through both Codex and PI.
-The PI validation journeys were pinned to `openai-codex/gpt-5.5` and did not use
-OpenRouter. Failures found during the journeys were fixed in the workflow gates,
-provider qualification, release contract validation, task-marker closure validation,
-and caller-owned context preflight.
+All four workflows are certified end-to-end on BOTH real harnesses with zero errors
+(2026-07-14): the codex chain in 4m43 and the pi chain in 14m06 on
+`gpt-5.3-codex-spark`, each running backlog → release → implementation → audit with no
+resume and no operator intervention. Two production releases (panel Pong and Breakout)
+were additionally shipped through the full chains. Failures found during the journeys
+were root-caused and fixed in evidence path framing, unique-suffix anchor binding,
+Python-side payload materialization, disk-truth deliverable checks, and lint/marker
+grammar tolerance.
 
 ## Runtime State
 
-- `.dadaia/runs/lifecycle/<run-id>/` - run state and immutable step payloads.
-- `.dadaia/tmp/lifecycle-worker/<run-id>/` - bounded worker staging area.
+- `.dadaia/runs/lifecycle/<run-id>/` - run state records.
+- `specs/releases/<release-id>/handoffs/<run-id>/steps/` - immutable step payloads,
+  REGISTERED IN THE RELEASE FOLDER (backlog runs: `specs/backlog/handoffs/<run-id>/`).
+- `.dadaia/tmp/lifecycle-worker/<context>/` - bounded worker staging area.
 - `.dadaia/handoff/<context>/` - validated cross-agent handoffs.
 - `.dadaia/states/workflow_model_policy.json` - operator workflow policy overlay.
 - `.dadaia/states/model_profiles.json` - optional operator model profiles.

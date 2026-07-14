@@ -62,9 +62,59 @@ class _FakeGit:
         return self._changed
 
 
+class _SequenceGit:
+    def __init__(self, *states: tuple[str, ...]) -> None:
+        self._states = list(states)
+        self.calls: list[Path] = []
+
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        self.calls.append(path)
+        if len(self._states) > 1:
+            return self._states.pop(0)
+        return self._states[0]
+
+
 # ---------------------------------------------------------------------------
 # T-PI-02 — minimal adapter: command, env, failure handling
 # ---------------------------------------------------------------------------
+
+
+def test_pi_changed_paths_are_content_delta_from_attempt_not_preexisting_dirt(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "preexisting-clean.txt").write_text("same", encoding="utf-8")
+    (tmp_path / "preexisting-changed.txt").write_text("before", encoding="utf-8")
+    (tmp_path / "preexisting-removed.txt").write_text("before", encoding="utf-8")
+    git = _SequenceGit(
+        ("preexisting-clean.txt", "preexisting-changed.txt", "preexisting-removed.txt"),
+        (
+            "preexisting-clean.txt",
+            "preexisting-changed.txt",
+            "preexisting-removed.txt",
+            "new.txt",
+        ),
+    )
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        (tmp_path / "preexisting-changed.txt").write_text("after", encoding="utf-8")
+        (tmp_path / "preexisting-removed.txt").unlink()
+        (tmp_path / "new.txt").write_text("new", encoding="utf-8")
+        payload = {
+            "schema": "agent-run-result-v1",
+            "summary": "done",
+            "artifact_refs": [".dadaia/handoff/dadaia-workspace/pi.handoff.json"],
+            "changed_paths": ["model-lie.txt"],
+        }
+        return subprocess.CompletedProcess(args[0], 0, stdout=_message_end(json.dumps(payload)))
+
+    result = PiHeadlessAdapter(
+        PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}, git=git
+    ).run(_request())
+
+    assert result.structured_output["changed_paths"] == (
+        "new.txt,preexisting-changed.txt,preexisting-removed.txt"
+    )
+    assert len(git.calls) == 2
 
 
 def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
@@ -83,6 +133,7 @@ def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
             "PATH": "/bin",
             "HOME": "/home/operator",
             "ANTHROPIC_API_KEY": "secret-key",
+            "PYTHONDONTWRITEBYTECODE": "1",
             "DADAIA_PRIVATE": "private",
         },
     )
@@ -108,6 +159,7 @@ def test_pi_adapter_builds_controlled_command_and_env(tmp_path: Path) -> None:
         "PATH": "/bin",
         "HOME": "/home/operator",
         "ANTHROPIC_API_KEY": "secret-key",
+        "PYTHONDONTWRITEBYTECODE": "1",
     }
     # Prompt is delivered on stdin.
     assert isinstance(call["kwargs"]["input"], str)
@@ -144,7 +196,7 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
         from dadaia_workspace import container
         from dadaia_workspace.core.harness_models import validate
 
-        option = validate("pi", "openai-codex/gpt-5.5:medium")
+        option = validate("pi", "openai-codex/gpt-5.3-codex-spark:medium")
         adapter = container.build_agent_runtime(
             AgentRuntimeKind.PI_HEADLESS, cwd=tmp_path, model=option
         )
@@ -156,7 +208,7 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
         argv = captured[0]
         assert argv[argv.index("--model") : argv.index("--model") + 2] == [
             "--model",
-            "openai-codex/gpt-5.5",
+            "openai-codex/gpt-5.3-codex-spark",
         ]
 
     elif case == "omit-model-flag-when-unset":
@@ -174,7 +226,7 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
         )
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"),
+            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.3-codex-spark"),
             runner=fake_runner,
             environ={},
         )
@@ -183,14 +235,17 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
             resolved_model=ResolvedModelConfig(
                 profile_id="pi-reasoning-high",
                 harness="pi",
-                model="openai-codex/gpt-5.5",
+                model="openai-codex/gpt-5.3-codex-spark",
                 reasoning="high",
                 source=PolicySource.CLI,
             ),
         )
         adapter.run(request)
         argv = captured[0]
-        assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "openai-codex/gpt-5.5"]
+        assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+            "--model",
+            "openai-codex/gpt-5.3-codex-spark",
+        ]
 
     elif case == "openrouter-model-id-passes-through-unchanged":
         import dataclasses
@@ -236,7 +291,7 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
         assert "--model" not in captured[0]
 
 
-@pytest.mark.parametrize("unsafe_model", ["gpt-5.5", "openai/gpt-5.5"])
+@pytest.mark.parametrize("unsafe_model", ["gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark"])
 def test_pi_rejects_gpt_outside_codex_subscription_before_spawn(
     tmp_path: Path, unsafe_model: str
 ) -> None:
@@ -742,7 +797,7 @@ def test_pi_thinking_flag_resolution(tmp_path: Path, case: str) -> None:
             resolved_model=ResolvedModelConfig(
                 profile_id="pi-reasoning-high",
                 harness="pi",
-                model="openai-codex/gpt-5.5",
+                model="openai-codex/gpt-5.3-codex-spark",
                 reasoning="high",
                 source=PolicySource.CLI,
             ),
@@ -778,7 +833,7 @@ def test_pi_thinking_flag_resolution(tmp_path: Path, case: str) -> None:
             resolved_model=ResolvedModelConfig(
                 profile_id="pi-reasoning-high",
                 harness="pi",
-                model="openai-codex/gpt-5.5",
+                model="openai-codex/gpt-5.3-codex-spark",
                 reasoning="high",
                 source=PolicySource.CLI,
             ),
@@ -807,13 +862,18 @@ def test_pi_thinking_flag_precedes_print_flag_and_stays_after_model(tmp_path: Pa
         return subprocess.CompletedProcess(argv, 0, stdout=_message_end("done"))
 
     adapter = PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5", reasoning_effort="high"),
+        PiHeadlessConfig(
+            cwd=tmp_path, model="openai-codex/gpt-5.3-codex-spark", reasoning_effort="high"
+        ),
         runner=fake_runner,
         environ={},
     )
     adapter.run(_request())
     argv = captured[0]
-    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "openai-codex/gpt-5.5"]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+        "--model",
+        "openai-codex/gpt-5.3-codex-spark",
+    ]
     assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
         "--thinking",
         "high",
@@ -841,7 +901,9 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr="boom")
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5", reasoning_effort="high"),
+            PiHeadlessConfig(
+                cwd=tmp_path, model="openai-codex/gpt-5.3-codex-spark", reasoning_effort="high"
+            ),
             runner=fake_runner,
             environ={},
         )
@@ -849,7 +911,7 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
         assert result.status is AgentRunStatus.FAILED
         assert result.diagnostic is not None
         assert result.diagnostic.runtime == "pi_headless"
-        assert result.diagnostic.model == "openai-codex/gpt-5.5"
+        assert result.diagnostic.model == "openai-codex/gpt-5.3-codex-spark"
         assert result.diagnostic.requested_reasoning == "high"
         assert result.diagnostic.exit_code == 1
         assert result.diagnostic.parser_classification == "no-result"
@@ -862,7 +924,9 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
             return subprocess.CompletedProcess(argv, 0, stdout="not json at all", stderr="")
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"), runner=fake_runner, environ={}
+            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.3-codex-spark"),
+            runner=fake_runner,
+            environ={},
         )
         result = adapter.run(_request())
         assert result.status is AgentRunStatus.SUCCEEDED
@@ -880,7 +944,9 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
             return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"), runner=fake_runner, environ={}
+            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.3-codex-spark"),
+            runner=fake_runner,
+            environ={},
         )
         result = adapter.run(_request(expected_schema="agent-run-result-v1"))
         assert result.status is AgentRunStatus.SUCCEEDED
@@ -931,9 +997,9 @@ def test_pi_schema_shaped_result_with_missing_ref_carries_diagnostic(tmp_path: P
         assert isinstance(argv, list)
         return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
-    result = PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}
-    ).run(_request(expected_schema="agent-run-result-v1"))
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
 
     assert result.artifact_refs == (".dadaia/handoff/missing.json",)
     assert result.diagnostic is not None
@@ -950,9 +1016,9 @@ def test_pi_schema_shaped_result_without_refs_carries_diagnostic(tmp_path: Path)
         assert isinstance(argv, list)
         return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
-    result = PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}
-    ).run(_request(expected_schema="agent-run-result-v1"))
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
 
     assert result.artifact_refs == ()
     assert result.diagnostic is not None

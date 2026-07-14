@@ -143,12 +143,7 @@ def test_purge_step_payloads_matrix(tmp_path: Path, case: str) -> None:
 def test_purge_worker_outputs_removes_only_exact_confined_refs(tmp_path: Path) -> None:
     adapter = FilesystemRuntimeFileAdapter(tmp_path)
     worker = (
-        tmp_path
-        / ".dadaia"
-        / "tmp"
-        / "lifecycle-worker"
-        / "demo"
-        / "run-step.step-output.json"
+        tmp_path / ".dadaia" / "tmp" / "lifecycle-worker" / "demo" / "run-step.step-output.json"
     )
     worker.parent.mkdir(parents=True)
     worker.write_text("{}", encoding="utf-8")

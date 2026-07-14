@@ -276,6 +276,33 @@ class LifecycleAgentRunner:
         )
         return retry_result, self._blocked_result(lifecycle_run, retry_data, retry_result)
 
+    @staticmethod
+    def _materialize_from_parsed(result: AgentRunResult, target: Path) -> bool:
+        """Write the canonical worker-output file Python-side from the parsed payload.
+
+        The single most common weak-model failure is emitting a perfectly valid result
+        envelope on stdout while skipping the write-the-file ritual. The adapter already
+        parsed that envelope into ``domain_payload``/``structured_output`` — blocking
+        (or re-running a full worker session) to re-obtain data Python is holding is
+        pure waste. When the parsed payload is substantive, Python materializes the
+        file itself and the normal promotion path proceeds. Returns True when written.
+        """
+        # Only a SUBSTANTIVE parsed payload is worth materializing: a bare
+        # structured_output (e.g. the adapter's changed-paths stub) would manufacture a
+        # vacuous envelope that the named domain validator then rejects — blocking with
+        # a confusing schema error instead of the honest missing-artifact retry.
+        if not isinstance(result.domain_payload, dict) or not result.domain_payload:
+            return False
+        payload = dict(result.domain_payload)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+        except OSError:
+            return False
+        return True
+
     def _recover_exact_worker_output(
         self, result: AgentRunResult, request: AgentRunRequest
     ) -> AgentRunResult:
@@ -290,7 +317,7 @@ class LifecycleAgentRunner:
             return result
         ref = canonical_worker_output_ref(request.context, request.task_id)
         target = self._artifact_root / ref
-        if not target.is_file():
+        if not target.is_file() and not self._materialize_from_parsed(result, target):
             return result
         try:
             document = json.loads(target.read_text(encoding="utf-8"))
@@ -304,8 +331,7 @@ class LifecycleAgentRunner:
             for key, value in os.environ.items()
             if value
             and any(
-                part in key.upper()
-                for part in ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
+                part in key.upper() for part in ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
             )
         )
 
@@ -359,7 +385,15 @@ class LifecycleAgentRunner:
             return result
         normalized: list[str] = []
         changed = False
+        root_prefix = str(self._artifact_root.resolve()) + "/"
         for ref in result.artifact_refs:
+            # A worker citing its assigned path ABSOLUTELY (under the workspace root)
+            # meant the same file — normalize to workspace-relative instead of letting
+            # the scope gate reject the run over citation form. Absolute refs outside
+            # the workspace root stay as-is and still fail the scope gate.
+            if ref.startswith(root_prefix):
+                ref = ref[len(root_prefix) :]
+                changed = True
             if not ref.startswith("specs/") or (self._artifact_root / ref).exists():
                 normalized.append(ref)
                 continue
@@ -479,6 +513,15 @@ class LifecycleAgentRunner:
             outside = out_of_scope_paths(candidates, allowed=data.deliverable_globs, forbidden=())
             delivered = [path for path in candidates if path not in set(outside)]
             if not delivered:
+                # Disk truth beats self-reporting: a worker that wrote its deliverable
+                # without citing it in artifact_refs — or one that verified a valid
+                # deliverable already present from a prior attempt of this run — still
+                # leaves the zone genuinely non-empty. The gate's job is "a deliverable
+                # exists for the next review to judge", not "the model repeated the
+                # citation ritual". The zone is release-scoped, so a different release's
+                # artifacts can never satisfy it.
+                delivered = self._zone_files(data.deliverable_globs)
+            if not delivered:
                 return self._blocked(
                     lifecycle_run,
                     data,
@@ -487,6 +530,27 @@ class LifecycleAgentRunner:
                     result=result,
                 )
         return None
+
+    def _zone_files(self, deliverable_globs: tuple[str, ...]) -> list[str]:
+        """Files currently present in the step's deliverable zone."""
+        if self._artifact_root is None:
+            return []
+        found: list[str] = []
+        for pattern in deliverable_globs:
+            clean = pattern.strip().lstrip("/")
+            if not clean or ".." in clean.split("/"):
+                continue
+            try:
+                matches = self._artifact_root.glob(clean)
+            except (OSError, ValueError):
+                continue
+            for path in matches:
+                try:
+                    if path.is_file():
+                        found.append(path.relative_to(self._artifact_root).as_posix())
+                except OSError:
+                    continue
+        return found
 
     def _blocked(
         self,

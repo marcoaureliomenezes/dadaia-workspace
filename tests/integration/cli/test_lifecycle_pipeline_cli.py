@@ -73,7 +73,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
             "--harness",
             "fake",
             "--step-harness",
-            "review_qa=codex",
+            "review_combined=codex",
             "--json",
         ],
     )

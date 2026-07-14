@@ -13,8 +13,8 @@ tags:
 - quality
 - test-architecture
 token_estimate: 460
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-07-14'
+release_origin: v0.2.7
 ---
 
 ## Purpose
@@ -43,7 +43,12 @@ Each of the four dadaia-workflows has deterministic fake-worker coverage and rea
 phantom journeys through Codex and PI. Tests assert step order, fragment/persona
 injection, provider/model resolution, immutable attempt payloads, exact dependency
 consumption, rejection/retry behavior, task-marker closure gating, diagnostics, and
-terminal state.
+terminal state. The v0.2.3 simplification adds: bounded in-run revision (a REJECTED
+review or failed deterministic lint auto-revises its create step once with the
+rejection digest), per-step static-input prefixes, Python-side materialization of a
+worker payload the adapter already parsed, disk-truth deliverable-zone checks,
+unique-suffix anchor binding, and review evidence providers (write-set-scoped git
+diff + executed pytest output) injected into every review prompt.
 
 Live PI GPT validation must use provider-qualified `openai-codex/...` profiles when the
 campaign is intended to use the Codex subscription. Optional OpenRouter profiles require

@@ -22,7 +22,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStoreError
-from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict
+from dadaia_workspace.features.backlog.classifier import BoundItem
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
 from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
@@ -93,9 +93,7 @@ def _registry(tmp_path: Path) -> Registry:
     )
 
 
-def _workflow(
-    tmp_path: Path, registry: Registry, downgrade: object | None = None
-) -> BacklogDefinitionWorkflow:
+def _workflow(tmp_path: Path, registry: Registry) -> BacklogDefinitionWorkflow:
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
     selector = ContextSelector(
@@ -109,8 +107,6 @@ def _workflow(
         "context_selector": selector,
         "registry": registry,
     }
-    if downgrade is not None:
-        kwargs["downgrade"] = downgrade
     return BacklogDefinitionWorkflow(**kwargs)  # type: ignore[arg-type]
 
 
@@ -127,27 +123,6 @@ def _cd_demand() -> BacklogDemand:
             bound=BoundItem(slug="new", anchor_changes={_ANCHOR_C: "C becomes E"}),
         ),
     )
-
-
-def test_offline_defaults_to_divergent_conflict(tmp_path: Path) -> None:
-    """Model OFFLINE (default no_downgrade): the C->D/C->E twin is DIVERGENT_CONFLICT."""
-    wf = _workflow(tmp_path, _registry(tmp_path))
-    result = wf.run("bd-offline", _cd_demand())
-    verdicts = [c.verdict for c in result.overlap]
-    assert Verdict.DIVERGENT_CONFLICT in verdicts
-
-
-def test_stubbed_compatible_merge_downgrades(tmp_path: Path) -> None:
-    """A stubbed proven-compatible merge downgrades the same-anchor pair to OVERLAP."""
-
-    def proven_compatible(_new: str, _existing: str) -> Verdict | None:
-        return Verdict.OVERLAP
-
-    wf = _workflow(tmp_path, _registry(tmp_path), downgrade=proven_compatible)
-    result = wf.run("bd-downgrade", _cd_demand())
-    verdicts = [c.verdict for c in result.overlap]
-    assert Verdict.OVERLAP in verdicts
-    assert Verdict.DIVERGENT_CONFLICT not in verdicts
 
 
 def test_operator_demand_reaches_every_model_step_prompt(tmp_path: Path) -> None:

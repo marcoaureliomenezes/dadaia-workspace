@@ -53,7 +53,7 @@ def test_effective_harness_precedence_matrix() -> None:
     # Every supported Layer-2 harness has a governed default profile for the step.
     assert implement_step.default_profiles["codex"] == "codex-implementation-standard"
     assert implement_step.default_profiles["pi"] == "pi-implementation-standard"
-    review_step = workflow.step("review_qa")
+    review_step = workflow.step("review_combined")
     assert review_step is not None
     assert review_step.default_profiles["codex"] == "codex-review-deep"
     assert review_step.default_profiles["pi"] == "pi-reasoning-high"
@@ -68,7 +68,7 @@ def test_effective_harness_precedence_matrix() -> None:
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="pi"),),
     )
     assert step_only_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert step_only_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    assert step_only_snapshot.step("review_combined").harness == "codex"  # type: ignore[union-attr]
 
     cli_beats_cli_default = _resolver().resolve(
         _WORKFLOW,
@@ -77,7 +77,7 @@ def test_effective_harness_precedence_matrix() -> None:
         step_harness_overrides=(StepHarnessOverride(step="implement", harness="codex"),),
     )
     assert cli_beats_cli_default.step("implement").harness == "codex"  # type: ignore[union-attr]
-    assert cli_beats_cli_default.step("review_qa").harness == "pi"  # type: ignore[union-attr]
+    assert cli_beats_cli_default.step("review_combined").harness == "pi"  # type: ignore[union-attr]
 
     overlay_step_only = WorkflowModelPolicyOverlay(
         policy_id="default",
@@ -87,7 +87,7 @@ def test_effective_harness_precedence_matrix() -> None:
     )
     overlay_step_snapshot = _resolver(overlay_step_only).resolve(_WORKFLOW, context="default")
     assert overlay_step_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert overlay_step_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    assert overlay_step_snapshot.step("review_combined").harness == "codex"  # type: ignore[union-attr]
 
     cli_beats_overlay_step = _resolver(overlay_step_only).resolve(
         _WORKFLOW,
@@ -106,7 +106,7 @@ def test_effective_harness_precedence_matrix() -> None:
         _WORKFLOW, context="default"
     )
     assert overlay_layered_snapshot.step("implement").harness == "pi"  # type: ignore[union-attr]
-    assert overlay_layered_snapshot.step("review_qa").harness == "codex"  # type: ignore[union-attr]
+    assert overlay_layered_snapshot.step("review_combined").harness == "codex"  # type: ignore[union-attr]
 
     overlay_default_all = WorkflowModelPolicyOverlay(
         policy_id="default",
@@ -130,7 +130,7 @@ def test_auto_profile_on_harness_override_and_explicit_profile_not_overridden() 
     assert impl is not None
     assert impl.harness == "pi"
     assert impl.model_profile == "pi-implementation-standard"
-    review = auto.step("review_qa")
+    review = auto.step("review_combined")
     assert review is not None
     assert review.model_profile == "pi-reasoning-high"
 

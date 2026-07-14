@@ -204,7 +204,7 @@ def test_w2_boundary_and_sel_constitution_indirection(tmp_path: Path) -> None:
     assert "backlog_definition" in wired  # its main-fragment inputs ARE resolved (assembly mixin)
     main_ids = fcd._selector_wired_main_fragment_ids()
     assert "backlog_definition.backlog_authoring" in main_ids
-    assert "implementation.qa_review" in main_ids
+    assert "implementation.combined_review" in main_ids
 
     # sel_constitution (A4) — NOT dead: the selector stays registered under its named-atom key.
     assert "constitution.md" in known_dynamic_inputs()

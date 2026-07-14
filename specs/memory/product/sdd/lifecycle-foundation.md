@@ -5,8 +5,9 @@ category: product
 tldr: Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence.
 summary: >-
   The runtime foundation beneath the four dadaia-workflows. Python owns sequencing,
-  context selection, policy resolution, task-marker and artifact gates, run state,
-  retries, diagnostics, and retention. Codex and PI workers run behind AgentRuntimePort.
+  context selection, policy resolution, task-marker and artifact gates, advisory Git
+  preflight warnings, run state, retries, diagnostics, and retention. Codex and PI
+  workers run behind AgentRuntimePort with content-delta changed-path attribution.
 tags:
 - sdd
 - lifecycle
@@ -14,8 +15,8 @@ tags:
 - hygiene
 - gates
 token_estimate: 655
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-07-14'
+release_origin: v0.2.7
 ---
 
 ## Purpose
@@ -36,6 +37,8 @@ the lifecycle state machine.
 - `AgentRunner` invokes `AgentRuntimePort`, redacts diagnostics, validates the worker
   result, and persists evidence even when the worker is noncompliant.
 - `WorkflowHandoffResolver` enforces exact producer-to-consumer payload edges.
+- Lifecycle preflight blocks invalid context/release state but reports Git dirtiness,
+  missing upstream, and unpushed commits as deterministic warnings.
 - Hygiene and retention operate only in `.dadaia/` safe zones and preserve active or
   referenced evidence.
 
@@ -65,29 +68,39 @@ Every model step is assembled from:
 
 Accepted workers return `agent-run-result-v1` with artifact references. Lifecycle
 payloads conform to the current handoff contract and capture `self_pull` evidence when
-the role has memory references. A successful process without required artifacts is a
-blocked attempt, not success. Non-zero exits, parse failures, missing verdicts, and
-schema failures retain redacted diagnostics.
+the role has memory references. Worker `changed_paths` are derived from before/after Git
+content and existence deltas around the attempt: untouched pre-existing dirty paths are
+excluded, while new, removed, or content-changed paths are included. A successful process
+without required artifacts is a blocked attempt, not success. Non-zero exits, parse
+failures, missing verdicts, and schema failures retain redacted diagnostics.
 
 ## Review And Retry
 
-Implementation plus reviews runs implementation, QA, security, and code review in
-order. A rejected review returns to implementation through a bounded correction loop.
-Each retry gets a new attempt number and immutable payload. The terminal close step is
-unreachable while any canonical task marker remains `[ ]` or `[-]`, or while any review
-is not approved.
+Implementation plus reviews runs implement, ONE combined tri-angle review (QA +
+security + code angles in a single worker session), then close. A rejected review
+returns to implementation through a bounded correction loop with the rejection digest
+injected into the retry prompt. In the definition workflows, a REJECTED review or a
+failed deterministic lint auto-revises its consumed create step once in-run before
+blocking. Each retry gets a new attempt number and immutable payload. Review prompts
+receive executed evidence: the write-set-scoped git diff and the captured pytest run
+of the release's declared test paths. The terminal close step is unreachable while any
+canonical task marker remains `[ ]` or `[-]`, or while the review is not approved.
 
 ## Context And Concurrency
 
 Preflight resolves mode only from the caller's environment or caller-owned session
 record. A foreign bind can never impose READ mode or a context on the current run.
-Concurrent sessions are permitted and surfaced through advisory presence; lifecycle
-does not acquire or wait on a concurrency lock.
+Git dirtiness, missing upstream, and unpushed commits are visible warnings rather than
+workflow blockers; the commit, CI, and exact-security-verdict push chokepoints remain
+the authoritative Git quality boundaries. Concurrent sessions are permitted and surfaced
+through advisory presence; lifecycle does not acquire or wait on a concurrency lock.
 
 ## Hygiene
 
-Runtime data stays under `.dadaia/`. Worker output has a bounded staging directory;
-accepted step payloads and required diagnostics are durable for the run. Cleanup is
+Transient runtime data stays under `.dadaia/` (worker output staging, diagnostics).
+Durable step payloads are REGISTERED IN THE SPEC CONTEXT: a run with a release writes
+`specs/releases/<release_id>/handoffs/<run_id>/steps/`; a no-release run (backlog
+definition) writes `specs/backlog/handoffs/<run_id>/steps/`. Cleanup is
 dry-run by default, path-confined, and reference-aware. No lifecycle execution creates
 repo-local cache, state, report, or temporary directories.
 

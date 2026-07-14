@@ -123,8 +123,7 @@ def _approving_result() -> AgentRunResult:
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: APPROVED",
         artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
-            "release-definition-step.step-output.json",
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
         ),
         structured_output={"verdict": "APPROVED"},
     )
@@ -135,8 +134,7 @@ def _rejecting_result() -> AgentRunResult:
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: REJECTED",
         artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
-            "release-definition-step.step-output.json",
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
         ),
         structured_output={"verdict": "REJECTED"},
     )
@@ -251,16 +249,17 @@ def test_release_scope_consumes_exact_backlog_author_run(
 def test_rejected_review_blocks_before_commit_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A REJECTED verdict at spec_arch_review stops the run before the commit gate."""
+    """A REJECTED verdict at spec_review stops the run before the commit gate
+    (after the single bounded in-run revision of spec_create is spent)."""
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
 
-    # Drive spec_arch_review on a distinct harness (codex) and make that kind reject;
+    # Drive spec_review on a distinct harness (codex) and make that kind reject;
     # every other step (on the default pi harness, also fake-backed) approves. Python —
     # not the model — decides the block.
     _install_fake_factory(monkeypatch, reject_kind=AgentRuntimeKind.CODEX_EXEC)
 
-    result = _define(["--harness", "pi", "--step-harness", "spec_arch_review=codex"])
+    result = _define(["--harness", "pi", "--step-harness", "spec_review=codex"])
 
     assert result.exit_code == 3, result.output
     payload = _payload(result.output)
@@ -271,7 +270,7 @@ def test_rejected_review_blocks_before_commit_gate(
     steps = payload["steps"]
     assert isinstance(steps, list)
     labels = [step["label"] for step in steps]
-    assert labels[-1] == "spec_arch_review"
+    assert labels[-1] == "spec_review"
     assert "definition_commit_gate" not in labels
     assert steps[-1]["accepted"] is False
     blocked = payload["blocked"]
@@ -296,7 +295,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
       (b) both harnesses pass through the same Python gate logic (both accepted);
       (c) the mixed-harness run completes identically to the single-harness path.
 
-    The single-harness baseline below IS the full happy-path proof (all 8 model steps +
+    The single-harness baseline below IS the full happy-path proof (all 7 model steps +
     terminal Python commit gate, release advances to IMPLEMENTATION) — absorbing the
     former standalone happy-path test. Fragment-scoped (non-generic) prompt assertions
     are folded in as this fn already builds workflow objects directly.
@@ -307,7 +306,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     monkeypatch.chdir(workspace)
     _install_fake_factory(monkeypatch)
 
-    # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 8
+    # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 7
     # model steps + the terminal Python commit gate ran, release advances to IMPLEMENTATION.
     baseline = _define(["--harness", "pi"])
     assert baseline.exit_code == 0, baseline.output
@@ -319,8 +318,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_labels == [
         "release_scope",
         "spec_create",
-        "spec_arch_review",
-        "spec_qa_review",
+        "spec_review",
         "plan_create",
         "plan_review",
         "tasks_create",

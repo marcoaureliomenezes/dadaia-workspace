@@ -68,8 +68,7 @@ def _passing_result(label: str, *, artifact_ref: str | None = None) -> AgentRunR
         status=AgentRunStatus.SUCCEEDED,
         summary=f"fake runtime: {label} APPROVED",
         artifact_refs=(
-            artifact_ref
-            or f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{label}.step-output.json",
+            artifact_ref or f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{label}.step-output.json",
         ),
         structured_output={"verdict": "APPROVED", "task_group": "rc-1"},
     )
@@ -110,24 +109,19 @@ def test_pipeline_runs_to_closure_on_fake(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """T-23-02 — happy path: feeding every gate (qa, security, code) a green
+    """T-23-02 — happy path: feeding the combined tri-angle gate a green
     verdict+handoff advances the run through every phase and reaches terminal
     ``CLOSURE`` via the real CLI ``lifecycle pipeline`` surface."""
-    # One passing result per ladder step (implement, review_qa, review_security,
-    # review_code). The pipeline builds a fresh FAKE adapter per step, so index order
-    # equals step order.
+    # One passing result per ladder step (implement, review_combined, close). The
+    # pipeline builds a fresh FAKE adapter per step, so index order equals step order.
     _inject_passing_fake(
         monkeypatch,
         result_for={
             "0": _passing_result("implement"),
-            "1": _passing_result("review_qa"),
-            "2": _passing_result("review_security"),
-            "3": _passing_result("review_code"),
-            "4": _passing_result(
-                    "close",
-                    artifact_ref=(
-                        "specs/releases/multiharness-engine-v0116/CLOSURE.md"
-                    ),
+            "1": _passing_result("review_combined"),
+            "2": _passing_result(
+                "close",
+                artifact_ref=("specs/releases/multiharness-engine-v0116/CLOSURE.md"),
             ),
         },
     )
@@ -160,7 +154,7 @@ def test_pipeline_runs_to_closure_on_fake(
     assert payload["blocked"] is None
     # Every step ran on the fake harness and was accepted, in ladder order.
     labels = [step["label"] for step in payload["steps"]]
-    assert labels == ["implement", "review_qa", "review_security", "review_code", "close"]
+    assert labels == ["implement", "review_combined", "close"]
     assert all(step["accepted"] is True for step in payload["steps"])
     assert all(step["runtime"] == "fake" for step in payload["steps"])
     # The last accepted step landed the run in CLOSURE.
@@ -225,28 +219,7 @@ def test_pipeline_no_review_can_backtrack_to_implementation_on_fake(
     assert qa_result.final_phase is LifecyclePhase.QA_REVIEW
     assert qa_result.final_phase is not LifecyclePhase.IMPLEMENTATION
 
-    # security + code cases: each driven independently from its source phase through a
-    # one-step rework ladder.
-    for source_idx, label, review_phase in (
-        (2, "review_security", LifecyclePhase.SECURITY_REVIEW),
-        (3, "review_code", LifecyclePhase.CODE_REVIEW),
-    ):
-        assert not is_legal_transition(review_phase, LifecyclePhase.IMPLEMENTATION), label
-
-        review_step = ladder[source_idx]
-        rework: PipelineStep = replace(
-            review_step,
-            label=f"{label}_rework",
-            target_phase=LifecyclePhase.IMPLEMENTATION,
-        )
-        _inject_passing_fake(monkeypatch, default=_passing_result(rework.label))
-        pipeline = container.build_lifecycle_pipeline(
-            workspace,
-            context=_CONTEXT,
-            release_id="multiharness-engine-v0116",
-        )
-        result = pipeline.run(f"pipe-no-backtrack-{label}", (rework,))
-
-        assert result.final_phase is review_phase, label
-        assert result.final_phase is not LifecyclePhase.IMPLEMENTATION, label
-        assert result.steps[0].phase is review_phase, label
+    # Legacy review phases keep their no-backtrack law even though the canonical
+    # ladder no longer schedules them (a custom sequence still can).
+    for review_phase in (LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.CODE_REVIEW):
+        assert not is_legal_transition(review_phase, LifecyclePhase.IMPLEMENTATION)

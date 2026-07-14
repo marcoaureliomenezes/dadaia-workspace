@@ -423,9 +423,7 @@ def bind(
     pid = os.getpid()
 
     # The persisted mode the gate reads: mutating modes carry BOUND_; READ stays bare.
-    persisted_mode = (
-        f"BOUND_{resolved_mode}" if resolved_mode in _MUTATING_MODES else resolved_mode
-    )
+    persisted_mode = f"BOUND_{resolved_mode}" if resolved_mode in _MUTATING_MODES else resolved_mode
 
     session_data: dict = {  # type: ignore[type-arg]
         "session_id": session_id,

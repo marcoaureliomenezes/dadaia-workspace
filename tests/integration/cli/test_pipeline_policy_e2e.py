@@ -54,9 +54,7 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(
-            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
-        ),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -108,7 +106,7 @@ def test_pipeline_e2e_persists_snapshot_threads_model_and_invalid_overlay_blocks
     impl_entry = persisted.workflow_policy.step("implement")
     assert impl_entry is not None
     assert impl_entry.model_profile == "codex-implementation-standard"
-    assert impl_entry.model == "gpt-5.5"
+    assert impl_entry.model == "gpt-5.3-codex-spark"
     assert impl_entry.reasoning == "medium"
     assert "implementation.implement_tdd" in impl_entry.fragments
 

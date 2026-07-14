@@ -138,13 +138,9 @@ _RELEASE_STEP_PURPOSE: dict[str, str] = {
         "Product-engineer authors SPEC.md — the approved problem/solution contract — and "
         "hands it off for review."
     ),
-    "spec_arch_review": (
-        "Software-architect reviews the SPEC for architectural soundness; a REJECTED "
-        "verdict blocks advancement."
-    ),
-    "spec_qa_review": (
-        "QA-engineer reviews the SPEC for testable acceptance criteria; a REJECTED verdict "
-        "blocks advancement."
+    "spec_review": (
+        "Software-architect and QA-engineer jointly review the SPEC in ONE pass "
+        "(architecture + testability angles); a REJECTED verdict blocks advancement."
     ),
     "plan_create": "Product-engineer authors PLAN.md — the implementation approach for the SPEC.",
     "plan_review": (
@@ -170,21 +166,14 @@ _IMPLEMENTATION_STEP_PURPOSE: dict[str, str] = {
         "Software-engineer implements the approved release task set test-first (the fragment-driven "
         "TDD step) and emits an implementation handoff."
     ),
-    "review_qa": (
-        "QA-engineer validates acceptance + runs the suite (fragment-driven); a REJECTED "
-        "verdict blocks advancement."
-    ),
-    "review_security": (
-        "Security-reviewer audits the commit against the OWASP checklist (generic step — "
-        "not yet fragment-migrated)."
-    ),
-    "review_code": (
-        "Code-reviewer reviews the diff for the pre-PR gate (generic step — not yet "
-        "fragment-migrated)."
+    "review_combined": (
+        "QA-engineer, security-reviewer, and code-reviewer judge the change in ONE "
+        "tri-angle pass (tests real, OWASP checks, correctness/architecture fidelity); "
+        "a REJECTED verdict returns to implementation through the bounded loop."
     ),
     "close": (
         "Product-engineer records closure evidence and updates current memory only after "
-        "all three reviews approve."
+        "the combined review approves (light-effort mechanical step)."
     ),
 }
 
@@ -202,31 +191,16 @@ _CLOSURE_STEP_PURPOSE: dict[str, str] = {
 
 _BACKLOG_STEP_PURPOSE: dict[str, str] = {
     "intake_grill": (
-        "Project-manager grills the operator demand into proposed (subject -> change) "
-        "intents (mandatory grill; fragment-driven)."
-    ),
-    "subject_bind": (
-        "Python binds every proposed subject through the canonical-subject registry; HALTs "
-        "on any unresolved/ambiguous subject (no silent NEW)."
-    ),
-    "existing_backlog_review": (
-        "Python runs the deterministic set-intersection classifier over the bound intents "
-        "vs every existing item (model offline by default; downgrade seam fail-closed)."
-    ),
-    "reconcile_decision": (
-        "Python blocks a NEW file unless every existing item is UNRELATED; otherwise forces "
-        "an UPDATE/MERGE."
-    ),
-    "conflict_resolution_grill": (
-        "Project-manager grills a DIVERGENT_CONFLICT into one reconciled change — conditional, "
-        "runs only when the review found a conflict (fragment-driven)."
+        "Product-engineer challenges the operator demand from evidence (OPT-IN via "
+        "--grill; unresolved items become open_questions; its digest feeds the author)."
     ),
     "backlog_author": (
         "Product-engineer authors the single consistent item (NEW file XOR edit existing — "
-        "never a twin; fragment-driven)."
+        "never a twin; fragment-driven). The default path's ONE model call."
     ),
     "backlog_review_gate": (
-        "Python re-runs the classifier over the authored result and blocks any "
+        "Python validates what the author ACTUALLY wrote to disk: binds its intents "
+        "through the registry, diffs against the pre-authoring snapshot, and blocks any "
         "DUPLICATE/DIVERGENT_CONFLICT it would introduce."
     ),
 }
@@ -234,21 +208,15 @@ _BACKLOG_STEP_PURPOSE: dict[str, str] = {
 # Wave-E fragment+gate workflow bodies (T-30-E-01..03). Each step's purpose is sourced from
 # its fragment role; the terminal gate is Python-owned (no worker).
 _AUDIT_STEP_PURPOSE: dict[str, str] = {
-    "audit_scope": (
-        "Project-auditor bounds the audit question, lenses, surfaces, and acceptance rubric "
-        "(fragment-driven)."
-    ),
-    "drift_scan": (
-        "Project-auditor scans the bounded surfaces for drift and returns a verdict + findings "
-        "(review gate — blocking drift BLOCKS)."
-    ),
-    "triage": (
-        "Project-manager disposes every finding into disposition-ready output (bug / backlog / "
-        "accepted-risk / resolved — never a deletion; fragment-driven)."
+    "audit_report": (
+        "Project-auditor runs the whole audit arc in ONE pass: states the question, "
+        "scans the lenses, emits findings, and routes each to a disposition (bug / "
+        "backlog / accepted-risk / resolved — never a deletion; fragment-driven)."
     ),
     "audit_disposition_gate": (
-        "Python-owned terminal gate: completes the audit only when every prior gate passed and "
-        "the workflow-step handoff graph is complete. Runs no worker."
+        "Python-owned terminal gate: referential integrity only (every finding routed "
+        "exactly once; no phantom disposition) — severity/lens are derived from the "
+        "finding by id, never re-verified as byte copies. Runs no worker."
     ),
 }
 
@@ -259,30 +227,27 @@ _WORKFLOW_PURPOSE: dict[str, str] = {
         "fragment bundle + scoped context + output schema run on a discrete (harness, "
         "model). It walks scope → SPEC → SPEC reviews → PLAN → PLAN review → TASKS → "
         "implementability review → a terminal Python commit gate that advances the "
-        "release to IMPLEMENTATION."
+        "release to IMPLEMENTATION. A consumed backlog pick skips the scope model step."
     ),
     "implementation_reviews": (
-        "Implements the approved release task set, verifies it, runs QA, security, and code review, "
-        "then closes the release. Rejected reviews return to implementation through the "
-        "bounded correction loop; the terminal Python gate completes closure only after "
-        "all review evidence is approved."
+        "Implements the approved release task set test-first, judges it with ONE combined "
+        "tri-angle review (QA + security + code), then closes the release. A rejected "
+        "review returns to implementation through the bounded correction loop with the "
+        "rejection digest injected."
     ),
     "backlog_definition": (
-        "Turns an operator demand into one consistent backlog item by construction. Python "
-        "owns the gates: it binds every proposed subject through the canonical-subject "
-        "registry (HALT on unresolved), classifies the demand against every existing item "
-        "with the deterministic set-intersection classifier (model offline by default), "
-        "blocks a NEW file unless every existing item is UNRELATED, runs a conditional "
-        "conflict-resolution grill only on a DIVERGENT_CONFLICT, and re-validates the "
-        "authored result. It walks intake_grill → subject_bind → existing_backlog_review → "
-        "reconcile_decision → conflict_resolution_grill → backlog_author → backlog_review_gate."
+        "Turns an operator demand into one consistent backlog item with ONE model call. "
+        "backlog_author writes the item; the Python backlog_review_gate then validates "
+        "what actually landed on disk — binds its intents through the canonical-subject "
+        "registry and blocks any DUPLICATE/DIVERGENT_CONFLICT against the real backlog. "
+        "--grill opts into an evidence-first intake step whose digest feeds the author. "
+        "It walks [intake_grill] → backlog_author → backlog_review_gate."
     ),
     "audit": (
-        "Runs a bounded audit: project-auditor scopes the audit question + lenses, scans the "
-        "bounded surfaces for drift (a review gate — blocking drift BLOCKS), and project-auditor "
-        "triages every finding into disposition-ready output (bug / backlog / accepted-risk / "
-        "resolved — never a deletion). Python owns the step order, the drift-scan gate, and the "
-        "terminal disposition gate. It walks audit_scope → drift_scan → triage → "
+        "Runs a bounded audit in ONE model pass: project-auditor states the question, "
+        "scans the lenses for drift, emits findings, and routes each to a disposition "
+        "(bug / backlog / accepted-risk / resolved — never a deletion). The terminal "
+        "Python gate checks referential integrity only. It walks audit_report → "
         "audit_disposition_gate."
     ),
 }
@@ -333,18 +298,19 @@ _DEFAULT_WORKER_HARNESS: str = harness_models.CODEX_HARNESS
 
 
 def _default_profiles_for(
-    *, harness_options: list[str], is_gate: bool
+    *, harness_options: list[str], is_gate: bool, light: bool = False
 ) -> tuple[str | None, dict[str, str]]:
     """Return (default_harness, {harness: default_profile_id}) for a step.
 
     A worker step (``harness_options`` non-empty) defaults to the deep profile when it is a
-    review/gate step, else the standard profile, for *each* supported harness. The default
-    harness is :data:`_DEFAULT_WORKER_HARNESS` when supported, else the first option. A
+    review/gate step, the light profile when *light* (mechanical steps like ``close``),
+    else the standard profile, for *each* supported harness. The default harness is
+    :data:`_DEFAULT_WORKER_HARNESS` when supported, else the first option. A
     Python-owned gate step (no worker) carries no default harness/profile.
     """
     if not harness_options:
         return None, {}
-    purpose = "deep" if is_gate else "standard"
+    purpose = "light" if light else ("deep" if is_gate else "standard")
     profiles: dict[str, str] = {}
     for harness in harness_options:
         by_purpose = DEFAULT_PROFILE_BY_HARNESS_PURPOSE.get(harness)
@@ -409,7 +375,9 @@ def _implementation_steps() -> list[DadaiaWorkflowStepDTO]:
         harness_options, model_options = _harness_options_for(is_worker_step=True)
         is_gate = pstep.label.startswith("review")
         default_harness, default_profiles = _default_profiles_for(
-            harness_options=harness_options, is_gate=is_gate
+            harness_options=harness_options,
+            is_gate=is_gate,
+            light=pstep.label == "close",
         )
         steps.append(
             DadaiaWorkflowStepDTO(

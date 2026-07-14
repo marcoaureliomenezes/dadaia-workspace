@@ -39,9 +39,7 @@ def test_reports_hygiene_status_and_clean_are_live_remediation_commands(
     assert workflow_status.exit_code == 0, workflow_status.output
     assert json.loads(workflow_status.stdout)["status"] == "OK"
 
-    dry_run = runner.invoke(
-        app, ["reports", "workflow-hygiene-clean", "--dry-run", "--json"]
-    )
+    dry_run = runner.invoke(app, ["reports", "workflow-hygiene-clean", "--dry-run", "--json"])
     assert dry_run.exit_code == 0, dry_run.output
     assert json.loads(dry_run.stdout)["candidate_count"] >= 1
     assert old.is_file()
@@ -62,9 +60,7 @@ def test_reports_workflow_profiles_lists_and_filters_governed_profiles(
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
 
-    result = runner.invoke(
-        app, ["reports", "workflow-profiles", "--harness", "pi", "--json"]
-    )
+    result = runner.invoke(app, ["reports", "workflow-profiles", "--harness", "pi", "--json"])
 
     assert result.exit_code == 0, result.output
     profiles = json.loads(result.stdout)["profiles"]

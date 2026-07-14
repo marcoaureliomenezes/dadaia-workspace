@@ -4,17 +4,18 @@ title: Harness — Codex
 category: product
 tldr: 'Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.'
 summary: Capability and scaffold truth for the Codex harness at both agentic layers —
-  interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, model
-  catalog, and what a Codex-only workspace installation contains.
+  interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport,
+  content-delta changed-path attribution, bytecode-suppression environment preservation,
+  model catalog, and what a Codex-only workspace installation contains.
 tags:
 - harness
 - codex
 - layer-1
 - layer-2
 - projection
-token_estimate: 930
-last_updated: '2026-07-08'
-release_origin: v0.1.66
+token_estimate: 980
+last_updated: '2026-07-14'
+release_origin: v0.2.5
 ---
 
 ## Purpose
@@ -44,8 +45,11 @@ the echo, the pin, and explicit `--harness fake`).
    `DADAIA_CODEX_LIVE=1`): it drives a real Codex binary against a throwaway trusted
    workspace under `.dadaia/tmp/` and re-proves these contract facts repeatably.
 4. As a Layer-2 worker: the engine builds the exec argv (model `(id, effort)` discrete;
-   no approval flag — exec never prompts), pipes the fragment+persona prompt, and
-   extracts the result via the shared strict-schema-first extraction.
+   no approval flag — exec never prompts), preserves the non-secret
+   `PYTHONDONTWRITEBYTECODE` control in the subprocess environment allowlist, pipes the
+   fragment+persona prompt, extracts the result via the shared strict-schema-first
+   extraction, and returns Git-derived content-delta `changed_paths` rather than trusting
+   model self-report.
 5. **Trust + sandbox posture (v0.1.66, FR4/FR5).** `CodexExecAdapter._command` includes
    `--skip-git-repo-check` unconditionally alongside `--ignore-user-config`, so a
    governed worker never fails codex's own "Not inside a trusted directory" trust

@@ -271,6 +271,7 @@ def upgrade(
 # Canonical templates directory — inside the installed package
 _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 
+
 @app.command("init")
 def init(
     specs_dir: str | None = typer.Option(

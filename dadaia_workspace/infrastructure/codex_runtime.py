@@ -40,6 +40,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
 )
 
 _DEFAULT_ENV_ALLOWLIST = (
+    "PYTHONDONTWRITEBYTECODE",
     "PATH",
     "HOME",
     "CODEX_HOME",
@@ -201,6 +202,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         with tempfile.TemporaryDirectory(prefix="dadaia-codex-exec-") as tmp:
             output_path = Path(tmp) / "last-message.json"
             args = self._command(request, output_path)
+            before_snapshot = self._snapshot_changed_paths()
             try:
                 proc = self._resolve_runner()(
                     args,
@@ -234,7 +236,7 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                     error=self._redact(error),
                 )
             result = self._result_from_output(request, output_path, proc)
-            return self._with_changed_paths(result)
+            return self._with_changed_paths(result, before_snapshot)
 
     @staticmethod
     def _classify_failure(stderr_text: str) -> tuple[str, str]:

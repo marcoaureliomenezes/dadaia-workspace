@@ -40,7 +40,7 @@ from dadaia_workspace.features.lifecycle.pipeline import (
 )
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-_PI_MODELS = {"openai-codex/gpt-5.5"}
+_PI_MODELS = {"openai-codex/gpt-5.3-codex-spark"}
 
 
 def _init_workspace(path: Path) -> Path:
@@ -57,9 +57,7 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(
-            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
-        ),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -137,7 +135,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     resolver = container.build_workflow_policy_resolver(kwarg_ws, context="dadaia-workspace")
     snapshot = resolver.resolve("implementation_reviews", context="default", default_harness="pi")
     assert snapshot.step("implement").model_profile == "pi-implementation-standard"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
+    assert snapshot.step("review_combined").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
     recorder, persisted = _run(kwarg_ws, snapshot)
     _assert_all_pi(recorder, persisted)
 
@@ -173,7 +171,9 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
+                "default": {
+                    "workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}
+                }
             },
         }
     )
@@ -194,7 +194,9 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}
+                    }
                 }
             },
         }
@@ -210,7 +212,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     assert step_persisted is not None
     step_snap = step_persisted.workflow_policy  # type: ignore[attr-defined]
     assert step_snap.step("implement").harness == "pi"
-    assert step_snap.step("review_qa").harness == "codex"
+    assert step_snap.step("review_combined").harness == "codex"
 
 
 def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -> None:
@@ -245,7 +247,9 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
+                "default": {
+                    "workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}
+                }
             },
         }
     ).encode("utf-8")

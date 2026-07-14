@@ -14,8 +14,8 @@ tags:
 - agents
 - workflows
 token_estimate: 1044
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-07-14'
+release_origin: v0.2.7
 ---
 
 ## Overview
@@ -130,7 +130,7 @@ Canonical workspace state is rooted at `.dadaia/`:
 | `states/presence/` | advisory live-session records |
 | `states/server_registry.json` | development server registry |
 | `states/*model*policy*.json` | Layer-1/Layer-2 governance overlays |
-| `runs/lifecycle/` | workflow run state and immutable step payloads |
+| `runs/lifecycle/` | workflow run state (durable step payloads live in the Spec Context: `specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) |
 | `handoff/` | machine-readable agent handoffs |
 | `reports/` | optional human-readable reports |
 | `tmp/` | bounded ephemeral files |

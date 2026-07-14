@@ -47,6 +47,7 @@ from dadaia_workspace.infrastructure.headless_adapter_base import (
 
 _DEFAULT_ENV_ALLOWLIST = (
     "ANTHROPIC_API_KEY",
+    "PYTHONDONTWRITEBYTECODE",
     "PATH",
     "HOME",
     "XDG_CONFIG_HOME",
@@ -142,6 +143,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                 summary="pi headless rejected unsafe model provider",
                 error=self._redact(str(exc)),
             )
+        before_snapshot = self._snapshot_changed_paths()
         try:
             proc = self._resolve_runner()(
                 args,
@@ -176,7 +178,7 @@ class PiHeadlessAdapter(SubprocessAdapterMixin):
                     diagnostic=result.diagnostic,
                 )
             return result
-        return self._with_changed_paths(result)
+        return self._with_changed_paths(result, before_snapshot)
 
     def _command(self, request: AgentRunRequest) -> list[str]:
         """Build the ``pi --mode json`` argv, threading the resolved per-request model.

@@ -127,12 +127,14 @@ def _workflow(
 def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     store = _MemoryRunStore()
 
-    # Run the first review step (spec_arch_review) on a distinct harness kind so the
-    # factory can return a REJECTED verdict for exactly that step while every other step
-    # (the create steps) approves. Python — not the model — decides this blocks.
+    # Run the merged SPEC review step on a distinct harness kind so the factory can
+    # return a REJECTED verdict for exactly that step while every other step (the
+    # create steps) approves. Python — not the model — decides this blocks. The
+    # bounded in-run revision re-runs spec_create once, then the still-rejecting
+    # review exhausts the budget and the run blocks.
     sequence = tuple(
         replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
-        if step.label == "spec_arch_review"
+        if step.label == "spec_review"
         else step
         for step in _SEQUENCE
     )
@@ -150,7 +152,7 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     assert result.blocked is not None
     # The sequence stopped at the rejected review — the commit gate never ran.
     labels = [s.label for s in result.steps]
-    assert labels[-1] == "spec_arch_review"
+    assert labels[-1] == "spec_review"
     assert "definition_commit_gate" not in labels
     assert result.steps[-1].accepted is False
     # The release never advanced to IMPLEMENTATION.
@@ -178,12 +180,12 @@ def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path
 
     assert result.completed is False
     assert result.blocked is not None
-    assert result.blocked.blocked_at_step == "plan_dependency_gate"
+    # The lint anchors at the create step it revises; the bounded revision re-ran
+    # plan_create once before blocking, and the resume advice names that step.
+    assert result.blocked.blocked_at_step == "plan_create"
     assert "depends on later workstream" in result.blocked.reason
-    assert [step.label for step in result.steps][-2:] == [
-        "plan_create",
-        "plan_dependency_gate",
-    ]
+    assert "--resume-from plan_create" in (result.blocked.operator_command or "")
+    assert [step.label for step in result.steps][-1] == "plan_create"
 
 
 def test_plan_dependency_gate_accepts_numbered_heading(tmp_path: Path) -> None:
@@ -231,12 +233,10 @@ def test_tasks_command_hygiene_gate_rejects_cache_clear_as_no_cache_claim(
 
     assert result.completed is False
     assert result.blocked is not None
-    assert result.blocked.blocked_at_step == "tasks_command_hygiene_gate"
+    assert result.blocked.blocked_at_step == "tasks_create"
     assert "missing '-p no:cacheprovider'" in result.blocked.reason
-    assert [step.label for step in result.steps][-2:] == [
-        "tasks_create",
-        "tasks_command_hygiene_gate",
-    ]
+    assert "--resume-from tasks_create" in (result.blocked.operator_command or "")
+    assert [step.label for step in result.steps][-1] == "tasks_create"
 
 
 def test_tasks_command_hygiene_gate_accepts_disabled_pytest_cache(tmp_path: Path) -> None:

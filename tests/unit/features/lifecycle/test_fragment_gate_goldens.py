@@ -97,11 +97,29 @@ class _GoldenFake:
     sequence completes/produces. The requests are recorded in call order for prompt capture.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, workspace_root: Path | None = None) -> None:
         self.received_requests: list[AgentRunRequest] = []
+        self.workspace_root = workspace_root
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return AgentRuntimeKind.FAKE
+
+    def _author_backlog_item(self) -> None:
+        """The REAL post-authoring gate diffs disk state — write a bound NEW item."""
+        if self.workspace_root is None:
+            return
+        item = self.workspace_root / "repos" / _CONTEXT / "specs" / "backlog" / "new-item.md"
+        item.parent.mkdir(parents=True, exist_ok=True)
+        item.write_text(
+            "---\n"
+            "slug: new-item\n"
+            "status: OPEN\n"
+            "intents:\n"
+            "  - subject: { kind: code, ref: pkg/a.py#A }\n"
+            "    change: add A\n"
+            "---\n\n# new-item\n\nGolden authored item.\n",
+            encoding="utf-8",
+        )
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         self.received_requests.append(request)
@@ -112,34 +130,14 @@ class _GoldenFake:
         )
         artifact = allowed.replace("**", "step.step-output.json")
         step = (request.task_id or "").rsplit(":", 1)[-1]
+        if step == "backlog_author":
+            self._author_backlog_item()
         audit_payloads: dict[str, dict[str, object]] = {
-            "audit_scope": {
-                "summary": "Bound architecture drift.",
-                "audit_question": "Does implementation match architecture memory?",
-                "lenses": [
-                    {"name": "architecture", "rationale": "Contract fidelity."}
-                ],
-                "surfaces": ["pkg/a.py"],
-                "acceptance_criteria": [
-                    {"lens": "architecture", "pass_condition": "No contract drift."}
-                ],
-            },
-            "drift_scan": {
+            "audit_report": {
                 "summary": "No drift found.",
-                "verdict": "APPROVED",
-                "verdict_reason": "Every scoped lens passed.",
-                "lens_results": [
-                    {
-                        "lens": "architecture",
-                        "status": "PASS",
-                        "evidence": ["pkg/a.py:1"],
-                    }
-                ],
+                "question": "Does implementation match architecture memory?",
+                "lenses": ["architecture"],
                 "findings": [],
-            },
-            "triage": {
-                "summary": "No findings require routing.",
-                "source_verdict": "APPROVED",
                 "dispositions": [],
             },
         }
@@ -364,7 +362,7 @@ def test_audit_golden(tmp_path: Path) -> None:
 
 def test_backlog_definition_golden(tmp_path: Path) -> None:
     specs = _seed_workspace(tmp_path)
-    fake = _GoldenFake()
+    fake = _GoldenFake(workspace_root=tmp_path)
     resolver = _resolver(tmp_path)
     wf = BacklogDefinitionWorkflow(
         context=_CONTEXT,
@@ -375,7 +373,7 @@ def test_backlog_definition_golden(tmp_path: Path) -> None:
         registry=_registry(tmp_path, specs),
         handoff_resolver=resolver,
     )
-    result = wf.run("bd-golden", _clean_demand())
+    result = wf.run("bd-golden", _clean_demand(), grill=True)
     assert result.completed is True
     run = JsonLifecycleRunStore(tmp_path).load("bd-golden")
     assert run is not None

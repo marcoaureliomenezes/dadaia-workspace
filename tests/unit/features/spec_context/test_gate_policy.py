@@ -248,14 +248,7 @@ def test_evaluate_mutating_write_upserts_presence(tmp_path: Path) -> None:
         pid=1234,
     )
     assert decision == Decision.ALLOW
-    record = (
-        tmp_path
-        / ".dadaia"
-        / "states"
-        / "presence"
-        / "dadaia-workspace"
-        / "sess-solo.json"
-    )
+    record = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace" / "sess-solo.json"
     assert record.is_file()
 
 
@@ -277,6 +270,7 @@ def test_evaluate_peer_presence_warns_but_allows(tmp_path: Path) -> None:
     )
     assert decision == Decision.ALLOW
     assert "owner-A" in message
+
 
 def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
     decision, _ = evaluate(

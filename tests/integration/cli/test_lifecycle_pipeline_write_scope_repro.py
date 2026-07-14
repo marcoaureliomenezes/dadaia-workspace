@@ -58,9 +58,7 @@ def _implement_result_with_production_change() -> AgentRunResult:
         status=AgentRunStatus.SUCCEEDED,
         summary="fake runtime: implement wrote a production file",
         artifact_refs=(
-            canonical_worker_output_ref(
-                _CONTEXT, "pipe-write-scope:implement:attempt-0"
-            ),
+            canonical_worker_output_ref(_CONTEXT, "pipe-write-scope:implement:attempt-0"),
         ),
         structured_output={"changed_paths": _PRODUCTION_PATH},
     )

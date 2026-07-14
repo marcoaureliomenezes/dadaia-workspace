@@ -53,8 +53,8 @@ from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.core.session_env import harness_session_id
+from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -722,8 +722,8 @@ def build_lifecycle_preflight_input(
         ActiveReleaseState,
         BoundContext,
         GitPreflightState,
-        PresenceState,
         LifecyclePreflightInput,
+        PresenceState,
         SpecsDoctorState,
     )
     from dadaia_workspace.features.spec_context import presence, session_identity
@@ -1177,19 +1177,45 @@ def build_lifecycle_pipeline(
     ``LifecyclePipeline(...)`` construction (tests) can still omit it.
     """
     from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
+    from dadaia_workspace.infrastructure.git_evidence import (
+        build_git_diff_provider,
+        build_test_output_provider,
+    )
 
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     model_by_kind = models or {}
     context_name = resolve_bound_context_name(context) or context
     specs_dir = _context_specs_dir(workspace_root, context_name)
+    # Runtime-evidence providers (review R-04): reviewers judge the ACTUAL diff of the
+    # release's declared write set + executed test output instead of re-exploring the
+    # repo or refusing for lack of evidence. Scoped to the TASKS write-set paths so a
+    # pre-dirty tree outside the release never pollutes the review evidence.
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import (
+        write_scope_from_release_tasks,
+    )
+
+    write_set = write_scope_from_release_tasks(specs_dir, release_id)
+    repo_root = specs_dir.parent
+    # TASKS write sets are WORKSPACE-relative (repos/<ctx>/...); the evidence providers
+    # run git/pytest inside repo_root — strip the repo prefix so pathspecs resolve.
+    try:
+        repo_prefix = repo_root.resolve().relative_to(workspace_root.resolve()).as_posix() + "/"
+    except ValueError:
+        repo_prefix = ""
+    repo_write_set = tuple(
+        path[len(repo_prefix) :] if repo_prefix and path.startswith(repo_prefix) else path
+        for path in write_set
+    )
     selector = ContextSelector(
         SpecContext(
             specs_dir=specs_dir,
             release_id=release_id,
             handoff_dir=workspace_root / ".dadaia" / "handoff" / context_name,
             phase=_active_phase(specs_dir),
-        )
+        ),
+        diff_provider=build_git_diff_provider(repo_root, paths=repo_write_set),
+        test_output_provider=build_test_output_provider(repo_root, paths=repo_write_set),
     )
     return LifecyclePipeline(
         context=context,
@@ -1256,8 +1282,7 @@ def _release_definition_runtime_factory(
         def run(self, request: AgentRunRequest) -> AgentRunResult:
             label = (request.task_id or "").rsplit(":", 1)[-1]
             refs = [
-                f".dadaia/tmp/lifecycle-worker/{context}/"
-                "release-definition-step.step-output.json"
+                f".dadaia/tmp/lifecycle-worker/{context}/release-definition-step.step-output.json"
             ]
             deliverable = _CREATE_DELIVERABLES.get(label)
             if deliverable is not None and release_id is not None:
@@ -1384,8 +1409,7 @@ def _backlog_definition_runtime_factory(
         status=AgentRunStatus.SUCCEEDED,
         summary="fake backlog-definition worker: APPROVED",
         artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{context}/"
-            "backlog-definition-step.step-output.json",
+            f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json",
         ),
         structured_output={"verdict": "APPROVED"},
     )
@@ -1565,9 +1589,7 @@ def build_audit_workflow(
             context=context,
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
-            artifact_ref=(
-                f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"
-            ),
+            artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,

@@ -57,42 +57,26 @@ _KNOWN_SEQUENCE_MODULES = {
 }
 
 # AC-2 — every create step + every substantive review step cites shared.anti_slop.
+# v0.2.x simplification: anti-slop rides on CREATE steps only — reviews judge, they
+# do not author, and every removed restatement is prompt tax on a weak model.
 _REQUIRED_ANTI_SLOP = {
-    "release_definition.release_scope",
     "release_definition.spec_create",
     "release_definition.plan_create",
     "release_definition.tasks_create",
-    "release_definition.spec_arch_review",
-    "release_definition.plan_review",
     "backlog_definition.backlog_author",
     "implementation_reviews.implement",
-    "implementation_reviews.review_security",
-    "implementation_reviews.review_code",
 }
 
-# AC-3 — every verdict-emitting review step and every audit model step cites
-# shared.output_handoff.
-_REQUIRED_OUTPUT_HANDOFF = {
-    "release_definition.spec_arch_review",
-    "release_definition.spec_qa_review",
-    "release_definition.plan_review",
-    "release_definition.tasks_implementability_review",
-    "implementation_reviews.review_qa",
-    "implementation_reviews.review_security",
-    "implementation_reviews.review_code",
-    "audit.drift_scan",
-    "audit.triage",
-}
+# v0.2.x simplification: the output contract is stated ONCE by the engine's
+# "## Required output" section (prompt_builder) — NO step bundles the shared
+# output-handoff restatement anymore. The guardrail now proves the inverse.
+_REQUIRED_OUTPUT_HANDOFF: set[str] = set()
 
-# WS-2c — shared.memory_selection is wired to the spec/plan/tasks create + review steps.
+# WS-2c (narrowed): shared.memory_selection rides on the SPEC/PLAN create steps
+# (the memory-grounded authoring work); reviews and TASKS authoring stay lean.
 _REQUIRED_MEMORY_SELECTION = {
     "release_definition.spec_create",
     "release_definition.plan_create",
-    "release_definition.tasks_create",
-    "release_definition.spec_arch_review",
-    "release_definition.spec_qa_review",
-    "release_definition.plan_review",
-    "release_definition.tasks_implementability_review",
 }
 
 
@@ -151,7 +135,7 @@ def test_no_model_step_uses_generic_prompt() -> None:
 
 
 # ---------------------------------------------------------------------------
-# (b) — no orphan fragments (conflict_scan + memory_selection wired is a strict subset)
+# (b) — no orphan fragments (memory_selection wired is a strict subset)
 # ---------------------------------------------------------------------------
 
 
@@ -165,7 +149,6 @@ def test_no_orphan_or_dangling_fragments_and_discovered_sequence_set_matches_kno
     assert dangling == [], f"dangling fragment citations (cited but not shipped): {dangling}"
     # The two formerly-orphan fragments (v0.1.43) are each cited by ≥1 step — a strict
     # instance of the no-orphan property above, kept as a named regression pin.
-    assert _citers("backlog_definition.conflict_scan")
     assert _citers("shared.memory_selection")
 
     # Item E: a future 7th workflow with a `_SEQUENCE` cannot silently escape the guardrail

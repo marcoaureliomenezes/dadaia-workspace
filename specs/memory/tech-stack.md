@@ -12,8 +12,8 @@ tags:
 - toolchain
 - constraints
 token_estimate: 545
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-07-14'
+release_origin: v0.2.7
 ---
 
 ## Language And Packaging
@@ -45,10 +45,12 @@ Python or PI TypeScript projections.
 - **Codex:** Layer-1 entry runtime and Layer-2 `codex exec` worker.
 - **PI:** trusted Layer-1 entry runtime and Layer-2 `pi --mode json` worker.
 
-Layer-2 Codex profiles use `gpt-5.5` at medium/high reasoning. PI profiles include
-provider-qualified `openai-codex/gpt-5.5` at low/medium/high and the explicit optional
-OpenRouter `moonshotai/kimi-k2.5:high` profile. Provider qualification is part of the
-model contract.
+Layer-2 Codex profiles use `gpt-5.3-codex-spark` at medium/high reasoning. PI profiles
+include provider-qualified `openai-codex/gpt-5.3-codex-spark` at low/medium/high and the
+explicit optional OpenRouter `moonshotai/kimi-k2.5:high` profile. Provider qualification
+is part of the model contract. A `light` purpose tier routes mechanical steps (e.g. the
+implementation `close` step) to the lowest-effort profile per harness. On containerized
+hosts without landlock, Codex workers require `DADAIA_CODEX_SANDBOX=danger-full-access`.
 
 Layer-1 agent model/effort comes from the selected agent-policy template plus operator
 overrides. Layer-2 model/effort comes from workflow profiles and per-run policy.

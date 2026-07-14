@@ -2,20 +2,21 @@
 slug: panel
 title: panel
 category: product
-tldr: Loopback-only local control surface with seven tabs, four workflow diagrams/policies, agent governance, telemetry, reports, and playable Snake/Tetris.
+tldr: Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout.
 summary: >-
   `dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st
-  Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. It is
-  loopback-only, no-auth, Host-guarded, and CSP-constrained.
+  Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. The Games
+  tab includes wall-wrapping Snake plus Tetris, Codex Pong, and PI Breakout. It is loopback-only, no-auth,
+  Host-guarded, and CSP-constrained.
 tags:
 - panel
 - ui
 - http
 - dashboard
 - games
-token_estimate: 394
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+token_estimate: 481
+last_updated: '2026-07-14'
+release_origin: v0.2.7
 ---
 
 ## Purpose
@@ -34,7 +35,7 @@ There is no panel token, cookie, or credential store.
 4. **Reports** - handoff/report discovery and retention controls.
 5. **Academy** - packaged knowledge-base content.
 6. **Servers** - registered development servers and TTL/PID status.
-7. **Games** - playable Snake (Codex) and Tetris (PI).
+7. **Games** - playable Snake (Codex), Tetris (PI), Pong (Codex), and Breakout (PI).
 
 ## Workflow Surface
 
@@ -46,11 +47,17 @@ harness/profile compatibility, and never invents a raw model outside the catalog
 
 ## Games
 
-Games use isolated canvas state and local JavaScript only. Snake supports keyboard and
-direction-pad input; Tetris supports keyboard and touch/button move, rotate, down, and
-drop controls. Both expose score, pause/start, and reset. Stable canvas dimensions and
-responsive constraints prevent layout shifts. Browser validation covers nonblank pixels,
-state changes after input, desktop/mobile geometry, and horizontal overflow.
+Games use isolated canvas state and local JavaScript only. Snake runs on a 20x20 board,
+wraps across all four walls to the opposite edge, keeps self-collision on the reset path,
+and supports keyboard and direction-pad input. Tetris supports keyboard and touch/button
+move, rotate, down, and drop controls. Pong uses a Codex panel with `#pong-canvas`,
+`#pong-score`, `data-action="pong-toggle"`, `data-action="pong-reset"`, and up/down input
+controls via both keyboard (`ArrowUp`/`ArrowDown`) and `data-pong-dir` buttons. Breakout adds a PI
+panel with `#breakout-canvas`, `#breakout-score`, `data-action="breakout-toggle"`,
+`data-action="breakout-reset"`, `data-breakout-dir="left"`, and `data-breakout-dir="right"` controls.
+All games expose score, pause/start, and reset semantics. Stable canvas dimensions and responsive
+constraints prevent layout shifts. Browser validation covers nonblank pixels, state changes
+after input, desktop/mobile geometry, horizontal overflow, and game-switch visibility.
 
 ## HTTP Boundary
 

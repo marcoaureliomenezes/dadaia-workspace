@@ -69,8 +69,8 @@ _VERBS: list[tuple[str, list[str], str, str, str, str]] = [
         ["audit"],
         "gov-audit",
         "audit",
-        "audit_scope",
-        "audit_scope",
+        "audit_report",
+        "audit_report",
     ),
 ]
 

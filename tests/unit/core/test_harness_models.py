@@ -53,21 +53,24 @@ def test_catalog_golden() -> None:
     assert len(options_for(CODEX_HARNESS)) == 2
 
     assert options_for(PI_HARNESS) == (
-        HarnessModelOption("openai-codex/gpt-5.5", "high"),
-        HarnessModelOption("openai-codex/gpt-5.5", "low"),
-        HarnessModelOption("openai-codex/gpt-5.5", "medium"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
         HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     )
     assert options_for(CODEX_HARNESS) == (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     )
 
-    assert model_choices(CODEX_HARNESS) == ("gpt-5.5:high", "gpt-5.5:medium")
+    assert model_choices(CODEX_HARNESS) == (
+        "gpt-5.3-codex-spark:high",
+        "gpt-5.3-codex-spark:medium",
+    )
     assert model_choices(PI_HARNESS) == (
-        "openai-codex/gpt-5.5:high",
-        "openai-codex/gpt-5.5:low",
-        "openai-codex/gpt-5.5:medium",
+        "openai-codex/gpt-5.3-codex-spark:high",
+        "openai-codex/gpt-5.3-codex-spark:low",
+        "openai-codex/gpt-5.3-codex-spark:medium",
         "moonshotai/kimi-k2.5:high",
     )
 
@@ -87,21 +90,29 @@ def test_catalog_golden() -> None:
     [
         (
             PI_HARNESS,
-            "openai-codex/gpt-5.5:high",
-            HarnessModelOption("openai-codex/gpt-5.5", "high"),
+            "openai-codex/gpt-5.3-codex-spark:high",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
         ),
         (
             PI_HARNESS,
-            "openai-codex/gpt-5.5:low",
-            HarnessModelOption("openai-codex/gpt-5.5", "low"),
+            "openai-codex/gpt-5.3-codex-spark:low",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
         ),
         (
             PI_HARNESS,
-            "openai-codex/gpt-5.5:medium",
-            HarnessModelOption("openai-codex/gpt-5.5", "medium"),
+            "openai-codex/gpt-5.3-codex-spark:medium",
+            HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
         ),
-        (CODEX_HARNESS, "gpt-5.5:high", HarnessModelOption("gpt-5.5", "high")),
-        (CODEX_HARNESS, "gpt-5.5:medium", HarnessModelOption("gpt-5.5", "medium")),
+        (
+            CODEX_HARNESS,
+            "gpt-5.3-codex-spark:high",
+            HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        ),
+        (
+            CODEX_HARNESS,
+            "gpt-5.3-codex-spark:medium",
+            HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+        ),
         # The OpenRouter id validates via the union, both suffixed and bare.
         (
             PI_HARNESS,
@@ -121,11 +132,11 @@ def test_validate_accept_table(harness: str, model: str, expected: HarnessModelO
 
 
 def test_ambiguous_bare_model_id_is_rejected() -> None:
-    """``gpt-5.5`` has two efforts for codex, so a bare id must not silently pick one."""
+    """``gpt-5.3-codex-spark`` has two efforts for codex, so a bare id must not silently pick one."""
     with pytest.raises(ValueError) as exc:
-        validate(CODEX_HARNESS, "gpt-5.5")
-    assert "gpt-5.5:high" in str(exc.value)
-    assert "gpt-5.5:medium" in str(exc.value)
+        validate(CODEX_HARNESS, "gpt-5.3-codex-spark")
+    assert "gpt-5.3-codex-spark:high" in str(exc.value)
+    assert "gpt-5.3-codex-spark:medium" in str(exc.value)
 
     with pytest.raises(ValueError) as exc2:
         validate(PI_HARNESS, "gpt-9.9:high")
@@ -134,7 +145,7 @@ def test_ambiguous_bare_model_id_is_rejected() -> None:
         assert choice in message
 
     with pytest.raises(ValueError) as exc3:
-        validate("fake", "gpt-5.5:high")
+        validate("fake", "gpt-5.3-codex-spark:high")
     assert "no discrete model catalog" in str(exc3.value)
 
     assert options_for("nonexistent") == ()
@@ -156,7 +167,7 @@ def test_layer2_allowlist_law() -> None:
     for entry in REGISTRY:
         assert entry.codex_id in known
     assert "moonshotai/kimi-k2.5" in known
-    assert "openai/gpt-5.5" not in known
+    assert "openai/gpt-5.3-codex-spark" not in known
     assert "openai/gpt-oss-120b:free" not in known
     assert known == (
         frozenset(e.codex_id for e in REGISTRY)

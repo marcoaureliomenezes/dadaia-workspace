@@ -22,6 +22,7 @@ from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+    from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
 
 # Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
 # deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
@@ -84,7 +85,7 @@ def _authoritative_backlog_prefix(
     context: str,
     release_id: str,
     backlog_run_id: str | None,
-) -> "PromptPrefix | None":
+) -> PromptPrefix | None:
     """Resolve one exact completed backlog-definition producer for release scope.
 
     Direct release definition remains valid when no matching backlog workflow exists.
@@ -125,13 +126,12 @@ def _authoritative_backlog_prefix(
         )
     upstream = matches[0]
     try:
-        resolved = container.build_workflow_handoff_resolver(
-            workspace_root
-        ).resolve_required(upstream, producer_step="backlog_author", attempt=0)
+        resolved = container.build_workflow_handoff_resolver(workspace_root).resolve_required(
+            upstream, producer_step="backlog_author", attempt=0
+        )
     except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
         raise typer.BadParameter(
-            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author "
-            f"payload: {exc}"
+            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author payload: {exc}"
         ) from exc
 
     authored_paths: set[str] = set()
@@ -143,8 +143,24 @@ def _authoritative_backlog_prefix(
         if clean.startswith("specs/backlog/") or "/specs/backlog/" in clean:
             authored_paths.add(clean)
 
+    # Tolerant extraction: workers nest the authored path differently (top-level
+    # artifact_refs, result.artifact, handoff.artifact.path, ...). Any string value
+    # anywhere in the payload that names a specs/backlog path counts.
+    def _walk_payload(value: object) -> None:
+        if isinstance(value, str):
+            _record_backlog_path(value)
+        elif isinstance(value, list):
+            for item in value:
+                _walk_payload(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                _walk_payload(item)
+
+    _walk_payload(resolved.payload)
     raw_refs = resolved.payload.get("artifact_refs")
-    refs = tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
+    refs = (
+        tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
+    )
     root = workspace_root.resolve()
     for ref in refs:
         _record_backlog_path(ref)
@@ -191,8 +207,8 @@ def backlog_define(
     step_harness: list[str] | None = typer.Option(
         None,
         "--step-harness",
-        help="Per-step harness override 'step=harness' (repeatable); steps are the §4 "
-        "model-step labels (intake_grill, conflict_resolution_grill, backlog_author).",
+        help="Per-step harness override 'step=harness' (repeatable); steps are the "
+        "model-step labels (intake_grill, backlog_author).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -204,9 +220,21 @@ def backlog_define(
     demand: str | None = typer.Option(
         None,
         "--demand",
-        help="Raw operator demand text the intake grill interrogates (bug "
-        "backlog-define-has-no-demand-input-channel). Injected into every model "
-        "step's prompt as an '## Operator demand' block.",
+        help="Raw operator demand text injected into every model step's prompt as an "
+        "'## Operator demand' block — the author's primary input.",
+    ),
+    grill: bool = typer.Option(
+        False,
+        "--grill",
+        help="Opt-in: run the intake_grill step before authoring (default path is "
+        "author-only — one model call). The grill's payload digest is injected into "
+        "the author prompt.",
+    ),
+    resume_from: str | None = typer.Option(
+        None,
+        "--resume-from",
+        help="Re-execute an existing blocked run from this step label onward without "
+        "re-running completed model steps.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
@@ -227,12 +255,9 @@ def backlog_define(
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
-    from dadaia_workspace.features.backlog.classifier import BoundItem
     from dadaia_workspace.features.lifecycle.pipeline import apply_resolved_policy
     from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
         _SEQUENCE,
-        AuthoredItem,
-        BacklogDemand,
     )
 
     workspace_root = resolve_workspace_root()
@@ -268,19 +293,16 @@ def backlog_define(
         default_runtime_kind=default_kind,
         policy_snapshot=snapshot,
     )
-    # The CLI verb walks the §4 sequence on the chosen harness; absent a structured demand
-    # source it threads an empty demand (no proposed intents, an empty authored result) so
-    # the Python gates dispose deterministically and the sequence completes on ``fake``.
-    structured_demand = BacklogDemand(
-        proposed_intents=(),
-        existing=(),
-        authored=AuthoredItem(
-            slug=run_id,
-            is_new=True,
-            bound=BoundItem(slug=run_id, anchor_changes={}),
-        ),
+    # The author-first default path: ONE model call (backlog_author) + the REAL
+    # post-authoring Python gate over what landed on disk (bug
+    # backlog-definition-empty-demand-wiring). --grill opts into the intake step.
+    result = workflow.run(
+        run_id,
+        sequence=sequence,
+        operator_demand=demand,
+        grill=grill,
+        resume_from=resume_from,
     )
-    result = workflow.run(run_id, structured_demand, sequence=sequence, operator_demand=demand)
 
     status = (
         LifecycleCommandStatus.OK.value
@@ -417,7 +439,17 @@ def release_define(
         prefix=upstream_prefix,
         policy_snapshot=snapshot,
     )
-    result = workflow.run(run_id, sequence, resume_from=resume_from)
+    # Small-release fast path: a consumed authoritative backlog pick already fixed the
+    # scope (it rides the prompt prefix) — the release_scope model step is a redundant
+    # restatement and is skipped, saving one worker session. Applied on RESUME too:
+    # the resumed sequence must keep the shape of the original run (which never
+    # produced a release_scope payload to consume).
+    result = workflow.run(
+        run_id,
+        sequence,
+        resume_from=resume_from,
+        skip_scope=upstream_prefix is not None,
+    )
 
     # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
     # **Consumes:** line, bind the declared slugs' anchors through the R1 registry, and write
@@ -541,7 +573,6 @@ def _apply_closure_removal_for_release(
             action.slug for action in removal.actions if action.action.value == "unchanged"
         ],
     }
-
 
 
 def _resolve_default_harness(harness: str) -> str:
@@ -702,7 +733,6 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
-
 # -- Audit workflow emitter ------------------------------------------------------------
 
 
@@ -786,12 +816,17 @@ def audit(
         None,
         "--step-model",
         help="Per-step model override 'step=profile-id' (repeatable). Profile ids ONLY "
-        "(D-3); steps: audit_scope, drift_scan, triage. See "
-        "'dadaia reports workflow-profiles'.",
+        "(D-3); steps: audit_report. See 'dadaia reports workflow-profiles'.",
+    ),
+    resume_from: str | None = typer.Option(
+        None,
+        "--resume-from",
+        help="Re-execute an existing blocked run from this step label onward without "
+        "re-buying completed worker sessions.",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the audit workflow (scope→drift-scan→triage) as a fragment-driven sequence.
+    """Run the audit workflow (one audit_report model pass + Python disposition gate).
 
     Born resolver-governed (v0.1.56 / FR2): the per-step model is resolved through the shared
     ``WorkflowExecutionPolicyResolver`` and the frozen snapshot is recorded on the run before
@@ -832,9 +867,8 @@ def audit(
         default_runtime_kind=default_kind,
         policy_snapshot=snapshot,
     )
-    result = workflow.run(run_id, sequence=sequence)
+    result = workflow.run(run_id, sequence=sequence, resume_from=resume_from)
     _emit_wire_result("audit", result, json_output=json_output)
-
 
 
 def _enforce_preflight_gate(
@@ -941,7 +975,7 @@ def pipeline(
         None,
         "--step-harness",
         help="Per-step override 'label=harness' (repeatable); labels: "
-        "implement, review_qa, review_security, review_code, close.",
+        "implement, review_combined, close.",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -1061,7 +1095,11 @@ def pipeline(
         raise typer.BadParameter(str(exc)) from exc
 
     if show_policy:
-        _emit_json(_policy_snapshot_payload(snapshot)) if json_output else _print_policy(snapshot)
+        payload = _policy_snapshot_payload(snapshot)
+        if json_output:
+            _emit_json(payload)
+        else:
+            typer.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
 
     # D-2: apply_resolved_policy is the SINGLE author of runtime_kind — it sets each step's
@@ -1108,9 +1146,7 @@ def pipeline(
     )
     result = pipe.run(run_id, steps)
     closure_gate = (
-        _apply_closure_removal_for_release(
-            workspace_root, context=context, release_id=release_id
-        )
+        _apply_closure_removal_for_release(workspace_root, context=context, release_id=release_id)
         if result.completed
         else None
     )

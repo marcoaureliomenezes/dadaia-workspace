@@ -206,20 +206,17 @@ def test_run_record_persists_composition_and_round_trips_through_json_store(
     run = store.load("obs-1")
     assert run is not None
     by_step = {entry.step: entry for entry in run.injected_context}
-    # The workflow folds the fragments' static_inputs into the cacheable prefix, so the
-    # effective prefix hash is shared by every step (one value) — not necessarily the
-    # hash of the bare input prefix.
-    effective_hashes = {by_step[label].prefix_hash for label in _model_steps()}
-    assert len(effective_hashes) == 1
-    effective_hash = next(iter(effective_hashes))
-    assert effective_hash is not None
-    # Static inputs were folded in, so the effective hash differs from the bare prefix.
-    assert effective_hash != prefix.content_hash
+    # Static inputs fold into a PER-STEP prefix (each step pays only for its own
+    # fragments' declared inputs), so hashes may legitimately differ across steps.
+    # A step that declares static inputs records a hash differing from the bare prefix.
+    spec_create_hash = by_step["spec_create"].prefix_hash
+    assert spec_create_hash is not None
+    assert spec_create_hash != prefix.content_hash
     # Every model step recorded a full composition record.
     for label in _model_steps():
         entry = by_step[label]
         assert entry.fragment_ids, f"{label} missing fragment ids"
-        assert entry.prefix_hash == effective_hash
+        assert entry.prefix_hash is not None
         assert entry.runtime_kind == AgentRuntimeKind.FAKE.value
         assert entry.output_schema  # the fragment's declared output contract
         assert entry.gate_result == GateVerdict.APPROVED.value
@@ -244,9 +241,9 @@ def test_run_record_persists_composition_and_round_trips_through_json_store(
     reloaded_hashes = {
         e.prefix_hash for e in reloaded.injected_context if e.prefix_hash is not None
     }
-    assert len(reloaded_hashes) == 1
-    arch_review = next(e for e in reloaded.injected_context if e.step == "spec_arch_review")
-    assert arch_review.prefix_hash == next(iter(reloaded_hashes))
+    assert reloaded_hashes
+    arch_review = next(e for e in reloaded.injected_context if e.step == "spec_review")
+    assert arch_review.prefix_hash in reloaded_hashes
     assert arch_review.runtime_kind == AgentRuntimeKind.FAKE.value
     assert arch_review.output_schema
     assert arch_review.gate_result == GateVerdict.APPROVED.value
@@ -274,25 +271,25 @@ def test_prefix_bytes_are_byte_identical_across_steps(tmp_path: Path) -> None:
     result = wf.run("obs-3")
 
     model_steps = [s for s in result.steps if s.fragment_id is not None]
-    assert len(model_steps) >= 2, "need >=2 model steps to assert prefix reuse"
-    # The workflow folds the fragments' static_inputs into the cacheable prefix once, so the
-    # effective prefix is re-derived; every step must still record exactly ONE prefix hash...
+    assert len(model_steps) >= 2, "need >=2 model steps to assert prefix behavior"
+    # Per-step prefixes: each step's recorded hash is the sha256 of the exact prefix
+    # bytes leading ITS OWN prompt, and steps declaring the SAME static inputs share
+    # identical prefix bytes (the cacheable unit is now per-step, not per-run).
     run = store.load("obs-3")
     assert run is not None
-    hashes = {e.prefix_hash for e in run.injected_context if e.prefix_hash is not None}
-    assert len(hashes) == 1, "prefix hash differs across steps — not cacheable"
-    effective_hash = next(iter(hashes))
-    # ...and the SAME prefix BYTES lead every emitted prompt verbatim (built once, reused).
-    leading = model_steps[0].prompt_text
-    assert leading is not None
-    common_prefix = leading.split("\n\n---\n\n", 1)[0]
+    by_step = {e.step: e for e in run.injected_context}
+    prefix_bytes: dict[str, str] = {}
     for step in model_steps:
         assert step.prompt_text is not None
-        assert step.prompt_text.startswith(common_prefix), (
-            f"step {step.label} did not reuse the cacheable prefix bytes verbatim"
+        step_prefix = step.prompt_text.split("\n\n---\n\n", 1)[0]
+        prefix_bytes[step.label] = step_prefix
+        recorded = by_step[step.label].prefix_hash
+        assert recorded == hashlib.sha256(step_prefix.encode("utf-8")).hexdigest(), (
+            f"step {step.label}'s recorded prefix hash does not match its prompt bytes"
         )
-    # The recorded hash is sha256 of those exact shared prefix bytes (cacheable invariant).
-    assert effective_hash == hashlib.sha256(common_prefix.encode("utf-8")).hexdigest()
+    # spec_review and plan_review declare the same static inputs -> identical prefixes.
+    if "spec_review" in prefix_bytes and "plan_review" in prefix_bytes:
+        assert prefix_bytes["spec_review"] == prefix_bytes["plan_review"]
 
     # No whole-memory injection by default (cost regression guard). The sentinel lives
     # deep in architecture.md's body. The release-definition fragments only ever pull
@@ -327,17 +324,22 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
 
     result = wf.run("obs-static")
 
-    model_steps = [s for s in result.steps if s.fragment_id is not None]
+    model_steps = {s.label: s for s in result.steps if s.fragment_id is not None}
     assert model_steps
-    for step in model_steps:
-        assert step.prompt_text is not None
-        # constitution.md is a static input of spec_create; architecture.md of several steps.
-        assert "STATIC_CONST_MARKER_42" in step.prompt_text, (
-            f"step {step.label} did not receive the constitution static-input content"
-        )
-        assert _ARCH_STATIC_MARKER in step.prompt_text, (
-            f"step {step.label} did not receive the architecture static-input content"
-        )
+    # Per-step static inputs: constitution.md is declared ONLY by spec_create — it must
+    # reach spec_create and must NOT tax steps that never declared it.
+    spec_create = model_steps["spec_create"]
+    assert spec_create.prompt_text is not None
+    assert "STATIC_CONST_MARKER_42" in spec_create.prompt_text
+    assert _ARCH_STATIC_MARKER in spec_create.prompt_text
+    scope = model_steps["release_scope"]
+    assert scope.prompt_text is not None
+    assert "STATIC_CONST_MARKER_42" not in scope.prompt_text, (
+        "release_scope declares no static inputs — the cross-sequence union tax is back"
+    )
+    review = model_steps["spec_review"]
+    assert review.prompt_text is not None
+    assert _ARCH_STATIC_MARKER in review.prompt_text
 
     # Remove a declared static input file; the workflow must not crash and must still run
     # every step, simply omitting the absent file's content (graceful skip).
@@ -358,9 +360,10 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
     missing_result = missing_wf.run("obs-missing")
 
     assert missing_result.completed
-    missing_model_steps = [s for s in missing_result.steps if s.fragment_id is not None]
-    for step in missing_model_steps:
+    missing_steps = {s.label: s for s in missing_result.steps if s.fragment_id is not None}
+    # constitution.md is gone — its marker must be absent everywhere; architecture
+    # still reaches the steps that declare it (graceful skip, no crash).
+    for step in missing_steps.values():
         assert step.prompt_text is not None
-        # constitution.md is gone — its marker must be absent, but architecture remains.
         assert "STATIC_CONST_MARKER_42" not in step.prompt_text
-        assert _ARCH_STATIC_MARKER in step.prompt_text
+    assert _ARCH_STATIC_MARKER in (missing_steps["spec_create"].prompt_text or "")

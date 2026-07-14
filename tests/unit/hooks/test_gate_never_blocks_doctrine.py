@@ -17,6 +17,7 @@ from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
 
+
 def _mk_workspace(tmp_path: Path, *slugs: str, phase: str = "IMPLEMENTATION") -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(

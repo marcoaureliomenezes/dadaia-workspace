@@ -270,7 +270,6 @@ def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
     The marker is the SOLE trigger for context-memory injection and the ctx-inject
     hook's harness-real discovery source.
     """
-    from dadaia_workspace.features.spec_context import session_identity
 
     _register_alive_ctx(workspace)
     marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
@@ -318,6 +317,7 @@ def test_context_bind_implementation_and_review_persist_mode(
         session_id = record["session_id"]
         session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
         assert session_file.exists(), "Session file must be created"
+
 
 def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
     """Independent implementation binds both succeed; peer presence is advisory."""

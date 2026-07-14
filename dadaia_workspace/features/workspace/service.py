@@ -277,6 +277,7 @@ class WorkspaceService:
 
 def _is_stale_sh_entry(entry: dict) -> bool:  # type: ignore[type-arg]
     """Return True for superseded shell or bytecode-writing Python hook commands."""
+
     def stale(command: object) -> bool:
         cmd = str(command or "")
         if cmd.endswith(_CTX_INJECT_SH_BASENAME) or _CTX_INJECT_SH_BASENAME in cmd:

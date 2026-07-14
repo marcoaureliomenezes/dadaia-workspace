@@ -37,7 +37,7 @@ def test_build_assigns_exact_handoff_and_prepends_prefix_verbatim() -> None:
     assert without.prefix_hash is None
     handoff_ref = canonical_worker_output_ref("dadaia-workspace", "t1")
     assert without.request.prompt.startswith("do the qa step")
-    assert f"create exactly `{handoff_ref}`" in without.request.prompt
+    assert f"to exactly `{handoff_ref}`" in without.request.prompt
     assert f"include exactly `{handoff_ref}`" in without.request.prompt
     assert "read it back" in without.request.prompt
 
@@ -48,9 +48,7 @@ def test_build_assigns_exact_handoff_and_prepends_prefix_verbatim() -> None:
     assert with_prefix.prefix_hash == prefix.content_hash
     assert with_prefix.request.prompt.startswith(prefix.text)
     assert "do the qa step" in with_prefix.request.prompt
-    assert with_prefix.request.prompt.endswith(
-        "workflow handoff ledger."
-    )
+    assert with_prefix.request.prompt.endswith("workflow handoff ledger.")
     assert with_prefix.prompt_text.startswith(prefix.text)
 
 
@@ -75,9 +73,7 @@ def test_production_scope_keeps_only_resolved_context_specs_tree(tmp_path) -> No
         ".dadaia/handoff/demo/**",
     )
 
-    assert filter_context_spec_paths(
-        paths, workspace_root=tmp_path, specs_dir=context_specs
-    ) == (
+    assert filter_context_spec_paths(paths, workspace_root=tmp_path, specs_dir=context_specs) == (
         "repos/demo/specs/releases/v1/**",
         ".dadaia/handoff/demo/**",
     )

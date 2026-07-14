@@ -144,7 +144,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         # haiku-tier pricing (was keyed under the dropped ``claude-haiku-3-5``)
         # is preserved here so past telemetry costed at the haiku tier resolves.
         claude_id="claude-haiku-4-5-20251001",
-        codex_id="gpt-5.4-mini",
+        codex_id="gpt-5.3-codex-spark",
         pricing=(ModelPricing(0.80, 4.00, 1.00, 0.08, date(2025, 1, 1)),),
         tier="fast",
     ),

@@ -559,9 +559,7 @@ def test_durable_payload_promotes_domain_handoff_without_temp_self_ref() -> None
         },
     )
 
-    payload = durable_payload_from_result(
-        result, fallback_summary="release_scope", is_review=False
-    )
+    payload = durable_payload_from_result(result, fallback_summary="release_scope", is_review=False)
 
     assert payload == {
         "summary": "Bound one authoritative backlog item.",
@@ -590,16 +588,12 @@ def test_durable_payload_keeps_real_artifact_and_review_verdict() -> None:
         },
     )
 
-    payload = durable_payload_from_result(
-        result, fallback_summary="review_qa", is_review=True
-    )
+    payload = durable_payload_from_result(result, fallback_summary="review_qa", is_review=True)
 
     assert payload["verdict"] == "REJECTED"
     assert payload["verdict_reason"] == "coverage gap"
     assert payload["artifact_refs"] == ["specs/reviews/qa.json"]
-    assert payload["findings"] == [
-        {"severity": "HIGH", "message": "missing replay rejection case"}
-    ]
+    assert payload["findings"] == [{"severity": "HIGH", "message": "missing replay rejection case"}]
 
 
 def test_durable_payload_summarizes_top_level_domain_and_drops_temp_artifact() -> None:
@@ -618,9 +612,7 @@ def test_durable_payload_summarizes_top_level_domain_and_drops_temp_artifact() -
         },
     )
 
-    payload = durable_payload_from_result(
-        result, fallback_summary="release_scope", is_review=False
-    )
+    payload = durable_payload_from_result(result, fallback_summary="release_scope", is_review=False)
 
     assert payload["summary"] == "Replay outcomes need an explicit adapter contract."
     assert "artifact" not in payload
@@ -648,9 +640,7 @@ def test_durable_payload_prefers_structured_domain_contract_over_transport_findi
             "schema": "agent-run-result-v1",
             "artifact_refs": [temp_ref],
             "verdict": "REJECTED",
-            "findings": [
-                {"severity": "MEDIUM", "message": "presentation-only finding"}
-            ],
+            "findings": [{"severity": "MEDIUM", "message": "presentation-only finding"}],
             "structured_output": {
                 "summary": "One memory drift found.",
                 "verdict": "REJECTED",
@@ -667,9 +657,7 @@ def test_durable_payload_prefers_structured_domain_contract_over_transport_findi
         },
     )
 
-    payload = durable_payload_from_result(
-        result, fallback_summary="drift_scan", is_review=True
-    )
+    payload = durable_payload_from_result(result, fallback_summary="drift_scan", is_review=True)
 
     assert payload["summary"] == "One memory drift found."
     assert payload["lens_results"] == [
@@ -697,9 +685,7 @@ def test_reset_run_zone_purges_ledger_and_exact_worker_outputs(tmp_path: Path) -
     worker_ref = ".dadaia/tmp/lifecycle-worker/demo/scope.step-output.json"
     writer.worker_outputs.add(worker_ref)
 
-    removed = resolver.reset_run_zone(
-        "run-1", worker_output_refs=(worker_ref,)
-    )
+    removed = resolver.reset_run_zone("run-1", worker_output_refs=(worker_ref,))
 
     assert removed == 2
     assert writer.files == {}

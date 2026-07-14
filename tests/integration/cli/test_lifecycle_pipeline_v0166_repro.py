@@ -188,9 +188,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
     reason.
     """
     accept_calls: list[object] = []
-    impl_rel = canonical_worker_output_ref(
-        "dadaia-workspace", "pipe-fr2-repro:implement:attempt-0"
-    )
+    impl_rel = canonical_worker_output_ref("dadaia-workspace", "pipe-fr2-repro:implement:attempt-0")
     worker_payload = json.dumps(
         {
             "schema_version": "agent-run-result-v1",

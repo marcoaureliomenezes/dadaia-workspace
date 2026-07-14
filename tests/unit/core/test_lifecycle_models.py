@@ -56,8 +56,10 @@ def test_transitions_table_pins_the_full_review_ladder_by_frozenset_equality() -
 
     # The exact frozenset-equality pin: each review phase's only legal targets are the
     # next forward phase and BLOCKED.
+    # QA_REVIEW additionally reaches CLOSURE: the combined single-review ladder runs
+    # one tri-angle review under QA_REVIEW and advances straight to closure.
     assert TRANSITIONS[LifecyclePhase.QA_REVIEW] == frozenset(
-        {LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}
+        {LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}
     )
     assert TRANSITIONS[LifecyclePhase.SECURITY_REVIEW] == frozenset(
         {LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}
