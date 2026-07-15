@@ -12,13 +12,21 @@ releases, and how releases mature and are reviewed. Full detail: the
 
 ## Bug & backlog → release
 
-- **`product-engineer` picks** the bug + backlog set, **dispatched by
+> **Bug-hotfix doctrine (operator decree, 2026-07-15) — bugs are NOT release
+> material.** A reported bug is fixed **on the spot** per the always-on
+> `bug-hotfix-doctrine` rule (register → root-cause → RED reproducing test →
+> fix → GREEN → `resolved` event → new wheel to the consumer-side validator).
+> Releases pick **backlog only**. The bug-picking language below survives solely
+> for the residual case where a backlog feature legitimately **supersedes** an
+> open bug with a more complete solution.
+
+- **`product-engineer` picks** the backlog set, **dispatched by
   `project-manager`** — never self-initiated, never another agent.
-- **Bugs are always solved.** Every picked bug is fixed in the release, **unless**
-  a picked backlog item supersedes it with a more complete solution — then record
-  `superseded_by: <backlog-slug>` in the bug's frontmatter + a SPEC note, and the
-  backlog item's TASKS must cover the bug's acceptance. A bug is **never silently
-  dropped**.
+- **Bugs are never silently dropped.** A bug is hotfixed immediately (doctrine
+  above); the only release-side disposition left is supersession: if a picked
+  backlog item subsumes an open bug with a more complete solution, record
+  `superseded_by: <backlog-slug>` (a `superseded` ledger event) and the backlog
+  item's TASKS must cover the bug's acceptance.
 - **Sanitize continuously.** Stale or invalid bugs/backlog are marked `deferred`
   or `rejected` with a reason. **Never delete** a bug or backlog file.
 - **Grill is mandatory.** A `dadaia-grill-me` session on the picked set is required

@@ -75,10 +75,16 @@ event requires every field above (`title`, `severity`, `surface`, `component`,
 `context`, `tags[]`, `symptom`, `repro`, `expected`, `notes`).
 
 **Event lifecycle.** A `bug_id`'s stream opens with `reported` and carries at most one
-**terminal** event — `{resolved, superseded, deferred, rejected}` — appended later by
-the release that dispositions it (`resolved --release <id>`, `superseded
---superseded-by <slug>`, `deferred`/`rejected --reason <text>`). Do not append a
-terminal event when you register; that is the disposition step, not registration.
+**terminal** event — `{resolved, superseded, deferred, rejected}`. Under the always-on
+`bug-hotfix-doctrine` rule the normal path is: the fixing agent appends `resolved`
+**in the same hotfix session**, immediately after proving the fix (RED reproducing
+test → root-cause fix → GREEN), carrying the resolution evidence
+(`--resolution-evidence`: reproducing test, fix, suite result; the `--release`
+anchor takes the shipped package version, e.g. `0.2.6` — no release artifact is
+created for bugs). `superseded --superseded-by <slug>`, `deferred`/`rejected
+--reason <text>` remain for the residual dispositions. Do not append a terminal
+event when you register; registration and resolution are distinct events even when
+minutes apart.
 
 Inspect the stream with `dadaia bugs status` (lists open bugs) and `dadaia bugs stats`
 (aggregates by severity/status). Archiving a bug's legacy source is a `git mv` into
