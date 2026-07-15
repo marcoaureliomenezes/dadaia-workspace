@@ -1,3 +1,6 @@
+---
+specs_pattern_version: 4
+---
 # Constitution: <Project Name>
 
 > Este documento define as leis imutáveis que governam todo o desenvolvimento de <project-name>.

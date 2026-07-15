@@ -52,7 +52,8 @@ _DEFAULT_ENV_ALLOWLIST = (
 _VALID_CODEX_EFFORTS: frozenset[str] = frozenset(get_args(CodexEffort))
 
 #: FR5 (v0.1.66) — the finite set of `codex exec --sandbox` values this adapter accepts,
-#: identical to codex-cli's own accepted set. The compiled-in default is "read-only"; the
+#: identical to codex-cli's own accepted set. The compiled-in default is
+#: ``workspace-write`` because lifecycle workers must materialize governed artifacts; the
 #: env override MUST resolve to one of these or construction fails loudly (AC5.3).
 _VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
     {"read-only", "workspace-write", "danger-full-access"}
@@ -60,10 +61,10 @@ _VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
 
 #: FR5 (v0.1.66) — the environment-variable override read at ``CodexExecConfig``
 #: construction (the single choke point — architect finding MEDIUM-1). Overrides the
-#: compiled-in "read-only" default ONLY when the caller did not pass an explicit
+#: compiled-in "workspace-write" default ONLY when the caller did not pass an explicit
 #: ``sandbox=`` value; an explicit caller value always wins over the env var.
 _DADAIA_CODEX_SANDBOX_ENV = "DADAIA_CODEX_SANDBOX"
-_DEFAULT_CODEX_SANDBOX = "read-only"
+_DEFAULT_CODEX_SANDBOX = "workspace-write"
 _MAX_DIAGNOSTIC_TAIL = 4_000
 
 
@@ -198,6 +199,10 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                 error=f"unsupported runtime: {request.runtime.value}",
             )
 
+        preflight = self._writable_artifact_preflight(request)
+        if preflight is not None:
+            return preflight
+
         with tempfile.TemporaryDirectory(prefix="dadaia-codex-exec-") as tmp:
             output_path = Path(tmp) / "last-message.json"
             args = self._command(request, output_path)
@@ -236,6 +241,27 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             result = self._result_from_output(request, output_path, proc)
             return self._with_changed_paths(result)
 
+    def _writable_artifact_preflight(self, request: AgentRunRequest) -> AgentRunResult | None:
+        """Prove the lifecycle artifact zone is writable before model dispatch."""
+        probe_dir = self._config.cwd / ".dadaia" / "tmp" / "lifecycle-worker" / request.context
+        try:
+            probe_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix=".preflight-", dir=probe_dir) as probe:
+                probe.write(b"ok")
+                probe.flush()
+        except OSError as exc:
+            message = self._redact(
+                f"lifecycle artifact preflight failed for {probe_dir}: {exc}. "
+                "Run the worker in a workspace with writable .dadaia/tmp storage."
+            )
+            return AgentRunResult(
+                status=AgentRunStatus.FAILED,
+                summary="codex worker artifact storage is not writable",
+                error=message,
+                diagnostic=self._diagnostic(request, message, "worker-artifact-preflight-failed"),
+            )
+        return None
+
     @staticmethod
     def _classify_failure(stderr_text: str) -> tuple[str, str]:
         """Map a non-zero codex exec failure to ``(summary, error)``.
@@ -248,6 +274,16 @@ class CodexExecAdapter(SubprocessAdapterMixin):
         non-zero exit. All other failures keep the raw (redacted) stderr.
         """
         lowered = stderr_text.lower()
+        if "bwrap:" in lowered or "failed rtm_newaddr" in lowered:
+            return (
+                "codex worker sandbox failed to initialize",
+                (
+                    "The Codex sandbox could not initialize in this host/container. "
+                    "Use a host that supports the workspace-write sandbox, or explicitly set "
+                    "DADAIA_CODEX_SANDBOX=danger-full-access only inside an isolated trusted "
+                    f"worker container. Underlying error: {stderr_text}"
+                ),
+            )
         if "unexpected argument" in lowered or "unrecognized" in lowered:
             return (
                 "codex exec rejected an argument (incompatible codex-cli flag contract)",
@@ -341,6 +377,31 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             raw = output_path.read_text(encoding="utf-8")
         except OSError:
             raw = proc.stdout
+
+        lowered = raw.lower()
+        if "bwrap:" in lowered or "failed rtm_newaddr" in lowered:
+            error = self._redact(
+                "The Codex sandbox could not initialize in this host/container. Use a host "
+                "that supports workspace-write, or set DADAIA_CODEX_SANDBOX=danger-full-access "
+                "only inside an isolated trusted worker container. Worker output: " + raw
+            )
+            return AgentRunResult(
+                status=AgentRunStatus.FAILED,
+                summary="codex worker sandbox failed to initialize",
+                error=error,
+                diagnostic=self._diagnostic(request, raw, "worker-sandbox-infrastructure-failure"),
+            )
+        if "read-only" in lowered and "step-output" in lowered:
+            error = self._redact(
+                "The Codex worker sandbox rejected its mandatory step-output write. "
+                "The lifecycle runtime requires workspace-write. Worker output: " + raw
+            )
+            return AgentRunResult(
+                status=AgentRunStatus.FAILED,
+                summary="codex worker sandbox prevented artifact materialization",
+                error=error,
+                diagnostic=self._diagnostic(request, raw, "worker-sandbox-read-only"),
+            )
 
         # PRIMARY: shared strict-primary / structural-fallback result extraction.
         payload = self._extract_result_payload(raw, request.expected_schema)

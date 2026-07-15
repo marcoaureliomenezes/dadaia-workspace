@@ -93,13 +93,11 @@ def filter_context_spec_paths(
     return tuple(
         path
         for path in paths
-        if "specs/" not in path
-        or path == prefix
-        or path.startswith(f"{prefix}/")
+        if "specs/" not in path or path == prefix or path.startswith(f"{prefix}/")
     )
 
 
-def _materialization_instruction(scope: "PromptScope") -> str:
+def _materialization_instruction(scope: PromptScope) -> str:
     if GateEvidenceKind.HANDOFF not in scope.required_evidence:
         return ""
     ref = canonical_worker_output_ref(scope.context, scope.task_id)
@@ -119,7 +117,7 @@ def _materialization_instruction(scope: "PromptScope") -> str:
     )
 
 
-def _worker_prompt(scope: "PromptScope") -> str:
+def _worker_prompt(scope: PromptScope) -> str:
     materialization = _materialization_instruction(scope)
     if not materialization:
         return scope.prompt

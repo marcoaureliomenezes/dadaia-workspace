@@ -5,6 +5,7 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 (``bin/python``) and Windows (``Scripts/python.exe``).
 """
 
+import os
 import subprocess
 import venv
 from importlib import metadata
@@ -33,6 +34,12 @@ class VenvPythonEnvironmentManager:
         source edits. Otherwise (wheel install, e.g. pipx/PyPI): pin the exact running
         version from the index.
         """
+        candidate = os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
+        if candidate:
+            candidate_path = Path(candidate).expanduser().resolve()
+            if not candidate_path.is_file() or candidate_path.suffix != ".whl":
+                raise ValueError("DADAIA_BOOTSTRAP_PACKAGE must name an existing local wheel")
+            return str(candidate_path)
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
             return str(src_root)
@@ -52,7 +59,7 @@ class VenvPythonEnvironmentManager:
         if not self._dadaia_entrypoint(workspace_root).exists():
             spec = self._install_spec()
             install_cmd = [self.pip_executable(workspace_root), "install", "--quiet"]
-            if not spec.startswith("dadaia-workspace=="):
+            if Path(spec).is_dir():
                 install_cmd.append("--editable")
             install_cmd.append(spec)
             subprocess.run(install_cmd, check=True)

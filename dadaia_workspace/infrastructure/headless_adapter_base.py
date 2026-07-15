@@ -309,13 +309,6 @@ class ChangedPathsMixin:
         if self._git is None:
             return result
         changed = self._git.diff_name_only(self._cwd_for_diff)
-        if not changed:
-            # An empty diff must not clobber a worker-reported changed_paths with ""
-            # (bug result-contract-drops-singular-artifact-ref-and-changed-paths-list):
-            # the diff root is the run cwd (typically the WORKSPACE root, which is not
-            # the context's git repo), so an empty answer is structurally blind, not
-            # proof of a no-op. Git truth still wins whenever it actually sees changes.
-            return result
         structured = dict(result.structured_output)
         structured["changed_paths"] = ",".join(changed)
         return AgentRunResult(
@@ -342,9 +335,7 @@ _PERSONA_DIRECTIVE_PREAMBLE = (
 )
 
 
-def build_prompt_envelope(
-    request: AgentRunRequest, *, execution_root: Path | None = None
-) -> str:
+def build_prompt_envelope(request: AgentRunRequest, *, execution_root: Path | None = None) -> str:
     """Build the deterministic JSON prompt envelope handed to a headless worker.
 
     Fields: ``role``, ``prompt``, ``context``, ``release_id``, ``task_id``,

@@ -416,9 +416,7 @@ def durable_payload_from_result(
         payload: dict[str, object] = {str(key): value for key, value in nested.items()}
     else:
         payload = {
-            str(key): value
-            for key, value in document.items()
-            if key not in _TRANSPORT_ONLY_KEYS
+            str(key): value for key, value in document.items() if key not in _TRANSPORT_ONLY_KEYS
         }
 
     summary = _first_domain_summary(payload) or _first_domain_summary(document)
@@ -442,9 +440,7 @@ def durable_payload_from_result(
         if isinstance(findings, list) and findings:
             payload["findings"] = findings
 
-    stable_refs = [
-        ref for ref in result.artifact_refs if not ref.startswith(_WORKER_OUTPUT_PREFIX)
-    ]
+    stable_refs = [ref for ref in result.artifact_refs if not ref.startswith(_WORKER_OUTPUT_PREFIX)]
     artifact = document.get("artifact")
     artifact_path = artifact.get("path") if isinstance(artifact, dict) else None
     if (
@@ -702,9 +698,9 @@ class WorkflowHandoffResolver:
         lenses = payload.get("lenses")
         if isinstance(lenses, list) and lenses:
             names = [
-                item.get("name")
+                name
                 for item in lenses
-                if isinstance(item, dict) and isinstance(item.get("name"), str)
+                if isinstance(item, dict) and isinstance((name := item.get("name")), str)
             ]
             if names:
                 lines.append(f"- lenses: {', '.join(names)}")
@@ -725,9 +721,7 @@ class WorkflowHandoffResolver:
                 lens = criterion.get("lens")
                 condition = criterion.get("pass_condition")
                 if isinstance(lens, str) and isinstance(condition, str):
-                    lines.append(
-                        f"  - {lens}: {_compact_digest_text(condition, limit=280)}"
-                    )
+                    lines.append(f"  - {lens}: {_compact_digest_text(condition, limit=280)}")
         findings = payload.get("findings")
         if isinstance(findings, list) and findings:
             lines.append(f"- findings: {len(findings)}")
@@ -737,9 +731,7 @@ class WorkflowHandoffResolver:
                     msg = finding.get("message", "")
                     finding_id = finding.get("id")
                     identity = (
-                        f" (id: {finding_id})"
-                        if isinstance(finding_id, str) and finding_id
-                        else ""
+                        f" (id: {finding_id})" if isinstance(finding_id, str) and finding_id else ""
                     )
                     lines.append(
                         f"  - [{sev}] {_compact_digest_text(str(msg), limit=240)}{identity}"
@@ -747,13 +739,9 @@ class WorkflowHandoffResolver:
                     surface = finding.get("surface")
                     evidence = finding.get("evidence")
                     if isinstance(surface, str) and surface.strip():
-                        lines.append(
-                            f"    surface: {_compact_digest_text(surface, limit=180)}"
-                        )
+                        lines.append(f"    surface: {_compact_digest_text(surface, limit=180)}")
                     if isinstance(evidence, str) and evidence.strip():
-                        lines.append(
-                            f"    evidence: {_compact_digest_text(evidence, limit=300)}"
-                        )
+                        lines.append(f"    evidence: {_compact_digest_text(evidence, limit=300)}")
             if len(findings) > 20:
                 lines.append("  - read the authoritative payload ref for all findings")
         refs = payload.get("artifact_refs")

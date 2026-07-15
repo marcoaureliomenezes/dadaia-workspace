@@ -47,9 +47,7 @@ def _passing_result(label: str) -> AgentRunResult:
     artifact_ref = (
         f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/CLOSURE.md"
         if label == "close"
-        else canonical_worker_output_ref(
-            _CONTEXT, f"pipe-review-prompts:{label}:attempt-0"
-        )
+        else canonical_worker_output_ref(_CONTEXT, f"pipe-review-prompts:{label}:attempt-0")
     )
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,

@@ -116,9 +116,7 @@ class _GoldenFake:
             "audit_scope": {
                 "summary": "Bound architecture drift.",
                 "audit_question": "Does implementation match architecture memory?",
-                "lenses": [
-                    {"name": "architecture", "rationale": "Contract fidelity."}
-                ],
+                "lenses": [{"name": "architecture", "rationale": "Contract fidelity."}],
                 "surfaces": ["pkg/a.py"],
                 "acceptance_criteria": [
                     {"lens": "architecture", "pass_condition": "No contract drift."}

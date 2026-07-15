@@ -18,10 +18,10 @@ from dadaia_workspace.features.lifecycle.service import (
     ActiveReleaseState,
     BoundContext,
     GitPreflightState,
-    PresenceState,
     LifecycleCommandStatus,
     LifecyclePreflightInput,
     LifecyclePreflightService,
+    PresenceState,
     RequiredHandoff,
     SpecsDoctorState,
 )

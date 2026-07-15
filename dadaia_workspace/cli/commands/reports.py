@@ -740,9 +740,7 @@ def workflow_doctor(
     from dadaia_workspace.features.lifecycle.policy_doctor import Severity, run_policy_doctor
 
     workspace_root = resolve_workspace_root()
-    findings = run_policy_doctor(
-        store=container.build_workflow_model_policy_store(workspace_root)
-    )
+    findings = run_policy_doctor(store=container.build_workflow_model_policy_store(workspace_root))
     coherence = run_fragment_coherence_doctor()
     if json_output:
         typer.echo(
@@ -761,8 +759,11 @@ def workflow_doctor(
             console.print(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
         if coherence.ok and not coherence.findings:
             console.print("[green]OK[/green] fragment coherence")
-        for finding in coherence.findings:
-            console.print(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
+        for coherence_finding in coherence.findings:
+            console.print(
+                f"[{coherence_finding.severity.value}] {coherence_finding.code.value}: "
+                f"{coherence_finding.message}"
+            )
     has_error = any(finding.severity is Severity.ERROR for finding in findings) or any(
         finding.severity is CoherenceSeverity.ERROR for finding in coherence.findings
     )
@@ -845,8 +846,7 @@ def workflow_status(
         typer.echo(_json.dumps(payload, sort_keys=True))
     else:
         console.print(
-            f"OK cleanup_candidates={counters.cleanup_candidate_count} "
-            f"runs_matched={len(matched)}"
+            f"OK cleanup_candidates={counters.cleanup_candidate_count} runs_matched={len(matched)}"
         )
     raise typer.Exit(0)
 
@@ -873,9 +873,7 @@ def workflow_profiles(
         typer.echo(_json.dumps(payload, sort_keys=True))
     else:
         for profile in profiles:
-            console.print(
-                f"{profile.id}: {profile.harness} {profile.model_id}:{profile.effort}"
-            )
+            console.print(f"{profile.id}: {profile.harness} {profile.model_id}:{profile.effort}")
     raise typer.Exit(0)
 
 
@@ -889,9 +887,7 @@ def workflow_hygiene_clean(
     if apply and dry_run:
         raise typer.BadParameter("--apply and --dry-run are mutually exclusive")
     workspace_root = resolve_workspace_root()
-    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(
-        dry_run=not apply
-    )
+    result = container.build_lifecycle_hygiene_service(workspace_root).cleanup(dry_run=not apply)
     payload = {
         "dry_run": result.dry_run,
         "candidate_count": len(result.candidates),

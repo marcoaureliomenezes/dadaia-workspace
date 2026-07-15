@@ -24,7 +24,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 
 MINIMAL_MEMORY_PRODUCT_INDEX_MD = """\

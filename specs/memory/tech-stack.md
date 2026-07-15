@@ -12,8 +12,8 @@ tags:
 - toolchain
 - constraints
 token_estimate: 545
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-07-15'
+release_origin: v0.2.5
 ---
 
 ## Language And Packaging
@@ -52,6 +52,8 @@ model contract.
 
 Layer-1 agent model/effort comes from the selected agent-policy template plus operator
 overrides. Layer-2 model/effort comes from workflow profiles and per-run policy.
+The v0.2.5 live contract was certified with `codex-cli 0.144.4`; both headless exec
+and TUI fired all four projected hook events.
 
 ## Quality Toolchain
 

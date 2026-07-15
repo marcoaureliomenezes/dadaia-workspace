@@ -42,7 +42,6 @@ def test_generated_and_canonical_scaffold_atoms_lint_clean(tmp_path: Path) -> No
         _SCAFFOLD_MEMORY / "architecture.md",
         _SCAFFOLD_MEMORY / "tech-stack.md",
         _SCAFFOLD_MEMORY / "product" / "index.md",
-        _SCAFFOLD_MEMORY / "product" / "feature.md",
     ]
     for path in expected:
         assert path.is_file(), f"Missing memory scaffold asset: {path}"

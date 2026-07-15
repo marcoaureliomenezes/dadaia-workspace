@@ -1,11 +1,9 @@
-"""Direct unit pin of ``resolve_context_for_cli``'s fallback ORDERING (v0.1.77 FR1)
+"""Direct unit pin of caller-owned ``resolve_context_for_cli`` resolution
 and its context-NAME allowlist guard (v0.1.80 FR3).
 
-QA finding (v0.1.77 release review, LOW): the seam's rung order — explicit → env →
-own session → first-ALIVE → self-hosting-slug terminal fallback — was exercised only
-indirectly. These tests pin the two rungs that protect CONSUMER workspaces: a real
-ALIVE context always outranks the terminal ``"dadaia-workspace"`` literal, and the
-literal fires only in the degenerate zero-ALIVE-context workspace.
+The seam never borrows a foreign first-ALIVE context. Consumer workspaces must bind
+or pass a context explicitly; only the recognizable source checkout gets the
+self-hosting slug fallback.
 
 v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
 security-review INFO defense-in-depth): both the ``explicit`` and ``DADAIA_CONTEXT``
@@ -72,35 +70,21 @@ def _clean_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("_clean_session_env")
-@pytest.mark.parametrize(
-    ("contexts", "expected"),
-    [
-        pytest.param(
-            ["consumer-only-context"],
-            "consumer-only-context",
-            id="first-alive-outranks-the-terminal-literal-in-a-consumer-workspace",
-        ),
-        pytest.param(
-            [],
-            "dadaia-workspace",
-            id="terminal-literal-fires-only-with-zero-alive-contexts",
-        ),
-    ],
-)
-def test_fallback_ordering_first_alive_before_terminal_literal(
+@pytest.mark.parametrize("contexts", [[], ["consumer-only-context"]])
+def test_unbound_consumer_never_selects_first_alive(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     contexts: list[str],
-    expected: str,
 ) -> None:
     ws = tmp_path / "ws"
     _mk_workspace(ws, contexts)
     monkeypatch.chdir(ws)
-    assert resolve_context_for_cli(None) == expected
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli(None)
 
 
 @pytest.mark.usefixtures("_clean_session_env")
-def test_explicit_and_env_outrank_first_alive(
+def test_explicit_and_env_resolve_without_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ws = tmp_path / "ws"
@@ -160,7 +144,8 @@ def test_traversal_shaped_env_is_skipped_not_crashed(
     _mk_workspace(ws, ["alive-ctx"])
     monkeypatch.chdir(ws)
     monkeypatch.setenv("DADAIA_CONTEXT", name)
-    assert resolve_context_for_cli(None) == "alive-ctx"
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli(None)
 
 
 @pytest.mark.usefixtures("_clean_session_env")
@@ -174,9 +159,11 @@ def test_empty_string_explicit_and_env_fall_through_unchanged(
     ws = tmp_path / "ws"
     _mk_workspace(ws, ["alive-ctx"])
     monkeypatch.chdir(ws)
-    assert resolve_context_for_cli("") == "alive-ctx"
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli("")
     monkeypatch.setenv("DADAIA_CONTEXT", "")
-    assert resolve_context_for_cli(None) == "alive-ctx"
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli(None)
 
 
 @pytest.mark.usefixtures("_clean_session_env")

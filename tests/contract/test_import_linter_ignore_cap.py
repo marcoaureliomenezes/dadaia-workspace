@@ -70,15 +70,15 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # re-enumerated by grep at implementation time = 10 module-pair edges. None is
 # composition-root wiring (container.py's monopoly); all are accepted, capped, ratcheted
 # debt. Cap raised 26 -> 36 (+10) in the same commit as the setup.cfg contract.
-_RECORDED_IGNORE_EDGE_CAP = 31
+_RECORDED_IGNORE_EDGE_CAP = 28
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-infrastructure": 9,
+    "features-no-infrastructure": 7,
     "features-no-subprocess": 4,
-    "features-no-cross-feature": 11,
-    "cli-no-infrastructure": 7,
+    "features-no-cross-feature": 12,
+    "cli-no-infrastructure": 5,
 }
 
 

@@ -35,12 +35,11 @@ Current-doc corrections to keep active:
   concerns and must not be emitted from dadaia public assets.
 - Hook matchers are event-specific. `UserPromptSubmit` and `Stop` ignore matchers;
   command hooks are the only handler type that runs today.
-- HEADLINE (live-verified, codex-cli 0.139.0): command hooks fire ONLY in the
-  interactive `codex` TUI. Under headless `codex exec` they never run, in any
-  configuration form. Harness-hook gate enforcement on Codex is interactive-only
-  today; on the headless path the git chokepoints (pre-commit, WARN-only presence
-  detection; pre-push security-verdict gate, v0.1.14) provide the deterministic
-  coverage — they fire as git hooks, independent of any harness hook (§9).
+- HEADLINE (live-verified, codex-cli 0.144.4): projected command hooks fire in both
+  the interactive `codex` TUI and headless `codex exec`. The git chokepoints
+  (pre-commit, WARN-only presence detection; pre-push security-verdict gate) remain
+  independent defense-in-depth. Rerun the opt-in live contract after a CLI upgrade
+  instead of carrying this version-specific fact forward by assumption (§9).
 
 ---
 
@@ -395,19 +394,13 @@ verdict wins (fixed in v0.1.14 — bug
 | Interactive `codex` TUI | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); the block envelope is honored (FROZEN write blocked live) | deterministic gate enforcement EXISTS interactively |
 | Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | the merged pre_gate, ctx-inject, and heartbeat DO NOT run; harness-hook enforcement is absent on this path |
 
-**Never claim "harness-hook enforcement on Codex" unqualified.** Harness hooks fire
-only in interactive sessions today (upstream defect, bug
-`codex-exec-hooks-do-not-fire-headless`, resolved per its option (b)). The headless
-gap is covered by the **git chokepoints** (v0.1.14): pre-commit (WARN-only presence
-detection, NO-LOCKS DOCTRINE v0.1.76) and the pre-push security-verdict gate run as git
-hooks and fire regardless of whether any harness hook ran — file-tool-level gating is
-absent headless, but pushes stay deterministically gated. Agent discipline plus doctor
-checks cover the remainder.
+**Treat hook behavior as a live-tested harness contract, not timeless prose.** Codex CLI
+0.144.4 fires the projected hooks in both TUI and headless exec. The **git chokepoints**
+remain independent: pre-commit (WARN-only presence detection, NO-LOCKS DOCTRINE) and
+the pre-push security-verdict gate run as git hooks regardless of harness hook behavior.
 
-`dadaia public doctor` surfaces this boundary honestly as an INFO line
-(`[info] codex:trust-boundary — Codex interactive hooks fire and block; \`codex exec\`
-headless does not`, WS-CDX-HYGIENE) so an operator onboarding to Codex sees it without
-reading this skill.
+`dadaia public doctor` reports the current live-certified parity and tells the operator
+to rerun the live contract after a Codex CLI upgrade (WS-CDX-HYGIENE).
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the

@@ -144,6 +144,8 @@ def test_verb_persists_resolver_derived_snapshot(
     argv = [
         "lifecycle",
         *subcmd,
+        "--context",
+        _CONTEXT,
         "--release-id",
         _RELEASE,
         "--run-id",

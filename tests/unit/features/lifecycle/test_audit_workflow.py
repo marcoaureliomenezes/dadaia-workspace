@@ -53,9 +53,7 @@ class _KindFake:
             payload = {
                 "summary": "Bound architecture drift.",
                 "audit_question": "Does implementation match architecture memory?",
-                "lenses": [
-                    {"name": "architecture", "rationale": "Contract fidelity."}
-                ],
+                "lenses": [{"name": "architecture", "rationale": "Contract fidelity."}],
                 "surfaces": ["src/games.py"],
                 "acceptance_criteria": [
                     {"lens": "architecture", "pass_condition": "No contract drift."}
@@ -110,9 +108,7 @@ class _KindFake:
                 ),
             }
         verdict = payload.get("verdict")
-        structured: dict[str, str] = (
-            {"verdict": verdict} if isinstance(verdict, str) else {}
-        )
+        structured: dict[str, str] = {"verdict": verdict} if isinstance(verdict, str) else {}
         if isinstance(payload.get("verdict_reason"), str):
             structured["verdict_reason"] = payload["verdict_reason"]
         return AgentRunResult(
@@ -218,9 +214,9 @@ def test_triage_produces_disposition_ready_output(tmp_path: Path) -> None:
 
 def test_artifact_only_scope_blocks_as_malformed_domain_output(tmp_path: Path) -> None:
     _workspace(tmp_path)
-    result = _workflow(
-        tmp_path, _resolver(tmp_path), artifact_only_scope=True
-    ).run("aud-empty-scope")
+    result = _workflow(tmp_path, _resolver(tmp_path), artifact_only_scope=True).run(
+        "aud-empty-scope"
+    )
 
     assert not result.completed
     assert result.blocked is not None
@@ -230,9 +226,7 @@ def test_artifact_only_scope_blocks_as_malformed_domain_output(tmp_path: Path) -
 
 def test_rejected_drift_is_triaged_and_can_complete(tmp_path: Path) -> None:
     _workspace(tmp_path)
-    result = _workflow(tmp_path, _resolver(tmp_path), with_finding=True).run(
-        "aud-rejected"
-    )
+    result = _workflow(tmp_path, _resolver(tmp_path), with_finding=True).run("aud-rejected")
 
     assert result.completed
     assert [step.label for step in result.steps] == [

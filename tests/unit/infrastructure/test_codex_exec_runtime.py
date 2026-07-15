@@ -440,7 +440,7 @@ def test_pi_and_codex_share_one_extraction_helper(tmp_path: Path, monkeypatch: A
     "case",
     [
         "env-override-reaches-resolved-config",
-        "default-stays-read-only-when-env-unset",
+        "default-is-workspace-write-when-env-unset",
         "env-invalid-value-fails-loud-at-construction",
         "explicit-caller-value-wins-over-env",
         "explicit-caller-invalid-value-still-fails-loud",
@@ -460,11 +460,11 @@ def test_codex_sandbox_env_choke_point(
         assert config.sandbox == "workspace-write"
         assert config.resolved_sandbox == "workspace-write"
 
-    elif case == "default-stays-read-only-when-env-unset":
+    elif case == "default-is-workspace-write-when-env-unset":
         monkeypatch.delenv("DADAIA_CODEX_SANDBOX", raising=False)
         config = CodexExecConfig(cwd=tmp_path)
-        assert config.sandbox == "read-only"
-        assert config.resolved_sandbox == "read-only"
+        assert config.sandbox == "workspace-write"
+        assert config.resolved_sandbox == "workspace-write"
 
     elif case == "env-invalid-value-fails-loud-at-construction":
         monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "not-a-real-value")
@@ -556,6 +556,49 @@ def test_default_runner_resolves_subprocess_run_at_call_time_not_construction_ti
     )
     assert result.status is AgentRunStatus.SUCCEEDED
     assert result.summary == "call-time interception proof"
+
+
+def test_codex_success_output_with_bwrap_failure_is_infrastructure_failure(tmp_path: Path) -> None:
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        output = Path(argv[argv.index("--output-last-message") + 1])
+        output.write_text(
+            "Blocked: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    result = CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request()
+    )
+    assert result.status is AgentRunStatus.FAILED
+    assert result.summary == "codex worker sandbox failed to initialize"
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "worker-sandbox-infrastructure-failure"
+
+
+def test_codex_preflight_blocks_before_runner_when_artifact_zone_is_unwritable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    called = False
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.codex_runtime.tempfile.NamedTemporaryFile",
+        lambda **kwargs: (_ for _ in ()).throw(PermissionError("read-only")),
+    )
+    result = CodexExecAdapter(CodexExecConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request()
+    )
+    assert called is False
+    assert result.status is AgentRunStatus.FAILED
+    assert result.diagnostic is not None
+    assert result.diagnostic.parser_classification == "worker-artifact-preflight-failed"
 
 
 # ---------------------------------------------------------------------------

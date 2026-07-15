@@ -17,6 +17,8 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 - `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia lifecycle --help`).
 - Always call the binary in the workspace venv: `.dadaia/.venv/bin/dadaia`. Never system Python/pip.
 - Add `--json` to most read commands for machine-readable output.
+- Start every new or upgraded runtime with `dadaia capabilities --json`; this versioned
+  document is authoritative over remembered command syntax.
 
 ## Panel — see everything
 
@@ -29,6 +31,7 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 | `context` | Spec Context Projects: `list show create alive dead bind release heartbeat delete` |
 | `lifecycle` | Deterministic workflow verbs (see below) |
 | `specs` | SDD structure: `doctor upgrade init hotfix release segment` |
+| `capabilities` / `certify` / `reconcile` | Discover, prove, and converge the installed provider |
 | `bugs` | Event-sourced bug telemetry: `append status stats` |
 | `backlog` / `release` | Backlog + release entry management |
 | `reports` | Handoff/report inspection: `validate lint doctor status …` |
@@ -45,6 +48,7 @@ dadaia context show --json          # active context + specs_dir + session
 dadaia context list --json          # all contexts, ALIVE/DEAD
 dadaia context bind <ctx> --mode implementation --release <id>   # bind THIS session
 dadaia context alive <ctx> / dead <ctx>                          # lifecycle transitions
+dadaia context baseline <ctx> --yes --push                       # explicit unborn-repo baseline
 ```
 
 Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
@@ -65,6 +69,37 @@ and handoff doctors are diagnostics under their owning top-level command groups;
 not workflows.
 
 Full per-verb detail (steps, harness/model, diagrams): the panel **Workflows** tab.
+
+## Runtime convergence and certification
+
+An install is not promoted merely because `pip` returned zero. Converge the exact
+installed version, then require a green disposable certification ledger:
+
+```bash
+version="$(${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} capabilities --json | \
+  .dadaia/.venv/bin/python -c 'import json,sys; print(json.load(sys.stdin)["provider"]["distribution_version"])')"
+${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} reconcile --expect-version "$version" --json
+${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} certify --json
+```
+
+`reconcile` validates the exact provider version, migrates state, reinstalls projections,
+runs public/workspace doctors, and executes a capability canary. `certify` creates a
+disposable workspace and proves init, projections, clean specs scaffolds, empty Git remote
+baseline, caller-owned bind/heartbeat, all four fake workflows through closure, strict
+handoff validation, panel HTTP/server registry, and ALIVE/DEAD/delete teardown. Any failed
+check is a release blocker. Real Codex and PI canaries remain required before publishing a
+provider release; `fake` is only the deterministic workflow contract harness.
+
+## Agent operating sequence
+
+1. Read `dadaia capabilities --json`; never infer features from an older conversation.
+2. Select the target with `context list/show --json`, then bind this session explicitly.
+3. Run `specs doctor --context <ctx> --json`; do not implement against errors or warnings.
+4. Use exactly one current lifecycle verb with explicit `--context` and `--release-id`.
+5. Preserve the complete JSON result and worker diagnostic when blocked; never reduce it
+   to “workflow failed”.
+6. Use `dadaia panel` for the human view and the server registry for ports.
+7. Emit/validate the final handoff and register genuine provider bugs before workarounds.
 
 ## Register a bug (any runtime, ADDITIVE)
 

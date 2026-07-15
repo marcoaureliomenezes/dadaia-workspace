@@ -54,9 +54,7 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(
-            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
-        ),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 

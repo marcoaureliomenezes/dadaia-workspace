@@ -48,9 +48,7 @@ class _ApprovingRuntime:
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="step complete",
-            artifact_refs=(
-                f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",
-            ),
+            artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
             structured_output={"verdict": "APPROVED"},
         )
 
@@ -69,9 +67,7 @@ class _RejectingQaRuntime(_ApprovingRuntime):
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary=f"qa verdict {verdict}",
-            artifact_refs=(
-                f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",
-            ),
+            artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",),
             structured_output={"verdict": verdict},
         )
 
@@ -174,9 +170,7 @@ def test_rejected_review_restarts_from_implementation_with_exact_payload(
         ("close", 1),
     ]
     implement_requests = [
-        request
-        for request in runtime.received_requests
-        if ":implement:attempt-" in request.task_id
+        request for request in runtime.received_requests if ":implement:attempt-" in request.task_id
     ]
     assert [request.task_id for request in implement_requests] == [
         "run-retry:implement:attempt-0",

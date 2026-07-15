@@ -10,11 +10,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
-from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.features.spec_context import presence, session_identity
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5

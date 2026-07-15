@@ -51,6 +51,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
     MaxContextPolicy,
     SelectionAudit,
+    SelectionResult,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import (
     Fragment,
@@ -71,8 +72,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
-from dadaia_workspace.features.lifecycle.state_machine import TransitionInput
+from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
     durable_payload_from_result,
@@ -166,7 +166,6 @@ _TASK_MARKER_LINE_RES = (
     # Consumer grammar: a standalone marker associated with a bold task heading.
     re.compile(r"^\s*\[(?P<marker>[ x-])\]\s+T-?[0-9][0-9A-Za-z.\-]*\s*$"),
 )
-
 
 
 class LifecyclePipeline:
@@ -339,10 +338,7 @@ class LifecyclePipeline:
                     current_step=step.label,
                     is_review=step.is_review,
                     deliverable_globs=(
-                        (
-                            f"repos/{self._context}/specs/releases/"
-                            f"{self._release_id}/CLOSURE.md"
-                        ),
+                        (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
                         f"specs/releases/{self._release_id}/CLOSURE.md",
                     )
                     if step.label == "close"
@@ -529,11 +525,7 @@ class LifecyclePipeline:
         output_schema = (
             _REVIEW_OUTPUT_SCHEMA_BY_LABEL.get(step.label, "qa-review-handoff-v1")
             if step.is_review
-            else (
-                "closure-handoff-v1"
-                if step.label == "close"
-                else "generic-step-handoff-v1"
-            )
+            else ("closure-handoff-v1" if step.label == "close" else "generic-step-handoff-v1")
         )
         run, _record = self._handoff_resolver.produce(
             run,
@@ -577,9 +569,7 @@ class LifecyclePipeline:
             workspace_root=self._artifact_root,
             specs_dir=self._specs_dir,
         )
-        allowed_paths = (
-            (output_glob, *expanded_paths) if not step.is_review else (output_glob,)
-        )
+        allowed_paths = (output_glob, *expanded_paths) if not step.is_review else (output_glob,)
         return PromptScope(
             role=step.role,
             context=self._context,
@@ -655,7 +645,7 @@ class LifecyclePipeline:
         """Resolve main and shared fragment inputs under each fragment's own policy."""
         if self._context_selector is None:
             return SelectionAudit(step=step.label)
-        results = []
+        results: list[SelectionResult] = []
         seen: set[str] = set()
         for fragment in fragments:
             names = tuple(name for name in fragment.dynamic_inputs if name not in seen)

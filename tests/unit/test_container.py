@@ -202,7 +202,9 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {"implement": "codex-review-deep"}}
+                    }
                 }
             },
         }
@@ -210,7 +212,9 @@ def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> 
     store.save(overlay)
 
     overlay_resolver = container.build_workflow_policy_resolver(tmp_path)
-    overlay_impl = overlay_resolver.resolve("implementation_reviews", context="default").step("implement")
+    overlay_impl = overlay_resolver.resolve("implementation_reviews", context="default").step(
+        "implement"
+    )
     assert overlay_impl is not None
     assert overlay_impl.model_profile == "codex-review-deep"
 

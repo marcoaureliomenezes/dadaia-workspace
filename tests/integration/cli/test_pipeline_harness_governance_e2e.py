@@ -57,9 +57,7 @@ def _approving() -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="approved",
-        artifact_refs=(
-            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",
-        ),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json",),
         structured_output={"verdict": "APPROVED"},
     )
 
@@ -149,6 +147,8 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--release-id",
             "v0.1.29",
             "--harness",
@@ -165,6 +165,24 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
         assert entry["harness"] == "pi", entry
         assert entry["model"] in _PI_MODELS, entry
 
+    human_result = CliRunner().invoke(
+        app,
+        [
+            "lifecycle",
+            "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
+            "--release-id",
+            "v0.1.29",
+            "--harness",
+            "pi",
+            "--show-policy",
+        ],
+    )
+    assert human_result.exit_code == 0, human_result.output
+    assert "workflow=implementation_reviews" in human_result.output
+    assert "implement: harness=pi" in human_result.output
+
     # 3. Overlay default_harness path, no CLI flag.
     overlay_ws = _init_workspace(tmp_path / "overlay-default-case")
     overlay_store = container.build_workflow_model_policy_store(overlay_ws)
@@ -173,7 +191,9 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
+                "default": {
+                    "workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}
+                }
             },
         }
     )
@@ -194,7 +214,9 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}
+                    }
                 }
             },
         }
@@ -245,7 +267,9 @@ def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}}
+                "default": {
+                    "workflows": {"implementation_reviews": {"steps": {}, "default_harness": "pi"}}
+                }
             },
         }
     ).encode("utf-8")

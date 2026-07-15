@@ -22,6 +22,7 @@ from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
+    from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
 
 # Layer-2 workflow harnesses (LAW 1, ADR-A): pi/codex run as workers; fake is the
 # deterministic test adapter. ``claude`` is intentionally ABSENT — Claude Code is a
@@ -67,7 +68,7 @@ def _resolve_context_option(context: str | None) -> str:
     further per-command patches accepted for recurrence family F2).
 
     ``resolve_context_for_cli`` always returns a non-empty string (explicit -> env ->
-    bound session -> first-ALIVE -> the self-hosting-workspace slug terminal fallback),
+    caller-owned bound session -> the self-hosting-workspace slug terminal fallback),
     so a bare verb invocation with no context registered at all keeps its long-standing
     behavior (degrading to the self-hosting slug, which every downstream ``container``
     factory already resolves gracefully); a real bind or a real ALIVE context now
@@ -84,7 +85,7 @@ def _authoritative_backlog_prefix(
     context: str,
     release_id: str,
     backlog_run_id: str | None,
-) -> "PromptPrefix | None":
+) -> PromptPrefix | None:
     """Resolve one exact completed backlog-definition producer for release scope.
 
     Direct release definition remains valid when no matching backlog workflow exists.
@@ -125,13 +126,12 @@ def _authoritative_backlog_prefix(
         )
     upstream = matches[0]
     try:
-        resolved = container.build_workflow_handoff_resolver(
-            workspace_root
-        ).resolve_required(upstream, producer_step="backlog_author", attempt=0)
+        resolved = container.build_workflow_handoff_resolver(workspace_root).resolve_required(
+            upstream, producer_step="backlog_author", attempt=0
+        )
     except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
         raise typer.BadParameter(
-            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author "
-            f"payload: {exc}"
+            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author payload: {exc}"
         ) from exc
 
     authored_paths: set[str] = set()
@@ -144,7 +144,9 @@ def _authoritative_backlog_prefix(
             authored_paths.add(clean)
 
     raw_refs = resolved.payload.get("artifact_refs")
-    refs = tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
+    refs = (
+        tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
+    )
     root = workspace_root.resolve()
     for ref in refs:
         _record_backlog_path(ref)
@@ -543,7 +545,6 @@ def _apply_closure_removal_for_release(
     }
 
 
-
 def _resolve_default_harness(harness: str) -> str:
     """Resolve the ``auto`` default sentinel to a concrete Layer-2 harness name (FR3).
 
@@ -702,7 +703,6 @@ def _parse_step_profile_overrides(step_model: list[str] | None) -> tuple[object,
     return tuple(overrides)
 
 
-
 # -- Audit workflow emitter ------------------------------------------------------------
 
 
@@ -836,7 +836,6 @@ def audit(
     _emit_wire_result("audit", result, json_output=json_output)
 
 
-
 def _enforce_preflight_gate(
     workspace_root: Path,
     *,
@@ -900,15 +899,55 @@ def _implementation_runtime_factory(
     respected verbatim; only the PLAIN default fake is upgraded to the driving result.
     """
     from dadaia_workspace import container
-    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
+        AgentRunResult,
+        AgentRunStatus,
+    )
+    from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
     from dadaia_workspace.infrastructure import fake_runtime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake pipeline worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/pipeline-step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class _ImplementationDrivingFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            artifact_ref = canonical_worker_output_ref(
+                request.context,
+                request.task_id or "pipeline-step",
+            )
+            refs = [artifact_ref]
+            closure_ref = next(
+                (path for path in request.allowed_paths if path.endswith("/CLOSURE.md")),
+                None,
+            )
+            if closure_ref is None and request.role == "product-engineer":
+                specs_prefix = (
+                    f"repos/{context}/specs"
+                    if (workspace_root / "repos" / context / "specs").is_dir()
+                    else "specs"
+                )
+                closure_ref = f"{specs_prefix}/releases/{request.release_id}/CLOSURE.md"
+            if closure_ref is not None:
+                refs.append(closure_ref)
+            for ref in refs:
+                target = workspace_root / ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                body = (
+                    "# Closure: deterministic lifecycle certification\n\n"
+                    "> **Status:** Aprovado\n\n"
+                    "## Evidence\n\n"
+                    "The governed fake implementation and review ladder completed.\n"
+                    if target.name == "CLOSURE.md"
+                    else '{"fake": true, "summary": "implementation driving-fake output"}\n'
+                )
+                target.write_text(body, encoding="utf-8")
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake pipeline worker: APPROVED",
+                artifact_refs=tuple(refs),
+                structured_output={"verdict": "APPROVED"},
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         runtime = container.build_agent_runtime(kind, cwd=workspace_root)
@@ -919,7 +958,7 @@ def _implementation_runtime_factory(
         ):
             # Attribute access (not a from-import) so test seams patching the CLASS on
             # the infrastructure module are honored here too.
-            return fake_runtime.FakeAgentRuntime(result=approving, materialize_root=workspace_root)
+            return _ImplementationDrivingFake()
         return runtime
 
     return factory
@@ -1108,9 +1147,7 @@ def pipeline(
     )
     result = pipe.run(run_id, steps)
     closure_gate = (
-        _apply_closure_removal_for_release(
-            workspace_root, context=context, release_id=release_id
-        )
+        _apply_closure_removal_for_release(workspace_root, context=context, release_id=release_id)
         if result.completed
         else None
     )
@@ -1157,3 +1194,16 @@ def _policy_snapshot_payload(snapshot: object) -> dict[str, Any]:
 
     assert isinstance(snapshot, WorkflowPolicySnapshot)
     return snapshot.to_dict()
+
+
+def _print_policy(snapshot: WorkflowPolicySnapshot) -> None:
+    """Render a resolved workflow policy for the human ``--show-policy`` path."""
+    typer.echo(
+        f"workflow={snapshot.workflow_id} policy={snapshot.policy_id} "
+        f"resolved_at={snapshot.resolved_at}"
+    )
+    for entry in snapshot.steps:
+        typer.echo(
+            f"{entry.step}: harness={entry.harness} profile={entry.model_profile} "
+            f"model={entry.model} reasoning={entry.reasoning} source={entry.source.value}"
+        )

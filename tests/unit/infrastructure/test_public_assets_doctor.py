@@ -290,6 +290,7 @@ def test_list_all_reports_current_public_asset_categories(tmp_path: Path) -> Non
     assert "my-rule.md" in result["rules"]
     assert "README.md" not in result  # non-directories at root are skipped
 
+
 # ---------------------------------------------------------------------------
 # _runtime_expectations
 # ---------------------------------------------------------------------------
@@ -419,6 +420,7 @@ def test_dcx1_dcx2_dcx3(tmp_path: Path) -> None:
     no_agents_codex = no_agents_ws / ".codex"
     no_agents_codex.mkdir()
     assert manager._dcx2_config_toml_entries(no_agents_agentic, no_agents_codex) == []
+
 
 def _dcx4_clean_gpt_toml(tmp_path: Path) -> Path:
     codex_dir = tmp_path / ".codex"

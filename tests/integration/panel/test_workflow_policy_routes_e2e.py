@@ -139,7 +139,9 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {"implement": "codex-review-deep"}}
+                    }
                 }
             },
         }
@@ -150,7 +152,9 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
 
     get_status, get_body = _get(handler, "/api/workflow-model-policy?context=default")
     assert get_status == 200 and get_body["exists"] is True
-    steps = get_body["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"]["steps"]
+    steps = get_body["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"][
+        "steps"
+    ]
     assert steps["implement"] == "codex-review-deep"
 
     # The catalog now reports the override as the effective profile (default-vs-effective).
@@ -167,7 +171,9 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {}, "harnesses": {"implement": "pi"}}
+                    }
                 }
             },
         }
@@ -197,7 +203,9 @@ def test_put_round_trip_harness_only_validate_and_415(tmp_path: Path) -> None:
             "schema_version": "workflow-model-policy-v1",
             "policy_id": "default",
             "contexts": {
-                "default": {"workflows": {"implementation_reviews": {"steps": {"implement": "ghost"}}}}
+                "default": {
+                    "workflows": {"implementation_reviews": {"steps": {"implement": "ghost"}}}
+                }
             },
         }
     ).encode("utf-8")

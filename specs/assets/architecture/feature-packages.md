@@ -1,9 +1,10 @@
-# `dadaia_workspace/features` — post-merge package map (23 packages)
+# `dadaia_workspace/features` — package map (26 packages)
 
 **Release origin:** v0.1.55 (Architecture Decomposition, FR3). This package graph is the
 canonical picture of the feature layer after the `reports_next` / `reports_retention` /
 `reports_validation` triplet merged into one `features/reports/` package (flat `next` /
-`retention` / `validation` submodules). The feature count drops **25 → 23**.
+`retention` / `validation` submodules), plus the v0.2.5 capability, certification, and
+transactional reconciliation boundaries. The current feature count is **26**.
 
 Each feature is isolated (no feature imports another feature — composition happens in
 `container.py`); the surviving cross-feature edges are frozen by the import-linter
@@ -14,12 +15,14 @@ pinned by the `lifecycle-no-workflows` contract.
 
 ```mermaid
 flowchart TB
-    subgraph features["dadaia_workspace/features — 23 packages"]
+    subgraph features["dadaia_workspace/features — 26 packages"]
         academy["academy"]
         agents["agents"]
         ai_surface["ai_surface"]
         backlog["backlog"]
         bugs["bugs"]
+        capabilities["capabilities"]
+        certification["certification"]
         chokepoints["chokepoints"]
         ci_preflight["ci_preflight"]
         export["export"]
@@ -28,6 +31,7 @@ flowchart TB
         migrate["migrate"]
         panel["panel"]
         public["public"]
+        reconcile["reconcile"]
         reports["reports"]
         repos["repos"]
         server_registry["server_registry"]
@@ -57,7 +61,7 @@ flowchart TB
 ```
 
 **Regeneration law.** Regenerate at the closure of every structural release (any feature
-package added, removed, renamed, split, or merged). The 23 package names and the three
+package added, removed, renamed, split, or merged). The 26 package names and the three
 `features/reports` submodule names above are pinned by the introspection drift-guard
 `tests/contract/test_architecture_diagrams_current.py`, which discovers the live packages via
 `pkgutil` and fails if a diagrammed package name goes stale or a live package is missing.

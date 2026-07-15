@@ -4,6 +4,8 @@ import typer
 
 from dadaia_workspace.cli.commands import (
     academy,
+    capabilities,
+    certify,
     ci,
     clean,
     context,
@@ -14,6 +16,7 @@ from dadaia_workspace.cli.commands import (
     panel,
     plugin,
     public,
+    reconcile,
     reports,
     repos,
     server,
@@ -38,6 +41,9 @@ app = typer.Typer(
 app.command(name="init")(init.init)
 app.command(name="export")(export)
 app.command(name="import")(import_workspace)
+app.command(name="capabilities")(capabilities.capabilities)
+app.command(name="certify")(certify.certify)
+app.command(name="reconcile")(reconcile.reconcile)
 app.add_typer(clean.app, name="clean")
 
 # Sub-command groups

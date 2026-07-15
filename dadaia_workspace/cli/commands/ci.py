@@ -98,6 +98,7 @@ def pre_commit_check() -> None:
     """
     from dadaia_workspace.container import build_process_ancestry
     from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
+    from dadaia_workspace.features.spec_context import presence
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
@@ -121,6 +122,7 @@ def pre_commit_check() -> None:
         env_sid=os.environ.get("DADAIA_SESSION_ID"),
         pid_probe=pid_probe,
         ancestry=ancestry_adapter.is_ancestor,
+        presence_reader=presence.others_alive,
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)

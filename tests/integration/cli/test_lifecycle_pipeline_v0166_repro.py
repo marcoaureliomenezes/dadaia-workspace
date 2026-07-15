@@ -137,6 +137,8 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "v0166-fr1-repro",
@@ -188,9 +190,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
     reason.
     """
     accept_calls: list[object] = []
-    impl_rel = canonical_worker_output_ref(
-        "dadaia-workspace", "pipe-fr2-repro:implement:attempt-0"
-    )
+    impl_rel = canonical_worker_output_ref("dadaia-workspace", "pipe-fr2-repro:implement:attempt-0")
     worker_payload = json.dumps(
         {
             "schema_version": "agent-run-result-v1",
@@ -225,6 +225,8 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro",
@@ -268,6 +270,8 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "v0166-fr2-repro-negative",
@@ -357,6 +361,8 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "v0166-fr8-repro",

@@ -55,6 +55,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
     assert "pre-push-ci-gate.sh" in listing
+    assert "certify-dadaia-workspace.sh" in listing
 
     pyproject = _REPO_ROOT / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))

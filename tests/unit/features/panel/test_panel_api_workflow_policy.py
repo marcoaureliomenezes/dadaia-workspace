@@ -170,7 +170,9 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     )
     view_pi = render_api_workflow_catalog(catalog, _resolver_factory(store_pi))
     _status_pi, payload_pi = _decode(view_pi(qs={}))
-    impl_pi = next(w for w in payload_pi["workflows"] if w["workflow_id"] == "implementation_reviews")
+    impl_pi = next(
+        w for w in payload_pi["workflows"] if w["workflow_id"] == "implementation_reviews"
+    )
     implement_pi = next(s for s in impl_pi["steps"] if s["step"] == "implement")
     assert implement_pi["default_harness"] == "codex"
     assert implement_pi["harness"] == "pi"
@@ -326,9 +328,9 @@ def test_policy_state_and_runs_and_ledger(tmp_path: Path) -> None:
     status_persisted, payload_persisted = _decode(view_policy(qs={}))
     assert status_persisted == 200
     assert payload_persisted["exists"] is True
-    steps = payload_persisted["policy"]["contexts"]["default"]["workflows"]["implementation_reviews"][
-        "steps"
-    ]
+    steps = payload_persisted["policy"]["contexts"]["default"]["workflows"][
+        "implementation_reviews"
+    ]["steps"]
     assert steps["implement"] == "codex-review-deep"
 
     # (c) Policy GET: invalid JSON on disk -> 409.

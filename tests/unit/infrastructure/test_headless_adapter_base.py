@@ -200,6 +200,10 @@ def test_changed_paths_override_parity_for_cli_adapters(
     out = adapter._with_changed_paths(lying)
     assert out.structured_output["changed_paths"] == "a.py,b.py"
 
+    adapter._git = _FakeGit(())
+    clean = adapter._with_changed_paths(lying)
+    assert clean.structured_output["changed_paths"] == ""
+
     adapter._git = None
     result = AgentRunResult(status=AgentRunStatus.SUCCEEDED, summary="ok")
     assert adapter._with_changed_paths(result) is result

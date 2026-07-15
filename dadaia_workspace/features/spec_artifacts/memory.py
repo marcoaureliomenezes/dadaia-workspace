@@ -3,8 +3,8 @@
 Implements:
 - memory_product_add: creates a feature Markdown atom (born-markdown).
 
-Scaffold template used:
-- public/scaffold/memory/product/feature.md  → specs/memory/product/<slug>.md
+Template used:
+- public/templates/memory-feature.md → specs/memory/product/<slug>.md
 
 The legacy HTML index (memory-product-index.html.j2 → index.html) was retired
 in memory-markdown-source-v1 (T-MMS-10/11). The catalog is now generated from
@@ -20,7 +20,7 @@ from pathlib import Path
 
 # ── canonical directories ─────────────────────────────────────────────────────
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
-_SCAFFOLD_DIR = _PUBLIC_DIR / "scaffold" / "memory" / "product"
+_TEMPLATE_PATH = _PUBLIC_DIR / "templates" / "memory-feature.md"
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
@@ -45,20 +45,18 @@ class MemoryProductAddResult:
 def _build_feature_md(slug: str, today: str, scaffold_dir: Path | None = None) -> str:
     """Build the Markdown content for a new product feature atom.
 
-    Reads the ``feature.md`` scaffold template from ``scaffold_dir`` (defaults to
-    ``_SCAFFOLD_DIR``) and substitutes the slug, title, and date placeholders.
+    Reads an injected legacy ``feature.md`` when ``scaffold_dir`` is supplied; otherwise
+    reads the canonical template outside the live scaffold atom tree.
 
     Args:
         slug:         Feature slug (already validated by the caller).
         today:        ISO-8601 date string (``YYYY-MM-DD``).
-        scaffold_dir: Directory containing ``feature.md`` scaffold template.
-                      Defaults to the canonical ``public/scaffold/memory/product/``.
+        scaffold_dir: Optional compatibility directory containing ``feature.md``.
 
     Returns:
         Rendered Markdown string ready to be written to ``<slug>.md``.
     """
-    sdir = scaffold_dir or _SCAFFOLD_DIR
-    feature_template = sdir / "feature.md"
+    feature_template = scaffold_dir / "feature.md" if scaffold_dir is not None else _TEMPLATE_PATH
     template_content = feature_template.read_text(encoding="utf-8")
     # Substitute canonical placeholders in the frontmatter stubs.
     content = template_content.replace("SLUG_PLACEHOLDER", slug)
@@ -80,7 +78,7 @@ def memory_product_add(
 
     1. Validates ``slug`` against ``^[a-z][a-z0-9-]+$``.
     2. Creates ``specs/memory/product/<slug>.md`` from the born-markdown scaffold
-       template (``public/scaffold/memory/product/feature.md``) if it does not
+       template (``public/templates/memory-feature.md``) if it does not
        yet exist.
     3. Returns the sorted list of all feature slugs in the product directory.
 
@@ -92,8 +90,7 @@ def memory_product_add(
         slug:          Feature slug (e.g. ``payments``). Must match
                        ``^[a-z][a-z0-9-]+$``.
         templates_dir: Unused; kept for API compatibility during migration.
-        scaffold_dir:  Directory containing the ``feature.md`` scaffold template.
-                       Defaults to ``public/scaffold/memory/product/``.
+        scaffold_dir:  Optional compatibility directory containing ``feature.md``.
         project_name:  Unused; kept for API compatibility during migration.
 
     Returns:

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T00:02:36Z",
+  "generated_at": "2026-07-15T04:45:03Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -187,8 +187,8 @@
       "title": "Harness — Codex",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.",
-      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, model catalog, and what a Codex-only workspace installation contains.",
+      "tldr": "Dual-layer Codex harness with projected hooks in TUI and headless exec, a governed CODEX_EXEC worker, and independent git chokepoints.",
+      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — shared hook enforcement, the CODEX_EXEC worker transport, model catalog, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -155,12 +156,8 @@ def remove_legacy_workflow_projections(
         for path in sorted(legacy_dir.glob("*.workflow.md")):
             path.unlink()
             installed.append(f"[rm] {path}")
-        try:
+        with suppress(OSError):
             legacy_dir.rmdir()
-        except OSError:
-            # Preserve a non-empty directory: non-workflow/operator files are outside
-            # this migration's ownership.
-            pass
 
 
 # ---------------------------------------------------------------------------

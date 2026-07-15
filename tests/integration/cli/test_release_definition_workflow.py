@@ -123,8 +123,7 @@ def _approving_result() -> AgentRunResult:
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: APPROVED",
         artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
-            "release-definition-step.step-output.json",
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
         ),
         structured_output={"verdict": "APPROVED"},
     )
@@ -135,8 +134,7 @@ def _rejecting_result() -> AgentRunResult:
         status=AgentRunStatus.SUCCEEDED,
         summary="fake worker: REJECTED",
         artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/"
-            "release-definition-step.step-output.json",
+            f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/release-definition-step.step-output.json",
         ),
         structured_output={"verdict": "REJECTED"},
     )
@@ -177,6 +175,8 @@ def _define(args: list[str]) -> Result:
         [
             "lifecycle",
             "release-definition",
+            "--context",
+            _CONTEXT,
             "--release-id",
             _RELEASE,
             "--json",

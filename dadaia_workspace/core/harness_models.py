@@ -102,9 +102,7 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
 # ``telemetry.pricing.compute_cost`` returns ``None`` ("unknown" — never fabricated)
 # for them. Membership is named and explicit — no wildcard.
 # ---------------------------------------------------------------------------
-LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset(
-    {"moonshotai/kimi-k2.5"}
-)
+LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"moonshotai/kimi-k2.5"})
 
 
 def _known_codex_ids() -> frozenset[str]:

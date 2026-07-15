@@ -93,6 +93,8 @@ def test_pipeline_blocked_by_noncompliant_worker_carries_diagnostic_ref(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            _CONTEXT,
             "--skip-preflight",
             "--release-id",
             _RELEASE,

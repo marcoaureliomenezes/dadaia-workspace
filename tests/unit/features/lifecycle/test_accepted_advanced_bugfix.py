@@ -70,9 +70,7 @@ def _success(verdict: str = "APPROVED") -> AgentRunResult:
     return AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary="ok",
-        artifact_refs=(
-            ".dadaia/tmp/lifecycle-worker/dadaia-workspace/x.step-output.json",
-        ),
+        artifact_refs=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/x.step-output.json",),
         structured_output={"verdict": verdict},
     )
 

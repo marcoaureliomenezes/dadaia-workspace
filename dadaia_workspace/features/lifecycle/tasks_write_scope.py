@@ -147,9 +147,9 @@ def _incomplete_task_blocks(text: str) -> tuple[str, ...]:
             bold_ids[bold.group("id")] = idx
 
     for task_id, marker in standalone_markers.items():
-        idx = bold_ids.get(task_id)
-        if idx is not None:
-            task_markers[idx] = marker
+        bold_idx = bold_ids.get(task_id)
+        if bold_idx is not None:
+            task_markers[bold_idx] = marker
 
     ordered = sorted(set(boundaries))
     blocks: list[str] = []

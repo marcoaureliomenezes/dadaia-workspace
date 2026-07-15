@@ -95,7 +95,9 @@ def test_clean_tree_zero_errors_and_closure_merged(tmp_path: Path) -> None:
             "policy_id": "default",
             "contexts": {
                 "default": {
-                    "workflows": {"implementation_reviews": {"steps": {"implement": "codex-review-deep"}}}
+                    "workflows": {
+                        "implementation_reviews": {"steps": {"implement": "codex-review-deep"}}
+                    }
                 }
             },
         },
@@ -138,7 +140,9 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "contexts": {
                     "default": {
                         "workflows": {
-                            "implementation_reviews": {"steps": {"no_such_step": "codex-review-deep"}}
+                            "implementation_reviews": {
+                                "steps": {"no_such_step": "codex-review-deep"}
+                            }
                         }
                     }
                 },
@@ -153,7 +157,9 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "contexts": {
                     "default": {
                         "workflows": {
-                            "implementation_reviews": {"steps": {"implement": "pi-implementation-standard"}}
+                            "implementation_reviews": {
+                                "steps": {"implement": "pi-implementation-standard"}
+                            }
                         }
                     }
                 },
@@ -167,7 +173,9 @@ def _harness_overlay(workflow: str, *, step: str, harness: str) -> dict[str, obj
                 "policy_id": "default",
                 "contexts": {
                     "default": {
-                        "workflows": {"implementation_reviews": {"steps": {"implement": "not-a-profile"}}}
+                        "workflows": {
+                            "implementation_reviews": {"steps": {"implement": "not-a-profile"}}
+                        }
                     }
                 },
             },
@@ -249,7 +257,8 @@ def test_state_file_hard_errors_matrix(tmp_path: Path, case_id: str) -> None:
         }
     elif case_id == "forbidden-step-harness":
         _write_overlay(
-            workspace, _harness_overlay("implementation_reviews", step="implement", harness="claude")
+            workspace,
+            _harness_overlay("implementation_reviews", step="implement", harness="claude"),
         )
         findings = _doctor(workspace)  # must not raise
         codes = {f.code for f in findings if f.severity is Severity.ERROR}
@@ -264,7 +273,9 @@ def test_state_file_hard_errors_matrix(tmp_path: Path, case_id: str) -> None:
                 "schema_version": "workflow-model-policy-v1",
                 "policy_id": "default",
                 "contexts": {
-                    "default": {"workflows": {"implementation_reviews": {"default_harness": "claude"}}},
+                    "default": {
+                        "workflows": {"implementation_reviews": {"default_harness": "claude"}}
+                    },
                 },
             },
         )

@@ -47,9 +47,7 @@ class _Fake:
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
             summary="ok",
-            artifact_refs=(
-                f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/s.step-output.json",
-            ),
+            artifact_refs=(f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/s.step-output.json",),
             structured_output={"verdict": "APPROVED"},
         )
 

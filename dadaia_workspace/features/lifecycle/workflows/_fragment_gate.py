@@ -65,6 +65,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
     ContextSelector,
     MaxContextPolicy,
     SelectionAudit,
+    SelectionResult,
     StaticInput,
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
@@ -230,7 +231,7 @@ class _FragmentAssemblyMixin:
         self, step: AssemblyStep, fragments: tuple[Fragment, ...]
     ) -> SelectionAudit:
         """Resolve main and shared fragment inputs under their declared policies."""
-        results = []
+        results: list[SelectionResult] = []
         seen: set[str] = set()
         for fragment in fragments:
             names = tuple(name for name in fragment.dynamic_inputs if name not in seen)
@@ -436,9 +437,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 self._handoff_resolver.reset_run_zone(
                     run_id,
                     worker_output_refs=tuple(
-                        canonical_worker_output_ref(
-                            self._context, f"{run_id}:{step.label}"
-                        )
+                        canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
                         for step in sequence
                         if step.fragment_id is not None
                     ),
@@ -482,9 +481,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     run_id,
                     producer_steps=resumed_labels,
                     worker_output_refs=tuple(
-                        canonical_worker_output_ref(
-                            self._context, f"{run_id}:{step.label}"
-                        )
+                        canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
                         for step in sequence[index:]
                         if step.fragment_id is not None
                     ),
@@ -641,8 +638,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 request=built.request,
                 target_phase=run.phase,
                 current_step=step.label,
-                is_review=step.is_review
-                and getattr(step, "blocks_on_rejection", True),
+                is_review=step.is_review and getattr(step, "blocks_on_rejection", True),
                 deliverable_globs=deliverable_globs,
             ),
         )

@@ -48,9 +48,7 @@ def test_build_assigns_exact_handoff_and_prepends_prefix_verbatim() -> None:
     assert with_prefix.prefix_hash == prefix.content_hash
     assert with_prefix.request.prompt.startswith(prefix.text)
     assert "do the qa step" in with_prefix.request.prompt
-    assert with_prefix.request.prompt.endswith(
-        "workflow handoff ledger."
-    )
+    assert with_prefix.request.prompt.endswith("workflow handoff ledger.")
     assert with_prefix.prompt_text.startswith(prefix.text)
 
 
@@ -75,9 +73,7 @@ def test_production_scope_keeps_only_resolved_context_specs_tree(tmp_path) -> No
         ".dadaia/handoff/demo/**",
     )
 
-    assert filter_context_spec_paths(
-        paths, workspace_root=tmp_path, specs_dir=context_specs
-    ) == (
+    assert filter_context_spec_paths(paths, workspace_root=tmp_path, specs_dir=context_specs) == (
         "repos/demo/specs/releases/v1/**",
         ".dadaia/handoff/demo/**",
     )

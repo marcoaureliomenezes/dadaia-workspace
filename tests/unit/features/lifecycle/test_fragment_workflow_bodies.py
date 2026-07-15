@@ -87,9 +87,7 @@ class _AuditFake:
             "audit_scope": {
                 "summary": "Bound architecture drift.",
                 "audit_question": "Does implementation match architecture memory?",
-                "lenses": [
-                    {"name": "architecture", "rationale": "Contract fidelity."}
-                ],
+                "lenses": [{"name": "architecture", "rationale": "Contract fidelity."}],
                 "surfaces": ["src/games.py"],
                 "acceptance_criteria": [
                     {"lens": "architecture", "pass_condition": "No contract drift."}
@@ -117,9 +115,7 @@ class _AuditFake:
         payload = payloads[step]
         artifact_ref = f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{step}.step-output.json"
         verdict = payload.get("verdict")
-        structured: dict[str, str] = (
-            {"verdict": verdict} if isinstance(verdict, str) else {}
-        )
+        structured: dict[str, str] = {"verdict": verdict} if isinstance(verdict, str) else {}
         if isinstance(payload.get("verdict_reason"), str):
             structured["verdict_reason"] = payload["verdict_reason"]
         return AgentRunResult(

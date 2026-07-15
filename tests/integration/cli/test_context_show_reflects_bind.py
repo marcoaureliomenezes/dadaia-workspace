@@ -144,11 +144,9 @@ def test_context_show_reflects_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert noarg_payload["session"]["context"] == "bound-second"
     assert noarg_payload["session"]["release"] == "v0.2.0"
 
-    # FR3 fallback — with no live bound session anywhere, no-arg show returns first-ALIVE.
+    # Caller-owned selection — without a bind, no-arg show fails actionably.
     fallback_ws = _make_two_context_workspace(tmp_path / "fallback-root")
     monkeypatch.chdir(fallback_ws)
     fallback_show_result = _runner.invoke(app, ["context", "show", "--json"])
-    assert fallback_show_result.exit_code == 0, fallback_show_result.output
-    fallback_payload = json.loads(fallback_show_result.output)
-    assert fallback_payload["name"] == "default-first", fallback_payload
-    assert fallback_payload["session"] is None
+    assert fallback_show_result.exit_code != 0
+    assert "No caller-owned Spec Context is selected" in str(fallback_show_result.exception)

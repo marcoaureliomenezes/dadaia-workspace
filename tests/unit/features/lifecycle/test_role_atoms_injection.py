@@ -135,9 +135,7 @@ def _seed_specs(tmp_path: Path, *, active_phase: str | None = "IMPLEMENTATION") 
     (specs / "memory" / "product" / "catalog.json").write_text(
         '{"features": [{"slug": "demo", "tldr": "FIXTURE CATALOG BODY"}]}\n', encoding="utf-8"
     )
-    (specs / "releases" / _RELEASE / "SPEC.md").write_text(
-        "# SPEC.md\n\nBody.\n", encoding="utf-8"
-    )
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text("# SPEC.md\n\nBody.\n", encoding="utf-8")
     (specs / "releases" / _RELEASE / "PLAN.md").write_text(
         "# PLAN.md\n\nBody.\n\n## Validation Dependency Table\n\n"
         "| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |\n"

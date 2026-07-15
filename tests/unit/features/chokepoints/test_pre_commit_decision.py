@@ -9,6 +9,7 @@ from pathlib import Path
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
 from dadaia_workspace.features.chokepoints import pre_commit_decision
 from dadaia_workspace.features.chokepoints.service import context_slug_for_path
+from dadaia_workspace.features.spec_context import presence
 
 _CTX = "demo-ctx"
 
@@ -45,6 +46,7 @@ def _decision(workspace: Path, *, env_sid: str | None = "caller"):
         env_sid=env_sid,
         pid_probe=forbidden_probe,
         ancestry=forbidden_ancestry,
+        presence_reader=presence.others_alive,
     )
 
 
@@ -80,6 +82,7 @@ def test_non_context_path_always_allows(tmp_path: Path) -> None:
         env_sid=None,
         pid_probe=None,
         ancestry=lambda _a, _b: Ancestry.UNKNOWN,
+        presence_reader=presence.others_alive,
     )
     assert decision.allowed
     assert decision.warn is None

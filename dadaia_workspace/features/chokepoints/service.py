@@ -16,13 +16,12 @@ Two gates, one shared shape (:class:`Decision`):
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-from dadaia_workspace.features.spec_context import presence
 
 __all__ = [
     "Decision",
@@ -153,6 +152,7 @@ def pre_commit_decision(
     env_sid: str | None,
     pid_probe: Callable[[int], bool] | None,
     ancestry: Callable[[int, int], Ancestry],
+    presence_reader: Callable[[Path, str, str], Sequence[object]],
     now: datetime | None = None,
 ) -> Decision:
     """Decide whether a commit into ``ctx`` may proceed (v0.1.76 FR3, WARN-only).
@@ -168,7 +168,7 @@ def pre_commit_decision(
         return Decision(allowed=True, message="[pre-commit] not a Spec Context repo; allow.")
 
     own_sid = env_sid or "pre-commit-anonymous"
-    others = presence.others_alive(workspace, ctx, own_sid)
+    others = presence_reader(workspace, ctx, own_sid)
     if not others:
         return Decision(
             allowed=True,
@@ -176,11 +176,11 @@ def pre_commit_decision(
         )
 
     other = others[0]
-    age = _age_seconds(other.last_seen_at, now=clock)
+    age = _age_seconds(getattr(other, "last_seen_at", None), now=clock)
     return Decision(
         allowed=True,
         message="[pre-commit] commit allowed.",
-        warn=_advisory_message(ctx, other.session_id, age),
+        warn=_advisory_message(ctx, str(getattr(other, "session_id", "unknown")), age),
     )
 
 

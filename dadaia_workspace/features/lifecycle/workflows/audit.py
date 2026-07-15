@@ -201,26 +201,46 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
                 blocked_at_step=step.label,
             )
 
-        scope_lenses = {
-            item["name"]
-            for item in scope["lenses"]
-            if isinstance(item, dict) and isinstance(item.get("name"), str)
-        }
-        result_lenses = {
-            item["lens"]
-            for item in scan["lens_results"]
-            if isinstance(item, dict) and isinstance(item.get("lens"), str)
-        }
-        findings = {
-            item["id"]: item
-            for item in scan["findings"]
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
-        }
-        dispositions = {
-            item["finding_id"]: item
-            for item in triage["dispositions"]
-            if isinstance(item, dict) and isinstance(item.get("finding_id"), str)
-        }
+        scope_lenses_raw = scope.get("lenses")
+        scan_lenses_raw = scan.get("lens_results")
+        findings_raw = scan.get("findings")
+        dispositions_raw = triage.get("dispositions")
+        scope_lenses = (
+            {
+                item["name"]
+                for item in scope_lenses_raw
+                if isinstance(item, dict) and isinstance(item.get("name"), str)
+            }
+            if isinstance(scope_lenses_raw, list)
+            else set()
+        )
+        result_lenses = (
+            {
+                item["lens"]
+                for item in scan_lenses_raw
+                if isinstance(item, dict) and isinstance(item.get("lens"), str)
+            }
+            if isinstance(scan_lenses_raw, list)
+            else set()
+        )
+        findings = (
+            {
+                item["id"]: item
+                for item in findings_raw
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+            if isinstance(findings_raw, list)
+            else {}
+        )
+        dispositions = (
+            {
+                item["finding_id"]: item
+                for item in dispositions_raw
+                if isinstance(item, dict) and isinstance(item.get("finding_id"), str)
+            }
+            if isinstance(dispositions_raw, list)
+            else {}
+        )
         violations: list[str] = []
         if result_lenses != scope_lenses:
             violations.append("drift scan must report every scoped lens exactly")

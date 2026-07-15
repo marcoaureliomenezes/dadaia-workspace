@@ -38,6 +38,8 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
         [
             "lifecycle",
             "backlog-definition",
+            "--context",
+            "dadaia-workspace",
             "--release-id",
             "v0.1.26",
             "--harness",

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
+    from dadaia_workspace.features.certification import CertificationResult
     from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowCatalog,
@@ -53,8 +54,8 @@ from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.core.session_env import harness_session_id
+from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -426,6 +427,16 @@ def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
     return WorkflowsService(workspace_root)
 
 
+def run_certification(workspace_root: Path, *, keep: bool = False) -> "CertificationResult":
+    """Compose and run the disposable full-capability certification journey."""
+    from dadaia_workspace.features.certification import certify
+    from dadaia_workspace.infrastructure.certification_process import (
+        SubprocessCertificationProcess,
+    )
+
+    return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
+
+
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
@@ -722,8 +733,8 @@ def build_lifecycle_preflight_input(
         ActiveReleaseState,
         BoundContext,
         GitPreflightState,
-        PresenceState,
         LifecyclePreflightInput,
+        PresenceState,
         SpecsDoctorState,
     )
     from dadaia_workspace.features.spec_context import presence, session_identity
@@ -1256,8 +1267,7 @@ def _release_definition_runtime_factory(
         def run(self, request: AgentRunRequest) -> AgentRunResult:
             label = (request.task_id or "").rsplit(":", 1)[-1]
             refs = [
-                f".dadaia/tmp/lifecycle-worker/{context}/"
-                "release-definition-step.step-output.json"
+                f".dadaia/tmp/lifecycle-worker/{context}/release-definition-step.step-output.json"
             ]
             deliverable = _CREATE_DELIVERABLES.get(label)
             if deliverable is not None and release_id is not None:
@@ -1271,12 +1281,38 @@ def _release_definition_runtime_factory(
                 target = run_cwd / ref
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(
-                        '{"fake": true, "summary": "driving-fake stub artifact"}\n'
-                        if ref.endswith(".json")
-                        else "# driving-fake stub artifact\n\n> **Status:** Draft\n",
-                        encoding="utf-8",
-                    )
+                    if ref.endswith(".json"):
+                        body = '{"fake": true, "summary": "driving-fake step output"}\n'
+                    elif target.name == "SPEC.md":
+                        body = (
+                            "# Spec: deterministic lifecycle certification\n\n"
+                            "> **Status:** Draft\n\n"
+                            "## Acceptance\n\nThe fake workflow completes every governed gate.\n"
+                        )
+                    elif target.name == "PLAN.md":
+                        body = (
+                            "# Plan: deterministic lifecycle certification\n\n"
+                            "> **Status:** Draft\n\n"
+                            "## Validation Dependency Table\n\n"
+                            "| Workstream | Produces by end | Direct validation | "
+                            "Validation dependencies | Deferred integration evidence |\n"
+                            "|---|---|---|---|---|\n"
+                            "| WS-1 | deterministic fixture | lifecycle gate | None | None |\n"
+                        )
+                    elif target.name == "TASKS.md":
+                        body = (
+                            "# Tasks: deterministic lifecycle certification\n\n"
+                            "> **Status:** Draft\n\n"
+                            "Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.\n\n"
+                            "## T1 - Complete deterministic fixture\n\n"
+                            "- [ ] **T1 - Complete deterministic fixture**\n"
+                            "- **Owner:** software-engineer\n"
+                            "- **Files modified:** `.dadaia/tmp/lifecycle-worker/**`.\n"
+                            "- **Acceptance:** deterministic workflow gate passes.\n"
+                        )
+                    else:
+                        body = "# driving-fake artifact\n\n> **Status:** Draft\n"
+                    target.write_text(body, encoding="utf-8")
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="fake release-definition worker: APPROVED",
@@ -1375,26 +1411,56 @@ def _backlog_definition_runtime_factory(
     fake factory).
     """
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake backlog-definition worker: APPROVED",
-        artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{context}/"
-            "backlog-definition-step.step-output.json",
-        ),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class _BacklogDefinitionDrivingFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            label = (request.task_id or "").rsplit(":", 1)[-1]
+            run_id = (request.task_id or "fake-backlog").rsplit(":", 1)[0]
+            safe_run_id = "".join(c if c.isalnum() or c in "-_" else "-" for c in run_id)
+            refs = [
+                f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
+            ]
+            if label == "backlog_author":
+                specs_prefix = (
+                    f"repos/{context}/specs"
+                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    else "specs"
+                )
+                refs.append(f"{specs_prefix}/backlog/{safe_run_id}.md")
+            for ref in refs:
+                target = run_cwd / ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.suffix == ".json":
+                    body = '{"fake": true, "summary": "backlog driving-fake output"}\n'
+                else:
+                    body = (
+                        "---\n"
+                        f"title: Deterministic backlog item {safe_run_id}\n"
+                        "status: idea\n"
+                        "opened: 2026-07-15\n"
+                        "description: Deterministic lifecycle certification fixture.\n"
+                        "---\n\n"
+                        f"# Deterministic backlog item {safe_run_id}\n\n"
+                        "Exercise the governed backlog-to-release evidence boundary.\n"
+                    )
+                target.write_text(body, encoding="utf-8")
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake backlog-definition worker: APPROVED",
+                artifact_refs=tuple(refs),
+                structured_output={"verdict": "APPROVED"},
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            # materialize_root: the gate now verifies declared refs EXIST (bug
-            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
-            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
+            return _BacklogDefinitionDrivingFake()
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1483,6 +1549,7 @@ def _step_output_driving_fake_factory(
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
+    domain_payloads: dict[str, dict[str, object]] | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build a runtime factory whose FAKE returns one in-scope raw step output.
 
@@ -1494,23 +1561,41 @@ def _step_output_driving_fake_factory(
     ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
     """
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary=summary,
-        artifact_refs=(artifact_ref,),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class _StepOutputDrivingFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            target = run_cwd / artifact_ref
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                '{"fake": true, "summary": "schema driving-fake output"}\n',
+                encoding="utf-8",
+            )
+            schema_by_label = {
+                "audit_scope": "audit-scope-handoff-v1",
+                "drift_scan": "audit-findings-handoff-v1",
+                "triage": "audit-disposition-handoff-v1",
+            }
+            label = (request.task_id or "").rsplit(":", 1)[-1]
+            payload_key = schema_by_label.get(label, request.expected_schema or "")
+            payload = (domain_payloads or {}).get(payload_key, {})
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary=summary,
+                artifact_refs=(artifact_ref,),
+                structured_output={"verdict": "APPROVED"},
+                domain_payload=dict(payload),
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            # materialize_root: the gate now verifies declared refs EXIST (bug
-            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
-            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
+            return _StepOutputDrivingFake()
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1565,9 +1650,36 @@ def build_audit_workflow(
             context=context,
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
-            artifact_ref=(
-                f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"
-            ),
+            artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
+            domain_payloads={
+                "audit-scope-handoff-v1": {
+                    "summary": "deterministic audit scope",
+                    "audit_question": "Do the selected contracts behave as declared?",
+                    "lenses": [{"name": "contract", "rationale": "Verify public behavior."}],
+                    "surfaces": ["specs/", ".dadaia/"],
+                    "acceptance_criteria": [
+                        {"lens": "contract", "pass_condition": "No contract drift."}
+                    ],
+                },
+                "audit-findings-handoff-v1": {
+                    "summary": "deterministic audit passed",
+                    "verdict": "APPROVED",
+                    "verdict_reason": "All scoped contract evidence passed.",
+                    "lens_results": [
+                        {
+                            "lens": "contract",
+                            "status": "PASS",
+                            "evidence": ["deterministic certification fixture"],
+                        }
+                    ],
+                    "findings": [],
+                },
+                "audit-disposition-handoff-v1": {
+                    "summary": "no findings require disposition",
+                    "source_verdict": "APPROVED",
+                    "dispositions": [],
+                },
+            },
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,

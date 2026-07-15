@@ -89,6 +89,11 @@ class GitSubprocessClient:
         result = _run(["git", "status", "--porcelain"], cwd=path)
         return bool(result.stdout.strip())
 
+    def has_commits(self, path: Path) -> bool:
+        """Return whether the repository has a valid HEAD commit."""
+        result = _run(["git", "rev-parse", "--verify", "HEAD"], cwd=path)
+        return result.returncode == 0
+
     def commit_all(self, path: Path, msg: str) -> None:
         # Bug 1 fix: use safe staging that excludes embedded git repos
         _stage_files_safe(path)

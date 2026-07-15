@@ -7,8 +7,9 @@ secret/private-IP/.pem redaction gates. Secret values must never be echoed back 
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,

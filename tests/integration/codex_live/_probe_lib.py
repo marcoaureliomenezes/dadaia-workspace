@@ -331,8 +331,8 @@ def run_headless_exec(
 ) -> subprocess.CompletedProcess[str]:
     """Run a non-interactive ``codex exec`` turn against a fixture.
 
-    Used by the headless hooks-don't-fire probe (FACTS.md: headless hooks never
-    fire). Returns the completed process for diagnostic capture.
+    Used by the headless hook-firing probe. Returns the completed process for
+    diagnostic capture.
     """
     binary = codex_binary()
     assert binary is not None  # caller gates on presence

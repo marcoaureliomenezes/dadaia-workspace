@@ -1,9 +1,8 @@
 """Chokepoint enforcement (W1, v0.1.14): harness-independent git-hook gates.
 
-The SDD gate (``hooks/sdd_gate``) only fires for *file-write tools* inside a harness that
-supports PreToolUse hooks — ``codex exec`` headless and any non-hooked runtime slip through
-(bug ``codex-exec-hooks-do-not-fire-headless``). The chokepoints close that gap at the two
-git boundaries every workflow must cross:
+The SDD gate (``hooks/sdd_gate``) fires for *file-write tools* inside a harness that
+supports PreToolUse hooks. Chokepoints provide a separate boundary for any invocation
+where hooks are absent, disabled, bypassed, or changed by a future harness release:
 
 * **pre-commit presence check** (:func:`pre_commit_decision`) — warns when another live
   session is present and always allows the commit on concurrency grounds.

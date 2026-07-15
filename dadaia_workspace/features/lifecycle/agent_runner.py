@@ -304,8 +304,7 @@ class LifecycleAgentRunner:
             for key, value in os.environ.items()
             if value
             and any(
-                part in key.upper()
-                for part in ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
+                part in key.upper() for part in ("TOKEN", "KEY", "SECRET", "PASSWORD", "CREDENTIAL")
             )
         )
 
@@ -506,11 +505,25 @@ class LifecycleAgentRunner:
             ref = self._persist_diagnostic(lifecycle_run, data, result.diagnostic)
             if ref is not None:
                 full_detail["diagnostic_ref"] = ref
+        operator_command = None
+        if (
+            result is not None
+            and result.diagnostic is not None
+            and (
+                result.diagnostic.parser_classification.startswith("worker-sandbox-")
+                or result.diagnostic.parser_classification == "worker-artifact-preflight-failed"
+            )
+        ):
+            operator_command = (
+                "export DADAIA_CODEX_SANDBOX=danger-full-access  # isolated trusted "
+                "worker container only; then resume this lifecycle run"
+            )
         return BlockedState(
             reason=reason,
             blocked_at_step=data.current_step or lifecycle_run.current_step,
             resume_token=lifecycle_run.idempotency_key,
             detail=full_detail,
+            operator_command=operator_command,
         )
 
     def _persist_diagnostic(

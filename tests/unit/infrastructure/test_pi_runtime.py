@@ -190,7 +190,10 @@ def test_pi_model_flag_resolution(tmp_path: Path, case: str) -> None:
         )
         adapter.run(request)
         argv = captured[0]
-        assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "openai-codex/gpt-5.5"]
+        assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+            "--model",
+            "openai-codex/gpt-5.5",
+        ]
 
     elif case == "openrouter-model-id-passes-through-unchanged":
         import dataclasses
@@ -813,7 +816,10 @@ def test_pi_thinking_flag_precedes_print_flag_and_stays_after_model(tmp_path: Pa
     )
     adapter.run(_request())
     argv = captured[0]
-    assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "openai-codex/gpt-5.5"]
+    assert argv[argv.index("--model") : argv.index("--model") + 2] == [
+        "--model",
+        "openai-codex/gpt-5.5",
+    ]
     assert argv[argv.index("--thinking") : argv.index("--thinking") + 2] == [
         "--thinking",
         "high",
@@ -862,7 +868,9 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
             return subprocess.CompletedProcess(argv, 0, stdout="not json at all", stderr="")
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"), runner=fake_runner, environ={}
+            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"),
+            runner=fake_runner,
+            environ={},
         )
         result = adapter.run(_request())
         assert result.status is AgentRunStatus.SUCCEEDED
@@ -880,7 +888,9 @@ def test_pi_degraded_result_carries_diagnostic(tmp_path: Path, case: str) -> Non
             return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
         adapter = PiHeadlessAdapter(
-            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"), runner=fake_runner, environ={}
+            PiHeadlessConfig(cwd=tmp_path, model="openai-codex/gpt-5.5"),
+            runner=fake_runner,
+            environ={},
         )
         result = adapter.run(_request(expected_schema="agent-run-result-v1"))
         assert result.status is AgentRunStatus.SUCCEEDED
@@ -931,9 +941,9 @@ def test_pi_schema_shaped_result_with_missing_ref_carries_diagnostic(tmp_path: P
         assert isinstance(argv, list)
         return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
-    result = PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}
-    ).run(_request(expected_schema="agent-run-result-v1"))
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
 
     assert result.artifact_refs == (".dadaia/handoff/missing.json",)
     assert result.diagnostic is not None
@@ -950,9 +960,9 @@ def test_pi_schema_shaped_result_without_refs_carries_diagnostic(tmp_path: Path)
         assert isinstance(argv, list)
         return subprocess.CompletedProcess(argv, 0, stdout=_message_end(payload), stderr="")
 
-    result = PiHeadlessAdapter(
-        PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}
-    ).run(_request(expected_schema="agent-run-result-v1"))
+    result = PiHeadlessAdapter(PiHeadlessConfig(cwd=tmp_path), runner=fake_runner, environ={}).run(
+        _request(expected_schema="agent-run-result-v1")
+    )
 
     assert result.artifact_refs == ()
     assert result.diagnostic is not None

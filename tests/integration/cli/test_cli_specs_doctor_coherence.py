@@ -18,7 +18,6 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 _runner = CliRunner()

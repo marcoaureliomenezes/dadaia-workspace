@@ -105,3 +105,17 @@ def test_install_spec_pins_version_when_not_a_source_checkout(
     spec = VenvPythonEnvironmentManager()._install_spec()
 
     assert spec == "dadaia-workspace==9.9.9"
+
+
+def test_local_candidate_wheel_overrides_index_pin_without_editable(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    wheel = tmp_path / "dadaia_workspace-9.9.9-py3-none-any.whl"
+    wheel.write_bytes(b"candidate")
+    monkeypatch.setenv("DADAIA_BOOTSTRAP_PACKAGE", str(wheel))
+
+    VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path / "workspace"))
+
+    command = recorder.commands[0]
+    assert command[-1] == str(wheel)
+    assert "--editable" not in command

@@ -174,6 +174,7 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
     # Create required directories
     _create_dirs(workspace_root)
 
+
 def _create_dirs(workspace_root: Path) -> None:
     """Create the new directories required by v2."""
     for rel in (".dadaia/sessions",):

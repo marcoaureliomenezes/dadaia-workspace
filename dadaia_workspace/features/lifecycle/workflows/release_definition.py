@@ -311,8 +311,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         text = path.read_text(encoding="utf-8")
         snippets = re.findall(r"`([^`\n]+)`", text)
         snippets.extend(
-            match.group(1)
-            for match in re.finditer(r"```[^\n]*\n(.*?)```", text, flags=re.DOTALL)
+            match.group(1) for match in re.finditer(r"```[^\n]*\n(.*?)```", text, flags=re.DOTALL)
         )
         pytest_invocation = re.compile(
             r"(?:^|[;&|\n]\s*|\s)"
@@ -328,8 +327,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 if len(compact) > 160:
                     compact = compact[:157] + "..."
                 return self._tasks_hygiene_block(
-                    "pytest validation command is missing '-p no:cacheprovider': "
-                    f"{compact!r}"
+                    f"pytest validation command is missing '-p no:cacheprovider': {compact!r}"
                 )
         return None
 

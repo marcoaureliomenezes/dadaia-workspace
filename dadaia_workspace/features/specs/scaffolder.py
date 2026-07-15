@@ -7,6 +7,7 @@ Creates the canonical SDD directory tree for new repositories.
 from __future__ import annotations
 
 import datetime
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +15,7 @@ from pathlib import Path
 import jinja2
 from jinja2.sandbox import SandboxedEnvironment
 
-from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, RELEASE_SEMVER_RE
 
 
 @dataclass
@@ -27,6 +28,9 @@ class ScaffoldResult:
 
 
 _CONSTITUTION_STUB = """\
+---
+specs_pattern_version: {specs_pattern_version}
+---
 # Constitution — {project_name}
 
 > **Created:** {today}
@@ -141,14 +145,32 @@ def scaffold(
     else:
         try:
             constitution_path.parent.mkdir(parents=True, exist_ok=True)
-            content = _CONSTITUTION_STUB.format(project_name=project_name, today=today)
+            content = _CONSTITUTION_STUB.format(
+                project_name=project_name,
+                today=today,
+                specs_pattern_version=CANONICAL_SPECS_VERSION,
+            )
             constitution_path.write_text(content, encoding="utf-8")
             result.created.append(constitution_path)
         except OSError as exc:
             result.errors.append(f"Failed to write {constitution_path}: {exc}")
 
-    # Locate canonical scaffold stubs (public/scaffold/memory/ adjacent to templates_dir).
-    _scaffold_memory_dir = templates_dir.parent / "scaffold" / "memory"
+    # Locate canonical public assets adjacent to templates_dir.
+    _scaffold_dir = templates_dir.parent / "scaffold"
+    _scaffold_memory_dir = _scaffold_dir / "memory"
+
+    # 2 — scoped SDD rules. This exact template is what doctor compares against.
+    try:
+        _write(
+            specs_dir / "AGENTS.md",
+            (templates_dir / "specs-AGENTS.md").read_text(encoding="utf-8"),
+        )
+        _write(
+            specs_dir / "memory" / "AGENTS.md",
+            (_scaffold_memory_dir / "AGENTS.md").read_text(encoding="utf-8"),
+        )
+    except Exception as exc:
+        result.errors.append(f"Scaffold rules error: {exc}")
 
     # 2-4 — born-markdown memory scaffolds (.md only).
     # memory-markdown-source-v1: .md is the sole source of truth; the legacy
@@ -166,6 +188,16 @@ def scaffold(
             _write(dest, src.read_text(encoding="utf-8"))
         except Exception as exc:
             result.errors.append(f"Scaffold error ({rel}): {exc}")
+
+    # An empty product catalog is valid and makes a fresh tree self-pull ready.
+    _write(
+        specs_dir / "memory" / "product" / "catalog.json",
+        json.dumps(
+            {"generated_at": f"{today}T00:00:00Z", "context": project_name, "features": []},
+            indent=2,
+        )
+        + "\n",
+    )
 
     # 5 — releases/ACTIVE.md
     _write(

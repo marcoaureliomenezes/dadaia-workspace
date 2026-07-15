@@ -98,7 +98,7 @@ _MEMORY_VIEW_PREFIX = "/memory-view"
 # ---------------------------------------------------------------------------
 
 
-class _MemoryHTMLRenderer(HTMLRenderer):
+class _MemoryHTMLRenderer(HTMLRenderer):  # type: ignore[misc]
     """HTMLRenderer with mermaid-fence passthrough.
 
     Inherits all GFM behaviour (tables, nested lists, etc.) from HTMLRenderer.
@@ -119,7 +119,7 @@ class _MemoryHTMLRenderer(HTMLRenderer):
         """
         if info and info.strip().split(None, 1)[0].lower() == "mermaid":
             return f'<pre class="mermaid">{escape(code)}</pre>\n'
-        return super().block_code(code, info)
+        return super().block_code(code, info)  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ def build_renderer(slug: str = _DEFAULT_SLUG) -> Markdown:
         renderer = _MemoryHTMLRenderer(escape=True)
         _RENDERER_CACHE[slug] = Markdown(
             renderer=renderer,
-            plugins=[_make_wikilink_plugin(slug), mistune.import_plugin("table")],  # type: ignore[attr-defined,list-item]
+            plugins=[_make_wikilink_plugin(slug), mistune.import_plugin("table")],
         )
     return _RENDERER_CACHE[slug]
 
@@ -260,5 +260,5 @@ def render_md_to_html(source: str, renderer: Markdown | None = None) -> str:
         Sanitised HTML string ready to serve as ``text/html``.
     """
     md = renderer if renderer is not None else build_renderer()
-    raw_html: str = md(_sanitise(source))  # type: ignore[assignment]
+    raw_html: str = md(_sanitise(source))
     return _sanitise(raw_html)

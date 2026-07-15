@@ -68,8 +68,7 @@ def _passing_result(label: str, *, artifact_ref: str | None = None) -> AgentRunR
         status=AgentRunStatus.SUCCEEDED,
         summary=f"fake runtime: {label} APPROVED",
         artifact_refs=(
-            artifact_ref
-            or f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{label}.step-output.json",
+            artifact_ref or f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/{label}.step-output.json",
         ),
         structured_output={"verdict": "APPROVED", "task_group": "rc-1"},
     )
@@ -124,10 +123,8 @@ def test_pipeline_runs_to_closure_on_fake(
             "2": _passing_result("review_security"),
             "3": _passing_result("review_code"),
             "4": _passing_result(
-                    "close",
-                    artifact_ref=(
-                        "specs/releases/multiharness-engine-v0116/CLOSURE.md"
-                    ),
+                "close",
+                artifact_ref=("specs/releases/multiharness-engine-v0116/CLOSURE.md"),
             ),
         },
     )
@@ -140,6 +137,8 @@ def test_pipeline_runs_to_closure_on_fake(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            _CONTEXT,
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",

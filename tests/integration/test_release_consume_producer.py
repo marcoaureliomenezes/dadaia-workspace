@@ -194,7 +194,16 @@ Body that goes to the archive copy.
 def _define(args: list[str]) -> Result:
     return _runner.invoke(
         app,
-        ["lifecycle", "release-definition", "--release-id", _RELEASE, "--json", *args],
+        [
+            "lifecycle",
+            "release-definition",
+            "--context",
+            _CONTEXT,
+            "--release-id",
+            _RELEASE,
+            "--json",
+            *args,
+        ],
     )
 
 
@@ -204,6 +213,8 @@ def _close(args: list[str]) -> Result:
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            _CONTEXT,
             "--skip-preflight",
             "--release-id",
             _RELEASE,

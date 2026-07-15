@@ -105,6 +105,27 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
     assert "alpha" in list_out.output
     assert "dead" in list_out.output
 
+    list_json = _runner.invoke(app, ["context", "list", "--json"])
+    assert list_json.exit_code == 0, list_json.output
+    assert json.loads(list_json.stdout) == [
+        {
+            "alive_since": None,
+            "created_at": json.loads(show.stdout)["created_at"],
+            "current_branch": None,
+            "dead_since": None,
+            "name": "alpha",
+            "repo_slug": "alpha",
+            "repo_url": "",
+            "state": "dead",
+        }
+    ]
+
+
+def test_context_list_json_empty_is_stable_array(workspace: Path) -> None:
+    result = _runner.invoke(app, ["context", "list", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == []
+
 
 # ---------------------------------------------------------------------------
 # Error matrix: duplicate create, unknown show, delete nonexistent, uninitialized
@@ -270,7 +291,6 @@ def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
     The marker is the SOLE trigger for context-memory injection and the ctx-inject
     hook's harness-real discovery source.
     """
-    from dadaia_workspace.features.spec_context import session_identity
 
     _register_alive_ctx(workspace)
     marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
@@ -319,6 +339,7 @@ def test_context_bind_implementation_and_review_persist_mode(
         session_file = workspace / ".dadaia" / "sessions" / f"{session_id}.json"
         assert session_file.exists(), "Session file must be created"
 
+
 def test_context_bind_second_implementation_does_not_block(workspace: Path) -> None:
     """Independent implementation binds both succeed; peer presence is advisory."""
     _register_alive_ctx(workspace)
@@ -330,6 +351,36 @@ def test_context_bind_second_implementation_does_not_block(workspace: Path) -> N
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
     assert result2.exit_code == 0, result2.output
+
+
+def test_context_heartbeat_resolves_harness_native_persisted_bind(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register_alive_ctx(workspace)
+    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-heartbeat-session")
+
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert bind_result.exit_code == 0, bind_result.output
+
+    heartbeat_result = _runner.invoke(app, ["context", "heartbeat"])
+    assert heartbeat_result.exit_code == 0, heartbeat_result.output
+    assert "codex-heartbeat-session" in heartbeat_result.output
+
+
+def test_context_heartbeat_without_caller_identity_is_actionable(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in (
+        "DADAIA_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    result = _runner.invoke(app, ["context", "heartbeat"])
+    assert result.exit_code != 0
+    assert "--print-env" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -469,3 +520,47 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
         "upstream tracking must be set after git push -u; "
         f"got stderr: {has_upstream.stderr.strip()!r}"
     )
+
+
+def test_context_baseline_creates_and_pushes_initial_history(
+    workspace: Path, tmp_path: Path
+) -> None:
+    bare = tmp_path / "baseline.git"
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    repo = workspace / "repos" / "baseline"
+    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 4\n---\n", encoding="utf-8"
+    )
+    _register_alive_ctx(workspace, "baseline")
+
+    no_consent = _runner.invoke(app, ["context", "baseline", "baseline"])
+    assert no_consent.exit_code != 0
+    assert "--yes" in no_consent.output
+
+    result = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert result.exit_code == 0, result.output
+    assert GitSubprocessClient().has_commits(repo) is True
+    remote_head = subprocess.run(
+        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    assert remote_head.returncode == 0, remote_head.stderr
+
+    repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
+    assert repeated.exit_code != 0
+    assert "already has Git history" in repeated.output

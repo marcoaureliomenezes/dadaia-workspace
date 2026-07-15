@@ -153,9 +153,9 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     # isolated temp workspace, then `dadaia public doctor` — assert the `.pi/` tree
     # lands and doctor reports the pi projection green (proving the operator-facing
     # path, not just the manager API).
+    from dadaia_workspace.core.platform import PLATFORM
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-    from dadaia_workspace.core.platform import PLATFORM
 
     cli_workspace = tmp_path / "cli-ws"
     # The suite-wide venv fixture intentionally creates only the directory. Public init

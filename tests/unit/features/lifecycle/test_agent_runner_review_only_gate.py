@@ -33,8 +33,8 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
     AgentRunnerInput,
     LifecycleAgentRunner,
 )
-from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.lifecycle.pipeline import implementation_ladder
+from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
 _ARTIFACT = ".dadaia/tmp/lifecycle-worker/dadaia-workspace/step.step-output.json"

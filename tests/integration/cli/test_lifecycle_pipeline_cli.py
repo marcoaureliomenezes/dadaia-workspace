@@ -65,6 +65,8 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -167,6 +169,8 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -283,6 +287,8 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
         [
             "lifecycle",
             "implementation-reviews",
+            "--context",
+            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -416,6 +422,8 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
             [
                 "lifecycle",
                 "implementation-reviews",
+                "--context",
+                "dadaia-workspace",
                 "--skip-preflight",
                 "--release-id",
                 "multiharness-engine-v0116",
@@ -482,4 +490,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
     default_ws = _init_workspace(tmp_path / "sandbox-default-case")
     _run_pipeline(default_ws, "pipe-codex-sandbox-default")
     default_argv = default_captured["argv"]
-    assert default_argv[default_argv.index("--sandbox") :][:2] == ["--sandbox", "read-only"]
+    assert default_argv[default_argv.index("--sandbox") :][:2] == [
+        "--sandbox",
+        "workspace-write",
+    ]

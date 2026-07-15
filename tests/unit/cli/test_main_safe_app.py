@@ -12,6 +12,8 @@ pytestmark = pytest.mark.unit
 def test_safe_app_propagates_unexpected_failure() -> None:
     from dadaia_workspace.cli.main import _safe_app
 
-    with patch("dadaia_workspace.cli.main.app", side_effect=RuntimeError("boom")):
-        with pytest.raises(RuntimeError, match="boom"):
-            _safe_app()
+    with (
+        patch("dadaia_workspace.cli.main.app", side_effect=RuntimeError("boom")),
+        pytest.raises(RuntimeError, match="boom"),
+    ):
+        _safe_app()
