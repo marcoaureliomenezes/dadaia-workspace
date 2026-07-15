@@ -24,7 +24,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.session_env import harness_session_id
+from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
@@ -217,7 +217,13 @@ def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
     from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
     _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
-    resolved_name = resolve_context_for_cli(None)
+    try:
+        resolved_name = resolve_context_for_cli(None)
+    except ValueError:
+        # ``show`` is a query verb: "nothing is selected" is a valid ANSWER here, not an
+        # error — the resolver's ValueError is for verbs that REQUIRE a context (bug
+        # context-show-json-traceback-unbound, consumer validation 2026-07-15).
+        return None
     if not resolved_name:
         return None
     try:
@@ -471,7 +477,12 @@ def bind(
         )
         raise typer.Exit(1) from None
 
-    session_id = f"sess_{uuid.uuid4().hex[:8]}"
+    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
+    # SAME resolution order the gate/hooks use — explicit DADAIA_SESSION_ID (eval-flow
+    # contract) → harness-native id → mint. Rebinds in one session therefore UPDATE one
+    # record instead of minting a divergent sess_* per invocation.
+    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
+    session_id = env_sid or harness_session_id() or f"sess_{uuid.uuid4().hex[:8]}"
     now = _now_iso()
     runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     pid = os.getpid()
@@ -495,9 +506,13 @@ def bind(
     # Persist the CLI session and, when available, the harness-native session record. There
     # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.
     session_identity.write_session(workspace_root, session_id, session_data)
-    # Also persist under the harness-native id so later harness calls resolve this bind.
+    # No duplicate record: when a harness-native id exists it IS session_id above (the
+    # divergent dual-write was the bind-session-id-divergence bug). The only remaining
+    # alias case is an explicit DADAIA_SESSION_ID that differs from the harness id —
+    # keep the harness-keyed record in sync then, so hook payload-side resolution
+    # (which prefers the harness id) still sees this bind.
     harness_id = harness_session_id()
-    if harness_id:
+    if harness_id and harness_id != session_id:
         with contextlib.suppress(ValueError, OSError):
             session_identity.write_session(
                 workspace_root,

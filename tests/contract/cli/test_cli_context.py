@@ -24,6 +24,16 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
     monkeypatch.chdir(tmp_path)
+    # Hermetic session identity: bind resolves DADAIA_SESSION_ID → harness-native id →
+    # mint (bug bind-session-id-divergence). Strip inherited ids so each test controls
+    # exactly which identity source is present.
+    for var in (
+        "DADAIA_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
     return tmp_path
 
 
@@ -564,3 +574,77 @@ def test_context_baseline_creates_and_pushes_initial_history(
     repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
     assert repeated.exit_code != 0
     assert "already has Git history" in repeated.output
+
+
+# ---------------------------------------------------------------------------
+# Bug bind-session-id-divergence (consumer validation, 2026-07-15): bind must
+# reuse a stable session identity instead of minting a fresh sess_* every call.
+# ---------------------------------------------------------------------------
+
+
+def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatch) -> None:
+    """Two binds in one harness session keep ONE stable id (the harness-native id)."""
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-stable-abc123")
+
+    first = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert first.exit_code == 0, first.output
+    assert "claude-stable-abc123" in first.output
+
+    second = _runner.invoke(
+        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
+    )
+    assert second.exit_code == 0, second.output
+    assert "claude-stable-abc123" in second.output
+    assert "sess_" not in second.output, "must not mint a divergent sess_* id"
+
+    record = session_identity.read_session(workspace, "claude-stable-abc123")
+    assert record is not None
+    assert record["session_id"] == "claude-stable-abc123"
+    assert record["mode"] == "BOUND_IMPLEMENTATION"
+    assert record["release"] == "v1"
+
+    sessions_dir = workspace / ".dadaia" / "sessions"
+    strays = [p.name for p in sessions_dir.glob("sess_*")]
+    assert strays == [], f"divergent minted records: {strays}"
+
+
+def test_bind_reuses_dadaia_session_id_env(workspace: Path, monkeypatch) -> None:
+    """An explicit DADAIA_SESSION_ID (eval-flow contract) is reused, never re-minted."""
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_stable01")
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    assert "sess_stable01" in result.output
+
+    record = session_identity.read_session(workspace, "sess_stable01")
+    assert record is not None
+    assert record["context"] == "myctx"
+
+
+# ---------------------------------------------------------------------------
+# Bug context-show-json-traceback-unbound (consumer validation, 2026-07-15)
+# ---------------------------------------------------------------------------
+
+
+def test_show_json_unbound_returns_null_context_not_traceback(workspace: Path) -> None:
+    """`context show --json` with no bind answers {"context": null}, exit 0 — no traceback."""
+    result = _runner.invoke(app, ["context", "show", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "Traceback" not in result.output
+    assert "ValueError" not in result.output
+    payload = json.loads(result.output)
+    assert payload == {"context": None}
+
+
+def test_show_unbound_human_output_is_calm(workspace: Path) -> None:
+    """Human-mode unbound `context show` prints a calm line, exit 0."""
+    result = _runner.invoke(app, ["context", "show"])
+    assert result.exit_code == 0, result.output
+    assert "Traceback" not in result.output
+    assert "No active context" in result.output

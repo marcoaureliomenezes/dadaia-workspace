@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.features.capabilities import build_capabilities
+from dadaia_workspace.features.migrate.legacy_dadaia_dirs import quarantine_legacy_dadaia_dirs
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 
 
@@ -89,6 +90,12 @@ def reconcile_workspace(
         if not plan.already_v2:
             execute_migration(states_dir, workspace_root)
         steps.append("state-schema-v2")
+
+        # Known-legacy .dadaia subdirs (pre-0.2.x leftovers) are quarantined — moved,
+        # never deleted — so ROOT-4 can hold without blocking convergence of a
+        # long-lived upgraded workspace (bug reconcile-legacy-dadaia-dirs-unmigrated).
+        quarantine_legacy_dadaia_dirs(workspace_root)
+        steps.append("legacy-dir-quarantine")
 
         public_service.stage(workspace_root)
         steps.append("public-stage")
