@@ -142,6 +142,9 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     # 2. Real CLI --harness pi --show-policy flag.
     cli_ws = _init_workspace(tmp_path / "cli-flag-case")
     monkeypatch.chdir(cli_ws)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     cli_result = CliRunner().invoke(
         app,
         [

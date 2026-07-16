@@ -182,3 +182,27 @@ def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
         f"alive() did not merge scaffold files into empty specs/; "
         f"expected >={len(non_dir_scaffold)} files, got {len(specs_files2)}"
     )
+
+
+def test_alive_commits_its_own_scaffold(
+    service: SpecContextService,
+    store: FakeContextStore,
+    git: FakeGitClient,
+    workspace_root: Path,
+) -> None:
+    """Bug alive-scaffold-blocks-dead (validation-027 F-06).
+
+    alive() scaffolds specs/ + AGENTS.md into the cloned repo but left them
+    UNTRACKED, so an immediate dead() hit the untracked-consent guard and the
+    create->alive->dead lifecycle could never complete on a fresh context. The
+    tool must commit the files IT created: alive() ends with a scaffold commit.
+    """
+    repo = workspace_root / "repos" / "my-repo"
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    # The fake reports the working tree dirty (as the real client does right after
+    # alive() writes the scaffold into the fresh clone).
+    git._dirty.add(repo)
+    service.alive("proj")
+
+    assert (repo / "specs").exists(), "scaffold must exist"
+    assert repo in git.committed, "alive() must commit the scaffold it created"

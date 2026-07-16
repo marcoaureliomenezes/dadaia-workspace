@@ -87,6 +87,11 @@ class ImportService:
                         file=sys.stderr,
                     )
                     continue
+                if member.name == "export-manifest.json":
+                    # Archive metadata, not workspace content: the Root Law forbids it
+                    # at the workspace root (the imported tree must pass doctor —
+                    # bug import-extracts-manifest-to-root). Relocate for provenance.
+                    member.name = ".dadaia/states/import-manifest.json"
                 members.append(member)
             tar.extractall(path=dest, members=members, filter="data")
 

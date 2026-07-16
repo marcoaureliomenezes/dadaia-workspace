@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.2.3"
+version = "0.3.0"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and PI"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
@@ -33,7 +33,7 @@ dadaia = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = {extras = ["all"], version = ">=0.25"}
+typer = ">=0.25"
 rich = ">=13,<16"
 openpyxl = "^3.1"
 pyyaml = "^6.0"

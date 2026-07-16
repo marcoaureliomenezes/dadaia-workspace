@@ -144,6 +144,10 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
+        # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
+        # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
+        # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
+        "DADAIA_BOOTSTRAP_PACKAGE",
         "DADAIA_AGENTS_DIR",
         "DADAIA_WORKFLOWS_DIR",
         "DADAIA_AGENT_RUNTIME",

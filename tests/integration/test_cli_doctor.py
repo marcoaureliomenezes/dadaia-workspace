@@ -20,6 +20,17 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
+    # VENV-1 skeleton: the conftest anti-disk-exhaustion backstop fakes the venv
+    # builder, so materialize the entrypoint doctor checks — otherwise every doctor
+    # run carries a VENV-1 issue and the truthful exit-code assertions can't isolate
+    # the invariant under test.
+    from dadaia_workspace.core.platform import PLATFORM
+
+    venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    venv_bin.mkdir(parents=True, exist_ok=True)
+    entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry.write_text("#!/bin/sh\n")
+    entry.chmod(0o755)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -53,9 +64,11 @@ def test_doctor_detects_and_fixes_dead_context_stale_repo_clean_run_non_crash(
     stale_repo.mkdir(parents=True)
 
     detect_result = _runner.invoke(app, ["doctor"])
-    assert detect_result.exit_code == 0, detect_result.output
+    # Exit-code truthfulness (validation-029 F-04): issues found => non-zero.
+    assert detect_result.exit_code == 1, detect_result.output
     assert "stale-ctx" in detect_result.output or "INV-5" in detect_result.output
 
     fix_result = _runner.invoke(app, ["doctor", "--fix"])
+    # All issues repaired in the same run => healthy exit 0.
     assert fix_result.exit_code == 0, fix_result.output
     assert not stale_repo.exists()

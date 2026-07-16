@@ -24,6 +24,16 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
     monkeypatch.chdir(tmp_path)
+    # Hermetic session identity: bind resolves DADAIA_SESSION_ID → harness-native id →
+    # mint (bug bind-session-id-divergence). Strip inherited ids so each test controls
+    # exactly which identity source is present.
+    for var in (
+        "DADAIA_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
     return tmp_path
 
 
@@ -104,6 +114,27 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
     assert list_out.exit_code == 0, list_out.output
     assert "alpha" in list_out.output
     assert "dead" in list_out.output
+
+    list_json = _runner.invoke(app, ["context", "list", "--json"])
+    assert list_json.exit_code == 0, list_json.output
+    assert json.loads(list_json.stdout) == [
+        {
+            "alive_since": None,
+            "created_at": json.loads(show.stdout)["created_at"],
+            "current_branch": None,
+            "dead_since": None,
+            "name": "alpha",
+            "repo_slug": "alpha",
+            "repo_url": "",
+            "state": "dead",
+        }
+    ]
+
+
+def test_context_list_json_empty_is_stable_array(workspace: Path) -> None:
+    result = _runner.invoke(app, ["context", "list", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == []
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +363,36 @@ def test_context_bind_second_implementation_does_not_block(workspace: Path) -> N
     assert result2.exit_code == 0, result2.output
 
 
+def test_context_heartbeat_resolves_harness_native_persisted_bind(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register_alive_ctx(workspace)
+    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-heartbeat-session")
+
+    bind_result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
+    assert bind_result.exit_code == 0, bind_result.output
+
+    heartbeat_result = _runner.invoke(app, ["context", "heartbeat"])
+    assert heartbeat_result.exit_code == 0, heartbeat_result.output
+    assert "codex-heartbeat-session" in heartbeat_result.output
+
+
+def test_context_heartbeat_without_caller_identity_is_actionable(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in (
+        "DADAIA_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    result = _runner.invoke(app, ["context", "heartbeat"])
+    assert result.exit_code != 0
+    assert "--print-env" in result.output
+
+
 # ---------------------------------------------------------------------------
 # T-10d: context release
 # ---------------------------------------------------------------------------
@@ -469,3 +530,159 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
         "upstream tracking must be set after git push -u; "
         f"got stderr: {has_upstream.stderr.strip()!r}"
     )
+
+
+def test_context_baseline_creates_and_pushes_initial_history(
+    workspace: Path, tmp_path: Path
+) -> None:
+    bare = tmp_path / "baseline.git"
+    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    repo = workspace / "repos" / "baseline"
+    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text(
+        "---\nspecs_pattern_version: 4\n---\n", encoding="utf-8"
+    )
+    _register_alive_ctx(workspace, "baseline")
+
+    no_consent = _runner.invoke(app, ["context", "baseline", "baseline"])
+    assert no_consent.exit_code != 0
+    assert "--yes" in no_consent.output
+
+    result = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert result.exit_code == 0, result.output
+    assert GitSubprocessClient().has_commits(repo) is True
+    remote_head = subprocess.run(
+        ["git", "--git-dir", str(bare), "rev-parse", "--verify", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    assert remote_head.returncode == 0, remote_head.stderr
+
+    # Bug baseline-refuses-alive-scaffold-commit: baseline is CONVERGENT — a repo
+    # that already carries history with a clean tree is success (idempotent no-op),
+    # not a refusal. alive() commits its own scaffold, so the canonical
+    # create -> alive -> baseline flow always reaches this state.
+    repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
+    assert repeated.exit_code == 0, repeated.output
+
+    repushed = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert repushed.exit_code == 0, repushed.output
+
+    # A dirty tree on top of existing history is NOT a baseline situation —
+    # operator content must never be swept into a "baseline" commit.
+    (repo / "operator-notes.md").write_text("do not auto-commit me", encoding="utf-8")
+    dirty = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
+    assert dirty.exit_code != 0
+    assert "already has Git history" in dirty.output
+
+
+# ---------------------------------------------------------------------------
+# Bug bind-session-id-divergence (consumer validation, 2026-07-15): bind must
+# reuse a stable session identity instead of minting a fresh sess_* every call.
+# ---------------------------------------------------------------------------
+
+
+def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatch) -> None:
+    """Two binds in one harness session keep ONE stable id (the harness-native id)."""
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-stable-abc123")
+
+    first = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert first.exit_code == 0, first.output
+    assert "claude-stable-abc123" in first.output
+
+    second = _runner.invoke(
+        app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
+    )
+    assert second.exit_code == 0, second.output
+    assert "claude-stable-abc123" in second.output
+    assert "sess_" not in second.output, "must not mint a divergent sess_* id"
+
+    record = session_identity.read_session(workspace, "claude-stable-abc123")
+    assert record is not None
+    assert record["session_id"] == "claude-stable-abc123"
+    assert record["mode"] == "BOUND_IMPLEMENTATION"
+    assert record["release"] == "v1"
+
+    sessions_dir = workspace / ".dadaia" / "sessions"
+    strays = [p.name for p in sessions_dir.glob("sess_*")]
+    assert strays == [], f"divergent minted records: {strays}"
+
+
+def test_bind_reuses_dadaia_session_id_env(workspace: Path, monkeypatch) -> None:
+    """An explicit DADAIA_SESSION_ID (eval-flow contract) is reused, never re-minted."""
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_stable01")
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    assert "sess_stable01" in result.output
+
+    record = session_identity.read_session(workspace, "sess_stable01")
+    assert record is not None
+    assert record["context"] == "myctx"
+
+
+# ---------------------------------------------------------------------------
+# Bug context-show-json-traceback-unbound (consumer validation, 2026-07-15)
+# ---------------------------------------------------------------------------
+
+
+def test_show_json_unbound_returns_null_context_not_traceback(workspace: Path) -> None:
+    """`context show --json` with no bind answers {"context": null}, exit 0 — no traceback."""
+    result = _runner.invoke(app, ["context", "show", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "Traceback" not in result.output
+    assert "ValueError" not in result.output
+    payload = json.loads(result.output)
+    assert payload == {"context": None}
+
+
+def test_show_unbound_human_output_is_calm(workspace: Path) -> None:
+    """Human-mode unbound `context show` prints a calm line, exit 0."""
+    result = _runner.invoke(app, ["context", "show"])
+    assert result.exit_code == 0, result.output
+    assert "Traceback" not in result.output
+    assert "No active context" in result.output
+
+
+def test_bind_env_id_with_harness_id_yields_single_record(workspace: Path, monkeypatch) -> None:
+    """Bug validation-027-f-07: DADAIA_SESSION_ID + harness id set -> ONE record only.
+
+    The residual harness-alias dual-write recreated the identity divergence the
+    original bind-session-id-divergence fix removed: two records for one session.
+    The resolved identity (env id first) owns the ONLY record.
+    """
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_envfixed")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-native-xyz")
+
+    for _ in range(2):
+        result = _runner.invoke(app, ["context", "bind", "myctx"])
+        assert result.exit_code == 0, result.output
+        assert "sess_envfixed" in result.output
+
+    sessions_dir = workspace / ".dadaia" / "sessions"
+    records = sorted(p.name for p in sessions_dir.glob("*.json"))
+    assert records == ["sess_envfixed.json"], f"expected ONE record, got: {records}"
+    rec = session_identity.read_session(workspace, "sess_envfixed")
+    assert rec is not None and rec["session_id"] == "sess_envfixed"

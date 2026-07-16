@@ -128,6 +128,9 @@ def test_pipeline_runs_to_closure_on_fake(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
@@ -184,6 +187,9 @@ def test_pipeline_no_review_can_backtrack_to_implementation_on_fake(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     # qa case: two-step run (implement advances IMPLEMENTATION -> QA_REVIEW first, then
     # the rework step's illegal QA_REVIEW -> IMPLEMENTATION transition is rejected).

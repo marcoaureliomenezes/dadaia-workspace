@@ -1,5 +1,6 @@
 # dadaia-workspace self-hosting memory headings
 Adapter Boundaries
+Adoption (16 instruction surfaces)
 Agent Runtimes
 Agentic Layers
 Anti-Slop
@@ -35,6 +36,7 @@ Model Governance
 Non-Goals
 Operating Chain
 Operating Rules
+Packaging Notes
 PreToolUse
 Presence
 Primary Subsystems
@@ -50,6 +52,7 @@ Runtime Boundary
 Runtime Dependencies
 Runtime State
 Security And Credentials
+Snapshot
 Tabs
 Telemetry
 Usage
@@ -59,4 +62,3 @@ Validator Families
 Workflow Surface
 Workflow Use
 Workflow Validation
-Adoption (16 instruction surfaces)

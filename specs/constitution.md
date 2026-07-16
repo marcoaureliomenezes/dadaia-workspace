@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 4
-constitution_version: 2.1.0
+constitution_version: 2.1.1
 ---
 
 # Constitution — dadaia-workspace
@@ -68,6 +68,25 @@ judgment-enforced (human PR review + the reactive memory-truth obligation) — n
 doctor invariant or hook can decide "memory-bearing" mechanically. Ratification
 pointer: PRs #112/#113/#115 (landed release-less before this lane existed) are
 ratified post-hoc by release v0.1.61 (see its SPEC §9 ADR-1 and CLOSURE).
+
+**Bug-hotfix lane (operator decree, 2026-07-15 — releases are FORBIDDEN for bug
+fixing).** A reported bug is NEVER fixed through a release: no SPEC/PLAN/TASKS, no
+grill, no task-marker ceremony, no reviewer fan-out. The mandatory flow, executed
+immediately upon identification, is exactly:
+1. register the bug (`dadaia bugs append`, `reported` event);
+2. identify the ROOT CAUSE (reproduce against the tool, never patch symptoms);
+3. write the failing test that REPRODUCES the bug (TDD — RED first, executed path);
+4. fix the root cause;
+5. prove GREEN (the new test + the full suite);
+6. close the bug (`resolved` event carrying the evidence triple: test, fix, suite);
+7. deliver a new wheel to the operator's consumer-side validator.
+Approval of the fix belongs to the operator and the consumer-side validation agent
+after validating the whole workspace — internal gates (`certify` included) never
+substitute for that. Rationale: the release-per-bug loop demonstrably produced new
+bugs per remediation cycle (see the v0.1.66–71 recurrence audit: ~40% need-unmet),
+burning time and tokens in an unproductive loop. Releases remain exclusively for
+feature work picked from backlog (§10). The always-on `bug-hotfix-doctrine` rule
+carries this law to every harness.
 
 ## 2. Public Defaults Must Be Generic
 
@@ -189,7 +208,7 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 1. No agent, skill, rule, workflow, fragment, or persona ships without a §7 phase (or
    workflow step) it owns or gates; phase-less artifacts are removed. Plugin stubs are
    the named exemption (§14).
-2. No store without a GC mechanism: every state file, lock, session record, or cache
+2. No store without a GC mechanism: every state file, session record, or cache
    has a defined expiry and cleanup path.
 3. No fact in two sources, no fact in two channels. The constitution states law once;
    memory states mechanism once; skills and personas cite, never duplicate. Injected
@@ -238,5 +257,6 @@ This constitution is versioned (`constitution_version`, semver). An amendment is
 release-gated change: MAJOR for a changed/removed article, MINOR for a new article or
 substantive clarification, PATCH for wording. Amendment history lives in the amending
 releases' CLOSURE files and `_archive/` — never inline in the articles. The
-`specs doctor` invariants (including the no-roster-enumeration check) guard this law's
-consistency with code and memory.
+`specs doctor` invariants (including the no-runtime-kind-enumeration check,
+SPEC-DOC-037 — it forbids enumerating `AgentRuntimeKind`/harness-roster tokens here,
+not the §14 agent table) guard this law's consistency with code and memory.

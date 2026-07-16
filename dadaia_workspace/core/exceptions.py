@@ -140,3 +140,7 @@ class PlatformCapabilityError(DadaiaError):
         self.feature_name = feature_name
         self.platform = platform
         super().__init__(message)
+
+
+class WorkspaceVenvBootstrapError(RuntimeError):
+    """Workspace venv bootstrap could not install the running distribution."""

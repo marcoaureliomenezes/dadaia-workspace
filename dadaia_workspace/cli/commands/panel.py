@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
 import sys
@@ -169,6 +170,22 @@ def panel(
     # Print the readiness banner.  No credential, no launch URL — the panel is
     # open without auth on loopback (operator decision 2026-06-11); the browser
     # opens the bare URL directly.
+    # dev-server-registry law (validation-027 F-13): the panel is a dev server, so it
+    # registers its own port and releases it on clean shutdown. Registry I/O never
+    # blocks the panel — failures are logged, not fatal.
+    registry = None
+    try:
+        registry = container.build_server_registry_service(workspace_root)
+        registry.register(
+            port,
+            "dadaia-panel",
+            url=f"http://{bind}:{port}",
+            description="Dadaia Workspace Panel",
+        )
+    except Exception as exc:  # noqa: BLE001 - advisory registration only
+        logger.warning("panel port registration failed: %s", exc)
+        registry = None
+
     typer.echo(f"Panel running at http://{bind}:{port}/")
     # Flush the readiness banner before entering the blocking serve loop. stdout
     # is block-buffered when piped (e.g. a supervising launcher or the e2e
@@ -181,5 +198,12 @@ def panel(
     if not no_open:
         webbrowser.open(f"http://{bind}:{port}/")
 
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if registry is not None:
+            with contextlib.suppress(Exception):
+                registry.release(port, "dadaia-panel")
     sys.exit(0)

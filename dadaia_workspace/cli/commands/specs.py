@@ -294,6 +294,19 @@ def init(
     # Resolve specs_dir
     target = Path(specs_dir).resolve() if specs_dir else Path.cwd() / "specs"
 
+    # Coherence with `specs doctor` (validation-027 F-04/F-10): the doctor refuses the
+    # workspace-root specs/ fallback (Root Law), so init must refuse to CREATE it there.
+    # An explicit --specs-dir is a deliberate operator choice and always wins.
+    if specs_dir is None and (Path.cwd() / ".dadaia").is_dir():
+        typer.secho(
+            "Error: refusing to scaffold 'specs/' at the workspace root: the Workspace "
+            "Root Law forbids a top-level specs/ directory (and 'specs doctor' would "
+            "refuse it). Run inside a repo, or pass --specs-dir repos/<slug>/specs.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
     # Resolve project name
     project_name = name or target.parent.name
 

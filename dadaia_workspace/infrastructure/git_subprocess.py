@@ -89,11 +89,31 @@ class GitSubprocessClient:
         result = _run(["git", "status", "--porcelain"], cwd=path)
         return bool(result.stdout.strip())
 
+    def has_commits(self, path: Path) -> bool:
+        """Return whether the repository has a valid HEAD commit."""
+        result = _run(["git", "rev-parse", "--verify", "HEAD"], cwd=path)
+        return result.returncode == 0
+
     def commit_all(self, path: Path, msg: str) -> None:
         # Bug 1 fix: use safe staging that excludes embedded git repos
         _stage_files_safe(path)
 
-        result = _run(["git", "commit", "-m", msg], cwd=path)
+        # Tool-authored commits must not depend on an operator git identity being
+        # configured (validation-029 F-06: containers/CI runners without user.email made
+        # dead()'s auto-commit die with 'Please tell me who you are'). When no identity
+        # resolves, fall back to a deterministic tool identity via -c overrides; a
+        # configured identity always wins.
+        commit_cmd = ["git"]
+        identity = _run(["git", "config", "user.email"], cwd=path)
+        if identity.returncode != 0 or not identity.stdout.strip():
+            commit_cmd += [
+                "-c",
+                "user.name=dadaia-workspace",
+                "-c",
+                "user.email=dadaia@workspace.local",
+            ]
+        commit_cmd += ["commit", "-m", msg]
+        result = _run(commit_cmd, cwd=path)
 
         # Bug 2 fix: treat empty stdout+stderr with non-zero exit as silent
         # no-op (submodule edge case); include both streams in error message.

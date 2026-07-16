@@ -389,6 +389,17 @@ class SpecContextService:
         if not repo_agents_dst.exists() and repo_agents_src.exists():
             shutil.copy2(repo_agents_src, repo_agents_dst)
 
+        # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
+        # validation-027 F-06): leaving tool-created files untracked made an immediate
+        # dead() refuse via the untracked-consent guard, so create->alive->dead could
+        # never complete on a fresh context. Only tool-authored files are involved here;
+        # operator-created untracked files still hit dead()'s guard as designed (F-5).
+        with contextlib.suppress(Exception):
+            if self._git.is_git_root(repo_path) and self._git.is_dirty(repo_path):
+                self._git.commit_all(
+                    repo_path, "chore(scaffold): dadaia context alive specs baseline"
+                )
+
         ctx_fresh = self._store.get(name)
         if ctx_fresh is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
@@ -407,6 +418,78 @@ class SpecContextService:
         self._store.update(alive_ctx)
 
         return alive_ctx
+
+    # ------------------------------------------------------------------ baseline
+
+    def baseline(
+        self,
+        name: str,
+        *,
+        message: str = "chore: establish dadaia scaffold baseline",
+        push: bool = False,
+    ) -> SpecContextProject:
+        """Create the explicit initial Git commit for an ALIVE unborn repository."""
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if ctx.state != ContextState.ALIVE:
+            raise ContextStateError(
+                f"Context '{name}' is not ALIVE. Run 'dadaia context alive {name}' first."
+            )
+
+        repo_path = self._repo_path(ctx.repo_slug)
+        if not repo_path.exists() or not self._git.is_git_root(repo_path):
+            raise ContextStateError(
+                f"Context '{name}' has no materialized Git repository at '{repo_path}'."
+            )
+        if self._git.has_commits(repo_path):
+            # Convergent contract (bug baseline-refuses-alive-scaffold-commit):
+            # alive() commits its own scaffold, so history + clean tree is the
+            # canonical post-alive state — success, not refusal. Only a dirty tree
+            # on top of existing history refuses: operator content must never be
+            # swept into a "baseline" commit.
+            if self._git.is_dirty(repo_path):
+                raise ContextStateError(
+                    f"Context '{name}' already has Git history with uncommitted changes; "
+                    "baseline never commits on top of existing history. Commit or stash "
+                    "your changes first."
+                )
+            if push:
+                if not self._git.has_remote(repo_path):
+                    raise GitSyncError(f"Context '{name}' has no remote; baseline cannot push.")
+                self._git.push(repo_path)
+            return ctx
+        if not self._git.is_dirty(repo_path):
+            raise ContextStateError(
+                f"Context '{name}' has no scaffold content to commit as a baseline."
+            )
+
+        flagged: list[str] = []
+        for rel in self._git.list_untracked(repo_path):
+            path = repo_path / rel
+            if path.is_file():
+                hits = _scan_file_for_secrets(path)
+                if hits:
+                    flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
+        if flagged:
+            raise DeadSecretFoundError(
+                f"Context '{name}': secret scan blocked initial baseline (values redacted):\n"
+                + "\n".join(flagged)
+            )
+
+        self._git.commit_all(repo_path, message)
+        if not self._git.has_commits(repo_path):
+            raise GitSyncError(
+                f"Initial baseline commit was not created for context '{name}'. "
+                "Configure Git user.name/user.email and retry."
+            )
+        if push:
+            if not self._git.has_remote(repo_path):
+                raise GitSyncError(
+                    f"Context '{name}' has no remote; baseline was committed locally but not pushed."
+                )
+            self._git.push(repo_path)
+        return ctx
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 

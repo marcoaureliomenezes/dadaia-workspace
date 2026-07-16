@@ -4,23 +4,40 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 Root workspace behavior is in the workspace `AGENTS.md`; production-source
 behavior is in the repo-local `AGENTS.md`.
 
-## Lifecycle is owned by the dadaia-workflows
+## Load Order
 
-The ordered SDD ritual — the load order (read constitution/memory/`ACTIVE.md`/
-SPEC/PLAN/TASKS before acting), the release gate (`Aprovado` artifacts +
-`phase: IMPLEMENTATION` + reserve the task `[ ]`→`[-]` before production edits +
-stay inside the declared write set), and the per-phase definition → implementation →
-review → closure sequence — is executed by the **dadaia-workflows** (the
-`dadaia lifecycle` verbs), each a Python workflow body with fragment-scoped prompts and
-**Python-validated gates**. Agents are **oriented toward** those workflows; the
-disk/commit boundary is **safety-gate-enforced** by the deterministic SDD gate and git
-chokepoints (write-scope, presence, phase). Open **`dadaia panel` → Agentic →
-dadaia-workflows** for each workflow's purpose, ordered steps, per-step harness/model,
-mermaid diagram, and availability.
+Before writing or reviewing SDD artifacts, read:
+
+```text
+constitution.md
+memory/architecture.md
+memory/tech-stack.md
+memory/product/index.md
+releases/ACTIVE.md
+releases/<release-id>/SPEC.md
+releases/<release-id>/PLAN.md
+releases/<release-id>/TASKS.md
+```
 
 Use `_archive/` only for history. Use `backlog/` and `bugs/` for intake and
-triage; they are not approval gates. (`Aprovado`, `Em revisão`, and `Draft` are the
-canonical SDD status tokens — do not translate them.)
+triage; they are not approval gates.
+
+Run ordered work through exactly one of the four `dadaia lifecycle` workflows:
+`backlog-definition`, `release-definition`, `implementation-reviews`, or `audit`.
+Concurrent sessions are allowed and surfaced through advisory presence; never wait for
+or create a workspace concurrency lock.
+
+## Release Gate
+
+Implementation is allowed only when:
+
+- `ACTIVE.md` declares the active release and `phase: IMPLEMENTATION`.
+- `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
+- The active task is changed from `[ ]` to `[-]` before production edits.
+- The task's declared write set contains every production file to be edited.
+
+If any item is missing, stop. Draft or repair the SDD artifact instead of
+editing production.
 
 ## Artifact Authority
 
@@ -33,7 +50,7 @@ canonical SDD status tokens — do not translate them.)
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |
 | `releases/<id>/CLOSURE.md` | `product-engineer` in `CLOSURE` |
 | `memory/**` | `product-engineer` in `CLOSURE` only |
-| `backlog/**` | `product-engineer` or operator intake |
+| `backlog/**` | `project-manager` only (sole backlog author; `product-engineer` is a read-only consumer) |
 | `bugs/**` | any agent may file; `product-engineer` resolves into release work |
 
 ## Task Markers

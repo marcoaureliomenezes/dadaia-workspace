@@ -5,13 +5,17 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 (``bin/python``) and Windows (``Scripts/python.exe``).
 """
 
+import os
 import subprocess
 import venv
 from importlib import metadata
 from pathlib import Path
 
 import dadaia_workspace
+from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 from dadaia_workspace.core.platform import PLATFORM
+
+__all__ = ["VenvPythonEnvironmentManager", "WorkspaceVenvBootstrapError"]
 
 
 class VenvPythonEnvironmentManager:
@@ -33,6 +37,12 @@ class VenvPythonEnvironmentManager:
         source edits. Otherwise (wheel install, e.g. pipx/PyPI): pin the exact running
         version from the index.
         """
+        candidate = os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
+        if candidate:
+            candidate_path = Path(candidate).expanduser().resolve()
+            if not candidate_path.is_file() or candidate_path.suffix != ".whl":
+                raise ValueError("DADAIA_BOOTSTRAP_PACKAGE must name an existing local wheel")
+            return str(candidate_path)
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
             return str(src_root)
@@ -52,10 +62,24 @@ class VenvPythonEnvironmentManager:
         if not self._dadaia_entrypoint(workspace_root).exists():
             spec = self._install_spec()
             install_cmd = [self.pip_executable(workspace_root), "install", "--quiet"]
-            if not spec.startswith("dadaia-workspace=="):
+            if Path(spec).is_dir():
                 install_cmd.append("--editable")
             install_cmd.append(spec)
-            subprocess.run(install_cmd, check=True)
+            try:
+                subprocess.run(install_cmd, check=True)
+            except subprocess.CalledProcessError as exc:
+                # Unpublished candidate wheels are the consumer-validation norm: the
+                # exact-version PyPI pin cannot resolve, and a raw CalledProcessError
+                # traceback pointed nowhere (validation-028 F-02..F-23 cascade). Name
+                # the escape hatch that exists for exactly this case.
+                raise WorkspaceVenvBootstrapError(
+                    f"workspace venv bootstrap failed installing '{spec}'. If this "
+                    "version is not published on the index (e.g. a candidate wheel "
+                    "under validation) or the index is unreachable, point "
+                    "DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry, e.g. "
+                    "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
+                    "dadaia init"
+                ) from exc
         return str(venv_dir)
 
     def python_executable(self, workspace_root: str) -> str:

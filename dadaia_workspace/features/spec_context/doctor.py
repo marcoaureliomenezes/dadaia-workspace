@@ -67,31 +67,38 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 _ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 
 #: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
+# The canonical .dadaia/ subdirs. Each has ONE architectural purpose, documented in
+# the projected .dadaia/AGENTS.md canonical-folder table. This set is the enforcement
+# half of that law: anything else is slop and flags ROOT-4. Do NOT re-add a folder here
+# to silence the check — route the concern into the zone that owns it (bug
+# doctor-whitelist-legitimizes-slop-dirs, 2026-07-15; the retired junk-drawer entries
+# figma-bridge/imgs/references were removed — MCP state -> mcps/, evidence ->
+# tmp/<agent>/<date>/).
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
     {
-        "agentic",
-        "mcps",
-        "scripts",
-        "tmp",
-        "reports",
-        "dev-report",
-        "states",
-        "logs",
-        "sessions",
-        "handoff",
-        # Python governance hooks projected under .dadaia/hooks/ (workspace-init) — a
-        # canonical subdir, not a ROOT-4 violation (v0.1.47 W1-9, bug
-        # workspace-doctor-root4-false-positive-dadaia-hooks).
-        "hooks",
-        ".cache",
-        ".venv",
-        # Additional dirs observed in practice
-        "academy",
-        "dist",
-        "figma-bridge",
-        "imgs",
-        "references",
-        "runs",
+        # ── Projections (lib-originated; regen via `dadaia public install`) ──
+        "agentic",  # staged public assets + manifest.json (projection source-of-truth)
+        "hooks",  # projected Python governance hook entrypoints (v0.1.47 W1-9)
+        "scripts",  # projected runtime/git-hook scripts
+        # ── Runtime working areas ──
+        "mcps",  # per-MCP-server working dirs (mcps/<server>/)
+        "runtime",  # long-lived local runtime working area for tooling
+        # ── CLI/service-owned state ──
+        "states",  # machine-readable runtime state JSON
+        "sessions",  # per-session identity/bind records (PROTECTED)
+        # ── Outputs ──
+        "handoff",  # machine-readable agent handoffs (handoff/<context>/)
+        "reports",  # human-readable HTML reports (reports/<context>/<agent>/)
+        "academy",  # durable agent study/mastery notes + validation ledgers
+        # ── Ephemeral (disposable, GC'd) ──
+        "tmp",  # scratch + evidence, tmp/<agent>/<YYYYMMDD>/
+        "logs",  # telemetry/event logs
+        "runs",  # workflow run transcripts
+        "dev-report",  # generated developer diagnostic reports
+        # ── Artifacts / managed environments ──
+        "dist",  # built wheels + local exports
+        ".venv",  # managed workspace Python environment
+        ".cache",  # redirected tool caches (ruff/coverage), kept out of repos
     }
 )
 

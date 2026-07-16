@@ -246,6 +246,22 @@ def test_root4_allow_table(tmp_path: Path, name: str, setup_fn: object) -> None:
     assert "ROOT-4" not in codes
 
 
+@pytest.mark.parametrize("name", ["figma-bridge", "imgs", "references"])
+def test_root4_flags_retired_junk_drawer_dirs(tmp_path: Path, name: str) -> None:
+    """Bug doctor-whitelist-legitimizes-slop-dirs (2026-07-15).
+
+    The retired 'Additional dirs observed in practice' junk-drawer entries
+    (figma-bridge, imgs, references) are NO LONGER canonical — they have no
+    architectural purpose (MCP state -> mcps/, evidence -> tmp/<agent>/<date>/).
+    Doctor must flag them ROOT-4 so slop stops accumulating at the .dadaia root.
+    """
+    _init_workspace(tmp_path)
+    (tmp_path / ".dadaia" / name).mkdir()
+    svc = _make_doctor(tmp_path)
+    codes = {i.code for i in svc.check()}
+    assert "ROOT-4" in codes
+
+
 def test_root4_unknown_subdir_flags_not_fixable_and_absent_dadaia_dir_no_root4(
     tmp_path: Path,
 ) -> None:

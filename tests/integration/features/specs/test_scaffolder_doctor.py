@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import Severity, SpecsDoctor
+from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = [
@@ -31,7 +31,6 @@ def test_fresh_scaffold_passes_specs_doctor(tmp_path: Path) -> None:
     assert result.errors == [], f"Scaffold errors: {result.errors}"
 
     issues = SpecsDoctor(specs_dir).check()
-    errors = [issue for issue in issues if issue.severity == Severity.ERROR]
-    assert errors == [], "Scaffolded specs/ should pass doctor with 0 errors. Got:\n" + "\n".join(
-        f"  {issue.code}: {issue.description}" for issue in errors
+    assert issues == [], "Scaffolded specs/ should pass doctor with 0 issues. Got:\n" + "\n".join(
+        f"  {issue.severity.value} {issue.code}: {issue.description}" for issue in issues
     )

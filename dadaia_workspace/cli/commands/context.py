@@ -18,12 +18,13 @@ from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
+    GitSyncError,
     RepoCatalogError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.session_env import harness_session_id
+from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
@@ -159,13 +160,35 @@ def create(
 
 
 @app.command(name="list")
-def list_all() -> None:
+def list_all(
+    json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
+) -> None:
     """List all Spec Context Projects."""
     try:
         contexts = _ctx_service().list_all()
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
+    if json_output:
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": ctx.name,
+                        "state": ctx.state.value,
+                        "repo_slug": ctx.repo_slug,
+                        "repo_url": ctx.repo_url,
+                        "created_at": ctx.created_at,
+                        "alive_since": ctx.alive_since,
+                        "dead_since": ctx.dead_since,
+                        "current_branch": ctx.current_branch,
+                    }
+                    for ctx in contexts
+                ],
+                sort_keys=True,
+            )
+        )
+        return
     if not contexts:
         console.print("[dim]No contexts found. Use 'dadaia context create' to create one.[/dim]")
         return
@@ -194,7 +217,13 @@ def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
     from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
     _ = workspace_root  # kept for signature stability; resolution no longer needs it directly.
-    resolved_name = resolve_context_for_cli(None)
+    try:
+        resolved_name = resolve_context_for_cli(None)
+    except ValueError:
+        # ``show`` is a query verb: "nothing is selected" is a valid ANSWER here, not an
+        # error — the resolver's ValueError is for verbs that REQUIRE a context (bug
+        # context-show-json-traceback-unbound, consumer validation 2026-07-15).
+        return None
     if not resolved_name:
         return None
     try:
@@ -307,6 +336,37 @@ def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) ->
 
 
 @app.command()
+def baseline(
+    name: str = typer.Argument(..., help="ALIVE context with an unborn Git repository"),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Explicitly consent to creating the initial commit."
+    ),
+    push: bool = typer.Option(False, "--push", help="Also push and configure upstream."),
+    message: str = typer.Option(
+        "chore: establish dadaia scaffold baseline",
+        "--message",
+        help="Initial commit message.",
+    ),
+) -> None:
+    """Create the explicit initial scaffold commit for an unborn repository."""
+    if not yes:
+        err_console.print(
+            "[red]Error:[/red] Baseline creates a Git commit. Re-run with --yes after "
+            "reviewing the scaffold; add --push only if remote publication is intended."
+        )
+        raise typer.Exit(1)
+    try:
+        ctx = _ctx_service().baseline(name, message=message, push=push)
+        suffix = " and pushed" if push else ""
+        console.print(
+            f"[green]✓[/green] Initial baseline committed{suffix} for '[bold]{ctx.name}[/bold]'"
+        )
+    except (ContextNotFoundError, ContextStateError, DeadSecretFoundError, GitSyncError) as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
+
+
+@app.command()
 def dead(
     name: str = typer.Argument(..., help="Context name to make DEAD"),
     commit: bool = typer.Option(
@@ -327,6 +387,11 @@ def dead(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except DeadSecretFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except GitSyncError as e:
+        # Residual git failures (network, refs) surface as a clean error, not a
+        # traceback (validation-029 F-06/F-22 no-traceback law).
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
@@ -417,7 +482,12 @@ def bind(
         )
         raise typer.Exit(1) from None
 
-    session_id = f"sess_{uuid.uuid4().hex[:8]}"
+    # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
+    # SAME resolution order the gate/hooks use — explicit DADAIA_SESSION_ID (eval-flow
+    # contract) → harness-native id → mint. Rebinds in one session therefore UPDATE one
+    # record instead of minting a divergent sess_* per invocation.
+    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
+    session_id = env_sid or harness_session_id() or f"sess_{uuid.uuid4().hex[:8]}"
     now = _now_iso()
     runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
     pid = os.getpid()
@@ -440,16 +510,12 @@ def bind(
 
     # Persist the CLI session and, when available, the harness-native session record. There
     # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.
+    # Exactly ONE record per session, keyed by the resolved identity. The former
+    # harness-alias dual-write (env id != harness id -> second record) recreated the
+    # identity divergence this resolution order exists to prevent (consumer validation
+    # F-07, 2026-07-15): hooks resolve DADAIA_SESSION_ID first too, so the alias never
+    # carried information the primary record does not.
     session_identity.write_session(workspace_root, session_id, session_data)
-    # Also persist under the harness-native id so later harness calls resolve this bind.
-    harness_id = harness_session_id()
-    if harness_id:
-        with contextlib.suppress(ValueError, OSError):
-            session_identity.write_session(
-                workspace_root,
-                harness_id,
-                {**session_data, "session_id": harness_id},
-            )
     # The bind epoch is the sole context-memory injection trigger.
     session_identity.write_bind_epoch(
         workspace_root,
@@ -528,15 +594,18 @@ def release_cmd(
 def heartbeat() -> None:
     """Renew the heartbeat for the current session.
 
-    Reads DADAIA_SESSION_ID from the environment.
+    Resolves the caller-owned session from the explicit eval-flow override or
+    the harness-native session id persisted by ``context bind``.
 
     Run: dadaia context heartbeat
     """
-    session_id = os.environ.get("DADAIA_SESSION_ID")
+    session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
     if not session_id:
         err_console.print(
-            "[red]Error:[/red] No active session. Set DADAIA_SESSION_ID first "
-            "(e.g. eval $(dadaia context bind ...))."
+            "[red]Error:[/red] No caller-owned session identity. Run "
+            "'dadaia context bind <name> --mode <mode>' inside a supported harness, "
+            "or use 'eval $(dadaia context bind <name> --mode <mode> --print-env)' "
+            "in a plain shell."
         )
         raise typer.Exit(1) from None
 
@@ -555,9 +624,9 @@ def heartbeat() -> None:
     from dadaia_workspace.features.spec_context import presence
 
     ctx_name = session_data.get("context", "")
-    presence.renew(workspace_root, session_id)
-
     now = _now_iso()
+    presence.renew(workspace_root, session_id)
+    session_identity.touch_last_seen_at(workspace_root, session_id, now=now)
     console.print(
         f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
         f"(context={ctx_name}, last_seen_at={now})"

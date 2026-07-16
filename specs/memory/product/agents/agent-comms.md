@@ -17,7 +17,7 @@ tags:
 - handoff
 - schema
 token_estimate: 1560
-last_updated: '2026-07-07'
+last_updated: '2026-07-16'
 release_origin: v0.1.62
 ---
 
@@ -59,8 +59,8 @@ The field contract's single source of truth is the schema file itself: `dadaia_w
   * **Sidecar version detection:** `cli/commands/reports.py#_detect_sidecar_version` treats `"handoff-v1.2"` (token or `$id`) as modern — a v1.2 sidecar never routes into the v1.0-compat path (which would hard-error on a missing `findings[]`).
   * **Hash:** when `artifact.path` exists, `validate_file()` resolves the artifact inside the workspace and rejects mismatch, missing artifact, or a reference outside the workspace.
   * **`artifact.path` resolution (workspace-rooted):** any **relative** path that exists under the workspace root resolves from the root — covering `repos/<slug>/specs/audits/<UTC>/…` (the auditor's committed channel) and any other workspace-rooted path, not just `.dadaia/…`. The legacy fallback (resolution relative to the handoff's own directory) is kept for paths that only exist there; when a path resolves both ways, **workspace-root wins**. Absolute paths and `..` segments remain rejected by the schema; the `_within_workspace` guard remains.
-  * **Exit codes:** `0` = all valid (or violations in non-strict); `1` = violation in strict; `2` = file not found; `3` = bad invocation (neither PATHS nor `--all`, or workspace not initialized).
-  * **Default `--strict=false`**: violations surface as warnings in non-strict. Release gates use QA/security handoffs with coherent `verdict`, `release_id`, `context`, and `agent`.
+  * **Exit codes:** `0` = all valid; `1` = any INVALID file (always, regardless of `--strict`) or soft violations under `--strict`; `2` = file not found; `3` = bad invocation (neither PATHS nor `--all`, or workspace not initialized).
+  * **Default `--strict=false`**: only SOFT warnings stay non-fatal in non-strict; a schema-invalid handoff is a hard exit-1 failure in any mode. Release gates use QA/security handoffs with coherent `verdict`, `release_id`, `context`, and `agent`.
   * **Composition (constitution L67-compliant):** `cli/commands/reports.py` resolves `ReportsValidationService` via `container.build_reports_validation_service(workspace_root)`; `service.py` does not import `StdlibHandoffValidator` directly — it receives it via the `ValidatorPort` Protocol in `core/protocols/handoff_validator.py`. The service now lives in `features/reports/validation.py`: the former top-level `reports_next` / `reports_retention` / `reports_validation` triplet was merged into one `features/reports/` package with flat `next` / `retention` / `validation` submodules (v0.1.55, behavior-preserving relocation); the `build_reports_*_service` factory names are unchanged (identifiers, not module paths).
   * **Coverage:** 98% scoped in `features/reports.validation` (NFR8 ≥ 80% honored with room to spare).
 

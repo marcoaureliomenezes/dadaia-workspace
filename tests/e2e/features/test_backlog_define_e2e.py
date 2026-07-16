@@ -45,6 +45,9 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     return tmp_path
 
 

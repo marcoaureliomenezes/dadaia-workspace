@@ -114,9 +114,10 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
     assert isinstance(entry["errors"], list)
 
 
-def test_schema_violation_strict_vs_non_strict(tmp_path: Path, monkeypatch) -> None:
-    """Missing required field: strict mode → exit 1 + field path in output;
-    non-strict mode → exit 0 with an INVALID warning + the field violation."""
+def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
+    """An INVALID file exits 1 in BOTH modes (exit-code truthfulness,
+    validation-029 F-12): the old non-strict 'print INVALID, exit 0' contract masked
+    tampered/malformed handoffs from every consuming script."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -127,7 +128,7 @@ def test_schema_violation_strict_vs_non_strict(tmp_path: Path, monkeypatch) -> N
     assert "agent" in strict.output
 
     non_strict = _runner.invoke(app, ["reports", "validate", str(handoff_path)])
-    assert non_strict.exit_code == 0, non_strict.output
+    assert non_strict.exit_code == 1, non_strict.output
     assert "INVALID" in non_strict.output
     assert "agent" in non_strict.output
 

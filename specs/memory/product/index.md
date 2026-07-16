@@ -35,7 +35,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris. |
+| `panel` | panel | Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout. |
 
 ### philosophy
 

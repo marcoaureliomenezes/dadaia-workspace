@@ -4,6 +4,8 @@ import typer
 
 from dadaia_workspace.cli.commands import (
     academy,
+    capabilities,
+    certify,
     ci,
     clean,
     context,
@@ -14,6 +16,7 @@ from dadaia_workspace.cli.commands import (
     panel,
     plugin,
     public,
+    reconcile,
     reports,
     repos,
     server,
@@ -34,10 +37,44 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+
+def _resolve_version() -> str:
+    from importlib import metadata
+
+    try:
+        return metadata.version("dadaia-workspace")
+    except metadata.PackageNotFoundError:
+        return "0+source"
+
+
+@app.callback(invoke_without_command=True)
+def _root(
+    ctx: typer.Context,
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show the installed dadaia-workspace version and exit.",
+        is_eager=True,
+    ),
+) -> None:
+    """Root callback: handles the top-level ``--version`` flag."""
+    if version:
+        typer.echo(f"dadaia-workspace {_resolve_version()}")
+        raise typer.Exit(0)
+    # Preserve no_args_is_help behavior: bare `dadaia` prints help and exits.
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit(0)
+
+
 # Top-level commands
 app.command(name="init")(init.init)
 app.command(name="export")(export)
 app.command(name="import")(import_workspace)
+app.command(name="capabilities")(capabilities.capabilities)
+app.command(name="certify")(certify.certify)
+app.command(name="reconcile")(reconcile.reconcile)
 app.add_typer(clean.app, name="clean")
 
 # Sub-command groups

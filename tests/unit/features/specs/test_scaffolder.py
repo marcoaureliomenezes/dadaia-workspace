@@ -19,14 +19,18 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 # Expected canonical outputs (relative to specs_dir).
 # Since memory-markdown-source-v1 (T-MMS-10/11), scaffold emits ONLY .md born-markdown
 # files for memory atoms. Legacy .yaml stubs, .html files, and placeholder.html were
-# retired. The 14 paths below are the complete scaffolded set, including the v0.1.46
+# retired. The paths below are the complete scaffolded set, including scoped rules,
+# an empty generated catalog, and the v0.1.46
 # AC-4 per-artifact _archive dirs (FROZEN gate-class landing zone).
 _EXPECTED_FILES = [
     "constitution.md",
+    "AGENTS.md",
+    "memory/AGENTS.md",
     "memory/architecture.md",
     "memory/tech-stack.md",
     "memory/quality-assurance.md",
     "memory/product/index.md",
+    "memory/product/catalog.json",
     "releases/ACTIVE.md",
     "backlog/candidates.md",
     "backlog/ideas.md",
@@ -73,6 +77,11 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     for rel in ("memory/architecture.md", "memory/tech-stack.md", "memory/product/index.md"):
         content = (specs_dir / rel).read_text(encoding="utf-8")
         assert content.startswith("---"), f"{rel} must start with YAML frontmatter"
+
+    assert "specs_pattern_version: 4" in (specs_dir / "constitution.md").read_text(encoding="utf-8")
+    assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
+        _TEMPLATES_DIR / "specs-AGENTS.md"
+    ).read_text(encoding="utf-8")
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:

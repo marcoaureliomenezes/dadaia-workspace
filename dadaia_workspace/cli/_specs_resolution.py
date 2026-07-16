@@ -44,22 +44,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name as _resolve_bound_name
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
-#: The self-hosting-workspace slug (mirrors the pre-existing ``_DEFAULT_SLUG`` convention
-#: in ``features.panel.views._md_render``). Terminal fallback of :func:`resolve_context_for_cli`
-#: when NO context is ALIVE at all (a workspace with zero registered contexts — e.g. this
-#: source-library self-hosting workspace pre-first-``context create``, or a hermetic test
-#: fixture). This is NOT the FR2 hardcoded-Typer-default bug: FR2 forbids a specific
-#: context name baked into a *CLI option default that shadows an explicit bind*; this is
-#: the seam's OWN terminal fallback constant, reached only after explicit/env/session/
-#: first-ALIVE are all exhausted — structurally identical in kind to
-#: ``resolve_specs_dir_for_cli``'s own cwd/specs terminal fallback rung.
+#: Self-hosting source checkout slug. It is returned only when the current working
+#: directory is recognizably this library checkout, never as a consumer-workspace fallback.
 _SELF_HOSTING_SLUG = "dadaia-workspace"
 
 
@@ -81,27 +71,14 @@ def current_ancestry_pids() -> frozenset[int] | None:
         return None
 
 
-def _first_alive_context_name() -> str | None:
-    """Fail-soft first-ALIVE context name (the seam's last resolution rung, FR1).
-
-    Mirrors the fallback ``context show`` used pre-v0.1.77 for its no-arg default
-    (``cli.commands.context._resolve_default_context``'s tail case): when no explicit
-    input, env, or live session record resolves a context, fall back to the first ALIVE
-    Spec Context Project (workspace-registration order). Any failure (workspace not
-    initialized, no ALIVE context, store error) fails soft to ``None`` — resolution
-    never raises here; the caller's own not-bound error path is unchanged.
-    """
-    try:
-        from dadaia_workspace import container
-
-        workspace_root = resolve_workspace_root()
-        svc = container.build_spec_context_service(workspace_root)
-        for ctx in svc.list_all():
-            if ctx.state == ContextState.ALIVE:
-                return ctx.name
-        return None
-    except (WorkspaceNotInitializedError, Exception):  # noqa: BLE001 — fail-soft, never raise.
-        return None
+def _is_self_hosting_checkout() -> bool:
+    """Return whether cwd is the dadaia-workspace source checkout."""
+    cwd = Path.cwd().resolve()
+    return (
+        cwd.name == _SELF_HOSTING_SLUG
+        and (cwd / "dadaia_workspace").is_dir()
+        and (cwd / "specs").is_dir()
+    )
 
 
 def resolve_context_for_cli(explicit: str | None) -> str:
@@ -109,13 +86,9 @@ def resolve_context_for_cli(explicit: str | None) -> str:
 
     Order: *explicit* -> ``DADAIA_CONTEXT`` env -> this session's OWN bound record
     (harness-native id, then ancestry-marker membership — never a foreign session's
-    bind) -> first-ALIVE context (fail-soft) -> the self-hosting-workspace slug
-    (``"dadaia-workspace"``, terminal fallback when NO context is ALIVE at all).
-    Always returns a non-empty string — never ``None`` — so a real bind or a real ALIVE
-    context always takes priority (the FR1 bug this release fixes), while a workspace
-    with no context registered at all degrades to the same self-hosting name every
-    resolver-driven verb has always assumed by construction (unchanged prior behavior
-    for that degenerate case).
+    bind) -> the self-hosting slug only from the recognizable source checkout. A
+    consumer workspace without caller-owned selection raises an actionable error;
+    it never borrows the first ALIVE context.
 
     v0.1.80 FR3: both the *explicit* and ``DADAIA_CONTEXT`` env rungs are validated
     against the ``[A-Za-z0-9_-]+`` context-name allowlist before use (defense-in-depth
@@ -153,7 +126,14 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
     if resolved:
         return resolved
-    return _first_alive_context_name() or _SELF_HOSTING_SLUG
+    if _is_self_hosting_checkout():
+        return _SELF_HOSTING_SLUG
+    raise ValueError(
+        "No caller-owned Spec Context is selected. Run "
+        "'dadaia context bind <name> --mode <mode>' in this session or pass "
+        "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
+        "available contexts."
+    )
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:

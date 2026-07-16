@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
+    from dadaia_workspace.features.certification import CertificationResult
     from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
     from dadaia_workspace.features.lifecycle.policy_resolver import (
         WorkflowCatalog,
@@ -424,6 +425,16 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
 def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
     """Compose a ``WorkflowsService`` for the given workspace root."""
     return WorkflowsService(workspace_root)
+
+
+def run_certification(workspace_root: Path, *, keep: bool = False) -> "CertificationResult":
+    """Compose and run the disposable full-capability certification journey."""
+    from dadaia_workspace.features.certification import certify
+    from dadaia_workspace.infrastructure.certification_process import (
+        SubprocessCertificationProcess,
+    )
+
+    return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
 
 
 def build_panel_service(

@@ -13,8 +13,8 @@ tags:
 - dependency-rules
 - agents
 - workflows
-token_estimate: 1044
-last_updated: '2026-07-14'
+token_estimate: 1250
+last_updated: '2026-07-16'
 release_origin: v0.2.7
 ---
 
@@ -51,6 +51,12 @@ identity, advisory presence, path classification, and workspace doctor checks. T
 no lease or locking module. `hooks/pre_gate.py` composes root whitelist, venv guard, and
 the SDD path/phase/mode gate. `hooks/sdd_post_gate.py` refreshes advisory presence and
 runs the nonblocking reconciler.
+
+Exit codes tell the truth: `dadaia doctor` (and `reports validate`) exit non-zero
+whenever issues remain — a green exit is proof, never a formality. Tool-initiated
+commits (`alive` scaffold, `dead` sync) fall back to an injected
+`dadaia-workspace <dadaia@workspace.local>` git identity when the environment has
+none (`infrastructure/git_subprocess.py`), so containers and CI never die on it.
 
 Git chokepoints are installed from:
 
@@ -120,7 +126,9 @@ primitives; they must have bounded failure behavior and cannot freeze Spec Conte
 
 ## Runtime State
 
-Canonical workspace state is rooted at `.dadaia/`:
+Canonical workspace state is rooted at `.dadaia/`. The binding whitelist is
+`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py` (ROOT-4 flags anything
+else); this table mirrors it:
 
 | Path | Owner |
 |---|---|
@@ -130,16 +138,29 @@ Canonical workspace state is rooted at `.dadaia/`:
 | `states/presence/` | advisory live-session records |
 | `states/server_registry.json` | development server registry |
 | `states/*model*policy*.json` | Layer-1/Layer-2 governance overlays |
+| `states/root_exceptions.txt` | operator-approved root-whitelist exceptions |
+| `states/import-manifest.json` | provenance of the last `dadaia import` |
 | `runs/lifecycle/` | workflow run state (durable step payloads live in the Spec Context: `specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) |
 | `handoff/` | machine-readable agent handoffs |
 | `reports/` | optional human-readable reports |
-| `tmp/` | bounded ephemeral files |
+| `tmp/` | bounded ephemeral files (incl. `tmp/legacy-quarantine/`) |
 | `agentic/` | staged public assets and manifest |
+| `hooks/` | projected harness hook wrappers |
+| `scripts/` | projected governance/gate scripts |
+| `mcps/` | MCP server working dirs |
+| `runtime/` | projected runtime assets |
+| `academy/` | academy working data |
 | `logs/` | hook/reconciler diagnostics |
-| `.venv/` | workspace Python runtime |
+| `dev-report/`, `dist/` | dev artifacts and built wheels |
+| `.venv/`, `.cache/` | workspace Python runtime and tool caches |
 
 Legacy `states/ctx_locks/` and `sessions/runtime/` are invalid retired state. Doctor
-removes them with `--fix`.
+removes them with `--fix`. Known-legacy `.dadaia/` subdirs (`bugs`, `src`, `locks`,
+`figma-bridge`, `imgs`, `references`) are quarantined — never deleted — by the
+reconcile `legacy-dir-quarantine` step (`features/migrate/legacy_dadaia_dirs.py`) into
+`tmp/legacy-quarantine/run-<id>/` with a manifest. `dadaia import` relocates the
+archive's `export-manifest.json` to `states/import-manifest.json` so an imported
+workspace passes its own doctor.
 
 No repo may contain `.dadaia/`, a virtualenv, cache directories, test-results,
 Playwright reports, or coverage artifacts.

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-14T04:42:54Z",
+  "generated_at": "2026-07-16T04:35:38Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -257,8 +257,8 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris.",
-      "summary": "`dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. The Games tab includes wall-wrapping Snake plus Tetris. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
+      "tldr": "Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout.",
+      "summary": "`dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. The Games tab includes wall-wrapping Snake plus Tetris, Codex Pong, and PI Breakout. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
@@ -267,7 +267,7 @@
         "dashboard",
         "games"
       ],
-      "token_estimate": 394,
+      "token_estimate": 481,
       "depends_on": [
         "dadaia-workflows",
         "agent-orchestration",
@@ -413,7 +413,7 @@
       ],
       "token_estimate": 325,
       "depends_on": [
-        "workspace-init",
+        "public-asset-distribution",
         "context-management"
       ]
     },
@@ -569,7 +569,7 @@
         "backlog",
         "bugs"
       ],
-      "token_estimate": 309,
+      "token_estimate": 380,
       "depends_on": [
         "dadaia-workflows",
         "specs-doctor",

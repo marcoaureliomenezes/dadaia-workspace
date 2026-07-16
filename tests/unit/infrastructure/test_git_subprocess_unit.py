@@ -45,18 +45,21 @@ def test_error_and_noop_mapping(monkeypatch: pytest.MonkeyPatch, case: str) -> N
 
         def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
             calls.append(args)
-            if args[:2] == ["git", "commit"]:
+            if args[:3] == ["git", "config", "user.email"]:
+                return _result(0, stdout="op@example.com\n")  # identity configured
+            if "commit" in args:
                 return _result(1, stdout="nothing to commit, working tree clean")
             return _result()
 
         monkeypatch.setattr(git_subprocess, "_run", fake_run)
         GitSubprocessClient().commit_all(Path("/repo"), "message")
+        # Identity configured -> NO -c fallback injected (operator identity wins).
         assert ["git", "commit", "-m", "message"] in calls
 
     elif case == "commit-raises-with-stdout-and-stderr":
 
         def fake_run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-            if args[:2] == ["git", "commit"]:
+            if "commit" in args:
                 return _result(1, stdout="stdout detail", stderr="stderr detail")
             return _result()
 

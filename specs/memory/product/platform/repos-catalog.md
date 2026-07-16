@@ -10,7 +10,7 @@ tags:
 - catalog
 - discovery
 token_estimate: 325
-last_updated: '2026-07-02'
+last_updated: '2026-07-16'
 release_origin: v0.1.48
 ---
 
@@ -18,7 +18,7 @@ CLI surface: `dadaia repos list` · Closure: sdd-release-lifecycle-v1
 
 ## Purpose
 
-Queries the static catalog of known repos at `.dadaia/src/repos.xlsx` and displays slug, URL, description. Serves as fast discovery for the operator to create new contexts without memorizing URLs.
+Queries the static catalog of known repos at `.dadaia/agentic/data/repos.xlsx` (canonical source `dadaia_workspace/public/data/repos.xlsx`) and displays slug, URL, description. Serves as fast discovery for the operator to create new contexts without memorizing URLs.
 
 ## Usage flow
 
@@ -39,11 +39,11 @@ Without the catalog, creating a context required pasting the full URL every time
 
 ## Runtime state touched
 
-  * Read-only: `.dadaia/src/repos.xlsx`
+  * Read-only: `.dadaia/agentic/data/repos.xlsx`
 
 
 
 ## Dependencies
 
-  * Depends on [[workspace-init]] (installs the XLSX at `.dadaia/src/`).
+  * Depends on [[public-asset-distribution]] (projects the XLSX into `.dadaia/agentic/data/`); `.dadaia/src/` is a retired legacy dir, quarantined by reconcile.
   * Consumed by [[context-management]] (the operator checks repos list before creating a context).

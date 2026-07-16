@@ -131,6 +131,9 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
@@ -218,6 +221,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
 
     accept_workspace = _init_workspace(tmp_path / "accept-case")
     monkeypatch.chdir(accept_workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")  # explicit rung
     accept_result = _runner.invoke(
         app,
         [
@@ -260,6 +264,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
 
     negative_workspace = _init_workspace(tmp_path / "negative-case")
     monkeypatch.chdir(negative_workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")  # explicit rung
 
     negative_result = _runner.invoke(
         app,
@@ -331,6 +336,9 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     # Pre-write a genuinely valid, independently-validating handoff file at the exact
     # path the RETIRED FR8 enrichment used to match: <workspace>/.dadaia/handoff/<context>/

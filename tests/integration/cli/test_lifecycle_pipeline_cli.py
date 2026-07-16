@@ -45,6 +45,9 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     real_build = container.build_agent_runtime
     no_evidence = AgentRunResult(
@@ -161,6 +164,9 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
@@ -277,6 +283,9 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
@@ -411,6 +420,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
 
     def _run_pipeline(workspace: Path, run_id: str):  # type: ignore[no-untyped-def]
         monkeypatch.chdir(workspace)
+        monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")  # explicit rung
         return _runner.invoke(
             app,
             [

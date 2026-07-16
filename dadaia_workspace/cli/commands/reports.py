@@ -470,10 +470,12 @@ def validate(
             f"(of {len(results)} files)"
         )
 
-    # Exit code logic: hard error if v1.0 missing findings[], or strict mode violations
+    # Exit-code truthfulness (validation-029 F-12): an INVALID file is a hard failure
+    # — printing INVALID while exiting 0 masked tampered/malformed handoffs from every
+    # consuming script. --strict remains the elevation for soft warnings only.
     if has_v10_error:
         raise typer.Exit(1)
-    if strict and n_invalid > 0:
+    if n_invalid > 0:
         raise typer.Exit(1)
 
 

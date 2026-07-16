@@ -195,6 +195,9 @@ def test_release_scope_consumes_exact_backlog_author_run(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     handoff_ref = f".dadaia/handoff/{_CONTEXT}/author.handoff.json"
     handoff = workspace / handoff_ref
     handoff.parent.mkdir(parents=True, exist_ok=True)
@@ -253,6 +256,9 @@ def test_rejected_review_blocks_before_commit_gate(
     (after the single bounded in-run revision of spec_create is spent)."""
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     # Drive spec_review on a distinct harness (codex) and make that kind reject;
     # every other step (on the default pi harness, also fake-backed) approves. Python —
@@ -304,6 +310,9 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
 
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     _install_fake_factory(monkeypatch)
 
     # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 7

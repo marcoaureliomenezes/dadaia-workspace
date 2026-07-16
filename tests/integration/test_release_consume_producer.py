@@ -229,6 +229,9 @@ def test_define_writes_ledger_close_removes_item_zero_stale_and_bad_consumes_fai
 ) -> None:
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     _install_fake_factory(monkeypatch)
     _plant_specs(workspace, consumes=_SLUG)
 
