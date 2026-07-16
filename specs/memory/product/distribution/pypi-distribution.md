@@ -24,10 +24,11 @@ release_origin: v0.2.5
 ## Purpose
 
 `dadaia-workspace` is a published PyPI package: `pip install dadaia-workspace`
-installs the library and its `dadaia` CLI. The published line is **0.2.x**; the last
-PUBLISHED version is `0.2.2` (`pyproject.toml` `version` is the single source and may
-run ahead locally through consumer-validated hotfix wheels — e.g. 0.2.6–0.2.12 —
-that are NOT published until the operator orders the next PyPI release). PyPI descriptions are immutable per release: a
+installs the library and its `dadaia` CLI. The last PUBLISHED version is
+`0.2.2`; the next deploy version is `0.3.0` (`pyproject.toml` `version` is the single
+source). Consumer-validation candidates are throwaway wheels — they NEVER mint
+intermediate published versions; version numbers advance only at deploy time, on the
+operator's order. PyPI descriptions are immutable per release: a
 documentation-only fix to the project page requires a version bump, never an
 in-place edit.
 
