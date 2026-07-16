@@ -24,9 +24,11 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     # builder, so materialize the entrypoint doctor checks — otherwise every doctor
     # run carries a VENV-1 issue and the truthful exit-code assertions can't isolate
     # the invariant under test.
-    venv_bin = tmp_path / ".dadaia" / ".venv" / "bin"
+    from dadaia_workspace.core.platform import PLATFORM
+
+    venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
-    entry = venv_bin / "dadaia"
+    entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
     entry.write_text("#!/bin/sh\n")
     entry.chmod(0o755)
     monkeypatch.chdir(tmp_path)

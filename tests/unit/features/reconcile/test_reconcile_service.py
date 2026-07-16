@@ -88,10 +88,14 @@ def test_reconcile_quarantines_legacy_dadaia_dirs(tmp_path: Path, monkeypatch) -
     workspace = _v1_workspace(tmp_path)
     (workspace / "repos").mkdir()
     (workspace / "AGENTS.md").write_text("# agents", encoding="utf-8")
-    venv_bin = workspace / ".dadaia" / ".venv" / "bin"  # VENV-1 skeleton
+    from dadaia_workspace.core.platform import PLATFORM
+
+    # VENV-1 skeleton — platform-correct layout ("bin" on POSIX, "Scripts" on Windows)
+    venv_bin = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
-    (venv_bin / "dadaia").write_text("#!/bin/sh\n", encoding="utf-8")
-    (venv_bin / "dadaia").chmod(0o755)
+    entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry.write_text("#!/bin/sh\n", encoding="utf-8")
+    entry.chmod(0o755)
     (workspace / ".dadaia" / "bugs").mkdir()
     (workspace / ".dadaia" / "bugs" / "legacy-report.md").write_text("x", encoding="utf-8")
     (workspace / ".dadaia" / "src").mkdir()
