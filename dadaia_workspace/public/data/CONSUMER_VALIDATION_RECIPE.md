@@ -20,10 +20,21 @@ Do NOT mark FAIL for "not fully demonstrated": every statement here has a crisp
 assertion — if the commands ran and the assertion holds, it is PASS. If a command uses
 a flag/subcommand that does not exist, THAT is a real FAIL (contract/CLI mismatch).
 
-Setup once: `python3 -m venv /tmp/val-venv && /tmp/val-venv/bin/pip install <wheel>`.
-Let `D=/tmp/val-venv/bin/dadaia`. Destructive statements use throwaway dirs under
-`/tmp` — never the production workspace. Where a statement needs an initialized
-workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
+Setup once:
+
+```bash
+python3 -m venv /tmp/val-venv && /tmp/val-venv/bin/pip install <wheel>
+export DADAIA_BOOTSTRAP_PACKAGE=<wheel>   # REQUIRED for a candidate wheel
+D=/tmp/val-venv/bin/dadaia
+```
+
+`DADAIA_BOOTSTRAP_PACKAGE` makes every workspace-venv bootstrap (`init`, `certify`,
+`reconcile`) install the CANDIDATE wheel itself instead of pinning the version from
+PyPI — an unpublished candidate is the validation norm, and without this export every
+`init` fails with "No matching distribution found". Destructive statements use
+throwaway dirs under `/tmp` — never the production workspace. Where a statement needs
+an initialized workspace, create it:
+`mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
 
 ---
 

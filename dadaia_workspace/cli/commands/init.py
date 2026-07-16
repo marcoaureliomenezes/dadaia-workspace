@@ -38,7 +38,13 @@ def init(
     console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
 
     svc = container.build_workspace_service(root)
-    _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
+    from dadaia_workspace.infrastructure.python_env import WorkspaceVenvBootstrapError
+
+    try:
+        _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
+    except WorkspaceVenvBootstrapError as exc:
+        typer.secho(f"Error: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from None
 
     console.print(f"[green]✓[/green] .dadaia/ bootstrapped at {root / '.dadaia'}")
 
