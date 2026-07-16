@@ -107,10 +107,16 @@ an initialized workspace, create it:
   that IS the demonstration.)
 
 ### F-09 — Bugs ledger
-- Run: `$D bugs append --event reported --bug-id valbug ...all required fields...`;
-  `$D bugs status`; then `$D bugs append --event reported --bug-id x` (missing fields).
-- **PASS if:** the complete append exits 0 and appears in `bugs status`; the incomplete
-  one exits non-zero and writes nothing.
+- Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
+  repos/vp/specs`). `bugs` resolves its specs tree from `--specs-dir` OR a bound context —
+  pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
+  do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
+  ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
+- Run: `$D bugs append --event reported --bug-id valbug ...all required fields...
+  --specs-dir repos/vp/specs`; `$D bugs status --specs-dir repos/vp/specs`; then
+  `$D bugs append --event reported --bug-id x --specs-dir repos/vp/specs` (missing fields).
+- **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
+  repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
@@ -133,12 +139,14 @@ an initialized workspace, create it:
   (non-zero, names the failure).
 
 ### F-13 — Panel
-- Run: `$D panel --no-open --port <p>` in the background; `curl -fsS localhost:<p>/`;
-  `$D server list` WHILE the panel is up; then stop the panel.
+- Run: `$D panel --no-open --port <p>` in the background; hit the port with an HTTP GET;
+  `$D server list` WHILE the panel is up; then stop the panel. Use whatever HTTP client
+  the env has — `curl -fsS localhost:<p>/`, or, since `curl` is not guaranteed, the always
+  available stdlib: `python -c "import urllib.request as u; print(u.urlopen('http://localhost:<p>/').status)"`.
 - **PASS if:** HTTP 200; `server list` shows port `<p>` registered to `dadaia-panel`
   while running (the panel self-registers per the dev-server-registry law); and the
-  entry is released after a clean stop. If the env cannot bind a port, mark
-  **EXCEPTION**.
+  entry is released after a clean stop. Only if the env cannot bind ANY port at all, mark
+  **EXCEPTION** — a missing `curl` is not an EXCEPTION (use the stdlib client above).
 
 ### F-14 — Server registry
 - Run: `$D server register --port <p> --project val`; `$D server list`; then re-register

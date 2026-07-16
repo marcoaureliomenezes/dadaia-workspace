@@ -238,9 +238,14 @@ def backlog_define(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the backlog-definition workflow (§4) as a fragment-driven sequence.
+    """Turn an operator demand into one refined backlog item (interview, dedupe, author).
 
-    Python owns step order and the typed gates; each model step's prompt is assembled
+    This is one of the four lifecycle workflows; it runs a fixed sequence of AI worker
+    steps behind Python-checked gates and stops if a gate blocks. Use ``--harness fake``
+    to walk the whole sequence deterministically with no model calls.
+
+    (Internal contract, constitution §4.) Python owns step order and the typed gates; each
+    model step's prompt is assembled
     from its fragment bundle + selected dynamic context + output schema + the discrete
     ``(harness, model)``. The §4 Python steps (``subject_bind``, ``existing_backlog_review``,
     ``reconcile_decision``, ``backlog_review_gate``) dispose deterministically via the R1
@@ -381,9 +386,15 @@ def release_define(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the release-definition workflow (§6.1) as a fragment-driven sequence.
+    """Turn a picked backlog set into an approved SPEC/PLAN/TASKS release, review-gated.
 
-    Python owns step order and the typed gates; each model step's prompt is assembled
+    This is one of the four lifecycle workflows; it runs a fixed sequence of AI worker
+    steps behind Python-checked gates (a rejected or missing review blocks advancement) and
+    only reaches IMPLEMENTATION when every gate passes. ``--harness fake`` walks it with no
+    model calls.
+
+    (Internal contract, constitution §6.1.) Python owns step order and the typed gates;
+    each model step's prompt is assembled
     from its fragment bundle + selected dynamic context + output schema + the discrete
     ``(harness, model)`` — there is no generic "Run the step" suffix. A REJECTED or
     missing review handoff BLOCKS advancement; the terminal ``definition_commit_gate``
@@ -826,9 +837,14 @@ def audit(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run the audit workflow (one audit_report model pass + Python disposition gate).
+    """Produce a governance audit report of the project, with a Python disposition gate.
 
-    Born resolver-governed (v0.1.56 / FR2): the per-step model is resolved through the shared
+    This is one of the four lifecycle workflows; it runs one AI audit-report step and a
+    Python gate that dispositions the findings. ``--harness fake`` walks it with no model
+    calls.
+
+    (Internal contract.) Born resolver-governed (v0.1.56 / FR2): the per-step model is
+    resolved through the shared
     ``WorkflowExecutionPolicyResolver`` and the frozen snapshot is recorded on the run before
     step 1 (LAW 7). ``--harness fake`` walks the whole sequence; ``--step-model`` is
     profile-ids-only (D-3); the legacy ``--model`` flag was removed in v0.1.57 (FR6).
@@ -1013,9 +1029,15 @@ def pipeline(
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
-    """Run implementation, bounded review corrections, and closure.
+    """Implement an approved release, run bounded review-correction rounds, then close it.
 
-    The per-step model is governed: ``--step-model label=profile-id`` selects a built-in
+    This is one of the four lifecycle workflows; it runs the implement + review AI steps
+    with a capped number of automatic correction rounds and ends at closure.
+    ``--harness fake`` walks it with no model calls; ``--show-policy`` prints the resolved
+    per-step model policy and exits without running.
+
+    (Internal contract.) The per-step model is governed: ``--step-model label=profile-id``
+    selects a built-in
     model profile (D-3), resolved through the shared ``WorkflowExecutionPolicyResolver``
     (CLI > overlay > library default). The resolved policy is snapshotted onto the run
     before the first step (LAW 7). ``--show-policy`` prints the resolved policy and exits.
