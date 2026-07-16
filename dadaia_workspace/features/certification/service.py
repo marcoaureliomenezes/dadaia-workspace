@@ -105,8 +105,9 @@ def certify(
             )
         return proc.stdout
 
-
-    def cli_expect_block(expected_step: str, *args: str, extra_env: dict[str, str] | None = None) -> str:
+    def cli_expect_block(
+        expected_step: str, *args: str, extra_env: dict[str, str] | None = None
+    ) -> str:
         """Run a lifecycle verb on the PLAIN fake and assert the v0.2.3 honest-block contract.
 
         Since v0.2.3 the plain ``--harness fake`` worker deliberately produces no
