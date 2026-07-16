@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import tempfile
+from pathlib import Path
 
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 
@@ -15,7 +18,16 @@ def certify(
     keep: bool = typer.Option(False, "--keep", help="Keep the disposable workspace."),
 ) -> None:
     """Certify assembled public features in a disposable local workspace."""
-    result = container.run_certification(resolve_workspace_root(), keep=keep)
+    # The whole run happens in a disposable workspace, so an initialized workspace at
+    # the cwd is NOT a prerequisite (validation-029 F-03: bare-dir certify tracebacked).
+    # Prefer the real workspace root (keeps artifacts under its .dadaia/tmp), fall back
+    # to the system temp dir when none exists.
+    try:
+        anchor_root = resolve_workspace_root()
+    except WorkspaceNotInitializedError:
+        anchor_root = Path(tempfile.mkdtemp(prefix="dadaia-certify-"))
+        typer.echo(f"[info] no initialized workspace here; using disposable anchor {anchor_root}")
+    result = container.run_certification(anchor_root, keep=keep)
     payload = result.to_dict()
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))

@@ -389,6 +389,11 @@ def dead(
     except DeadSecretFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+    except GitSyncError as e:
+        # Residual git failures (network, refs) surface as a clean error, not a
+        # traceback (validation-029 F-06/F-22 no-traceback law).
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     except (ContextNotFoundError, ContextStateError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

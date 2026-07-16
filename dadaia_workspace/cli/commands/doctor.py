@@ -40,5 +40,12 @@ def doctor(
         typer.echo(f"\nApplied {len(actions)} repair(s):")
         for action in actions:
             typer.echo(f"  - {action}")
+        remaining = dr.check()
+        if remaining:
+            typer.echo(f"\n{len(remaining)} issue(s) remain after repairs.")
+            raise typer.Exit(1)
     else:
         typer.echo("\nRun 'dadaia doctor --fix' to apply automatic repairs.")
+        # Exit-code truthfulness (validation-029 F-04): issues found => non-zero, so
+        # scripts and agents consuming doctor never mistake a sick tree for healthy.
+        raise typer.Exit(1)
