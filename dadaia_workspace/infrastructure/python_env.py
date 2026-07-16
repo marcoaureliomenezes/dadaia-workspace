@@ -12,11 +12,10 @@ from importlib import metadata
 from pathlib import Path
 
 import dadaia_workspace
+from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 from dadaia_workspace.core.platform import PLATFORM
 
-
-class WorkspaceVenvBootstrapError(RuntimeError):
-    """Workspace venv bootstrap could not install the running distribution."""
+__all__ = ["VenvPythonEnvironmentManager", "WorkspaceVenvBootstrapError"]
 
 
 class VenvPythonEnvironmentManager:

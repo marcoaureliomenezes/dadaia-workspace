@@ -38,7 +38,7 @@ def init(
     console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
 
     svc = container.build_workspace_service(root)
-    from dadaia_workspace.infrastructure.python_env import WorkspaceVenvBootstrapError
+    from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 
     try:
         _, installed = svc.init(root, skip_assets=skip_assets, harnesses=harnesses)
