@@ -1,5 +1,7 @@
 """dadaia CLI entry point."""
 
+import sys
+
 import typer
 
 from dadaia_workspace.cli.commands import (
@@ -30,11 +32,18 @@ from dadaia_workspace.cli.commands.newartifacts import (
     backlog_app,
     release_app,
 )
+from dadaia_workspace.core.exceptions import DadaiaError
 
 app = typer.Typer(
     name="dadaia",
     help="AI-native workspace management with Spec Context Projects.",
     no_args_is_help=True,
+    # A DadaiaError (e.g. WorkspaceNotInitializedError from a verb run outside an
+    # initialized workspace) is an EXPECTED operator-facing condition, not a crash. Let it
+    # propagate out of app() so _safe_app renders a concise message instead of a Rich
+    # traceback (bug doctor-uninitialized-workspace-traceback). Genuinely unexpected
+    # exceptions still surface their traceback for debugging.
+    pretty_exceptions_enable=False,
 )
 
 
@@ -98,8 +107,18 @@ app.add_typer(bugs_app, name="bugs")
 
 
 def _safe_app() -> None:
-    """Console entry point; failures surface without creating a second bug database."""
-    app()
+    """Console entry point; failures surface without creating a second bug database.
+
+    A DadaiaError is a known, operator-facing condition (uninitialized workspace, unknown
+    context, etc.) — surface it as one concise stderr line + a non-zero exit, never a
+    traceback (bug doctor-uninitialized-workspace-traceback). Every other exception keeps
+    its traceback for debugging.
+    """
+    try:
+        app()
+    except DadaiaError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":
