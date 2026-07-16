@@ -165,9 +165,14 @@ an initialized workspace, create it:
 
 ### F-17 — Migrations
 - Setup: seed an older specs tree (lower pattern version) in a throwaway dir.
-- Run: `$D migrate --help` then the relevant migrate verb; `$D specs doctor` after.
-- **PASS if:** the migrate verb upgrades losslessly and `specs doctor` is green after;
-  re-running the migrate verb is a no-op.
+- Run: `$D migrate --help` then the relevant migrate verb (`migrate tree-v2 -y`);
+  `$D specs doctor` after.
+- **PASS if:** the migrate verb upgrades losslessly (legacy content relocated under
+  `releases/legacy/`, nothing dropped) and `specs doctor` exits 0 with **0 errors**
+  afterwards; re-running the migrate verb is a no-op. A SPEC-DOC-027 **WARNING** on the
+  sanctioned `releases/legacy/` holding dir is EXPECTED, not a FAIL — it is the migration's
+  own destination, preserved-until-renamed by design (doctor exits 0 on warnings). Judge
+  on errors + exit code, not on the presence of that warning.
 
 ### F-18 — Init / onboarding
 - Run in an empty dir: `$D init --harness all`.
