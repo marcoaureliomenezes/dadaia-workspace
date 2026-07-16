@@ -141,9 +141,14 @@ an initialized workspace, create it:
   **EXCEPTION**.
 
 ### F-14 — Server registry
-- Run: `$D server register --port <p> --project val`; `$D server list`; register the
-  same port again.
-- **PASS if:** first register + list round-trip; the duplicate is refused with guidance.
+- Run: `$D server register --port <p> --project val`; `$D server list`; then re-register
+  the SAME port for the SAME project (`--project val`); then register the same port for a
+  DIFFERENT project (`--project other`).
+- **PASS if:** first register + list round-trip; the same-project re-register is an
+  idempotent no-op (exit 0 — a dev server re-registering its own port on restart must not
+  be refused); and the different-project registration is REFUSED with guidance (non-zero,
+  names the owning project). Assert exit codes directly — do not read them through a pipe,
+  which masks them.
 
 ### F-15 — Memory & injection
 - Run in a bound context with a scaffolded specs tree:
