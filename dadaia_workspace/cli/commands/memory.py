@@ -37,7 +37,8 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 @product_app.command("add")
 def product_add(
     slug: str = typer.Argument(
-        ..., help="Feature slug (e.g. payments). Must match ^[a-z][a-z0-9-]+$."
+        ...,
+        help="Feature slug in lowercase kebab-case: start with a letter, then a-z0-9 or hyphens (e.g. payments).",
     ),
     specs_dir: str | None = typer.Option(
         None,

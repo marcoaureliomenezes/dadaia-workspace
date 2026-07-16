@@ -81,7 +81,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 def release_new_cmd(
     release_id: str = typer.Argument(
         ...,
-        help="New release ID. SemVer vX.Y.Z (e.g. v0.1.23 — preferred, matches the specs-doctor canon) or the legacy slug ^[a-z][a-z0-9-]+$.",
+        help="New release ID. SemVer vX.Y.Z (e.g. v0.1.23 — preferred, matches the specs-doctor canon) or the legacy slug in lowercase kebab-case (start with a letter, then a-z0-9 or hyphens).",
     ),
     specs_dir: str | None = typer.Option(
         None,
@@ -119,7 +119,7 @@ def release_new_cmd(
 def backlog_new_cmd(
     slug: str = typer.Argument(
         ...,
-        help="Backlog entry slug (e.g. cool-idea). Must match ^[a-z][a-z0-9-]+$.",
+        help="Backlog entry slug in lowercase kebab-case: start with a letter, then a-z0-9 or hyphens (e.g. cool-idea).",
     ),
     specs_dir: str | None = typer.Option(
         None,
