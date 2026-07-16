@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import typer
 
+from dadaia_workspace.core.exceptions import ReleaseNotFoundError
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
@@ -876,13 +877,19 @@ def audit(
     base = tuple(_replace(step, runtime_kind=default_kind) for step in _SEQUENCE)
     sequence = apply_resolved_policy(base, snapshot)
 
-    workflow = container.build_audit_workflow(
-        workspace_root,
-        context=context,
-        release_id=release_id,
-        default_runtime_kind=default_kind,
-        policy_snapshot=snapshot,
-    )
+    try:
+        workflow = container.build_audit_workflow(
+            workspace_root,
+            context=context,
+            release_id=release_id,
+            default_runtime_kind=default_kind,
+            policy_snapshot=snapshot,
+        )
+    except ReleaseNotFoundError as exc:
+        # Reject an undefined --release-id with a concise, actionable error — never a
+        # traceback, and without synthesizing a specs/releases/<id>/ tree.
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(3) from None
     result = workflow.run(run_id, sequence=sequence, resume_from=resume_from)
     _emit_wire_result("audit", result, json_output=json_output)
 

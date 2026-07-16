@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
+    ReleaseNotFoundError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.harness_models import HarnessModelOption
@@ -1583,6 +1584,16 @@ def build_audit_workflow(
     specs_dir = workspace_root / "repos" / context_name / "specs"
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
+    # Bug audit-accepts-undefined-release-and-creates-release-tree: audit runs against an
+    # EXISTING release. Its step payloads route to specs/releases/<release_id>/handoffs/
+    # (release-scoped, unlike backlog_definition), so an undefined id would synthesize a
+    # bogus release tree. Reject before any run/write.
+    if not (specs_dir / "releases" / release_id).is_dir():
+        raise ReleaseNotFoundError(
+            f"Audit target release '{release_id}' does not exist under "
+            f"{specs_dir.as_posix()}/releases/. Audit runs against an existing release — "
+            "define/approve the release first, or pass an existing --release-id."
+        )
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
         SpecContext(

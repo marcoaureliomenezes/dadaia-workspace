@@ -237,3 +237,27 @@ def test_sequence_shape_is_one_model_step_plus_python_gate() -> None:
         ("audit_report", "audit.audit_report"),
         ("audit_disposition_gate", None),
     ]
+
+
+def test_build_audit_workflow_rejects_undefined_release_id(tmp_path: Path) -> None:
+    """Bug audit-accepts-undefined-release-and-creates-release-tree: `lifecycle audit`
+    with a release id that has no `specs/releases/<id>/` directory must be rejected
+    BEFORE the run, so it never synthesizes a bogus release tree by writing its
+    handoff step-payload under `specs/releases/<bogus>/handoffs/`. The audit runs
+    against an EXISTING release (the happy-path test pre-creates releases/<id>)."""
+    import pytest
+
+    from dadaia_workspace import container
+    from dadaia_workspace.core.exceptions import ReleaseNotFoundError
+
+    _workspace(tmp_path)  # creates releases/v0.1.30 only
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+
+    # An existing release builds fine.
+    container.build_audit_workflow(tmp_path, context=_CONTEXT, release_id=_RELEASE)
+
+    # A release id with no directory is rejected, and nothing is synthesized.
+    bogus = "canary-does-not-exist-20260716"
+    with pytest.raises(ReleaseNotFoundError):
+        container.build_audit_workflow(tmp_path, context=_CONTEXT, release_id=bogus)
+    assert not (specs / "releases" / bogus).exists(), "audit must not create a bogus release dir"

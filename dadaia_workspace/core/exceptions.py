@@ -76,6 +76,16 @@ class NoActiveReleaseError(DadaiaError):
     """
 
 
+class ReleaseNotFoundError(DadaiaError):
+    """Raised when a lifecycle verb targets a ``--release-id`` that has no release directory.
+
+    ``lifecycle audit`` runs against an EXISTING release; accepting an undefined id would
+    synthesize a bogus ``specs/releases/<id>/`` tree by writing its handoff there (bug
+    ``audit-accepts-undefined-release-and-creates-release-tree``). The CLI maps this to a
+    non-zero exit with an orienting message — never a traceback.
+    """
+
+
 class NoAgentSequenceError(DadaiaError):
     """Raised when the active release's PLAN.md declares no identifiable agent owners.
 
