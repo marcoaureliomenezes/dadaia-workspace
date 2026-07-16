@@ -146,8 +146,11 @@ an initialized workspace, create it:
 - **PASS if:** first register + list round-trip; the duplicate is refused with guidance.
 
 ### F-15 — Memory & injection
-- Run in a bound context: `$D memory list` (or the memory catalog verb).
-- **PASS if:** it reads the bound context's atoms without error, exit 0.
+- Run in a bound context with a scaffolded specs tree:
+  `$D memory product add --help` (verb exists) and
+  `$D memory catalog generate --specs-dir <bound specs dir>`.
+- **PASS if:** both verbs exist and `catalog generate` exits 0, producing/refreshing
+  the catalog from the context's memory `.md` atoms without touching other paths.
 
 ### F-16 — Portability
 - Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional);
@@ -194,8 +197,10 @@ an initialized workspace, create it:
 - Run the projected hooks directly: pre-gate with the F-08 payload set (in-repo paths,
   same expected decisions) and ctx-inject SessionStart with a JSON payload.
 - **PASS if:** the hooks execute exit 0 and the pre-gate reproduces the F-08 decisions.
-  An EMPTY stdout from ctx-inject on a fresh unbound session is the CORRECT result
-  (generic preflight only — injection is bind-driven), not a failure.
+  On a fresh unbound session ctx-inject prints the GENERIC dispatcher preflight and
+  NO context memory — that non-empty generic output is the CORRECT result (injection
+  is bind-driven). FAIL only if it injects a context's memory without a bind, or
+  crashes.
 
 ---
 **Verdict line (Telegram-short, last line of output):**
