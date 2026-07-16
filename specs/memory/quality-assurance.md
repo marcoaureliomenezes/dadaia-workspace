@@ -12,9 +12,9 @@ tags:
 - ci
 - quality
 - test-architecture
-token_estimate: 460
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+token_estimate: 560
+last_updated: '2026-07-16'
+release_origin: v0.2.5
 ---
 
 ## Purpose
@@ -33,9 +33,13 @@ explicit opt-in.
 | E2E | Complete Python journeys and browser-backed panel behavior. |
 | Live opt-in | Explicit Codex/PI binary and provider validation outside default CI. |
 
-`tests/conftest.py` blocks accidental real PI/Codex invocation unless the corresponding
-live flag is set. Temporary workspaces use pytest `tmp_path` or workspace `.dadaia/tmp/`;
-they never bootstrap the source repo as a consumer workspace.
+`tests/conftest.py` carries two autouse safety backstops: it blocks accidental real
+PI/Codex invocation unless the corresponding live flag is set
+(`DADAIA_E2E_REAL_WORKER` / `DADAIA_PI_LIVE` / `DADAIA_CODEX_LIVE` /
+`DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
+real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
+workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
+workspace. The suite is ~2,700 collected tests, green-serial in 5–10 minutes.
 
 ## Workflow Validation
 
@@ -52,17 +56,24 @@ an explicit operator choice and are never selected implicitly.
 ## Browser Validation
 
 Panel changes are checked through unit DOM/static-asset contracts and Chromium journeys.
-Responsive features are exercised at desktop and mobile viewports. Canvas features
-require nonblank pixel evidence and a state/pixel change after real keyboard or touch
-input. Screenshots and Playwright outputs go outside the repository.
+Responsive checks currently run at desktop widths (1024/1440) only — no mobile viewport
+is exercised yet. Canvas games are asserted as DOM contracts in unit tests; the
+nonblank-pixel-after-input journey is a normative requirement for new canvas work, not
+yet enforced by an existing Playwright test. Screenshots and Playwright outputs go
+outside the repository.
 
 ## CI
 
 CI runs importability, Ruff format/lint, import-linter, mypy strict, unit, contract with
 80% coverage, Windows/macOS cross-platform subsets, integration, Python E2E, panel E2E,
-repository hygiene, backlog doctor, branch/PR governance, and security verdict jobs.
-Release publication repeats the relevant quality ladder before build, approval, publish,
-and package smoke test.
+repository hygiene, backlog doctor, branch/PR governance, security verdict, and a
+gitleaks secret-scan job on every push/PR. Release publication repeats the relevant
+quality ladder before build, approval, publish, and package smoke test.
+
+Internal gates never approve a deploy by themselves: every candidate wheel must pass the
+consumer-side validation matrix shipped in the package
+(`public/data/CONSUMER_VALIDATION_RECIPE.md`, statements F-01..F-23) with verdict
+APROVADA from the operator's consumer-side validator.
 
 ## Anti-Slop
 

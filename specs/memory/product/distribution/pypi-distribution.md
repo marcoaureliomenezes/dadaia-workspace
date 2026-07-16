@@ -17,17 +17,17 @@ tags:
 - release
 - packaging
 token_estimate: 800
-last_updated: '2026-07-07'
-release_origin: v0.1.61
+last_updated: '2026-07-16'
+release_origin: v0.2.5
 ---
 
 ## Purpose
 
 `dadaia-workspace` is a published PyPI package: `pip install dadaia-workspace`
-installs the library and its `dadaia` CLI. The published line is **0.2.x**
-(`pyproject.toml` `version` is the single source; PyPI has been live since the
-0.2.0/0.2.1 publications — PRs #112/#113, post-hoc ratified by the v0.1.61
-operational-change lane). PyPI descriptions are immutable per release: a
+installs the library and its `dadaia` CLI. The published line is **0.2.x**; the last
+PUBLISHED version is `0.2.2` (`pyproject.toml` `version` is the single source and may
+run ahead locally through consumer-validated hotfix wheels — e.g. 0.2.6–0.2.12 —
+that are NOT published until the operator orders the next PyPI release). PyPI descriptions are immutable per release: a
 documentation-only fix to the project page requires a version bump, never an
 in-place edit.
 
@@ -80,7 +80,14 @@ workflows, scripts, schemas, templates, data, scaffold, runtime, personas,
 lifecycle_fragments, pi) **including the in-package plugin packs**
 (`public/plugins/{frontend-design,devops}/` — verified at the v0.1.60 audit), so
 `dadaia init` and `dadaia plugin install` work offline from a bare pip install
-with no network fetch of assets.
+with no network fetch of assets. The wheel also ships
+`public/data/CONSUMER_VALIDATION_RECIPE.md` — the canonical consumer-side
+validation matrix (statements F-01..F-23, verdict APROVADA / BLOQUEADA /
+APROVADA COM EXCEÇÃO EXPLÍCITA) that a consumer-side validator runs against
+EVERY candidate wheel before deploy; internal gates (`certify` included) never
+approve a deploy by themselves. `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes
+workspace-venv bootstraps install the candidate itself instead of pinning the
+(possibly unpublished) version from PyPI.
 
 ## Runtime state touched
 

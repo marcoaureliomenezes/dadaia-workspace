@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 4
-constitution_version: 2.1.0
+constitution_version: 2.1.1
 ---
 
 # Constitution — dadaia-workspace
@@ -208,7 +208,7 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 1. No agent, skill, rule, workflow, fragment, or persona ships without a §7 phase (or
    workflow step) it owns or gates; phase-less artifacts are removed. Plugin stubs are
    the named exemption (§14).
-2. No store without a GC mechanism: every state file, lock, session record, or cache
+2. No store without a GC mechanism: every state file, session record, or cache
    has a defined expiry and cleanup path.
 3. No fact in two sources, no fact in two channels. The constitution states law once;
    memory states mechanism once; skills and personas cite, never duplicate. Injected
@@ -257,5 +257,6 @@ This constitution is versioned (`constitution_version`, semver). An amendment is
 release-gated change: MAJOR for a changed/removed article, MINOR for a new article or
 substantive clarification, PATCH for wording. Amendment history lives in the amending
 releases' CLOSURE files and `_archive/` — never inline in the articles. The
-`specs doctor` invariants (including the no-roster-enumeration check) guard this law's
-consistency with code and memory.
+`specs doctor` invariants (including the no-runtime-kind-enumeration check,
+SPEC-DOC-037 — it forbids enumerating `AgentRuntimeKind`/harness-roster tokens here,
+not the §14 agent table) guard this law's consistency with code and memory.

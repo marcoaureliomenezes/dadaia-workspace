@@ -12,7 +12,7 @@ tags:
 - layer-1
 - projection
 token_estimate: 500
-last_updated: '2026-07-04'
+last_updated: '2026-07-16'
 release_origin: v0.1.58
 ---
 
@@ -56,7 +56,7 @@ batch/workflow execution is delegated to pi/codex workers.
 
 Scaffold projected by `dadaia public install --target claude` (all lib-originated,
 manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin stubs),
-`.claude/skills/` (18), `.claude/rules/` (8), `.claude/workflows/` (2, reference),
+`.claude/skills/` (19), `.claude/rules/` (9), `.claude/workflows/` (2, reference),
 `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
 `--target agents` tree); no `.codex/` or `.pi/` is required. This isolation is now

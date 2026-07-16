@@ -13,7 +13,7 @@ tags:
 - ports
 - ttl
 token_estimate: 750
-last_updated: '2026-07-07'
+last_updated: '2026-07-16'
 release_origin: v0.1.61
 ---
 
@@ -46,6 +46,10 @@ When agents or scripts spawn local dev servers and need to coordinate to avoid p
 Without the registry, parallel agents would overwrite each other's ports — a non-deterministic, hard-to-diagnose bug. TTL + PID tracking avoids slot leaks when processes die unexpectedly; correct `PermissionError` semantics prevent root-owned PIDs (docker-proxy) from being auto-swept; store resilience (per-entry skip-and-log) prevents a single malformed JSON entry from breaking the whole `list_all()`; `scan` provides observability over listeners left outside the registry (push-only was invisible, now reconcilable).
 
 ## Runtime state touched
+
+  * The panel itself obeys this law: `dadaia panel` self-registers its port as
+    `dadaia-panel` before serving and releases the entry on a clean stop
+    (`cli/commands/panel.py`).
 
   * **Read+Write**: `.dadaia/states/server_registry.json` — array of PortEntry with TTL+PID. Resilient load: `JSONDecodeError` or per-entry `KeyError/TypeError/ValueError` emit the structured warning `registry_entry_malformed` + skip; never raise.
   * **Read**: `ss -tlnp` via subprocess (filtered by the current user's uid; ports <1024 skipped); `/proc/<pid>/cmdline` and `/proc/<pid>/cwd` to enrich orphans. If `ss` is absent: returns an empty list + warning.

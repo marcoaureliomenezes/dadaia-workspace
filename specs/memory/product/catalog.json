@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-15T04:45:03Z",
+  "generated_at": "2026-07-16T03:12:11Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -413,7 +413,7 @@
       ],
       "token_estimate": 325,
       "depends_on": [
-        "workspace-init",
+        "public-asset-distribution",
         "context-management"
       ]
     },
@@ -569,7 +569,7 @@
         "backlog",
         "bugs"
       ],
-      "token_estimate": 309,
+      "token_estimate": 380,
       "depends_on": [
         "dadaia-workflows",
         "specs-doctor",

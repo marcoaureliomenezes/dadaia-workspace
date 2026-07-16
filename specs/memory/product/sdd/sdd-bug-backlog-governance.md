@@ -13,8 +13,8 @@ tags:
 - release-lifecycle
 - backlog
 - bugs
-token_estimate: 309
-last_updated: '2026-07-13'
+token_estimate: 380
+last_updated: '2026-07-16'
 release_origin: v0.2.3
 ---
 
@@ -28,6 +28,11 @@ Markdown bug records and never delete bug history.
 Every dadaia-workspace production defect encountered while using the tool is registered
 before the turn ends. Expected validation failures and mistakes in throwaway scripts are
 not product bugs.
+
+**Bug-hotfix doctrine (constitution §1, always-on rule `bug-hotfix-doctrine`):** a bug
+is fixed ON THE SPOT — register → root-cause → RED reproducing test → fix → GREEN →
+`resolved` event with evidence → new wheel to the consumer-side validator. Releases are
+NEVER created to fix bugs; they exist only for backlog feature work.
 
 ## Backlog
 
