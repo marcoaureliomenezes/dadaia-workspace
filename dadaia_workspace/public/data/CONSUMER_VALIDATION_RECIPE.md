@@ -1,139 +1,180 @@
 # Consumer Validation Recipe — dadaia-workspace
 
-**Contract.** This is the canonical end-to-end validation matrix a consumer-side
-validation agent runs against EVERY candidate version, before deploy. It ships with
-the package so recipe and product version never drift. The verdict is exactly one of
-**APROVADA / BLOQUEADA / APROVADA COM EXCEÇÃO EXPLÍCITA**, with persisted evidence
-(command, exit code, output) per feature statement. A green internal gate (`certify`
-included) is never, by itself, validation. Every failure becomes a `dadaia bugs
-append` report (redacted) — a failed statement is a product bug, not a local quirk.
+**Contract.** The canonical end-to-end validation matrix a consumer-side agent runs
+against EVERY candidate wheel before deploy. Ships inside the package so recipe and
+version never drift — always read the copy from the INSTALLED candidate. Verdict is
+exactly one of **APROVADA / BLOQUEADA / APROVADA COM EXCEÇÃO EXPLÍCITA**.
 
-Run everything from the workspace root, with the workspace venv binaries
-(`.dadaia/.venv/bin/dadaia`). Statements marked **[destructive]** run in a throwaway
-copy or a dedicated test context, never against production contexts.
+## How to judge each statement (read first)
 
-## F-01 — Install & identity
-The candidate wheel installs cleanly; `dadaia capabilities` reports schema
-`dadaia-capabilities-v1` and `provider.distribution_version` == the candidate version;
-`dadaia --version`/help render without traceback.
+Each `F-NN` below is one feature with an explicit, binary **PASS assertion**. Run the
+listed commands in the listed setup, capture command+exit+output as evidence, then mark:
 
-## F-02 — Reconcile (exact-version convergence)
-`dadaia reconcile --expect-version <v>` exits 0 on this real, long-lived workspace:
-steps provider-version → state-schema-v2 → legacy-dir-quarantine → public-stage →
-public-install → public-doctor → workspace-doctor → capability-canary all `[ok]`.
-Legacy `.dadaia/bugs`/`.dadaia/src` (if present) end up under
-`.dadaia/tmp/legacy-quarantine/<run>/` with `manifest.json` — moved, never deleted.
-Version mismatch (`--expect-version 9.9.9`) fails cleanly with rollback guidance,
-no state corruption.
+- **PASS** — the PASS assertion is objectively true from the captured output.
+- **FAIL** — the assertion is false (a real defect). Register a `dadaia bugs append`.
+- **EXCEPTION** — the assertion cannot run because the validation environment lacks a
+  prerequisite the wheel does not own (e.g. no Layer-2 model/harness reachable for a
+  live workflow). Record why; an EXCEPTION is NOT a FAIL and does not block on its own.
 
-## F-03 — Certification battery
-`dadaia certify` all PASS — and its verdict must AGREE with F-02 (a certify-green /
-reconcile-red divergence is itself a HIGH bug).
+Do NOT mark FAIL for "not fully demonstrated": every statement here has a crisp
+assertion — if the commands ran and the assertion holds, it is PASS. If a command uses
+a flag/subcommand that does not exist, THAT is a real FAIL (contract/CLI mismatch).
 
-## F-04 — Doctors
-`dadaia doctor`, `dadaia specs doctor`, `dadaia public doctor` each: exit 0 on a
-healthy tree; non-zero with actionable, specific messages on a seeded violation
-**[destructive]** (e.g. stray root file → ROOT-1; unknown `.dadaia` dir → ROOT-4;
-hand-edited projection → drift). No false positives on the canonical layout.
-
-## F-05 — Projections (public assets)
-`dadaia public stage` + `dadaia public install --target all` project byte-identical
-assets to `.claude/`, `.codex/`, `.agents/`, `.pi/`; manifest tracks them; plain
-`install` propagates a source edit (hash mismatch) without `--force`; `public doctor`
-flags `[drift]`/`[missing]` correctly and exits non-zero on drift.
-
-## F-06 — Context lifecycle **[destructive: use a test context]**
-`context create` → `list`/`show --json` (DEAD) → `alive` (clone/scaffold) →
-`bind` → `dead` → `delete`. Each transition idempotent where promised, each guard
-(dead-requires-alive, duplicate create, unknown names) fails with a clear message.
-
-## F-07 — Bind & session identity
-Unbound `context show --json` answers `{"context": null}` exit 0 — no traceback.
-Two `bind`s in one session print the SAME session id (harness-native or
-`DADAIA_SESSION_ID`) and keep ONE record in `.dadaia/sessions/`; `--mode
-implementation|review` requires `--release`; `--print-env` emits eval-safe exports;
-`show --json` after bind reflects context/mode/release ("session" block).
-
-## F-08 — SDD gate & chokepoints
-File-tool write to `specs/bugs|backlog|audits/` always flows (ADDITIVE); write to
-`specs/_archive/` blocks (FROZEN); `.dadaia/sessions/` blocks (PROTECTED);
-`specs/memory/` blocks outside DEFINITION/CLOSURE (MEMORY); a new non-whitelisted
-root entry blocks (root-whitelist); a system `pip`/`dadaia` invocation is corrected
-to the venv (venv-guard). Git: commit with a foreign live presence WARNS but ALLOWS
-(NO-LOCKS); push without a sha-matching security APPROVE handoff is REJECTED; push
-with it passes.
-
-## F-09 — Bugs ledger
-`bugs append --event reported` validates schema (missing field ⇒ non-zero, nothing
-written) and lands in the ACTIVE context's `specs/bugs/bugs.jsonl` (`--context`
-overrides); `resolved` requires `--resolution-evidence`; `bugs status`/`stats`
-aggregate correctly.
-
-## F-10 — Backlog governance
-Backlog doctor blocks a commit of an item missing bound `intents[]` or with an
-unresolvable subject ref; a well-formed item commits.
-
-## F-11 — Lifecycle workflows (the 4 verbs) **[destructive: test context]**
-`dadaia lifecycle backlog-definition | release-definition | implementation-reviews |
-audit` each: assembles fragment+persona prompts, advances only through its Python
-gates, writes step handoffs under the release folder, BLOCKs on a REJECTED review,
-resumes with `--resume-from`, and COMPLETEs leaving the promised artifacts on disk
-(gates verify disk, not prose).
-
-## F-12 — Reports & handoffs
-A generated handoff validates with `dadaia reports validate <file>` (schema
-handoff-v1); a tampered `content_hash` fails validation.
-
-## F-13 — Panel
-`dadaia panel` serves HTTP 200 on a registered port (server registry entry created
-and released); tabs render Workflows/contexts/reports/handoffs from real state; no
-JS console errors on load.
-
-## F-14 — Server registry
-`dadaia server register/list` round-trips; a second registration of a taken port is
-refused with guidance.
-
-## F-15 — Memory & injection
-`dadaia memory` verbs read the bound context's atoms; after `context bind`, the next
-session turn receives the context memory injection exactly once (bind-epoch), and an
-unbound fresh session receives generic preflight only.
-
-## F-16 — Portability **[destructive: throwaway dir]**
-`dadaia export` → `dadaia import` round-trips a workspace (contexts, states, specs)
-byte-faithfully; `dadaia clean` reclaims only what it names beforehand.
-
-## F-17 — Migrations
-`dadaia migrate` helpers upgrade a seeded older tree (specs pattern, bugs JSONL,
-state v2) losslessly; `specs doctor` green after; re-run is a no-op.
-
-## F-18 — Init/onboarding **[destructive: empty dir]**
-`dadaia init` bootstraps a valid workspace from nothing (root law satisfied, venv,
-projections, doctors green).
-
-## F-19 — Plugins
-`dadaia plugin install <pack>` records the ledger and replaces stub agents with real
-bodies; doctor stays green; uninstalled packs keep stubs that refuse work with the
-`[PLUGIN REQUIRED]` message.
-
-## F-20 — Academy
-`dadaia academy` verbs create/read the agent's study area without touching governed
-paths.
-
-## F-21 — CI preflight
-`dadaia ci preflight` runs format/lint/type/tests and blocks on any failure; exit
-codes are truthful (no masked pipes).
-
-## F-22 — Help & docs quality (UX gate)
-Every top-level verb: `--help` states purpose, args, and at least one usage line;
-error messages on misuse name the fix (no raw tracebacks anywhere in the matrix);
-README/AGENTS.md instructions reproduce as written.
-
-## F-23 — Harness canaries
-Projected assets load in each installed harness (Claude/Codex/PI): rules corpus
-readable, hooks fire (PreToolUse gate blocks a seeded violation), ctx-inject
-delivers memory after bind.
+Setup once: `python3 -m venv /tmp/val-venv && /tmp/val-venv/bin/pip install <wheel>`.
+Let `D=/tmp/val-venv/bin/dadaia`. Destructive statements use throwaway dirs under
+`/tmp` — never the production workspace. Where a statement needs an initialized
+workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
 
 ---
-**Discipline:** persist per-statement evidence; register every failure as a bug
-before the run ends; the final verdict message stays SHORT (Telegram-sized): version,
-verdict, counts (statements pass/fail), bug ids, evidence path.
+
+### F-01 — Version & identity
+- Run: `$D --version`; `$D capabilities --json`.
+- **PASS if:** `$D --version` exits 0 and prints the candidate version; and
+  `capabilities` JSON `.provider.distribution_version` equals that same version.
+
+### F-02 — Reconcile with legacy quarantine
+- Setup: an initialized workspace that also contains legacy `.dadaia/bugs/` and
+  `.dadaia/src/` dirs (create them with a file inside).
+- Run: `$D reconcile --expect-version <candidate> --json`.
+- **PASS if:** exit 0, result `.ok == true`, `.steps` contains `legacy-dir-quarantine`,
+  and `.dadaia/tmp/legacy-quarantine/<run>/manifest.json` exists while `.dadaia/bugs`
+  and `.dadaia/src` are gone (moved, not deleted — content present under quarantine).
+
+### F-03 — Certify agrees with reconcile
+- Run: `$D certify --json`.
+- **PASS if:** exit 0 and all checks report pass; and this verdict does not contradict
+  F-02 (certify-green while reconcile-red, or vice versa, is a FAIL of this statement).
+
+### F-04 — Doctors
+- Run in an initialized workspace: `$D doctor`; `$D specs init >/dev/null && $D specs
+  doctor`; `$D public doctor`.
+- **PASS if:** each exits 0 on the clean tree. Then seed one violation (e.g. `mkdir
+  .dadaia/nonsense`) and rerun `$D doctor` — **PASS also requires** it now exits
+  non-zero naming ROOT-4 for the stray dir.
+
+### F-05 — Projections
+- Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
+- **PASS if:** stage+install exit 0 and `public doctor` reports every asset `[ok]`
+  (no `[drift]`/`[missing]`), exit 0.
+
+### F-06 — Context lifecycle
+- Setup: a local source repo (`git init --bare /tmp/f06/src.git`).
+- Run: `$D context create alpha --repo alpha --url file:///tmp/f06/src.git`;
+  `$D context list --json`; `$D context show alpha --json`; `$D context alive alpha`;
+  `$D context dead alpha`.
+- **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones and flips to
+  `alive`; `dead` flips back; and a guard fails cleanly (`$D context dead ghost` exits
+  non-zero with a clear message, no traceback).
+
+### F-07 — Bind & session identity
+- Setup: initialized workspace with one alive context `beta`; export a STABLE id:
+  `export DADAIA_SESSION_ID=f07-fixed`.
+- Run: `$D context show --json` (no bind yet); `$D context bind beta --mode
+  implementation --release r1`; `$D context bind beta --mode implementation --release
+  r1` (again); `ls .dadaia/sessions/*.json | wc -l`.
+- **PASS if:** the unbound `show --json` prints `{"context": null}` exit 0 (no
+  traceback); both binds print the SAME session id (`f07-fixed`); and exactly ONE
+  session record exists after the two binds.
+
+### F-08 — SDD gate & chokepoints
+- Run the projected pre-gate hook directly with JSON payloads (no workflow needed):
+  a Write to `specs/bugs/x.md` (ADDITIVE), to `specs/_archive/x.md` (FROZEN), to
+  `.dadaia/sessions/x` (PROTECTED), and a new root dir.
+- **PASS if:** ADDITIVE returns `allow`; FROZEN and PROTECTED and the new-root-dir
+  return `block` with a reason. (Each is one hook invocation with a deterministic
+  decision — that IS the demonstration.)
+
+### F-09 — Bugs ledger
+- Run: `$D bugs append --event reported --bug-id valbug ...all required fields...`;
+  `$D bugs status`; then `$D bugs append --event reported --bug-id x` (missing fields).
+- **PASS if:** the complete append exits 0 and appears in `bugs status`; the incomplete
+  one exits non-zero and writes nothing.
+
+### F-10 — Backlog governance
+- Run in a workspace with a specs tree: `$D specs doctor --json` (must be valid JSON);
+  add a backlog item missing `intents[]` and run the backlog doctor path.
+- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; the malformed backlog
+  item is flagged BL-SCHEMA.
+
+### F-11 — Lifecycle workflows present & gated
+- Run: `$D lifecycle --help` and each of `backlog-definition|release-definition|
+  implementation-reviews|audit --help`.
+- **PASS if:** all four subcommands exist and their help renders (options, purpose).
+  Actually EXECUTING a workflow needs a Layer-2 model/harness; if none is reachable in
+  the validation env, mark **EXCEPTION** for the live-run portion (not FAIL).
+
+### F-12 — Reports & handoffs
+- Setup: write a minimal valid handoff JSON to a file, and a tampered copy.
+- Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
+- **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
+  (non-zero, names the failure).
+
+### F-13 — Panel
+- Run: `$D panel` bound to a free port in the background; `curl -fsS localhost:<port>/`.
+- **PASS if:** HTTP 200 and the server registry has the port; stop the server after.
+  If the env cannot bind a port, mark **EXCEPTION**.
+
+### F-14 — Server registry
+- Run: `$D server register --port <p> --project val`; `$D server list`; register the
+  same port again.
+- **PASS if:** first register + list round-trip; the duplicate is refused with guidance.
+
+### F-15 — Memory & injection
+- Run in a bound context: `$D memory list` (or the memory catalog verb).
+- **PASS if:** it reads the bound context's atoms without error, exit 0.
+
+### F-16 — Portability
+- Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional);
+  `$D import <archive> --into /tmp/f16b/` (use the verb's real flags from `--help`).
+- **PASS if:** export produces an archive exit 0 and import reconstructs a workspace
+  that passes `$D doctor`.
+
+### F-17 — Migrations
+- Setup: seed an older specs tree (lower pattern version) in a throwaway dir.
+- Run: `$D migrate --help` then the relevant migrate verb; `$D specs doctor` after.
+- **PASS if:** the migrate verb upgrades losslessly and `specs doctor` is green after;
+  re-running the migrate verb is a no-op.
+
+### F-18 — Init / onboarding
+- Run in an empty dir: `$D init --harness all`.
+- **PASS if:** exit 0, `.dadaia/` bootstrapped (venv + projections), and `$D doctor`
+  green afterward. (Init builds a venv — the env must allow PyPI; if egress is blocked
+  mark EXCEPTION with the network cause, else FAIL.)
+
+### F-19 — Plugins
+- Run in an initialized workspace: `$D plugin list`.
+- **PASS if:** it lists installed packs (empty set on a fresh workspace is a valid
+  answer — exit 0, "no plugins", NOT an error). Then `$D plugin install <pack>` records
+  the ledger and doctor stays green. `plugin list` in an UNINITIALIZED dir returning a
+  clean "run init first" message (non-zero) is acceptable, not a FAIL.
+
+### F-20 — Academy
+- Run: `$D academy --help` and a read verb.
+- **PASS if:** the academy verbs exist and read without touching governed paths.
+
+### F-21 — CI preflight
+- Run inside a git repo working tree with the wheel installed: `$D ci preflight` (it
+  gates format/lint/type/tests). Consult `$D ci preflight --help` for required context.
+- **PASS if:** it runs the gate and its exit code truthfully reflects pass/fail. Running
+  it OUTSIDE a repo returning a clear usage error is expected, not a FAIL — run it in a
+  prepared repo to demonstrate the gate.
+
+### F-22 — Help & docs quality
+- Run `--help` on every top-level verb.
+- **PASS if:** each states purpose + usage, and NO invocation in this whole matrix
+  produced a raw Python traceback (a traceback anywhere is a FAIL of this statement).
+
+### F-23 — Harness canaries
+- Run the projected hooks directly: pre-gate (F-08 covers the block path) and
+  ctx-inject SessionStart with a JSON payload.
+- **PASS if:** the hooks execute exit 0 and the pre-gate produces the expected
+  allow/block decisions. An empty stdout from ctx-inject on a fresh unbound session is
+  the CORRECT result (generic preflight only), not a failure.
+
+---
+**Verdict line (Telegram-short, last line of output):**
+`<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
+
+APROVADA requires 0 FAIL. EXCEPTIONs are listed but do not block; note each so the
+operator can decide. Persist per-statement evidence; register every FAIL as a bug
+before the run ends.

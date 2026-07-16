@@ -23,7 +23,18 @@ from pathlib import Path
 #: Only names on this list are ever quarantined — unknown dirs keep failing ROOT-4
 #: loudly (that is the invariant working, and operator-created dirs are never touched
 #: implicitly).
-LEGACY_DADAIA_SUBDIRS: frozenset[str] = frozenset({"bugs", "src"})
+LEGACY_DADAIA_SUBDIRS: frozenset[str] = frozenset(
+    {
+        "bugs",  # legacy bug store — superseded by specs/bugs/bugs.jsonl
+        "src",  # legacy stray (repos.xlsx belongs in public/data)
+        "locks",  # retired by the NO-LOCKS doctrine
+        # Retired ROOT-4 junk-drawer dirs (bug doctor-whitelist-legitimizes-slop-dirs):
+        # no architectural purpose — MCP state -> mcps/, evidence -> tmp/<agent>/<date>/.
+        "figma-bridge",
+        "imgs",
+        "references",
+    }
+)
 
 
 def quarantine_legacy_dadaia_dirs(workspace_root: Path) -> list[str]:
