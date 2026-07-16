@@ -79,9 +79,13 @@ an initialized workspace, create it:
   `$D context dead alpha`.
 - **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND
   commits its own scaffold (repo left clean — `git status --porcelain` empty of
-  tool-created files); `dead` flips back WITHOUT the untracked-consent refusal (the
-  tool must never refuse its own scaffold); and a guard fails cleanly (`$D context
-  dead ghost` exits non-zero with a clear message, no traceback).
+  tool-created files); the freshly-scaffolded context is doctor-clean —
+  `$D specs doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
+  init path must reach a fully clean tree, with `ACTIVE.md`, catalog, and no raw
+  placeholder atom — a fresh context that doctor rejects is a FAIL); `dead` flips back
+  WITHOUT the untracked-consent refusal (the tool must never refuse its own scaffold);
+  and a guard fails cleanly (`$D context dead ghost` exits non-zero with a clear
+  message, no traceback).
 
 ### F-07 — Bind & session identity
 - Setup: initialized workspace with one alive context `beta`; export a STABLE id:
@@ -128,9 +132,18 @@ an initialized workspace, create it:
 ### F-11 — Lifecycle workflows present & gated
 - Run: `$D lifecycle --help` and each of `backlog-definition|release-definition|
   implementation-reviews|audit --help`.
-- **PASS if:** all four subcommands exist and their help renders (options, purpose).
-  Actually EXECUTING a workflow needs a Layer-2 model/harness; if none is reachable in
-  the validation env, mark **EXCEPTION** for the live-run portion (not FAIL).
+- Also assert the **undefined-input guards** (deterministic, no live worker needed):
+  in a context whose `specs/releases/` has NO `<bogus-id>` dir, run
+  `$D lifecycle audit --context <ctx> --release-id <bogus-id> --harness codex` and
+  `$D lifecycle implementation-reviews --context <ctx> --release-id <bogus-id> --harness
+  fake`. Each MUST exit non-zero and MUST NOT create `specs/releases/<bogus-id>/` — a
+  lifecycle verb must reject an undefined release, never synthesize a release tree for it
+  (audit runs against an EXISTING release). Check the exit code directly, not through a pipe.
+- **PASS if:** all four subcommands exist and their help renders (options, purpose); AND
+  both undefined-release invocations are rejected (non-zero) with no synthesized release
+  dir. Actually EXECUTING a workflow to completion needs a Layer-2 model/harness; if none
+  is reachable in the validation env, mark **EXCEPTION** for the live-run portion (not FAIL)
+  — but the reject-undefined guards above run without any model.
 
 ### F-12 — Reports & handoffs
 - Setup: write a minimal valid handoff JSON to a file, and a tampered copy.
@@ -159,11 +172,15 @@ an initialized workspace, create it:
   which masks them.
 
 ### F-15 — Memory & injection
-- Run in a bound context with a scaffolded specs tree:
-  `$D memory product add --help` (verb exists) and
-  `$D memory catalog generate --specs-dir <bound specs dir>`.
-- **PASS if:** both verbs exist and `catalog generate` exits 0, producing/refreshing
-  the catalog from the context's memory `.md` atoms without touching other paths.
+- Setup: a scaffolded specs tree that is doctor-clean (`$D specs init --specs-dir S`;
+  confirm `$D specs doctor --specs-dir S` reports **0 errors AND 0 warnings**).
+- Run: `$D memory product add <slug> --specs-dir S`; `$D memory catalog generate
+  --specs-dir S`; then `$D specs doctor --specs-dir S` again.
+- **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
+  supported "add a feature" path leaves `specs doctor` at **0 errors AND 0 warnings** —
+  the atom emitted by `memory product add` must lint clean out of the box (its template
+  headings are allowlisted). A LINT-1 unknown-heading warning on a freshly added atom is a
+  FAIL: the tool's own template must not violate its own linter.
 
 ### F-16 — Portability
 - Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional);

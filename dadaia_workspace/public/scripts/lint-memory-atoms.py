@@ -60,6 +60,11 @@ _HEADING_GROUP_A_EN: frozenset[str] = frozenset(
         "Differentiator",
         "Runtime state touched",
         "Dependencies",
+        # Canonical headings emitted by the `dadaia memory product add` template
+        # (public/templates/memory-feature.md). A supported "add a feature" atom must
+        # lint clean out of the box (test_memory_feature_template_headings_are_allowlisted).
+        "Current behavior",
+        "Boundaries",
     ]
 )
 
