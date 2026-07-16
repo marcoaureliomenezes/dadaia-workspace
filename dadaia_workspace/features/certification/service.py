@@ -105,6 +105,36 @@ def certify(
             )
         return proc.stdout
 
+
+    def cli_expect_block(expected_step: str, *args: str, extra_env: dict[str, str] | None = None) -> str:
+        """Run a lifecycle verb on the PLAIN fake and assert the v0.2.3 honest-block contract.
+
+        Since v0.2.3 the plain ``--harness fake`` worker deliberately produces no
+        gate-satisfying artifact: the engine must RUN and then BLOCK (exit 3) at the
+        known deterministic gate. That block IS the certification proof — engine,
+        step order, and gate all executed for real (a stub would raise instead).
+        """
+        child_env = {**env, **(extra_env or {})}
+        proc = process.run(
+            [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
+            cwd=target,
+            env=child_env,
+            timeout=180,
+        )
+        if proc.returncode != 3:
+            raise RuntimeError(
+                f"expected honest-block exit 3 at '{expected_step}', got {proc.returncode}: "
+                f"{(proc.stderr or proc.stdout).strip()[:400]}"
+            )
+        payload = json.loads(proc.stdout)
+        blocked_at = (payload.get("blocked") or {}).get("blocked_at_step")
+        if payload.get("status") != "BLOCKED" or blocked_at != expected_step:
+            raise RuntimeError(
+                f"expected BLOCKED at '{expected_step}', got status={payload.get('status')} "
+                f"blocked_at={blocked_at}"
+            )
+        return f"engine ran and honestly blocked at deterministic gate '{expected_step}'"
+
     def check(name: str, action: Callable[[], str | None]) -> None:
         try:
             detail = action() or "passed"
@@ -217,7 +247,8 @@ def certify(
     )
     check(
         "workflow-backlog-definition",
-        lambda: cli(
+        lambda: cli_expect_block(
+            "backlog_review_gate",
             "lifecycle",
             "backlog-definition",
             "--context",
@@ -236,7 +267,8 @@ def certify(
     )
     check(
         "workflow-release-definition",
-        lambda: cli(
+        lambda: cli_expect_block(
+            "plan_create",
             "lifecycle",
             "release-definition",
             "--context",
@@ -252,7 +284,8 @@ def certify(
     )
     check(
         "workflow-audit",
-        lambda: cli(
+        lambda: cli_expect_block(
+            "audit_report",
             "lifecycle",
             "audit",
             "--context",
@@ -277,9 +310,11 @@ def certify(
     check("workflow-definition-git-baseline", commit_definition)
     check(
         "workflow-implementation-reviews",
-        lambda: cli(
+        lambda: cli_expect_block(
+            "implement",
             "lifecycle",
             "implementation-reviews",
+            "--skip-preflight",
             "--context",
             "certified-consumer",
             "--release-id",
