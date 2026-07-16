@@ -6,16 +6,17 @@ tldr: Dual-layer PI runtime with a trusted TypeScript entry extension and a gove
 summary: >-
   PI can enter the workspace interactively after explicit trust and can execute bounded
   Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified
-  Codex-subscription ids; optional OpenRouter profiles remain explicit.
+  Codex-subscription ids; optional OpenRouter profiles remain explicit; headless attempts
+  preserve bytecode-suppression env and report content-delta changed paths.
 tags:
 - harness
 - pi
 - layer-1
 - layer-2
 - projection
-token_estimate: 348
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+token_estimate: 380
+last_updated: '2026-07-14'
+release_origin: v0.2.5
 ---
 
 ## Purpose
@@ -33,9 +34,11 @@ Generated `.pi/**` files contain no secrets and must not be hand-edited.
 ## Layer 2
 
 `PiHeadlessAdapter` invokes `pi --mode json` with the exact governed model id and
-`--thinking` effort. It parses the event stream, validates `agent-run-result-v1`, retains
-redacted diagnostics for malformed/non-zero attempts, and returns artifact references to
-the lifecycle engine.
+`--thinking` effort. It preserves the non-secret `PYTHONDONTWRITEBYTECODE` control in
+its subprocess environment allowlist, parses the event stream, validates
+`agent-run-result-v1`, retains redacted diagnostics for malformed/non-zero attempts, and
+returns artifact references plus Git-derived content-delta `changed_paths` to the
+lifecycle engine.
 
 The built-in PI catalog includes:
 

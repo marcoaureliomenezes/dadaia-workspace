@@ -285,10 +285,32 @@ class Registry:
         return sorted(out, key=lambda a: (a.kind.value, a.id))
 
     def _resolve_in_kind(self, raw_ref: str, kind: SubjectKind) -> BindResult:
-        """Resolve ``raw_ref`` as a direct (non-alias) anchor of ``kind``."""
+        """Resolve ``raw_ref`` as a direct (non-alias) anchor of ``kind``.
+
+        A ref that is not an exact anchor id still binds when it suffix-matches
+        EXACTLY ONE known anchor of the kind on a path boundary (e.g. a worker
+        writing ``snake.py#move`` for the canonical ``src/snake.py#move`` — the
+        common weak-model slip of dropping the leading directories). Zero matches
+        stay UNRESOLVED; more than one is AMBIGUOUS with the candidates named —
+        the unique-suffix rule can never bind the wrong anchor silently.
+        """
         ids = self._anchors.get(kind, set())
         if raw_ref in ids:
             return BindResult(status=BindStatus.RESOLVED, anchor=Anchor(kind=kind, id=raw_ref))
+        suffix_matches = sorted(anchor_id for anchor_id in ids if anchor_id.endswith("/" + raw_ref))
+        if len(suffix_matches) == 1:
+            return BindResult(
+                status=BindStatus.RESOLVED, anchor=Anchor(kind=kind, id=suffix_matches[0])
+            )
+        if len(suffix_matches) > 1:
+            return BindResult(
+                status=BindStatus.AMBIGUOUS,
+                message=(
+                    f"subject ref {raw_ref!r} (kind={kind.value}) suffix-matches multiple "
+                    f"anchors; qualify the path."
+                ),
+                candidates=tuple(suffix_matches),
+            )
         return BindResult(
             status=BindStatus.UNRESOLVED,
             message=(

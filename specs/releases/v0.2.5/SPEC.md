@@ -1,119 +1,164 @@
-# Spec: Supported agent consumer certification - v0.2.5
+# SPEC — Release v0.2.5 — Snake wall wrap for PI workflow validation
 
 > **Status:** Aprovado
-> **Release ID:** v0.2.5
-> **Owner:** product-engineer
-> **Created:** 2026-07-15
 
-## Problem
+**Release ID:** v0.2.5
+**Owner:** product-engineer
+**Source:** backlog `snake-wall-wrap-v025-pi-validation` plus bug
+`release-definition-terminal-gate-leaves-next-workflow-preflight-unsatisfiable`
+**Workflow:** release-definition / spec_create
 
-dadaia-workspace is intended to be the operating environment for humans and
-agents, but a real Hermes consumer exposed gaps that isolated provider tests do
-not catch. Provider wheels, workspace state, public projections, persisted
-prompts, and specs schemas can drift independently. Agent consumers can invoke
-obsolete commands, select the wrong context, miss nested rules and memory, or
-fail inside a lifecycle worker sandbox while the outer command reports only a
-generic artifact failure.
+## 1. Problem
 
-The complete source audit is
-`specs/audits/2026-07-15-hermes-dadaia-integration.md`. This release is its
-mandatory remediation release. No audit finding is accepted or deferred.
+The panel Games tab Snake game currently treats a head coordinate outside the 20×20 board as game-ending/reset behavior. This release changes that wall-contact rule while preserving the rest of the Games tab behavior. The live PI validation also exposed a workflow boundary defect: successful release definition leaves legitimate producer-owned Git state that implementation preflight rejects. This release repairs both bounded outcomes and proves the real consecutive workflow path.
 
-## Product contract
+## 2. Picked scope
 
-### Capability discovery
+### Backlog items
 
-The installed runtime SHALL expose one machine-readable, versioned capability
-document describing its public CLI groups, Spec Context operations, four
-lifecycle workflows, specs standard version, public projection version, panel
-and server surfaces, report/handoff contract, and compatibility requirements.
-Agent prompts and tests SHALL consume this document instead of preserving copied
-command syntax.
+| Item | Disposition in this SPEC |
+|---|---|
+| `specs/backlog/20260714-snake-wall-wrap-v025-pi-validation.md` | Picked. Fully addressed by FR1–FR7. |
 
-### Caller-owned context
+### Bugs
 
-- `context list --json` SHALL return stable structured output.
-- `context heartbeat` SHALL resolve the current session's persisted bind when
-  `DADAIA_SESSION_ID` is not manually exported.
-- Unbound resolution SHALL never select an arbitrary first-ALIVE context.
-- Failure SHALL name the exact explicit bind/context command needed to proceed.
+| Bug | Disposition in this SPEC |
+|---|---|
+| `release-definition-terminal-gate-leaves-next-workflow-preflight-unsatisfiable` | Picked. Solved by FR8. |
 
-### Transactional runtime reconciliation
+### Audit findings
 
-A supported reconciliation operation SHALL verify an exact candidate version,
-migrate state, stage and install all public projections, run public/workspace
-doctors and a capability canary, and only then report promotion success. A
-failed candidate SHALL leave an actionable diagnosis and SHALL NOT claim that
-the workspace is upgraded.
+No live audit finding is picked for this release. Archived audit material supplied to the step is historical context only and does not add release scope.
 
-### Empty repository onboarding
+### Subsumptions
 
-Context onboarding SHALL distinguish materialization from creation of an
-initial Git baseline. An explicit, operator-consented command/flag SHALL create
-the scaffold baseline for an unborn repository. Normal `alive` SHALL remain
-non-committing and non-destructive.
+None. The workflow-boundary bug is independent of the Snake backlog item.
 
-### Lifecycle worker execution
+### Sanitization outcomes
 
-Every real worker dispatch SHALL preflight executable availability, writable
-artifact storage, and harness sandbox compatibility before model work begins.
-Launch failures SHALL retain the root diagnostic and an operator command; an
-exit-zero model response without required artifact evidence SHALL never be
-described as a semantic workflow rejection.
+The authoritative producer output is `snake-wall-wrap-v025-backlog-pi`; candidate-backlog scanning must not substitute a different item. Archived and terminal backlog neighbors remain historical and are not revived, consumed, or re-dispositioned by this release.
 
-### Full-capability certification
+## 3. Functional requirements
 
-The project SHALL ship a deterministic certification entrypoint usable by
-Hermes and other agents in a disposable workspace. It SHALL exercise supported
-interfaces for:
+### FR1 — Horizontal wall crossing wraps instead of ending the game
 
-- workspace initialization and exact-version reconciliation;
-- specs scaffold/templates and specs doctor;
-- context create, alive, list, bind, heartbeat, explicit switching, dead, and
-  empty-remote baseline behavior;
-- public stage/install/doctor and projected Codex/PI structures;
-- all four lifecycle workflows and their state, artifact, block, resume, and
-  evidence contracts;
-- panel HTTP smoke and server registry lifecycle;
-- report/handoff emission and validation;
-- capability discovery and version-matched operational skill loading.
+When the Snake head moves left from `x = 0`, the next head coordinate MUST be `x = 19` with the same `y`. When it moves right from `x = 19`, the next head coordinate MUST be `x = 0` with the same `y`.
 
-The deterministic suite may use fixture workers for repeatability, but closure
-also requires bounded real Codex and PI canaries when those harnesses are
-available. The Hermes repository SHALL run the provider contract against the
-built candidate and its own bootstrap/task path before either release is
-certified.
+Acceptance / verification:
 
-### Complete diagnostics
+- A focused automated regression test drives the Games static Snake logic to move left across the left wall and observes the new head coordinate `(19, same y)` without any reset/game-over side effect.
+- A focused automated regression test drives the same logic to move right across the right wall and observes `(0, same y)` without any reset/game-over side effect.
+- The proof MUST inspect the observable Snake state after a tick; merely asserting that rendering still produces nonblank pixels is insufficient.
 
-Consumer delivery SHALL preserve the full result through bounded message chunks
-or a validated artifact reference. Truncating to the final tail is not compliant.
+### FR2 — Vertical wall crossing wraps instead of ending the game
 
-## Compatibility and migration
+When the Snake head moves up from `y = 0`, the next head coordinate MUST be `y = 19` with the same `x`. When it moves down from `y = 19`, the next head coordinate MUST be `y = 0` with the same `x`.
 
-The release preserves existing human-readable commands. New JSON contracts are
-additive and versioned. Removal of first-ALIVE fallback is an intentional safety
-correction: automation must bind or pass a context explicitly. Upgrade scripts
-that use `latest` must resolve it to an exact candidate before reconciliation.
+Acceptance / verification:
 
-## Security and credential boundary
+- A focused automated regression test drives movement upward across the top wall and observes `(same x, 19)` without reset/game-over.
+- A focused automated regression test drives movement downward across the bottom wall and observes `(same x, 0)` without reset/game-over.
+- The proof MUST use a controlled state/tick seam or equivalent JavaScript execution probe that can distinguish wrapped coordinates from a reset to the starting snake.
 
-Certification uses disposable repositories and workspace-root `.env` only.
-It must never copy, print, persist, or attach credential values. Worker
-diagnostics redact environment payloads and authentication material.
+### FR3 — Wall contact alone does not reset, pause, clear score, or end the game
 
-## Rollback
+Crossing a wall MUST NOT reset the snake body, clear the score, pause the game, or invoke the existing game-over/reset path.
 
-Revert the v0.2.5 implementation commit and reinstall the last certified exact
-version. Re-run its matching projection install. Do not retain v0.2.5 prompts or
-capability assertions against an older wheel.
+Acceptance / verification:
 
-## Acceptance criteria
+- A regression test initializes a non-starting score/body state, crosses a wall, and observes that score and body progression remain consistent with ordinary movement.
+- The test MUST prove the game-over/reset path was not invoked, either by observing stable score/body state that would be reset by that path or by a controlled call-observation hook in the test harness.
 
-- [ ] Every finding in the audit has a terminal implementation and test disposition.
-- [ ] Every reported open bug named by this release has a resolving event with evidence.
-- [ ] Provider unit, integration, feature E2E, and clean-room built-wheel certification pass.
-- [ ] Real Codex and PI lifecycle canaries pass or closure explicitly proves a harness is unavailable rather than silently substituting a fake.
-- [ ] Hermes executes the published full-capability script against the built candidate with zero failed checks and returns complete feedback.
-- [ ] Specs/public/workspace doctors and repository hygiene checks have zero errors.
+### FR4 — Self-collision still uses the existing game-over/reset behavior
 
+The release changes only wall collision semantics. Snake self-collision MUST still end/reset the game through the existing path.
+
+Acceptance / verification:
+
+- A regression test creates a self-collision state and observes the existing game-over/reset outcome.
+- The self-collision test MUST remain separate from wall-wrap tests so a passing wall wrap cannot mask a broken self-collision path.
+
+### FR5 — Food, scoring, and body advancement remain unchanged
+
+Food placement/eating, score increments, and body advancement MUST remain semantically unchanged except for the new wrapped coordinate calculation.
+
+Acceptance / verification:
+
+- A regression test places food at the next head coordinate, executes a tick, and observes the existing score increment and growth behavior.
+- A regression test covers ordinary non-food movement and observes body advancement without growth.
+- Any randomness in food placement MUST be controlled or isolated so the test proves food/score behavior rather than chance placement.
+
+### FR6 — Controls and board dimensions remain stable
+
+The existing keyboard and direction-pad controls, start/pause/reset controls, 20×20 board, and 400×400 Snake canvas MUST remain stable.
+
+Acceptance / verification:
+
+- Existing Games tab asset smoke coverage remains green.
+- Automated coverage asserts the Snake board still uses 20 columns by 20 rows and the existing 400×400 canvas dimensions.
+- Automated coverage asserts the existing direction controls and start/pause/reset controls are still present and wired through the Games tab assets.
+
+### FR7 — Scope containment: no Tetris, non-game panel, runtime dependency, or serving-path change
+
+The rendered Games surface and static asset serving path MUST remain unchanged except as directly required to expose wrapped Snake behavior. Tetris and non-game panel sections MUST NOT change. No new runtime dependency, external asset, framework, or alternate static serving path may be introduced.
+
+Acceptance / verification:
+
+- Static or structural inspection shows `render_games_section` still exposes the same Snake/Tetris surface and controls except for the Snake wall-wrap behavior.
+- Static or structural inspection shows `render_static` continues to serve the updated Games JavaScript from the existing panel static asset path.
+- A diff review confirms no Tetris behavior or non-game panel sections were modified.
+- Dependency metadata remains unchanged unless an existing test tool already in the project is used.
+
+### FR8 — Consecutive workflows must not deadlock on producer-owned Git state
+
+`implementation-reviews` MUST be directly runnable after a successful
+`release-definition` for the same context/release without `--skip-preflight`, a manual
+commit, or a manual push. Git dirtiness, missing upstream, and unpushed commits remain
+visible warnings; the independent commit/push chokepoints remain authoritative.
+
+Worker Ring-2 `changed_paths` MUST contain only paths changed during that worker attempt.
+Pre-existing dirty paths MUST be snapshotted before execution and excluded when untouched,
+while a worker modification to an already-dirty path MUST still be detected by content
+change. This contract applies equally to PI and Codex headless adapters.
+
+Acceptance / verification:
+
+- A regression test drives release-definition success into implementation preflight with
+  producer-owned dirty definition artifacts and proves preflight is OK with warnings.
+- Unit tests prove dirty, missing-upstream, and unpushed Git states warn instead of block.
+- Adapter tests prove untouched pre-existing paths are excluded and modified pre-existing
+  paths are included for both PI and Codex.
+- PI and Codex preserve `PYTHONDONTWRITEBYTECODE` through their environment allowlists so
+  governed workers and reviewers cannot recreate forbidden repo-local bytecode caches.
+- The real PI `v0.2.5` implementation workflow proceeds only with one documented bootstrap
+  override needed to install this fix; subsequent no-override boundary validation passes.
+
+## 4. Non-functional constraints
+
+- Keep the implementation inside the existing panel architecture: CLI wiring remains untouched; panel static assets remain packaged source; no external CDN or JavaScript framework is added.
+- Respect the product memory claim that the panel Games tab contains playable Snake and Tetris with stable controls, score, pause/start, reset, and canvas dimensions.
+- Preserve repository hygiene: no generated test output, cache, Playwright report, or temporary runtime state may be left in the repository.
+
+## 5. Traceability
+
+| Scoped item | Requirement(s) | Acceptance evidence |
+|---|---|---|
+| `snake-wall-wrap-v025-pi-validation` — horizontal wrap | FR1, FR3 | Horizontal wrap regression tests; no reset/game-over observation. |
+| `snake-wall-wrap-v025-pi-validation` — vertical wrap | FR2, FR3 | Vertical wrap regression tests; no reset/game-over observation. |
+| `snake-wall-wrap-v025-pi-validation` — preserve self-collision | FR4 | Dedicated self-collision regression test. |
+| `snake-wall-wrap-v025-pi-validation` — preserve food/score/body movement | FR5 | Food/score and ordinary movement regression tests. |
+| `snake-wall-wrap-v025-pi-validation` — preserve controls and dimensions | FR6 | Games asset smoke tests plus controls/dimensions assertions. |
+| `snake-wall-wrap-v025-pi-validation` — keep rendered surface/static serving path scoped | FR7 | Structural/static inspection and diff review. |
+| `release-definition-terminal-gate-leaves-next-workflow-preflight-unsatisfiable` | FR8 | Consecutive-workflow preflight and per-worker changed-path delta tests. |
+| `pi-headless-drops-bytecode-suppression-and-recreates-repo-caches` | FR8 | PI/Codex environment-projection tests and final full-depth hygiene scan. |
+
+## 6. Out of scope
+
+- Tetris behavior, layout, controls, scoring, and rendering changes.
+- Panel tabs, navigation, non-game sections, panel server security, or telemetry changes.
+- New runtime dependencies, external JavaScript/CSS assets, or alternate asset-serving paths.
+- Memory edits during definition beyond this release SPEC artifact; current product memory remains unchanged until closure if implementation changes the current product truth.
+
+## 7. Review expectations
+
+Reviewers should reject this SPEC if any acceptance criterion cannot be proven through an automated test, controlled JavaScript/state probe, structural/static inspection, or explicit diff evidence. Equal visual rendering alone is not enough to prove that the internal wall-collision path changed from reset to wrap.

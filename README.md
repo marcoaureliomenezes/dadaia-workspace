@@ -36,7 +36,7 @@ Requires Python 3.12+.
 ```bash
 dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .pi/)
 dadaia init --harness claude,pi    # or scaffold only a subset of harnesses (harness profile)
-dadaia doctor                      # health check: contexts, assets, gates, leases
+dadaia doctor                      # health check: contexts, assets, gates, presence
 dadaia panel                       # local dashboard (http://localhost:4999)
 ```
 
@@ -185,25 +185,24 @@ assembled from its **fragment** (the step-specific instruction: inputs, task, ou
 schema) plus its **persona** (the role's mandate), with role-scoped memory context
 injected from the bound Spec Context.
 
-| Workflow | Verb | What it does |
+There are exactly **four** workflows — lean by design, so weaker/cheaper worker
+models produce reliable results from scoped, evidence-grounded prompts:
+
+| Workflow | Verb | Shape |
 |---|---|---|
-| Release definition | `dadaia lifecycle release define` | Bug+backlog pick → grill → SPEC/PLAN/TASKS authoring |
-| Backlog definition | `dadaia lifecycle backlog define` | Turn an operator demand into one consistent backlog entry |
-| Implementation | `dadaia lifecycle implement` | One implementation step on a selectable harness |
-| Implement + review loop | `dadaia lifecycle implement-review` | Bounded implement → review retry loop |
-| Reviews | `dadaia lifecycle review qa\|security\|code` | A single review step (ADDITIVE evidence) |
-| Release pipeline | `dadaia lifecycle pipeline` | implement → qa → security → code, per-step harness mixing |
-| Closure | `dadaia lifecycle close` | CLOSURE.md, memory truth, archive |
-| Audit | `dadaia lifecycle audit` | scope → drift-scan → triage |
-| Research | `dadaia lifecycle research` | scope → investigate → synthesis |
-| Bug report | `dadaia lifecycle bug_report` | intake → dedupe → bug event write |
+| Backlog definition | `dadaia lifecycle backlog-definition` | ONE authoring worker call; a Python review gate validates what actually landed on disk (registry bind + duplicate/conflict classification). `--grill` opts into an evidence-first intake step. |
+| Release definition | `dadaia lifecycle release-definition` | SPEC → merged SPEC review (architecture + QA in one call) → PLAN → PLAN review → TASKS → implementability review → commit gate. A consumed backlog pick skips the scope step; rejected reviews and failed lints auto-revise their create step once in-run. |
+| Implementation + reviews | `dadaia lifecycle implementation-reviews` | implement → ONE combined tri-angle review (QA + security + code) over injected write-set diff + executed test output → close, with a bounded correction loop. |
+| Audit | `dadaia lifecycle audit` | ONE audit_report pass (question, lenses, findings, dispositions); the terminal gate checks referential integrity only. |
+
+Durable step handoffs are **registered in the Spec Context release folder**
+(`specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) — never
+in an opaque runtime path.
 
 ```bash
-dadaia lifecycle pipeline --release-id <id> \
-    --harness claude --step-harness review_security=pi
-dadaia lifecycle status                  # run state
-dadaia lifecycle handoffs list           # per-step handoff ledger
-dadaia lifecycle resume <run-id>         # resume a persisted run
+dadaia lifecycle implementation-reviews --release-id <id> \
+    --harness codex --step-model review_combined=codex-review-deep
+dadaia lifecycle release-definition --release-id <id> --resume-from plan_create
 ```
 
 **Model & harness governance.** Which model and harness each workflow step uses is
@@ -227,7 +226,7 @@ flowchart LR
 ```
 
 - **DEFINITION** — author SPEC/PLAN/TASKS; memory (`specs/memory/`) is writable here.
-- **IMPLEMENTATION** — production code + tests; one MUTATING lease per context.
+- **IMPLEMENTATION** — production code + tests; concurrent sessions surface through advisory presence (no locks).
 - **REVIEWS** — `qa-engineer` (commit gate), `security-reviewer` (push gate),
   `code-reviewer` (PR gate). Reviews are ADDITIVE evidence; they mature the release.
 - **CLOSURE** — write `CLOSURE.md`, update memory truth, archive the release.
@@ -285,12 +284,11 @@ dadaia [COMMAND] --help   # always works at every level
 | Command group | What it does |
 |---|---|
 | `dadaia init` | Bootstrap workspace; `--harness` selects the harness profile |
-| `dadaia doctor [--fix]` | Diagnose and repair workspace state (contexts, assets, leases) |
+| `dadaia doctor [--fix]` | Diagnose and repair workspace state (contexts, assets, presence) |
 | `dadaia context` | Manage Spec Context Projects (list, bind, show, …) |
 | `dadaia lifecycle` | The dadaia-workflows engine (see the workflow table above) |
 | `dadaia plugin` | Install and inspect distributed plugin packs |
 | `dadaia ci` | Local CI-equivalent preflight gate + git-hook chokepoints |
-| `dadaia lock` | Inspect SDD implementation lease records |
 | `dadaia public` | Stage, install (profile-aware), and doctor agentic assets |
 | `dadaia specs` | SDD release-lifecycle structural checks (`specs doctor`) |
 | `dadaia bugs` | Event-sourced JSONL bug telemetry (append/status/stats) |
@@ -330,8 +328,9 @@ dadaia panel                            # http://localhost:4999
 The panel is a local, loopback-bound dashboard (Host-header guarded, no auth on
 loopback). Tabs: **Workflows** (per-workflow diagram cards with inline model
 pickers), **Projects** (Spec Context Projects with clickable memory chips),
-**Sessions cost dashboard**, **Reports**, **Academy**, and **Servers** (the dev
-server registry). It exposes a no-auth health probe for automated checks:
+**Sessions cost dashboard**, **Reports**, **Academy**, **Servers** (the dev server
+registry), and **Games** — four playable canvas games (Snake, Tetris, Pong, Breakout),
+each implemented end-to-end by a Layer-2 worker through the dadaia-workflows. It exposes a no-auth health probe for automated checks:
 
 ```
 GET http://localhost:4999/health   →   {"status": "ok", "version": "<running version>"}

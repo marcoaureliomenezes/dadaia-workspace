@@ -108,13 +108,11 @@ def test_pipeline_completes_full_ladder_and_mixes_harness_per_step() -> None:
     assert result.final_phase is LifecyclePhase.CLOSURE
     assert [s.label for s in result.steps] == [
         "implement",
-        "review_qa",
-        "review_security",
-        "review_code",
+        "review_combined",
         "close",
     ]
     assert all(s.accepted for s in result.steps)
-    # One persisted run advancing through phases (start + 5 steps).
+    # One persisted run advancing through phases (start + 3 steps).
     assert store.saved["run-1"].phase is LifecyclePhase.CLOSURE
 
     mix_store = _MemoryRunStore()
@@ -347,7 +345,7 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     result = pipe.run("run-pfx", implementation_ladder(AgentRuntimeKind.FAKE))
 
     assert result.completed is True
-    assert len(captured) == 5
+    assert len(captured) == 3
     # Every step's worker prompt leads with the SAME cached prefix bytes (WS-7).
     assert all(req.prompt.startswith(prefix.text) for req in captured)
     # No "sonnet"/"opus" tier literals remain (LAW 2): the step model defaults from the

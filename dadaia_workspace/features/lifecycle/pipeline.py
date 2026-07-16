@@ -152,14 +152,15 @@ class PipelineResult:
 #: generic verdict shape) rather than raising — the ladder's 4 canonical labels are always
 #: covered; a future custom review step still produces *a* valid payload.
 _REVIEW_OUTPUT_SCHEMA_BY_LABEL: dict[str, str] = {
+    "review_combined": "combined-review-handoff-v1",
     "review_qa": "qa-review-handoff-v1",
     "review_security": "security-review-handoff-v1",
     "review_code": "code-review-handoff-v1",
 }
 
 _TASK_MARKER_LINE_RES = (
-    # Checklist grammar: ``- [ ] **T01 - title**``.
-    re.compile(r"^\s*-\s*\[(?P<marker>[ x-])\]\s+\*\*\s*T-?[0-9]"),
+    # Checklist grammar: ``- [ ] **T01 - title**`` (bold optional: ``- [ ] T1 - ...``).
+    re.compile(r"^\s*-\s*\[(?P<marker>[ x-])\]\s+(?:\*\*\s*)?T-?[0-9]"),
     # H3 grammar, with the marker before or after the task id/title:
     # ``### [ ] T1 - title`` and ``### T-1 - title `[ ]```.
     re.compile(r"^\s*###\s+(?=.*\bT-?[0-9])[^\n]*?\[(?P<marker>[ x-])\]"),
@@ -279,6 +280,8 @@ class LifecyclePipeline:
                     for step in steps
                     for attempt in range(self._max_review_retries + 1)
                 ),
+                context=self._context,
+                release_id=self._release_id,
             )
         run = LifecycleRun(
             run_id=run_id,
@@ -722,55 +725,29 @@ def implementation_ladder(
             runtime_kind=default_kind,
             model_profile=effort,
             # WS-6: the implementation step runs on the fragment library. Its bundle is
-            # the TDD implement fragment, citing the shared write-scope / anti-slop /
-            # output-handoff disciplines plus the self-verify fragment.
+            # the TDD implement fragment, citing the shared write-scope / anti-slop
+            # disciplines plus the self-verify fragment. The output contract is stated
+            # once by the engine's Required-output section — no shared restatement.
             fragment_id="implementation.implement_tdd",
             shared_fragment_ids=(
                 "shared.write_scope",
                 "shared.anti_slop",
-                "shared.output_handoff",
                 "implementation.self_verify",
             ),
         ),
         PipelineStep(
-            label="review_qa",
-            role="qa-engineer",
+            label="review_combined",
+            role="qa-engineer, security-reviewer, code-reviewer",
             from_phase=LifecyclePhase.QA_REVIEW,
-            target_phase=LifecyclePhase.SECURITY_REVIEW,
-            runtime_kind=default_kind,
-            model_profile=effort,
-            is_review=True,
-            # WS-6: the QA review step is the second fragment-driven pipeline step.
-            # WS-2b (v0.1.43): cite the shared output-handoff verdict contract.
-            fragment_id="implementation.qa_review",
-            shared_fragment_ids=("shared.output_handoff",),
-        ),
-        PipelineStep(
-            label="review_security",
-            role="security-reviewer",
-            from_phase=LifecyclePhase.SECURITY_REVIEW,
-            target_phase=LifecyclePhase.CODE_REVIEW,
-            runtime_kind=default_kind,
-            model_profile=effort,
-            is_review=True,
-            # WS-1a: the security review step runs on the fragment library — an OWASP-style
-            # rubric over the change diff. This step mechanically gates every push, so it
-            # must never fall back to the generic placeholder.
-            fragment_id="implementation.security_review",
-            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
-        ),
-        PipelineStep(
-            label="review_code",
-            role="code-reviewer",
-            from_phase=LifecyclePhase.CODE_REVIEW,
             target_phase=LifecyclePhase.CLOSURE,
             runtime_kind=default_kind,
             model_profile=effort,
             is_review=True,
-            # WS-1b: the code review step runs on the fragment library — a correctness /
-            # code-quality rubric over the change diff.
-            fragment_id="implementation.code_review",
-            shared_fragment_ids=("shared.anti_slop", "shared.output_handoff"),
+            # v0.2.x simplification: ONE tri-angle review (QA + security + code) replaces
+            # the three sequential single-angle reviews — same rubric coverage, one
+            # worker session. This step still mechanically gates the release toward the
+            # push boundary and must never fall back to the generic placeholder.
+            fragment_id="implementation.combined_review",
         ),
         PipelineStep(
             label="close",
@@ -780,11 +757,7 @@ def implementation_ladder(
             runtime_kind=default_kind,
             model_profile=effort,
             fragment_id="implementation.close_release",
-            shared_fragment_ids=(
-                "shared.anti_slop",
-                "shared.output_handoff",
-                "shared.memory_selection",
-            ),
+            shared_fragment_ids=("shared.memory_selection",),
             extra_allowed_paths=(
                 "repos/{context}/specs/releases/{release_id}/**",
                 "specs/releases/{release_id}/**",

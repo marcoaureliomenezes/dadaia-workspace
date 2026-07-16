@@ -84,6 +84,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+    _NO_RELEASE_CONTEXT_COMMANDS,
     MalformedHandoffError,
     RequiredHandoffMissingError,
     WorkflowHandoffResolver,
@@ -148,6 +149,15 @@ class _StepOutcome:
     prompt_text: str | None = None
     runtime_kind: AgentRuntimeKind | None = None
     blocked: BlockedState | None = None
+
+
+def _is_rejected_verdict(blocked: BlockedState | None) -> bool:
+    """True when a block carries an explicit reviewer REJECTED verdict (never transport noise)."""
+    if blocked is None:
+        return False
+    if str(blocked.detail.get("verdict", "")).upper() == "REJECTED":
+        return True
+    return "rejected" in blocked.reason.lower()
 
 
 class _FragmentAssemblyMixin:
@@ -426,8 +436,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         """
         if not sequence:
             raise ValueError(f"{self._WORKFLOW_LABEL} workflow requires at least one step")
-        # Fold each fragment's declared static_inputs into the cacheable prefix once.
-        self._prefix = self._prefix_with_static_inputs(sequence)
+        # Static inputs are folded PER STEP at model-step time (each step pays only for
+        # the static inputs its own fragments declare) — never unioned across the whole
+        # sequence, which taxed every step with every other step's inputs.
         if resume_from is None:
             # Restart semantics: a fresh run over an existing run_id replaces the record
             # (and its ledger), so reclaim the orphaned payload zone first — otherwise the
@@ -441,6 +452,8 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                         for step in sequence
                         if step.fragment_id is not None
                     ),
+                    context=self._context,
+                    release_id=self._zone_release_id(),
                 )
             run = LifecycleRun(
                 run_id=run_id,
@@ -485,6 +498,8 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                         for step in sequence[index:]
                         if step.fragment_id is not None
                     ),
+                    context=self._context,
+                    release_id=self._zone_release_id(),
                 )
             kept = tuple(
                 record
@@ -503,7 +518,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         self._run_store.save(run)
 
         outcomes: list[_StepOutcome] = []
-        for step in remaining:
+        revisions_used: dict[str, int] = {}
+        steps_seq = list(remaining)
+        idx = 0
+        while idx < len(steps_seq):
+            step = steps_seq[idx]
             if step.fragment_id is None:
                 run, outcome = self._run_terminal_gate(run, step, sequence)
             else:
@@ -525,6 +544,20 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                             blocked=post_accept_block,
                         )
                     )
+                    # Deterministic post-accept lint: revise the SAME create step once
+                    # with the lint digest instead of blocking the whole run (the
+                    # release-definition-lint-restart-advice fix, in-run half).
+                    revised = self._begin_revision(
+                        run,
+                        target_label=step.label,
+                        blocked=post_accept_block,
+                        steps_seq=steps_seq,
+                        revisions_used=revisions_used,
+                        budget_key=f"lint:{step.label}",
+                    )
+                    if revised is not None:
+                        run, idx = revised
+                        continue
                     return self._make_result(
                         run_id=run_id,
                         completed=False,
@@ -532,14 +565,32 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                         outcomes=tuple(outcomes),
                         blocked=post_accept_block,
                     )
-            if not outcome.accepted:
-                return self._make_result(
-                    run_id=run_id,
-                    completed=False,
-                    final_phase=run.phase,
-                    outcomes=tuple(outcomes),
-                    blocked=run.blocked,
-                )
+                idx += 1
+                continue
+            # Review REJECTED verdict: one bounded in-run revision of the create step
+            # this review consumes, with the rejection digest injected — the automatic
+            # replacement for a block-and-manual-resume round-trip.
+            if step.is_review and run.blocked is not None and _is_rejected_verdict(run.blocked):
+                target = self._revision_target(step, steps_seq)
+                if target is not None:
+                    revised = self._begin_revision(
+                        run,
+                        target_label=target,
+                        blocked=run.blocked,
+                        steps_seq=steps_seq,
+                        revisions_used=revisions_used,
+                        budget_key=f"review:{step.label}",
+                    )
+                    if revised is not None:
+                        run, idx = revised
+                        continue
+            return self._make_result(
+                run_id=run_id,
+                completed=False,
+                final_phase=run.phase,
+                outcomes=tuple(outcomes),
+                blocked=run.blocked,
+            )
         # Post-completion hook (bug definition-commit-gate-never-repoints-active-md):
         # bodies override to apply their deterministic Python-owned completion effects
         # (e.g. release_definition rewrites ACTIVE.md). Runs only on a FULLY completed
@@ -555,6 +606,84 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
 
     def _on_sequence_completed(self) -> None:
         """Called once after every step of the sequence is accepted. Default: no-op."""
+
+    def _zone_release_id(self) -> str | None:
+        """The release-aware handoff zone this workflow's payloads live in.
+
+        Mirrors ``workflow_handoffs._zone_release_id`` for reclaim-time callers that
+        have no run object yet: a no-release-context command (backlog definition)
+        routes to the shared backlog zone (``None``); everything else to its release.
+        """
+        return None if self._COMMAND in _NO_RELEASE_CONTEXT_COMMANDS else self._release_id
+
+    # -- bounded in-run revision -----------------------------------------
+
+    @staticmethod
+    def _revision_target(step: StepT, steps_seq: list[StepT]) -> str | None:
+        """The create step a rejected review revises: its first consumed non-review model step."""
+        by_label = {s.label: s for s in steps_seq}
+        for producer in step.consumes:
+            candidate = by_label.get(producer)
+            if (
+                candidate is not None
+                and candidate.fragment_id is not None
+                and not candidate.is_review
+            ):
+                return producer
+        return None
+
+    def _begin_revision(
+        self,
+        run: LifecycleRun,
+        *,
+        target_label: str,
+        blocked: BlockedState,
+        steps_seq: list[StepT],
+        revisions_used: dict[str, int],
+        budget_key: str,
+    ) -> tuple[LifecycleRun, int] | None:
+        """Rewind the run to *target_label* once, feeding the block digest into its re-run.
+
+        Returns the reset run + the loop index to continue from, or ``None`` when the
+        revision budget for *budget_key* is spent (at most one revision per gate) — the
+        caller then blocks exactly as before, so worst-case behavior is unchanged.
+        """
+        if revisions_used.get(budget_key, 0) >= 1:
+            return None
+        labels = [s.label for s in steps_seq]
+        if target_label not in labels:
+            return None
+        revisions_used[budget_key] = 1
+        target_idx = labels.index(target_label)
+        resumed_labels = set(labels[target_idx:])
+        self._resume_feedback[target_label] = self._render_prior_block_digest(blocked)
+        if self._handoff_resolver is not None:
+            self._handoff_resolver.reset_run_zone(
+                run.run_id,
+                producer_steps=resumed_labels,
+                worker_output_refs=tuple(
+                    canonical_worker_output_ref(self._context, f"{run.run_id}:{s.label}")
+                    for s in steps_seq[target_idx:]
+                    if s.fragment_id is not None
+                ),
+                context=self._context,
+                release_id=self._zone_release_id(),
+            )
+        kept = tuple(
+            record
+            for record in run.workflow_steps.records
+            if record.producer_step not in resumed_labels
+        )
+        run = replace(
+            run,
+            phase=self._INITIAL_PHASE,
+            status=LifecycleRunStatus.RUNNING,
+            current_step=target_label,
+            blocked=None,
+            workflow_steps=WorkflowStepLedger(records=kept),
+        )
+        self._run_store.save(run)
+        return run, target_idx
 
     # -- model step ------------------------------------------------------
 
@@ -610,8 +739,10 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         kind = step.runtime_kind or self._default_kind
         runtime = self._runtime_factory(kind)
         scope = self._scope(step, run.run_id, suffix)
+        # Per-step prefix: only THIS step's declared static inputs ride along.
+        step_prefix = self._prefix_with_static_inputs((step,))
         built = self._prompt_builder.build(
-            scope, runtime=runtime.runtime_kind(), prefix=self._prefix
+            scope, runtime=runtime.runtime_kind(), prefix=step_prefix
         )
 
         # Python owns the gate, REVIEW-ONLY for the verdict (v0.1.31 / L1). A review step runs

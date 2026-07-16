@@ -1,100 +1,79 @@
-# Closure: Release — v0.2.5
+# Closure: Release - v0.2.5
 
 > **Status:** Aprovado
 > **Release ID:** v0.2.5
 > **Owner:** product-engineer
-> **Closed:** 2026-07-15
+> **Closed:** 2026-07-14
 
 ## Summary
 
-dadaia-workspace now exposes a machine-readable capability contract, exact-version
-transactional reconciliation, caller-owned context binding, safe empty-repository
-baselining, and disposable full-capability certification. Fresh scaffolds are doctor-clean;
-all four lifecycle workflows complete through their Python gates; panel, reports, context
-transitions, public projections, Codex, and PI have executable validation paths.
+v0.2.5 ships the PI-validated Snake wall-wrap release and the lifecycle boundary repair that made the release directly runnable through consecutive real workflows. The panel Games tab Snake game keeps the existing 20x20 board, controls, scoring, reset, and Tetris containment while changing wall contact into toroidal movement across all four edges.
 
-Hermes Crawler now consumes those contracts through canonical commands, full diagnostic
-retention, exact-version update checks, and certification. Its consumer specs are pattern v4
-and doctor-clean.
+The release also makes release-definition output a valid producer for immediate implementation-reviews: Git dirtiness, missing upstream, and unpushed commits are advisory preflight warnings, while PI and Codex worker changed paths are attributed from content deltas around the worker attempt. Both headless adapters preserve `PYTHONDONTWRITEBYTECODE` so governed worker commands do not recreate repository bytecode caches.
 
 ## Tasks completed
 
 | Task ID | Description | Final commit |
-|---------|-------------|--------------|
-| T1 | Enforce caller-owned context contracts | Pending operator commit |
-| T2 | Publish machine-readable capabilities | Pending operator commit |
-| T3 | Make upgrades transactional | Pending operator commit |
-| T4 | Support explicit empty-repository baselines | Pending operator commit |
-| T5 | Preflight lifecycle workers and retain diagnostics | Pending operator commit |
-| T6 | Certify every public feature family | Pending operator commit |
-| T7 | Project version-matched agent mastery | Pending operator commit |
-| T8 | Prove Hermes compatibility and close | Pending operator commit |
+|---|---|---|
+| T1 | Add state-level Snake regression coverage and guarded browser test seam | working tree reviewed before commit; implementation payload `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` |
+| T2 | Implement toroidal Snake head calculation while preserving reset semantics | working tree reviewed before commit; implementation payload `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` |
+| T3 | Add containment assertions for Games markup, static serving, dependencies, and repo hygiene | working tree reviewed before commit; implementation payload `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` |
+| T4 | Make the release-definition to implementation boundary directly runnable | working tree reviewed before commit; implementation payload `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` |
 
 ## Validations
 
 | Description | Command | Evidence |
-|-------------|---------|----------|
-| Provider suite | `python -m pytest -p no:cacheprovider` | `2661 passed, 9 expected skips in 165.84s` |
-| Hermes Crawler suite | `python -m pytest -p no:cacheprovider docker/hermes-crawler/tests` | `50 passed in 1.27s` |
-| Static quality | `ruff check; ruff format --check; mypy dadaia_workspace; lint-imports --no-cache` | `814 files formatted; 323 source files typed; 10 contracts kept, 0 broken` |
-| Live Codex contract | `DADAIA_CODEX_LIVE=1 pytest tests/integration/codex_live` | `2 passed in 202.40s` |
-| Live PI contract | `DADAIA_E2E_REAL_WORKER=1 DADAIA_PI_LIVE=1 pytest tests/integration/pi_live` | `3 passed in 280.73s` |
-| Built wheel install | `pip install dadaia_workspace-0.2.5-py3-none-any.whl` | `installed 0.2.5 with declared dependencies and no invalid-extra warning` |
-| Built wheel certification | `dadaia certify --json` | `ok=true; provider=0.2.5; 16/16 checks PASS` |
-| Consumer specs | `dadaia specs doctor --specs-dir repos/dadaia-agents/specs` | `0 errors, 0 warnings` |
-
-Final wheel:
-
-```text
-/home/ubuntu/workspace/.dadaia/tmp/release-v025-certified-final/wheelhouse/dadaia_workspace-0.2.5-py3-none-any.whl
-sha256 da094518e88c92ef47f5c58cccda64c2055bbdc17b488389967fca845db9edbd
-```
+|---|---|---|
+| Focused implementation validation | `cd repos/dadaia-workspace && PYTHONDONTWRITEBYTECODE=1 ../../.dadaia/.venv/bin/python -m pytest -p no:cacheprovider tests/e2e/panel/test_snake_wall_wrap.py tests/unit/features/panel/test_games_tab.py tests/unit/features/lifecycle/test_preflight_service.py tests/unit/infrastructure/test_pi_runtime.py tests/unit/infrastructure/test_codex_exec_runtime.py tests/integration/cli/test_lifecycle_workflow_chain.py` | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` records `102 passed in 1.12s`. |
+| QA review | `cd repos/dadaia-workspace && PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /home/ubuntu/workspace/.dadaia/.venv/bin/python -m pytest -p no:cacheprovider tests/unit/features/panel/test_games_tab.py tests/e2e/panel/test_snake_wall_wrap.py tests/unit/features/lifecycle/test_preflight_service.py tests/integration/cli/test_lifecycle_workflow_chain.py tests/unit/infrastructure/test_codex_exec_runtime.py tests/unit/infrastructure/test_pi_runtime.py` | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_qa-attempt-0.step-payload.json` records `102 passed in 1.11s` and `verdict: APPROVED`. |
+| Workflow handoff coherence for this release | `cd repos/dadaia-workspace && PYTHONDONTWRITEBYTECODE=1 /home/ubuntu/workspace/.dadaia/.venv/bin/dadaia reports workflow-doctor --json && PYTHONDONTWRITEBYTECODE=1 /home/ubuntu/workspace/.dadaia/.venv/bin/dadaia reports workflow-handoffs-doctor --context dadaia-workspace --release-id v0.2.5 --json` | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_qa-attempt-0.step-payload.json` records workflow-doctor with no findings and release-filtered workflow-handoffs-doctor `ok=true`. |
+| Repository hygiene | `cd repos/dadaia-workspace && find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name test-results -o -name playwright-report -o -name .mypy_cache -o -name .ruff_cache -o -name .hypothesis -o -name coverage \) -print \| wc -l` | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_qa-attempt-0.step-payload.json` records `0 forbidden generated cache/artifact directories found`. |
+| Security review | working-tree security review of the implemented diff | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_security-attempt-0.step-payload.json` records `verdict: APPROVED` and no confirmed secrets, dependency CVEs, IaC exposure, injection path, auth bypass, or public-asset privacy leak. |
+| Code review | working-tree code review of the implemented diff | `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_code-attempt-0.step-payload.json` records `verdict: APPROVED` with passing architecture, design-pattern, test-coverage, security, performance, and dead-code axes. |
+| Specs structure and memory catalog | `PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/dadaia specs doctor` | `0 error(s), 4 warning(s)`; warnings are pre-existing legacy archive/audit warnings unrelated to v0.2.5. |
 
 ## Drifts
 
-### static-quality-debt
+### Bootstrap override before no-override proof
 
-**Description:** The final ladder exposed mypy errors, stale import-linter entries, broken
-architecture edges, and Ruff drift that ordinary runtime tests did not surface.
+**Description:** The first live PI implementation path needed a documented bootstrap override to install the lifecycle-boundary fix that allows producer-owned release-definition Git state to pass into implementation preflight.
 
-**Resolution:** Types were made explicit, a missing human `--show-policy` printer was
-implemented, certification process control moved behind a core port, presence reads became
-injected, ignored-import debt was ratcheted, and the repository was canonically formatted.
+**Resolution:** The subsequent `snake-wall-wrap-v025-impl-pi-nooverride4` run exercised the repaired no-override path and produced approved QA, security, and code-review payloads. The closure cites only durable run-scoped step payloads from that accepted no-override run for terminal evidence.
 
-**Memory updates:** `specs/memory/tech-stack.md` and Codex harness memory now match the
-verified runtime and quality contract.
+**Memory updates:** `specs/memory/product/sdd/lifecycle-foundation.md`, `specs/memory/product/harness/harness-pi.md`, and `specs/memory/product/harness/harness-codex.md` now describe advisory Git preflight, content-delta changed-path attribution, and bytecode-suppression environment preservation.
 
-### codex-runtime-facts-changed
+### Snake behavior required product-memory precision
 
-**Description:** Codex CLI 0.144.4 now fires projected hooks in headless exec, contradicting
-historical 0.139 behavior and old doctor/skill prose.
+**Description:** Product memory previously stated only that the panel includes playable Snake and Tetris. The shipped behavior now includes a specific Snake wall-contact rule that affects current product truth.
 
-**Resolution:** Live probes now assert headless and TUI parity; doctor, mastery skills,
-shared harness literacy, and product memory report the current fact and require re-probing
-after future CLI upgrades.
+**Resolution:** The panel atom now states that Snake wraps across all four walls on the 20x20 board while keeping self-collision on the reset path and preserving the existing controls and Tetris containment.
 
-**Memory updates:** `specs/memory/product/harness/harness-codex.md`,
-`specs/memory/product/index.md`, and generated catalog.
+**Memory updates:** `specs/memory/product/panel/panel.md`, plus regenerated `specs/memory/product/catalog.json` and `specs/memory/product/index.md`.
 
 ## Memory updates
 
-- `specs/memory/product/harness/harness-codex.md` — current hook parity and
-  `workspace-write` lifecycle default.
-- `specs/memory/product/index.md` and `catalog.json` — regenerated from atom frontmatter.
-- `specs/memory/tech-stack.md` — live-certified Codex CLI and release toolchain facts.
+- `specs/memory/product/panel/panel.md` - records wall-wrapping Snake behavior, self-collision reset preservation, and state-level wall-wrap validation.
+- `specs/memory/product/sdd/lifecycle-foundation.md` - records advisory Git preflight warnings and Git content/existence-delta worker `changed_paths` attribution.
+- `specs/memory/product/harness/harness-pi.md` - records PI headless bytecode-suppression environment preservation and Git-derived content-delta `changed_paths`.
+- `specs/memory/product/harness/harness-codex.md` - records Codex headless bytecode-suppression environment preservation and Git-derived content-delta `changed_paths`.
+- `specs/memory/product/catalog.json` and `specs/memory/product/index.md` - regenerated from atom frontmatter after the memory updates.
+- `specs/memory/architecture.md` - no change; the existing feature/infrastructure/lifecycle layer boundaries remain true.
+- `specs/memory/tech-stack.md` - no change; the release did not alter language, dependency, runtime, or model inventory.
 
 ## Dispositions
 
 | File | Kind | Terminal status | Evidence |
-|------|------|-----------------|----------|
-| `specs/bugs/bugs.jsonl` | event-sourced bug ledger | all v0.2.5 findings resolved | `dadaia bugs status --specs-dir specs` reports `0 open bug(s)` |
+|---|---|---|---|
+| `specs/backlog/20260714-snake-wall-wrap-v025-pi-validation.md` | backlog | `DELIVERED - v0.2.5` | Snake FR1-FR7 implementation and QA evidence in `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json` and `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/review_qa-attempt-0.step-payload.json`. |
+| `specs/bugs/bugs.jsonl#release-definition-terminal-gate-leaves-next-workflow-preflight-unsatisfiable` | bug | `resolved` | FR8 implementation and no-override workflow validation in `.dadaia/runs/lifecycle/snake-wall-wrap-v025-impl-pi-nooverride4/steps/implement-attempt-0.step-payload.json`, QA approval, and code-review approval. |
+| `specs/bugs/bugs.jsonl#pi-headless-drops-bytecode-suppression-and-recreates-repo-caches` | bug | `resolved` | PI/Codex environment allowlist tests, final hygiene scan, QA approval, and security approval in the no-override run payloads. |
+
+The current closure worker write scope does not include backlog or bug ledger files, so this closure records the product dispositions and leaves any ledger/frontmatter terminal-event materialization to the workflow path that owns those additive files.
 
 ## Backlog returns
 
-None. Every defect discovered during implementation and certification was fixed in this
-release rather than deferred.
+None.
 
 ## Archive decision
 
-**KEEP** — retain the release in `specs/releases/` until the operator creates the final
-commit; archive movement is intentionally not performed from an uncommitted working tree.
+**KEEP FOR WORKFLOW FINALIZATION** - this closure step writes `CLOSURE.md`, updates memory, and resets `specs/releases/ACTIVE.md` to `release: none` / `phase: none`. The current worker write scope does not include `specs/_archive/**`, so no archive move is performed by this step.

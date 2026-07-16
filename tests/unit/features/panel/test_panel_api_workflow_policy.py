@@ -191,7 +191,7 @@ def test_harness_dimension_default_and_override(tmp_path: Path) -> None:
     [
         pytest.param("implementation_reviews", 200, None, id="detail-known-workflow-200"),
         pytest.param("nope", 404, "not_found", id="detail-unknown-workflow-404"),
-        pytest.param("../etc", 400, "invalid_workflow_id", id="detail-traversal-id-400"),
+        pytest.param("../etc", 404, "not_found", id="detail-traversal-id-404"),
     ],
 )
 def test_catalog_detail(
@@ -231,17 +231,17 @@ def test_profiles_registry_and_pi_model_choices() -> None:
     pi_values = [c["value"] for c in choices["pi"]]
     assert "moonshotai/kimi-k2.5:high" in pi_values
     assert set(pi_values) == {
-        "openai-codex/gpt-5.5:high",
-        "openai-codex/gpt-5.5:low",
-        "openai-codex/gpt-5.5:medium",
+        "openai-codex/gpt-5.3-codex-spark:high",
+        "openai-codex/gpt-5.3-codex-spark:low",
+        "openai-codex/gpt-5.3-codex-spark:medium",
         "moonshotai/kimi-k2.5:high",
     }
 
     kimi = next(c for c in choices["pi"] if c["value"] == "moonshotai/kimi-k2.5:high")
     assert kimi["label"] == "OpenRouter — moonshotai/kimi-k2.5 (high)"
 
-    gpt = next(c for c in choices["pi"] if c["value"] == "openai-codex/gpt-5.5:high")
-    assert gpt["label"] == "openai-codex/gpt-5.5 (high)"
+    gpt = next(c for c in choices["pi"] if c["value"] == "openai-codex/gpt-5.3-codex-spark:high")
+    assert gpt["label"] == "openai-codex/gpt-5.3-codex-spark (high)"
     assert "moonshotai/kimi-k2.5:high" not in [c["value"] for c in choices["codex"]]
 
 
@@ -263,7 +263,7 @@ def _run_with_snapshot(
                 step="implement",
                 harness="codex",
                 model_profile=profile,
-                model="gpt-5.5",
+                model="gpt-5.3-codex-spark",
                 reasoning="medium",
                 source=PolicySource.LIBRARY_DEFAULT,
             ),

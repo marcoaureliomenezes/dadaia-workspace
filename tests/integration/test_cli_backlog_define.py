@@ -29,6 +29,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")  # explicit rung
     return tmp_path
 
 
@@ -38,8 +39,6 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
         [
             "lifecycle",
             "backlog-definition",
-            "--context",
-            "dadaia-workspace",
             "--release-id",
             "v0.1.26",
             "--harness",
@@ -47,25 +46,23 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.output
+    # The author-first sequence runs for real: the fake worker writes NO backlog item,
+    # so the REAL post-authoring review gate honestly blocks (proof the gate validates
+    # disk state, not a threaded demand). Exit code 3 = BLOCKED, never a crash.
+    assert result.exit_code == 3, result.output
     payload = json.loads(result.output)
-    assert payload["status"] == "OK"
-    assert payload["completed"] is True
-    assert payload["final_phase"] == "release_definition"
+    assert payload["status"] == "BLOCKED"
+    assert payload["completed"] is False
     labels = [step["label"] for step in payload["steps"]]
-    # The §4 seven-step sequence runs in order — proof it is the real workflow, not _deferred.
     assert labels == [
         "intake_grill",
-        "subject_bind",
-        "existing_backlog_review",
-        "reconcile_decision",
-        "conflict_resolution_grill",
         "backlog_author",
         "backlog_review_gate",
     ]
-    # Model steps carry their fragment id (no generic "Run the step" stub).
+    # The grill is opt-in and skipped by default — zero model calls spent on it.
     intake = next(s for s in payload["steps"] if s["label"] == "intake_grill")
-    assert intake["fragment_id"] == "backlog_definition.intake_grill"
-    # The conditional grill is skipped on a clean demand.
-    grill = next(s for s in payload["steps"] if s["label"] == "conflict_resolution_grill")
-    assert grill["skipped"] is True
+    assert intake["skipped"] is True
+    author = next(s for s in payload["steps"] if s["label"] == "backlog_author")
+    assert author["fragment_id"] == "backlog_definition.backlog_authoring"
+    assert payload["blocked"]["blocked_at_step"] == "backlog_review_gate"
+    assert "no new/changed item" in payload["blocked"]["reason"]

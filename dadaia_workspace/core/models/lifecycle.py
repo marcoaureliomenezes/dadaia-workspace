@@ -72,7 +72,12 @@ TRANSITIONS: dict[LifecyclePhase, frozenset[LifecyclePhase]] = {
     # FR4 (v0.1.56): the review phases advance forward or block only. The three
     # review->implementation backtrack edges were unused table entries (no production
     # path took them); the operator-driven rework path is BLOCKED -> IMPLEMENTATION.
-    LifecyclePhase.QA_REVIEW: frozenset({LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.BLOCKED}),
+    # QA_REVIEW -> CLOSURE: the combined single-review ladder (v0.2.x simplification)
+    # runs one tri-angle review under QA_REVIEW and advances straight to CLOSURE; the
+    # SECURITY_REVIEW edge stays for any legacy three-review sequence.
+    LifecyclePhase.QA_REVIEW: frozenset(
+        {LifecyclePhase.SECURITY_REVIEW, LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}
+    ),
     LifecyclePhase.SECURITY_REVIEW: frozenset({LifecyclePhase.CODE_REVIEW, LifecyclePhase.BLOCKED}),
     LifecyclePhase.CODE_REVIEW: frozenset({LifecyclePhase.CLOSURE, LifecyclePhase.BLOCKED}),
     LifecyclePhase.CLOSURE: frozenset({LifecyclePhase.BLOCKED}),

@@ -170,9 +170,7 @@ def test_build_workflow_model_profile_registry_catalog_and_policy_store(tmp_path
     assert impl is not None
     assert [s.label for s in impl.steps] == [
         "implement",
-        "review_qa",
-        "review_security",
-        "review_code",
+        "review_combined",
         "close",
     ]
 

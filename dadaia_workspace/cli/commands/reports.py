@@ -761,10 +761,9 @@ def workflow_doctor(
             console.print(f"[{finding.severity.value}] {finding.code.value}: {finding.message}")
         if coherence.ok and not coherence.findings:
             console.print("[green]OK[/green] fragment coherence")
-        for coherence_finding in coherence.findings:
+        for coh_finding in coherence.findings:
             console.print(
-                f"[{coherence_finding.severity.value}] {coherence_finding.code.value}: "
-                f"{coherence_finding.message}"
+                f"[{coh_finding.severity.value}] {coh_finding.code.value}: {coh_finding.message}"
             )
     has_error = any(finding.severity is Severity.ERROR for finding in findings) or any(
         finding.severity is CoherenceSeverity.ERROR for finding in coherence.findings

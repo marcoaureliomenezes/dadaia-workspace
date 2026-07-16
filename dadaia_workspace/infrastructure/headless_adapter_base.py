@@ -29,6 +29,7 @@ import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -261,6 +262,17 @@ class _GitDiffPort(Protocol):
     def diff_name_only(self, path: Path) -> tuple[str, ...]: ...
 
 
+@dataclass(frozen=True)
+class _PathContentState:
+    """Content/existence state for a git-reported changed path before a worker attempt."""
+
+    exists: bool
+    content: bytes | None
+
+
+GitChangedPathSnapshot = dict[str, _PathContentState]
+
+
 class RedactionMixin:
     """Secret-scrub surfaced output using the host environment.
 
@@ -305,10 +317,38 @@ class ChangedPathsMixin:
     _git: _GitDiffPort | None
     _cwd_for_diff: Path
 
-    def _with_changed_paths(self, result: AgentRunResult) -> AgentRunResult:
+    def _snapshot_changed_paths(self) -> GitChangedPathSnapshot | None:
+        if self._git is None:
+            return None
+        return {
+            path: self._path_content_state(path)
+            for path in self._git.diff_name_only(self._cwd_for_diff)
+        }
+
+    def _path_content_state(self, path: str) -> _PathContentState:
+        target = self._cwd_for_diff / path
+        if not target.is_file():
+            return _PathContentState(exists=False, content=None)
+        try:
+            return _PathContentState(exists=True, content=target.read_bytes())
+        except OSError:
+            return _PathContentState(exists=False, content=None)
+
+    def _with_changed_paths(
+        self,
+        result: AgentRunResult,
+        before_snapshot: GitChangedPathSnapshot | None = None,
+    ) -> AgentRunResult:
         if self._git is None:
             return result
-        changed = self._git.diff_name_only(self._cwd_for_diff)
+        if before_snapshot is None:
+            changed = self._git.diff_name_only(self._cwd_for_diff)
+            if not changed:
+                # Legacy direct-call behaviour for callers that did not snapshot an
+                # attempt: an empty diff is structurally blind, not proof of a no-op.
+                return result
+        else:
+            changed = self._changed_paths_since(before_snapshot)
         structured = dict(result.structured_output)
         structured["changed_paths"] = ",".join(changed)
         return AgentRunResult(
@@ -322,6 +362,16 @@ class ChangedPathsMixin:
             # this rebuild must never silently discard the evidence the adapter attached.
             diagnostic=result.diagnostic,
         )
+
+    def _changed_paths_since(self, before_snapshot: GitChangedPathSnapshot) -> tuple[str, ...]:
+        after_paths = set(self._git.diff_name_only(self._cwd_for_diff)) if self._git else set()
+        changed: list[str] = []
+        for path in sorted(after_paths | set(before_snapshot)):
+            before = before_snapshot.get(path)
+            after = self._path_content_state(path)
+            if before is None or before != after:
+                changed.append(path)
+        return tuple(changed)
 
 
 #: Preamble that turns a persona mandate into an OPERATIVE DIRECTIVE (v0.1.44 / AC-2). The

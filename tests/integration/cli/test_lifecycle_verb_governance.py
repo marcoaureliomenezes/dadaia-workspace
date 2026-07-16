@@ -69,8 +69,8 @@ _VERBS: list[tuple[str, list[str], str, str, str, str]] = [
         ["audit"],
         "gov-audit",
         "audit",
-        "audit_scope",
-        "audit_scope",
+        "audit_report",
+        "audit_report",
     ),
 ]
 
@@ -84,6 +84,9 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(tmp_path)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     return tmp_path
 
 
@@ -144,8 +147,6 @@ def test_verb_persists_resolver_derived_snapshot(
     argv = [
         "lifecycle",
         *subcmd,
-        "--context",
-        _CONTEXT,
         "--release-id",
         _RELEASE,
         "--run-id",

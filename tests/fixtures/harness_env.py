@@ -141,17 +141,18 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 #:   - ``DADAIA_MODE`` — the operator-shell mode escape, order (1) of
 #:     ``hooks/sdd_gate._resolve_mode``. Harness-never-set (scrubbed from subprocess env)
 #:     but read from the environment by design when an operator exports it.
-#:   - ``DADAIA_BOOTSTRAP_PACKAGE`` — release-engineering local-wheel input read by
-#:     ``infrastructure/python_env`` so an unpublished exact candidate can bootstrap.
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
+        # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
+        # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
+        # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
+        "DADAIA_BOOTSTRAP_PACKAGE",
         "DADAIA_AGENTS_DIR",
         "DADAIA_WORKFLOWS_DIR",
         "DADAIA_AGENT_RUNTIME",
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
-        "DADAIA_BOOTSTRAP_PACKAGE",
         # Operator/test path-override knob read by production in
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR/DADAIA_WORKFLOWS_DIR above.

@@ -2,18 +2,19 @@
 slug: harness-codex
 title: Harness — Codex
 category: product
-tldr: 'Dual-layer Codex harness with projected hooks in TUI and headless exec, a governed CODEX_EXEC worker, and independent git chokepoints.'
+tldr: 'Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.'
 summary: Capability and scaffold truth for the Codex harness at both agentic layers —
-  shared hook enforcement, the CODEX_EXEC worker transport, model
-  catalog, and what a Codex-only workspace installation contains.
+  interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport,
+  content-delta changed-path attribution, bytecode-suppression environment preservation,
+  model catalog, and what a Codex-only workspace installation contains.
 tags:
 - harness
 - codex
 - layer-1
 - layer-2
 - projection
-token_estimate: 930
-last_updated: '2026-07-15'
+token_estimate: 980
+last_updated: '2026-07-14'
 release_origin: v0.2.5
 ---
 
@@ -38,15 +39,17 @@ the echo, the pin, and explicit `--harness fake`).
 2. Interactive sessions get the deterministic gate: PreToolUse `pre_gate` (matcher
    `^(apply_patch|Edit|Write|Bash)$`) + matcher-less PostToolUse heartbeat, registered
    in `.codex/hooks.json` via self-locating wrappers under `.dadaia/hooks/codex-*`.
-3. **Headless parity:** current `codex exec` fires SessionStart, UserPromptSubmit,
-   PreToolUse, and PostToolUse hooks. The live verification harness is
-   `tests/integration/codex_live/` (opt-in `DADAIA_CODEX_LIVE=1`): it drives a real
-   Codex binary against a throwaway trusted workspace under `.dadaia/tmp/` and
-   re-proves both headless and TUI hook contracts repeatably. Git chokepoints remain
-   independent enforcement and do not depend on harness hook execution.
+3. **Headless asymmetry (honesty):** `codex exec` fires NO hooks (upstream codex-cli
+   defect, live-verified) — headless enforcement is chokepoints-only. The live
+   verification harness is `tests/integration/codex_live/` (opt-in
+   `DADAIA_CODEX_LIVE=1`): it drives a real Codex binary against a throwaway trusted
+   workspace under `.dadaia/tmp/` and re-proves these contract facts repeatably.
 4. As a Layer-2 worker: the engine builds the exec argv (model `(id, effort)` discrete;
-   no approval flag — exec never prompts), pipes the fragment+persona prompt, and
-   extracts the result via the shared strict-schema-first extraction.
+   no approval flag — exec never prompts), preserves the non-secret
+   `PYTHONDONTWRITEBYTECODE` control in the subprocess environment allowlist, pipes the
+   fragment+persona prompt, extracts the result via the shared strict-schema-first
+   extraction, and returns Git-derived content-delta `changed_paths` rather than trusting
+   model self-report.
 5. **Trust + sandbox posture (v0.1.66, FR4/FR5).** `CodexExecAdapter._command` includes
    `--skip-git-repo-check` unconditionally alongside `--ignore-user-config`, so a
    governed worker never fails codex's own "Not inside a trusted directory" trust
@@ -59,12 +62,11 @@ the echo, the pin, and explicit `--harness fake`).
    var; the resolved value — whether from the caller or the env — is always validated
    against `{read-only, workspace-write, danger-full-access}` (an unrecognized value
    raises at construction, never passed through blind to `codex exec`); the
-   compiled-in lifecycle default is `workspace-write`, because every governed worker must
-   materialize step output and handoff artifacts. An explicit `read-only` value remains
-   accepted for diagnostic/no-write uses but fails the lifecycle writable-artifact
-   preflight. The override also exists because the sandbox mechanism (`bwrap`) can fail
-   inside constrained containers ("loopback: Failed RTM_NEWADDR: Operation not permitted");
-   `danger-full-access` is the explicit bwrap-free unblock for an isolated trusted worker.
+   compiled-in default stays `read-only` when the env var is unset (no silent security
+   posture downgrade for operators who never set it). The override exists because the
+   `read-only` default's underlying sandbox mechanism (`bwrap`) can fail inside
+   constrained containers ("loopback: Failed RTM_NEWADDR: Operation not permitted");
+   `danger-full-access` is the confirmed bwrap-free unblock for that case.
 
 ## Typical trigger
 
@@ -76,8 +78,8 @@ whose governed harness resolves to `codex` (model catalog: `(gpt-5.5, high)`,
 
 Runs on the operator's Codex subscription. Command policy is expressed natively as
 Starlark `.codex/rules/*.rules` (prefix rules, venv-form paths) — not in config keys.
-Hook parity is asserted against the current supported Codex CLI. Do not infer future
-harness behavior from prose: run the opt-in live contract after a Codex CLI upgrade.
+The interactive/headless enforcement split is the key operational fact: never assume a
+hook fired in an exec run.
 
 ## Runtime state touched
 
@@ -102,5 +104,5 @@ profile ([[workspace-init]]) — not merely documented.
 
 - [[tech-stack]] — roster + model catalog single source.
 - [[lifecycle-foundation]] — the engine that drives the CODEX_EXEC worker.
-- [[sdd-gate-v3]] — gate + independent git chokepoint mechanism.
+- [[sdd-gate-v3]] — gate + chokepoint mechanism, incl. the headless asymmetry.
 - [[public-asset-distribution]] — the `.codex/` projection pipeline.

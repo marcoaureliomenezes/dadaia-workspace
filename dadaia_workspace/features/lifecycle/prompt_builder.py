@@ -103,17 +103,10 @@ def _materialization_instruction(scope: PromptScope) -> str:
     ref = canonical_worker_output_ref(scope.context, scope.task_id)
     return (
         "## Mandatory evidence materialization\n"
-        f"Use your write tool to create exactly `{ref}` before returning the result. "
-        "Put the exact substantive `agent-run-result-v1` JSON object in that temporary "
-        "step-output file, then use your read tool to "
-        "read it back and confirm it exists. Set `artifact_refs` to include exactly "
-        f"`{ref}`. Never invent a timestamped alternative, never claim "
-        "`handoff_validated` before the read-back succeeds, and never return the final "
-        "result object while this file is absent. Resolve this relative reference only "
-        "beneath the outer prompt envelope's `execution_root`; do not infer a different "
-        "workspace from global skills or configuration. Do not write this raw result "
-        "under `.dadaia/handoff`; Python owns promotion into the immutable run-scoped "
-        "workflow handoff ledger."
+        f"Write your `agent-run-result-v1` JSON object to exactly `{ref}` (relative to "
+        "the prompt envelope's `execution_root`), read it back to confirm it exists, and "
+        f"set `artifact_refs` to include exactly `{ref}`. Use no other path for this file; "
+        "Python promotes it into the workflow handoff ledger."
     )
 
 
@@ -311,13 +304,6 @@ class LifecyclePromptBuilder:
             },
             "expected_schema": scope.expected_schema,
             "required_evidence": [kind.value for kind in scope.required_evidence],
-            "output_contract": {
-                "structured_output": {
-                    "verdict": "APPROVED|REJECTED",
-                    "changed_paths": "comma-separated workspace-relative paths",
-                },
-                "artifact_refs": "workspace-relative evidence paths",
-            },
         }
         return json.dumps(payload, indent=2, sort_keys=True)
 

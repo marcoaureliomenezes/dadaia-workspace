@@ -94,7 +94,7 @@ def test_per_step_default_invariants() -> None:
     # review/gate worker steps default to a deep-reasoning profile; worker steps to standard.
     impl = get_dadaia_workflow("implementation_reviews")
     assert impl is not None
-    review = next(s for s in impl.steps if s.label == "review_qa")
+    review = next(s for s in impl.steps if s.label == "review_combined")
     implement = next(s for s in impl.steps if s.label == "implement")
     assert review.default_harness is not None
     assert implement.default_harness is not None
@@ -115,7 +115,7 @@ def test_governed_catalog_and_resolver_contract() -> None:
     impl = catalog.workflow("implementation_reviews")
     assert impl is not None
     labels = {s.label for s in impl.steps}
-    assert {"implement", "review_qa", "review_security", "review_code", "close"} <= labels
+    assert {"implement", "review_combined", "close"} <= labels
 
     # every governed step's default profile resolves and matches the harness.
     for workflow in catalog.workflows:
@@ -203,8 +203,6 @@ def test_exact_four_workflows_and_merged_closure() -> None:
     audit = get_dadaia_workflow("audit")
     assert audit is not None
     assert [s.label for s in audit.steps] == [
-        "audit_scope",
-        "drift_scan",
-        "triage",
+        "audit_report",
         "audit_disposition_gate",
     ]

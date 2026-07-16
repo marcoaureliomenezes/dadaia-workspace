@@ -267,11 +267,19 @@ def test_handoff_without_declared_deliverable_gets_one_correction_attempt(
     handoff = tmp_path / handoff_ref
     handoff.parent.mkdir(parents=True, exist_ok=True)
     handoff.write_text(json.dumps({"summary": "handoff only"}), encoding="utf-8")
+    # Disk truth: the zone must be EMPTY on attempt 1 (an existing zone file counts as
+    # delivered); the corrected attempt materializes the deliverable itself.
     spec_ref = "specs/releases/v1/SPEC.md"
-    spec = tmp_path / spec_ref
-    spec.parent.mkdir(parents=True, exist_ok=True)
-    spec.write_text("# SPEC\n", encoding="utf-8")
-    runtime = _SequenceRuntime(
+
+    class _DeliverOnRetryRuntime(_SequenceRuntime):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            if len(self.requests) == 1:  # the correction attempt delivers for real
+                spec = tmp_path / spec_ref
+                spec.parent.mkdir(parents=True, exist_ok=True)
+                spec.write_text("# SPEC\n", encoding="utf-8")
+            return super().run(request)
+
+    runtime = _DeliverOnRetryRuntime(
         [
             _result(verdict=None, artifact_refs=()),
             _result(verdict=None, artifact_refs=(spec_ref,)),
@@ -383,9 +391,9 @@ def test_create_step_out_of_scope_artifact_refs_still_block() -> None:
 
 def test_ladder_review_steps_marked_is_review_implement_step_is_not() -> None:
     ladder = implementation_ladder(AgentRuntimeKind.FAKE)
-    review_labels = {"review_qa", "review_security", "review_code"}
+    review_labels = {"review_combined"}
     review_steps = tuple(s for s in ladder if s.label in review_labels)
-    assert len(review_steps) == 3
+    assert len(review_steps) == 1
     for step in review_steps:
         assert step.is_review is True
 
@@ -399,7 +407,7 @@ def test_ladder_review_steps_marked_is_review_implement_step_is_not() -> None:
 @pytest.mark.parametrize("verdict", [None, "REJECTED"], ids=["missing", "rejected"])
 def test_pipeline_review_steps_block_on_missing_or_rejected_verdict(verdict: str | None) -> None:
     ladder = implementation_ladder(AgentRuntimeKind.FAKE)
-    review_labels = {"review_qa", "review_security", "review_code"}
+    review_labels = {"review_combined"}
     review_steps = tuple(s for s in ladder if s.label in review_labels)
     for step in review_steps:
         blocked = _gate(
@@ -409,3 +417,41 @@ def test_pipeline_review_steps_block_on_missing_or_rejected_verdict(verdict: str
         assert blocked is not None, f"{step.label} should block on {verdict!r} verdict"
         expected = _VERDICT_REASON if verdict is None else _REJECTED_REASON
         assert blocked.reason == expected
+
+
+def test_parsed_stdout_payload_is_materialized_when_worker_skipped_the_write(
+    tmp_path: Path,
+) -> None:
+    """Bug class: a weak worker emits a perfect envelope on stdout but never writes the
+    canonical step-output file. Python holds the parsed payload — it materializes the
+    file itself and the gate passes with ZERO extra worker sessions."""
+    request = replace(_request(), task_id="run-1:backlog_author")
+    ref = canonical_worker_output_ref(request.context, request.task_id or "")
+    assert not (tmp_path / ref).exists()
+    stdout_only = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="authored the item",
+        artifact_refs=(ref,),  # claims the canonical path it never wrote
+        structured_output={},
+        domain_payload={"summary": "authored the item", "action": "new"},
+    )
+    runtime = _SequenceRuntime([stdout_only])
+
+    result, blocked = LifecycleAgentRunner(
+        runtime=runtime, artifact_root=tmp_path
+    ).evaluate_gate_with_result(
+        _run(),
+        AgentRunnerInput(
+            request=request,
+            target_phase=LifecyclePhase.RELEASE_DEFINITION,
+            current_step="backlog_author",
+            is_review=False,
+        ),
+    )
+
+    assert blocked is None
+    # One worker session only — no structural retry was spent on the missing file.
+    assert len(runtime.requests) == 1
+    assert (tmp_path / ref).is_file()
+    assert result.domain_payload is not None
+    assert result.domain_payload["action"] == "new"

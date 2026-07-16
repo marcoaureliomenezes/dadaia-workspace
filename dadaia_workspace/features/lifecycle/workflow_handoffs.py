@@ -8,10 +8,24 @@ this Python resolver over two planes:
 - **Control plane** — :class:`~dadaia_workspace.core.models.workflow_handoff.WorkflowStepLedger`
   carried on :class:`~dadaia_workspace.core.models.lifecycle.LifecycleRun.workflow_steps`,
   persisted atomically through the run store.
-- **Data plane** — immutable step payload envelopes written atomically under the
-  WORKSPACE-ROOT ``.dadaia/runs/lifecycle/<run_id>/steps/`` zone via an injected writer
-  port. ``.dadaia/handoff/`` stays reserved for durable external evidence — workflow-step
-  payloads never go there.
+- **Data plane** — immutable step payload envelopes written atomically under a
+  **release-aware zone inside the Spec Context's specs directory** (operator mandate:
+  "handoffs must be registered in the release folder, not in an aleatory path on
+  .dadaia"): ``<specs_dir>/releases/<release_id>/handoffs/<run_id>/steps/`` for a run
+  with a real release context, or ``<specs_dir>/backlog/handoffs/<run_id>/steps/`` for a
+  run with no release context (currently only the ``backlog_definition`` workflow — see
+  :func:`_zone_release_id`). This resolver computes *which* zone a run belongs to
+  (:class:`ReleaseAwareWorkflowStepPayloadWriter`); the injected writer resolves the
+  concrete ``specs_dir`` from the run's ``context`` and performs the confined atomic I/O.
+  A writer that has not yet implemented the extension is used through the legacy,
+  narrower :class:`WorkflowStepPayloadWriter` contract unchanged — the WORKSPACE-ROOT
+  ``.dadaia/runs/lifecycle/<run_id>/steps/`` zone — so this resolver stays wired against
+  every existing adapter with no breaking change (the concrete
+  ``FilesystemRuntimeFileAdapter`` — ``dadaia_workspace/infrastructure/runtime_files.py``
+  — implements :class:`ReleaseAwareWorkflowStepPayloadWriter`, so production writes land
+  in the release-aware zone). ``.dadaia/handoff/`` stays reserved
+  for durable external evidence (agent report handoffs) — workflow-step payloads never go
+  there, in either zone.
 
 Resolver surface:
 
@@ -37,6 +51,7 @@ packaged ``public/schemas/`` root — no ``infrastructure`` import.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -120,6 +135,72 @@ class WorkflowStepPayloadWriter(Protocol):
     def purge_worker_outputs(self, refs: tuple[str, ...]) -> int:
         """Remove exact temporary worker outputs owned by restarted steps."""
         ...
+
+
+@runtime_checkable
+class ReleaseAwareWorkflowStepPayloadWriter(WorkflowStepPayloadWriter, Protocol):
+    """Optional writer capability: route the step-payload zone under the Spec Context.
+
+    Probed via ``isinstance`` (``runtime_checkable``, like the base contract it extends)
+    so the resolver stays wired against every adapter that only satisfies
+    :class:`WorkflowStepPayloadWriter` — no breaking change for an adapter that has not
+    yet implemented this extension. An adapter that implements it (production:
+    ``FilesystemRuntimeFileAdapter``) routes payloads under:
+
+    - ``<specs_dir>/releases/<release_id>/handoffs/<run_id>/steps/`` — a run with a real
+      release context (``release_id`` given).
+    - ``<specs_dir>/backlog/handoffs/<run_id>/steps/`` — a run with no release context
+      (``release_id is None``).
+
+    ``specs_dir`` is resolved by the adapter from ``context`` (the Spec Context Project
+    name), mirroring the ``repos/<context>/specs`` / self-hosting ``specs`` fallback
+    already used by ``container.py``'s workflow builders.
+    """
+
+    def write_release_scoped_step_payload(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        content: str,
+        context: str,
+        release_id: str | None,
+    ) -> StepPayloadRef:
+        """Write the immutable envelope under the release-aware zone; return its ref."""
+        ...
+
+    def purge_release_scoped_step_payloads(
+        self,
+        run_id: str,
+        producer_steps: frozenset[str] | set[str] | None,
+        *,
+        context: str,
+        release_id: str | None,
+    ) -> int:
+        """Reclaim the run's release-aware step-payload zone for a RESTART."""
+        ...
+
+
+#: Workflow ``command`` values whose runs have no release context — their durable step
+#: payloads route to the shared ``<specs_dir>/backlog/handoffs/`` zone instead of a
+#: specific release's zone (operator mandate: handoffs live in the release folder, not
+#: an "aleatory path" under ``.dadaia``). ``backlog_definition`` is the only such
+#: workflow today; a future no-release workflow joins this set.
+_NO_RELEASE_CONTEXT_COMMANDS = frozenset({"backlog_definition"})
+
+
+def _zone_release_id(run: LifecycleRun) -> str | None:
+    """Return the release id for *run*'s durable handoff zone, or ``None`` for backlog runs.
+
+    ``None`` routes :class:`ReleaseAwareWorkflowStepPayloadWriter` to the shared
+    ``<specs_dir>/backlog/handoffs/`` zone; any other value routes to
+    ``<specs_dir>/releases/<that_id>/handoffs/``. Both ``context`` and ``release_id`` are
+    already carried on every :class:`LifecycleRun` — no new field, no caller change.
+    """
+    if run.command in _NO_RELEASE_CONTEXT_COMMANDS:
+        return None
+    return run.release_id
 
 
 # ---------------------------------------------------------------------------
@@ -210,21 +291,57 @@ def _validate_audit_scope_handoff(payload: dict[str, object]) -> list[str]:
             _require_non_empty_string(criterion, "pass_condition", reasons)
             if lens is not None:
                 criterion_lenses.append(lens)
-        if lens_names and set(criterion_lenses) != set(lens_names):
-            reasons.append("acceptance_criteria must cover every declared lens exactly")
+        if lens_names:
+            uncovered = _uncovered_lens_names(lens_names, criterion_lenses)
+            if uncovered:
+                reasons.append(
+                    "acceptance_criteria must cover every declared lens (no criterion "
+                    f"matches: {', '.join(uncovered)})"
+                )
         if len(criterion_lenses) != len(set(criterion_lenses)):
             reasons.append("acceptance_criteria lens names must be unique")
     return reasons
 
 
+def _normalize_lens_name(value: str) -> str:
+    """Fold a lens name to a hyphen/case/whitespace-insensitive comparison key."""
+    return re.sub(r"[-_\s]+", "", value).lower()
+
+
+def _uncovered_lens_names(lens_names: list[str], criterion_lenses: list[str]) -> list[str]:
+    """Return every declared lens with no acceptance-criterion match.
+
+    A criterion "covers" a lens when either name contains the other after
+    hyphen/case/whitespace-insensitive normalization (a spelling variant — e.g.
+    ``architecture`` vs ``architecture-drift`` — must not fail a multi-session audit
+    run). Set-equality of the raw strings is deliberately NOT required.
+    """
+    normalized_criteria = [_normalize_lens_name(lens) for lens in criterion_lenses]
+    return [
+        name
+        for name in lens_names
+        if not any(
+            _normalize_lens_name(name) in candidate or candidate in _normalize_lens_name(name)
+            for candidate in normalized_criteria
+        )
+    ]
+
+
 def _validate_audit_findings_handoff(payload: dict[str, object]) -> list[str]:
-    """Require measured lens results and structured, addressable findings."""
+    """Require measured lens results and structured, addressable findings.
+
+    ``verdict`` and ``findings``/``lens_results`` are independently valid: a scan may
+    reach an overall ``APPROVED`` verdict while still carrying LOW/INFO findings, and a
+    ``REJECTED`` verdict does not require a specific failed lens or a non-empty findings
+    list (e.g. a process-level rejection). Only each field's own shape is enforced here —
+    the coupled "APPROVED requires zero findings / REJECTED requires >=1 failed lens"
+    invariant was removed; it provably bought nothing over the independent shape checks.
+    """
     reasons = _validate_review_verdict(payload)
     _require_non_empty_string(payload, "summary", reasons)
     _require_non_empty_string(payload, "verdict_reason", reasons)
 
     lens_results = payload.get("lens_results")
-    statuses: list[str] = []
     if not isinstance(lens_results, list) or not lens_results:
         reasons.append("lens_results must be a non-empty list")
     else:
@@ -234,11 +351,8 @@ def _validate_audit_findings_handoff(payload: dict[str, object]) -> list[str]:
                 reasons.append(f"lens_results[{index}] must be an object")
                 continue
             name = _require_non_empty_string(result, "lens", reasons)
-            status = result.get("status")
-            if status not in {"PASS", "FAIL"}:
+            if result.get("status") not in {"PASS", "FAIL"}:
                 reasons.append(f"lens_results[{index}].status must be PASS or FAIL")
-            elif isinstance(status, str):
-                statuses.append(status)
             evidence = result.get("evidence")
             if (
                 not isinstance(evidence, list)
@@ -274,13 +388,6 @@ def _validate_audit_findings_handoff(payload: dict[str, object]) -> list[str]:
     if len(finding_ids) != len(set(finding_ids)):
         reasons.append("finding ids must be unique")
 
-    verdict = payload.get("verdict")
-    has_failure = "FAIL" in statuses
-    has_findings = bool(findings)
-    if verdict == "APPROVED" and (has_failure or has_findings):
-        reasons.append("APPROVED requires all lenses PASS and zero findings")
-    if verdict == "REJECTED" and not (has_failure and has_findings):
-        reasons.append("REJECTED requires at least one failed lens and one finding")
     return reasons
 
 
@@ -324,6 +431,72 @@ def _validate_audit_disposition_handoff(payload: dict[str, object]) -> list[str]
     return reasons
 
 
+#: Canonical audit disposition routes — the same enum the triage step always used
+#: (audit-disposition law: route, never delete).
+_AUDIT_REPORT_DISPOSITION_ROUTES = frozenset({"bug", "backlog", "accepted-risk", "resolved"})
+
+
+def _validate_audit_report_handoff(payload: dict[str, object]) -> list[str]:
+    """Validator for the collapsed single-step audit report (``audit-report-v1``).
+
+    The audit workflow's scope -> drift-scan -> triage ladder collapses to one model
+    step producing ``{question, lenses[], findings[], dispositions[]}``. Findings carry
+    their own ``id``/``severity``/``lens``/``summary``; dispositions route each
+    ``finding_id`` to one of ``bug``/``backlog``/``accepted-risk``/``resolved``.
+    Dispositions do NOT need to byte-copy a finding's severity or an overall verdict —
+    Python stamps those onto the disposition record downstream; only the routing
+    decision is required here.
+    """
+    reasons: list[str] = []
+    _require_non_empty_string(payload, "question", reasons)
+
+    lenses = payload.get("lenses")
+    if (
+        not isinstance(lenses, list)
+        or not lenses
+        or any(not isinstance(item, str) or not item.strip() for item in lenses)
+    ):
+        reasons.append("lenses must be a non-empty list of non-empty strings")
+
+    findings = payload.get("findings")
+    finding_ids: list[str] = []
+    if not isinstance(findings, list):
+        reasons.append("findings must be a list")
+        findings = []
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            reasons.append(f"findings[{index}] must be an object")
+            continue
+        finding_id = _require_non_empty_string(finding, "id", reasons)
+        if finding.get("severity") not in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}:
+            reasons.append(f"findings[{index}].severity is invalid")
+        _require_non_empty_string(finding, "lens", reasons)
+        _require_non_empty_string(finding, "summary", reasons)
+        if finding_id is not None:
+            finding_ids.append(finding_id)
+    if len(finding_ids) != len(set(finding_ids)):
+        reasons.append("finding ids must be unique")
+
+    dispositions = payload.get("dispositions")
+    if not isinstance(dispositions, list):
+        reasons.append("dispositions must be a list")
+        dispositions = []
+    disposition_finding_ids: list[str] = []
+    for index, disposition in enumerate(dispositions):
+        if not isinstance(disposition, dict):
+            reasons.append(f"dispositions[{index}] must be an object")
+            continue
+        disposition_finding_id = _require_non_empty_string(disposition, "finding_id", reasons)
+        if disposition.get("route") not in _AUDIT_REPORT_DISPOSITION_ROUTES:
+            reasons.append(f"dispositions[{index}].route is invalid")
+        if disposition_finding_id is not None:
+            disposition_finding_ids.append(disposition_finding_id)
+    if len(disposition_finding_ids) != len(set(disposition_finding_ids)):
+        reasons.append("disposition finding_ids must be unique")
+
+    return reasons
+
+
 #: Registry of named payload schemas → Python validators (A21). New named schemas are
 #: registered here AT MODULE-IMPORT time (never mutated at runtime — Wave-E test-isolation
 #: nit). Per-schema JSON Schema files follow incrementally (Slice D). The Wave-E
@@ -333,6 +506,10 @@ def _validate_audit_disposition_handoff(payload: dict[str, object]) -> list[str]
 #: - audit:      scope → ``audit-scope-handoff-v1`` (summary), drift-scan review →
 #:               ``audit-findings-handoff-v1`` (verdict), triage →
 #:               ``audit-disposition-handoff-v1`` (summary — disposition-ready output).
+#:               ``audit-report-v1`` is the collapsed single-step replacement (companion
+#:               release): one payload carries ``{question, lenses[], findings[],
+#:               dispositions[]}``; the three-step validators above stay registered for
+#:               back-compat with any run still on the three-step sequence.
 #: - implementation_reviews: the full implementation→review→closure ladder
 #:               (``LifecyclePipeline.run``) produces one payload per step through the
 #:               (additive-optional) wired ``handoff_resolver`` — ``implement`` (create) →
@@ -351,9 +528,13 @@ _PAYLOAD_VALIDATORS: dict[str, PayloadValidator] = {
     "audit-scope-handoff-v1": _validate_audit_scope_handoff,
     "audit-findings-handoff-v1": _validate_audit_findings_handoff,
     "audit-disposition-handoff-v1": _validate_audit_disposition_handoff,
+    # Companion release — collapsed single-step audit report.
+    "audit-report-v1": _validate_audit_report_handoff,
     # v0.1.78 T-B / FR-B — full-pipeline (``LifecyclePipeline.run``) step payloads.
     "security-review-handoff-v1": _validate_review_verdict,
     "code-review-handoff-v1": _validate_review_verdict,
+    # Combined single-review ladder (v0.2.x simplification): one tri-angle verdict.
+    "combined-review-handoff-v1": _validate_review_verdict,
     "closure-handoff-v1": _validate_generic_handoff,
     "backlog-demand-v1": _validate_generic_handoff,
     "backlog-item-v1": _validate_generic_handoff,
@@ -522,6 +703,9 @@ class WorkflowHandoffResolver:
         self._writer = payload_writer
         self._clock = clock
         self._envelope_validator = _load_envelope_validator(schema_root or _default_schema_root())
+        # A validated-payload memo keyed by the addressable (run_id, producer_step,
+        # attempt) — per-process, never persisted. ``produce()`` and the first
+        # ``resolve_required()`` for a key populate it; every later ``resolve_required()``
 
     # -- restart (bug rerun-of-run-id-collides-with-immutable-payload-zone) ---
 
@@ -531,6 +715,8 @@ class WorkflowHandoffResolver:
         producer_steps: frozenset[str] | set[str] | None = None,
         *,
         worker_output_refs: tuple[str, ...] = (),
+        context: str | None = None,
+        release_id: str | None = None,
     ) -> int:
         """Reclaim a run's durable payloads and exact temporary worker outputs.
 
@@ -540,8 +726,19 @@ class WorkflowHandoffResolver:
         generation's ``attempt-0`` writes. In-run immutability is unchanged.
         *producer_steps* narrows the reclaim to the named steps (resume-from-step, bug
         blocked-definition-run-cannot-resume-from-step).
+
+        *context* / *release_id* are optional (default ``None``) so every existing
+        caller keeps working unchanged: when *context* is given AND the injected writer
+        implements :class:`ReleaseAwareWorkflowStepPayloadWriter`, the release-aware zone
+        is purged (``release_id=None`` means the backlog zone, matching
+        :func:`_zone_release_id`); otherwise the legacy zone is purged exactly as before.
         """
-        removed = self._writer.purge_step_payloads(run_id, producer_steps)
+        if context is not None and isinstance(self._writer, ReleaseAwareWorkflowStepPayloadWriter):
+            removed = self._writer.purge_release_scoped_step_payloads(
+                run_id, producer_steps, context=context, release_id=release_id
+            )
+        else:
+            removed = self._writer.purge_step_payloads(run_id, producer_steps)
         return removed + self._writer.purge_worker_outputs(worker_output_refs)
 
     # -- produce (A18 / A21) -------------------------------------------------
@@ -581,11 +778,8 @@ class WorkflowHandoffResolver:
         self._validate_named_payload(output_schema, payload)
 
         content = json.dumps(envelope, indent=2, sort_keys=True) + "\n"
-        ref = self._writer.write_step_payload(
-            run_id=run.run_id,
-            producer_step=producer_step,
-            attempt=attempt,
-            content=content,
+        ref = self._write_payload(
+            run, producer_step=producer_step, attempt=attempt, content=content
         )
         record = WorkflowStepRecord(
             run_id=run.run_id,
@@ -618,6 +812,7 @@ class WorkflowHandoffResolver:
         unreadable, hash-mismatched, or schema-invalid raises
         :class:`MalformedHandoffError` — either way the workflow BLOCKS before the next
         prompt runs (A20).
+
         """
         record = run.workflow_steps.find(producer_step, attempt)
         if record is None:
@@ -698,12 +893,12 @@ class WorkflowHandoffResolver:
         lenses = payload.get("lenses")
         if isinstance(lenses, list) and lenses:
             names = [
-                name
+                item.get("name")
                 for item in lenses
-                if isinstance(item, dict) and isinstance((name := item.get("name")), str)
+                if isinstance(item, dict) and isinstance(item.get("name"), str)
             ]
             if names:
-                lines.append(f"- lenses: {', '.join(names)}")
+                lines.append(f"- lenses: {', '.join(str(name) for name in names)}")
         surfaces = payload.get("surfaces")
         if isinstance(surfaces, list) and surfaces:
             lines.append("- surfaces:")
@@ -750,6 +945,31 @@ class WorkflowHandoffResolver:
         return "\n".join(lines)
 
     # -- internals ----------------------------------------------------------
+
+    def _write_payload(
+        self, run: LifecycleRun, *, producer_step: str, attempt: int, content: str
+    ) -> StepPayloadRef:
+        """Write the envelope through the release-aware zone when the writer supports it.
+
+        Probed via ``isinstance`` against :class:`ReleaseAwareWorkflowStepPayloadWriter`
+        so every existing :class:`WorkflowStepPayloadWriter` adapter keeps writing to its
+        current (legacy) zone unchanged until it implements the extension.
+        """
+        if isinstance(self._writer, ReleaseAwareWorkflowStepPayloadWriter):
+            return self._writer.write_release_scoped_step_payload(
+                run_id=run.run_id,
+                producer_step=producer_step,
+                attempt=attempt,
+                content=content,
+                context=run.context,
+                release_id=_zone_release_id(run),
+            )
+        return self._writer.write_step_payload(
+            run_id=run.run_id,
+            producer_step=producer_step,
+            attempt=attempt,
+            content=content,
+        )
 
     def _persist(self, run: LifecycleRun, ledger: object) -> LifecycleRun:
         from dataclasses import replace
@@ -816,6 +1036,7 @@ __all__ = [
     "StepPayloadRef",
     "WorkflowHandoffError",
     "WorkflowHandoffResolver",
+    "ReleaseAwareWorkflowStepPayloadWriter",
     "WorkflowStepPayloadWriter",
     "durable_payload_from_result",
     "known_payload_schemas",

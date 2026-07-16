@@ -19,8 +19,6 @@ from dadaia_workspace.features.lifecycle.fragments.loader import (
 # (fragment id, declared output schema) per SPEC §4.
 _EXPECTED = {
     "backlog_definition.intake_grill": "backlog-demand-v1",
-    "backlog_definition.conflict_scan": "overlap-report-v1",
-    "backlog_definition.conflict_resolution_grill": "conflict-resolution-v1",
     "backlog_definition.backlog_authoring": "backlog-item-v1",
 }
 

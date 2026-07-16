@@ -552,14 +552,15 @@ def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[str]:
 
 
 def codex_trust_boundary_info() -> list[str]:
-    """WS-CDX-HYGIENE (A7): surface the live-certified Codex trust boundary.
+    """WS-CDX-HYGIENE (A7): surface the Codex interactive-vs-headless trust boundary.
 
-    Current supported Codex fires projected hooks in interactive and headless sessions.
-    Git chokepoints remain independent defense-in-depth. Operators must rerun the opt-in
-    live contract after a Codex CLI upgrade instead of relying on historical assumptions.
+    Codex governance hooks fire and block only in **interactive** sessions; under
+    headless ``codex exec`` they never fire, so the headless posture is protected by
+    the git chokepoints (pre-commit presence advisory + pre-push security-verdict gate) only.
+    This INFO line states that boundary honestly in ``dadaia public doctor`` output.
     """
     return [
-        "[info] codex:trust-boundary — projected hooks are live-certified for "
-        "interactive and headless Codex; git chokepoints remain harness-independent. "
-        "Re-run the live contract after Codex CLI upgrades. (WS-CDX-HYGIENE)"
+        "[info] codex:trust-boundary — Codex interactive hooks fire and block; "
+        "`codex exec` headless does not (headless is protected by the git "
+        "chokepoints only). (WS-CDX-HYGIENE)"
     ]

@@ -96,14 +96,15 @@ def test_implement_pipeline_write_scope_covers_reserved_task_production_path(
     _inject_fake_implement_result(monkeypatch)
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
         [
             "lifecycle",
             "implementation-reviews",
-            "--context",
-            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",
@@ -142,14 +143,15 @@ def test_implement_pipeline_without_write_scope_still_blocks_out_of_scope(
     _inject_fake_implement_result(monkeypatch)
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     result = _runner.invoke(
         app,
         [
             "lifecycle",
             "implementation-reviews",
-            "--context",
-            "dadaia-workspace",
             "--skip-preflight",
             "--release-id",
             "multiharness-engine-v0116",

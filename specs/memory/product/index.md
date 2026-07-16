@@ -27,7 +27,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `harness-claude-code` | Harness — Claude Code | Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks). |
-| `harness-codex` | Harness — Codex | Dual-layer Codex harness with projected hooks in TUI and headless exec, a governed CODEX_EXEC worker, and independent git chokepoints. |
+| `harness-codex` | Harness — Codex | Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection. |
 | `harness-pi` | Harness - PI (pi-coding-agent) | Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles. |
 
 ### panel
@@ -35,7 +35,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | Loopback-only local control surface with seven tabs, four workflow diagrams/policies, agent governance, telemetry, reports, and playable Snake/Tetris. |
+| `panel` | panel | Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout. |
 
 ### philosophy
 

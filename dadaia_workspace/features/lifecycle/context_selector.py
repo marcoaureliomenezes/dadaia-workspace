@@ -16,15 +16,27 @@ those declarations into concrete, auditable content for a workflow step:
 Selectors are pure reads against the specs tree (memory atoms, product catalog,
 backlog items, bug records, audit findings, release artifacts) plus runtime evidence
 (git diffs, test outputs, prior handoffs). Every selector returns a *real* result —
-none raise ``NotImplementedError``. Selectors not exercised by the release-definition
-workflow (diffs, test outputs, generic source summaries) are minimal-but-working and
-unit-tested.
+none raise ``NotImplementedError``. Git-diff and test-output evidence are resolved
+through optional injected providers (``diff_provider`` / ``test_output_provider``,
+see :class:`ContextSelector.__init__`) rather than read from disk here — this module
+stays subprocess-free (``features-no-subprocess`` import-linter contract); the real
+git-backed provider lives in ``infrastructure/git_evidence.py`` and is wired by
+``container.py``.
+
+Every selector additionally applies bounded-corpus discipline (release review R-01..R-07,
+v0.2.x prompt-scoping pass): open/live items only (never archived or closed), a hard cap
+on how many full-text items a batch selector renders (the remainder degrades to a
+one-line pointer, never silently dropped from the audit ref trail), and a per-step
+selector-identity dedupe in :meth:`ContextSelector.select_all` so two fragment-vocabulary
+names that resolve the same underlying selector (e.g. ``task_group`` and
+``declared_write_set``, both backed by :meth:`ContextSelector.sel_tasks_draft`) inject
+their content once per step, not once per name.
 
 Max-context policies bound what a selector returns:
 
 | policy | bound |
 |---|---|
-| ``exact-files-only`` | full file content of the resolved refs |
+| ``exact-files-only`` | full file content of the resolved refs (still item-capped) |
 | ``summary`` | frontmatter / first-paragraph summary only |
 | ``catalog-only`` | the catalog line(s) — title + tldr, no body |
 | ``diff-only`` | a unified diff payload only |
@@ -186,10 +198,36 @@ def _bug_status(text: str) -> str:
 
 
 def _backlog_status(text: str) -> str:
+    """Return a backlog item's status, YAML frontmatter first, legacy bold-field fallback.
+
+    Current backlog items carry YAML frontmatter (``status: candidate`` /
+    ``status: superseded`` / ...); older fixtures and a handful of legacy docs still use
+    the bold-Markdown ``**Status:** ...`` field with no frontmatter block. Checking YAML
+    first, then falling back to the legacy field, keeps both formats correctly classified
+    by :meth:`ContextSelector._backlog_refs` (review finding R-01: an item whose real
+    status is ``deferred``/``superseded`` must not read as "open" merely because it uses
+    the newer frontmatter format the old regex never looked at).
+    """
+    match = _YAML_FRONTMATTER_RE.match(text)
+    if match:
+        for line in match.group(1).splitlines():
+            if line.strip().lower().startswith("status:"):
+                return line.split(":", 1)[1].strip().lower()
     for field_match in _MD_FIELD_RE.finditer(text):
         if field_match.group("key").strip().lower() == "status":
             return field_match.group("value").strip().lower()
     return ""
+
+
+def _is_archived(path: Path) -> bool:
+    """True when *path* sits under a ``_archive`` directory anywhere in its parts.
+
+    Review finding R-03: ``rglob`` over ``backlog/``, ``bugs/``, and ``audits/`` must
+    never include their ``_archive/`` subtrees — archived items are historical record,
+    not live corpus, and dumping them wastes the prompt budget on content nobody asked
+    the step to reason over.
+    """
+    return "_archive" in path.parts
 
 
 # ---------------------------------------------------------------------------
@@ -205,16 +243,62 @@ class _FileRef:
     ref: str
 
 
+# Batch-selector bounds (review R-01/R-02/R-06/R-07). Kept as named module constants
+# rather than magic numbers so the cap is a single, greppable, deliberately-changed
+# decision.
+_ITEM_CAP = 8
+"""Max full-text items a capped batch selector (backlog/bugs/audits) renders before
+degrading the remainder to one-line pointers."""
+
+_RELEVANT_ATOM_CAP = 5
+"""Max memory atoms :meth:`ContextSelector.sel_relevant_product_atoms` renders in full."""
+
+_RECENT_HANDOFF_CAP = 3
+"""Max historical handoffs :meth:`ContextSelector._render_handoffs` renders (chronological,
+most-recent-first) outside the ``previous-handoff-only`` single-handoff policy."""
+
+_SOURCE_TREE_MAX_DEPTH = 2
+"""Directory-recursion depth bound for :meth:`ContextSelector.sel_source_summary`."""
+
+_SOURCE_TREE_MAX_ENTRIES = 100
+"""Entry-count bound for :meth:`ContextSelector.sel_source_summary`."""
+
+
 class ContextSelector:
     """Resolve named dynamic inputs into bounded, auditable content."""
 
-    def __init__(self, context: SpecContext, *, cli_anchors: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        context: SpecContext,
+        *,
+        cli_anchors: frozenset[str] = frozenset(),
+        diff_provider: Callable[[], str] | None = None,
+        test_output_provider: Callable[[], str] | None = None,
+    ) -> None:
         self._ctx = context
         # Pre-derived cli-kind anchor set, threaded in from the composition boundary
         # (FR1b) — only :meth:`sel_backlog_index` uses it (to build the subject registry);
         # this feature never imports ``cli.main``. Empty when the selector never resolves
         # ``backlog_index`` (the default).
         self._cli_anchors = cli_anchors
+        # Runtime-evidence providers (review R-04), additive-optional: a zero-arg callable
+        # returning real diff / test-output text, injected by the composition root
+        # (``container.py``, e.g. ``infrastructure.git_evidence.build_git_diff_provider``).
+        # ``None`` (the default) keeps this feature module subprocess-free — unwired
+        # selectors return an explicit "not wired" note rather than a silent empty string.
+        self._diff_provider = diff_provider
+        self._test_output_provider = test_output_provider
+        # Per-step selector-identity dedupe state for :meth:`select_all` (review R-05).
+        # ``_step_selector_seen`` maps a step label to {underlying selector function ->
+        # the first dynamic-input name that resolved it for that step}; a later name in
+        # the SAME step batch that resolves the SAME function gets a one-line pointer
+        # instead of a second full copy. ``_last_select_all_step`` lets a fresh batch for
+        # a step whose bucket already exists (e.g. a retried step, reached again only
+        # after at least one *other* step's batch ran in between — the pipeline never
+        # interleaves two batches for the same step without an intervening step) start
+        # clean rather than inheriting a stale, already-exhausted bucket.
+        self._step_selector_seen: dict[str, dict[_SelectorFn, str]] = {}
+        self._last_select_all_step: str | None = None
 
     @property
     def spec_context(self) -> SpecContext:
@@ -270,14 +354,63 @@ class ContextSelector:
         absent from the map falls back to *policy*. ``input_policies=None`` (the default) is
         byte-identical to the pre-FR3 behaviour — every input resolves at the fragment-global
         policy — so a fragment declaring no ``input_policies`` is unchanged.
+
+        Selector-identity dedupe (review R-05): two dynamic-input *names* can map to the
+        very same underlying selector method (e.g. ``task_group`` and ``declared_write_set``
+        both resolve :meth:`sel_tasks_draft`). A prompt assembled from a step's main
+        fragment plus its shared fragments calls this method once per fragment but with the
+        SAME *step* label each time (see ``pipeline._select_context`` /
+        ``_fragment_gate._select_context``), so the first name to resolve a given selector
+        for *step* renders in full; a later name in a later call for the SAME step that
+        resolves the SAME selector renders as a one-line pointer instead of injecting the
+        identical content again. The bucket resets whenever *step* differs from the step of
+        the immediately-preceding call, so a step reached again later (a retry, always
+        preceded by at least one other step's own batch — implementation/QA/security/code
+        review never repeats a step back-to-back) gets a clean slate rather than an
+        already-exhausted one.
         """
         resolved = MaxContextPolicy.parse(policy) if isinstance(policy, str) else policy
         overrides = {
             name: (MaxContextPolicy.parse(value) if isinstance(value, str) else value)
             for name, value in (input_policies or {}).items()
         }
-        results = tuple(self.select(name, overrides.get(name, resolved)) for name in names)
-        return SelectionAudit(step=step, results=results, fragment_ids=fragment_ids)
+        if step != self._last_select_all_step:
+            self._step_selector_seen[step] = {}
+            self._last_select_all_step = step
+        seen_for_step = self._step_selector_seen.setdefault(step, {})
+
+        results: list[SelectionResult] = []
+        for name in names:
+            selector_fn = _SELECTORS.get(name)
+            if selector_fn is None:
+                valid = ", ".join(sorted(_SELECTORS))
+                raise UnknownDynamicInputError(
+                    f"no selector registered for dynamic input '{name}'; known inputs: {valid}"
+                )
+            name_policy = overrides.get(name, resolved)
+            first_name = seen_for_step.get(selector_fn)
+            if first_name is None:
+                seen_for_step[selector_fn] = name
+                results.append(selector_fn(self, name, name_policy))
+            elif first_name == name:
+                # Exact-name repeat within one call (pre-existing, unchanged behaviour):
+                # resolve again rather than pointer — a caller that literally lists the
+                # same name twice gets it twice, same as before this fix.
+                results.append(selector_fn(self, name, name_policy))
+            else:
+                results.append(
+                    SelectionResult(
+                        name=name,
+                        policy=name_policy,
+                        content=(
+                            f"(same content as '{first_name}' above — not re-injected; "
+                            f"'{name}' and '{first_name}' resolve the same underlying "
+                            "selector for this step)"
+                        ),
+                        refs=(),
+                    )
+                )
+        return SelectionAudit(step=step, results=tuple(results), fragment_ids=fragment_ids)
 
     # -- single API ------------------------------------------------------
 
@@ -329,6 +462,50 @@ class ContextSelector:
             f"{first_heading.lstrip('# ').strip()} — {summary.splitlines()[0] if summary else ''}"
         )
 
+    def _one_line_summary(self, fref: _FileRef) -> str:
+        """A single-line frontmatter/first-paragraph summary, used by pointer overflow."""
+        text = _read_text(fref.path)
+        summary = _frontmatter_summary(text, max_lines=3)
+        first_line = summary.splitlines()[0] if summary else ""
+        return first_line[:160]
+
+    def _render_capped(
+        self,
+        name: str,
+        policy: MaxContextPolicy,
+        refs: tuple[_FileRef, ...],
+        *,
+        cap: int = _ITEM_CAP,
+    ) -> SelectionResult:
+        """Render *refs* under *policy*, capping full-text items at *cap* (review R-01).
+
+        The first *cap* refs render exactly as :meth:`_render` would (full text under
+        ``exact-files-only``, frontmatter summary under ``summary``, catalog line under
+        ``catalog-only``). Beyond the cap, the remaining refs degrade to a one-line
+        pointer summary regardless of the requested *policy* — an ``exact-files-only``
+        fragment declaration is never a licence for an unbounded corpus dump. Every ref
+        (capped or not) is still listed in the result's ``refs`` — the audit trail stays
+        complete even when the rendered content is bounded.
+        """
+        if len(refs) <= cap:
+            return self._render(name, policy, refs)
+        head, tail = refs[:cap], refs[cap:]
+        rendered = self._render(name, policy, head)
+        pointer_lines = [f"- {fref.ref}: {self._one_line_summary(fref)}" for fref in tail]
+        pointer_block = (
+            f"### (+{len(tail)} more, summary only — capped at {cap} full items)\n"
+            + "\n".join(pointer_lines)
+        )
+        content = (
+            f"{rendered.content}\n\n{pointer_block}".strip() if rendered.content else pointer_block
+        )
+        return SelectionResult(
+            name=name,
+            policy=policy,
+            content=content,
+            refs=tuple(fref.ref for fref in refs),
+        )
+
     # -- file discovery ---------------------------------------------------
 
     def _specs_ref(self, path: Path) -> str:
@@ -344,6 +521,8 @@ class ContextSelector:
         refs: list[_FileRef] = []
         for path in sorted(directory.rglob(f"*{suffix}")):
             if path.name in {"index.md", "catalog.json"}:
+                continue
+            if _is_archived(path):
                 continue
             refs.append(_FileRef(path=path, ref=self._specs_ref(path)))
         return tuple(refs)
@@ -389,9 +568,109 @@ class ContextSelector:
             refs=(ref,) if ref else (),
         )
 
+    def _relevance_corpus(self) -> str:
+        """Lowercased text corpus describing what the active release is about.
+
+        Never rendered to the model — used only to keyword-rank memory atoms by
+        relevance (review R-02). Sourced from whatever release-definition evidence
+        already exists: the release-scope handoff, open backlog items, open bugs, and
+        any release artifacts (SPEC/PLAN/TASKS) already on disk. All of these are the
+        exact material the picked-scope steps (``spec_create`` and downstream) already
+        reason over, so this adds no new corpus the step could not already see.
+        """
+        parts: list[str] = []
+        for fref in self._handoffs(agent="project-manager"):
+            parts.append(self._handoff_digest(fref.path))
+        for fref in self._backlog_refs(open_only=True):
+            parts.append(_read_text(fref.path))
+        for fref in self._bug_refs(open_only=True):
+            parts.append(_read_text(fref.path))
+        for filename in ("SPEC.md", "PLAN.md", "TASKS.md"):
+            path = self._ctx.release_dir / filename
+            if path.is_file():
+                parts.append(_read_text(path))
+        return "\n".join(parts).lower()
+
+    @staticmethod
+    def _rank_atoms_by_relevance(
+        corpus: str, features: list[dict[str, object]]
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        """Split *features* into ``(matched, rest)`` by keyword hits against *corpus*.
+
+        A feature matches when its slug or any declared tag's text appears in the
+        corpus. ``matched`` is capped at :data:`_RELEVANT_ATOM_CAP`, ordered by hit
+        count (descending) then original catalog order; ``rest`` is every remaining
+        feature, in original catalog order.
+        """
+        scored: list[tuple[int, int, dict[str, object]]] = []
+        for index, feature in enumerate(features):
+            slug = str(feature.get("slug", ""))
+            tags_value = feature.get("tags", [])
+            tags = tags_value if isinstance(tags_value, list) else []
+            keywords = {slug.lower()} | {str(tag).lower() for tag in tags if str(tag).strip()}
+            score = sum(corpus.count(keyword) for keyword in keywords if keyword)
+            scored.append((score, index, feature))
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        matched = [feature for score, _, feature in scored if score > 0][:_RELEVANT_ATOM_CAP]
+        matched_slugs = {str(feature.get("slug", "")) for feature in matched}
+        rest = [
+            feature for feature in features if str(feature.get("slug", "")) not in matched_slugs
+        ]
+        return matched, rest
+
+    def _feature_refs(self, features: list[dict[str, object]]) -> tuple[_FileRef, ...]:
+        refs: list[_FileRef] = []
+        for feature in features:
+            path_value = feature.get("path")
+            if isinstance(path_value, str):
+                path = self._ctx.specs_dir.parent / path_value
+            else:
+                # Catalog entries conventionally live at memory/product/<slug>.md;
+                # a feature with no explicit path derives it from its slug.
+                slug = str(feature.get("slug", "")).strip()
+                if not slug:
+                    continue
+                path = self._ctx.specs_dir / "memory" / "product" / f"{slug}.md"
+            if path.is_file():
+                refs.append(_FileRef(path=path, ref=self._specs_ref(path)))
+        return tuple(refs)
+
     def sel_relevant_product_atoms(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        # Real implementation: product atoms under memory/product, bounded by policy.
-        return self._render(name, policy, self._dir_files("memory/product"))
+        """Select memory atoms relevant to the active release, capped at N=5 full atoms.
+
+        Review R-02: the naive version dumped every atom under ``memory/product`` in
+        full regardless of relevance. Relevance is a keyword match between each
+        catalog feature's slug/tags and :meth:`_relevance_corpus` (the release-scope
+        handoff, open backlog/bug items, and any existing SPEC/PLAN/TASKS). Matched
+        atoms render in full, bounded by *policy* exactly like any other file-backed
+        selector; every other catalog entry renders as a one-line ``slug: tldr``
+        pointer so the step still knows the feature exists without paying its
+        full-body cost. When nothing matches yet (no evidence names a feature — e.g.
+        the very first release-definition step), this falls back to the catalog's own
+        rank order so the step still gets concrete atoms rather than nothing. Falls
+        back further to every atom on disk (pre-fix behaviour) only when there is no
+        catalog to rank against at all.
+        """
+        features = self._catalog_features()
+        if not features:
+            return self._render(name, policy, self._dir_files("memory/product"))
+        corpus = self._relevance_corpus()
+        matched, rest = self._rank_atoms_by_relevance(corpus, features)
+        if not matched:
+            matched, rest = features[:_RELEVANT_ATOM_CAP], features[_RELEVANT_ATOM_CAP:]
+        rendered = self._render(name, policy, self._feature_refs(matched))
+        pointer_lines = [
+            f"- {feature.get('slug', '')}: {feature.get('tldr', '')}".rstrip() for feature in rest
+        ]
+        if not pointer_lines:
+            return rendered
+        pointer_block = "### other catalog atoms (tldr only — not injected in full)\n" + "\n".join(
+            pointer_lines
+        )
+        content = (
+            f"{rendered.content}\n\n{pointer_block}".strip() if rendered.content else pointer_block
+        )
+        return SelectionResult(name=name, policy=policy, content=content, refs=rendered.refs)
 
     def sel_architecture(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         path = self._ctx.specs_dir / "memory" / "architecture.md"
@@ -423,6 +702,10 @@ class ContextSelector:
 
     # ---- backlog / bugs / audits --------------------------------------
 
+    _CLOSED_BACKLOG_STATUSES = frozenset(
+        {"deferred", "rejected", "closed", "done", "shipped", "superseded"}
+    )
+
     def _backlog_refs(self, *, open_only: bool) -> tuple[_FileRef, ...]:
         refs = self._dir_files("backlog")
         if not open_only:
@@ -430,13 +713,13 @@ class ContextSelector:
         kept: list[_FileRef] = []
         for fref in refs:
             status = _backlog_status(_read_text(fref.path))
-            if status in {"deferred", "rejected", "closed", "done", "shipped"}:
+            if status in self._CLOSED_BACKLOG_STATUSES:
                 continue
             kept.append(fref)
         return tuple(kept)
 
     def sel_candidate_backlog(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._backlog_refs(open_only=True))
+        return self._render_capped(name, policy, self._backlog_refs(open_only=True))
 
     def sel_backlog_index(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
         """Return a compact bound-intent index of every surviving backlog item (SPEC §3.5).
@@ -502,7 +785,19 @@ class ContextSelector:
         return self._ctx.specs_dir.parent / ".dadaia" / "states" / "backlog_subject_aliases.txt"
 
     def sel_selected_backlog_items(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._backlog_refs(open_only=False))
+        """Open backlog items only, capped (review R-01).
+
+        Previously ``open_only=False`` dumped every backlog item ever filed — live and
+        archived alike — in full text (26 files at review time; ``_archive/`` alone
+        accounted for 24 of them, see R-03). A release's scope handoff has already
+        picked the exact items in play; until that pick is threaded through as an
+        explicit relevance hint, "every currently-open (non-archived, non-closed) item,
+        item-capped" is the honest, bounded default — never the full historical
+        corpus regardless of the fragment's declared ``max_context_policy``.
+        """
+        return self._render_capped(name, policy, self._backlog_refs(open_only=True))
+
+    _CLOSED_BUG_STATUSES = frozenset({"closed", "resolved", "deferred", "rejected", "superseded"})
 
     def _bug_refs(self, *, open_only: bool) -> tuple[_FileRef, ...]:
         refs = self._dir_files("bugs")
@@ -511,16 +806,18 @@ class ContextSelector:
         kept: list[_FileRef] = []
         for fref in refs:
             status = _bug_status(_read_text(fref.path))
-            if status in {"closed", "resolved", "deferred", "rejected"}:
+            if status in self._CLOSED_BUG_STATUSES:
                 continue
             kept.append(fref)
         return tuple(kept)
 
     def sel_open_bugs(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._bug_refs(open_only=True))
+        return self._render_capped(name, policy, self._bug_refs(open_only=True))
 
     def sel_selected_bugs(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._bug_refs(open_only=False))
+        # Same open-only + capped discipline as sel_selected_backlog_items (R-01,
+        # applied by symmetry — the identical open_only=False defect shape).
+        return self._render_capped(name, policy, self._bug_refs(open_only=True))
 
     def _audit_refs(self) -> tuple[_FileRef, ...]:
         directory = self._ctx.specs_dir / "audits"
@@ -528,14 +825,16 @@ class ContextSelector:
             return ()
         refs: list[_FileRef] = []
         for path in sorted(directory.rglob("index.md")):
+            if _is_archived(path):
+                continue
             refs.append(_FileRef(path=path, ref=self._specs_ref(path)))
         return tuple(refs)
 
     def sel_open_audits(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._audit_refs())
+        return self._render_capped(name, policy, self._audit_refs())
 
     def sel_selected_audit_findings(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        return self._render(name, policy, self._audit_refs())
+        return self._render_capped(name, policy, self._audit_refs())
 
     # ---- release artifacts --------------------------------------------
 
@@ -580,8 +879,18 @@ class ContextSelector:
         policy: MaxContextPolicy,
         refs: tuple[_FileRef, ...],
     ) -> SelectionResult:
+        """Render handoff digests, capped to the most recent ones (review R-06).
+
+        ``_handoffs`` returns matches sorted by filename, which is date-prefixed, so
+        chronological order — ``refs[-1]`` is the most recent. ``previous-handoff-only``
+        already bounds to exactly that one; every other policy is now bounded to the
+        most recent :data:`_RECENT_HANDOFF_CAP` instead of the full historical ledger
+        (previously ALL matching handoffs rendered, unbounded, for any other policy).
+        """
         if policy is MaxContextPolicy.PREVIOUS_HANDOFF_ONLY and refs:
             refs = (refs[-1],)
+        elif len(refs) > _RECENT_HANDOFF_CAP:
+            refs = refs[-_RECENT_HANDOFF_CAP:]
         blocks = [f"### {fref.ref}\n{self._handoff_digest(fref.path)}".rstrip() for fref in refs]
         return SelectionResult(
             name=name,
@@ -669,22 +978,161 @@ class ContextSelector:
 
     # ---- generic source summary / diff / test output ------------------
 
+    _TREE_SKIP_NAMES = frozenset(
+        {
+            "__pycache__",
+            ".git",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".import_linter_cache",
+        }
+    )
+
+    def _bounded_file_tree(
+        self,
+        root: Path,
+        *,
+        max_depth: int = _SOURCE_TREE_MAX_DEPTH,
+        max_entries: int = _SOURCE_TREE_MAX_ENTRIES,
+    ) -> list[str]:
+        """Depth- and entry-bounded file tree under *root* (review R-07).
+
+        Walks up to *max_depth* directory levels (the immediate children of *root* are
+        depth 1), skipping dunder/cache directories and dotfiles, and stops collecting
+        once *max_entries* have been recorded — the remainder is summarized with a
+        single overflow line rather than continuing unbounded. This replaces a bare
+        single-level ``root.iterdir()`` name dump with an actually-informative,
+        still-cheap tree.
+        """
+        if not root.is_dir():
+            return []
+        entries: list[str] = []
+        overflow = 0
+
+        def walk(dir_path: Path, depth: int, prefix: str) -> None:
+            nonlocal overflow
+            try:
+                children = sorted(dir_path.iterdir(), key=lambda p: (p.is_file(), p.name))
+            except OSError:
+                return
+            for child in children:
+                if child.name in self._TREE_SKIP_NAMES or child.name.startswith("."):
+                    continue
+                if len(entries) >= max_entries:
+                    overflow += 1
+                    continue
+                entries.append(f"{prefix}{child.name}{'/' if child.is_dir() else ''}")
+                if child.is_dir() and depth < max_depth:
+                    walk(child, depth + 1, prefix + "  ")
+
+        walk(root, 1, "")
+        if overflow:
+            entries.append(f"... ({overflow} more entries not shown, capped at {max_entries})")
+        return entries
+
+    def _changed_paths_from_diff(self) -> list[str]:
+        """Extract the ``Changed files:`` block's paths from the wired diff provider.
+
+        Returns ``[]`` when no provider is wired, the provider raises, or its output
+        does not carry the ``- <path>`` leading-block shape
+        (:func:`dadaia_workspace.infrastructure.git_evidence.git_diff_text` produces
+        it; an arbitrary custom provider that doesn't is simply not usable for this,
+        and :meth:`sel_source_summary` falls back to the bounded file tree).
+        """
+        if self._diff_provider is None:
+            return []
+        try:
+            diff_text = self._diff_provider()
+        except Exception:  # noqa: BLE001 — evidence is best-effort, never fatal
+            return []
+        paths: list[str] = []
+        for line in diff_text.splitlines():
+            if line.startswith("- "):
+                paths.append(line[2:].strip())
+            elif paths:
+                # The leading "- path" block ends at the first non-matching line.
+                break
+        return paths
+
     def sel_source_summary(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
+        """A bounded source overview — changed-paths-focused when diff evidence is
+        wired, else a depth<=2, entry-capped file tree (review R-07).
+
+        Previously a bare single-level ``ls`` of ``dadaia_workspace/`` (the package's
+        top-level dirs only — not informative and not depth-bounded by design, just
+        incidentally shallow). When a ``diff_provider`` is wired (see
+        :meth:`ContextSelector.__init__`), the step almost always cares about what
+        changed, not the whole tree, so this prefers the diff's changed-files list;
+        it falls back to the bounded tree when no diff evidence is wired or the
+        working tree has no changes.
+        """
         root = self._ctx.specs_dir.parent / "dadaia_workspace"
-        return self._list_summary(name, policy, "source summary", root)
+        changed = self._changed_paths_from_diff()
+        if changed:
+            content = "source summary (changed paths — diff evidence wired):\n" + "\n".join(
+                f"- {path}" for path in changed
+            )
+            return SelectionResult(
+                name=name, policy=policy, content=content, refs=(root.as_posix(),)
+            )
+        entries = self._bounded_file_tree(root)
+        if not entries:
+            return SelectionResult(
+                name=name, policy=policy, content="source summary: (none)", refs=()
+            )
+        content = (
+            f"source summary (depth<={_SOURCE_TREE_MAX_DEPTH}, capped at "
+            f"{_SOURCE_TREE_MAX_ENTRIES} entries):\n" + "\n".join(f"- {entry}" for entry in entries)
+        )
+        return SelectionResult(name=name, policy=policy, content=content, refs=(root.as_posix(),))
 
     def sel_git_diff(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        # Minimal-but-working: diffs are supplied as runtime evidence rather than read
-        # from disk here; the selector returns an empty diff payload bounded by policy.
-        return SelectionResult(name=name, policy=MaxContextPolicy.DIFF_ONLY, content="", refs=())
+        """Real diff evidence when a ``diff_provider`` is wired (review R-04).
+
+        See :meth:`ContextSelector.__init__`. Without a wired provider this returns an
+        explicit "no diff evidence wired" note rather than a silent empty string, so a
+        reviewer reading the assembled prompt can tell "evidence was never connected"
+        apart from "there happen to be no changes" (the latter is the provider's own
+        honest message — see
+        :func:`dadaia_workspace.infrastructure.git_evidence.git_diff_text`). The result
+        always carries ``DIFF_ONLY`` policy regardless of the requested *policy* — diff
+        evidence is inherently diff-shaped, independent of the fragment's declared
+        ``max_context_policy``.
+        """
+        if self._diff_provider is None:
+            content = "no diff evidence wired: ContextSelector.diff_provider is not set"
+        else:
+            try:
+                content = self._diff_provider() or "no diff evidence: provider returned no content"
+            except Exception as exc:  # noqa: BLE001 — evidence is best-effort, never fatal
+                content = f"no diff evidence: provider raised {exc.__class__.__name__}"
+        return SelectionResult(
+            name=name, policy=MaxContextPolicy.DIFF_ONLY, content=content, refs=()
+        )
 
     def sel_test_output(self, name: str, policy: MaxContextPolicy) -> SelectionResult:
-        # Minimal-but-working: test output is runtime evidence; selector returns the
-        # most-recent recorded test report ref if present, else an empty payload.
-        root = self._ctx.specs_dir.parent / "tests"
-        if not root.is_dir():
-            return SelectionResult(name=name, policy=policy, content="", refs=())
-        return SelectionResult(name=name, policy=policy, content="test output: pending", refs=())
+        """Real test-output evidence when a ``test_output_provider`` is wired (review R-04).
+
+        Mirrors :meth:`sel_git_diff`. Without a wired provider this returns an
+        explicit one-liner instead of the previous literal ``"test output: pending"``,
+        which read as "forthcoming" rather than "never connected".
+        """
+        if self._test_output_provider is None:
+            return SelectionResult(
+                name=name,
+                policy=policy,
+                content="no test-output evidence wired: ContextSelector.test_output_provider is not set",
+                refs=(),
+            )
+        try:
+            content = (
+                self._test_output_provider()
+                or "no test-output evidence: provider returned no content"
+            )
+        except Exception as exc:  # noqa: BLE001 — evidence is best-effort, never fatal
+            content = f"no test-output evidence: provider raised {exc.__class__.__name__}"
+        return SelectionResult(name=name, policy=policy, content=content, refs=())
 
 
 # ---------------------------------------------------------------------------

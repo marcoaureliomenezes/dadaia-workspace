@@ -456,9 +456,7 @@ class SpecContextService:
                 )
             if push:
                 if not self._git.has_remote(repo_path):
-                    raise GitSyncError(
-                        f"Context '{name}' has no remote; baseline cannot push."
-                    )
+                    raise GitSyncError(f"Context '{name}' has no remote; baseline cannot push.")
                 self._git.push(repo_path)
             return ctx
         if not self._git.is_dirty(repo_path):

@@ -84,31 +84,11 @@ class _AuditFake:
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         step = (request.task_id or "").rsplit(":", 1)[-1]
         payloads: dict[str, dict[str, object]] = {
-            "audit_scope": {
-                "summary": "Bound architecture drift.",
-                "audit_question": "Does implementation match architecture memory?",
-                "lenses": [{"name": "architecture", "rationale": "Contract fidelity."}],
-                "surfaces": ["src/games.py"],
-                "acceptance_criteria": [
-                    {"lens": "architecture", "pass_condition": "No contract drift."}
-                ],
-            },
-            "drift_scan": {
+            "audit_report": {
                 "summary": "No drift found.",
-                "verdict": "APPROVED",
-                "verdict_reason": "Every scoped lens passed.",
-                "lens_results": [
-                    {
-                        "lens": "architecture",
-                        "status": "PASS",
-                        "evidence": ["src/games.py:1"],
-                    }
-                ],
+                "question": "Does implementation match architecture memory?",
+                "lenses": ["architecture"],
                 "findings": [],
-            },
-            "triage": {
-                "summary": "No findings require routing.",
-                "source_verdict": "APPROVED",
                 "dispositions": [],
             },
         }
@@ -195,7 +175,7 @@ _CASES = (
         "audit",
         AuditWorkflow,
         audit,
-        ("audit_scope", "drift_scan", "triage", "audit_disposition_gate"),
+        ("audit_report", "audit_disposition_gate"),
         runtime_factory=lambda kind: _AuditFake(kind),
     ),
     _WorkflowCase(
@@ -205,8 +185,7 @@ _CASES = (
         (
             "release_scope",
             "spec_create",
-            "spec_arch_review",
-            "spec_qa_review",
+            "spec_review",
             "plan_create",
             "plan_review",
             "tasks_create",
@@ -285,14 +264,18 @@ def test_downstream_consumes_exact_upstream_payload(tmp_path: Path, case: _Workf
 
     run = JsonLifecycleRunStore(tmp_path).load(f"{case.case_id}-consume")
     assert run is not None
-    producer_label, consumer_label = case.labels[0], case.labels[1]
+    model_labels = [s.label for s in case.module._SEQUENCE if s.fragment_id is not None]
+    if len(model_labels) < 2:
+        pytest.skip("workflow has a single model step — no consume edge to prove")
+    producer_label, consumer_label = model_labels[0], model_labels[1]
     producer_record = run.workflow_steps.find(producer_label, 0)
     assert producer_record is not None
     consumers = {(c.consumer_step, c.consumer_attempt) for c in producer_record.consumptions}
     assert (consumer_label, 0) in consumers
-    # A18: the payload artifact is immutable and lands under the workspace-root runs zone.
+    # Operator mandate: the payload artifact is immutable and lands in the RELEASE
+    # folder (the release-aware zone), never an aleatory path under .dadaia.
     assert producer_record.payload_ref.startswith(
-        f".dadaia/runs/lifecycle/{case.case_id}-consume/steps/"
+        f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/handoffs/{case.case_id}-consume/steps/"
     )
     assert (tmp_path / producer_record.payload_ref).is_file()
 
@@ -304,7 +287,8 @@ def test_downstream_consumes_exact_upstream_payload(tmp_path: Path, case: _Workf
 
 def _broken_sequence(case: _WorkflowCase) -> tuple[Any, ...]:
     """A 2-step sequence whose only model step CONSUMES a producer that never ran."""
-    consumer_label, gate_label = case.labels[1], case.labels[-1]
+    gate_label = case.labels[-1]
+    first_model = next(s for s in case.module._SEQUENCE if s.fragment_id is not None)
     step_cls: type
     kwargs: dict[str, Any]
     if case.case_id == "audit":
@@ -314,10 +298,10 @@ def _broken_sequence(case: _WorkflowCase) -> tuple[Any, ...]:
         step_cls = ReleaseStep
         kwargs = {"role": "product-engineer", "is_review": True}
     consumer = step_cls(
-        label=consumer_label,
-        fragment_id=f"{case.module.__name__.rsplit('.', 1)[-1]}.{consumer_label}",
+        label=first_model.label,
+        fragment_id=first_model.fragment_id,
         produces="generic-step-handoff-v1",
-        consumes=(case.labels[0],),  # producer never ran in this sequence
+        consumes=("phantom_producer",),  # producer never ran in this sequence
         **kwargs,
     )
     gate = step_cls(label=gate_label, role="python", fragment_id=None)

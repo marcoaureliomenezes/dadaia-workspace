@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T03:12:11Z",
+  "generated_at": "2026-07-16T04:35:38Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -187,8 +187,8 @@
       "title": "Harness — Codex",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer Codex harness with projected hooks in TUI and headless exec, a governed CODEX_EXEC worker, and independent git chokepoints.",
-      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — shared hook enforcement, the CODEX_EXEC worker transport, model catalog, and what a Codex-only workspace installation contains.",
+      "tldr": "Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.",
+      "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, content-delta changed-path attribution, bytecode-suppression environment preservation, model catalog, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
@@ -197,7 +197,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 930,
+      "token_estimate": 980,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -213,7 +213,7 @@
       "category": "product",
       "area": "harness",
       "tldr": "Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles.",
-      "summary": "PI can enter the workspace interactively after explicit trust and can execute bounded Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified Codex-subscription ids; optional OpenRouter profiles remain explicit.",
+      "summary": "PI can enter the workspace interactively after explicit trust and can execute bounded Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified Codex-subscription ids; optional OpenRouter profiles remain explicit; headless attempts preserve bytecode-suppression env and report content-delta changed paths.",
       "path": "specs/memory/product/harness/harness-pi.md",
       "tags": [
         "harness",
@@ -222,7 +222,7 @@
         "layer-2",
         "projection"
       ],
-      "token_estimate": 348,
+      "token_estimate": 380,
       "depends_on": [
         "dadaia-workflows",
         "lifecycle-foundation",
@@ -257,8 +257,8 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "Loopback-only local control surface with seven tabs, four workflow diagrams/policies, agent governance, telemetry, reports, and playable Snake/Tetris.",
-      "summary": "`dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
+      "tldr": "Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout.",
+      "summary": "`dadaia panel` serves the local workspace UI. Its seven tabs are Projects, 1st Agentic Layer, 2nd Agentic Layer, Reports, Academy, Servers, and Games. The Games tab includes wall-wrapping Snake plus Tetris, Codex Pong, and PI Breakout. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
@@ -267,7 +267,7 @@
         "dashboard",
         "games"
       ],
-      "token_estimate": 394,
+      "token_estimate": 481,
       "depends_on": [
         "dadaia-workflows",
         "agent-orchestration",
@@ -535,7 +535,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence.",
-      "summary": "The runtime foundation beneath the four dadaia-workflows. Python owns sequencing, context selection, policy resolution, task-marker and artifact gates, run state, retries, diagnostics, and retention. Codex and PI workers run behind AgentRuntimePort.",
+      "summary": "The runtime foundation beneath the four dadaia-workflows. Python owns sequencing, context selection, policy resolution, task-marker and artifact gates, advisory Git preflight warnings, run state, retries, diagnostics, and retention. Codex and PI workers run behind AgentRuntimePort with content-delta changed-path attribution.",
       "path": "specs/memory/product/sdd/lifecycle-foundation.md",
       "tags": [
         "sdd",

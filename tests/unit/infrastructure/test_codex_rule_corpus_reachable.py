@@ -91,13 +91,12 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
 
 
 def test_trust_boundary_info_line_states_boundary() -> None:
-    """A7: INFO line states current parity and independent chokepoints."""
+    """A7: INFO line names interactive-fire and headless-no-fire honestly."""
     out = codex_trust_boundary_info()
 
     assert len(out) == 1
     line = out[0]
     assert line.startswith("[info] codex:trust-boundary")
-    assert "interactive and headless Codex" in line
-    assert "git chokepoints remain harness-independent" in line
-    assert "after Codex CLI upgrades" in line
+    assert "interactive hooks fire and block" in line
+    assert "`codex exec` headless does not" in line
     assert "WS-CDX-HYGIENE" in line

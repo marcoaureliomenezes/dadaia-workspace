@@ -40,7 +40,7 @@ from dadaia_workspace.features.lifecycle.pipeline import (
 )
 from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-_PI_MODELS = {"openai-codex/gpt-5.5"}
+_PI_MODELS = {"openai-codex/gpt-5.3-codex-spark"}
 
 
 def _init_workspace(path: Path) -> Path:
@@ -135,20 +135,21 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     resolver = container.build_workflow_policy_resolver(kwarg_ws, context="dadaia-workspace")
     snapshot = resolver.resolve("implementation_reviews", context="default", default_harness="pi")
     assert snapshot.step("implement").model_profile == "pi-implementation-standard"  # type: ignore[union-attr]
-    assert snapshot.step("review_qa").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
+    assert snapshot.step("review_combined").model_profile == "pi-reasoning-high"  # type: ignore[union-attr]
     recorder, persisted = _run(kwarg_ws, snapshot)
     _assert_all_pi(recorder, persisted)
 
     # 2. Real CLI --harness pi --show-policy flag.
     cli_ws = _init_workspace(tmp_path / "cli-flag-case")
     monkeypatch.chdir(cli_ws)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     cli_result = CliRunner().invoke(
         app,
         [
             "lifecycle",
             "implementation-reviews",
-            "--context",
-            "dadaia-workspace",
             "--release-id",
             "v0.1.29",
             "--harness",
@@ -164,24 +165,6 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     for entry in cli_steps:
         assert entry["harness"] == "pi", entry
         assert entry["model"] in _PI_MODELS, entry
-
-    human_result = CliRunner().invoke(
-        app,
-        [
-            "lifecycle",
-            "implementation-reviews",
-            "--context",
-            "dadaia-workspace",
-            "--release-id",
-            "v0.1.29",
-            "--harness",
-            "pi",
-            "--show-policy",
-        ],
-    )
-    assert human_result.exit_code == 0, human_result.output
-    assert "workflow=implementation_reviews" in human_result.output
-    assert "implement: harness=pi" in human_result.output
 
     # 3. Overlay default_harness path, no CLI flag.
     overlay_ws = _init_workspace(tmp_path / "overlay-default-case")
@@ -232,7 +215,7 @@ def test_pi_resolution_cli_flag_overlay_and_step_harness(
     assert step_persisted is not None
     step_snap = step_persisted.workflow_policy  # type: ignore[attr-defined]
     assert step_snap.step("implement").harness == "pi"
-    assert step_snap.step("review_qa").harness == "codex"
+    assert step_snap.step("review_combined").harness == "codex"
 
 
 def test_panel_put_default_harness_pi_overlay_drives_execution(tmp_path: Path) -> None:

@@ -107,11 +107,11 @@ def test_lifecycle_prompt_selector_composed_with_no_ctx_inject_side_effect(
     result = wf.run("a30-run")
 
     assert result.completed is True
-    scope_step = next(s for s in result.steps if s.label == "audit_scope")
+    scope_step = next(s for s in result.steps if s.label == "audit_report")
     prompt = scope_step.prompt_text
     assert prompt is not None
     # The fragment body is present (the step's own fragment, selector-composed).
-    assert "Audit scope" in prompt
+    assert "Audit report" in prompt
     # The selector-resolved dynamic context (open_bugs) is present in the SAME prompt — the
     # context came from ContextSelector, not from any ctx-inject session-bootstrap side effect.
     assert "SELECTOR-MARKER-OPEN-BUG" in prompt

@@ -183,7 +183,6 @@ class LifecyclePreflightService:
         checks = (
             self._check_binding,
             self._check_active_release,
-            self._check_git,
             self._check_specs_doctor,
             self._check_hygiene,
         )
@@ -192,8 +191,8 @@ class LifecyclePreflightService:
             if blocked is not None:
                 return LifecyclePreflightResult(ok=False, blocked=blocked)
 
-        # Presence can never block a lifecycle verb.
-        warnings = self._check_presence(data)
+        # Git cleanliness and sibling presence are advisory only.
+        warnings = self._check_git(data) + self._check_presence(data)
 
         handoff_result = self._check_handoffs(data)
         if handoff_result.blocked is not None:
@@ -377,28 +376,26 @@ class LifecyclePreflightService:
             )
         return None
 
-    def _check_git(self, data: LifecyclePreflightInput) -> BlockedState | None:
+    def _check_git(self, data: LifecyclePreflightInput) -> tuple[str, ...]:
+        warnings: list[str] = []
         if data.git.dirty_paths:
-            return self._blocked(
-                data,
-                "dirty worktree",
-                operator_command="git status --short",
-                detail={"dirty_paths": ",".join(data.git.dirty_paths)},
+            warnings.append(
+                "[GIT] dirty worktree is advisory for lifecycle preflight; "
+                f"paths={','.join(data.git.dirty_paths)}; authoritative commit/review "
+                "and push-security gates still apply."
             )
         if data.git.upstream_branch is None:
-            return self._blocked(
-                data,
-                "missing upstream branch",
-                operator_command="git push --set-upstream origin HEAD",
+            warnings.append(
+                "[GIT] missing upstream branch is advisory for lifecycle preflight; "
+                "set one with git push --set-upstream origin HEAD before relying on push gates."
             )
         if data.git.unpushed_commit_count > 0:
-            return self._blocked(
-                data,
-                "unpushed commits pending",
-                operator_command="git push",
-                detail={"unpushed_commit_count": str(data.git.unpushed_commit_count)},
+            warnings.append(
+                "[GIT] unpushed commits are advisory for lifecycle preflight; "
+                f"count={data.git.unpushed_commit_count}; push-security and CI gates "
+                "remain authoritative."
             )
-        return None
+        return tuple(warnings)
 
     def _check_specs_doctor(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if not data.specs_doctor.ok:

@@ -11,10 +11,17 @@ max_context_policy: summary
 
 # Backlog authoring — write the one consistent item
 
+Your deliverable is a FILE ON DISK: create or edit exactly one Markdown item under
+`specs/backlog/<slug>.md` using your file tools, then confirm it exists by reading it
+back. Answering with the item's content in your final message WITHOUT writing the file
+is a FAILED step — a Python gate diffs the `specs/backlog/` directory and blocks when
+nothing landed there.
+
 You author the result of the reconciliation: either a NEW backlog item or an EDIT to an
-existing one. The reconcile plan has already decided which — your job is to write a single,
-consistent item that carries bound intents, a valid status, and a clear scope. You never
-write both a new file and an edit, and you never create a twin of an existing item.
+existing one. Write a single, consistent item that carries bound intents (YAML
+frontmatter `intents:` list of `subject: { kind: code, ref: path#symbol }` + `change`),
+a valid status, and a clear scope. You never write both a new file and an edit, and you
+never create a twin of an existing item.
 
 ## Inputs you reason over
 

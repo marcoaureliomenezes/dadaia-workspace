@@ -156,8 +156,18 @@ _IMPLEMENTATION_STEP_PROFILE: dict[str, str] = {
 # resolves + harness matches). PI has no dedicated review profile, so its deep slot is
 # ``pi-reasoning-high``.
 DEFAULT_PROFILE_BY_HARNESS_PURPOSE: dict[str, dict[str, str]] = {
-    "codex": {"standard": "codex-implementation-standard", "deep": "codex-review-deep"},
-    "pi": {"standard": "pi-implementation-standard", "deep": "pi-reasoning-high"},
+    # "light" is the mechanical-step tier (e.g. the close step): pi routes to its
+    # low-effort profile; codex has no sub-medium catalog option, so light == standard.
+    "codex": {
+        "standard": "codex-implementation-standard",
+        "deep": "codex-review-deep",
+        "light": "codex-implementation-standard",
+    },
+    "pi": {
+        "standard": "pi-implementation-standard",
+        "deep": "pi-reasoning-high",
+        "light": "pi-reasoning-low",
+    },
 }
 
 

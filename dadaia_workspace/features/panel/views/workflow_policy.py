@@ -225,9 +225,12 @@ def render_api_workflow_catalog_detail(
         qs: dict[str, list[str]] | None = None,
         **_kwargs: object,
     ) -> tuple[int, str, bytes]:
+        # A malformed id is, from the API consumer's perspective, simply not a
+        # workflow that exists — the ratified e2e contract (api-contracts E2E) expects
+        # 404 for any unknown name, never a 400 that leaks validation internals.
         if not workflow_id or not _WORKFLOW_ID_RE.match(workflow_id):
             return _json_response(
-                400, {"error": "invalid_workflow_id", "message": "Invalid workflow id."}
+                404, {"error": "not_found", "message": f"Workflow {workflow_id!r} not found."}
             )
         if catalog.workflow(workflow_id) is None:
             return _json_response(

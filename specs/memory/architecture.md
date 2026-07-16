@@ -15,7 +15,7 @@ tags:
 - workflows
 token_estimate: 1250
 last_updated: '2026-07-16'
-release_origin: v0.2.5
+release_origin: v0.2.7
 ---
 
 ## Overview
@@ -140,7 +140,7 @@ else); this table mirrors it:
 | `states/*model*policy*.json` | Layer-1/Layer-2 governance overlays |
 | `states/root_exceptions.txt` | operator-approved root-whitelist exceptions |
 | `states/import-manifest.json` | provenance of the last `dadaia import` |
-| `runs/lifecycle/` | workflow run state and immutable step payloads |
+| `runs/lifecycle/` | workflow run state (durable step payloads live in the Spec Context: `specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) |
 | `handoff/` | machine-readable agent handoffs |
 | `reports/` | optional human-readable reports |
 | `tmp/` | bounded ephemeral files (incl. `tmp/legacy-quarantine/`) |

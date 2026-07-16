@@ -56,7 +56,6 @@ _SHARED_IDS = {
     "shared.anti_slop",
     "shared.grill_questionnaire",
     "shared.memory_selection",
-    "shared.output_handoff",
     "shared.write_scope",
 }
 # No canonical workflow ships a deferred README-only directory.
@@ -127,13 +126,13 @@ def test_shipped_library_existence_derived_from_sequence_and_ladder() -> None:
 
 
 def test_load_by_id_and_path_round_trip_unknown_id_raises() -> None:
-    fragment = load_fragment("release_definition.spec_review_architecture")
-    assert fragment.id == "release_definition.spec_review_architecture"
+    fragment = load_fragment("release_definition.spec_review")
+    assert fragment.id == "release_definition.spec_review"
     assert fragment.workflow == "release_definition"
-    assert fragment.step == "spec_review_architecture"
+    assert fragment.step == "spec_review"
     assert fragment.output_schema == "spec-review-verdict-v1"
     assert "specs/memory/architecture.md" in fragment.static_inputs
-    assert fragment.body.startswith("# SPEC architecture review")
+    assert fragment.body.startswith("# SPEC review")
 
     loader = FragmentLoader()
     by_path = loader.load_fragment(Path("shared") / "anti-slop.md")
@@ -197,13 +196,11 @@ def test_workflow_dir_shape_matrix() -> None:
     assert ids == {
         "implementation.implement_tdd",
         "implementation.self_verify",
-        "implementation.qa_review",
-        "implementation.security_review",
-        "implementation.code_review",
+        "implementation.combined_review",
         "implementation.close_release",
     }
-    assert len(loader.list_fragments(workflow="shared")) == 5
-    assert len(loader.list_fragments(workflow="release_definition")) == 8
+    assert len(loader.list_fragments(workflow="shared")) == 4
+    assert len(loader.list_fragments(workflow="release_definition")) == 7
 
     dirs = set(loader.list_workflow_dirs())
     assert dirs >= _DEFERRED_WORKFLOW_DIRS

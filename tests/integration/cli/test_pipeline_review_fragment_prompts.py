@@ -99,8 +99,7 @@ def _install_recording_fake(monkeypatch: pytest.MonkeyPatch) -> _RecordingFake:
 @pytest.mark.parametrize(
     ("label", "marker"),
     [
-        ("review_security", "<!-- fragment:implementation.security_review -->"),
-        ("review_code", "<!-- fragment:implementation.code_review -->"),
+        ("review_combined", "<!-- fragment:implementation.combined_review -->"),
     ],
 )
 def test_pipeline_review_prompt_is_fragment_scoped_not_generic(

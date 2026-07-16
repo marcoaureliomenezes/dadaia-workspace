@@ -78,6 +78,9 @@ def test_pipeline_blocked_by_noncompliant_worker_carries_diagnostic_ref(
 ) -> None:
     workspace_root = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace_root)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
 
     noncompliant = _NoncompliantRuntime(AgentRuntimeKind.FAKE)
 
@@ -93,8 +96,6 @@ def test_pipeline_blocked_by_noncompliant_worker_carries_diagnostic_ref(
         [
             "lifecycle",
             "implementation-reviews",
-            "--context",
-            _CONTEXT,
             "--skip-preflight",
             "--release-id",
             _RELEASE,

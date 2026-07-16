@@ -4,11 +4,11 @@ The operator's two-layer model (v0.1.24 ADR-B) makes the Layer-2 worker model a
 **discrete choice on the CLI call**, not a tier abstraction. Each Layer-2 harness
 exposes an ordered, finite set of ``(model_id, reasoning_effort)`` options:
 
-- **pi → 4 options:** ``(openai-codex/gpt-5.5, high)``,
-  ``(openai-codex/gpt-5.5, low)``,
-  ``(openai-codex/gpt-5.5, medium)``,
+- **pi → 4 options:** ``(openai-codex/gpt-5.3-codex-spark, high)``,
+  ``(openai-codex/gpt-5.3-codex-spark, low)``,
+  ``(openai-codex/gpt-5.3-codex-spark, medium)``,
   ``(moonshotai/kimi-k2.5, high)``
-- **codex → 2 options:** ``(gpt-5.5, high)``, ``(gpt-5.5, medium)``
+- **codex → 2 options:** ``(gpt-5.3-codex-spark, high)``, ``(gpt-5.3-codex-spark, medium)``
 
 **Allowlist-validated invariant (ADR-B, opened v0.1.44).** PI runs on the operator's
 *Codex* subscription for GPT models, while a curated non-GPT Layer-2-native
@@ -75,14 +75,14 @@ class HarnessModelOption:
 # ---------------------------------------------------------------------------
 _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
     PI_HARNESS: (
-        HarnessModelOption("openai-codex/gpt-5.5", "high"),
-        HarnessModelOption("openai-codex/gpt-5.5", "low"),
-        HarnessModelOption("openai-codex/gpt-5.5", "medium"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "low"),
+        HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "medium"),
         HarnessModelOption("moonshotai/kimi-k2.5", "high"),
     ),
     CODEX_HARNESS: (
-        HarnessModelOption("gpt-5.5", "high"),
-        HarnessModelOption("gpt-5.5", "medium"),
+        HarnessModelOption("gpt-5.3-codex-spark", "high"),
+        HarnessModelOption("gpt-5.3-codex-spark", "medium"),
     ),
 }
 
@@ -181,7 +181,7 @@ def model_choices(harness: str) -> tuple[str, ...]:
     """Return the human-facing CLI ``--model`` choices for *harness*.
 
     Each choice is ``"<model_id>:<effort>"`` so the two distinct codex profiles of the
-    same model id remain individually selectable (``gpt-5.5:high`` vs ``gpt-5.5:medium``).
+    same model id remain individually selectable (``gpt-5.3-codex-spark:high`` vs ``gpt-5.3-codex-spark:medium``).
     Order matches :func:`options_for`.
     """
     return tuple(f"{opt.model_id}:{opt.effort}" for opt in options_for(harness))
@@ -193,7 +193,7 @@ def validate(harness: str, model: str) -> HarnessModelOption:
     *model* is matched against each option's ``"<model_id>:<effort>"`` choice string
     (the canonical CLI form) and, as a convenience, against a bare ``model_id`` **only
     when that id is unambiguous** for the harness (exactly one effort). This keeps the
-    unambiguous ids ergonomic while forcing ``openai-codex/gpt-5.5`` to be
+    unambiguous ids ergonomic while forcing ``openai-codex/gpt-5.3-codex-spark`` to be
     disambiguated by effort.
 
     Args:

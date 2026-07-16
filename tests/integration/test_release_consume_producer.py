@@ -194,16 +194,7 @@ Body that goes to the archive copy.
 def _define(args: list[str]) -> Result:
     return _runner.invoke(
         app,
-        [
-            "lifecycle",
-            "release-definition",
-            "--context",
-            _CONTEXT,
-            "--release-id",
-            _RELEASE,
-            "--json",
-            *args,
-        ],
+        ["lifecycle", "release-definition", "--release-id", _RELEASE, "--json", *args],
     )
 
 
@@ -213,8 +204,6 @@ def _close(args: list[str]) -> Result:
         [
             "lifecycle",
             "implementation-reviews",
-            "--context",
-            _CONTEXT,
             "--skip-preflight",
             "--release-id",
             _RELEASE,
@@ -240,6 +229,9 @@ def test_define_writes_ledger_close_removes_item_zero_stale_and_bad_consumes_fai
 ) -> None:
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
+    monkeypatch.setenv(
+        "DADAIA_CONTEXT", "dadaia-workspace"
+    )  # explicit rung (no first-ALIVE/terminal fallback)
     _install_fake_factory(monkeypatch)
     _plant_specs(workspace, consumes=_SLUG)
 

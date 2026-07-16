@@ -14,7 +14,8 @@ isolated ``CODEX_HOME`` that copies in only ``auth.json`` (chmod 600). The user'
 ``~/.codex`` is never modified.
 
 Verified facts encoded as assertions (see FACTS.md):
-  * headless ``codex exec`` fires all four event hooks;
+  * headless ``codex exec`` does NOT fire command hooks (documents the known
+    defect — bug ``codex-exec-hooks-do-not-fire-headless``);
   * the interactive ``codex`` TUI DOES fire all four event hooks;
   * the interactive TUI honors the legacy ``{"decision":"block"}`` envelope and
     blocks a FROZEN ``specs/_archive/`` write.
@@ -67,12 +68,15 @@ def sandbox() -> lib.CodexSandbox:
 
 
 @requires_live
-def test_hook_contract_headless_and_tui_fire_and_tui_honors_block(
+def test_hook_contract_headless_no_fire_tui_fires_and_honors_block(
     sandbox: lib.CodexSandbox,
 ) -> None:
     """Merged hook-contract fn (3 verified FACTS.md behaviors, opt-in, real codex binary):
 
-    1. Headless ``codex exec`` fires all four event hooks after an apply_patch turn.
+    1. Headless ``codex exec`` does NOT fire command hooks. Documents the known defect
+       (bug ``codex-exec-hooks-do-not-fire-headless``): the model performs the
+       apply_patch (the tool fires and the file is written), but NO
+       PreToolUse/PostToolUse/SessionStart marker is created.
     2. The interactive ``codex`` TUI fires all four event hooks — after one real model
        turn (apply_patch), every marker log grows.
     3. The interactive ``codex`` TUI blocks a FROZEN ``specs/_archive/`` write: the
@@ -80,7 +84,7 @@ def test_hook_contract_headless_and_tui_fire_and_tui_honors_block(
        (exit 0); codex honors it as DENY, so the committed frozen file is byte-identical
        before and after.
     """
-    # 1. Headless exec fires all four hooks.
+    # 1. Headless exec does not fire hooks.
     headless_fixture = lib.build_events_fixture(sandbox)
     result = lib.run_headless_exec(
         sandbox,
@@ -94,7 +98,11 @@ def test_hook_contract_headless_and_tui_fire_and_tui_honors_block(
             f"inconclusive (codex stderr tail: {result.stderr[-200:]!r})"
         )
     headless_fired = {e: lib.marker_fired(headless_fixture, e) for e in lib.MARKER_EVENTS}
-    assert all(headless_fired.values()), f"expected all headless event hooks, got {headless_fired}"
+    assert not any(headless_fired.values()), (
+        "EXPECTED no headless hooks to fire (known defect), but some did: "
+        f"{headless_fired}. If this passes, the headless-hooks defect may be fixed — "
+        "update FACTS.md and the bug."
+    )
 
     # 2. Interactive TUI fires all four event hooks.
     events_fixture = lib.build_events_fixture(sandbox)

@@ -11,6 +11,15 @@ max_context_policy: exact-files-only
 
 # TASKS create — author the task breakdown
 
+Every task MUST carry a checklist marker line in exactly this shape (the
+implementation pipeline parses it to reserve/complete tasks — a TASKS.md with no
+recognizable markers cannot be implemented):
+
+```markdown
+- [ ] **T1 - <short imperative title>**
+```
+
+
 You break the approved PLAN into concrete, implementable tasks. Each task is a unit
 of work an implementer can pick up and finish without guessing: it names its owner
 role, its write set, and how it is validated.
@@ -42,6 +51,11 @@ generic phrases such as "one value" or "one API", and never invent a binding mis
 from the approved PLAN.
 
 ## Rules
+
+- **When revising an existing TASKS.md, REWRITE THE WHOLE FILE.** Never append or
+  patch sections: a leftover tail from a prior draft creates duplicate task ids,
+  which is an automatic implementability rejection. One file, one consistent task
+  list, every id unique.
 
 - Group tasks so that two tasks with disjoint write sets can proceed independently,
   and never let two tasks claim the same path family without an explicit dependency

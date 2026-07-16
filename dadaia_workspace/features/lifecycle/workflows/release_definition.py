@@ -104,11 +104,6 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="release_scope",
         role="product-engineer",
         fragment_id="release_definition.release_scope",
-        shared_fragment_ids=(
-            "shared.grill_questionnaire",
-            "shared.output_handoff",
-            "shared.anti_slop",
-        ),
         produces="release-scope-handoff-v1",
     ),
     ReleaseStep(
@@ -116,7 +111,6 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         role="product-engineer",
         fragment_id="release_definition.spec_create",
         shared_fragment_ids=(
-            "shared.output_handoff",
             "shared.anti_slop",
             "shared.memory_selection",
         ),
@@ -130,26 +124,9 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         consumes=("release_scope",),
     ),
     ReleaseStep(
-        label="spec_arch_review",
-        role="software-architect",
-        fragment_id="release_definition.spec_review_architecture",
-        shared_fragment_ids=(
-            "shared.anti_slop",
-            "shared.output_handoff",
-            "shared.memory_selection",
-        ),
-        is_review=True,
-        produces="spec-review-handoff-v1",
-        consumes=("spec_create",),
-    ),
-    ReleaseStep(
-        label="spec_qa_review",
-        role="qa-engineer",
-        fragment_id="release_definition.spec_review_qa",
-        shared_fragment_ids=(
-            "shared.output_handoff",
-            "shared.memory_selection",
-        ),
+        label="spec_review",
+        role="software-architect, qa-engineer",
+        fragment_id="release_definition.spec_review",
         is_review=True,
         produces="spec-review-handoff-v1",
         consumes=("spec_create",),
@@ -159,7 +136,6 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         role="product-engineer",
         fragment_id="release_definition.plan_create",
         shared_fragment_ids=(
-            "shared.output_handoff",
             "shared.anti_slop",
             "shared.memory_selection",
         ),
@@ -176,11 +152,6 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="plan_review",
         role="qa-engineer, software-architect",
         fragment_id="release_definition.plan_review",
-        shared_fragment_ids=(
-            "shared.anti_slop",
-            "shared.output_handoff",
-            "shared.memory_selection",
-        ),
         is_review=True,
         produces="plan-review-handoff-v1",
         consumes=("plan_create",),
@@ -189,11 +160,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="tasks_create",
         role="product-engineer",
         fragment_id="release_definition.tasks_create",
-        shared_fragment_ids=(
-            "shared.output_handoff",
-            "shared.anti_slop",
-            "shared.memory_selection",
-        ),
+        shared_fragment_ids=("shared.anti_slop",),
         produces="generic-step-handoff-v1",
         extra_allowed_paths=(
             "repos/{context}/specs/releases/{release_id}/**",
@@ -207,10 +174,6 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
         label="tasks_implementability_review",
         role="software-engineer",
         fragment_id="release_definition.tasks_review_implementability",
-        shared_fragment_ids=(
-            "shared.output_handoff",
-            "shared.memory_selection",
-        ),
         is_review=True,
         produces="tasks-review-handoff-v1",
         consumes=("tasks_create",),
@@ -242,15 +205,33 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         sequence: tuple[ReleaseStep, ...] = _SEQUENCE,
         *,
         resume_from: str | None = None,
+        skip_scope: bool = False,
     ) -> ReleaseDefinitionResult:
-        """Execute the sequence; stop at the first blocked gate; advance on success."""
+        """Execute the sequence; stop at the first blocked gate; advance on success.
+
+        ``skip_scope=True`` (small-release fast path): when the CLI already consumed a
+        completed backlog-definition pick (injected as the authoritative prompt prefix),
+        the ``release_scope`` model step is a redundant restatement — it is dropped from
+        the sequence and its ``consumes`` edges are erased, saving one worker session.
+        """
+        if skip_scope:
+            from dataclasses import replace as _replace
+
+            sequence = tuple(
+                _replace(
+                    step,
+                    consumes=tuple(c for c in step.consumes if c != "release_scope"),
+                )
+                for step in sequence
+                if step.label != "release_scope"
+            )
         return self._run_sequence(run_id, sequence, resume_from=resume_from)
 
     #: Review-gate label → the SDD artifact it approves (bug
-    #: approved-review-never-flips-artifact-status). ``spec_qa_review`` is the LAST of
-    #: the two SPEC gates in the sequence, so the flip lands only when both passed.
+    #: approved-review-never-flips-artifact-status). ``spec_review`` is the single
+    #: merged SPEC gate (architecture + QA angles in one call, v0.2.x simplification).
     _STATUS_FLIP_BY_REVIEW: ClassVar[dict[str, str]] = {
-        "spec_qa_review": "SPEC.md",
+        "spec_review": "SPEC.md",
         "plan_review": "PLAN.md",
         "tasks_implementability_review": "TASKS.md",
     }
@@ -335,8 +316,11 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     def _tasks_hygiene_block(reason: str) -> BlockedState:
         return BlockedState(
             reason=f"TASKS command hygiene lint failed: {reason}",
-            blocked_at_step="tasks_command_hygiene_gate",
-            operator_command="restart release-definition from release_scope after fixing the workflow",
+            blocked_at_step="tasks_create",
+            operator_command=(
+                "re-run release-definition with --resume-from tasks_create "
+                "(only the TASKS authoring step re-executes)"
+            ),
             detail={"artifact": "TASKS.md", "gate": "task-command-hygiene-v1"},
         )
 
@@ -356,7 +340,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 index
                 for index, line in enumerate(lines)
                 if re.fullmatch(
-                    r"##\s+(?:\d+\.\s+)?validation dependency table",
+                    r"##\s+(?:\d+\s*[.)-]?\s+)?validation dependency table",
                     line.strip(),
                     flags=re.IGNORECASE,
                 )
@@ -376,7 +360,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             return self._plan_dependency_block(
                 "validation dependency table requires a header and at least one workstream row"
             )
-        header = [cell.strip().lower() for cell in table_lines[0].strip("|").split("|")]
+        header = [" ".join(cell.split()).lower() for cell in table_lines[0].strip("|").split("|")]
         expected = [
             "workstream",
             "produces by end",
@@ -386,7 +370,8 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         ]
         if header != expected:
             return self._plan_dependency_block(
-                "validation dependency table columns must exactly match the workflow contract"
+                "validation dependency table columns must match the workflow contract "
+                f"(case/whitespace-insensitive): expected {expected}, got {header}"
             )
 
         seen: set[int] = set()
@@ -418,8 +403,11 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     def _plan_dependency_block(reason: str) -> BlockedState:
         return BlockedState(
             reason=f"plan dependency lint failed: {reason}",
-            blocked_at_step="plan_dependency_gate",
-            operator_command="restart release-definition from release_scope after fixing the workflow",
+            blocked_at_step="plan_create",
+            operator_command=(
+                "re-run release-definition with --resume-from plan_create "
+                "(only the PLAN authoring step re-executes)"
+            ),
             detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
         )
 
