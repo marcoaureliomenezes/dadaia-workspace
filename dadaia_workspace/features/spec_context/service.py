@@ -443,9 +443,24 @@ class SpecContextService:
                 f"Context '{name}' has no materialized Git repository at '{repo_path}'."
             )
         if self._git.has_commits(repo_path):
-            raise ContextStateError(
-                f"Context '{name}' already has Git history; baseline is only for unborn repos."
-            )
+            # Convergent contract (bug baseline-refuses-alive-scaffold-commit):
+            # alive() commits its own scaffold, so history + clean tree is the
+            # canonical post-alive state — success, not refusal. Only a dirty tree
+            # on top of existing history refuses: operator content must never be
+            # swept into a "baseline" commit.
+            if self._git.is_dirty(repo_path):
+                raise ContextStateError(
+                    f"Context '{name}' already has Git history with uncommitted changes; "
+                    "baseline never commits on top of existing history. Commit or stash "
+                    "your changes first."
+                )
+            if push:
+                if not self._git.has_remote(repo_path):
+                    raise GitSyncError(
+                        f"Context '{name}' has no remote; baseline cannot push."
+                    )
+                self._git.push(repo_path)
+            return ctx
         if not self._git.is_dirty(repo_path):
             raise ContextStateError(
                 f"Context '{name}' has no scaffold content to commit as a baseline."

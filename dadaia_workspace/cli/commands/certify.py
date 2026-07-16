@@ -26,7 +26,12 @@ def certify(
         anchor_root = resolve_workspace_root()
     except WorkspaceNotInitializedError:
         anchor_root = Path(tempfile.mkdtemp(prefix="dadaia-certify-"))
-        typer.echo(f"[info] no initialized workspace here; using disposable anchor {anchor_root}")
+        # stderr, not stdout: --json consumers parse stdout as one JSON document
+        # (bug certify-json-stdout-polluted-info-line).
+        typer.echo(
+            f"[info] no initialized workspace here; using disposable anchor {anchor_root}",
+            err=True,
+        )
     result = container.run_certification(anchor_root, keep=keep)
     payload = result.to_dict()
     if json_output:

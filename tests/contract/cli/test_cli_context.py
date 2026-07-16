@@ -571,9 +571,22 @@ def test_context_baseline_creates_and_pushes_initial_history(
     )
     assert remote_head.returncode == 0, remote_head.stderr
 
+    # Bug baseline-refuses-alive-scaffold-commit: baseline is CONVERGENT — a repo
+    # that already carries history with a clean tree is success (idempotent no-op),
+    # not a refusal. alive() commits its own scaffold, so the canonical
+    # create -> alive -> baseline flow always reaches this state.
     repeated = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
-    assert repeated.exit_code != 0
-    assert "already has Git history" in repeated.output
+    assert repeated.exit_code == 0, repeated.output
+
+    repushed = _runner.invoke(app, ["context", "baseline", "baseline", "--yes", "--push"])
+    assert repushed.exit_code == 0, repushed.output
+
+    # A dirty tree on top of existing history is NOT a baseline situation —
+    # operator content must never be swept into a "baseline" commit.
+    (repo / "operator-notes.md").write_text("do not auto-commit me", encoding="utf-8")
+    dirty = _runner.invoke(app, ["context", "baseline", "baseline", "--yes"])
+    assert dirty.exit_code != 0
+    assert "already has Git history" in dirty.output
 
 
 # ---------------------------------------------------------------------------

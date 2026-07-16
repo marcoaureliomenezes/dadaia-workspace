@@ -155,6 +155,29 @@ def test_extract_creates_files_and_skips_env_files(tmp_path: Path) -> None:
     assert not (dest2 / ".env").exists()  # .env was skipped
 
 
+def test_extract_relocates_export_manifest_off_the_root(tmp_path: Path) -> None:
+    """Bug import-extracts-manifest-to-root (validation F-16): archive metadata must
+    never land at the workspace root — the imported workspace has to pass the tool's
+    own doctor (ROOT-1). Provenance is preserved under .dadaia/states/."""
+    archive = tmp_path / "ws.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        manifest = b'{"version": "1"}'
+        info = tarfile.TarInfo("export-manifest.json")
+        info.size = len(manifest)
+        tar.addfile(info, io.BytesIO(manifest))
+        payload = b"content"
+        info2 = tarfile.TarInfo(".dadaia/states/spec_contexts.json")
+        info2.size = len(payload)
+        tar.addfile(info2, io.BytesIO(payload))
+    dest = tmp_path / "ws-out"
+    svc = ImportService(workspace_root=dest)
+    svc.extract(archive, dest, skip_mnt=False)
+    assert not (dest / "export-manifest.json").exists()
+    assert (dest / ".dadaia" / "states" / "import-manifest.json").read_bytes() == (
+        b'{"version": "1"}'
+    )
+
+
 # ---------------------------------------------------------------------------
 # patch_state() — rewrite + clears-primary / no-file / non-dict entries
 # ---------------------------------------------------------------------------
