@@ -46,11 +46,15 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
   F-02 (certify-green while reconcile-red, or vice versa, is a FAIL of this statement).
 
 ### F-04 — Doctors
-- Run in an initialized workspace: `$D doctor`; `$D specs init >/dev/null && $D specs
-  doctor`; `$D public doctor`.
-- **PASS if:** each exits 0 on the clean tree. Then seed one violation (e.g. `mkdir
-  .dadaia/nonsense`) and rerun `$D doctor` — **PASS also requires** it now exits
-  non-zero naming ROOT-4 for the stray dir.
+- Run in an initialized workspace: `$D doctor`; `$D public doctor`; and a specs tree
+  INSIDE a repo: `mkdir -p repos/valproj && $D specs init --specs-dir
+  repos/valproj/specs && $D specs doctor --specs-dir repos/valproj/specs`.
+- Also assert coherence: bare `$D specs init` AT the workspace root must REFUSE
+  (Root Law — init must not create what doctor refuses), exit non-zero, no `specs/`
+  created.
+- **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree, the root
+  `specs init` refusal holds, and seeding one violation (`mkdir .dadaia/nonsense`)
+  makes `$D doctor` exit non-zero naming ROOT-4.
 
 ### F-05 — Projections
 - Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
@@ -62,9 +66,11 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
 - Run: `$D context create alpha --repo alpha --url file:///tmp/f06/src.git`;
   `$D context list --json`; `$D context show alpha --json`; `$D context alive alpha`;
   `$D context dead alpha`.
-- **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones and flips to
-  `alive`; `dead` flips back; and a guard fails cleanly (`$D context dead ghost` exits
-  non-zero with a clear message, no traceback).
+- **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND
+  commits its own scaffold (repo left clean — `git status --porcelain` empty of
+  tool-created files); `dead` flips back WITHOUT the untracked-consent refusal (the
+  tool must never refuse its own scaffold); and a guard fails cleanly (`$D context
+  dead ghost` exits non-zero with a clear message, no traceback).
 
 ### F-07 — Bind & session identity
 - Setup: initialized workspace with one alive context `beta`; export a STABLE id:
@@ -77,12 +83,17 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
   session record exists after the two binds.
 
 ### F-08 — SDD gate & chokepoints
-- Run the projected pre-gate hook directly with JSON payloads (no workflow needed):
-  a Write to `specs/bugs/x.md` (ADDITIVE), to `specs/_archive/x.md` (FROZEN), to
-  `.dadaia/sessions/x` (PROTECTED), and a new root dir.
-- **PASS if:** ADDITIVE returns `allow`; FROZEN and PROTECTED and the new-root-dir
-  return `block` with a reason. (Each is one hook invocation with a deterministic
-  decision — that IS the demonstration.)
+- Run the projected pre-gate hook directly with JSON payloads (no workflow needed).
+  IMPORTANT: path-class payloads use IN-REPO paths (`repos/valproj/specs/...`) — a
+  bare root `specs/...` write is intercepted FIRST by the root-whitelist (that is a
+  separate, correct decision, asserted on its own):
+  - `repos/valproj/specs/bugs/x.md` (ADDITIVE) → expect `allow`;
+  - `repos/valproj/specs/_archive/x.md` (FROZEN) → expect `block`;
+  - `.dadaia/sessions/x` (PROTECTED) → expect `block`;
+  - `newdir/x.md` (new top-level root entry) → expect `block` naming the root
+    whitelist.
+- **PASS if:** all four decisions match. (Each is one deterministic hook invocation —
+  that IS the demonstration.)
 
 ### F-09 — Bugs ledger
 - Run: `$D bugs append --event reported --bug-id valbug ...all required fields...`;
@@ -91,8 +102,9 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
   one exits non-zero and writes nothing.
 
 ### F-10 — Backlog governance
-- Run in a workspace with a specs tree: `$D specs doctor --json` (must be valid JSON);
-  add a backlog item missing `intents[]` and run the backlog doctor path.
+- Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
+  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]`
+  under `repos/valproj/specs/backlog/` and run the backlog doctor path.
 - **PASS if:** `specs doctor --json` emits parseable JSON exit 0; the malformed backlog
   item is flagged BL-SCHEMA.
 
@@ -110,9 +122,12 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
   (non-zero, names the failure).
 
 ### F-13 — Panel
-- Run: `$D panel` bound to a free port in the background; `curl -fsS localhost:<port>/`.
-- **PASS if:** HTTP 200 and the server registry has the port; stop the server after.
-  If the env cannot bind a port, mark **EXCEPTION**.
+- Run: `$D panel --no-open --port <p>` in the background; `curl -fsS localhost:<p>/`;
+  `$D server list` WHILE the panel is up; then stop the panel.
+- **PASS if:** HTTP 200; `server list` shows port `<p>` registered to `dadaia-panel`
+  while running (the panel self-registers per the dev-server-registry law); and the
+  entry is released after a clean stop. If the env cannot bind a port, mark
+  **EXCEPTION**.
 
 ### F-14 — Server registry
 - Run: `$D server register --port <p> --project val`; `$D server list`; register the
@@ -165,11 +180,11 @@ workspace, create it: `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness
   produced a raw Python traceback (a traceback anywhere is a FAIL of this statement).
 
 ### F-23 — Harness canaries
-- Run the projected hooks directly: pre-gate (F-08 covers the block path) and
-  ctx-inject SessionStart with a JSON payload.
-- **PASS if:** the hooks execute exit 0 and the pre-gate produces the expected
-  allow/block decisions. An empty stdout from ctx-inject on a fresh unbound session is
-  the CORRECT result (generic preflight only), not a failure.
+- Run the projected hooks directly: pre-gate with the F-08 payload set (in-repo paths,
+  same expected decisions) and ctx-inject SessionStart with a JSON payload.
+- **PASS if:** the hooks execute exit 0 and the pre-gate reproduces the F-08 decisions.
+  An EMPTY stdout from ctx-inject on a fresh unbound session is the CORRECT result
+  (generic preflight only — injection is bind-driven), not a failure.
 
 ---
 **Verdict line (Telegram-short, last line of output):**

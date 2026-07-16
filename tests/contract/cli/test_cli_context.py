@@ -648,3 +648,28 @@ def test_show_unbound_human_output_is_calm(workspace: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Traceback" not in result.output
     assert "No active context" in result.output
+
+
+def test_bind_env_id_with_harness_id_yields_single_record(workspace: Path, monkeypatch) -> None:
+    """Bug validation-027-f-07: DADAIA_SESSION_ID + harness id set -> ONE record only.
+
+    The residual harness-alias dual-write recreated the identity divergence the
+    original bind-session-id-divergence fix removed: two records for one session.
+    The resolved identity (env id first) owns the ONLY record.
+    """
+    from dadaia_workspace.features.spec_context import session_identity
+
+    _register_alive_ctx(workspace)
+    monkeypatch.setenv("DADAIA_SESSION_ID", "sess_envfixed")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-native-xyz")
+
+    for _ in range(2):
+        result = _runner.invoke(app, ["context", "bind", "myctx"])
+        assert result.exit_code == 0, result.output
+        assert "sess_envfixed" in result.output
+
+    sessions_dir = workspace / ".dadaia" / "sessions"
+    records = sorted(p.name for p in sessions_dir.glob("*.json"))
+    assert records == ["sess_envfixed.json"], f"expected ONE record, got: {records}"
+    rec = session_identity.read_session(workspace, "sess_envfixed")
+    assert rec is not None and rec["session_id"] == "sess_envfixed"

@@ -389,6 +389,17 @@ class SpecContextService:
         if not repo_agents_dst.exists() and repo_agents_src.exists():
             shutil.copy2(repo_agents_src, repo_agents_dst)
 
+        # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
+        # validation-027 F-06): leaving tool-created files untracked made an immediate
+        # dead() refuse via the untracked-consent guard, so create->alive->dead could
+        # never complete on a fresh context. Only tool-authored files are involved here;
+        # operator-created untracked files still hit dead()'s guard as designed (F-5).
+        with contextlib.suppress(Exception):
+            if self._git.is_git_root(repo_path) and self._git.is_dirty(repo_path):
+                self._git.commit_all(
+                    repo_path, "chore(scaffold): dadaia context alive specs baseline"
+                )
+
         ctx_fresh = self._store.get(name)
         if ctx_fresh is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")

@@ -505,20 +505,12 @@ def bind(
 
     # Persist the CLI session and, when available, the harness-native session record. There
     # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.
+    # Exactly ONE record per session, keyed by the resolved identity. The former
+    # harness-alias dual-write (env id != harness id -> second record) recreated the
+    # identity divergence this resolution order exists to prevent (consumer validation
+    # F-07, 2026-07-15): hooks resolve DADAIA_SESSION_ID first too, so the alias never
+    # carried information the primary record does not.
     session_identity.write_session(workspace_root, session_id, session_data)
-    # No duplicate record: when a harness-native id exists it IS session_id above (the
-    # divergent dual-write was the bind-session-id-divergence bug). The only remaining
-    # alias case is an explicit DADAIA_SESSION_ID that differs from the harness id —
-    # keep the harness-keyed record in sync then, so hook payload-side resolution
-    # (which prefers the harness id) still sees this bind.
-    harness_id = harness_session_id()
-    if harness_id and harness_id != session_id:
-        with contextlib.suppress(ValueError, OSError):
-            session_identity.write_session(
-                workspace_root,
-                harness_id,
-                {**session_data, "session_id": harness_id},
-            )
     # The bind epoch is the sole context-memory injection trigger.
     session_identity.write_bind_epoch(
         workspace_root,
