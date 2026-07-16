@@ -116,9 +116,12 @@ an initialized workspace, create it:
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
   do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run: `$D bugs append --event reported --bug-id valbug ...all required fields...
-  --specs-dir repos/vp/specs`; `$D bugs status --specs-dir repos/vp/specs`; then
-  `$D bugs append --event reported --bug-id x --specs-dir repos/vp/specs` (missing fields).
+- Run the complete append with EVERY required `reported` field —
+  `--event reported --bug-id valbug --reported-by selfrun --title t --severity LOW
+  --surface s --component c --context vp --tag x --symptom sy --repro rp --expected ex
+  --notes no --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
+  then an INCOMPLETE append `$D bugs append --event reported --bug-id x --specs-dir
+  repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
 
@@ -146,7 +149,12 @@ an initialized workspace, create it:
   — but the reject-undefined guards above run without any model.
 
 ### F-12 — Reports & handoffs
-- Setup: write a minimal valid handoff JSON to a file, and a tampered copy.
+- Setup: write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
+  `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
+  `scope`, `metrics:{}`, `self_pull:{"refs":[<one ref that EXISTS on disk, e.g. "AGENTS.md">]}`,
+  `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
+  `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
+  Also write a tampered copy (e.g. `schema_version:"handoff-BOGUS"` and drop `agent`).
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
   (non-zero, names the failure).
@@ -172,8 +180,9 @@ an initialized workspace, create it:
   which masks them.
 
 ### F-15 — Memory & injection
-- Setup: a scaffolded specs tree that is doctor-clean (`$D specs init --specs-dir S`;
-  confirm `$D specs doctor --specs-dir S` reports **0 errors AND 0 warnings**).
+- Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&
+  $D specs init --specs-dir S`) that is doctor-clean — confirm `$D specs doctor
+  --specs-dir S` reports **0 errors AND 0 warnings**.
 - Run: `$D memory product add <slug> --specs-dir S`; `$D memory catalog generate
   --specs-dir S`; then `$D specs doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
