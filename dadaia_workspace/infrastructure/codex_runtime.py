@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import get_args
 
+from dadaia_workspace.core.exceptions import CodexConfigError
 from dadaia_workspace.core.model_registry import CodexEffort, codex_tier_views
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -130,7 +131,7 @@ class CodexExecConfig:
             resolved = os.environ.get(_DADAIA_CODEX_SANDBOX_ENV) or _DEFAULT_CODEX_SANDBOX
         if resolved not in _ACCEPTED_SANDBOX_VALUES:
             valid = ", ".join(sorted(_ACCEPTED_SANDBOX_VALUES))
-            raise ValueError(
+            raise CodexConfigError(
                 f"invalid Codex sandbox mode {resolved!r}; valid: {valid} "
                 f"(set via CodexExecConfig(sandbox=...) or the {_DADAIA_CODEX_SANDBOX_ENV} "
                 "environment variable)"

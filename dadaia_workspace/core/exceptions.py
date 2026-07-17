@@ -154,3 +154,13 @@ class PlatformCapabilityError(DadaiaError):
 
 class WorkspaceVenvBootstrapError(RuntimeError):
     """Workspace venv bootstrap could not install the running distribution."""
+
+
+class CodexConfigError(DadaiaError, ValueError):
+    """Invalid Codex adapter configuration (e.g. an unknown ``DADAIA_CODEX_SANDBOX`` value).
+
+    Inherits ``ValueError`` (back-compat: existing callers catch ValueError) AND
+    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
+    traceback (bug doctor-uninitialized-workspace-traceback class). A stale dadaia that
+    predates a newer sandbox value must fail cleanly, not crash.
+    """

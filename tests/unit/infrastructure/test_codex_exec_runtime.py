@@ -674,7 +674,10 @@ def test_sandbox_bypass_mode_emits_dangerously_bypass_and_omits_sandbox(tmp_path
     (mutually exclusive with `--sandbox`) so a trusted containerized consumer can run."""
     argv = _capture_argv(
         CodexExecConfig(
-            cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium",
+            cwd=tmp_path,
+            codex_bin="/usr/bin/codex",
+            model="m",
+            reasoning_effort="medium",
             sandbox="danger-bypass",
         )
     )
@@ -687,7 +690,10 @@ def test_normal_sandbox_mode_emits_sandbox_and_no_bypass(tmp_path: Path) -> None
     never the bypass flag."""
     argv = _capture_argv(
         CodexExecConfig(
-            cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium",
+            cwd=tmp_path,
+            codex_bin="/usr/bin/codex",
+            model="m",
+            reasoning_effort="medium",
             sandbox="read-only",
         )
     )
@@ -698,5 +704,19 @@ def test_normal_sandbox_mode_emits_sandbox_and_no_bypass(tmp_path: Path) -> None
 def test_sandbox_bypass_selectable_via_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The single env choke point DADAIA_CODEX_SANDBOX accepts the bypass sentinel."""
     monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "danger-bypass")
-    cfg = CodexExecConfig(cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium")
+    cfg = CodexExecConfig(
+        cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium"
+    )
     assert cfg.bypass_sandbox is True
+
+
+def test_invalid_sandbox_error_is_dadaia_error_for_clean_cli(tmp_path: Path) -> None:
+    """An unknown DADAIA_CODEX_SANDBOX value must fail CLEANLY, not as a raw traceback: the
+    error is a DadaiaError (so _safe_app renders one line) AND a ValueError (back-compat).
+    A stale dadaia predating a newer sandbox value must not crash with a traceback."""
+    from dadaia_workspace.core.exceptions import CodexConfigError, DadaiaError
+
+    with pytest.raises(CodexConfigError) as exc:
+        CodexExecConfig(cwd=tmp_path, sandbox="totally-bogus")
+    assert isinstance(exc.value, DadaiaError)
+    assert isinstance(exc.value, ValueError)
