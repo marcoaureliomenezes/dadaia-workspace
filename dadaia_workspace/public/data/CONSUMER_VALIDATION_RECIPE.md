@@ -127,10 +127,13 @@ an initialized workspace, create it:
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
-  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]`
-  under `repos/valproj/specs/backlog/` and run the backlog doctor path.
-- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; the malformed backlog
-  item is flagged BL-SCHEMA.
+  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]` at
+  status `candidate` under `repos/valproj/specs/backlog/`, then run the backlog-specific
+  doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT `specs doctor`, which
+  validates candidates.md format; BL-SCHEMA is the `backlog doctor` path). Assert its exit
+  code directly, not through a pipe.
+- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
+  flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
 
 ### F-11 — Lifecycle workflows present & gated
 - Run: `$D lifecycle --help` and each of `backlog-definition|release-definition|
@@ -229,9 +232,10 @@ an initialized workspace, create it:
 ### F-19 — Plugins
 - Run in an initialized workspace: `$D plugin list`.
 - **PASS if:** it lists installed packs (empty set on a fresh workspace is a valid
-  answer — exit 0, "no plugins", NOT an error). Then `$D plugin install <pack>` records
-  the ledger and doctor stays green. `plugin list` in an UNINITIALIZED dir returning a
-  clean "run init first" message (non-zero) is acceptable, not a FAIL.
+  answer — exit 0, "no plugins", NOT an error). Then install one of the two in-package
+  packs — `$D plugin install frontend-design` (or `devops`) — which records the ledger and
+  leaves doctor green. `plugin list` in an UNINITIALIZED dir returning a clean "run init
+  first" message (non-zero) is acceptable, not a FAIL.
 
 ### F-20 — Academy
 - Run: `$D academy --help` and a read verb.
