@@ -19,6 +19,7 @@ from dataclasses import Field, dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Protocol
 
+from dadaia_workspace.core.exceptions import TasksMarkerStateError
 from dadaia_workspace.core.harness_models import (
     CODEX_HARNESS,
     HarnessModelOption,
@@ -483,7 +484,9 @@ class LifecyclePipeline:
             # artifacts. The normal CLI preflight owns the missing-file gate.
             return
         except OSError as exc:
-            raise RuntimeError(f"cannot validate task markers at {boundary}: {path}") from exc
+            raise TasksMarkerStateError(
+                f"cannot validate task markers at {boundary}: {path}"
+            ) from exc
 
         markers: list[str] = []
         for line in text.splitlines():
@@ -493,11 +496,15 @@ class LifecyclePipeline:
                     markers.append(match.group("marker"))
                     break
         if not markers:
-            raise RuntimeError(f"no recognizable task markers at {boundary}: {path}")
+            raise TasksMarkerStateError(
+                f"no recognizable task markers at {boundary}: {path}. TASKS.md must "
+                "declare at least one task line the pipeline grammar recognizes "
+                "(e.g. '- [ ] T-1 - <title>')."
+            )
         unexpected = sorted({marker for marker in markers if marker not in allowed})
         if unexpected:
             rendered = ", ".join(f"[{marker}]" for marker in unexpected)
-            raise RuntimeError(
+            raise TasksMarkerStateError(
                 f"invalid task marker state at {boundary}: found {rendered} in {path}"
             )
 

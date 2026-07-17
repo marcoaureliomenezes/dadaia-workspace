@@ -164,3 +164,14 @@ class CodexConfigError(DadaiaError, ValueError):
     traceback (bug doctor-uninitialized-workspace-traceback class). A stale dadaia that
     predates a newer sandbox value must fail cleanly, not crash.
     """
+
+
+class TasksMarkerStateError(DadaiaError, RuntimeError):
+    """TASKS.md marker state does not match a pipeline boundary contract.
+
+    Inherits ``RuntimeError`` (back-compat: pre-existing callers catch RuntimeError) AND
+    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
+    traceback (bug implementation-reviews-tasks-marker-traceback, F-22 class): running
+    ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
+    recognizable task markers is an operator-facing condition, never a crash.
+    """

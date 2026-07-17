@@ -942,30 +942,76 @@ def _implementation_runtime_factory(
     workspace_root: Path,
     *,
     context: str,
+    release_id: str | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Per-step runtime factory for the implementation-reviews workflow.
 
     ``FAKE`` resolves to a driving APPROVED result carrying artifact evidence, so
     ``implementation-reviews --harness fake`` is a deterministic workflow-wiring smoke test
     instead of always blocking at ``implement`` with ``agent result missing artifact
-    evidence``. Real harnesses (pi/codex) resolve to their live adapters; the
-    policy-resolved concrete model reaches each adapter through
-    ``request.resolved_model`` (threaded by ``apply_resolved_policy``).
+    evidence``. The driving fake is STEP-AWARE (bug
+    certification-passes-without-complete-workflow-chain): the declared ref lives in the
+    worker raw-output zone (`.dadaia/tmp/lifecycle-worker/<ctx>/**` — the previous
+    `.dadaia/handoff/...` ref was out-of-scope and always blocked the implement step),
+    and the terminal ``close`` step also materializes its declared CLOSURE.md
+    deliverable, so ``--harness fake`` walks the whole implement→review→close ladder.
+    Real harnesses (pi/codex) resolve to their live adapters; the policy-resolved
+    concrete model reaches each adapter through ``request.resolved_model``.
 
     Seam-preserving: FAKE still routes THROUGH ``container.build_agent_runtime`` — a
     test-injected scripted fake (monkeypatched builder: custom result or on_run hook) is
     respected verbatim; only the PLAIN default fake is upgraded to the driving result.
     """
     from dadaia_workspace import container
-    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
+        AgentRunResult,
+        AgentRunStatus,
+    )
     from dadaia_workspace.infrastructure import fake_runtime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake pipeline worker: APPROVED",
-        artifact_refs=(f".dadaia/handoff/{context}/pipeline-step.handoff.json",),
-        structured_output={"verdict": "APPROVED"},
-    )
+    step_output_ref = f".dadaia/tmp/lifecycle-worker/{context}/pipeline-step.step-output.json"
+
+    def _driving_result(request: AgentRunRequest) -> AgentRunResult:
+        task_id = request.task_id or ""
+        parts = task_id.split(":")
+        label = parts[1] if len(parts) > 1 else ""
+        refs = [step_output_ref]
+        if label == "close" and release_id is not None:
+            specs_prefix = (
+                f"repos/{context}/specs"
+                if (workspace_root / "repos" / context / "specs").is_dir()
+                else "specs"
+            )
+            closure_ref = f"{specs_prefix}/releases/{release_id}/CLOSURE.md"
+            refs.append(closure_ref)
+            closure = workspace_root / closure_ref
+            if not closure.exists():
+                closure.parent.mkdir(parents=True, exist_ok=True)
+                closure.write_text(
+                    "# CLOSURE: driving-fake stub\n\n> **Status:** Draft\n\n"
+                    "Deterministic driving-fake closure deliverable.\n",
+                    encoding="utf-8",
+                )
+        target = workspace_root / step_output_ref
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                '{"fake": true, "summary": "driving-fake stub artifact"}\n', encoding="utf-8"
+            )
+        return AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary="fake pipeline worker: APPROVED",
+            artifact_refs=tuple(refs),
+            structured_output={"verdict": "APPROVED"},
+        )
+
+    class _ImplementationDrivingFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            return _driving_result(request)
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         runtime = container.build_agent_runtime(kind, cwd=workspace_root)
@@ -974,9 +1020,7 @@ def _implementation_runtime_factory(
             and isinstance(runtime, fake_runtime.FakeAgentRuntime)
             and runtime.is_plain_default
         ):
-            # Attribute access (not a from-import) so test seams patching the CLASS on
-            # the infrastructure module are honored here too.
-            return fake_runtime.FakeAgentRuntime(result=approving, materialize_root=workspace_root)
+            return _ImplementationDrivingFake()
         return runtime
 
     return factory
@@ -1170,7 +1214,9 @@ def pipeline(
         policy_snapshot=snapshot,
         # The driving-fake-aware factory lets `--harness fake` complete the smoke path
         # with artifact evidence.
-        runtime_factory=_implementation_runtime_factory(workspace_root, context=context),
+        runtime_factory=_implementation_runtime_factory(
+            workspace_root, context=context, release_id=release_id
+        ),
         max_review_retries=max_review_retries,
     )
     result = pipe.run(run_id, steps)
