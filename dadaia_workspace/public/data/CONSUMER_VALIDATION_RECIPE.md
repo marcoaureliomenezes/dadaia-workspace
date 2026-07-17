@@ -40,7 +40,7 @@ D=/tmp/val-venv/bin/dadaia
 
 `DADAIA_BOOTSTRAP_PACKAGE` makes every workspace-venv bootstrap (`init`, `certify`,
 `reconcile`) install the CANDIDATE wheel itself instead of pinning the version from
-PyPI — the fast path for a candidate under validation. Since 0.3.2 the bootstrap also
+PyPI — the fast path for a candidate under validation. The bootstrap also
 self-heals WITHOUT the export by re-packing the running installed distribution as a
 local wheel when the index cannot resolve the exact version — F-25 asserts that path
 deliberately unset. Destructive statements use
@@ -300,7 +300,7 @@ an initialized workspace, create it:
   `**Status:** Aprovado`, `TASKS.md` exists, and `releases/ACTIVE.md` points at the
   release in IMPLEMENTATION; after (4) `releases/v0.0.1/CLOSURE.md` exists. The
   documented fake path walks the WHOLE user flow — any deterministic block in this
-  chain is a FAIL (the pre-0.3.2 "honest block" behavior is retired). Also: re-running
+  chain is a FAIL (the former "honest block" behavior is retired). Also: re-running
   ANY of the four steps with its SAME completed `--run-id` must be REFUSED cleanly —
   non-zero exit, one line naming the refusal (`already COMPLETED`, fresh --run-id
   guidance), no traceback, and NO re-execution of the ladder (probe at least steps (1)
