@@ -59,6 +59,18 @@ _VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
     {"read-only", "workspace-write", "danger-full-access"}
 )
 
+#: An opt-in dadaia-level directive (NOT a codex `--sandbox` value): run codex with
+#: `--dangerously-bypass-approvals-and-sandbox` — no sandbox at all — instead of
+#: `--sandbox <mode>`. Codex's `--sandbox` modes (even danger-full-access) still set up a
+#: sandbox namespace via bwrap, which CANNOT be created in a nested/unprivileged container
+#: (bug codex-adapter-cannot-run-in-nested-container: "No permissions to create a new
+#: namespace"). The bypass skips that entirely. Safe ONLY where the OUTER container is the
+#: trust boundary (e.g. the Hermes worker, which already runs its own agent this way) — so
+#: it is opt-in via DADAIA_CODEX_SANDBOX and never the default; the outer `dadaia lifecycle`
+#: allowed-paths/review gates remain the real security boundary (same reasoning as FR5).
+_SANDBOX_BYPASS = "danger-bypass"
+_ACCEPTED_SANDBOX_VALUES: frozenset[str] = _VALID_CODEX_SANDBOX_MODES | {_SANDBOX_BYPASS}
+
 #: FR5 (v0.1.66) — the environment-variable override read at ``CodexExecConfig``
 #: construction (the single choke point — architect finding MEDIUM-1). Overrides the
 #: compiled-in "read-only" default ONLY when the caller did not pass an explicit
@@ -116,8 +128,8 @@ class CodexExecConfig:
         resolved = self.sandbox
         if resolved is None:
             resolved = os.environ.get(_DADAIA_CODEX_SANDBOX_ENV) or _DEFAULT_CODEX_SANDBOX
-        if resolved not in _VALID_CODEX_SANDBOX_MODES:
-            valid = ", ".join(sorted(_VALID_CODEX_SANDBOX_MODES))
+        if resolved not in _ACCEPTED_SANDBOX_VALUES:
+            valid = ", ".join(sorted(_ACCEPTED_SANDBOX_VALUES))
             raise ValueError(
                 f"invalid Codex sandbox mode {resolved!r}; valid: {valid} "
                 f"(set via CodexExecConfig(sandbox=...) or the {_DADAIA_CODEX_SANDBOX_ENV} "
@@ -140,6 +152,16 @@ class CodexExecConfig:
         """
         assert self.sandbox is not None, "CodexExecConfig.__post_init__ always resolves sandbox"
         return self.sandbox
+
+    @property
+    def bypass_sandbox(self) -> bool:
+        """True iff the resolved directive is the opt-in no-sandbox bypass.
+
+        When True, ``_command`` emits ``--dangerously-bypass-approvals-and-sandbox`` INSTEAD
+        of ``--sandbox <mode>`` (the two are mutually exclusive) so codex runs without a
+        sandbox namespace — the only way it executes inside a nested/unprivileged container.
+        """
+        return self.sandbox == _SANDBOX_BYPASS
 
 
 class CodexExecAdapter(SubprocessAdapterMixin):
@@ -281,8 +303,17 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             # reasoning as the sandbox override in FR5) — this flag governs only whether
             # codex itself refuses to run, not what it is permitted to write.
             "--skip-git-repo-check",
-            "--sandbox",
-            self._config.resolved_sandbox,
+            # Sandbox posture: normally `--sandbox <mode>` (secure default read-only). The
+            # opt-in `danger-bypass` directive instead runs codex WITHOUT a sandbox
+            # (`--dangerously-bypass-approvals-and-sandbox`) — mutually exclusive with
+            # `--sandbox` — the only way codex executes inside a nested/unprivileged
+            # container where its sandbox namespace (bwrap) cannot be created (bug
+            # codex-adapter-cannot-run-in-nested-container).
+            *(
+                ["--dangerously-bypass-approvals-and-sandbox"]
+                if self._config.bypass_sandbox
+                else ["--sandbox", self._config.resolved_sandbox]
+            ),
             "--cd",
             str(self._config.cwd),
             "--output-last-message",
