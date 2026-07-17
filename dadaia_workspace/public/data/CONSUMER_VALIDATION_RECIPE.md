@@ -345,8 +345,15 @@ an initialized workspace, create it:
   diagnostic (the blocked detail references the diagnostic; the payload is never a
   bare "codex exec completed" that sails through to fail later at
   `backlog_review_gate` with no worker trace). Blocking at `backlog_review_gate` with
-  an empty-payload author step marked `accepted` is a FAIL of this statement. Mark
-  **EXCEPTION** only if no codex binary/credentials exist in the environment.
+  an empty-payload author step marked `accepted` is a FAIL of this statement.
+  **Chain continuation:** when the live backlog run COMPLETES, the pick must be
+  CONSUMABLE — inspect the promoted `backlog_author` ledger payload (it must carry a
+  `specs/backlog/` path, e.g. `authored_backlog_paths`; a bare "codex exec completed"
+  payload is a FAIL — bug backlog-author-bare-payload-breaks-release-handoff class)
+  and then run `release-definition` for the same context/release: it must ACCEPT the
+  authoritative pick (never refuse with "produced no exact specs/backlog artifact
+  path"). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  environment.
 
 ---
 **Verdict line (Telegram-short, last line of output):**

@@ -258,3 +258,46 @@ def test_author_prompt_carries_canonical_anchor_digest(tmp_path: Path) -> None:
     assert "pkg/a.py#A" in author_prompt
     # The instruction makes the contract explicit: refs come FROM this list.
     assert "backlog_review_gate" in author_prompt
+
+
+def test_bare_worker_payload_is_enriched_with_authored_item_paths(tmp_path: Path) -> None:
+    """Bug backlog-author-bare-payload-breaks-release-handoff (Hermes live chain).
+
+    A live worker can materialize the backlog item on disk yet return a bare payload
+    ("codex exec completed") — the author step passes on the real deliverable, but the
+    promoted ledger evidence then carries no specs/backlog path and release-definition
+    refuses to consume the pick. Python owns the disk truth: the promoted payload is
+    enriched with the diffed authored path(s), never trusting the worker's self-report.
+    """
+
+    @dataclass
+    class _BareFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            # Same disk write, but the transported payload is BARE — no artifact path.
+            return AgentRunResult(
+                status=result.status,
+                summary="codex exec completed",
+                artifact_refs=result.artifact_refs,
+                structured_output={},
+                domain_payload={"summary": "codex exec completed"},
+            )
+
+    fake = _BareFake(root=tmp_path)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-bare", operator_demand="documentar o pipeline")
+    assert result.completed is True
+
+    run = JsonLifecycleRunStore(tmp_path).load("bd-bare")
+    assert run is not None
+    record = run.workflow_steps.find("backlog_author", 0)
+    assert record is not None
+    payload_path = tmp_path / record.payload_ref
+    import json as _json
+
+    document = _json.loads(payload_path.read_text(encoding="utf-8"))
+    payload = document.get("payload", document)
+    authored = payload.get("authored_backlog_paths")
+    assert isinstance(authored, list) and authored, payload
+    assert any("specs/backlog/new-item.md" in p for p in authored)

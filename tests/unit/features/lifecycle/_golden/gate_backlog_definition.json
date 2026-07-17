@@ -4,6 +4,9 @@
       "attempt": 0,
       "output_schema": "backlog-item-v1",
       "payload": {
+        "authored_backlog_paths": [
+          "<WS>/repos/dadaia-workspace/specs/backlog/new-item.md"
+        ],
         "summary": "golden step ok"
       },
       "producer_step": "backlog_author"

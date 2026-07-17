@@ -40,6 +40,7 @@ A resumed step whose prior attempt blocked receives a one-shot digest of that
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -320,6 +321,10 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # ONCE, before any step in THIS call runs). ``backlog_review_gate`` diffs the
         # post-authoring snapshot against this to find what ``backlog_author`` actually wrote.
         before = self._backlog_snapshot()
+        # Kept for the author-step payload promotion (bug
+        # backlog-author-bare-payload-breaks-release-handoff): the promoted evidence is
+        # enriched with the DISK-diffed authored path(s), never a worker self-report.
+        self._before_snapshot = before
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
@@ -462,6 +467,35 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             anchor_changes, _unresolved = bound_anchor_changes(item, self._registry)
             snapshot[item.slug] = BoundItem(slug=item.slug, anchor_changes=anchor_changes)
         return snapshot
+
+    def _authored_backlog_paths(self) -> list[str]:
+        """Disk-diffed paths of the item(s) this run's author actually wrote.
+
+        Compares the live backlog snapshot against the pre-authoring snapshot captured
+        at ``run()`` start. Paths are workspace-relative when the artifact root is
+        known (the shape every downstream consumer scans for), else specs-dir-relative.
+        """
+        before = getattr(self, "_before_snapshot", None)
+        if before is None:
+            return []
+        after = self._backlog_snapshot()
+        changed = sorted(
+            slug
+            for slug, bound in after.items()
+            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        )
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        paths: list[str] = []
+        for slug in changed:
+            target = backlog_dir / f"{slug}.md"
+            rendered = target.as_posix()
+            if self._artifact_root is not None:
+                with contextlib.suppress(ValueError):
+                    rendered = (
+                        target.resolve().relative_to(self._artifact_root.resolve()).as_posix()
+                    )
+            paths.append(rendered)
+        return paths
 
     # -- Python step: backlog_review_gate (the real post-authoring gate) ---
 
@@ -708,6 +742,16 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             payload = durable_payload_from_result(
                 worker_result, fallback_summary=step.label, is_review=False
             )
+            if step.label == "backlog_author":
+                # Bug backlog-author-bare-payload-breaks-release-handoff: a live worker
+                # can write the item yet transport a bare payload ("codex exec
+                # completed"), leaving downstream consumers (release-definition's
+                # authoritative-pick resolver) with no specs/backlog path. Python owns
+                # the disk truth — enrich the promoted evidence with the diffed
+                # authored path(s).
+                authored = self._authored_backlog_paths()
+                if authored:
+                    payload["authored_backlog_paths"] = authored
             run, _ = self._handoff_resolver.produce(
                 run,
                 producer_step=step.label,
