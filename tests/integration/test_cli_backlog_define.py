@@ -4,6 +4,11 @@ Acceptance §3.7.6: ``--harness fake`` drives :class:`BacklogDefinitionWorkflow`
 ``_deferred`` stub). The LAW1/D-3/--model rejection dupes are deleted — owned by the
 policy matrix (``test_lifecycle_policy_cli.py``) and the AC-9 matrix
 (``test_model_flag_removed_ac9.py``).
+
+Bug fake-backlog-definition-cannot-complete-user-flow: the driving fake now materializes
+a REAL synthetic backlog item (valid ``intents[]`` binding a live cli anchor), so the
+documented ``--harness fake`` path walks the WHOLE sequence to completion — the
+post-authoring review gate validates a real on-disk item instead of always blocking.
 """
 
 from __future__ import annotations
@@ -33,7 +38,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
-def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
+def test_fake_harness_drives_the_real_workflow_to_completion(workspace: Path) -> None:
     result = _runner.invoke(
         app,
         [
@@ -41,18 +46,20 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
             "backlog-definition",
             "--release-id",
             "v0.1.26",
+            "--run-id",
+            "it-backlog-1",
             "--harness",
             "fake",
             "--json",
         ],
     )
-    # The author-first sequence runs for real: the fake worker writes NO backlog item,
-    # so the REAL post-authoring review gate honestly blocks (proof the gate validates
-    # disk state, not a threaded demand). Exit code 3 = BLOCKED, never a crash.
-    assert result.exit_code == 3, result.output
+    # The author-first sequence runs for real: the driving fake authors a REAL synthetic
+    # backlog item, the REAL post-authoring review gate validates it on disk (subject
+    # binding + overlap classification), and the run COMPLETES. Exit 0, never a crash.
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["status"] == "BLOCKED"
-    assert payload["completed"] is False
+    assert payload["status"] == "OK", payload
+    assert payload["completed"] is True
     labels = [step["label"] for step in payload["steps"]]
     assert labels == [
         "intake_grill",
@@ -64,5 +71,31 @@ def test_fake_harness_drives_the_real_workflow(workspace: Path) -> None:
     assert intake["skipped"] is True
     author = next(s for s in payload["steps"] if s["label"] == "backlog_author")
     assert author["fragment_id"] == "backlog_definition.backlog_authoring"
-    assert payload["blocked"]["blocked_at_step"] == "backlog_review_gate"
-    assert "no new/changed item" in payload["blocked"]["reason"]
+    # The synthetic item is REAL disk state the gate validated.
+    items = list((workspace / "specs" / "backlog").glob("*.md"))
+    assert items, "driving fake must materialize a backlog item under specs/backlog/"
+
+
+def test_fake_harness_rerun_edits_the_canary_item_and_completes(workspace: Path) -> None:
+    """A second fake run must not block on 'no new/changed item' — it EDITs the canary."""
+    for run_id in ("it-backlog-a", "it-backlog-b"):
+        result = _runner.invoke(
+            app,
+            [
+                "lifecycle",
+                "backlog-definition",
+                "--release-id",
+                "v0.1.26",
+                "--run-id",
+                run_id,
+                "--harness",
+                "fake",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["completed"] is True
+    # Idempotent slug: re-runs edit ONE canary item, never accumulate near-duplicates
+    # (which would trip the overlap classifier on the third run).
+    items = list((workspace / "specs" / "backlog").glob("*.md"))
+    assert len(items) == 1, sorted(p.name for p in items)

@@ -1284,6 +1284,33 @@ def _release_definition_runtime_factory(
         "tasks_create": "TASKS.md",
     }
 
+    # Deliverable stubs must be VALID under the workflow's own deterministic gates
+    # (bug fake-backlog-definition-cannot-complete-user-flow, release-definition leg):
+    # PLAN.md carries the mandatory Validation Dependency Table so the plan lint passes
+    # and `--harness fake` walks the WHOLE §6.1 sequence to the terminal commit gate.
+    _STUB_CONTENT = {
+        "SPEC.md": (
+            "# SPEC: driving-fake stub\n\n> **Status:** Draft\n\n## Scope\n\nDeterministic driving-fake deliverable.\n"
+        ),
+        "PLAN.md": (
+            "# PLAN: driving-fake stub\n\n> **Status:** Draft\n\n"
+            "## Validation Dependency Table\n\n"
+            "| Workstream | Produces by end | Direct validation | "
+            "Validation dependencies | Deferred integration evidence |\n"
+            "|---|---|---|---|---|\n"
+            "| WS-1 | driving-fake stub deliverable | deterministic gate walk | "
+            "none | none |\n"
+        ),
+        "TASKS.md": (
+            "# TASKS: driving-fake stub\n\n> **Status:** Draft\n\n"
+            "Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.\n\n"
+            "## Tasks\n\n"
+            "- [ ] T-1 - driving-fake stub task\n"
+            "  - **Owner:** software-engineer\n"
+            "  - **Acceptance:** deterministic gate walk completes\n"
+        ),
+    }
+
     class _ReleaseDefinitionDrivingFake:
         def __init__(self, kind: AgentRuntimeKind) -> None:
             self._kind = kind
@@ -1308,12 +1335,14 @@ def _release_definition_runtime_factory(
                 target = run_cwd / ref
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(
-                        '{"fake": true, "summary": "driving-fake stub artifact"}\n'
-                        if ref.endswith(".json")
-                        else "# driving-fake stub artifact\n\n> **Status:** Draft\n",
-                        encoding="utf-8",
-                    )
+                    if ref.endswith(".json"):
+                        content = '{"fake": true, "summary": "driving-fake stub artifact"}\n'
+                    else:
+                        content = _STUB_CONTENT.get(
+                            Path(ref).name,
+                            "# driving-fake stub artifact\n\n> **Status:** Draft\n",
+                        )
+                    target.write_text(content, encoding="utf-8")
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="fake release-definition worker: APPROVED",
@@ -1397,6 +1426,25 @@ def build_release_definition_workflow(
     )
 
 
+#: The single idempotent slug the backlog driving fake upserts. One fixed slug means
+#: re-runs EDIT the same canary item (a changed ``change`` text) instead of accumulating
+#: near-duplicate NEW items that would trip the overlap classifier.
+_FAKE_BACKLOG_CANARY_SLUG = "dadaia-fake-harness-canary"
+
+
+def _fake_backlog_canary_ref() -> str:
+    """Pick a live ``cli``-kind anchor for the canary item's intent.
+
+    Derived from the real CLI command tree at write time so the canary always binds
+    through the R1 registry regardless of command renames. ``backlog doctor`` is the
+    stable first choice; any derived anchor works as a fallback.
+    """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
+
+    anchors = derive_cli_anchors()
+    return "backlog doctor" if "backlog doctor" in anchors else min(anchors)
+
+
 def _backlog_definition_runtime_factory(
     *,
     context: str,
@@ -1406,31 +1454,77 @@ def _backlog_definition_runtime_factory(
 
     Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
     model reaches each adapter through ``request.resolved_model`` (threaded from the step's
-    ``resolved_model``), not a construction-time model; ``FAKE`` resolves to a *driving*
-    fake that returns an APPROVED step output with an in-scope artifact_ref, so ``--harness
-    fake`` walks the whole §4 sequence deterministically (mirrors the release-definition
-    fake factory).
+    ``resolved_model``), not a construction-time model. ``FAKE`` resolves to a *driving*,
+    STEP-AWARE fake (bug fake-backlog-definition-cannot-complete-user-flow, mirroring the
+    release-definition driving fake): ``backlog_author`` upserts a REAL synthetic backlog
+    item (valid ``intents[]`` binding a live cli anchor, ``change`` text unique per run)
+    so the real post-authoring review gate validates real disk state and the whole §4
+    sequence COMPLETES deterministically.
     """
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake backlog-definition worker: APPROVED",
-        artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json",
-        ),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class _BacklogDefinitionDrivingFake:
+        def __init__(self, kind: AgentRuntimeKind) -> None:
+            self._kind = kind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self._kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            task_id = request.task_id or ""
+            label = task_id.rsplit(":", 1)[-1]
+            refs = [
+                f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
+            ]
+            if label == "backlog_author":
+                specs_prefix = (
+                    f"repos/{context}/specs"
+                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    else "specs"
+                )
+                item_ref = f"{specs_prefix}/backlog/{_FAKE_BACKLOG_CANARY_SLUG}.md"
+                refs.append(item_ref)
+                target = run_cwd / item_ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                # Upsert (never append): the change text carries the task id so a re-run
+                # is a detectable EDIT of the one canary item.
+                target.write_text(
+                    "---\n"
+                    "status: proposed\n"
+                    "intents:\n"
+                    "  - subject:\n"
+                    "      kind: cli\n"
+                    f"      ref: {_fake_backlog_canary_ref()}\n"
+                    f"    change: driving-fake canary authored by run '{task_id}'\n"
+                    "---\n\n"
+                    "# Driving-fake backlog canary\n\n"
+                    "Synthetic item written by `--harness fake` so the documented\n"
+                    "backlog-definition flow completes deterministically. Safe to delete.\n",
+                    encoding="utf-8",
+                )
+            for ref in refs:
+                if ref.endswith(".json"):
+                    target = run_cwd / ref
+                    if not target.exists():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(
+                            '{"fake": true, "summary": "driving-fake stub artifact"}\n',
+                            encoding="utf-8",
+                        )
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake backlog-definition worker: APPROVED",
+                artifact_refs=tuple(refs),
+                structured_output={"verdict": "APPROVED"},
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            # materialize_root: the gate now verifies declared refs EXIST (bug
-            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
-            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
+            return _BacklogDefinitionDrivingFake(kind)
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1519,6 +1613,7 @@ def _step_output_driving_fake_factory(
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
+    domain_payload: dict[str, object] | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build a runtime factory whose FAKE returns one in-scope raw step output.
 
@@ -1528,6 +1623,10 @@ def _step_output_driving_fake_factory(
     harnesses (pi/codex) resolve to their live adapters; the policy-resolved concrete model
     reaches each adapter through ``request.resolved_model`` (threaded from the step's
     ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
+    ``domain_payload`` (bug certification-passes-without-complete-workflow-chain) lets a
+    workflow whose step schema is stricter than the generic handoff (e.g. audit's
+    ``audit-report-v1``) hand the fake a schema-VALID payload so ``--harness fake`` walks
+    that sequence to completion instead of always blocking on payload validation.
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -1540,6 +1639,7 @@ def _step_output_driving_fake_factory(
         summary=summary,
         artifact_refs=(artifact_ref,),
         structured_output={"verdict": "APPROVED"},
+        domain_payload=domain_payload or {},
     )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
@@ -1612,6 +1712,23 @@ def build_audit_workflow(
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
             artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
+            # A schema-VALID audit-report-v1 canary (one INFO finding routed to
+            # accepted-risk) so the fake exercises the real referential-integrity gate
+            # and the sequence COMPLETES (bug
+            # certification-passes-without-complete-workflow-chain).
+            domain_payload={
+                "question": "driving-fake audit canary: does the audit chain complete?",
+                "lenses": ["workflow-wiring"],
+                "findings": [
+                    {
+                        "id": "F-FAKE-1",
+                        "severity": "INFO",
+                        "lens": "workflow-wiring",
+                        "summary": "driving-fake canary finding (no real defect)",
+                    }
+                ],
+                "dispositions": [{"finding_id": "F-FAKE-1", "route": "accepted-risk"}],
+            },
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,
