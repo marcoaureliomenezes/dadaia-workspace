@@ -352,7 +352,11 @@ an initialized workspace, create it:
   payload is a FAIL — bug backlog-author-bare-payload-breaks-release-handoff class)
   and then run `release-definition` for the same context/release: it must ACCEPT the
   authoritative pick (never refuse with "produced no exact specs/backlog artifact
-  path"). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  path") AND drive the live definition to APPROVAL in the fresh context — SPEC and
+  PLAN flipped to `**Status:** Aprovado`, TASKS authored. A fresh (greenfield)
+  context's embryonic memory is NEVER a valid rejection reason at `spec_review` (bug
+  live-release-definition-rejects-fresh-context class): the SPEC itself is the
+  founding structural reference there. Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---

@@ -357,3 +357,25 @@ def test_pre_fix_payload_shape_with_no_session_id_documents_the_closed_bug(
 
     presence_dir = ws / ".dadaia" / "states" / "presence" / "a"
     assert not presence_dir.exists() or list(presence_dir.glob("*.json")) == []
+
+
+def test_main_emits_explicit_allow_envelope(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Bug projected-pre-gate-silent-allow: an allowed probe must EMIT its decision.
+
+    The block path prints a {"decision":"block",...} envelope; the allow path used to
+    print nothing, so external automation (recipe F-08) could not distinguish an
+    explicit allow from a hook that never evaluated. Allow now prints
+    {"decision":"allow"} — same envelope family, verifiable contract.
+    """
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    out = capsys.readouterr().out.strip()
+    assert json.loads(out.splitlines()[-1]) == {"decision": "allow"}

@@ -109,6 +109,8 @@ def main() -> int:
     reason = evaluate_payload(payload)
     if reason is not None:
         _common.emit_block(reason)
+    else:
+        _common.emit_allow()
     duration_ms = (time.monotonic() - start) * 1000.0
     try:
         workspace: Path | None = _resolve_workspace()

@@ -55,6 +55,11 @@ into a precise, testable specification.
   behavior or surface it as an unresolved question instead of asserting it.
 - Ground every requirement in a scoped item or current-truth memory; invented
   requirements are slop.
+- **Greenfield context:** when the architecture memory is embryonic (placeholder or
+  explicitly greenfield), the SPEC is the FOUNDING structural reference — it must
+  additionally propose the initial module layout (components and their
+  responsibilities) and state end-to-end acceptance scenarios in Given/When/Then
+  form, so the review has concrete structure and observable criteria to approve.
 
 ## Output
 

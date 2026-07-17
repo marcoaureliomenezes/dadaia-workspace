@@ -94,7 +94,11 @@ def test_two_actors_same_context_both_writes_allow_and_are_mutually_visible(
     assert {sid_a, sid_b} <= recorded, recorded
 
     # B's write surfaced an advisory naming A (throttled — at most one per window).
-    combined_b = result_b.stdout + result_b.stderr
+    combined_b = "\n".join(
+        line
+        for line in (result_b.stdout + result_b.stderr).splitlines()
+        if line.strip() and line.strip() != '{"decision": "allow"}'
+    )
     if combined_b.strip():
         assert sid_a in combined_b
 
