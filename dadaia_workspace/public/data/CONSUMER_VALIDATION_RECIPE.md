@@ -20,6 +20,16 @@ Do NOT mark FAIL for "not fully demonstrated": every statement here has a crisp
 assertion — if the commands ran and the assertion holds, it is PASS. If a command uses
 a flag/subcommand that does not exist, THAT is a real FAIL (contract/CLI mismatch).
 
+**Sweep the whole matrix, never one bug per cycle.** A validation run is a FULL sweep:
+run EVERY statement every time, never stop at the first FAIL, and report ALL failures
+of the run in one batch (one bug event each, full evidence). When a defect is found,
+immediately probe the SAME defect class across every sibling surface in the SAME run —
+e.g. a worker-step defect in `backlog-definition` means you also probe
+`release-definition`, `audit`, and `implementation-reviews` for that class before
+reporting — so the operator fixes a CLASS, not an instance, and the next candidate does
+not fail on the sibling you never tried. A run that reports one bug and stops is an
+incomplete validation, not a verdict.
+
 Setup once:
 
 ```bash
@@ -30,8 +40,10 @@ D=/tmp/val-venv/bin/dadaia
 
 `DADAIA_BOOTSTRAP_PACKAGE` makes every workspace-venv bootstrap (`init`, `certify`,
 `reconcile`) install the CANDIDATE wheel itself instead of pinning the version from
-PyPI — an unpublished candidate is the validation norm, and without this export every
-`init` fails with "No matching distribution found". Destructive statements use
+PyPI — the fast path for a candidate under validation. Since 0.3.2 the bootstrap also
+self-heals WITHOUT the export by re-packing the running installed distribution as a
+local wheel when the index cannot resolve the exact version — F-25 asserts that path
+deliberately unset. Destructive statements use
 throwaway dirs under `/tmp` — never the production workspace. Where a statement needs
 an initialized workspace, create it:
 `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
@@ -51,10 +63,17 @@ an initialized workspace, create it:
   and `.dadaia/tmp/legacy-quarantine/<run>/manifest.json` exists while `.dadaia/bugs`
   and `.dadaia/src` are gone (moved, not deleted — content present under quarantine).
 
-### F-03 — Certify agrees with reconcile
+### F-03 — Certify agrees with reconcile AND proves the workflow chain
 - Run: `$D certify --json`.
-- **PASS if:** exit 0 and all checks report pass; and this verdict does not contradict
-  F-02 (certify-green while reconcile-red, or vice versa, is a FAIL of this statement).
+- **PASS if:** exit 0 and all checks report pass; the verdict does not contradict F-02
+  (certify-green while reconcile-red, or vice versa, is a FAIL); AND the check ledger
+  proves a COMPLETE chain, not gate reachability: `workflow-backlog-definition`,
+  `workflow-release-definition`, `workflow-audit`, and
+  `workflow-implementation-reviews` all PASS with `completed` detail (a certification
+  that reports ok:true while its workflow checks only reached deterministic blocks is a
+  FAIL of this statement), plus the honest-failure canaries
+  (`workflow-audit-undefined-release-refused`, `workflow-completed-run-rerun-refused`)
+  PASS with "no traceback".
 
 ### F-04 — Doctors
 - Run in an initialized workspace: `$D doctor`; `$D public doctor`; and a specs tree
@@ -262,6 +281,49 @@ an initialized workspace, create it:
   NO context memory — that non-empty generic output is the CORRECT result (injection
   is bind-driven). FAIL only if it injects a context's memory without a bind, or
   crashes.
+
+### F-24 — Workflow chain E2E (fake harness, disposable context)
+- Setup: a clean disposable context `chain` (create + alive + baseline as in F-06),
+  bound with a release id `v0.0.1`.
+- Run, in order, each with `--harness fake --json` and a fresh `--run-id`:
+  1. `$D lifecycle backlog-definition --context chain --release-id v0.0.1 --demand "chain canary"`
+  2. `$D lifecycle release-definition --context chain --release-id v0.0.1`
+  3. `$D lifecycle audit --context chain --release-id v0.0.1`
+  4. commit the specs tree, then
+     `$D lifecycle implementation-reviews --skip-preflight --context chain --release-id v0.0.1`
+- **PASS if:** ALL four runs exit 0 with `"completed": true`; step (1) materialized a
+  new/changed item under `specs/backlog/`; after (2) `SPEC.md` and `PLAN.md` carry
+  `**Status:** Aprovado`, `TASKS.md` exists, and `releases/ACTIVE.md` points at the
+  release in IMPLEMENTATION; after (4) `releases/v0.0.1/CLOSURE.md` exists. The
+  documented fake path walks the WHOLE user flow — any deterministic block in this
+  chain is a FAIL (the pre-0.3.2 "honest block" behavior is retired). Also: re-running
+  step (1) with the SAME completed `--run-id` must be REFUSED cleanly (non-zero, no
+  traceback).
+
+### F-25 — Disposable bootstrap without index or env override
+- Setup: an initialized workspace with the candidate installed. UNSET the override:
+  `unset DADAIA_BOOTSTRAP_PACKAGE` for this statement only.
+- Run: `$D certify --json`.
+- **PASS if:** certification bootstraps its disposable workspace with the EXACT
+  installed provider version even though the index does not serve it — the venv
+  bootstrap re-packs the running installed distribution as a local wheel
+  (`workspace-init-all-harnesses` and `exact-version-reconciliation` PASS). "pip could
+  not resolve dadaia-workspace==<candidate>" surfacing to the operator is a FAIL: an
+  unpublished candidate is the validation norm and must bootstrap with no env var.
+
+### F-26 — Live authoring canary (Codex materializes a real artifact)
+- Setup: a disposable canary context, bound; codex harness reachable
+  (`DADAIA_CODEX_SANDBOX=danger-bypass` in a nested container).
+- Run: `$D lifecycle backlog-definition --context <canary> --release-id <rid>
+  --run-id <fresh> --demand "<bounded fictional demand>" --harness codex --json`.
+- **PASS if:** EITHER the run completes with a real new/changed `specs/backlog/` item
+  (the worker authored a real deliverable), OR it blocks AT `backlog_author` with
+  reason "no deliverable in the step's declared zone" and a persisted worker
+  diagnostic (the blocked detail references the diagnostic; the payload is never a
+  bare "codex exec completed" that sails through to fail later at
+  `backlog_review_gate` with no worker trace). Blocking at `backlog_review_gate` with
+  an empty-payload author step marked `accepted` is a FAIL of this statement. Mark
+  **EXCEPTION** only if no codex binary/credentials exist in the environment.
 
 ---
 **Verdict line (Telegram-short, last line of output):**
