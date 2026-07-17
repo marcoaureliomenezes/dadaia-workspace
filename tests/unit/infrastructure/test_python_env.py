@@ -36,11 +36,16 @@ def recorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Recorder:
         rec.venv_created.append(path)
         (Path(path) / PLATFORM.venv_scripts_dir).mkdir(parents=True, exist_ok=True)
 
-    def fake_run(cmd: list[str], check: bool = False) -> None:
+    def fake_run(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
         rec.commands.append(list(cmd))
 
     monkeypatch.setattr(python_env_module.venv, "create", fake_venv_create)
     monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
+    # Post-bootstrap provider verification runs a REAL venv python — no-op it here;
+    # its own behavior is covered by the dedicated verification tests below.
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager, "_verify_venv_provider", lambda self, ws, expected=None: None
+    )
     # Undo the suite-wide no-op backstop for these tests only.
     monkeypatch.setattr(
         VenvPythonEnvironmentManager, "ensure_workspace_venv", _REAL_ENSURE, raising=True
@@ -215,7 +220,7 @@ def test_bootstrap_falls_back_to_repacked_wheel_when_index_cannot_resolve(
 
     calls: list[list[str]] = []
 
-    def failing_then_ok(cmd: list[str], check: bool = False) -> None:
+    def failing_then_ok(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
         calls.append(list(cmd))
         if cmd[-1] == "dadaia-workspace==9.9.9":
             raise _subprocess.CalledProcessError(1, cmd)
@@ -239,7 +244,7 @@ def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
         python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: None
     )
 
-    def always_fail(cmd: list[str], check: bool = False) -> None:
+    def always_fail(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
         raise _subprocess.CalledProcessError(1, cmd)
 
     monkeypatch.setattr(python_env_module.subprocess, "run", always_fail)
@@ -247,3 +252,91 @@ def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
     with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
         mgr.ensure_workspace_venv(str(tmp_path))
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(excinfo.value)
+
+
+# ── bug init-succeeds-after-provider-bootstrap-failure (Hermes live canary) ─────────
+#
+# init used to leak pip's raw "ERROR: Could not find a version..." into its output while
+# the repack fallback quietly saved the bootstrap — indistinguishable, for a consumer,
+# from a masked incomplete bootstrap. The index install is now output-captured, the
+# fallback announces itself in ONE clean line, and the bootstrap VERIFIES the venv's
+# provider independently (clean env, exact running version) before reporting success.
+
+
+def test_index_install_is_output_captured_and_fallback_announces_itself(
+    tmp_path: Path,
+    recorder: _Recorder,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import subprocess as _subprocess
+
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
+    repacked = tmp_path / "repacked" / "dadaia_workspace-9.9.9-py3-none-any.whl"
+    repacked.parent.mkdir(parents=True)
+    repacked.write_bytes(b"fake-wheel")
+    monkeypatch.setattr(
+        python_env_module, "repack_installed_wheel", lambda dest_dir, dist=None: repacked
+    )
+
+    captured_kwargs: list[dict[str, object]] = []
+
+    def failing_then_ok(cmd: list[str], check: bool = False, **kwargs: object) -> None:
+        captured_kwargs.append(dict(kwargs))
+        if cmd[-1] == "dadaia-workspace==9.9.9":
+            raise _subprocess.CalledProcessError(1, cmd, output="", stderr="ERROR: no dist")
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", failing_then_ok)
+
+    mgr.ensure_workspace_venv(str(tmp_path))
+
+    # pip's own stream is captured — its raw ERROR never leaks to the operator.
+    assert captured_kwargs and all(k.get("capture_output") for k in captured_kwargs)
+    out = capsys.readouterr().out
+    assert "re-packed" in out  # one clean, honest fallback line replaces the noise
+
+
+def test_verification_failure_fails_the_bootstrap(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(mgr, "_install_spec", lambda: "dadaia-workspace==9.9.9")
+
+    def broken_verify(
+        self: VenvPythonEnvironmentManager, ws: str, expected: str | None = None
+    ) -> None:
+        raise python_env_module.WorkspaceVenvBootstrapError("venv provider verification failed")
+
+    monkeypatch.setattr(VenvPythonEnvironmentManager, "_verify_venv_provider", broken_verify)
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
+        mgr.ensure_workspace_venv(str(tmp_path))
+
+
+def test_verify_venv_provider_uses_clean_env_and_checks_exact_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The verification must not be satisfiable through inherited PYTHONPATH."""
+    mgr = VenvPythonEnvironmentManager()
+    seen: dict[str, object] = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = "9.9.8\n"
+        stderr = ""
+
+    def fake_run(cmd: list[str], **kwargs: object) -> _Proc:
+        seen["cmd"] = cmd
+        seen["env"] = kwargs.get("env")
+        return _Proc()
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
+    monkeypatch.setenv("PYTHONPATH", "/somewhere/inherited")
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+        mgr._verify_venv_provider(str(tmp_path), expected="9.9.9")
+
+    assert "9.9.8" in str(excinfo.value) and "9.9.9" in str(excinfo.value)
+    env = seen["env"]
+    assert isinstance(env, dict) and "PYTHONPATH" not in env

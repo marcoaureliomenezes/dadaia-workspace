@@ -28,6 +28,7 @@ never create a twin of an existing item.
 | Input | Use |
 |---|---|
 | `backlog_index` | The existing items' bound intents + status, so an EDIT folds into the right item and a NEW item does not duplicate one. |
+| `Canonical subject anchors` | The registry's resolvable anchor list injected into this prompt — the ONLY refs `intents[]` may bind. Copy `ref` verbatim from it; match the `kind`. |
 
 ## What the item must carry
 
@@ -42,7 +43,9 @@ never create a twin of an existing item.
 - **NEW file XOR edit EXISTING — never both, never a twin.** A NEW item is permitted only
   when the review found every existing item `UNRELATED`. Any overlap means an EDIT/MERGE
   into the existing item, folding the new scope in.
-- Keep subjects canonical: reuse the bound anchors from the plan; introduce no synonym.
+- Keep subjects canonical: every `subject.ref` is copied VERBATIM from the "Canonical
+  subject anchors" list in this prompt (kind must match the anchor's kind). Never invent
+  a ref — an unlisted ref is rejected by `backlog_review_gate` as an unresolved subject.
 - Anchors stay module-relative `path#symbol` (or a non-path anchor id) — never an
   operator-local absolute path or a private name.
 - Author content, not history: the item states current intended scope, not a changelog.

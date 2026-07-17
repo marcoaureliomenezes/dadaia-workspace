@@ -690,3 +690,71 @@ def test_reset_run_zone_purges_ledger_and_exact_worker_outputs(tmp_path: Path) -
     assert removed == 2
     assert writer.files == {}
     assert writer.worker_outputs == set()
+
+
+# ── bug audit-fragment-schema-envelope-mismatch (Hermes 0.3.x live canary) ──────────
+#
+# The audit fragment instructs the worker to emit its domain fields (question, lenses,
+# findings, dispositions) TOP-LEVEL in the agent-run-result-v1 object. A worker that
+# obeys AND also carries a structured_output dict used to lose every top-level domain
+# field — durable_payload_from_result preferred the nested dict exclusively, so the
+# audit-report-v1 gate rejected a fully compliant report.
+
+
+def test_durable_payload_keeps_top_level_domain_fields_alongside_nested() -> None:
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        durable_payload_from_result,
+    )
+
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="audit pass complete",
+        structured_output={"verdict": "APPROVED"},
+        domain_payload={
+            "status": "succeeded",
+            "summary": "audit pass complete",
+            "question": "does the audit chain hold?",
+            "lenses": ["architecture"],
+            "findings": [
+                {
+                    "id": "f-1",
+                    "severity": "LOW",
+                    "lens": "architecture",
+                    "summary": "concrete divergence",
+                }
+            ],
+            "dispositions": [{"finding_id": "f-1", "route": "accepted-risk"}],
+            # The worker ALSO carried a structured_output dict — this must not erase
+            # the top-level domain fields above.
+            "structured_output": {"verdict": "APPROVED"},
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="audit_report", is_review=False)
+
+    assert payload["question"] == "does the audit chain hold?"
+    assert payload["lenses"] == ["architecture"]
+    assert isinstance(payload["findings"], list) and payload["findings"][0]["id"] == "f-1"
+    assert payload["dispositions"] == [{"finding_id": "f-1", "route": "accepted-risk"}]
+
+
+def test_durable_payload_nested_handoff_still_wins_when_top_level_is_transport_only() -> None:
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        durable_payload_from_result,
+    )
+
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="ok",
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "task_id": "r:step",
+            "handoff": {"summary": "the real domain payload", "detail_key": "value"},
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="step", is_review=False)
+    assert payload["detail_key"] == "value"
+    assert payload["summary"] == "the real domain payload"

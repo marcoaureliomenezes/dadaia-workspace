@@ -554,6 +554,44 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
         return overlap, self._still_running(run, step.label), self._ok_sr(step)
 
+    # -- canonical anchors digest (bug backlog-author-missing-canonical-subject-input) --
+
+    #: Per-kind cap for the anchors digest — keeps the prompt bounded on large source
+    #: trees while every kind stays represented.
+    _ANCHORS_PER_KIND_CAP = 40
+
+    def _canonical_anchors_digest(self) -> str | None:
+        """Render the registry's resolvable anchor set for the author's prompt.
+
+        The post-authoring gate binds every ``intents[]`` subject through THIS registry;
+        handing the author the same anchor list is what makes a completed author step
+        unable to emit a ref its next mandatory gate rejects. Bounded per kind; a
+        truncated kind says so and points at ``dadaia backlog subjects``.
+        """
+        anchors = self._registry.list_anchors(None)
+        if not anchors:
+            return None
+        by_kind: dict[str, list[str]] = {}
+        for anchor in anchors:
+            by_kind.setdefault(anchor.kind.value, []).append(anchor.id)
+        lines = [
+            "## Canonical subject anchors",
+            "",
+            "Bind EVERY `intents[]` subject to one of these anchors — `kind` must match "
+            "the anchor's kind and `ref` must be copied verbatim from this list. A ref "
+            "outside this list is rejected by `backlog_review_gate` (unresolved "
+            "subject). Explore the full set with `dadaia backlog subjects`.",
+            "",
+        ]
+        for kind in sorted(by_kind):
+            ids = sorted(by_kind[kind])
+            shown = ids[: self._ANCHORS_PER_KIND_CAP]
+            lines.append(f"- {kind}:")
+            lines.extend(f"  - `{anchor_id}`" for anchor_id in shown)
+            if len(ids) > len(shown):
+                lines.append(f"  - … {len(ids) - len(shown)} more (see `dadaia backlog subjects`)")
+        return "\n".join(lines)
+
     # -- opt-in grill digest (item 2: consumed, not decorative) ----------
 
     def _intake_grill_digest(self, run: LifecycleRun) -> str | None:
@@ -600,6 +638,13 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             digest = self._intake_grill_digest(run)
             if digest:
                 selected = "\n\n".join(filter(None, (selected, digest)))
+            # Bug backlog-author-missing-canonical-subject-input: the author must be
+            # HANDED the resolvable anchor set — without it a live worker invents refs
+            # (e.g. specs/backlog/README.md#Backlog) that its own next mandatory gate
+            # rejects. Same registry the gate binds against, so prompt and gate agree.
+            anchors_digest = self._canonical_anchors_digest()
+            if anchors_digest:
+                selected = "\n\n".join(filter(None, (selected, anchors_digest)))
         # One-shot resume-rejection digest for the resume-point step.
         resume_digest = self._resume_feedback.pop(step.label, None)
         if resume_digest:

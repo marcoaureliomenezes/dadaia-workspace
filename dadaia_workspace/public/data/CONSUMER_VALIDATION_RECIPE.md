@@ -247,10 +247,22 @@ an initialized workspace, create it:
   own destination, preserved-until-renamed by design (doctor exits 0 on warnings). Judge
   on errors + exit code, not on the presence of that warning.
 
-### F-18 — Init / onboarding
-- Run in an empty dir: `$D init --harness all`.
-- **PASS if:** exit 0, `.dadaia/` bootstrapped (venv + projections), and `$D doctor`
-  green afterward. (Init builds a venv — the env must allow PyPI; if egress is blocked
+### F-18 — Init / onboarding (bootstrap INTEGRITY, not just exit 0)
+- Run in an empty dir, with fail-fast shell discipline (`set -euo pipefail`, explicit
+  `cd` into the target workspace, exit codes asserted directly — never through a pipe):
+  `$D init --harness all` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
+- **PASS if ALL of:**
+  1. exit 0 and `.dadaia/` bootstrapped (venv + projections), `$D doctor` green after;
+  2. the captured init output contains NO raw installer error (`ERROR:`/`Traceback`) —
+     an index miss handled by the re-pack fallback announces itself in one clean
+     `[bootstrap]` line instead;
+  3. the GENERATED venv stands alone: run
+     `env -i PATH="$PATH" <ws>/.dadaia/.venv/bin/python -c "import dadaia_workspace, importlib.metadata as m; print(m.version('dadaia-workspace'))"`
+     — it must import WITHOUT inherited PYTHONPATH/parent-workspace resolution and
+     print EXACTLY the candidate version. A version mismatch or import failure is a
+     FAIL even when init exited 0 (bug init-succeeds-after-provider-bootstrap-failure
+     class: a bootstrap that only works through inherited runtime paths is broken).
+  (Init may reach an index — if egress is fully blocked AND the fallback cannot apply,
   mark EXCEPTION with the network cause, else FAIL.)
 
 ### F-19 — Plugins
@@ -323,7 +335,11 @@ an initialized workspace, create it:
   (`DADAIA_CODEX_SANDBOX=danger-bypass` in a nested container).
 - Run: `$D lifecycle backlog-definition --context <canary> --release-id <rid>
   --run-id <fresh> --demand "<bounded fictional demand>" --harness codex --json`.
-- **PASS if:** EITHER the run completes with a real new/changed `specs/backlog/` item
+- **PASS if:** the author step's prompt supplied the canonical anchor set (the item's
+  `intents[]` refs resolve through `dadaia backlog subjects` — an authored item whose
+  ref no canonical anchor resolves means the workflow failed to hand the author its
+  anchors, bug backlog-author-missing-canonical-subject-input class); and EITHER the
+  run completes with a real new/changed `specs/backlog/` item
   (the worker authored a real deliverable), OR it blocks AT `backlog_author` with
   reason "no deliverable in the step's declared zone" and a persisted worker
   diagnostic (the blocked detail references the diagnostic; the payload is never a

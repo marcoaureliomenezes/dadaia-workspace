@@ -140,11 +140,16 @@ class VenvPythonEnvironmentManager:
             spec = self._install_spec()
             pip = self.pip_executable(workspace_root)
             install_cmd = [pip, "install", "--quiet"]
-            if Path(spec).is_dir():
+            editable = Path(spec).is_dir()
+            if editable:
                 install_cmd.append("--editable")
             install_cmd.append(spec)
+            # Bug init-succeeds-after-provider-bootstrap-failure: pip's stream is
+            # CAPTURED — a resolvable-from-fallback index miss must not leak a raw
+            # "ERROR: Could not find a version..." into init's output, where it reads
+            # as a masked broken bootstrap.
             try:
-                subprocess.run(install_cmd, check=True)
+                subprocess.run(install_cmd, check=True, capture_output=True, text=True)
             except subprocess.CalledProcessError as exc:
                 # Unpublished candidate wheels are the consumer-validation norm: the
                 # exact-version pin cannot resolve from the index (bug
@@ -156,13 +161,24 @@ class VenvPythonEnvironmentManager:
                     Path(workspace_root) / ".dadaia" / "tmp" / "bootstrap-wheel"
                 )
                 if repacked is not None:
+                    print(
+                        f"[bootstrap] index could not resolve '{spec}'; installing the "
+                        f"re-packed running distribution ({repacked.name}) instead"
+                    )
                     try:
-                        subprocess.run([pip, "install", "--quiet", str(repacked)], check=True)
+                        subprocess.run(
+                            [pip, "install", "--quiet", str(repacked)],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        )
+                        self._verify_venv_provider(workspace_root, expected=self._running_version())
                         return str(venv_dir)
                     except subprocess.CalledProcessError:
                         pass
                 # Name the escape hatch that exists for exactly this case (a raw
                 # CalledProcessError traceback pointed nowhere — validation-028 cascade).
+                pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]
                 raise WorkspaceVenvBootstrapError(
                     f"workspace venv bootstrap failed installing '{spec}' (and the "
                     "running distribution could not be re-packed as a local wheel). If "
@@ -170,9 +186,64 @@ class VenvPythonEnvironmentManager:
                     "under validation) or the index is unreachable, point "
                     "DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry, e.g. "
                     "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
-                    "dadaia init"
+                    f"dadaia init. Installer output: {pip_tail}"
                 ) from exc
+            # Success is only reported after the venv provider VERIFIES independently
+            # (clean env, no inherited PYTHONPATH). The exact running version is
+            # required for the pin path; an operator-chosen wheel (env override) or a
+            # self-hosting editable checkout may legitimately differ, so those verify
+            # import-integrity only.
+            expected = (
+                None
+                if editable or os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
+                else self._running_version()
+            )
+            self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
+
+    @staticmethod
+    def _running_version() -> str | None:
+        try:
+            return metadata.version("dadaia-workspace")
+        except metadata.PackageNotFoundError:
+            return None
+
+    def _verify_venv_provider(self, workspace_root: str, expected: str | None = None) -> None:
+        """Prove the venv's provider stands on its own — never via inherited paths.
+
+        Bug init-succeeds-after-provider-bootstrap-failure: a generated venv command can
+        LOOK usable through an inherited PYTHONPATH / parent-workspace resolution while
+        the venv itself is incomplete. The check imports ``dadaia_workspace`` with the
+        venv's own interpreter under a CLEAN environment and, when *expected* is given,
+        requires the exact version.
+        """
+        clean_env = {"PATH": os.environ.get("PATH", "")}
+        proc = subprocess.run(
+            [
+                self.python_executable(workspace_root),
+                "-c",
+                "import dadaia_workspace, importlib.metadata as m; "
+                "print(m.version('dadaia-workspace'))",
+            ],
+            capture_output=True,
+            text=True,
+            env=clean_env,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise WorkspaceVenvBootstrapError(
+                "workspace venv provider verification failed: the venv python cannot "
+                "import dadaia_workspace on its own (no inherited paths). Installer "
+                f"diagnostics: {(proc.stderr or proc.stdout or '').strip()[-400:]}"
+            )
+        installed = (proc.stdout or "").strip()
+        if expected is not None and installed != expected:
+            raise WorkspaceVenvBootstrapError(
+                f"workspace venv provider verification failed: venv carries "
+                f"dadaia-workspace {installed or '<unknown>'} but the running "
+                f"distribution is {expected}. The bootstrap must converge on the exact "
+                "running version."
+            )
 
     def python_executable(self, workspace_root: str) -> str:
         return str(

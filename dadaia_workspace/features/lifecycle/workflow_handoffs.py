@@ -593,12 +593,18 @@ def durable_payload_from_result(
         nested = document.get("details")
     if not isinstance(nested, dict):
         nested = document.get("structured_output")
+    # ONE unambiguous envelope (bug audit-fragment-schema-envelope-mismatch): the
+    # fragments instruct workers to emit domain fields TOP-LEVEL in the result object,
+    # so top-level non-transport fields are ALWAYS retained. A nested
+    # handoff/details/structured_output dict keeps its historical authority — where BOTH
+    # levels carry a key, the nested (structured-contract) value wins — but it never
+    # ERASES a top-level field it does not itself carry, so a worker that obeyed the
+    # fragment's top-level contract passes its gate.
+    payload: dict[str, object] = {
+        str(key): value for key, value in document.items() if key not in _TRANSPORT_ONLY_KEYS
+    }
     if isinstance(nested, dict):
-        payload: dict[str, object] = {str(key): value for key, value in nested.items()}
-    else:
-        payload = {
-            str(key): value for key, value in document.items() if key not in _TRANSPORT_ONLY_KEYS
-        }
+        payload.update({str(key): value for key, value in nested.items()})
 
     summary = _first_domain_summary(payload) or _first_domain_summary(document)
     if summary is None:

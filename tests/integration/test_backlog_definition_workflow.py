@@ -237,3 +237,24 @@ def test_sequence_shape() -> None:
         "backlog_author",
         "backlog_review_gate",
     ]
+
+
+def test_author_prompt_carries_canonical_anchor_digest(tmp_path: Path) -> None:
+    """Bug backlog-author-missing-canonical-subject-input (Hermes live Codex canary).
+
+    A normal demand made the live author invent an unresolvable ref
+    (specs/backlog/README.md#Backlog) because nothing supplied the canonical anchor
+    set. The author prompt must now carry the registry's resolvable anchors so the
+    worker binds intents[] to refs its own next gate accepts.
+    """
+    fake = _AuthoringFake(root=tmp_path)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    wf.run("bd-anchors", operator_demand="adicionar um README minimo")
+
+    author_prompt = (fake.received or [])[0].prompt
+    assert "Canonical subject anchors" in author_prompt
+    # The fixture registry derives exactly this code anchor from the seeded source tree.
+    assert "pkg/a.py#A" in author_prompt
+    # The instruction makes the contract explicit: refs come FROM this list.
+    assert "backlog_review_gate" in author_prompt
