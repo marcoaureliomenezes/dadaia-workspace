@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import CompletedRunRerunError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -484,8 +485,12 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
     assert "review verdict REJECTED: fix spec" in resumed_review_prompt
     assert "verdict_reason: fix spec" in resumed_review_prompt
 
-    # One-shot: a fresh full re-run of the same run id carries no stale digest.
-    fresh = wf.run("resume-digest-run", sequence=custom)
+    # Completed-rerun guard (bug completed-workflow-rerun-not-refused): a fresh full
+    # re-run of the now-COMPLETED run id refuses cleanly instead of re-executing.
+    with pytest.raises(CompletedRunRerunError):
+        wf.run("resume-digest-run", sequence=custom)
+    # One-shot: a fresh run (new id) carries no stale digest.
+    fresh = wf.run("resume-digest-run-2", sequence=custom)
     assert fresh.completed is True
     assert "Prior rejection feedback" not in fake.received_requests[-1].prompt
 

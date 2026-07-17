@@ -73,6 +73,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
+from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
@@ -263,6 +264,10 @@ class LifecyclePipeline:
     def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
         if not steps:
             raise ValueError("pipeline requires at least one step")
+        # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
+        # id is immutable history — refuse cleanly before any marker rewrite or zone
+        # reclaim; blocked/failed run ids remain restartable.
+        refuse_completed_rerun(self._run_store, run_id)
         # Python owns task-marker state because the implementation worker's write scope
         # deliberately excludes TASKS.md. Reservations survive retries and blocked runs;
         # completion happens only after the entire review + close ladder succeeds.

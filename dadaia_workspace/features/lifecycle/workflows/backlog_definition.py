@@ -83,6 +83,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
     canonical_worker_output_ref,
 )
+from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
@@ -362,6 +363,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
     def _start_run(
         self, run_id: str, sequence: tuple[BacklogStep, ...]
     ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
+        # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
+        # id refuses cleanly; blocked runs stay restartable via resume_from.
+        refuse_completed_rerun(self._run_store, run_id)
         if self._handoff_resolver is not None:
             self._handoff_resolver.reset_run_zone(
                 run_id,

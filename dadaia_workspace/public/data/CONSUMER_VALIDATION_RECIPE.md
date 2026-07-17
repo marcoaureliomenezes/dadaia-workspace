@@ -84,7 +84,11 @@ an initialized workspace, create it:
   created.
 - **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree, the root
   `specs init` refusal holds, and seeding one violation (`mkdir .dadaia/nonsense`)
-  makes `$D doctor` exit non-zero naming ROOT-4.
+  makes `$D doctor` exit non-zero naming ROOT-4. Evidence discipline for the ROOT-4
+  probe: capture the `mkdir`, the `pwd`, and the doctor invocation in the SAME log —
+  the seeded dir and the doctor run must share the workspace root (a doctor run from
+  another cwd resolves a different workspace and proves nothing), and assert the exit
+  code directly, never through a pipe.
 
 ### F-05 — Projections
 - Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
@@ -297,8 +301,11 @@ an initialized workspace, create it:
   release in IMPLEMENTATION; after (4) `releases/v0.0.1/CLOSURE.md` exists. The
   documented fake path walks the WHOLE user flow — any deterministic block in this
   chain is a FAIL (the pre-0.3.2 "honest block" behavior is retired). Also: re-running
-  step (1) with the SAME completed `--run-id` must be REFUSED cleanly (non-zero, no
-  traceback).
+  ANY of the four steps with its SAME completed `--run-id` must be REFUSED cleanly —
+  non-zero exit, one line naming the refusal (`already COMPLETED`, fresh --run-id
+  guidance), no traceback, and NO re-execution of the ladder (probe at least steps (1)
+  and (4); the refusal is a shared engine guard, so a sibling that re-executes is a
+  FAIL of this statement).
 
 ### F-25 — Disposable bootstrap without index or env override
 - Setup: an initialized workspace with the candidate installed. UNSET the override:

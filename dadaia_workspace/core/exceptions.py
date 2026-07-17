@@ -175,3 +175,13 @@ class TasksMarkerStateError(DadaiaError, RuntimeError):
     ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
     recognizable task markers is an operator-facing condition, never a crash.
     """
+
+
+class CompletedRunRerunError(DadaiaError):
+    """Re-invoking a COMPLETED lifecycle run id is refused (idempotency contract).
+
+    Bug completed-workflow-rerun-not-refused (Hermes 0.3.2 run-2): the pipeline
+    silently re-executed a completed run id while the fragment workflows only blocked
+    by accident of identical content. Every workflow engine now refuses explicitly and
+    cleanly — a completed run is immutable history; new work takes a fresh --run-id.
+    """

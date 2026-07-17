@@ -317,7 +317,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
 
     # Single-harness baseline: everything on pi. This IS the full happy-path proof: all 7
     # model steps + the terminal Python commit gate ran, release advances to IMPLEMENTATION.
-    baseline = _define(["--harness", "pi"])
+    baseline = _define(["--harness", "pi", "--run-id", "adjacent-baseline"])
     assert baseline.exit_code == 0, baseline.output
     baseline_payload = _payload(baseline.output)
     assert baseline_payload["status"] == "OK"
@@ -340,7 +340,10 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_commit_gate["accepted"] is True
 
     # Mixed: release_scope on pi, adjacent spec_create on codex — real --step-harness path.
-    mixed = _define(["--harness", "pi", "--step-harness", "spec_create=codex"])
+    # Distinct run id: the completed-rerun guard refuses re-using the baseline's id.
+    mixed = _define(
+        ["--harness", "pi", "--step-harness", "spec_create=codex", "--run-id", "adjacent-mixed"]
+    )
     assert mixed.exit_code == 0, mixed.output
     mixed_payload = _payload(mixed.output)
 
@@ -382,7 +385,11 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     )
     # Same run_id for both so the only thing that could differ is the harness — proving
     # the assembled bundle is harness-independent (task_id is part of the prompt payload).
+    # The completed-rerun guard (bug completed-workflow-rerun-not-refused) refuses a
+    # fresh run over a COMPLETED id, so drop the first run's record before the second.
     out_pi = wf_pi.run("seam-identity")
+    store = container.build_lifecycle_run_store(workspace)
+    next(store.root.glob("*seam-identity*")).unlink()
     out_codex = wf_codex.run("seam-identity")
     bundle_pi = next(s for s in out_pi.steps if s.label == "spec_create").prompt_text
     bundle_codex = next(s for s in out_codex.steps if s.label == "spec_create").prompt_text
