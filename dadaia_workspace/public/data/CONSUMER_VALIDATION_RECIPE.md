@@ -161,7 +161,8 @@ an initialized workspace, create it:
   `danger-bypass` mode fixes.
 
 ### F-12 — Reports & handoffs
-- Setup: write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
+- Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
+  write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
   `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
   `scope`, `metrics:{}`, `self_pull:{"refs":[<one ref that EXISTS on disk, e.g. "AGENTS.md">]}`,
   `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
