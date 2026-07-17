@@ -1190,6 +1190,7 @@ def build_lifecycle_pipeline(
     """
     from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
     from dadaia_workspace.infrastructure.git_evidence import (
+        build_executed_test_gate,
         build_git_diff_provider,
         build_test_output_provider,
     )
@@ -1251,6 +1252,9 @@ def build_lifecycle_pipeline(
         # step-artifact zone.
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
         max_review_retries=max_review_retries,
+        # Bug implementation-review-approves-unexecuted-validation: closure requires an
+        # EXECUTED, green test run over the release's declared test paths.
+        executed_test_gate=build_executed_test_gate(repo_root, paths=repo_write_set),
     )
 
 

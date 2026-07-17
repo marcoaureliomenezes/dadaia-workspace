@@ -67,7 +67,10 @@ def test_fresh_bootstrap_creates_venv_and_installs_package(
 
     assert result == str(tmp_path / ".dadaia" / ".venv")
     assert recorder.venv_created == [str(tmp_path / ".dadaia" / ".venv")]
-    assert len(recorder.commands) == 1
+    # Two installs: the provider spec, then the CI toolchain (pytest) the product
+    # promises for `ci preflight` and the executed-test close gate.
+    assert len(recorder.commands) == 2
+    assert recorder.commands[1][-1] == "pytest"
     cmd = recorder.commands[0]
     assert cmd[0] == mgr.pip_executable(str(tmp_path))
     assert cmd[1] == "install"
@@ -83,7 +86,7 @@ def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _R
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
 
     assert recorder.venv_created == []  # no re-create
-    assert len(recorder.commands) == 1  # but the package IS installed
+    assert len(recorder.commands) == 2  # package installed + CI toolchain (pytest)
 
 
 def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
@@ -231,6 +234,7 @@ def test_bootstrap_falls_back_to_repacked_wheel_when_index_cannot_resolve(
 
     assert calls[0][-1] == "dadaia-workspace==9.9.9"
     assert calls[1][-1] == str(repacked)
+    assert calls[2][-1] == "pytest"  # CI toolchain rides along on the fallback path too
 
 
 def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(

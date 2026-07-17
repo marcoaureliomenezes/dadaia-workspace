@@ -193,11 +193,19 @@ class LifecyclePipeline:
         specs_dir: Path | None = None,
         runtime_files: RuntimeFilePort | None = None,
         artifact_root: Path | None = None,
+        executed_test_gate: Callable[[], tuple[bool | None, str]] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
         self._run_store = run_store
         self._runtime_factory = runtime_factory
+        # Bug implementation-review-approves-unexecuted-validation: when wired
+        # (production composition), the terminal `close` step COMPLETES only on an
+        # EXECUTED, GREEN test run — Python-owned evidence, never a worker self-report.
+        # The gate yields (ok, evidence): ok=False blocks close; ok=None means the
+        # release declares no test paths (unaffected). ``None`` (fixtures) keeps
+        # behavior byte-identical.
+        self._executed_test_gate = executed_test_gate
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -373,6 +381,30 @@ class LifecyclePipeline:
                     decision, worker_result = runner.run_with_result(run, runner_input)
                     run = decision.run
                     accepted = decision.advanced
+
+                if accepted and step.label == "close" and self._executed_test_gate is not None:
+                    tests_ok, tests_evidence = self._executed_test_gate()
+                    if tests_ok is False:
+                        blocked_close = BlockedState(
+                            reason=(
+                                "close blocked: executed test validation is not green — "
+                                "closure requires the declared test suite to RUN and pass "
+                                "(planned-but-unexecuted validation never closes a release)"
+                            ),
+                            blocked_at_step="close",
+                            resume_token=run.idempotency_key,
+                            detail={"executed_tests": tests_evidence[-1500:]},
+                        )
+                        decision = self._state_machine.transition(
+                            run,
+                            TransitionInput(
+                                target_phase=LifecyclePhase.BLOCKED,
+                                blocked_state=blocked_close,
+                                current_step=step.label,
+                            ),
+                        )
+                        run = decision.run
+                        accepted = False
 
                 verdict = worker_result.structured_output.get("verdict")
                 rejected_review = (

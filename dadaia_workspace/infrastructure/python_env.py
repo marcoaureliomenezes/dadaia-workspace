@@ -172,6 +172,7 @@ class VenvPythonEnvironmentManager:
                             capture_output=True,
                             text=True,
                         )
+                        self._ensure_ci_toolchain(pip)
                         self._verify_venv_provider(workspace_root, expected=self._running_version())
                         return str(venv_dir)
                     except subprocess.CalledProcessError:
@@ -188,6 +189,7 @@ class VenvPythonEnvironmentManager:
                     "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
                     f"dadaia init. Installer output: {pip_tail}"
                 ) from exc
+            self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
             # (clean env, no inherited PYTHONPATH). The exact running version is
             # required for the pin path; an operator-chosen wheel (env override) or a
@@ -200,6 +202,29 @@ class VenvPythonEnvironmentManager:
             )
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
+
+    @staticmethod
+    def _ensure_ci_toolchain(pip: str) -> None:
+        """Best-effort install of the CI/validation toolchain the product promises.
+
+        Bug implementation-review-approves-unexecuted-validation: the generated venv
+        could not even run ``python -m pytest`` — yet ``dadaia ci preflight`` and the
+        executed-test close gate both depend on it. pytest ships with every bootstrap;
+        failure to fetch it is a clean one-line warning, never a bootstrap failure (the
+        close gate reports loudly when tests cannot run).
+        """
+        try:
+            subprocess.run(
+                [pip, "install", "--quiet", "pytest"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            print(
+                "[bootstrap] warning: could not install pytest into the workspace venv; "
+                "test validation (ci preflight, closure gate) will report it missing"
+            )
 
     @staticmethod
     def _running_version() -> str | None:

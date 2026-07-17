@@ -259,7 +259,9 @@ an initialized workspace, create it:
   3. the GENERATED venv stands alone: run
      `env -i PATH="$PATH" <ws>/.dadaia/.venv/bin/python -c "import dadaia_workspace, importlib.metadata as m; print(m.version('dadaia-workspace'))"`
      — it must import WITHOUT inherited PYTHONPATH/parent-workspace resolution and
-     print EXACTLY the candidate version. A version mismatch or import failure is a
+     print EXACTLY the candidate version; and the venv carries the promised CI
+     toolchain — `<ws>/.dadaia/.venv/bin/python -m pytest --version` exits 0 (without
+     it, `ci preflight` and the executed-test closure gate are unusable). A version mismatch or import failure is a
      FAIL even when init exited 0 (bug init-succeeds-after-provider-bootstrap-failure
      class: a bootstrap that only works through inherited runtime paths is broken).
   (Init may reach an index — if egress is fully blocked AND the fallback cannot apply,
@@ -356,7 +358,16 @@ an initialized workspace, create it:
   PLAN flipped to `**Status:** Aprovado`, TASKS authored. A fresh (greenfield)
   context's embryonic memory is NEVER a valid rejection reason at `spec_review` (bug
   live-release-definition-rejects-fresh-context class): the SPEC itself is the
-  founding structural reference there. Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  founding structural reference there. **Closure integrity:** when the release's
+  TASKS/write set declare test paths, `implementation-reviews` may reach CLOSURE only
+  with an EXECUTED, green test run — the deterministic close gate runs pytest itself.
+  A closure whose final payload lists validation commands as "planned / not run", or
+  a CLOSURE.md produced without an executed green suite, is a FAIL (bug
+  implementation-review-approves-unexecuted-validation class). **Anchor stability:**
+  after CLOSURE (memory/catalog updates included), every intent of the consumed
+  backlog item must STILL resolve via `dadaia backlog subjects` — a regeneration that
+  renames/destroys a canonical heading anchor is a FAIL (bug
+  closure-breaks-canonical-backlog-anchor class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---

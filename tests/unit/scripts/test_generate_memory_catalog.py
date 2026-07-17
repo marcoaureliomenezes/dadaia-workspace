@@ -267,7 +267,7 @@ def test_generate_index_md_has_expected_sections(tmp_path: Path) -> None:
 
     assert "feat-a" in index_md
     assert "feat-b" in index_md
-    assert "## Features by area" in index_md
+    assert "## Catálogo de features" in index_md
     assert "### product" in index_md
     assert "### sdd" in index_md
 
