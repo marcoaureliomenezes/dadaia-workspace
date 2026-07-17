@@ -50,6 +50,7 @@ packaged ``public/schemas/`` root — no ``infrastructure`` import.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable
@@ -951,6 +952,63 @@ class WorkflowHandoffResolver:
         return "\n".join(lines)
 
     # -- internals ----------------------------------------------------------
+
+    def recover_persisted_record(
+        self, run: LifecycleRun, *, producer_step: str, attempt: int = 0
+    ) -> tuple[LifecycleRun, WorkflowStepRecord] | None:
+        """Re-admit a ledger record from its persisted immutable payload, if valid.
+
+        Reconciliation for the interrupted-worker class (bug
+        release-commit-gate-ignores-existing-plan-review-payload): a record lost from
+        the in-memory ledger between resets/resumes is recovered from the durable
+        payload file — Python-owned disk truth — after re-validating BOTH the envelope
+        and the named payload schema. Returns ``None`` when the writer cannot look up
+        by identity, no file exists, or validation fails (the gate then blocks as
+        before).
+        """
+        reader = getattr(self._writer, "read_step_payload_by_identity", None)
+        if reader is None:
+            return None
+        found = reader(
+            run_id=run.run_id,
+            producer_step=producer_step,
+            attempt=attempt,
+            context=run.context,
+            release_id=_zone_release_id(run),
+        )
+        if found is None:
+            return None
+        payload_ref, content = found
+        try:
+            envelope = json.loads(content)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(envelope, dict):
+            return None
+        try:
+            self._validate_envelope(envelope)
+            output_schema = str(envelope["output_schema"])
+            self._require_known_schema(output_schema)
+            payload = envelope["payload"]
+            assert isinstance(payload, dict)
+            self._validate_named_payload(output_schema, payload)
+        except (MalformedHandoffError, KeyError, AssertionError):
+            return None
+        record = WorkflowStepRecord(
+            run_id=run.run_id,
+            producer_step=producer_step,
+            attempt=attempt,
+            output_schema=output_schema,
+            payload_ref=payload_ref,
+            content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            produced_at=str(envelope.get("produced_at", "")),
+            retention_mode=RetentionMode(
+                str(envelope.get("retention_mode", "delete-after-consumed"))
+            ),
+            declared_consumers=tuple(str(c) for c in envelope.get("declared_consumers", [])),
+        )
+        updated = self._persist(run, run.workflow_steps.upsert(record))
+        return updated, record
 
     def _write_payload(
         self, run: LifecycleRun, *, producer_step: str, attempt: int, content: str

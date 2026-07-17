@@ -123,6 +123,35 @@ class FilesystemRuntimeFileAdapter:
         assert ref.content_hash is not None
         return StepPayloadRef(payload_ref=ref.path, content_hash=ref.content_hash)
 
+    def read_step_payload_by_identity(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        context: str,
+        release_id: str | None,
+    ) -> tuple[str, str] | None:
+        """Locate a persisted step-payload envelope by its addressable identity.
+
+        Reconciliation seam (bug release-commit-gate-ignores-existing-plan-review-payload):
+        an interrupted worker between resets/resumes can drop a ledger record while its
+        immutable payload file survives. Probes the release-aware zone first, then the
+        legacy run zone; returns ``(workspace_ref, content)`` or ``None``.
+        """
+        filename = f"{self._safe_segment(producer_step)}-attempt-{attempt}.step-payload.json"
+        candidates = [
+            self._release_zone_dir(run_id, context=context, release_id=release_id) / filename,
+            self._canonical_path("runs", "lifecycle", run_id, "steps", filename),
+        ]
+        for path in candidates:
+            try:
+                if path.is_file():
+                    return self._workspace_ref(path), path.read_text(encoding="utf-8")
+            except (OSError, RuntimeFilePathError):
+                continue
+        return None
+
     def purge_step_payloads(
         self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
     ) -> int:
