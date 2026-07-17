@@ -142,11 +142,20 @@ an initialized workspace, create it:
   fake`. Each MUST exit non-zero and MUST NOT create `specs/releases/<bogus-id>/` — a
   lifecycle verb must reject an undefined release, never synthesize a release tree for it
   (audit runs against an EXISTING release). Check the exit code directly, not through a pipe.
-- **PASS if:** all four subcommands exist and their help renders (options, purpose); AND
-  both undefined-release invocations are rejected (non-zero) with no synthesized release
-  dir. Actually EXECUTING a workflow to completion needs a Layer-2 model/harness; if none
-  is reachable in the validation env, mark **EXCEPTION** for the live-run portion (not FAIL)
-  — but the reject-undefined guards above run without any model.
+- Also assert a **live worker step executes** (not just the deterministic guards): in a
+  context with an EXISTING release dir, run `$D lifecycle audit --context <ctx>
+  --release-id <existing> --harness codex`. The Codex worker must actually run its
+  `audit_report` step (`"runtime":"codex_exec"`, step `accepted`) — the workflow then
+  completes or blocks honestly at a gate. In a nested/unprivileged container, set
+  `DADAIA_CODEX_SANDBOX=danger-bypass` so codex runs without a sandbox namespace (the outer
+  container is the trust boundary); a `bwrap`/"No permissions to create a new namespace"
+  failure is now a **FAIL**, not an EXCEPTION — dadaia's adapter supports the bypass.
+- **PASS if:** all four subcommands exist and their help renders (options, purpose); the
+  two undefined-release invocations are rejected (non-zero) with no synthesized release
+  dir; AND the live Codex `audit_report` step executes (no sandbox namespace error). Mark
+  **EXCEPTION** for the live-run portion ONLY if NO Layer-2 harness is installed at all
+  (no codex and no pi binary) — never for a sandbox-namespace failure, which the
+  `danger-bypass` mode fixes.
 
 ### F-12 — Reports & handoffs
 - Setup: write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
