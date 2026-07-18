@@ -763,10 +763,20 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # Deliverable-zone requirement (bug
         # create-step-gate-accepts-refusal-handoff-as-success): a create step that
         # declares extra write paths must actually deliver inside them.
-        deliverable_globs = tuple(
-            pattern.format(context=self._context, release_id=self._release_id)
-            for pattern in getattr(step, "extra_allowed_paths", ())
-        )
+        step_deliverable = getattr(step, "deliverable", None)
+        if step_deliverable:
+            # Exact-file deliverable (bug
+            # release-definition-completes-without-persisting-artifacts): the step
+            # passes only when ITS artifact was written, not any write in the zone.
+            deliverable_globs = (
+                f"repos/{self._context}/specs/releases/{self._release_id}/{step_deliverable}",
+                f"specs/releases/{self._release_id}/{step_deliverable}",
+            )
+        else:
+            deliverable_globs = tuple(
+                pattern.format(context=self._context, release_id=self._release_id)
+                for pattern in getattr(step, "extra_allowed_paths", ())
+            )
         worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(

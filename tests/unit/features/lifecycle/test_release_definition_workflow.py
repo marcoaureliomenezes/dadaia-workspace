@@ -333,3 +333,58 @@ def test_plan_lint_still_blocks_forward_dependency_in_translated_table(tmp_path:
     block = wf._validate_plan_dependency_table()
     assert block is not None
     assert "WS-2" in block.reason and "WS-3" in block.reason
+
+
+# ── bug release-definition-completes-without-persisting-artifacts (game cycle 6) ────
+#
+# A live worker "passed" spec_create without persisting SPEC.md (the zone-wide
+# deliverable glob was satisfied by any write) and the terminal gate advanced the
+# release to IMPLEMENTATION with 2 doctor errors. Create steps now declare their
+# EXACT file deliverable, and definition_commit_gate refuses to complete unless
+# SPEC/PLAN/TASKS exist with the review-approved status on disk.
+
+
+class _SkipsSpecFake:
+    """Approves every step; writes PLAN/TASKS but never SPEC.md (the cycle-6 shape)."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return AgentRuntimeKind.FAKE
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        refs = [f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"]
+        deliverable = {"plan_create": "PLAN.md", "tasks_create": "TASKS.md"}.get(label)
+        if deliverable is not None:
+            ref = f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/{deliverable}"
+            refs.append(ref)
+        for ref in refs:
+            target = self.root / ref
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('{"fake": true}\n', encoding="utf-8")
+        return AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary="ok",
+            artifact_refs=tuple(refs),
+            structured_output={"verdict": "APPROVED"},
+        )
+
+
+def test_definition_never_completes_without_spec_on_disk(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _SkipsSpecFake(tmp_path))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    # Remove the pre-seeded SPEC so only the worker could create it (it won't).
+    (specs / "releases" / _RELEASE / "SPEC.md").unlink()
+
+    result = wf.run("no-spec-run")
+
+    assert result.completed is False, "definition must NEVER complete without SPEC.md on disk"
+    assert result.blocked is not None
+    # ACTIVE.md must not have been repointed to IMPLEMENTATION.
+    active = specs / "releases" / "ACTIVE.md"
+    if active.exists():
+        assert "IMPLEMENTATION" not in active.read_text(encoding="utf-8")

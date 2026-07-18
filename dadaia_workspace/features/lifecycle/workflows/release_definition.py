@@ -31,6 +31,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
+    LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
@@ -70,6 +71,11 @@ class ReleaseStep:
     # release-definition-create-steps-cannot-write-specs). Placeholders {context} and
     # {release_id} are expanded by the shared ``_scope``.
     extra_allowed_paths: tuple[str, ...] = ()
+    #: The EXACT release-artifact filename this create step must persist (bug
+    #: release-definition-completes-without-persisting-artifacts): the zone-wide glob
+    #: let a worker "pass" spec_create by writing anything in the release dir. When
+    #: set, the structural gate requires THIS file among the step's refs/changed paths.
+    deliverable: str | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +116,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="spec_create",
         role="product-engineer",
+        deliverable="SPEC.md",
         fragment_id="release_definition.spec_create",
         shared_fragment_ids=(
             "shared.anti_slop",
@@ -135,6 +142,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="plan_create",
         role="product-engineer",
+        deliverable="PLAN.md",
         fragment_id="release_definition.plan_create",
         shared_fragment_ids=(
             "shared.anti_slop",
@@ -160,6 +168,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="tasks_create",
         role="product-engineer",
+        deliverable="TASKS.md",
         fragment_id="release_definition.tasks_create",
         shared_fragment_ids=("shared.anti_slop",),
         produces="generic-step-handoff-v1",
@@ -427,6 +436,52 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             ),
             detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
         )
+
+    def _terminal_semantic_block(
+        self,
+        run: LifecycleRun,
+        step: ReleaseStep,
+        sequence: tuple[ReleaseStep, ...],
+    ) -> BlockedState | None:
+        """Refuse to complete a definition whose artifacts are not persisted+approved.
+
+        Bug release-definition-completes-without-persisting-artifacts: a live worker
+        can satisfy the transport gate without writing its artifact. The terminal gate
+        re-reads DISK truth: SPEC.md/PLAN.md/TASKS.md must exist and SPEC/PLAN must
+        carry the review-flipped ``**Status:** Aprovado`` before ACTIVE.md is
+        repointed or ``completed`` is reported.
+        """
+        release_dir = self._selector.spec_context.specs_dir / "releases" / self._release_id
+        labels = {s.label for s in sequence}
+        # Run-scoped requirements: an artifact is required only when ITS create step ran
+        # in this sequence; the Aprovado flip only when its review gate ran too.
+        required = {
+            "SPEC.md": ("spec_create" in labels, "spec_review" in labels),
+            "PLAN.md": ("plan_create" in labels, "plan_review" in labels),
+            "TASKS.md": ("tasks_create" in labels, False),
+        }
+        missing: list[str] = []
+        for name, (must_exist, must_be_approved) in required.items():
+            if not must_exist:
+                continue
+            path = release_dir / name
+            if not path.is_file():
+                missing.append(f"{name} (absent)")
+                continue
+            if must_be_approved and "**Status:** Aprovado" not in path.read_text(
+                encoding="utf-8"
+            ):
+                missing.append(f"{name} (not Aprovado)")
+        if missing:
+            return BlockedState(
+                reason=(
+                    "definition_commit_gate: release artifacts are not persisted/approved "
+                    "on disk: " + ", ".join(missing)
+                ),
+                blocked_at_step=step.label,
+                detail={"unpersisted_artifacts": ", ".join(missing)},
+            )
+        return None
 
     def _on_sequence_completed(self) -> None:
         """Repoint ACTIVE.md to the newly defined release (deterministic Python).
