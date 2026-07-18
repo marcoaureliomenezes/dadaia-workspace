@@ -18,11 +18,32 @@ Close only after QA, security, and code review have approved the same change.
    the durable `.dadaia/runs/lifecycle/<run>/steps/*.step-payload.json` refs supplied
    by the workflow, never the temporary worker `artifact_refs` nested inside them.
 3. Update memory only where the shipped product truth changed. A shipped feature is
-   recorded as a memory ATOM: create/update
-   `specs/memory/product/<area>/<slug>.md` with valid frontmatter (slug, title,
-   category, tldr, summary, tags) and a body that STARTS with a markdown heading
-   (`## <section>` — a heading-less body is a doctor SPEC-DOC-002 error and blocks
-   this close). NEVER hand-edit `catalog.json` or
+   recorded as a memory ATOM at `specs/memory/product/<area>/<slug>.md`. PREFER the
+   generator — `dadaia memory product add <slug> --specs-dir <specs-dir>` — then edit
+   the generated body. If you write the file directly, copy this template VERBATIM
+   and fill it (a malformed atom blocks this close — the Python gate validates
+   frontmatter, allowlisted headings, and the mandatory markdown heading):
+
+   ```markdown
+   ---
+   slug: <kebab-case-slug>
+   title: <Feature Title>
+   category: product
+   tldr: <one-line summary under 160 chars>
+   summary: <2-3 sentence description of the shipped capability>
+   tags:
+     - <tag>
+   token_estimate: 0
+   last_updated: "<YYYY-MM-DD>"
+   release_origin: <release-id>
+   ---
+
+   ## Visão atômica
+
+   <what this feature does, grounded in the shipped behavior>
+   ```
+
+   NEVER hand-edit `catalog.json` or
    `memory/product/index.md` — both are DERIVED files the workflow regenerates from
    the atoms after this step; a catalog entry without its atom is a doctor CAT-1
    defect and will be erased by the regeneration. Atom body headings must come from
