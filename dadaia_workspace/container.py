@@ -1229,7 +1229,9 @@ def build_lifecycle_pipeline(
             phase=_active_phase(specs_dir),
         ),
         diff_provider=build_git_diff_provider(repo_root, paths=repo_write_set),
-        test_output_provider=build_test_output_provider(repo_root, paths=repo_write_set),
+        test_output_provider=build_test_output_provider(
+            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
+        ),
     )
     return LifecyclePipeline(
         context=context,
@@ -1255,7 +1257,9 @@ def build_lifecycle_pipeline(
         max_review_retries=max_review_retries,
         # Bug implementation-review-approves-unexecuted-validation: closure requires an
         # EXECUTED, green test run over the release's declared test paths.
-        executed_test_gate=build_executed_test_gate(repo_root, paths=repo_write_set),
+        executed_test_gate=build_executed_test_gate(
+            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
+        ),
         # Bug closure-catalog-references-missing-memory-atom: the catalog is derived
         # from the atoms — closure regenerates catalog.json + index.md so phantom
         # entries cannot survive the cycle.
@@ -1267,6 +1271,17 @@ def build_lifecycle_pipeline(
         # sweeps cache dirs out of the context repo.
         repo_hygiene_sweeper=_repo_hygiene_sweeper(repo_root),
     )
+
+
+def _workspace_python_bin(workspace_root: Path) -> str | None:
+    """The workspace venv interpreter, when provisioned — the runtime the bootstrap
+    guarantees carries pytest (bug implementation-review-uses-parent-venv-without-
+    pytest: the CLI may itself run from a foreign venv with no test toolchain).
+    """
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+    candidate = VenvPythonEnvironmentManager().python_executable(str(workspace_root))
+    return candidate if Path(candidate).is_file() else None
 
 
 #: Cache/artifact dirs that must never survive inside a context repo

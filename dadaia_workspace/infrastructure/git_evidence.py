@@ -136,6 +136,7 @@ def build_executed_test_gate(
     *,
     paths: tuple[str, ...] = (),
     timeout_seconds: float = 300.0,
+    python_bin: str | None = None,
 ) -> Callable[[], tuple[bool | None, str]]:
     """Build the deterministic executed-test CLOSE gate (container DI seam).
 
@@ -158,7 +159,15 @@ def build_executed_test_gate(
         existing = [t for t in test_targets if (repo_root / t).exists()]
         if not existing:
             return None, "declared test paths do not exist on disk"
-        cmd = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", *existing]
+        cmd = [
+            python_bin or sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            *existing,
+        ]
         try:
             proc = subprocess.run(  # noqa: S603 — fixed argv, read-only evidence run
                 cmd,
@@ -184,6 +193,7 @@ def build_test_output_provider(
     paths: tuple[str, ...] = (),
     max_lines: int = 120,
     timeout_seconds: float = 300.0,
+    python_bin: str | None = None,
 ) -> Callable[[], str]:
     """Build a zero-arg executed-test-evidence provider (container DI seam).
 
@@ -206,7 +216,7 @@ def build_test_output_provider(
         if not existing:
             return "no test evidence: declared test paths do not exist yet"
         cmd = [
-            sys.executable,
+            python_bin or sys.executable,
             "-m",
             "pytest",
             "-p",
