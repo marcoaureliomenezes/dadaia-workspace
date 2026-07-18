@@ -445,10 +445,7 @@ class LifecyclePipeline:
                         # the workspace root (outside repos/<ctx>/) blocks AT the step
                         # with the correct zone in its retry digest.
                         else (
-                            tuple(
-                                path.format(context=self._context, release_id=self._release_id)
-                                for path in step.extra_allowed_paths
-                            )
+                            self._implement_deliverable_globs(step)
                             if step.label == "implement" and step.extra_allowed_paths
                             else ()
                         )
@@ -643,6 +640,25 @@ class LifecyclePipeline:
             raise
         return count
 
+    def _implement_deliverable_globs(self, step: PipelineStep) -> tuple[str, ...]:
+        """The implement step's deliverable zone in BOTH canonical spellings.
+
+        Bug implementation-deliverable-zone-misses-context-repo: TASKS write sets are
+        commonly repo-relative (``src/**``) while workers report workspace-relative
+        paths (``repos/<ctx>/src/...``) — both name the same zone, so both must match.
+        A glob already qualified with ``repos/`` passes through unchanged.
+        """
+        globs: list[str] = []
+        for raw in step.extra_allowed_paths:
+            path = raw.format(context=self._context, release_id=self._release_id)
+            if path not in globs:
+                globs.append(path)
+            if not path.startswith("repos/"):
+                qualified = f"repos/{self._context}/{path}"
+                if qualified not in globs:
+                    globs.append(qualified)
+        return tuple(globs)
+
     @staticmethod
     def _progress(message: str) -> None:
         """One human progress line on STDERR (bug
@@ -814,10 +830,19 @@ class LifecyclePipeline:
         # (ARCHITECT MEDIUM-2) — never a label string match — so review steps
         # (review_qa/review_security/review_code, is_review=True) ALWAYS stay
         # handoff-only regardless of what extra_allowed_paths carries.
-        expanded_paths = tuple(
-            path.format(context=self._context, release_id=self._release_id)
-            for path in step.extra_allowed_paths
-        )
+        expanded_paths_list: list[str] = []
+        for _raw in step.extra_allowed_paths:
+            _path = _raw.format(context=self._context, release_id=self._release_id)
+            if _path not in expanded_paths_list:
+                expanded_paths_list.append(_path)
+            # Dual spelling (bug implementation-deliverable-zone-misses-context-repo):
+            # repo-relative write sets and workspace-relative worker reports name the
+            # same zone.
+            if not _path.startswith("repos/"):
+                _qualified = f"repos/{self._context}/{_path}"
+                if _qualified not in expanded_paths_list:
+                    expanded_paths_list.append(_qualified)
+        expanded_paths = tuple(expanded_paths_list)
         expanded_paths = filter_context_spec_paths(
             expanded_paths,
             workspace_root=self._artifact_root,

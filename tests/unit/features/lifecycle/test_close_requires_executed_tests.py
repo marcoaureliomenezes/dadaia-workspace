@@ -403,3 +403,54 @@ def test_implement_requires_delivery_inside_declared_write_set(tmp_path: Path) -
     assert result.completed is False
     assert result.blocked is not None and result.blocked.blocked_at_step == "implement"
     assert "deliverable" in result.blocked.reason
+
+
+def test_implement_accepts_delivery_qualified_with_context_repo(tmp_path: Path) -> None:
+    """Bug implementation-deliverable-zone-misses-context-repo: a TASKS write set in
+    repo-relative form (src/**) must match a delivery reported workspace-relative
+    (repos/<ctx>/src/...) — both spellings name the same zone.
+    """
+    from dataclasses import replace as _replace
+
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+
+    class _InRepoRuntime(_ApprovingRuntime):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            refs = list(result.artifact_refs)
+            label = (request.task_id or "").split(":")[1] if ":" in (request.task_id or "") else ""
+            if label == "implement":
+                refs.append(f"repos/{_CONTEXT}/src/game.py")
+            if label == "close":
+                refs.append(f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/CLOSURE.md")
+            for ref in refs:
+                target = tmp_path / ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("x = 1\n", encoding="utf-8")
+            return AgentRunResult(
+                status=result.status,
+                summary=result.summary,
+                artifact_refs=tuple(refs),
+                structured_output=result.structured_output,
+            )
+
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _InRepoRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        artifact_root=tmp_path,
+    )
+    ladder = tuple(
+        _replace(step, extra_allowed_paths=("src/**",)) if step.label == "implement" else step
+        for step in implementation_ladder(AgentRuntimeKind.FAKE)
+    )
+
+    result = pipe.run("impl-qualified", ladder)
+
+    assert result.completed is True, result.blocked.reason if result.blocked else result
