@@ -230,6 +230,8 @@ class LifecyclePipeline:
         # commits the context repo's release/implementation/memory changes — closure is
         # a durable state, not a dirty working tree. Best-effort, never un-closes.
         self._closure_committer = closure_committer
+        # One-shot prior-block digest injected into the first resumed step's prompt.
+        self._resume_digest: str | None = None
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -322,6 +324,22 @@ class LifecyclePipeline:
                     f"resume_from step {resume_from!r} is not in the pipeline sequence {labels}"
                 )
             prior = self._run_store.load(run_id)
+            if prior is not None and prior.blocked is not None:
+                # Parity with the fragment-gate engines: the resumed step's prompt
+                # carries the prior rejection/block digest — a blind re-run repeats
+                # the identical findings forever.
+                blocked_prior = prior.blocked
+                resume_digest_lines = [
+                    "## Prior rejection feedback (resumed run)",
+                    f"The previous run blocked at step {blocked_prior.blocked_at_step!r}: "
+                    f"{blocked_prior.reason}",
+                ]
+                for key, value in sorted(blocked_prior.detail.items()):
+                    resume_digest_lines.append(f"- {key}: {value}")
+                resume_digest_lines.append(
+                    "Revise the deliverable so every point above is addressed."
+                )
+                self._resume_digest = "\n".join(resume_digest_lines)
             if prior is None:
                 raise ValueError(
                     f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run"
@@ -393,6 +411,9 @@ class LifecyclePipeline:
             retry_requested = False
             for index, step in enumerate(steps, start=1):
                 digest: str | None = None
+                if self._resume_digest is not None:
+                    digest = self._resume_digest
+                    self._resume_digest = None
                 live_step = step.runtime_kind is not AgentRuntimeKind.FAKE
                 if live_step:
                     self._progress(

@@ -502,3 +502,57 @@ def test_blocked_close_never_commits(tmp_path: Path) -> None:
 
     assert result.completed is False
     assert calls == []
+
+
+def test_pipeline_resume_injects_prior_rejection_digest(tmp_path: Path) -> None:
+    """Parity with the fragment-gate engines: resuming a run that blocked on a review
+    rejection feeds the rejection digest into the resumed step's prompt — otherwise
+    the worker re-implements blind and the reviewer repeats the identical findings.
+    """
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+
+    class _RejectingReview(_ApprovingRuntime):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            if ":review_combined:" in (request.task_id or ""):
+                return AgentRunResult(
+                    status=result.status,
+                    summary="review verdict REJECTED: RF-07 not satisfied",
+                    artifact_refs=result.artifact_refs,
+                    structured_output={
+                        "verdict": "REJECTED",
+                        "verdict_reason": "RF-07 not satisfied",
+                    },
+                )
+            return result
+
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _RejectingReview(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        max_review_retries=0,
+    )
+    first = pipe.run("resume-digest", implementation_ladder(AgentRuntimeKind.FAKE))
+    assert first.completed is False and first.blocked is not None
+
+    approving = _ApprovingRuntime()
+    pipe2 = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: approving,  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        max_review_retries=0,
+    )
+    resumed = pipe2.run(
+        "resume-digest", implementation_ladder(AgentRuntimeKind.FAKE), resume_from="implement"
+    )
+    assert resumed.completed is True
+    implement_prompt = approving.received[0].prompt
+    assert "RF-07 not satisfied" in implement_prompt, implement_prompt[-500:]
