@@ -434,11 +434,25 @@ class LifecyclePipeline:
                     current_step=step.label,
                     is_review=step.is_review,
                     deliverable_globs=(
-                        (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
-                        f"specs/releases/{self._release_id}/CLOSURE.md",
-                    )
-                    if step.label == "close"
-                    else (),
+                        (
+                            (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
+                            f"specs/releases/{self._release_id}/CLOSURE.md",
+                        )
+                        if step.label == "close"
+                        # Bug lifecycle-worker-executes-at-workspace-root-not-context-repo:
+                        # when the implement step carries a derived write set, at least
+                        # one delivered path must land INSIDE it — a worker writing at
+                        # the workspace root (outside repos/<ctx>/) blocks AT the step
+                        # with the correct zone in its retry digest.
+                        else (
+                            tuple(
+                                path.format(context=self._context, release_id=self._release_id)
+                                for path in step.extra_allowed_paths
+                            )
+                            if step.label == "implement" and step.extra_allowed_paths
+                            else ()
+                        )
+                    ),
                 )
                 if step.target_phase is None:
                     worker_result, blocked = runner.evaluate_gate_with_result(run, runner_input)

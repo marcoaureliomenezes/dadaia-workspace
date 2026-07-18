@@ -358,3 +358,48 @@ def test_pipeline_emits_step_progress_on_stderr(
     assert "[lifecycle]" in err
     assert "implement" in err and "close" in err
     assert "1/3" in err and "3/3" in err
+
+
+def test_implement_requires_delivery_inside_declared_write_set(tmp_path: Path) -> None:
+    """Bug lifecycle-worker-executes-at-workspace-root-not-context-repo: an implement
+    worker that writes OUTSIDE the release write set (workspace-root src/ instead of
+    repos/<ctx>/) used to be accepted on its step-output envelope alone. When the step
+    declares a write set, at least one delivered path must fall inside it.
+    """
+    from dataclasses import replace as _replace
+
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+
+    class _MaterializingRuntime(_ApprovingRuntime):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            for ref in result.artifact_refs:
+                target = tmp_path / ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('{"fake": true}', encoding="utf-8")
+            return result
+
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _MaterializingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        artifact_root=tmp_path,
+    )
+    ladder = tuple(
+        _replace(step, extra_allowed_paths=(f"repos/{_CONTEXT}/src/**",))
+        if step.label == "implement"
+        else step
+        for step in implementation_ladder(AgentRuntimeKind.FAKE)
+    )
+
+    result = pipe.run("impl-zone", ladder)
+
+    assert result.completed is False
+    assert result.blocked is not None and result.blocked.blocked_at_step == "implement"
+    assert "deliverable" in result.blocked.reason
