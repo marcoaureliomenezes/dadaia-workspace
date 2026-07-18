@@ -282,3 +282,47 @@ def test_completed_close_resets_active_md_python_owned(tmp_path: Path) -> None:
     assert result.completed is True
     active = (specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
     assert "release: none" in active and "phase: none" in active
+
+
+def test_memory_lint_gate_rejects_atom_without_heading(tmp_path: Path) -> None:
+    """Bug closure-generates-memory-atom-without-heading: the close gate must catch a
+    heading-less atom (doctor SPEC-DOC-002) — not only allowlist violations.
+    """
+    from dadaia_workspace.container import _memory_lint_gate
+
+    specs = tmp_path / "specs"
+    (specs / "memory").mkdir(parents=True)
+    (specs / "memory" / "architecture.md").write_text(
+        "---\nslug: architecture\ntitle: A\ncategory: core\ntldr: t\nsummary: s\n"
+        'tags: [a]\ntoken_estimate: 10\nlast_updated: "2026-01-01"\n'
+        "release_origin: x\n---\n\nCorpo sem nenhum heading markdown.\n",
+        encoding="utf-8",
+    )
+
+    gate = _memory_lint_gate(specs)
+    assert gate is not None
+    ok, evidence = gate()
+    assert ok is False
+    assert "heading" in evidence.lower()
+
+
+def test_memory_lint_gate_rejects_product_atom_without_heading(tmp_path: Path) -> None:
+    """The EXACT live shape: a product-area atom with valid frontmatter and a body
+    carrying no markdown heading at all (doctor SPEC-DOC-002)."""
+    from dadaia_workspace.container import _memory_lint_gate
+
+    specs = tmp_path / "specs"
+    area = specs / "memory" / "product" / "console-game"
+    area.mkdir(parents=True)
+    (area / "valgame-console-game.md").write_text(
+        "---\nslug: valgame-console-game\ntitle: Valgame\ncategory: product\ntldr: t\n"
+        'summary: s\ntags: [game]\ntoken_estimate: 10\nlast_updated: "2026-01-01"\n'
+        "release_origin: v0.1.0\n---\n\nDescricao do jogo sem nenhum heading.\n",
+        encoding="utf-8",
+    )
+
+    gate = _memory_lint_gate(specs)
+    assert gate is not None
+    ok, evidence = gate()
+    assert ok is False, evidence
+    assert "heading" in evidence.lower()

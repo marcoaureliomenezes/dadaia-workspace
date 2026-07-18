@@ -1338,6 +1338,29 @@ def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None
             return True, f"memory lint could not run ({exc}); doctor covers it after the fact"
         merged = (proc.stdout + "\n" + proc.stderr).strip()
         ok = proc.returncode == 0 and "WARN:" not in merged
+        # SPEC-DOC-002 leg (bug closure-generates-memory-atom-without-heading): the
+        # lint script validates the headings PRESENT; a body with no markdown heading
+        # at all sails through it — but doctor flags it post-closure. Enforce the
+        # has-a-heading contract here so a heading-less atom never rides a green close.
+        import re as _re
+
+        heading_re = _re.compile(r"^#{1,6}\s+\S", _re.MULTILINE)
+        fm_re = _re.compile(r"^---\n.*?\n---\n", _re.DOTALL)
+        headingless: list[str] = []
+        for md in sorted(memory_dir.rglob("*.md")):
+            if md.name == "index.md":
+                continue
+            try:
+                body = fm_re.sub("", md.read_text(encoding="utf-8"), count=1)
+            except OSError:
+                continue
+            if heading_re.search(body) is None:
+                headingless.append(str(md.relative_to(memory_dir)))
+        if headingless:
+            ok = False
+            merged += "\nERROR: memory atom(s) with no markdown heading (doctor " + (
+                "SPEC-DOC-002): " + ", ".join(headingless)
+            )
         tail = "\n".join(merged.splitlines()[-30:])
         return ok, tail
 

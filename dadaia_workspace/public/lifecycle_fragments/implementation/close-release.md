@@ -20,7 +20,9 @@ Close only after QA, security, and code review have approved the same change.
 3. Update memory only where the shipped product truth changed. A shipped feature is
    recorded as a memory ATOM: create/update
    `specs/memory/product/<area>/<slug>.md` with valid frontmatter (slug, title,
-   category, tldr, summary, tags). NEVER hand-edit `catalog.json` or
+   category, tldr, summary, tags) and a body that STARTS with a markdown heading
+   (`## <section>` — a heading-less body is a doctor SPEC-DOC-002 error and blocks
+   this close). NEVER hand-edit `catalog.json` or
    `memory/product/index.md` — both are DERIVED files the workflow regenerates from
    the atoms after this step; a catalog entry without its atom is a doctor CAT-1
    defect and will be erased by the regeneration. Atom body headings must come from
