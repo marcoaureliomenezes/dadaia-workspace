@@ -43,6 +43,21 @@ from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
+
+def _json_from_output(output: str) -> dict:
+    """Parse the CLI's JSON payload, ignoring [lifecycle] progress lines.
+
+    CliRunner mixes stderr into output; live-kind runs emit per-step progress there
+    (bug release-definition-codex-hangs-after-spec-create, visibility half).
+    """
+    import json as _json
+
+    lines = [ln for ln in output.splitlines() if not ln.startswith("[lifecycle]")]
+    text = "\n".join(lines).strip()
+    start = text.index("{")
+    return _json.loads(text[start:])
+
+
 _runner = CliRunner()
 
 
@@ -153,7 +168,7 @@ def test_pi_pipeline_surfaces_real_setup_failure_not_generic_block(
 
     assert len(calls) == 1, "the faked pi subprocess seam must be invoked exactly once"
     assert result.exit_code == 3, result.output
-    payload = json.loads(result.output)
+    payload = _json_from_output(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
     assert payload["steps"][0]["runtime"] == "pi_headless"
@@ -243,7 +258,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
     # the real binary, drove the implement step; the exact-once assertion used by the
     # negative case below does not apply here.
     assert len(accept_calls) >= 1, "the faked pi subprocess seam must have been invoked"
-    accept_payload = json.loads(accept_result.output)
+    accept_payload = _json_from_output(accept_result.output)
     assert accept_payload["steps"][0]["label"] == "implement"
     assert accept_payload["steps"][0]["runtime"] == "pi_headless"
     assert accept_payload["steps"][0]["accepted"] is True, accept_payload
@@ -286,7 +301,7 @@ def test_pi_pipeline_fr2_tolerant_schema_accept_and_noop_negative(
         "the structural gate must make exactly one bounded correction attempt"
     )
     assert negative_result.exit_code == 3, negative_result.output
-    negative_payload = json.loads(negative_result.output)
+    negative_payload = _json_from_output(negative_result.output)
     assert negative_payload["status"] == "BLOCKED"
     assert negative_payload["completed"] is False
     assert negative_payload["steps"][0]["label"] == "implement"
@@ -376,7 +391,7 @@ def test_pipeline_block_detail_carries_validated_handoff_path_when_refs_empty(
 
     assert len(calls) == 2, "the structural gate must make exactly one bounded correction attempt"
     assert result.exit_code == 3, result.output
-    payload = json.loads(result.output)
+    payload = _json_from_output(result.output)
     # The run is STILL blocked — the FR1 correction only removes the (mis)enrichment.
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False

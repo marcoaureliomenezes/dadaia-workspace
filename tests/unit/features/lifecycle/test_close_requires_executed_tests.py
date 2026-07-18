@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -326,3 +328,33 @@ def test_memory_lint_gate_rejects_product_atom_without_heading(tmp_path: Path) -
     ok, evidence = gate()
     assert ok is False, evidence
     assert "heading" in evidence.lower()
+
+
+def test_pipeline_emits_step_progress_on_stderr(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Bug release-definition-codex-hangs-after-spec-create (operator-visible half):
+    a multi-minute live run used to be SILENT until the end, so validators killed
+    healthy workers. Every engine now emits per-step progress on stderr (stdout stays
+    machine-pure for --json).
+    """
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+    )
+
+    result = pipe.run("progress-run", implementation_ladder(AgentRuntimeKind.CODEX_EXEC))
+
+    assert result.completed is True
+    err = capsys.readouterr().err
+    assert "[lifecycle]" in err
+    assert "implement" in err and "close" in err
+    assert "1/3" in err and "3/3" in err

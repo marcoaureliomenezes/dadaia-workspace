@@ -84,7 +84,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
     canonical_worker_output_ref,
 )
-from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
@@ -328,7 +328,14 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
-        for step in remaining:
+        for step_index, step in enumerate(remaining, start=1):
+            if (step.runtime_kind or self._default_kind) is not AgentRuntimeKind.FAKE and (
+                step.kind is BacklogStepKind.MODEL
+            ):
+                emit_progress(
+                    f"backlog-definition step {step.label!r} "
+                    f"({step_index}/{len(remaining)}) started"
+                )
             if step.kind is BacklogStepKind.REVIEW_GATE:
                 overlap_list, run, sr = self._run_review_gate(run, step, before)
                 overlap = overlap_list

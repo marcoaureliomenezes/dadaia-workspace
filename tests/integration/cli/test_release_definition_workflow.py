@@ -49,6 +49,21 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
+
+def _json_from_output(output: str) -> dict:
+    """Parse the CLI's JSON payload, ignoring [lifecycle] progress lines.
+
+    CliRunner mixes stderr into output; live-kind runs emit per-step progress there
+    (bug release-definition-codex-hangs-after-spec-create, visibility half).
+    """
+    import json as _json
+
+    lines = [ln for ln in output.splitlines() if not ln.startswith("[lifecycle]")]
+    text = "\n".join(lines).strip()
+    start = text.index("{")
+    return _json.loads(text[start:])
+
+
 _runner = CliRunner()
 _RELEASE = "v0.1.16"
 _CONTEXT = "dadaia-workspace"
@@ -63,7 +78,7 @@ def _init_workspace(path: Path) -> Path:
 
 
 def _payload(output: str) -> dict[str, object]:
-    payload = json.loads(output)
+    payload = _json_from_output(output)
     assert isinstance(payload, dict)
     return payload
 

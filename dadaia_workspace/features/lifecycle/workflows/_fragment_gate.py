@@ -82,7 +82,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     _NO_RELEASE_CONTEXT_COMMANDS,
@@ -527,10 +527,26 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         idx = 0
         while idx < len(steps_seq):
             step = steps_seq[idx]
+            live_step = (
+                step.fragment_id is not None
+                and (getattr(step, "runtime_kind", None) or self._default_kind)
+                is not AgentRuntimeKind.FAKE
+            )
+            if live_step:
+                emit_progress(
+                    f"{self._WORKFLOW_LABEL} step {step.label!r} ({idx + 1}/{len(steps_seq)}) "
+                    "started — a live worker step may take several minutes; it times out "
+                    "and blocks cleanly on its own"
+                )
             if step.fragment_id is None:
                 run, outcome = self._run_terminal_gate(run, step, sequence)
             else:
                 run, outcome = self._run_model_step(run, step, sequence)
+            if live_step:
+                emit_progress(
+                    f"{self._WORKFLOW_LABEL} step {step.label!r} "
+                    + ("accepted" if outcome.accepted else "blocked")
+                )
             self._run_store.save(run)
             outcomes.append(outcome)
             if outcome.accepted:

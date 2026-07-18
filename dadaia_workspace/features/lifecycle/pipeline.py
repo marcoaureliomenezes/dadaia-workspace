@@ -386,8 +386,15 @@ class LifecyclePipeline:
         retry_source: tuple[str, int] | None = None
         while True:
             retry_requested = False
-            for step in steps:
+            for index, step in enumerate(steps, start=1):
                 digest: str | None = None
+                live_step = step.runtime_kind is not AgentRuntimeKind.FAKE
+                if live_step:
+                    self._progress(
+                        f"implementation-reviews step {step.label!r} ({index}/{len(steps)}) "
+                        f"started on {step.runtime_kind.value} — a live worker step may take "
+                        "several minutes; it times out and blocks cleanly on its own"
+                    )
                 close_zone_snapshot = self._snapshot_close_zone() if step.label == "close" else None
                 if step.label == "implement" and retry_source is not None:
                     assert self._handoff_resolver is not None
@@ -522,6 +529,11 @@ class LifecyclePipeline:
                     # Transactional close (bug blocked-close-materializes-closure-...):
                     # a blocked close leaves no half-written closure/memory state.
                     self._restore_close_zone(close_zone_snapshot)
+                if live_step:
+                    self._progress(
+                        f"implementation-reviews step {step.label!r} ({index}/{len(steps)}) "
+                        + ("accepted" if accepted else "blocked")
+                    )
                 self._run_store.save(run)
                 results.append(
                     PipelineStepResult(
@@ -616,6 +628,17 @@ class LifecyclePipeline:
             tmp.unlink(missing_ok=True)
             raise
         return count
+
+    @staticmethod
+    def _progress(message: str) -> None:
+        """One human progress line on STDERR (bug
+        release-definition-codex-hangs-after-spec-create, visibility half): a live
+        multi-minute run must never be silent — validators kill healthy workers.
+        stdout stays machine-pure for --json consumers.
+        """
+        import sys as _sys
+
+        print(f"[lifecycle] {message}", file=_sys.stderr, flush=True)
 
     def _snapshot_close_zone(self) -> dict[str, bytes | None] | None:
         """Capture the closure-mutable zone before the close worker runs.
