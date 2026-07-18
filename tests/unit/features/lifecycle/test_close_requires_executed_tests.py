@@ -84,3 +84,29 @@ def test_close_unaffected_when_no_tests_are_declared(tmp_path: Path) -> None:
     pipe = _pipeline(tmp_path, lambda: (None, "no test paths declared"))
     result = pipe.run("close-none", implementation_ladder(AgentRuntimeKind.FAKE))
     assert result.completed is True
+
+
+def test_close_runs_memory_catalog_regenerator(tmp_path: Path) -> None:
+    """Bug closure-catalog-references-missing-memory-atom: the catalog is DERIVED from
+    memory atoms — closure regenerates it deterministically, so a hand-edited phantom
+    entry (feature in catalog.json with no atom) cannot survive the cycle.
+    """
+    calls: list[str] = []
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        memory_catalog_regenerator=lambda: calls.append("regenerated"),
+    )
+
+    result = pipe.run("close-regen", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    assert calls == ["regenerated"]

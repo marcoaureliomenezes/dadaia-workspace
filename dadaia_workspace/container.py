@@ -1255,7 +1255,33 @@ def build_lifecycle_pipeline(
         # Bug implementation-review-approves-unexecuted-validation: closure requires an
         # EXECUTED, green test run over the release's declared test paths.
         executed_test_gate=build_executed_test_gate(repo_root, paths=repo_write_set),
+        # Bug closure-catalog-references-missing-memory-atom: the catalog is derived
+        # from the atoms — closure regenerates catalog.json + index.md so phantom
+        # entries cannot survive the cycle.
+        memory_catalog_regenerator=_memory_catalog_regenerator(specs_dir),
     )
+
+
+def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
+    """Build the closure-time derived-catalog refresh for one context specs dir.
+
+    Returns ``None`` when the context has no product-memory zone (nothing to derive).
+    """
+    if not (specs_dir / "memory" / "product").is_dir():
+        return None
+
+    def _regenerate() -> None:
+        from dadaia_workspace.features.specs.catalog import (
+            generate_catalog,
+            write_catalog,
+            write_index,
+        )
+
+        catalog = generate_catalog(specs_dir)
+        write_catalog(specs_dir, catalog)
+        write_index(specs_dir, catalog)
+
+    return _regenerate
 
 
 def _release_definition_runtime_factory(

@@ -17,7 +17,13 @@ Close only after QA, security, and code review have approved the same change.
 2. Write `CLOSURE.md` with the delivered scope and exact verification evidence. Cite
    the durable `.dadaia/runs/lifecycle/<run>/steps/*.step-payload.json` refs supplied
    by the workflow, never the temporary worker `artifact_refs` nested inside them.
-3. Update memory only where the shipped product truth changed.
+3. Update memory only where the shipped product truth changed. A shipped feature is
+   recorded as a memory ATOM: create/update
+   `specs/memory/product/<area>/<slug>.md` with valid frontmatter (slug, title,
+   category, tldr, summary, tags). NEVER hand-edit `catalog.json` or
+   `memory/product/index.md` — both are DERIVED files the workflow regenerates from
+   the atoms after this step; a catalog entry without its atom is a doctor CAT-1
+   defect and will be erased by the regeneration.
 4. Set `ACTIVE.md` to `release: none` and `phase: none`. The Python workflow body
    owns the final `[-]` to `[x]` task-marker transition after this closure step and
    every review gate succeed; do not self-complete task markers.

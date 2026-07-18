@@ -367,7 +367,11 @@ an initialized workspace, create it:
   after CLOSURE (memory/catalog updates included), every intent of the consumed
   backlog item must STILL resolve via `dadaia backlog subjects` — a regeneration that
   renames/destroys a canonical heading anchor is a FAIL (bug
-  closure-breaks-canonical-backlog-anchor class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  closure-breaks-canonical-backlog-anchor class). **Post-closure coherence:** after
+  the live cycle closes, `dadaia specs doctor` on the context must report 0 errors —
+  in particular no CAT-1 (catalog entry without its memory atom; the catalog is
+  derived and regenerated at closure — bug
+  closure-catalog-references-missing-memory-atom class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---

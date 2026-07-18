@@ -11,6 +11,7 @@ and persists progress at every step (resumable).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import uuid
@@ -194,6 +195,7 @@ class LifecyclePipeline:
         runtime_files: RuntimeFilePort | None = None,
         artifact_root: Path | None = None,
         executed_test_gate: Callable[[], tuple[bool | None, str]] | None = None,
+        memory_catalog_regenerator: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -206,6 +208,12 @@ class LifecyclePipeline:
         # release declares no test paths (unaffected). ``None`` (fixtures) keeps
         # behavior byte-identical.
         self._executed_test_gate = executed_test_gate
+        # Bug closure-catalog-references-missing-memory-atom: the memory catalog is
+        # DERIVED from the atoms on disk. After a successful close, Python regenerates
+        # catalog.json + index.md so a hand-edited phantom entry cannot survive the
+        # cycle and doctor CAT-1 stays impossible post-closure. Best-effort: a
+        # regeneration failure never un-closes the release.
+        self._memory_catalog_regenerator = memory_catalog_regenerator
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -464,6 +472,10 @@ class LifecyclePipeline:
         run = replace(run, status=LifecycleRunStatus.COMPLETED)
         self._rewrite_task_markers("-", "x")
         self._require_task_markers(("x",), boundary="implementation completion")
+        if self._memory_catalog_regenerator is not None:
+            # Derived-state refresh must never un-close a completed release.
+            with contextlib.suppress(Exception):
+                self._memory_catalog_regenerator()
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,
