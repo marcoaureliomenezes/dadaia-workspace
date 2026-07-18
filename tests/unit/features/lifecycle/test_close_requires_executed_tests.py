@@ -454,3 +454,51 @@ def test_implement_accepts_delivery_qualified_with_context_repo(tmp_path: Path) 
     result = pipe.run("impl-qualified", ladder)
 
     assert result.completed is True, result.blocked.reason if result.blocked else result
+
+
+def test_completed_close_runs_closure_committer(tmp_path: Path) -> None:
+    """Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
+    commits the context repo (Python-owned, post-success); a blocked close does not.
+    """
+    calls: list[str] = []
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        closure_committer=lambda: calls.append("committed"),
+    )
+
+    result = pipe.run("close-commit", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    assert calls == ["committed"]
+
+
+def test_blocked_close_never_commits(tmp_path: Path) -> None:
+    calls: list[str] = []
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        memory_lint_gate=lambda: (False, "WARN: x"),
+        closure_committer=lambda: calls.append("committed"),
+    )
+
+    result = pipe.run("close-nocommit", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    assert calls == []

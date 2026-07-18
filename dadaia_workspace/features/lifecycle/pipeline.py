@@ -199,6 +199,7 @@ class LifecyclePipeline:
         memory_catalog_regenerator: Callable[[], None] | None = None,
         memory_lint_gate: Callable[[], tuple[bool, str]] | None = None,
         repo_hygiene_sweeper: Callable[[], None] | None = None,
+        closure_committer: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -225,6 +226,10 @@ class LifecyclePipeline:
         # completed cycle deterministically sweeps cache dirs (__pycache__,
         # .pytest_cache, ...) out of the context repo. Best-effort, never un-closes.
         self._repo_hygiene_sweeper = repo_hygiene_sweeper
+        # Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
+        # commits the context repo's release/implementation/memory changes — closure is
+        # a durable state, not a dirty working tree. Best-effort, never un-closes.
+        self._closure_committer = closure_committer
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -595,6 +600,9 @@ class LifecyclePipeline:
             with contextlib.suppress(Exception):
                 self._repo_hygiene_sweeper()
         self._reset_active_md()
+        if self._closure_committer is not None:
+            with contextlib.suppress(Exception):
+                self._closure_committer()
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,

@@ -1270,6 +1270,9 @@ def build_lifecycle_pipeline(
         # Bug lifecycle-workflows-leave-python-bytecode-in-repo: a completed cycle
         # sweeps cache dirs out of the context repo.
         repo_hygiene_sweeper=_repo_hygiene_sweeper(repo_root),
+        # Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
+        # commits the repo's release/implementation/memory changes.
+        closure_committer=_closure_committer(repo_root, release_id),
     )
 
 
@@ -1307,6 +1310,49 @@ def _repo_hygiene_sweeper(repo_root: Path) -> "Callable[[], None]":
                     shutil.rmtree(path, ignore_errors=True)
 
     return _sweep
+
+
+def _closure_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
+    """Build the closure-time commit of the context repo (Python-owned, post-success).
+
+    Commits everything the cycle produced (implementation, specs artifacts, memory)
+    with a conventional message. Uses per-invocation identity fallbacks so a repo
+    without user config still commits deterministically. ``None`` when the repo is not
+    a git checkout (self-hosting fixtures).
+    """
+    if not (repo_root / ".git").exists():
+        return None
+
+    def _commit() -> None:
+        import subprocess
+
+        subprocess.run(  # noqa: S603 — fixed argv
+            ["git", "-C", str(repo_root), "add", "-A"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        subprocess.run(  # noqa: S603 — fixed argv
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "-c",
+                "user.email=closure@dadaia.invalid",
+                "-c",
+                "user.name=dadaia-closure",
+                "commit",
+                "-m",
+                f"closure({release_id}): finalize release artifacts",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+    return _commit
 
 
 def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None":

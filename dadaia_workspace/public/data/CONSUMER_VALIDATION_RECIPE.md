@@ -387,7 +387,13 @@ an initialized workspace, create it:
   product proof:** the game evidence must come from the DECLARED entrypoint
   invocation (e.g. `python -m <pkg>.cli` with scripted moves producing real output),
   not only direct function calls — an approved CLI that exits 0 with no I/O is a
-  FAIL (bug implementation-review-misses-nonrunnable-cli-entrypoint class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  FAIL (bug implementation-review-misses-nonrunnable-cli-entrypoint class).
+  **Closure commit:** a completed cycle leaves the context repo COMMITTED
+  (`git status --porcelain` empty apart from operator files; the closure commit is
+  Python-owned — bug implementation-closure-leaves-uncommitted-release-tree class).
+  **Validator setup hint:** create the disposable bare remote OUTSIDE the workspace
+  root (e.g. a sibling dir) — a `src.git` at the root is a ROOT-1 finding of the
+  validator's own setup, not a candidate defect. Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---
