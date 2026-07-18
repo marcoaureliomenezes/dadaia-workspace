@@ -301,3 +301,32 @@ def test_bare_worker_payload_is_enriched_with_authored_item_paths(tmp_path: Path
     authored = payload.get("authored_backlog_paths")
     assert isinstance(authored, list) and authored, payload
     assert any("specs/backlog/new-item.md" in p for p in authored)
+
+
+def test_live_backlog_progress_emits_started_and_accepted(tmp_path: Path, capsys) -> None:
+    """Bug live-backlog-progress-misses-accepted-event: every live step emits BOTH the
+    started and the accepted/blocked progress events on stderr."""
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        _SEQUENCE,
+        BacklogStep,
+    )
+
+    fake = _AuthoringFake(root=tmp_path)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+    live_sequence = tuple(
+        _replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
+        if isinstance(step, BacklogStep) and step.kind.value == "model"
+        else step
+        for step in _SEQUENCE
+    )
+
+    result = wf.run("bd-progress", sequence=live_sequence, operator_demand="demanda")
+
+    assert result.completed is True
+    err = capsys.readouterr().err
+    assert "backlog_author" in err
+    assert "started" in err
+    assert "accepted" in err, err

@@ -329,9 +329,10 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
         for step_index, step in enumerate(remaining, start=1):
-            if (step.runtime_kind or self._default_kind) is not AgentRuntimeKind.FAKE and (
+            live_step = (step.runtime_kind or self._default_kind) is not AgentRuntimeKind.FAKE and (
                 step.kind is BacklogStepKind.MODEL
-            ):
+            )
+            if live_step:
                 emit_progress(
                     f"backlog-definition step {step.label!r} "
                     f"({step_index}/{len(remaining)}) started"
@@ -348,6 +349,11 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 )
             else:
                 run, sr = self._run_model_step(run, step)
+            if live_step:
+                # Bug live-backlog-progress-misses-accepted-event: every started step
+                # also reports its outcome — a silent tail reads as a hang.
+                outcome = "skipped" if sr.skipped else ("accepted" if sr.accepted else "blocked")
+                emit_progress(f"backlog-definition step {step.label!r} {outcome}")
             self._run_store.save(run)
             results.append(sr)
             if not sr.accepted:
