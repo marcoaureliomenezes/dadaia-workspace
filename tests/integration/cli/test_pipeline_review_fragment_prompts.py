@@ -32,7 +32,7 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 _CONTEXT = "dadaia-workspace"
-_RELEASE = "multiharness-engine-v0116"
+_RELEASE = "v0.1.16"
 
 
 def _init_workspace(path: Path) -> Path:

@@ -16,7 +16,7 @@ def _scope() -> PromptScope:
     return PromptScope(
         role="qa-engineer",
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         task_id="t1",
         prompt="do the qa step",
         allowed_paths=(".dadaia/tmp/lifecycle-worker/dadaia-workspace/**",),

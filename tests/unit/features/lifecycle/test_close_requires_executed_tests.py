@@ -194,3 +194,91 @@ def test_pipeline_resume_from_close_keeps_upstream_ledger(tmp_path: Path) -> Non
     assert run is not None
     producers = {r.producer_step for r in run.workflow_steps.records}
     assert "implement" in producers, sorted(producers)
+
+
+def _seed_close_zone(tmp_path: Path) -> Path:
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    (specs / "memory").mkdir(parents=True, exist_ok=True)
+    (specs / "releases" / _RELEASE).mkdir(parents=True, exist_ok=True)
+    (specs / "memory" / "architecture.md").write_text("# arch original\n", encoding="utf-8")
+    (specs / "releases" / "ACTIVE.md").write_text(
+        f"release: {_RELEASE}\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
+    return specs
+
+
+class _ClosureWritingRuntime(_ApprovingRuntime):
+    """Approves every step; the close step ALSO mutates the closure zone (the live shape)."""
+
+    def __init__(self, specs: Path) -> None:
+        super().__init__()
+        self._specs = specs
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        label = (request.task_id or "").split(":")[1] if ":" in (request.task_id or "") else ""
+        if label == "close":
+            (self._specs / "releases" / _RELEASE / "CLOSURE.md").write_text(
+                "# CLOSURE draft\n", encoding="utf-8"
+            )
+            (self._specs / "memory" / "architecture.md").write_text(
+                "# arch REWRITTEN by close worker\n", encoding="utf-8"
+            )
+        return super().run(request)
+
+
+def test_blocked_close_is_transactional_and_preserves_active(tmp_path: Path) -> None:
+    """Bugs blocked-close-materializes-closure-and-leaves-specs-incoherent +
+    implementation-close-block-resets-active-release-and-breaks-resume: a BLOCKED close
+    rolls back the closure-zone writes (CLOSURE.md, memory) and never touches ACTIVE.md.
+    """
+    specs = _seed_close_zone(tmp_path)
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ClosureWritingRuntime(specs),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        specs_dir=specs,
+        memory_lint_gate=lambda: (False, "WARN: bad heading"),
+    )
+
+    result = pipe.run("close-txn", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    assert result.blocked is not None and result.blocked.blocked_at_step == "close"
+    # Transactional rollback: closure artifacts gone, memory restored, ACTIVE intact.
+    assert not (specs / "releases" / _RELEASE / "CLOSURE.md").exists()
+    assert (specs / "memory" / "architecture.md").read_text(encoding="utf-8") == (
+        "# arch original\n"
+    )
+    active = (specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
+    assert _RELEASE in active and "IMPLEMENTATION" in active
+
+
+def test_completed_close_resets_active_md_python_owned(tmp_path: Path) -> None:
+    """ACTIVE.md is a Python-owned effect of a SUCCESSFUL close — never the worker's."""
+    specs = _seed_close_zone(tmp_path)
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ClosureWritingRuntime(specs),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        specs_dir=specs,
+    )
+
+    result = pipe.run("close-active", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    active = (specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
+    assert "release: none" in active and "phase: none" in active

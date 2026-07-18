@@ -378,7 +378,16 @@ an initialized workspace, create it:
   class), and a BLOCKED implementation run resumes with
   `implementation-reviews --resume-from <step>` keeping upstream ledger payloads (bug
   implementation-reviews-resume-token-without-cli-resume class — a published resume
-  token without a working resume command is a FAIL). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  token without a working resume command is a FAIL). **Release-id canon:** every
+  lifecycle verb refuses a noncanonical `--release-id` up front (canonical:
+  `vMAJOR.MINOR.PATCH[-suffix]`) — use e.g. `v0.1.0` for the live cycle; an accepted
+  noncanonical id that later breaks closure is a FAIL. **Blocked-close transaction:**
+  a close that BLOCKS must leave no half-written state — no CLOSURE.md, no memory
+  mutation, ACTIVE.md still pointing at the release (resume must work). **Runnable
+  product proof:** the game evidence must come from the DECLARED entrypoint
+  invocation (e.g. `python -m <pkg>.cli` with scripted moves producing real output),
+  not only direct function calls — an approved CLI that exits 0 with no I/O is a
+  FAIL (bug implementation-review-misses-nonrunnable-cli-entrypoint class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---

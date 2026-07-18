@@ -121,7 +121,7 @@ def test_pipeline_runs_to_closure_on_fake(
             "1": _passing_result("review_combined"),
             "2": _passing_result(
                 "close",
-                artifact_ref=("specs/releases/multiharness-engine-v0116/CLOSURE.md"),
+                artifact_ref=("specs/releases/v0.1.16/CLOSURE.md"),
             ),
         },
     )
@@ -139,7 +139,7 @@ def test_pipeline_runs_to_closure_on_fake(
             "implementation-reviews",
             "--skip-preflight",
             "--release-id",
-            "multiharness-engine-v0116",
+            "v0.1.16",
             "--run-id",
             "pipe-full",
             "--harness",
@@ -206,7 +206,7 @@ def test_pipeline_no_review_can_backtrack_to_implementation_on_fake(
     qa_pipeline = container.build_lifecycle_pipeline(
         workspace,
         context=_CONTEXT,
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
     )
     implement_step = ladder[0]
     qa_step = ladder[1]

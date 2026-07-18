@@ -31,7 +31,7 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 
 _runner = CliRunner()
 _CONTEXT = "dadaia-workspace"
-_RELEASE = "v0178-fr-d-repro"
+_RELEASE = "v0.1.78"
 
 
 def _init_workspace(path: Path) -> Path:

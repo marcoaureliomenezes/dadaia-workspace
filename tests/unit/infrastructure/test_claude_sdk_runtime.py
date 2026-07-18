@@ -35,7 +35,7 @@ def _request() -> AgentRunRequest:
         prompt="implement",
         runtime=AgentRuntimeKind.CLAUDE_SDK,
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),
         forbidden_paths=("repos/dadaia-workspace/secrets.py",),
     )

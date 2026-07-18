@@ -28,9 +28,10 @@ Close only after QA, security, and code review have approved the same change.
    workspace may extend it via `specs/memory/.heading-allowlist`) — a Python lint
    gate BLOCKS this close step on unknown/forbidden headings. `token_estimate` is
    derived and auto-corrected by the workflow; do not hand-tune it.
-4. Set `ACTIVE.md` to `release: none` and `phase: none`. The Python workflow body
-   owns the final `[-]` to `[x]` task-marker transition after this closure step and
-   every review gate succeed; do not self-complete task markers.
+4. NEVER touch `releases/ACTIVE.md` — pointing it at none/none is a Python-owned
+   effect applied only after this step and every gate succeed (a blocked close must
+   leave the active release intact for resume). The Python workflow body also owns
+   the final `[-]` to `[x]` task-marker transition; do not self-complete task markers.
 5. Emit one closure handoff referencing the closure artifact.
 
 Do not add history to memory, invent evidence, or close with an unresolved review.

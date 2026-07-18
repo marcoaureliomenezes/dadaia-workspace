@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
@@ -193,6 +194,27 @@ def _authoritative_backlog_prefix(
     return PromptPrefix.from_sections({"authoritative-backlog-definition": directive})
 
 
+_CANONICAL_RELEASE_ID_RE = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$")
+
+
+def _require_canonical_release_id(release_id: str) -> None:
+    """Refuse a noncanonical release id BEFORE any run or write.
+
+    Bug lifecycle-accepts-noncanonical-release-id-then-generates-invalid-memory-slug:
+    an id like 'valgame-v0.1.0' sailed through definition, then closure derived an
+    invalid memory slug and the release could never close. The canonical shape is the
+    same one specs doctor pins (SPEC-DOC-027): vMAJOR.MINOR.PATCH with an optional
+    -suffix segment (e.g. v0.1.0, v1.2.3-rc1).
+    """
+    if _CANONICAL_RELEASE_ID_RE.fullmatch(release_id) is None:
+        raise typer.BadParameter(
+            f"--release-id {release_id!r} is not canonical. Use vMAJOR.MINOR.PATCH "
+            "(optionally with a -suffix), e.g. v0.1.0 or v1.2.3-rc1 — noncanonical ids "
+            "break downstream closure/memory slugs.",
+            param_hint="--release-id",
+        )
+
+
 @app.command("backlog-definition")
 def backlog_define(
     context: str | None = typer.Option(
@@ -256,6 +278,7 @@ def backlog_define(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
@@ -403,6 +426,7 @@ def release_define(
     an unset ``--context`` resolves through the single bind-resolution seam instead of a
     hardcoded literal default.
     """
+    _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
@@ -852,6 +876,7 @@ def audit(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace as _replace
@@ -1101,6 +1126,7 @@ def pipeline(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
     from dataclasses import replace

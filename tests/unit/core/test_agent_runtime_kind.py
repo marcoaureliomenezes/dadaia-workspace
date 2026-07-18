@@ -26,7 +26,7 @@ def test_agent_run_request_roundtrips_every_runtime_kind(kind: AgentRuntimeKind)
         prompt="do work",
         runtime=kind,
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
     )
     restored = AgentRunRequest.from_dict(request.to_dict())
     assert restored.runtime is kind

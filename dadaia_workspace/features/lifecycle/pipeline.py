@@ -388,6 +388,7 @@ class LifecyclePipeline:
             retry_requested = False
             for step in steps:
                 digest: str | None = None
+                close_zone_snapshot = self._snapshot_close_zone() if step.label == "close" else None
                 if step.label == "implement" and retry_source is not None:
                     assert self._handoff_resolver is not None
                     producer_step, producer_attempt = retry_source
@@ -517,6 +518,10 @@ class LifecyclePipeline:
                         attempt=attempt,
                         declared_consumers=("implement",) if will_retry else (),
                     )
+                if step.label == "close" and not accepted:
+                    # Transactional close (bug blocked-close-materializes-closure-...):
+                    # a blocked close leaves no half-written closure/memory state.
+                    self._restore_close_zone(close_zone_snapshot)
                 self._run_store.save(run)
                 results.append(
                     PipelineStepResult(
@@ -566,6 +571,7 @@ class LifecyclePipeline:
         if self._repo_hygiene_sweeper is not None:
             with contextlib.suppress(Exception):
                 self._repo_hygiene_sweeper()
+        self._reset_active_md()
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,
@@ -610,6 +616,68 @@ class LifecyclePipeline:
             tmp.unlink(missing_ok=True)
             raise
         return count
+
+    def _snapshot_close_zone(self) -> dict[str, bytes | None] | None:
+        """Capture the closure-mutable zone before the close worker runs.
+
+        Bug blocked-close-materializes-closure-and-leaves-specs-incoherent: the close
+        worker legitimately writes CLOSURE.md + memory atoms, but a BLOCKED close must
+        be transactional. Captures every file under ``specs/memory/`` plus the
+        release's CLOSURE.md (``None`` marks paths that did not exist).
+        """
+        if self._specs_dir is None:
+            return None
+        snapshot: dict[str, bytes | None] = {}
+        memory_dir = self._specs_dir / "memory"
+        if memory_dir.is_dir():
+            for path in memory_dir.rglob("*"):
+                if path.is_file():
+                    with contextlib.suppress(OSError):
+                        snapshot[str(path)] = path.read_bytes()
+        closure = self._specs_dir / "releases" / self._release_id / "CLOSURE.md"
+        snapshot[str(closure)] = closure.read_bytes() if closure.is_file() else None
+        # Sentinel key so restore can prune NEW files created under memory/.
+        snapshot["__memory_dir__"] = str(memory_dir).encode("utf-8")
+        return snapshot
+
+    def _restore_close_zone(self, snapshot: dict[str, bytes | None] | None) -> None:
+        """Roll the closure-mutable zone back to its pre-close-worker state."""
+        if snapshot is None or self._specs_dir is None:
+            return
+        memory_dir_raw = snapshot.get("__memory_dir__")
+        memory_dir = Path(memory_dir_raw.decode("utf-8")) if memory_dir_raw else None
+        known = {key for key in snapshot if key != "__memory_dir__"}
+        # Remove files CREATED by the blocked close attempt.
+        if memory_dir is not None and memory_dir.is_dir():
+            for path in memory_dir.rglob("*"):
+                if path.is_file() and str(path) not in known:
+                    with contextlib.suppress(OSError):
+                        path.unlink()
+        # Restore pre-existing content; drop files that did not exist.
+        for key in known:
+            path = Path(key)
+            content = snapshot[key]
+            with contextlib.suppress(OSError):
+                if content is None:
+                    if path.is_file():
+                        path.unlink()
+                else:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+
+    def _reset_active_md(self) -> None:
+        """Point ACTIVE.md at none/none — the Python-owned effect of a SUCCESSFUL close.
+
+        Bug implementation-close-block-resets-active-release-and-breaks-resume: the
+        worker must never touch ACTIVE.md (it is out of the close scope now); Python
+        rewrites it only after the whole ladder completes.
+        """
+        if self._specs_dir is None:
+            return
+        releases = self._specs_dir / "releases"
+        with contextlib.suppress(OSError):
+            releases.mkdir(parents=True, exist_ok=True)
+            (releases / "ACTIVE.md").write_text("release: none\nphase: none\n", encoding="utf-8")
 
     def _require_task_markers(self, allowed: tuple[str, ...], *, boundary: str) -> None:
         """Fail closed when TASKS marker state does not match a pipeline boundary."""
@@ -905,10 +973,11 @@ def implementation_ladder(
             fragment_id="implementation.close_release",
             shared_fragment_ids=("shared.memory_selection",),
             extra_allowed_paths=(
+                # ACTIVE.md is deliberately NOT here: pointing it at none/none is a
+                # Python-owned effect of a SUCCESSFUL close (bug
+                # implementation-close-block-resets-active-release-and-breaks-resume).
                 "repos/{context}/specs/releases/{release_id}/**",
                 "specs/releases/{release_id}/**",
-                "repos/{context}/specs/releases/ACTIVE.md",
-                "specs/releases/ACTIVE.md",
                 "repos/{context}/specs/memory/**",
                 "specs/memory/**",
             ),
