@@ -23,6 +23,7 @@ IMPLEMENTATION only when every prior gate passed and the workflow-step handoff g
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -335,16 +336,29 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         if not path.is_file():
             return self._plan_dependency_block("PLAN.md was not created")
         lines = path.read_text(encoding="utf-8").splitlines()
-        try:
-            heading = next(
-                index
-                for index, line in enumerate(lines)
-                if re.fullmatch(
-                    r"##\s+(?:\d+\s*[.)-]?\s+)?validation dependency table",
-                    line.strip(),
-                    flags=re.IGNORECASE,
-                )
+
+        # Presentation tolerance (bug release-plan-author-does-not-converge-
+        # validation-contract): a live worker may legitimately localize the section
+        # heading and column titles. The heading is matched by NORMALIZED content
+        # (case/accents stripped, canonical English OR a translated
+        # dependency+validation table title); semantics below stay strict.
+        def _normalize(text: str) -> str:
+            stripped = "".join(
+                ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)
             )
+            return " ".join(stripped.lower().split())
+
+        def _is_table_heading(line: str) -> bool:
+            candidate = line.strip()
+            if not candidate.startswith("##"):
+                return False
+            title = _normalize(re.sub(r"^#+\s*(?:\d+\s*[.)-]?\s+)?", "", candidate))
+            if title == "validation dependency table":
+                return True
+            return ("valida" in title) and ("depend" in title) and ("tab" in title)
+
+        try:
+            heading = next(index for index, line in enumerate(lines) if _is_table_heading(line))
         except StopIteration:
             return self._plan_dependency_block(
                 "PLAN.md is missing the required 'Validation Dependency Table' section"
@@ -368,10 +382,13 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             "validation dependencies",
             "deferred integration evidence",
         ]
-        if header != expected:
+        # Column titles: canonical English exactly, OR a positional 5-column fallback
+        # (localized titles keep the canonical order; the semantic checks below —
+        # WS ids in column 1, dependency refs in column 4 — still bind strictly).
+        if header != expected and len(header) != len(expected):
             return self._plan_dependency_block(
                 "validation dependency table columns must match the workflow contract "
-                f"(case/whitespace-insensitive): expected {expected}, got {header}"
+                f"(five columns, canonical order): expected {expected}, got {header}"
             )
 
         seen: set[int] = set()

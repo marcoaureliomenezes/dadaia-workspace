@@ -289,3 +289,47 @@ def test_approved_spec_review_inserts_one_canonical_status(
     assert normalized.count("> **Status:** Aprovado") == 1
     assert "Status: Draft" not in normalized
     assert "status: Draft" not in normalized
+
+
+# ── bug release-plan-author-does-not-converge-validation-contract (game cycle 4) ────
+#
+# A live pt-BR worker translated the section heading and column titles; the lint then
+# blocked on presentation while the table's SEMANTICS were valid. Presentation is now
+# matched structurally (normalized heading, positional 5-column fallback); semantics
+# (canonical WS ids, five non-empty cells, no forward dependencies) stay strict.
+
+
+def _wf_with_plan(tmp_path: Path, plan_body: str) -> ReleaseDefinitionWorkflow:
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(plan_body, encoding="utf-8")
+    return wf
+
+
+def test_plan_lint_accepts_translated_headings_with_valid_semantics(tmp_path: Path) -> None:
+    translated = (
+        "# PLAN\n\n## Tabela de Dependências de Validação\n\n"
+        "| Fluxo de trabalho | Produz ao final | Validação direta | "
+        "Dependências de validação | Evidência de integração adiada |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | módulo board | testes unitários | None | None |\n"
+        "| WS-2 | CLI do jogo | testes de integração | WS-1 | None |\n"
+    )
+    wf = _wf_with_plan(tmp_path, translated)
+    assert wf._validate_plan_dependency_table() is None
+
+
+def test_plan_lint_still_blocks_forward_dependency_in_translated_table(tmp_path: Path) -> None:
+    translated_bad = (
+        "# PLAN\n\n## Tabela de Dependências de Validação\n\n"
+        "| Fluxo | Produz | Validação | Dependências | Evidência |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | board | unit | None | None |\n"
+        "| WS-2 | cli | integração | WS-3 | None |\n"
+        "| WS-3 | e2e | partida | WS-2 | None |\n"
+    )
+    wf = _wf_with_plan(tmp_path, translated_bad)
+    block = wf._validate_plan_dependency_table()
+    assert block is not None
+    assert "WS-2" in block.reason and "WS-3" in block.reason

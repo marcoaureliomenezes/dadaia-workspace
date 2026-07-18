@@ -50,7 +50,16 @@ PLAN says in what order and by what strategy.
   | Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |
   |---|---|---|---|---|
   | WS-1 | <deliverable> | <command or check> | None | None |
+  | WS-2 | <deliverable> | <command or check> | WS-1 | None |
   ```
+
+  Hard rules for this table (the Python lint enforces them):
+  - Keep the section heading and the five column titles EXACTLY as above — copy them
+    verbatim, even when the rest of the PLAN is written in another language.
+  - Dependency direction is one-way BACKWARD: the `Validation dependencies` cell of
+    `WS-n` may name only `WS-m` with `m < n` (or `None`). `| WS-2 | … | … | WS-3 | … |`
+    is INVALID and blocks the step — restructure the workstream order instead of
+    pointing a dependency forward.
 
 ## Rules
 
