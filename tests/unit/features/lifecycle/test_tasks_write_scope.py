@@ -489,7 +489,9 @@ def test_generated_checklist_grammar_reads_nested_path_bullets(tmp_path: Path) -
     )
     assert write_scope_from_release_tasks(tmp_path, _RELEASE) == (
         "repos/demo/src/games.py",
+        "repos/demo/src/**",
         "repos/demo/tests/test_games.py",
+        "repos/demo/tests/**",
     )
 
 
@@ -513,7 +515,9 @@ def test_release_scope_unions_open_and_reserved_tasks_but_skips_done(tmp_path: P
 
     assert write_scope_from_release_tasks(tmp_path, _RELEASE) == (
         "src/games.py",
+        "src/**",
         "tests/test_games.py",
+        "tests/**",
     )
 
 
@@ -532,3 +536,34 @@ def test_checklist_bullet_grammar_zero_or_multiple_reserved_returns_empty(
 """,
     )
     assert write_scope_from_tasks(tmp_path, _RELEASE) == ()
+
+
+def test_release_write_scope_expands_file_paths_to_their_package_dir(tmp_path) -> None:
+    """Bug implementation-write-scope-omits-declared-python-module-entrypoint.
+
+    A write set that names FILES (src/valgame/cli.py) used to deny creating sibling
+    files the contract requires (src/valgame/__main__.py) — the worker was scope-blocked
+    from finishing its own declared surface. Each file path now ALSO contributes its
+    parent-directory glob; explicit globs pass through unchanged.
+    """
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import (
+        write_scope_from_release_tasks,
+    )
+
+    release = tmp_path / "releases" / "v0.1.0"
+    release.mkdir(parents=True)
+    (release / "TASKS.md").write_text(
+        "# TASKS\n\n"
+        "### T-1 — implement `[-]`\n\n"
+        "- **Write set:** `src/valgame/cli.py`, `tests/test_cli.py`, `docs/**`\n",
+        encoding="utf-8",
+    )
+
+    scope = write_scope_from_release_tasks(tmp_path, "v0.1.0")
+
+    assert "src/valgame/cli.py" in scope
+    assert "src/valgame/**" in scope, scope
+    assert "tests/**" in scope, scope
+    assert "docs/**" in scope
+    # No duplicate dir glob for the explicit one.
+    assert scope.count("docs/**") == 1
