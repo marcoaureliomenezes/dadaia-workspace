@@ -42,6 +42,7 @@ from dadaia_workspace.core.models.workflow_execution import (
     WorkflowPolicySnapshot,
     WorkflowPolicyStepEntry,
 )
+from dadaia_workspace.core.models.workflow_handoff import WorkflowStepLedger
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
@@ -196,6 +197,8 @@ class LifecyclePipeline:
         artifact_root: Path | None = None,
         executed_test_gate: Callable[[], tuple[bool | None, str]] | None = None,
         memory_catalog_regenerator: Callable[[], None] | None = None,
+        memory_lint_gate: Callable[[], tuple[bool, str]] | None = None,
+        repo_hygiene_sweeper: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -214,6 +217,14 @@ class LifecyclePipeline:
         # cycle and doctor CAT-1 stays impossible post-closure. Best-effort: a
         # regeneration failure never un-closes the release.
         self._memory_catalog_regenerator = memory_catalog_regenerator
+        # Bug closure-allows-memory-doctor-warnings: when wired, the close step refuses
+        # to complete while the context's memory atoms carry lint findings — closure
+        # leaves memory lint-clean or blocks with the findings digest.
+        self._memory_lint_gate = memory_lint_gate
+        # Bug lifecycle-workflows-leave-python-bytecode-in-repo: when wired, a
+        # completed cycle deterministically sweeps cache dirs (__pycache__,
+        # .pytest_cache, ...) out of the context repo. Best-effort, never un-closes.
+        self._repo_hygiene_sweeper = repo_hygiene_sweeper
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -277,7 +288,13 @@ class LifecyclePipeline:
         )
         return run, replace(scope, prompt=prompt)
 
-    def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
+    def run(
+        self,
+        run_id: str,
+        steps: tuple[PipelineStep, ...],
+        *,
+        resume_from: str | None = None,
+    ) -> PipelineResult:
         if not steps:
             raise ValueError("pipeline requires at least one step")
         # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
@@ -289,33 +306,79 @@ class LifecyclePipeline:
         # completion happens only after the entire review + close ladder succeeds.
         self._rewrite_task_markers(" ", "-")
         self._require_task_markers(("-", "x"), boundary="implementation start")
-        # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
-        # replacing the run record discards its ledger, so reclaim the orphaned payload
-        # zone before the new generation's attempt-0 writes.
-        if self._handoff_resolver is not None:
-            self._handoff_resolver.reset_run_zone(
-                run_id,
-                worker_output_refs=tuple(
-                    canonical_worker_output_ref(
-                        self._context, f"{run_id}:{step.label}:attempt-{attempt}"
-                    )
-                    for step in steps
-                    for attempt in range(self._max_review_retries + 1)
-                ),
+        if resume_from is not None:
+            # Bug implementation-reviews-resume-token-without-cli-resume: the ledger
+            # advertised a resume token with no command honoring it. A blocked run now
+            # resumes from the named step — upstream ledger records are KEPT (their
+            # payloads stay addressable), only the resumed-step-onward zone is reclaimed.
+            labels = tuple(step.label for step in steps)
+            if resume_from not in labels:
+                raise ValueError(
+                    f"resume_from step {resume_from!r} is not in the pipeline sequence {labels}"
+                )
+            prior = self._run_store.load(run_id)
+            if prior is None:
+                raise ValueError(
+                    f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run"
+                )
+            index = labels.index(resume_from)
+            resumed_labels = set(labels[index:])
+            if self._handoff_resolver is not None:
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    producer_steps=resumed_labels,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(
+                            self._context, f"{run_id}:{step.label}:attempt-{attempt}"
+                        )
+                        for step in steps[index:]
+                        for attempt in range(self._max_review_retries + 1)
+                    ),
+                    context=self._context,
+                    release_id=self._release_id,
+                )
+            kept = tuple(
+                record
+                for record in prior.workflow_steps.records
+                if record.producer_step not in resumed_labels
+            )
+            run = replace(
+                prior,
+                phase=steps[index].from_phase,
+                status=LifecycleRunStatus.RUNNING,
+                current_step=resume_from,
+                blocked=None,
+                workflow_steps=WorkflowStepLedger(records=kept),
+            )
+            steps = steps[index:]
+        else:
+            # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
+            # replacing the run record discards its ledger, so reclaim the orphaned payload
+            # zone before the new generation's attempt-0 writes.
+            if self._handoff_resolver is not None:
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(
+                            self._context, f"{run_id}:{step.label}:attempt-{attempt}"
+                        )
+                        for step in steps
+                        for attempt in range(self._max_review_retries + 1)
+                    ),
+                    context=self._context,
+                    release_id=self._release_id,
+                )
+            run = LifecycleRun(
+                run_id=run_id,
                 context=self._context,
                 release_id=self._release_id,
+                command="pipeline",
+                phase=steps[0].from_phase,
+                status=LifecycleRunStatus.RUNNING,
+                current_step=steps[0].label,
+                idempotency_key=run_id,
+                workflow_policy=self._policy_snapshot,
             )
-        run = LifecycleRun(
-            run_id=run_id,
-            context=self._context,
-            release_id=self._release_id,
-            command="pipeline",
-            phase=steps[0].from_phase,
-            status=LifecycleRunStatus.RUNNING,
-            current_step=steps[0].label,
-            idempotency_key=run_id,
-            workflow_policy=self._policy_snapshot,
-        )
         self._run_store.save(run)
 
         results: list[PipelineStepResult] = []
@@ -389,6 +452,30 @@ class LifecyclePipeline:
                     decision, worker_result = runner.run_with_result(run, runner_input)
                     run = decision.run
                     accepted = decision.advanced
+
+                if accepted and step.label == "close" and self._memory_lint_gate is not None:
+                    lint_ok, lint_evidence = self._memory_lint_gate()
+                    if not lint_ok:
+                        blocked_lint = BlockedState(
+                            reason=(
+                                "close blocked: memory atoms carry lint findings — closure "
+                                "must leave specs/memory lint-clean (fix the atom headings/"
+                                "frontmatter per the memory template, then resume)"
+                            ),
+                            blocked_at_step="close",
+                            resume_token=run.idempotency_key,
+                            detail={"memory_lint": lint_evidence[-1500:]},
+                        )
+                        decision = self._state_machine.transition(
+                            run,
+                            TransitionInput(
+                                target_phase=LifecyclePhase.BLOCKED,
+                                blocked_state=blocked_lint,
+                                current_step=step.label,
+                            ),
+                        )
+                        run = decision.run
+                        accepted = False
 
                 if accepted and step.label == "close" and self._executed_test_gate is not None:
                     tests_ok, tests_evidence = self._executed_test_gate()
@@ -476,6 +563,9 @@ class LifecyclePipeline:
             # Derived-state refresh must never un-close a completed release.
             with contextlib.suppress(Exception):
                 self._memory_catalog_regenerator()
+        if self._repo_hygiene_sweeper is not None:
+            with contextlib.suppress(Exception):
+                self._repo_hygiene_sweeper()
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,

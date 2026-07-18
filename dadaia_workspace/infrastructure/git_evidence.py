@@ -23,6 +23,7 @@ honest diff text for a prompt.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -166,6 +167,7 @@ def build_executed_test_gate(
                 text=True,
                 timeout=timeout_seconds,
                 check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return False, f"pytest run failed to execute: {exc}"
@@ -220,6 +222,7 @@ def build_test_output_provider(
                 text=True,
                 timeout=timeout_seconds,
                 check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return f"no test evidence: pytest run failed to execute ({exc})"

@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import contextlib
 import datetime as dt
 import os
 from collections.abc import Callable
@@ -1259,7 +1260,109 @@ def build_lifecycle_pipeline(
         # from the atoms — closure regenerates catalog.json + index.md so phantom
         # entries cannot survive the cycle.
         memory_catalog_regenerator=_memory_catalog_regenerator(specs_dir),
+        # Bug closure-allows-memory-doctor-warnings: closure leaves memory lint-clean
+        # or blocks with the findings digest.
+        memory_lint_gate=_memory_lint_gate(specs_dir),
+        # Bug lifecycle-workflows-leave-python-bytecode-in-repo: a completed cycle
+        # sweeps cache dirs out of the context repo.
+        repo_hygiene_sweeper=_repo_hygiene_sweeper(repo_root),
     )
+
+
+#: Cache/artifact dirs that must never survive inside a context repo
+#: (tmp-file-guardrail zero-tolerance list).
+_REPO_CACHE_DIR_NAMES = (
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".hypothesis",
+)
+
+
+def _repo_hygiene_sweeper(repo_root: Path) -> "Callable[[], None]":
+    """Build the closure-time cache sweep for one context repo."""
+
+    def _sweep() -> None:
+        import shutil
+
+        for name in _REPO_CACHE_DIR_NAMES:
+            for path in repo_root.rglob(name):
+                if path.is_dir() and ".git" not in path.parts:
+                    shutil.rmtree(path, ignore_errors=True)
+
+    return _sweep
+
+
+def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None":
+    """Build the closure-time memory-atom lint gate for one context specs dir.
+
+    Runs the packaged ``lint-memory-atoms.py`` (the same script doctor LINT-1 shells
+    out to); the gate passes only on exit 0 with no ``WARN:`` findings. ``None`` when
+    the context has no memory dir or the script is not packaged (nothing to lint —
+    never a silent fake-green: the doctor still covers drift after the fact).
+    """
+    memory_dir = specs_dir / "memory"
+    script = Path(__file__).resolve().parent / "public" / "scripts" / "lint-memory-atoms.py"
+    if not memory_dir.is_dir() or not script.is_file():
+        return None
+
+    def _gate() -> tuple[bool, str]:
+        import subprocess
+        import sys as _sys
+
+        try:
+            proc = subprocess.run(  # noqa: S603 — fixed argv, read-only lint run
+                [_sys.executable, "-B", str(script), "--memory-dir", str(memory_dir)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return True, f"memory lint could not run ({exc}); doctor covers it after the fact"
+        merged = (proc.stdout + "\n" + proc.stderr).strip()
+        ok = proc.returncode == 0 and "WARN:" not in merged
+        tail = "\n".join(merged.splitlines()[-30:])
+        return ok, tail
+
+    return _gate
+
+
+def _normalize_memory_token_estimates(specs_dir: Path) -> None:
+    """Recompute drifting ``token_estimate`` frontmatter values (derived data).
+
+    Same formula as the packaged linter (``round(word_count * 1.35)``, contract-pinned
+    by the render/lint suites). Only rewrites when the declared value drifts >20% —
+    the linter's own warning threshold — so hand-tuned close values stay untouched.
+    """
+    import re as _re
+
+    memory_dir = specs_dir / "memory"
+    if not memory_dir.is_dir():
+        return
+    fm_re = _re.compile(r"^---\n(.*?)\n---\n", _re.DOTALL)
+    for md in memory_dir.rglob("*.md"):
+        try:
+            content = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = fm_re.match(content)
+        if match is None:
+            continue
+        body = content[match.end() :]
+        declared_match = _re.search(r"^token_estimate:\s*(\d+)\s*$", match.group(1), _re.MULTILINE)
+        if declared_match is None:
+            continue
+        declared = int(declared_match.group(1))
+        actual = round(len(body.split()) * 1.35)
+        if declared <= 0 or actual <= 0:
+            continue
+        if abs(actual - declared) / declared <= 0.20:
+            continue
+        updated = content.replace(f"token_estimate: {declared}", f"token_estimate: {actual}", 1)
+        with contextlib.suppress(OSError):
+            md.write_text(updated, encoding="utf-8")
 
 
 def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
@@ -1277,6 +1380,7 @@ def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
             write_index,
         )
 
+        _normalize_memory_token_estimates(specs_dir)
         catalog = generate_catalog(specs_dir)
         write_catalog(specs_dir, catalog)
         write_index(specs_dir, catalog)

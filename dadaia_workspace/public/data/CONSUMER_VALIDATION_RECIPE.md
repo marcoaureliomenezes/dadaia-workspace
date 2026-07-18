@@ -371,7 +371,14 @@ an initialized workspace, create it:
   the live cycle closes, `dadaia specs doctor` on the context must report 0 errors —
   in particular no CAT-1 (catalog entry without its memory atom; the catalog is
   derived and regenerated at closure — bug
-  closure-catalog-references-missing-memory-atom class). Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  closure-catalog-references-missing-memory-atom class). Also post-closure: the
+  context repo contains NO cache dirs (`__pycache__`, `.pytest_cache`, … — swept at
+  closure; bug lifecycle-workflows-leave-python-bytecode-in-repo class), memory atoms
+  are lint-clean (no LINT-1 warnings; bug closure-allows-memory-doctor-warnings
+  class), and a BLOCKED implementation run resumes with
+  `implementation-reviews --resume-from <step>` keeping upstream ledger payloads (bug
+  implementation-reviews-resume-token-without-cli-resume class — a published resume
+  token without a working resume command is a FAIL). Mark **EXCEPTION** only if no codex binary/credentials exist in the
   environment.
 
 ---

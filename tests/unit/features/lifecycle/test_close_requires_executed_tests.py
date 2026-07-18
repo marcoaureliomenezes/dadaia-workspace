@@ -110,3 +110,87 @@ def test_close_runs_memory_catalog_regenerator(tmp_path: Path) -> None:
 
     assert result.completed is True
     assert calls == ["regenerated"]
+
+
+def test_close_blocks_when_memory_lint_gate_fails(tmp_path: Path) -> None:
+    """Bug closure-allows-memory-doctor-warnings: closure leaves memory lint-clean or
+    refuses — a worker-authored atom with invalid headings never rides a green close.
+    """
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        memory_lint_gate=lambda: (False, "WARN: unknown '## Historia' heading"),
+    )
+
+    result = pipe.run("close-memlint", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    assert result.blocked is not None and result.blocked.blocked_at_step == "close"
+    assert "memory" in result.blocked.reason
+
+
+def test_close_runs_repo_hygiene_sweeper_on_completion(tmp_path: Path) -> None:
+    """Bug lifecycle-workflows-leave-python-bytecode-in-repo: a completed cycle sweeps
+    cache dirs (__pycache__, .pytest_cache, ...) out of the context repo.
+    """
+    calls: list[str] = []
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        repo_hygiene_sweeper=lambda: calls.append("swept"),
+    )
+
+    result = pipe.run("close-sweep", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is True
+    assert calls == ["swept"]
+
+
+def test_pipeline_resume_from_close_keeps_upstream_ledger(tmp_path: Path) -> None:
+    """Bug implementation-reviews-resume-token-without-cli-resume: a blocked run resumes
+    from the named step; upstream ledger records survive and only the resumed step
+    onward re-executes.
+    """
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-18T12:00:00Z",
+    )
+    gate_results = iter([(False, "1 failed"), (True, "12 passed")])
+    pipe = LifecyclePipeline(
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        run_store=JsonLifecycleRunStore(tmp_path),
+        runtime_factory=lambda kind: _ApprovingRuntime(),  # type: ignore[arg-type,return-value]
+        handoff_resolver=resolver,
+        executed_test_gate=lambda: next(gate_results),
+    )
+
+    first = pipe.run("resume-close", implementation_ladder(AgentRuntimeKind.FAKE))
+    assert first.completed is False and first.blocked is not None
+    assert first.blocked.blocked_at_step == "close"
+
+    resumed = pipe.run(
+        "resume-close", implementation_ladder(AgentRuntimeKind.FAKE), resume_from="close"
+    )
+    assert resumed.completed is True
+    run = JsonLifecycleRunStore(tmp_path).load("resume-close")
+    assert run is not None
+    producers = {r.producer_step for r in run.workflow_steps.records}
+    assert "implement" in producers, sorted(producers)

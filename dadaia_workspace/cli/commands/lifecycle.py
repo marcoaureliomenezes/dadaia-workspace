@@ -1044,6 +1044,12 @@ def pipeline(
         help="Per-step override 'label=harness' (repeatable); labels: "
         "implement, review_combined, close.",
     ),
+    resume_from: str | None = typer.Option(
+        None,
+        "--resume-from",
+        help="Resume a BLOCKED run from this step (implement | review_combined | close): "
+        "upstream ledger payloads are kept; only the named step onward re-executes.",
+    ),
     step_model: list[str] | None = typer.Option(
         None,
         "--step-model",
@@ -1219,7 +1225,7 @@ def pipeline(
         ),
         max_review_retries=max_review_retries,
     )
-    result = pipe.run(run_id, steps)
+    result = pipe.run(run_id, steps, resume_from=resume_from)
     closure_gate = (
         _apply_closure_removal_for_release(workspace_root, context=context, release_id=release_id)
         if result.completed

@@ -23,7 +23,11 @@ Close only after QA, security, and code review have approved the same change.
    category, tldr, summary, tags). NEVER hand-edit `catalog.json` or
    `memory/product/index.md` — both are DERIVED files the workflow regenerates from
    the atoms after this step; a catalog entry without its atom is a doctor CAT-1
-   defect and will be erased by the regeneration.
+   defect and will be erased by the regeneration. Atom body headings must come from
+   the memory heading allowlist (the scaffolded atoms show the canonical set; a
+   workspace may extend it via `specs/memory/.heading-allowlist`) — a Python lint
+   gate BLOCKS this close step on unknown/forbidden headings. `token_estimate` is
+   derived and auto-corrected by the workflow; do not hand-tune it.
 4. Set `ACTIVE.md` to `release: none` and `phase: none`. The Python workflow body
    owns the final `[-]` to `[x]` task-marker transition after this closure step and
    every review gate succeed; do not self-complete task markers.

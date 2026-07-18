@@ -468,9 +468,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             if not path.is_file():
                 missing.append(f"{name} (absent)")
                 continue
-            if must_be_approved and "**Status:** Aprovado" not in path.read_text(
-                encoding="utf-8"
-            ):
+            if must_be_approved and "**Status:** Aprovado" not in path.read_text(encoding="utf-8"):
                 missing.append(f"{name} (not Aprovado)")
         if missing:
             return BlockedState(
