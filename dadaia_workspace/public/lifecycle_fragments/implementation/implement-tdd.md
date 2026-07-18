@@ -56,7 +56,10 @@ fields. The result feeds self-verify and QA review; it does not mark the task do
 
 ## Runnable entrypoints
 
-Every declared runnable surface ships runnable: a CLI module carries
-`if __name__ == "__main__": main()` (or the equivalent console entry) and at least
-one test drives the DECLARED invocation end-to-end (subprocess or runner), not only
-the internal functions.
+Every declared runnable surface ships runnable, matched to its EXACT declared form:
+- `python -m <pkg>.<module>` → that module carries `if __name__ == "__main__": main()`;
+- `python -m <pkg>` (package form) → ship `<pkg>/__main__.py` calling `main()`;
+- a console script → the entry point is registered and importable.
+At least one test drives the DECLARED invocation end-to-end (subprocess or runner),
+not only the internal functions — run it yourself and confirm real output before
+finishing the step.
