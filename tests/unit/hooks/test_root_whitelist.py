@@ -38,6 +38,23 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
     return result.stdout, result.block_envelope()
 
 
+def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
+    """The block reason is DERIVED from the policy — it can never lag the whitelist.
+
+    Hermes-gate bug class (v0.2.8): the message literal omitted `.kimi-code/` while the
+    policy already allowed it. Assert the reason names EVERY whitelisted basename.
+    """
+    from dadaia_workspace.hooks.root_whitelist import _WHITELIST
+
+    _out, block = _run(
+        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+    )
+    assert block is not None
+    reason = block["reason"]
+    for entry in _WHITELIST:
+        assert entry in reason, f"{entry} missing from the block message: {reason}"
+
+
 @pytest.mark.parametrize(
     ("name", "target_fn", "reason_fragment"),
     [

@@ -87,3 +87,12 @@ exactly. Dispose every finding exactly once; never dispose an id that is not
 a finding. Severity and lens live only on the finding, never repeated on the
 disposition. Empty `lenses`, an undisposed finding, and artifact-only
 transport objects fail the Python gate.
+
+Every finding MUST carry exactly the keys `id`, `severity`, `lens`, `summary`,
+and `evidence` — no substitutes. Persona-level analysis habits (scorecards,
+drift inventories, recommended actions, `memory_claim`/`actual_state` field
+names) are INPUT to your reasoning: fold their substance into the finding's
+`summary`/`evidence` text, never emit them as replacement keys or as a
+competing top-level envelope alongside `question`/`lenses`/`findings`/
+`dispositions`. The Python gate validates exactly this shape and rejects
+anything else.
