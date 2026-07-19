@@ -280,7 +280,7 @@ _INDEX_MD_TEMPLATE = """\
 """
 
 
-def merge_catalog_section(existing, tables, context):
+def merge_catalog_section(existing: str | None, tables: str, context: str) -> str:
     """Anchor-stable merge (mirror of features/specs/catalog.py:merge_catalog_section)."""
     if existing and CATALOG_SECTION_HEADING in existing:
         lines = existing.splitlines(keepends=True)
@@ -403,7 +403,7 @@ def main(argv: list[str] | None = None) -> int:
         except OSError:
             existing = None
         if existing and CATALOG_SECTION_HEADING in existing:
-            by_area = {}
+            by_area: dict[str, list[dict[str, str]]] = {}
             for feature in catalog.get("features", []):
                 by_area.setdefault(str(feature.get("area", "product")), []).append(feature)
             sections = []
