@@ -433,9 +433,19 @@ def main() -> int:
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
             (tmp_dir / f"{_COMPACT_PREFIX}{session_id}").write_text("", encoding="utf-8")
-        _, recorded_slug = _read_sentinel(tmp_dir / f"{_SENTINEL_PREFIX}{session_id}")
-        if recorded_slug and (workspace / "repos" / recorded_slug / "specs").is_dir():
-            _emit_bootstrap(workspace, recorded_slug)
+        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+        sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
+        harness_pid = _resolve_harness_pid(payload)
+        # The emission resolves through the SAME chain as a normal prompt (DADAIA_CONTEXT
+        # env → self-keyed session record → bind-epoch marker), falling back to the
+        # sentinel's recorded slug: a bind with NO prior prompt leaves no sentinel file,
+        # but its session record still names the bound context (hermes round-3 bug
+        # kimi-postcompact-omits-bound-context-bootstrap).
+        context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
+        if not context:
+            context = recorded_slug
+        if context and (workspace / "repos" / context / "specs").is_dir():
+            _emit_bootstrap(workspace, context)
         else:
             _emit(_generic_preflight(workspace))
         return 0

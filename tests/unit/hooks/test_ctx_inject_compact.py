@@ -112,3 +112,25 @@ def test_compact_marker_without_sentinel_does_not_bind(tmp_path: Path) -> None:
     assert "[no bound context]" in _run(tmp_path, sid, event="PostCompact")
     # Fresh session: still only the generic preflight (bind-epoch never binds fresh sid).
     assert "[no bound context]" in _run(tmp_path, sid)
+
+
+def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path) -> None:
+    """Hermes round-3 bug (kimi-postcompact-omits-bound-context-bootstrap): a bind with
+    NO prior prompt leaves no sentinel file, but the session record names the bound
+    context — PostCompact must emit THAT context's bootstrap, not the generic preflight.
+    """
+    _ws(tmp_path)
+    sid = "sess-5"
+    # Bind flow: the session record exists (bind CLI wrote it), no sentinel, no marker.
+    sessions = tmp_path / ".dadaia" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / f"{sid}.json").write_text(
+        json.dumps({"session_id": sid, "context": "ctx", "mode": "implementation"}),
+        encoding="utf-8",
+    )
+    out = _run(tmp_path, sid, event="PostCompact")
+    assert "[ctx]" in out
+    assert "dispatcher preflight" in out
+    assert _compact_marker(tmp_path, sid).is_file()
+    # And the next prompt (first real prompt) resolves the same context and injects.
+    assert "[ctx]" in _run(tmp_path, sid)

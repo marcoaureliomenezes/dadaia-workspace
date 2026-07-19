@@ -373,6 +373,7 @@ exit 0
         _KIMI_SHIM_PROLOGUE
         + """
 export DADAIA_HOOK_EVENT="PostCompact"
+export DADAIA_RUNTIME="kimi-code"
 printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2>/dev/null || true
 exit 0
 """
