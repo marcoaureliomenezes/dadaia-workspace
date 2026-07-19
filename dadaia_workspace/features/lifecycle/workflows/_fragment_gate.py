@@ -89,6 +89,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
     RequiredHandoffMissingError,
     WorkflowHandoffResolver,
+    _compact_digest_text,
     durable_payload_from_result,
 )
 
@@ -847,6 +848,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         verdict + its reason since bug blocked-reason-misreports-rejected-verdict), and
         every detail entry — notably ``verdict``/``verdict_reason`` and any artifact or
         diagnostic refs the worker can open for the full findings.
+
+        Bounded (bug impl-reviews-retry-prompt-exceeds-codex-window): each detail value
+        is compacted and the whole brief is capped — an unbounded findings dump once
+        pushed the resumed step's prompt past the Codex context window. The full
+        findings stay reachable through the artifact/diagnostic refs in the brief.
         """
         lines = [
             "## Prior rejection feedback (resumed run)",
@@ -854,12 +860,19 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             f"'{blocked.blocked_at_step}': {blocked.reason}",
         ]
         for key, value in sorted(blocked.detail.items()):
-            lines.append(f"- {key}: {value}")
+            lines.append(f"- {key}: {_compact_digest_text(str(value))}")
         lines.append(
             "Revise the artifact so every point above is addressed; the same reviewer "
             "gate runs again after this step."
         )
-        return "\n".join(lines)
+        rendered = "\n".join(lines)
+        limit = 8000
+        if len(rendered) > limit:
+            rendered = (
+                rendered[:limit]
+                + "\n- [digest truncated: full findings at the artifact/diagnostic refs above]"
+            )
+        return rendered
 
     @staticmethod
     def _with_step_outcome(

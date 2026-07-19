@@ -100,6 +100,30 @@ def replace_injected_context(
     return replace(lifecycle_run, injected_context=entries)
 
 
+def _compact_block_detail(detail: dict[str, str], *, limit: int = 8000) -> str:
+    """Render a blocked-detail map as a bounded correction-attempt brief.
+
+    Bounded (bug impl-reviews-retry-prompt-exceeds-codex-window): each value is
+    compacted and the whole brief is capped — an unbounded findings dump once pushed
+    the retry prompt past the Codex context window. The full findings stay reachable
+    through the artifact/diagnostic refs the gate persists in the detail map.
+    """
+
+    def _compact(value: str, cap: int = 320) -> str:
+        compact = " ".join(value.split())
+        if len(compact) <= cap:
+            return compact
+        return compact[: cap - 3].rstrip() + "..."
+
+    rendered = "\n".join(f"- {key}: {_compact(value)}" for key, value in sorted(detail.items()))
+    if len(rendered) > limit:
+        rendered = (
+            rendered[:limit]
+            + "\n- [digest truncated: full findings at the artifact/diagnostic refs above]"
+        )
+    return rendered
+
+
 def _safe_filename_segment(value: str) -> str:
     """Sanitize *value* into a single filesystem-safe filename segment.
 
@@ -263,7 +287,7 @@ class LifecycleAgentRunner:
             "agent result carries no NEW or CHANGED deliverable in the step's declared zone",
         }:
             return result, blocked
-        detail = "\n".join(f"- {key}: {value}" for key, value in sorted(blocked.detail.items()))
+        detail = _compact_block_detail(blocked.detail)
         correction = (
             "## Automatic structural correction attempt (2 of 2)\n"
             f"The Python gate rejected the first attempt: {blocked.reason}.\n"

@@ -41,7 +41,7 @@ bug (`codex-backlog-author-no-materialization-regression-040`) reported+resolved
 
 ---
 
-- [-] **T2 - scaffold emits no invalid placeholder atom; upgrade/--fix repairs it (F2)**
+- [x] **T2 - scaffold emits no invalid placeholder atom; upgrade/--fix repairs it (F2)**
 
 **Owner role:** software-engineer
 
@@ -70,7 +70,7 @@ and `specs doctor --fix`, documented in their help. Register
 
 ---
 
-- [ ] **T3 - pain sweep: release-definition honest terminal state**
+- [x] **T3 - pain sweep: release-definition honest terminal state**
 
 **Owner role:** software-engineer
 
@@ -94,7 +94,7 @@ honest (completed or blocked with the reason). Register the bug.
 
 ---
 
-- [ ] **T4 - pain sweep: bounded rejection-correction digest for retries**
+- [x] **T4 - pain sweep: bounded rejection-correction digest for retries**
 
 **Owner role:** software-engineer
 
@@ -118,7 +118,7 @@ semantics. Register the bug.
 
 ---
 
-- [ ] **T5 - pain sweep: release-id canon at workflow intake + skills/CLI syntax audit + root-exceptions guidance**
+- [x] **T5 - pain sweep: release-id canon at workflow intake + skills/CLI syntax audit + root-exceptions guidance**
 
 **Owner role:** software-engineer
 
