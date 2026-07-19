@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRuntimeKind,
@@ -17,7 +18,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 
 
-class PromptScopeError(ValueError):
+class PromptScopeError(DadaiaError, ValueError):
     """Raised when a worker prompt would be broader than its declared scope."""
 
 

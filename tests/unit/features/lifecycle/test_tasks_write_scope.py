@@ -567,3 +567,30 @@ def test_release_write_scope_expands_file_paths_to_their_package_dir(tmp_path) -
     assert "docs/**" in scope
     # No duplicate dir glob for the explicit one.
     assert scope.count("docs/**") == 1
+
+
+def test_root_level_file_expands_to_sibling_extension_glob_never_repo_wide(tmp_path) -> None:
+    """Bug implementation-prompt-scope-rejects-repo-glob: a write-set FILE at the repo
+    root used to expand to repos/<slug>/** — the repo-wide glob the prompt-scope
+    security guard forbids (it would grant specs/ writes), crashing the run. Root
+    files now expand to a same-extension sibling glob instead; the repo-wide form is
+    never emitted.
+    """
+    from dadaia_workspace.features.lifecycle.tasks_write_scope import (
+        write_scope_from_release_tasks,
+    )
+
+    release = tmp_path / "releases" / "v0.1.0"
+    release.mkdir(parents=True)
+    (release / "TASKS.md").write_text(
+        "# TASKS\n\n### T-1 — implement `[-]`\n\n"
+        "- **Write set:** `repos/tictactoe/main.py`, `repos/tictactoe/tests/test_main.py`\n",
+        encoding="utf-8",
+    )
+
+    scope = write_scope_from_release_tasks(tmp_path, "v0.1.0")
+
+    assert "repos/tictactoe/main.py" in scope
+    assert "repos/tictactoe/*.py" in scope, scope
+    assert "repos/tictactoe/**" not in scope, scope
+    assert "repos/tictactoe/tests/**" in scope

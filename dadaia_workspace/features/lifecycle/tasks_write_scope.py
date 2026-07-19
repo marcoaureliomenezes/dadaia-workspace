@@ -121,7 +121,18 @@ def write_scope_from_release_tasks(specs_dir: Path, release_id: str) -> tuple[st
             # path also contributes its parent-directory glob — the declared zone is
             # the directory, not the single filename; explicit globs pass unchanged.
             if "*" not in path and "/" in path and "." in path.rsplit("/", 1)[-1]:
-                _add(path.rsplit("/", 1)[0] + "/**")
+                parent, filename = path.rsplit("/", 1)
+                parent_glob = parent + "/**"
+                # NEVER emit a repo-wide (repos/<slug>/**) or workspace-wide glob —
+                # the prompt-scope security guard forbids them (they would grant
+                # specs/ writes; bug implementation-prompt-scope-rejects-repo-glob).
+                segments = parent.split("/")
+                repo_wide = parent == "" or (len(segments) == 2 and segments[0] == "repos")
+                if not repo_wide:
+                    _add(parent_glob)
+                elif "." in filename:
+                    # Root-level file: allow same-extension siblings only.
+                    _add(f"{parent}/*.{filename.rsplit('.', 1)[-1]}")
     return tuple(globs)
 
 

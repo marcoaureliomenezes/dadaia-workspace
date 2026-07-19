@@ -556,3 +556,12 @@ def test_pipeline_resume_injects_prior_rejection_digest(tmp_path: Path) -> None:
     assert resumed.completed is True
     implement_prompt = approving.received[0].prompt
     assert "RF-07 not satisfied" in implement_prompt, implement_prompt[-500:]
+
+
+def test_prompt_scope_error_is_clean_dadaia_error() -> None:
+    """A scope violation must surface as ONE clean CLI line, never a traceback."""
+    from dadaia_workspace.core.exceptions import DadaiaError
+    from dadaia_workspace.features.lifecycle.prompt_builder import PromptScopeError
+
+    assert issubclass(PromptScopeError, DadaiaError)
+    assert issubclass(PromptScopeError, ValueError)
