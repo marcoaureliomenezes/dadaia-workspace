@@ -949,7 +949,14 @@ class WorkflowHandoffResolver:
         refs = payload.get("artifact_refs")
         if isinstance(refs, list) and refs:
             lines.append(f"- artifact_refs: {', '.join(str(r) for r in refs)}")
-        return "\n".join(lines)
+        rendered = "\n".join(lines)
+        # Bounded digest (bug implementation-retry-overflows-codex-context-window):
+        # an unbounded rejection digest injected into a retry prompt can blow the
+        # worker's context window. Cap the total; the payload stays addressable by ref.
+        limit = 8000
+        if len(rendered) > limit:
+            rendered = rendered[:limit] + "\n- [digest truncated: full payload at the ref above]"
+        return rendered
 
     # -- internals ----------------------------------------------------------
 

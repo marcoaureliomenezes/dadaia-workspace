@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from enum import IntEnum
 from pathlib import Path
@@ -19,6 +18,7 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.session_env import entry_harness
+from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus
 
@@ -194,7 +194,9 @@ def _authoritative_backlog_prefix(
     return PromptPrefix.from_sections({"authoritative-backlog-definition": directive})
 
 
-_CANONICAL_RELEASE_ID_RE = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$")
+# The ONE central canon (bug lifecycle-accepts-noncanonical-release-id retest: every
+# public validator shares this contract — see core.specs_version.RELEASE_SEMVER_RE).
+_CANONICAL_RELEASE_ID_RE = RELEASE_SEMVER_RE
 
 
 def _require_canonical_release_id(release_id: str) -> None:

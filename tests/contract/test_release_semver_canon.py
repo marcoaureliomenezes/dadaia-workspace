@@ -35,7 +35,10 @@ pytestmark = pytest.mark.contract
 # The canonical release-SemVer pattern string. Held as a literal here (not imported) so
 # the SCAN can run even while the canon is being established, and so a broken import of
 # the canon fails as a clear assertion rather than a collection error.
-_SEMVER_PATTERN = r"^v\d+\.\d+\.\d+$"
+# Widened 2026-07-19 (bug lifecycle-accepts-noncanonical-release-id retest): the ONE
+# canon accepts an optional -suffix segment — rc/canary/hotfix release identities are
+# legitimate at every public entry point (lifecycle verbs, release new, doctor).
+_SEMVER_PATTERN = r"^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$"
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG_ROOT = _REPO_ROOT / "dadaia_workspace"
@@ -133,5 +136,7 @@ def test_release_semver_single_canon_identity_scan_and_behavior() -> None:
     assert is_release_semver("v10.20.30") is True
     assert is_release_semver("v1.2") is False
     assert is_release_semver("1.2.3") is False
-    assert is_release_semver("v1.2.3-rc1") is False
+    # Suffixed identities are canonical since 2026-07-19 (rc/canary/hotfix flows).
+    assert is_release_semver("v1.2.3-rc1") is True
+    assert is_release_semver("v1.2.3-") is False
     assert is_release_semver("release-slug") is False
