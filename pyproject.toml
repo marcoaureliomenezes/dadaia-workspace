@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.3.1"
-description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and PI"
+version = "0.4.0"
+description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex, PI and Kimi Code"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
@@ -9,7 +9,7 @@ packages = [{include = "dadaia_workspace"}]
 # sdist/wheel. poetry-core honours these globs for both artifacts.
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
-    "ai-agents", "claude-code", "codex", "pi",
+    "ai-agents", "claude-code", "codex", "pi", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
     "developer-tools", "cli", "agentic"
 ]

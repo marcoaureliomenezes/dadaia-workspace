@@ -38,7 +38,7 @@ _EFFICIENCY_AUDIT_MARKER = "last_efficiency_audit.json"
 
 #: Directories allowed at workspace root (exact names, no wildcards).
 _ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".pi", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".kimi-code", ".pi", "repos"}
 )
 
 #: Files allowed at workspace root (exact names, no wildcards). Mirrors the Workspace

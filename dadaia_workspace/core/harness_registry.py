@@ -9,8 +9,9 @@ instead of bare string literals scattered across the codebase.
 Two distinct rosters live here:
 
 * :data:`L1_ENTRY_HARNESSES` — the Layer-1 *entry* harnesses an operator can drive the
-  workspace from: ``claude``, ``codex``, ``pi``. This is the identity set the panel
-  runtime-validation and the ``dadaia init --harness`` / projection vocabulary key on.
+  workspace from: ``claude``, ``codex``, ``pi``, ``kimi-code``. This is the identity set
+  the panel runtime-validation and the ``dadaia init --harness`` / projection vocabulary
+  key on. ``kimi-code`` is Layer-1 only — never a Layer-2 worker (v0.2.8).
 * :data:`L2_WORKER_HARNESSES` — the Layer-2 *worker* harnesses a governed workflow step
   may resolve to: ``codex``, ``pi``. ``claude`` is **never** a Layer-2 worker (cost
   bound, LAW 1). ``fake`` is the deterministic test adapter and is handled at the
@@ -30,7 +31,8 @@ from __future__ import annotations
 
 #: The Layer-1 entry-harness roster — the harnesses an operator enters the workspace
 #: from. Canonical order (also the ``init --harness all`` / projection order).
-L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "pi")
+#: ``kimi-code`` (v0.2.8) is Layer-1 only.
+L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "pi", "kimi-code")
 
 #: The Layer-2 worker-harness roster — the harnesses a governed workflow step may resolve
 #: to. ``claude`` is never a Layer-2 worker (cost bound, LAW 1). Canonical order kept
@@ -53,7 +55,7 @@ _L2_SET: frozenset[str] = frozenset(L2_WORKER_HARNESSES)
 
 
 def is_l1(harness: str) -> bool:
-    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``pi``)."""
+    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``pi``/``kimi-code``)."""
     return harness in _L1_SET
 
 

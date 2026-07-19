@@ -68,7 +68,7 @@ def build_capabilities() -> dict[str, Any]:
             {"id": "audit", "command": "dadaia lifecycle audit"},
         ],
         "harnesses": {
-            "layer_1": ["claude-code", "codex", "pi"],
+            "layer_1": ["claude-code", "codex", "pi", "kimi-code"],
             "layer_2_workers": ["codex", "pi", "fake"],
             "claude_layer_2_supported": False,
         },

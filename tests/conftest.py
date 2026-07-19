@@ -197,6 +197,22 @@ def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
     scrub_entry_signal_env(monkeypatch)
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
+
+    v0.2.8 (kimi-code): ``public install --target kimi-code`` (and therefore
+    ``--target all`` and ``dadaia init``) upserts the managed hook block into
+    ``$KIMI_CODE_HOME/config.toml`` and writes shims under ``$KIMI_CODE_HOME/hooks/``.
+    Unredirected, every all-target install test would mutate the developer's real Kimi
+    Code user config. Point ``KIMI_CODE_HOME`` at a session tmp dir; tests that assert
+    on the wiring re-point it themselves (function scope wins over this default).
+    """
+    import os
+
+    os.environ["KIMI_CODE_HOME"] = str(tmp_path_factory.mktemp("kimi-home"))
+
+
 _LIVE_OPT_IN_FLAGS: tuple[str, ...] = (
     "DADAIA_E2E_REAL_WORKER",
     "DADAIA_PI_LIVE",

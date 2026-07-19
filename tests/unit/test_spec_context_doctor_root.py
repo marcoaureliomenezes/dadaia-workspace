@@ -77,11 +77,14 @@ def test_root1_block_table(tmp_path: Path, name: str, setup_fn: object) -> None:
         (
             "whitelisted_dirs",
             lambda tp: [
-                (tp / name).mkdir(exist_ok=True) for name in [".agents", ".claude", ".codex", ".pi"]
+                (tp / name).mkdir(exist_ok=True)
+                for name in [".agents", ".claude", ".codex", ".kimi-code", ".pi"]
             ],
         ),
         # `.pi/` (PI Layer-2 harness home) does not trigger ROOT-1.
         ("pi_dir", lambda tp: (tp / ".pi").mkdir(exist_ok=True)),
+        # `.kimi-code/` (Kimi Code Layer-1 harness home, v0.2.8) does not trigger ROOT-1.
+        ("kimi_code_dir", lambda tp: (tp / ".kimi-code").mkdir(exist_ok=True)),
         (".gitignore", lambda tp: (tp / ".gitignore").write_text("*.pyc\n")),
         # Root-law-allowed files need NO exception list (bug
         # doctor-root-whitelist-contradicts-root-law).

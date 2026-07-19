@@ -513,17 +513,33 @@ class TestPerProfileInit:
 
         assert _persisted_profile(ws) == ["pi"]
 
-        # W2 boundary (recorded): a pi-only per-target subset init does NOT install the
-        # git chokepoint scripts — the existing install rule projects them only for the
-        # {all, claude, codex} targets (FR2 "follow the existing rule"). FR3 keeps the
-        # scripts doctor check UNCONDITIONAL (the chokepoints are harness-independent), so
-        # a pi-only tree must have them present to read green. Scaffold them via the real
-        # production installer (`_install_scripts`, exactly what `dadaia public install`
-        # runs) — this is the "scaffold scripts in the fixture" resolution the SPEC's FR3
-        # scripts-are-harness-independent text mandates (scoping them would contradict FR3).
-        mgr = _manager()
-        mgr._install_scripts(ws / ".dadaia" / "agentic", ws, False, [])
+        # Scripts boundary (v0.2.8 fix): the harness-independent chokepoint scripts
+        # install for EVERY L1 target, so a pi-only tree is doctor-green with no
+        # fixture scaffolding (the old {all, claude, codex} gate left it red).
+        _assert_profile_doctor_green(ws, monkeypatch)
 
+    def test_kimi_code_only_profile(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    ) -> None:
+        """AC-8 kimi-code-only (v0.2.8): `.kimi-code/` projection; NO .claude/ NO .codex/ NO .pi/."""
+        ws = tmp_path / "kimi_code_only"
+        monkeypatch.chdir(tmp_path)
+        result = _run_init(ws, "kimi-code")
+        assert result.exit_code == 0, result.output
+
+        # EXACT structure — the `.kimi-code/` projection carries the staged AGENTS.md.
+        assert (ws / ".kimi-code" / "AGENTS.md").is_file(), ".kimi-code/AGENTS.md missing"
+        # un-chosen harnesses get no projection.
+        assert not (ws / ".claude").exists(), (
+            "claude must NOT be scaffolded for a kimi-code profile"
+        )
+        assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a kimi-code profile"
+        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a kimi-code profile"
+
+        assert _persisted_profile(ws) == ["kimi-code"]
+
+        # Same scripts boundary as the pi-only profile: chokepoint scripts install for
+        # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_default_no_flag_scaffolds_all_four(
@@ -538,9 +554,10 @@ class TestPerProfileInit:
         assert (ws / ".claude" / "agents").is_dir()
         assert (ws / ".codex").is_dir()
         assert (ws / ".pi").is_dir()
+        assert (ws / ".kimi-code").is_dir()
         assert _ctx_inject_registered(ws / ".claude")
         # The all-four install path also lays the chokepoint scripts (target=="all").
         assert (ws / ".dadaia" / "scripts").is_dir()
 
-        assert _persisted_profile(ws) == ["claude", "codex", "pi"]
+        assert _persisted_profile(ws) == ["claude", "codex", "pi", "kimi-code"]
         _assert_profile_doctor_green(ws, monkeypatch)

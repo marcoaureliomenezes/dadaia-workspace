@@ -9,10 +9,10 @@
 scoped project contexts, a Spec-Driven Development (SDD) lifecycle with deterministic
 gates, a procedural multi-harness **workflow engine** (the *dadaia-workflows*), a
 persona-based agent roster with installable **plugin packs**, canonical agentic-asset
-projection across **three** AI harnesses, and a real-time monitoring panel.
+projection across **four** AI harnesses, and a real-time monitoring panel.
 
 It runs agents at **two distinct layers** (explained below) and supports
-**Claude Code, Codex, and PI** as peers. It is designed to be operated by **humans
+**Claude Code, Codex, PI, and Kimi Code** as peers. It is designed to be operated by **humans
 and by agents**: every capability is reachable through a discoverable CLI, and every
 state surface has a machine-readable form.
 
@@ -34,7 +34,7 @@ Requires Python 3.12+.
 ## Quick start
 
 ```bash
-dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .pi/)
+dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .pi/, .kimi-code/)
 dadaia init --harness claude,pi    # or scaffold only a subset of harnesses (harness profile)
 dadaia doctor                      # health check: contexts, assets, gates, presence
 dadaia panel                       # local dashboard (http://localhost:4999)
@@ -58,8 +58,9 @@ flowchart TB
         CC["claude"]:::h
         CX["codex"]:::h
         PI["pi"]:::h
+        KC["kimi"]:::h
     end
-    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
+    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
     CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(a procedural Python workflow)"]
     subgraph L2["LAYER 2 — worker harness (inside the workflow engine)"]
         direction LR
@@ -76,9 +77,9 @@ flowchart TB
 ```
 
 - **Layer 1 — the entry harness.** The AI coding agent a human launches in the
-  terminal: `claude`, `codex`, or `pi`. It is governed by the workspace-root
+  terminal: `claude`, `codex`, `pi`, or `kimi`. It is governed by the workspace-root
   `AGENTS.md` (read natively up the directory tree) plus the projected per-runtime
-  asset trees (`.claude/`, `.codex/`, `.pi/`).
+  asset trees (`.claude/`, `.codex/`, `.pi/`, `.kimi-code/`).
 - **Layer 2 — the worker harness.** The bounded agent workers that `dadaia lifecycle`
   drives, one selectable per step, behind a single `AgentRuntimePort`. Four runtime
   kinds — `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `PI_HEADLESS` — over two transports:
@@ -86,6 +87,8 @@ flowchart TB
 
 A harness can exist at one layer and not the other (`FAKE` is Layer-2 only). PI
 exists at both: a `.pi/` Layer-1 projection and a `PI_HEADLESS` Layer-2 worker.
+Kimi Code is Layer-1 only (`.kimi-code/` projection plus the managed user-level hook
+block).
 
 ---
 
@@ -96,6 +99,7 @@ exists at both: a `.pi/` Layer-1 projection and a `PI_HEADLESS` Layer-2 worker.
 | **Claude Code** | ✅ `.claude/` + PreToolUse hook + chokepoints | ✅ `CLAUDE_SDK` (only adapter with a pre-disk Ring-1 boundary) | SDK (in-process) |
 | **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; `codex exec` headless is chokepoints-only) | ✅ `CODEX_EXEC` | CLI-headless (`codex exec`) |
 | **PI** (`@earendil-works/pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` | CLI-headless (`pi --mode json`) |
+| **Kimi Code** | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi has no project-level config) | — (Layer-1 only) | — |
 
 **Harness profiles.** `dadaia init --harness <set>` scaffolds only the harnesses you
 use (persisted in `.dadaia/states/harness_profile.json`). `dadaia public install` and

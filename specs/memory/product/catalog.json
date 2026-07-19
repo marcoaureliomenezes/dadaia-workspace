@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T04:35:38Z",
+  "generated_at": "2026-07-19T06:11:37Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -208,6 +208,30 @@
     },
     {
       "rank": 10,
+      "slug": "harness-kimi-code",
+      "title": "Harness — Kimi Code",
+      "category": "product",
+      "area": "harness",
+      "tldr": "Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection.",
+      "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`, delegating to the shared Python hook modules. Layer-2 workers remain codex/pi only.",
+      "path": "specs/memory/product/harness/harness-kimi-code.md",
+      "tags": [
+        "harness",
+        "kimi-code",
+        "layer-1",
+        "projection"
+      ],
+      "token_estimate": 400,
+      "depends_on": [
+        "workspace-init",
+        "tech-stack",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "harness-claude-code"
+      ]
+    },
+    {
+      "rank": 11,
       "slug": "harness-pi",
       "title": "Harness - PI (pi-coding-agent)",
       "category": "product",
@@ -232,7 +256,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -252,7 +276,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -277,7 +301,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -302,7 +326,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -325,7 +349,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -348,7 +372,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -373,7 +397,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -398,7 +422,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -418,7 +442,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -439,7 +463,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -461,7 +485,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -483,7 +507,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -504,7 +528,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "dadaia-workflows",
       "title": "dadaia-workflows",
       "category": "product",
@@ -529,7 +553,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "lifecycle-foundation",
       "title": "lifecycle-foundation",
       "category": "product",
@@ -554,7 +578,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -578,7 +602,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -602,7 +626,7 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 28,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",

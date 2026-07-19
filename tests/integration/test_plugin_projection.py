@@ -47,7 +47,17 @@ _GOLDEN_DIR = _HERE / "_golden"
 _INSTALL_GOLDEN_B = _GOLDEN_DIR / "plugin_install_targets_golden_b_v0160.json"
 _DOCTOR_GOLDEN_B = _GOLDEN_DIR / "plugin_doctor_report_golden_b_v0160.json"
 
-_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
+_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi", "kimi-code")
+
+
+def _redirect_kimi_home(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:
+    """Root the kimi-code user-level wiring inside the fixture workspace (v0.2.8).
+
+    Same rationale as ``test_install_target_goldens._redirect_kimi_home``: the kimi
+    shims/config-block paths appear in install/doctor lines and must normalize to
+    ``<WS>`` — and the real user config is never touched.
+    """
+    monkeypatch.setenv("KIMI_CODE_HOME", str(ws / "kimi-home"))
 
 
 # ---------------------------------------------------------------------------
@@ -61,20 +71,22 @@ _INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
 # ---------------------------------------------------------------------------
 
 
-def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
+def _capture_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
     mgr = FileSystemPublicAssetManager()
     result: dict[str, list[str]] = {}
     for target in _INSTALL_TARGETS:
         ws = tmp_path / f"install_{target}"
         ws.mkdir()
+        _redirect_kimi_home(monkeypatch, ws)
         installed = mgr.install(ws, target=target)
         result[target] = [norm_path_line(line, ws) for line in installed]
     return result
 
 
-def _capture_doctor(tmp_path: Path) -> list[str]:
+def _capture_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     ws = tmp_path / "doctor_all_four"
     ws.mkdir()
+    _redirect_kimi_home(monkeypatch, ws)
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
@@ -93,25 +105,27 @@ def _golden_b_message(what: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_descriptors_present_zero_plugin_install_equals_golden_b(tmp_path: Path) -> None:
+def test_descriptors_present_zero_plugin_install_equals_golden_b(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """AC-5: install() (all targets) with descriptors present + no plugin == golden (b)."""
     assert_golden(
         _INSTALL_GOLDEN_B,
-        _capture_install(tmp_path),
+        _capture_install(tmp_path, monkeypatch),
         "plugin-golden-b-install-targets",
         message=_golden_b_message("plugin-golden-b-install-targets"),
     )
 
 
 def test_absent_plugin_doctor_byte_equals_golden_b_with_descriptor_stage_lines(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """AC-5: doctor() with descriptors present + no plugin installed == golden (b);
     golden (b) is the descriptors-present baseline — it INCLUDES ``stage:plugins/*``
     (what distinguishes it from the plugin-blind golden (a); if the descriptor-source
     lines ever vanished from golden (b), the byte-lock would stop covering the new
     staging inventory)."""
-    doctor = _capture_doctor(tmp_path)
+    doctor = _capture_doctor(tmp_path, monkeypatch)
     assert_golden(
         _DOCTOR_GOLDEN_B,
         doctor,

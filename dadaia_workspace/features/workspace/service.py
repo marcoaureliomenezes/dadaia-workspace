@@ -62,11 +62,11 @@ class WorkspaceService:
         """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
 
         *harnesses* selects which Layer-1 entry harnesses to scaffold (the ``.claude``/
-        ``.codex``/``.pi`` projections plus per-harness hook registration). ``None`` ⇒ the
-        full all-four set (back-compat with pre-v0.1.58 init). Only the chosen harnesses'
-        directories, hooks, and asset projections are created; the selected set is persisted
-        to ``.dadaia/states/harness_profile.json`` (the source of truth for profile-aware
-        install/doctor scoping, v0.1.58 FR3).
+        ``.codex``/``.pi``/``.kimi-code`` projections plus per-harness hook registration).
+        ``None`` ⇒ the full harness set (back-compat with pre-v0.1.58 init). Only the
+        chosen harnesses' directories, hooks, and asset projections are created; the
+        selected set is persisted to ``.dadaia/states/harness_profile.json`` (the source
+        of truth for profile-aware install/doctor scoping, v0.1.58 FR3).
         """
         workspace = Workspace.from_root(workspace_root)
         chosen = tuple(harnesses) if harnesses is not None else L1_ENTRY_HARNESSES
@@ -82,7 +82,8 @@ class WorkspaceService:
             workspace.claude_dir.mkdir(parents=True, exist_ok=True)
         if "codex" in chosen_set:
             (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
-        # `.pi/` is materialised by the pi install target below (no bare mkdir).
+        # `.pi/` and `.kimi-code/` are materialised by their install targets below (no
+        # bare mkdir).
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)

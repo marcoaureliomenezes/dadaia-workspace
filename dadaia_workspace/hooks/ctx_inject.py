@@ -35,6 +35,13 @@ Parity invariants preserved verbatim from the rc-4 shell hook:
 - **Output contract**: ``DADAIA_HOOK_OUTPUT`` in {``codex-json``, ``json``} emits the
   ``hookSpecificOutput.additionalContext`` envelope with ``hookEventName`` from
   ``DADAIA_HOOK_EVENT`` (default ``UserPromptSubmit``); otherwise raw payload to stdout.
+- **Compact epoch (v0.2.8, kimi-code)**: with ``DADAIA_HOOK_EVENT=PostCompact`` the hook
+  stamps ``.dadaia/tmp/ctx-compact-<sessionId>`` AND re-emits the bootstrap on stdout
+  (observable contract; Kimi discards PostCompact stdout). The repeat-prompt guards
+  treat a compact marker NEWER than the sentinel as a re-injection trigger, so the next
+  ``UserPromptSubmit`` after a ``/compact`` re-injects the bootstrap exactly once
+  (the sentinel restamp makes subsequent prompts silent again). Harnesses that never wire
+  a PostCompact hook see byte-identical behavior — no marker, no trigger.
 """
 
 from __future__ import annotations
@@ -61,6 +68,11 @@ _DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
 
 #: Filename prefix of the once-per-session sentinel (``ctx-inject-fired-<sessionId>``).
 _SENTINEL_PREFIX = "ctx-inject-fired-"
+
+#: Filename prefix of the per-session compact-epoch marker (``ctx-compact-<sessionId>``),
+#: stamped by the PostCompact hook event (v0.2.8, kimi-code) and consumed by the
+#: repeat-prompt guards as a re-injection trigger (mtime > sentinel mtime).
+_COMPACT_PREFIX = "ctx-compact-"
 
 #: Age (seconds) after which a once-per-session sentinel is considered stale and GC'd at
 #: inject time. Generous (24 h) so a long-running live session is never disturbed; a
@@ -315,12 +327,12 @@ def _build_memory(specs_dir: Path) -> str:
 
 
 def _gc_stale_sentinels(tmp_dir: Path, *, now: float | None = None) -> None:
-    """Sweep aged once-per-session sentinel files at inject time (fail-open).
+    """Sweep aged once-per-session sentinel/marker files at inject time (fail-open).
 
-    A sentinel (``ctx-inject-fired-*``) whose mtime is older than
-    :data:`_SENTINEL_GC_TTL_SECONDS` is removed; fresh sentinels (other live sessions) and
-    non-sentinel tmp files are left untouched. Any OS error during the scan is suppressed —
-    GC is best-effort housekeeping and must never break the bootstrap.
+    A sentinel (``ctx-inject-fired-*``) or compact marker (``ctx-compact-*``) whose mtime
+    is older than :data:`_SENTINEL_GC_TTL_SECONDS` is removed; fresh files (other live
+    sessions) and unrelated tmp files are left untouched. Any OS error during the scan is
+    suppressed — GC is best-effort housekeeping and must never break the bootstrap.
     """
     cutoff = (now if now is not None else time.time()) - _SENTINEL_GC_TTL_SECONDS
     try:
@@ -328,7 +340,7 @@ def _gc_stale_sentinels(tmp_dir: Path, *, now: float | None = None) -> None:
     except OSError:
         return
     for entry in entries:
-        if not entry.name.startswith(_SENTINEL_PREFIX):
+        if not entry.name.startswith((_SENTINEL_PREFIX, _COMPACT_PREFIX)):
             continue
         with contextlib.suppress(OSError):
             if entry.is_file() and entry.stat().st_mtime < cutoff:
@@ -385,6 +397,15 @@ def _generic_preflight(workspace: Path) -> str:
     return "\n".join(sections) + "\n"
 
 
+def _emit_bootstrap(workspace: Path, context: str) -> None:
+    """Emit the bound context's bootstrap (dispatcher preflight + memory bootstrap)."""
+    sections = [f"[{context}]", "", _DISPATCHER_PREFLIGHT]
+    memory = _build_memory(workspace / "repos" / context / "specs")
+    if memory:
+        sections.append(memory)
+    _emit("\n".join(sections) + "\n")
+
+
 def main() -> int:
     """Run the context-injection hook. Returns 0 always."""
     payload = _common.read_stdin_json()
@@ -400,10 +421,49 @@ def main() -> int:
     # Its content now records the last injected slug so a re-bind is detectable. Inject-time
     # GC of stale sentinels runs first so leftover sentinels are reaped on every fire.
     tmp_dir = workspace / ".dadaia" / "tmp"
+
+    # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker, then RE-EMIT the
+    # bootstrap on stdout. Kimi's PostCompact is observation-only (the harness discards
+    # stdout), so this never double-injects — the deterministic re-injection still
+    # happens at the next UserPromptSubmit via the marker. The emission follows the
+    # observable-contract doctrine (projected-pre-gate-silent-allow: a silent hook is
+    # unverifiable — external automation must SEE the re-injection happen). The sentinel
+    # is deliberately NOT restamped here, so the next prompt still re-injects.
+    if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":
+        with contextlib.suppress(OSError):
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            (tmp_dir / f"{_COMPACT_PREFIX}{session_id}").write_text("", encoding="utf-8")
+        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+        sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
+        harness_pid = _resolve_harness_pid(payload)
+        # The emission resolves through the SAME chain as a normal prompt (DADAIA_CONTEXT
+        # env → self-keyed session record → bind-epoch marker), falling back to the
+        # sentinel's recorded slug: a bind with NO prior prompt leaves no sentinel file,
+        # but its session record still names the bound context (hermes round-3 bug
+        # kimi-postcompact-omits-bound-context-bootstrap).
+        context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
+        if not context:
+            context = recorded_slug
+        if context and (workspace / "repos" / context / "specs").is_dir():
+            _emit_bootstrap(workspace, context)
+        else:
+            _emit(_generic_preflight(workspace))
+        return 0
+
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     _gc_stale_sentinels(tmp_dir)
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
     sentinel_exists = sentinel_mtime is not None
+
+    # Compact trigger: a compact marker newer than the sentinel forces re-injection on
+    # this prompt (the sentinel restamp below makes the following prompt silent again).
+    compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
+    compact_mtime: float | None = None
+    with contextlib.suppress(OSError):
+        compact_mtime = compact_marker.stat().st_mtime
+    compacted = (
+        sentinel_mtime is not None and compact_mtime is not None and compact_mtime > sentinel_mtime
+    )
 
     # The harness pid this session runs under uses the same resolution as the SDD gate
     # (payload harness_pid → os.getppid()). A bind-epoch
@@ -413,10 +473,18 @@ def main() -> int:
 
     context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
 
+    if not context and compacted and recorded_slug:
+        # Post-compact re-injection source: the bind-epoch marker qualified at bind time
+        # but is now OLDER than the sentinel, so the FR-W2-01 chain can no longer resolve
+        # the context. The sentinel's recorded slug is the last injected context — the
+        # session's bound truth — and is what gets re-injected after a compaction.
+        context = recorded_slug
+
     # Unbound: generic preflight (NO memory). Emit once per session — a fresh session (no
-    # sentinel) gets it and stamps the sentinel; a repeat prompt is silent.
+    # sentinel) gets it and stamps the sentinel; a repeat prompt is silent, unless a
+    # compaction just wiped the context (compacted ⇒ re-emit the preflight once).
     if not context:
-        if sentinel_exists:
+        if sentinel_exists and not compacted:
             return 0
         _emit(_generic_preflight(workspace))
         _stamp_sentinel(tmp_dir, sentinel, "")
@@ -425,16 +493,17 @@ def main() -> int:
     specs_dir = workspace / "repos" / context / "specs"
     if not specs_dir.is_dir():
         # Resolved a context with no specs tree — degrade to generic preflight once.
-        if sentinel_exists:
+        if sentinel_exists and not compacted:
             return 0
         _emit(_generic_preflight(workspace))
         _stamp_sentinel(tmp_dir, sentinel, "")
         return 0
 
     # Re-injection guard: a repeat prompt for the SAME already-injected slug is silent. A
-    # re-bind to a different context (recorded_slug != context) or a fresh session always
-    # (re-)injects that context's memory and restamps the sentinel with the new slug.
-    if sentinel_exists and recorded_slug == context:
+    # re-bind to a different context (recorded_slug != context), a compaction newer than
+    # the sentinel, or a fresh session always (re-)injects that context's memory and
+    # restamps the sentinel with the new slug.
+    if sentinel_exists and recorded_slug == context and not compacted:
         return 0
 
     sections = [f"[{context}]", "", _DISPATCHER_PREFLIGHT]
