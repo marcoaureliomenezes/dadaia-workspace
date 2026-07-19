@@ -766,7 +766,12 @@ class FileSystemPublicAssetManager:
             elif item == "kimi-code":
                 self._install_kimi_code(agentic_dir, workspace_root, force, installed, only=only)
 
-        if target in {"all", "claude", "codex"}:
+        # The git-chokepoint scripts are harness-independent: EVERY Layer-1 harness
+        # target gets them (v0.2.8 hermes bug kimi-only-init-public-doctor-missing-
+        # managed-scripts — a pi-only or kimi-only workspace must also read doctor-green;
+        # the doctor's dadaia:scripts/* lines are unconditional, so a per-harness install
+        # that skipped them left single-harness workspaces permanently red).
+        if target in {"all", *L1_ENTRY_HARNESSES}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
 
         # Projection precedence (FR3, AC-4): after the core projection, overlay any installed

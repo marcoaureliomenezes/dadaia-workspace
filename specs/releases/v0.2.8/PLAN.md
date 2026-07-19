@@ -42,7 +42,9 @@ kimi-specific split between workspace assets and user-global wiring:
   - `dadaia-kimi-post-gate.sh` → `hooks.sdd_post_gate`; discard output, exit 0.
   - `dadaia-kimi-ctx-inject.sh` → `hooks.ctx_inject`; forward stdout, exit 0.
   - `dadaia-kimi-post-compact.sh` → `hooks.ctx_inject` with `DADAIA_HOOK_EVENT=PostCompact`;
-    discard output, exit 0.
+    forward stdout, exit 0 (ctx_inject re-emits the bootstrap — observable contract;
+    Kimi discards PostCompact stdout, so the deterministic re-injection still lands at
+    the next prompt).
 - **Compact epoch (FR4):** `hooks/ctx_inject.py` — when the resolved event is
   `PostCompact`, write `.dadaia/tmp/ctx-compact-<session_id>` and emit nothing. The
   existing fire predicate gains a disjunct: compact marker mtime > sentinel mtime. The
@@ -107,7 +109,9 @@ timeout = 10
 ### 3.3 ctx_inject compact-epoch contract
 
 - `DADAIA_HOOK_EVENT=PostCompact` ⇒ resolve session id, write/touch
-  `.dadaia/tmp/ctx-compact-<session_id>`, exit 0 with no stdout.
+  `.dadaia/tmp/ctx-compact-<session_id>`, and re-emit the bootstrap on stdout without
+  restamping the sentinel (observable contract, per the projected-pre-gate-silent-allow
+  doctrine).
 - Fire predicate: fire iff (bind-epoch marker newer than sentinel) OR (compact marker
   newer than sentinel); on fire, write the sentinel as today. Existing tests must keep
   passing unchanged (no compact marker ⇒ old behavior).

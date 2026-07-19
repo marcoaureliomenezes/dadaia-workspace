@@ -36,9 +36,10 @@ Parity invariants preserved verbatim from the rc-4 shell hook:
   ``hookSpecificOutput.additionalContext`` envelope with ``hookEventName`` from
   ``DADAIA_HOOK_EVENT`` (default ``UserPromptSubmit``); otherwise raw payload to stdout.
 - **Compact epoch (v0.2.8, kimi-code)**: with ``DADAIA_HOOK_EVENT=PostCompact`` the hook
-  emits nothing and stamps ``.dadaia/tmp/ctx-compact-<sessionId>``. The repeat-prompt
-  guards treat a compact marker NEWER than the sentinel as a re-injection trigger, so the
-  next ``UserPromptSubmit`` after a ``/compact`` re-injects the bootstrap exactly once
+  stamps ``.dadaia/tmp/ctx-compact-<sessionId>`` AND re-emits the bootstrap on stdout
+  (observable contract; Kimi discards PostCompact stdout). The repeat-prompt guards
+  treat a compact marker NEWER than the sentinel as a re-injection trigger, so the next
+  ``UserPromptSubmit`` after a ``/compact`` re-injects the bootstrap exactly once
   (the sentinel restamp makes subsequent prompts silent again). Harnesses that never wire
   a PostCompact hook see byte-identical behavior — no marker, no trigger.
 """
@@ -396,6 +397,15 @@ def _generic_preflight(workspace: Path) -> str:
     return "\n".join(sections) + "\n"
 
 
+def _emit_bootstrap(workspace: Path, context: str) -> None:
+    """Emit the bound context's bootstrap (dispatcher preflight + memory bootstrap)."""
+    sections = [f"[{context}]", "", _DISPATCHER_PREFLIGHT]
+    memory = _build_memory(workspace / "repos" / context / "specs")
+    if memory:
+        sections.append(memory)
+    _emit("\n".join(sections) + "\n")
+
+
 def main() -> int:
     """Run the context-injection hook. Returns 0 always."""
     payload = _common.read_stdin_json()
@@ -412,13 +422,22 @@ def main() -> int:
     # GC of stale sentinels runs first so leftover sentinels are reaped on every fire.
     tmp_dir = workspace / ".dadaia" / "tmp"
 
-    # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker and emit NOTHING —
-    # the marker being newer than the sentinel turns the NEXT UserPromptSubmit into a
-    # re-injection (context was compacted away, so the bootstrap must be re-delivered).
+    # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker, then RE-EMIT the
+    # bootstrap on stdout. Kimi's PostCompact is observation-only (the harness discards
+    # stdout), so this never double-injects — the deterministic re-injection still
+    # happens at the next UserPromptSubmit via the marker. The emission follows the
+    # observable-contract doctrine (projected-pre-gate-silent-allow: a silent hook is
+    # unverifiable — external automation must SEE the re-injection happen). The sentinel
+    # is deliberately NOT restamped here, so the next prompt still re-injects.
     if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
             (tmp_dir / f"{_COMPACT_PREFIX}{session_id}").write_text("", encoding="utf-8")
+        _, recorded_slug = _read_sentinel(tmp_dir / f"{_SENTINEL_PREFIX}{session_id}")
+        if recorded_slug and (workspace / "repos" / recorded_slug / "specs").is_dir():
+            _emit_bootstrap(workspace, recorded_slug)
+        else:
+            _emit(_generic_preflight(workspace))
         return 0
 
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"

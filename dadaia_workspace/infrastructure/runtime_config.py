@@ -333,7 +333,9 @@ def kimi_hook_shims() -> dict[str, str]:
     - ctx-inject: ``hooks.ctx_inject``; stdout passes through (Kimi appends
       ``UserPromptSubmit`` stdout to the context).
     - post-compact: ``hooks.ctx_inject`` with ``DADAIA_HOOK_EVENT=PostCompact`` — writes
-      the compact-epoch marker consumed by the next ``UserPromptSubmit``.
+      the compact-epoch marker consumed by the next ``UserPromptSubmit`` AND re-emits
+      the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
+      stdout, so the deterministic re-injection still lands at the next prompt).
     """
     pre_gate = (
         _KIMI_SHIM_PROLOGUE
@@ -371,7 +373,7 @@ exit 0
         _KIMI_SHIM_PROLOGUE
         + """
 export DADAIA_HOOK_EVENT="PostCompact"
-printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject >/dev/null 2>&1 || true
+printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2>/dev/null || true
 exit 0
 """
     )

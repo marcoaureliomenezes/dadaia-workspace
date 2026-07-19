@@ -23,7 +23,7 @@ the other harnesses use:
 | `PreToolUse` (`Edit\|Write\|Bash`) | `dadaia-kimi-pre-gate.sh` | merged gate: root-whitelist → venv-guard → SDD gate (blocks via exit 2) |
 | `PostToolUse` | `dadaia-kimi-post-gate.sh` | session/presence heartbeat |
 | `UserPromptSubmit` | `dadaia-kimi-ctx-inject.sh` | context injection after `dadaia context bind` |
-| `PostCompact` | `dadaia-kimi-post-compact.sh` | marks compaction; the next prompt re-injects context |
+| `PostCompact` | `dadaia-kimi-post-compact.sh` | marks compaction and re-emits the bootstrap on stdout (observable; Kimi discards it) — the next prompt re-injects context |
 
 The shims fail open (exit 0) outside dadaia workspaces and never store
 workspace-absolute paths. Re-install or verify the wiring with

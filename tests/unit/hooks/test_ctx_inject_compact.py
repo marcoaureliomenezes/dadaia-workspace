@@ -2,9 +2,9 @@
 
 Drives ``ctx_inject`` as a real subprocess (the harness-real fixture) through the full
 kimi-code compaction flow: ``UserPromptSubmit`` injections, the ``PostCompact`` event
-(stamps ``ctx-compact-<sid>``, emits nothing), and the next-prompt re-injection that
-fires exactly once. Also covers the unbound-session variant (generic preflight re-emitted
-once after a compact).
+(stamps ``ctx-compact-<sid>`` AND re-emits the bootstrap on stdout — the observable
+contract; Kimi discards PostCompact stdout), and the next-prompt re-injection that
+fires exactly once. Also covers the unbound-session variant (generic preflight).
 """
 
 from __future__ import annotations
@@ -60,11 +60,13 @@ def _compact_marker(tmp_path: Path, session_id: str) -> Path:
     return tmp_path / ".dadaia" / "tmp" / f"ctx-compact-{session_id}"
 
 
-def test_post_compact_stamps_marker_and_emits_nothing(tmp_path: Path) -> None:
+def test_post_compact_stamps_marker_and_reemits_observably(tmp_path: Path) -> None:
+    """PostCompact: marker written + generic preflight re-emitted (unbound session)."""
     _ws(tmp_path)
     out = _run(tmp_path, "sess-1", event="PostCompact")
-    assert out == ""
     assert _compact_marker(tmp_path, "sess-1").is_file()
+    # Observable contract: PostCompact re-emits (never silence).
+    assert "[no bound context]" in out
 
 
 def test_bound_session_reinjects_once_after_compact(tmp_path: Path) -> None:
@@ -78,11 +80,15 @@ def test_bound_session_reinjects_once_after_compact(tmp_path: Path) -> None:
     # Repeat prompt: silent.
     assert _run(tmp_path, sid) == ""
 
-    # Compaction: marker only; next prompt re-injects the same context exactly once.
-    assert _run(tmp_path, sid, event="PostCompact") == ""
-    out = _run(tmp_path, sid)
+    # Compaction: marker + observable re-emission of the bound context's bootstrap…
+    out = _run(tmp_path, sid, event="PostCompact")
     assert "[ctx]" in out
     assert "dispatcher preflight" in out
+    # …but the sentinel was NOT restamped: the NEXT prompt re-injects (the deterministic
+    # path — Kimi discards PostCompact stdout, so the model really gets it here).
+    out = _run(tmp_path, sid)
+    assert "[ctx]" in out
+    # And after that: silent again (exactly-once discipline).
     assert _run(tmp_path, sid) == ""
 
 
@@ -93,7 +99,7 @@ def test_unbound_session_reemits_generic_preflight_after_compact(tmp_path: Path)
     assert "[no bound context]" in _run(tmp_path, sid)
     assert _run(tmp_path, sid) == ""
 
-    assert _run(tmp_path, sid, event="PostCompact") == ""
+    assert "[no bound context]" in _run(tmp_path, sid, event="PostCompact")
     assert "[no bound context]" in _run(tmp_path, sid)
     assert _run(tmp_path, sid) == ""
 
@@ -103,6 +109,6 @@ def test_compact_marker_without_sentinel_does_not_bind(tmp_path: Path) -> None:
     _ws(tmp_path)
     sid = "sess-4"
     _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
-    assert _run(tmp_path, sid, event="PostCompact") == ""
+    assert "[no bound context]" in _run(tmp_path, sid, event="PostCompact")
     # Fresh session: still only the generic preflight (bind-epoch never binds fresh sid).
     assert "[no bound context]" in _run(tmp_path, sid)

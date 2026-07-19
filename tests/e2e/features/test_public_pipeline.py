@@ -513,17 +513,9 @@ class TestPerProfileInit:
 
         assert _persisted_profile(ws) == ["pi"]
 
-        # W2 boundary (recorded): a pi-only per-target subset init does NOT install the
-        # git chokepoint scripts — the existing install rule projects them only for the
-        # {all, claude, codex} targets (FR2 "follow the existing rule"). FR3 keeps the
-        # scripts doctor check UNCONDITIONAL (the chokepoints are harness-independent), so
-        # a pi-only tree must have them present to read green. Scaffold them via the real
-        # production installer (`_install_scripts`, exactly what `dadaia public install`
-        # runs) — this is the "scaffold scripts in the fixture" resolution the SPEC's FR3
-        # scripts-are-harness-independent text mandates (scoping them would contradict FR3).
-        mgr = _manager()
-        mgr._install_scripts(ws / ".dadaia" / "agentic", ws, False, [])
-
+        # Scripts boundary (v0.2.8 fix): the harness-independent chokepoint scripts
+        # install for EVERY L1 target, so a pi-only tree is doctor-green with no
+        # fixture scaffolding (the old {all, claude, codex} gate left it red).
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_kimi_code_only_profile(
@@ -546,12 +538,8 @@ class TestPerProfileInit:
 
         assert _persisted_profile(ws) == ["kimi-code"]
 
-        # Same W2 boundary as the pi-only profile: the harness-independent chokepoint
-        # scripts project only for {all, claude, codex}, so scaffold them via the real
-        # production installer for the green-doctor assertion.
-        mgr = _manager()
-        mgr._install_scripts(ws / ".dadaia" / "agentic", ws, False, [])
-
+        # Same scripts boundary as the pi-only profile: chokepoint scripts install for
+        # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
         _assert_profile_doctor_green(ws, monkeypatch)
 
     def test_default_no_flag_scaffolds_all_four(

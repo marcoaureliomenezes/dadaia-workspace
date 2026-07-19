@@ -34,7 +34,8 @@ nearest `.dadaia/.venv/bin/python` walking up from the hook cwd and delegate to 
 same Python hook modules the other harnesses use: `PreToolUse` → merged pre-gate
 (block ⇒ exit 2 with the reason on stderr), `PostToolUse` → presence heartbeat,
 `UserPromptSubmit` → ctx-inject (stdout is appended to context), `PostCompact` →
-compact-epoch marker.
+compact-epoch marker plus an observable stdout re-emission of the bootstrap (Kimi
+discards it; the next prompt still re-injects deterministically).
 
 Kimi is the first harness with deterministic post-compaction context re-injection:
 the `PostCompact` hook stamps `.dadaia/tmp/ctx-compact-<session_id>`; the next
