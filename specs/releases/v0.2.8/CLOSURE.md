@@ -98,3 +98,21 @@ plugin-manifest distribution as an alternative to the managed config block.
 
 Archive `specs/releases/v0.2.8/` to `specs/_archive/releases/` after the operator
 confirms the PyPI deploy of the validated candidate.
+
+## Hermes certification (deploy gate, 2026-07-19)
+
+The candidate wheel `dadaia_workspace-0.4.0` (commit `a649b91e`) passed the full
+hermes-crawler gate at dd-chain-capture: **CERTIFIED_100** — matrix 26 PASS / 0 FAIL,
+structural gates 5/5, deterministic certification 18/18, verdict JSON at
+`/opt/data/.val/matrix-verdict/hermes-certification-0.4.0.json`.
+
+Five certification rounds, each bug investigated to root cause (no workaround fixes):
+
+| Round | Finding | Resolution |
+|---|---|---|
+| R1 | root-whitelist block message omitted `.kimi-code/` | message now DERIVES from `_WHITELIST` (bug `root-whitelist-message-drifts-from-policy`, resolved) |
+| R1 | audit_report rejected by `audit-report-v1` | persona `project-auditor` instructed a competing output envelope vs the fragment; persona now defers to the fragment, fragment pins required finding keys (bug `audit-fragment-schema-envelope-mismatch`, resolved) |
+| R2 | kimi-only init leaves `public doctor` red on `dadaia:scripts/*` | chokepoint scripts install for EVERY L1 harness target; e2e fixture workaround removed (bug `kimi-only-init-public-doctor-missing-managed-scripts`, resolved) |
+| R2 | kimi PostCompact silent (unverifiable) | PostCompact stamps the marker AND re-emits the bootstrap on stdout without restamping the sentinel (bug `kimi-postcompact-discards-context-reinjection`, resolved) |
+| R3 | PostCompact emitted generic preflight after bind-without-prompt | PostCompact resolves context through the full FR-W2-01 chain (session-record leg) with sentinel-slug fallback (bug `kimi-postcompact-omits-bound-context-bootstrap`, resolved) |
+| R4 | live backlog intent ref `public list` called unresolvable | **refuted with evidence**: `cli public list` is a canonical Typer-derived anchor listed by `dadaia backlog subjects`; the gate accepted it correctly (bug closed `rejected`) |
