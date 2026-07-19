@@ -397,6 +397,102 @@ an initialized workspace, create it:
   environment.
 
 ---
+
+## Real-use matrix — the hermes day-to-day contract (v0.2.9)
+
+**This section is the release gate's second half.** The deterministic matrix above
+(F-01…F-26 + the structural certification) proves components in isolation; it is
+**never sufficient to approve a release alone**. A candidate is green only when the
+real-use statements below — built from the hermes agent's actual day-to-day
+inventory — ALL pass with artifact-level evidence (bug
+certification-misses-live-codex-backlog-regression-040: a green certification that
+never exercised the live backlog path was false confidence).
+
+### R-01 — Live Codex chain, end to end, with per-link artifact proofs
+
+- Setup: a clean disposable context on the candidate; `DADAIA_CODEX_SANDBOX=danger-bypass`
+  in nested containers; a bounded real demand.
+- Run the chain IN ORDER: `lifecycle backlog-definition` → `lifecycle
+  release-definition` → `lifecycle implementation-reviews` → `lifecycle audit`.
+- **PASS if ALL of:**
+  1. backlog-definition COMPLETES and the authored item EXISTS on disk as a NEW or
+     CHANGED `specs/backlog/*.md` (bug codex-backlog-author-no-materialization: a
+     worker accepted with no delta is a FAIL, and it must now block AT the author
+     step with the retry, not later at the review gate);
+  2. release-definition COMPLETES with SPEC.md/PLAN.md/TASKS.md written AND
+     review-flipped to `**Status:** Aprovado`, ACTIVE.md repointed — never a
+     success report over missing artifacts (bug release-define-stalls-before-worker
+     class);
+  3. implementation-reviews reaches an honest terminal state (completed, or blocked
+     with a surfaced reason — a silent/empty terminal is a FAIL);
+  4. audit COMPLETES (or blocks honestly at a named gate) with the `audit-report-v1`
+     payload validating;
+  5. every produced handoff validates (`dadaia reports validate`).
+
+### R-02 — Real-demand backlog is canonical and consumable
+
+- Run a B3/CVM-style real capture demand through backlog-definition on a real or
+  disposable context, then `dadaia backlog subjects --specs-dir <ctx>/specs`.
+- **PASS if:** every emitted `intents[].ref` resolves against the live registry
+  (no unresolved subjects) AND release-definition's authoritative pick consumes the
+  item (the promoted payload carries the canonical `specs/backlog/<slug>.md` path —
+  never a bare "codex exec completed" summary).
+
+### R-03 — Fresh specs tree is doctor-clean with no manual edits
+
+- Run `$D specs init --specs-dir /tmp/r03/specs`; then `$D specs doctor --specs-dir
+  /tmp/r03/specs`.
+- **PASS if:** doctor reports 0 errors AND 0 warnings out of the box (no
+  placeholder atom requiring manual repair — the scaffold emits only valid atoms).
+
+### R-04 — Old tree with a placeholder atom is repaired by BOTH verbs
+
+- Seed `/tmp/r04/specs` (fresh init) + a raw `memory/product/feature.md` carrying
+  `SLUG_PLACEHOLDER`/`TITLE_PLACEHOLDER`/`RELEASE_PLACEHOLDER`.
+- Run `$D specs doctor --fix --specs-dir /tmp/r04/specs`; then re-seed and run `$D
+  specs upgrade --specs-dir /tmp/r04/specs -y`; also `$D specs upgrade --dry-run`.
+- **PASS if:** `doctor --fix` removes the atom and leaves doctor 0/0; `upgrade`
+  repairs even an already-current tree (dry-run reports without deleting);
+  filled atoms are never touched (bug
+  scaffold-repair-cannot-remediate-invalid-placeholder-atom).
+
+### R-05 — release-definition on a real context advances to a terminal state
+
+- On a repaired real context (or a faithful replica), run `lifecycle
+  release-definition --release-id v0.1.0 --harness codex` with a bounded demand.
+- **PASS if:** the run reaches an honest terminal state with persisted evidence —
+  never a `running` cursor with empty `workflow_steps` plus a success report (bug
+  lifecycle-release-define-stalls-before-worker class). A blocked run must surface
+  its reason and resume with `--resume-from`.
+
+### R-06 — Bug ledger round-trip
+
+- Register a synthetic bug (`bugs append` with every required field), fix-and-mark
+  it (`resolved` with evidence), and query `bugs status`.
+- **PASS if:** the events validate, stream order stays coherent (reported before
+  resolved), and status reflects the resolution.
+
+### R-07 — Fake-chain honesty (scope note, not a run)
+
+- The fake chain is evidence for DETERMINISTIC gates only. **PASS if:** every place
+  this recipe (or a verdict) cites a fake-chain run, it is labeled as gate evidence
+  — never as user-flow proof. A verdict that leans on fake flows for real-user
+  behavior is a FAIL of the verdict, not of the product.
+
+### R-08 — Kimi Code harness end to end (v0.2.8 surface)
+
+- Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init --harness kimi-code` in a
+  disposable dir.
+- **PASS if ALL of:** `.kimi-code/AGENTS.md` exists; the managed `[[hooks]]` block
+  and four `dadaia-kimi-*` shims exist under `$KIMI_CODE_HOME`; the pre-gate shim
+  allows a normal write (exit 0) and blocks a root-law violation (exit 2 + stderr
+  reason naming `.kimi-code/` among allowed entries); ctx-inject injects after
+  `dadaia context bind`; the post-compact shim stamps `ctx-compact-<sid>` AND
+  re-emits the bootstrap on stdout, and the next prompt re-injects exactly once;
+  `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
+  `dadaia public doctor` flags a tampered shim/block and `install` heals it.
+
+---
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 

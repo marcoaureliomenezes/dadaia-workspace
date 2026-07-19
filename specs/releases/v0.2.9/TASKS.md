@@ -145,7 +145,7 @@ projected skills against CLI help; fix syntax divergences that induce misuse.
 
 ---
 
-- [ ] **T6 - Recipe v2: real-use matrix section**
+- [x] **T6 - Recipe v2: real-use matrix section**
 
 **Owner role:** product-engineer
 
