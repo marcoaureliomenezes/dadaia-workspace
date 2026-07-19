@@ -574,3 +574,59 @@ def test_close_requires_real_closure_deliverable(tmp_path: Path) -> None:
     assert result.blocked is not None
     assert result.blocked.blocked_at_step == "close"
     assert "no deliverable" in result.blocked.reason
+
+
+def test_pipeline_review_retry_is_observable_in_the_run_record(tmp_path: Path) -> None:
+    """Bug implementation-reviews-hangs-after-worker-output-041: a bounded review retry
+    re-runs the implement step for minutes while the record reads bare RUNNING —
+    indistinguishable from a stall. The persisted run must carry a revision_note naming
+    the bounded retry (same observability law as the fragment-gate revision).
+    """
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
+    from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
+    from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
+
+    specs = _task_specs(tmp_path)
+    store = _MemoryRunStore()
+    calls = 0
+
+    class _RejectReviewFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return _approved_for("demo")
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="review rejected",
+                artifact_refs=(".dadaia/tmp/lifecycle-worker/demo/rejected.step-output.json",),
+                structured_output={"verdict": "REJECTED", "verdict_reason": "missing case"},
+            )
+
+    fake = _RejectReviewFake()
+    resolver = WorkflowHandoffResolver(
+        run_store=JsonLifecycleRunStore(tmp_path),
+        payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+        clock=lambda: "2026-07-19T12:00:00Z",
+    )
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=store,
+        runtime_factory=lambda kind: fake,  # type: ignore[arg-type,return-value]
+        specs_dir=specs,
+        handoff_resolver=resolver,
+        max_review_retries=1,
+    )
+
+    result = pipe.run("retry-obs", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    assert result.completed is False
+    run = store.load("retry-obs")
+    assert run is not None
+    assert run.revision_note is not None
+    assert "bounded review retry" in run.revision_note
+    assert "implement" in run.revision_note

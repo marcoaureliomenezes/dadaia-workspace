@@ -593,6 +593,16 @@ class LifecyclePipeline:
                         status=LifecycleRunStatus.RUNNING,
                         current_step=steps[0].label,
                         blocked=None,
+                        # Bug implementation-reviews-hangs-after-worker-output-041 (same
+                        # observability class as the _fragment_gate revision): a bounded
+                        # review retry re-runs the implement step for minutes while the
+                        # record reads bare RUNNING — indistinguishable from a stall.
+                        # Annotate it so a watcher sees the bounded retry by name.
+                        revision_note=(
+                            f"bounded review retry {attempt}/{self._max_review_retries} "
+                            f"of {steps[0].label!r} after {step.label!r} rejected "
+                            f"(review attempt {retry_source[1]})"
+                        ),
                     )
                     self._run_store.save(run)
                     retry_requested = True
