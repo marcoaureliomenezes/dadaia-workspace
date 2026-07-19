@@ -388,3 +388,56 @@ def test_definition_never_completes_without_spec_on_disk(tmp_path: Path) -> None
     active = specs / "releases" / "ACTIVE.md"
     if active.exists():
         assert "IMPLEMENTATION" not in active.read_text(encoding="utf-8")
+
+
+def test_revision_is_observable_in_the_persisted_run(tmp_path: Path) -> None:
+    """Bug release-definition-retry-stalls-with-empty-workflow-steps-041: during a
+    bounded in-run revision the record rewinds to RUNNING + reclaimed ledger — the
+    exact silhouette of the old stall. The persisted run must carry a revision_note
+    naming the revision so a watcher never reads it as stalled.
+    """
+    store = _MemoryRunStore()
+    sequence = tuple(
+        replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
+        if step.label == "spec_review"
+        else step
+        for step in _SEQUENCE
+    )
+
+    def kind_factory(kind: AgentRuntimeKind) -> _KindFake:
+        if kind is AgentRuntimeKind.CODEX_EXEC:
+            return _KindFake(kind, _rejected())
+        return _KindFake(kind, _approved())
+
+    wf = _workflow(tmp_path, store, kind_factory)
+    result = wf.run("rd-rev-obs", sequence)
+
+    assert result.completed is False
+    run = store.load("rd-rev-obs")
+    assert run is not None
+    assert run.revision_note is not None
+    assert "spec_create" in run.revision_note
+    assert "spec_review" in run.revision_note
+
+
+def test_run_record_revision_note_roundtrip_and_old_records() -> None:
+    """Additive-optional law: old records without revision_note load as None; new
+    records serialize it and reload it byte-identically."""
+    from dadaia_workspace.core.models.lifecycle import LifecycleRun, LifecycleRunStatus
+
+    run = LifecycleRun(
+        run_id="r1",
+        context=_CONTEXT,
+        release_id=_RELEASE,
+        command="release-definition",
+        phase=LifecyclePhase.RELEASE_DEFINITION,
+        status=LifecycleRunStatus.RUNNING,
+        current_step="spec_create",
+        revision_note="bounded revision 1/1 of 'spec_create' after 'spec_review' rejected: x",
+    )
+    loaded = LifecycleRun.from_dict(run.to_dict())
+    assert loaded.revision_note == run.revision_note
+
+    legacy = run.to_dict()
+    legacy.pop("revision_note")
+    assert LifecycleRun.from_dict(legacy).revision_note is None

@@ -302,6 +302,14 @@ class LifecycleRun:
     # ``workflow_steps`` key load as an empty ledger (A27) — the run-store
     # ``_SCHEMA_VERSION`` literal is deliberately unchanged, mirroring ``workflow_policy``.
     workflow_steps: WorkflowStepLedger = field(default_factory=WorkflowStepLedger)
+    # Additive-optional observability note (bug
+    # release-definition-retry-stalls-with-empty-workflow-steps-041): while a bounded
+    # in-run revision rewinds the run (RUNNING, retried current_step, reclaimed ledger
+    # entries), a watcher otherwise sees the exact silhouette of the old stall —
+    # running cursor + empty ledger. The note names the revision (target, trigger,
+    # reason) so the state reads as "bounded revision in progress", never a stall.
+    # Old records without the key load as ``None`` (same additive-optional law).
+    revision_note: str | None = None
 
     def prompt_composition(self) -> tuple[dict[str, Any], ...]:
         """Return the per-step prompt composition for this run (WS-9 observability).
@@ -329,6 +337,7 @@ class LifecycleRun:
             "injected_context": [entry.to_dict() for entry in self.injected_context],
             "workflow_policy": (self.workflow_policy.to_dict() if self.workflow_policy else None),
             "workflow_steps": self.workflow_steps.to_list(),
+            "revision_note": self.revision_note,
         }
 
     @classmethod
@@ -363,6 +372,8 @@ class LifecycleRun:
             injected_context=tuple(injected),
             workflow_policy=(WorkflowPolicySnapshot.from_dict(policy_raw) if policy_raw else None),
             workflow_steps=WorkflowStepLedger.from_list(steps_raw),
+            # Additive-optional: absent ``revision_note`` (old records) ⇒ ``None``.
+            revision_note=_optional_str(data.get("revision_note")),
         )
 
 

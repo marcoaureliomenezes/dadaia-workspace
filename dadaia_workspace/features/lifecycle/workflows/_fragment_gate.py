@@ -518,6 +518,10 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 current_step=resume_from,
                 blocked=None,
                 workflow_steps=WorkflowStepLedger(records=kept),
+                # Same observability law as the in-run revision: a resumed run rewinds
+                # to RUNNING + kept-ledger, and the record must SAY so (bug
+                # release-definition-retry-stalls-with-empty-workflow-steps-041).
+                revision_note=f"resumed run from step {resume_from!r}",
             )
             remaining = sequence[index:]
         self._run_store.save(run)
@@ -702,6 +706,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             current_step=target_label,
             blocked=None,
             workflow_steps=WorkflowStepLedger(records=kept),
+            # Bug release-definition-retry-stalls-with-empty-workflow-steps-041: make
+            # the bounded revision OBSERVABLE in the persisted record — a bare RUNNING
+            # + reclaimed ledger reads exactly like the old stall to any watcher.
+            revision_note=(
+                f"bounded revision 1/1 of {target_label!r} after "
+                f"{blocked.blocked_at_step!r} rejected: {blocked.reason}"
+            ),
         )
         self._run_store.save(run)
         return run, target_idx
