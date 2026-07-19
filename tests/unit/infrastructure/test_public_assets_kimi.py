@@ -73,7 +73,10 @@ def test_install_projects_workspace_tree_and_user_wiring(workspace: Path, kimi_h
         assert shim.is_file()
         assert shim.read_text(encoding="utf-8") == content
         assert os.access(shim, os.X_OK)
-        assert stat.S_IXUSR & shim.stat().st_mode
+        if os.name != "nt":
+            # POSIX-only: Windows cannot materialise Unix exec bits (os.chmod there
+            # toggles only the read-only flag), so the mode assertion is POSIX-scoped.
+            assert stat.S_IXUSR & shim.stat().st_mode
 
 
 def test_install_preserves_foreign_config_and_is_idempotent(
@@ -127,7 +130,7 @@ def test_doctor_ok_after_install(workspace: Path, kimi_home: Path) -> None:
     assert not [line for line in kimi if line.startswith(("[missing]", "[drift]"))]
 
 
-def test_doctor_flags_shim_drift_and_not_executable(workspace: Path, kimi_home: Path) -> None:
+def test_doctor_flags_shim_drift(workspace: Path, kimi_home: Path) -> None:
     mgr = FileSystemPublicAssetManager()
     _install(workspace, mgr)
     shim = kimi_home / "hooks" / "dadaia-kimi-pre-gate.sh"
@@ -137,8 +140,13 @@ def test_doctor_flags_shim_drift_and_not_executable(workspace: Path, kimi_home: 
         line == "[drift] kimi-code:hooks/dadaia-kimi-pre-gate.sh" for line in _kimi_lines(reports)
     )
 
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows cannot clear Unix exec bits via chmod")
+def test_doctor_flags_shim_not_executable(workspace: Path, kimi_home: Path) -> None:
+    mgr = FileSystemPublicAssetManager()
+    _install(workspace, mgr)
+    shim = kimi_home / "hooks" / "dadaia-kimi-pre-gate.sh"
     # Restored content but lost executable bit ⇒ drift (not executable).
-    shim.write_text(kimi_hook_shims()[shim.name], encoding="utf-8")
     shim.chmod(0o644)
     reports = mgr.doctor(workspace)
     assert any(
