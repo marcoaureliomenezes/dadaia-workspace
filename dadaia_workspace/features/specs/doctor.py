@@ -116,6 +116,7 @@ class SpecsDoctor:
         issues: list[SpecsDoctorIssue] = []
         issues.extend(self._coherence.check_constitution())
         issues.extend(self._memory.check_memory_files())
+        issues.extend(self._memory.check_placeholder_atoms())  # MEM-PLACEHOLDER-1
         issues.extend(self._release.check_active_md())
         issues.extend(self._release.check_active_release_artifacts())
         issues.extend(self._release.check_plan_line_limit())
@@ -197,6 +198,9 @@ class SpecsDoctor:
                     fixed.append(issue)
                 elif issue.code == "SPEC-DOC-034":
                     self._closure_audit.fix_archive_dir(issue)
+                    fixed.append(issue)
+                elif issue.code == "MEM-PLACEHOLDER-1":
+                    self._memory.fix_placeholder_atom(issue)
                     fixed.append(issue)
             except Exception:
                 # Leave as residual — will re-appear on next check()

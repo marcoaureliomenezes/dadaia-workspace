@@ -325,6 +325,12 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # backlog-author-bare-payload-breaks-release-handoff): the promoted evidence is
         # enriched with the DISK-diffed authored path(s), never a worker self-report.
         self._before_snapshot = before
+        # Raw-file hash map of the backlog zone at the same pre-authoring instant (bug
+        # codex-backlog-author-no-materialization-regression-040): the author step's
+        # deliverable gate runs in DELTA mode against this — a worker that leaves no NEW
+        # or CHANGED file blocks at the step (with the structural retry), instead of
+        # sailing through on a merely non-empty zone.
+        self._before_deliverable_hashes = self._deliverable_before_hashes()
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
@@ -464,6 +470,33 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         return "\n".join(lines)
 
     # -- real disk state: the backlog snapshot ---------------------------
+
+    def _deliverable_before_hashes(self) -> dict[str, str]:
+        """sha256 of every file currently in the backlog zone, keyed artifact-root-relative.
+
+        Captured once at run start and handed to the author step's deliverable gate
+        (delta mode): the zone covers both ``repos/<ctx>/specs/backlog/`` and the legacy
+        ``specs/backlog/`` root, mirroring the step's ``deliverable_globs``.
+        """
+        import hashlib
+
+        hashes: dict[str, str] = {}
+        if self._artifact_root is None:
+            return hashes
+        for root in (
+            self._artifact_root / "repos" / self._context / "specs" / "backlog",
+            self._artifact_root / "specs" / "backlog",
+        ):
+            if not root.is_dir():
+                continue
+            for path in sorted(root.rglob("*")):
+                if not path.is_file():
+                    continue
+                with contextlib.suppress(OSError):
+                    hashes[path.relative_to(self._artifact_root).as_posix()] = hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
+        return hashes
 
     def _backlog_snapshot(self) -> dict[str, BoundItem]:
         """Every real ``specs/backlog/*.md`` item, reduced to slug -> bound anchor changes.
@@ -748,6 +781,13 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                     )
                     if step.label == "backlog_author"
                     else ()
+                ),
+                # Bug codex-backlog-author-no-materialization-regression-040: the
+                # deliverable check runs in DELTA mode for the author step — the zone
+                # must gain a NEW or CHANGED file vs the pre-authoring snapshot, or the
+                # step blocks (existence of scaffold files never satisfies it).
+                deliverable_before_hashes=(
+                    self._before_deliverable_hashes if step.label == "backlog_author" else None
                 ),
             ),
         )
