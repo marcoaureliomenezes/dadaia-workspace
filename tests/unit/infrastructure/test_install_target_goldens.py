@@ -65,8 +65,20 @@ _INSTALL_GOLDEN = _GOLDEN_DIR / "install_target_resolution_v0158.json"
 _PANEL_GOLDEN = _GOLDEN_DIR / "panel_runtime_validation_v0158.json"
 _DOCTOR_GOLDEN = _GOLDEN_DIR / "doctor_all_four_v0158.json"
 
-_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi")
+_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi", "kimi-code")
 _RUNTIMES = ("claude", "codex", "pi", "bogus")
+
+
+def _redirect_kimi_home(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:
+    """Point the kimi-code user-level wiring at a dir INSIDE the fixture workspace.
+
+    v0.2.8: the kimi-code target upserts ``$KIMI_CODE_HOME/config.toml`` and shim files
+    whose absolute paths appear in the install/doctor lines. Rooting the home inside the
+    fixture workspace lets ``norm_path_line`` strip them to ``<WS>`` — the golden stays
+    machine-independent (and the real user config is never touched).
+    """
+    monkeypatch.setenv("KIMI_CODE_HOME", str(ws / "kimi-home"))
+
 
 # Normalization helpers (v0.1.55 platform-invariant law): consolidated into
 # tests/helpers/golden_platform.py (v0.1.64 FR1) — norm_path_line, norm_panel_body,
@@ -172,12 +184,13 @@ def _build_panel_service(tmp_path: Path) -> PanelService:
 # ---------------------------------------------------------------------------
 
 
-def _capture_install(tmp_path: Path) -> dict[str, list[str]]:
+def _capture_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
     mgr = FileSystemPublicAssetManager()
     result: dict[str, list[str]] = {}
     for target in _INSTALL_TARGETS:
         ws = tmp_path / f"install_{target}"
         ws.mkdir()
+        _redirect_kimi_home(monkeypatch, ws)
         installed = mgr.install(ws, target=target)
         result[target] = [norm_path_line(line, ws) for line in installed]
     return result
@@ -198,9 +211,10 @@ def _capture_panel(tmp_path: Path) -> dict[str, dict[str, object]]:
     return result
 
 
-def _capture_doctor(tmp_path: Path) -> list[str]:
+def _capture_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     ws = tmp_path / "doctor_all_four"
     ws.mkdir()
+    _redirect_kimi_home(monkeypatch, ws)
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
     report = mgr.doctor(ws)
@@ -224,11 +238,13 @@ def _v0158_message(what: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_install_target_resolution_is_byte_identical(tmp_path: Path) -> None:
+def test_install_target_resolution_is_byte_identical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """AC-1: install() per-target ``installed`` lists reproduce byte-identically."""
     assert_golden(
         _INSTALL_GOLDEN,
-        _capture_install(tmp_path),
+        _capture_install(tmp_path, monkeypatch),
         "install-target-resolution",
         message=_v0158_message("install-target-resolution"),
     )
@@ -244,11 +260,13 @@ def test_panel_runtime_validation_is_byte_identical(tmp_path: Path) -> None:
     )
 
 
-def test_doctor_all_four_report_is_byte_identical(tmp_path: Path) -> None:
+def test_doctor_all_four_report_is_byte_identical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """AC-1/Q2/A4: doctor()'s all-four (no-profile) report is the FR3 back-compat lock."""
     assert_golden(
         _DOCTOR_GOLDEN,
-        _capture_doctor(tmp_path),
+        _capture_doctor(tmp_path, monkeypatch),
         "doctor-all-four",
         message=_v0158_message("doctor-all-four"),
     )

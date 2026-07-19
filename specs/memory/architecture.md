@@ -73,7 +73,7 @@ is assembled in `features/lifecycle/governed_catalog.py` and exposed through
 diagrams.
 
 The supported Layer-2 real runtimes are Codex and PI behind `AgentRuntimePort`. Claude
-Code is Layer-1-only. `fake` is the deterministic test adapter.
+Code and Kimi Code are Layer-1-only. `fake` is the deterministic test adapter.
 
 ### Handoffs and reports
 
@@ -93,7 +93,7 @@ game interactions are local JavaScript.
 
 Canonical harness assets live in `dadaia_workspace/public/`. `public stage` copies
 versioned source into `.dadaia/agentic/`; `public install` projects runtime-specific
-assets to `.claude/`, `.codex/`, `.pi/`, and shared `.agents/`; `public doctor` compares
+assets to `.claude/`, `.codex/`, `.pi/`, `.kimi-code/`, and shared `.agents/`; `public doctor` compares
 source, staging, projection, privacy, and policy-aware rendering.
 
 Generated projection files are never edited in place. The source repository itself

@@ -37,10 +37,14 @@ _COPY_DIRS = (
     "lifecycle_fragments",
     "personas",
     "pi",
+    "kimi-code",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
 #: Subdirectories of the staged ``pi/`` tree that are copied as-is into ``.pi/``.
 _PI_DIRS = ("prompts", "extensions")
+#: Subdirectories of the staged ``kimi-code/`` tree for ``--only`` filtering (v0.2.8).
+#: Empty for now — the tree currently ships a single root ``AGENTS.md``.
+_KIMI_DIRS: tuple[str, ...] = ()
 
 
 def _sha256(path: Path) -> str:

@@ -80,6 +80,15 @@ def test_block_table(
             "Write",
             "file_path",
         ),
+        (
+            # `.kimi-code` is a whitelisted root entry (Kimi Code Layer-1 harness home,
+            # v0.2.8) — a root-level write of that basename must be ALLOWED.
+            "kimi_code_root_entry",
+            None,
+            lambda ws: ws / ".kimi-code",
+            "Write",
+            "file_path",
+        ),
         ("subdir_write", None, lambda ws: ws / "repos" / "x" / "file.py", "Write", "file_path"),
         ("unparseable_path_fails_open", None, None, "Write", None),
         (

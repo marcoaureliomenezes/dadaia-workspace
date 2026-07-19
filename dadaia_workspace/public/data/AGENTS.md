@@ -33,8 +33,8 @@ that root `.env`; they must not write a second credential store.
 
 The workspace **root** may contain **only**:
 
-- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.pi/`,
-  `repos/`
+- Directories: `.agents/`, `.claude/`, `.codex/`, `.dadaia/`, `.kimi-code/`,
+  `.pi/`, `repos/`
 - Files: `AGENTS.md`, `CLAUDE.md` (Claude Code bridge importing `@AGENTS.md`),
   `prompt.md` (optional operator long-prompt file)
 
@@ -43,6 +43,13 @@ other projection dirs, but its assets are **post-trust executable**: PI loads `.
 only after the operator grants trust and runs it as unsandboxed TypeScript. It carries
 no secrets and no operator-local paths, and must never be hand-edited in place — a
 deliberate privilege grant, not inert config.
+
+`.kimi-code/` is the Kimi Code Layer-1 projection. Its workspace tree is inert
+Markdown (`AGENTS.md`); the live wiring is a managed, marker-delimited `[[hooks]]`
+block in the user-level `$KIMI_CODE_HOME/config.toml` plus POSIX shims under
+`$KIMI_CODE_HOME/hooks/` — Kimi Code has no project-level config file. Both are
+written by `dadaia public install --target kimi-code`, carry no secrets and no
+workspace-absolute paths, and fail open outside dadaia workspaces.
 
 **Operator exception:** any file or directory created by the human operator is always
 allowed and MUST never be auto-deleted (e.g. `prompt.md`, screenshots). Operator
@@ -72,7 +79,7 @@ files at the repo root.
 
 Forbidden root artefacts:
 
-- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.pi/`
+- `.dadaia/`, `.agents/`, `.claude/`, `.codex/`, `.kimi-code/`, `.pi/`
 - `CLAUDE.md`, `Makefile`, `playwright.config.ts`
 - `playwright-report/`, `test-results/`, coverage/cache directories
 

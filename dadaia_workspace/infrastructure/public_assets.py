@@ -73,6 +73,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
 from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _CLAUDE_DIRS,
     _COPY_DIRS,
+    _KIMI_DIRS,
     _PI_DIRS,
     _SCHEMA_VERSION,
     _VALID_TARGETS,
@@ -94,6 +95,12 @@ from dadaia_workspace.infrastructure.runtime_config import (
 )
 from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
+    kimi_code_home,
+    kimi_hook_shims,
+    kimi_hooks_block,
+    upsert_kimi_hooks_block,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
@@ -756,6 +763,8 @@ class FileSystemPublicAssetManager:
                 )
             elif item == "pi":
                 self._install_pi(agentic_dir, workspace_root, force, installed, only=only)
+            elif item == "kimi-code":
+                self._install_kimi_code(agentic_dir, workspace_root, force, installed, only=only)
 
         if target in {"all", "claude", "codex"}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
@@ -957,6 +966,19 @@ class FileSystemPublicAssetManager:
         elif pi_projected.exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="pi"))
 
+        # Kimi Code (Layer-1 entry harness, v0.2.8) — scoped to `kimi-code in profile`.
+        kimi_staged = agentic_dir / "kimi-code"
+        kimi_projected = workspace_root / ".kimi-code"
+        if "kimi-code" in active:
+            for staged in self._iter_files(kimi_staged):
+                rel = staged.relative_to(kimi_staged)
+                reports.append(
+                    self._compare(staged, kimi_projected / rel, f"kimi-code:{rel.as_posix()}")
+                )
+            reports.extend(self._check_kimi_user_hooks())
+        elif kimi_projected.exists():
+            reports.append(_OUT_OF_PROFILE_WARN.format(harness="kimi-code"))
+
         # Harness-independent checks stay unconditional. The rule-corpus check
         # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
         # package public dir, not a runtime projection.
@@ -992,7 +1014,7 @@ class FileSystemPublicAssetManager:
         except subprocess.TimeoutExpired:
             reports.append("[warn] git-dirty check timed out")
 
-        for harness_dir in (".agents", ".claude", ".codex"):
+        for harness_dir in (".agents", ".claude", ".codex", ".kimi-code"):
             legacy_dir = workspace_root / harness_dir / "workflows"
             for legacy in sorted(legacy_dir.glob("*.workflow.md")):
                 reports.append(
@@ -1124,6 +1146,51 @@ class FileSystemPublicAssetManager:
         if only in _PI_DIRS:
             copy_tree(pi_src / only, pi_dst / only, force, installed, self._iter_files)
 
+    def _install_kimi_code(
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        force: bool,
+        installed: list[str],
+        only: str | None = None,
+    ) -> None:
+        """Project the staged ``kimi-code/`` tree into ``<workspace_root>/.kimi-code/`` and
+        upsert the user-level Kimi hook wiring (v0.2.8).
+
+        The workspace tree (``AGENTS.md``) is a verbatim hash-compare copy like the pi
+        projection. The hook *registration* cannot live in the workspace — Kimi Code has
+        no project-level config file — so it is upserted into the user-level
+        ``$KIMI_CODE_HOME/config.toml`` managed block, and the four workspace-agnostic
+        shims are written under ``$KIMI_CODE_HOME/hooks/`` (see
+        ``infrastructure/runtime_config.py``).
+        """
+        kimi_src = agentic_dir / "kimi-code"
+        kimi_dst = workspace_root / ".kimi-code"
+        if only is None:
+            copy_tree(kimi_src, kimi_dst, force, installed, self._iter_files)
+            self._install_kimi_user_hooks(force, installed)
+            return
+        # `only` filters to a single staged subdirectory (none today — _KIMI_DIRS is empty).
+        if only in _KIMI_DIRS:
+            copy_tree(kimi_src / only, kimi_dst / only, force, installed, self._iter_files)
+
+    def _install_kimi_user_hooks(self, force: bool, installed: list[str]) -> None:
+        """Write the kimi shims (chmod 755) and upsert the managed config.toml block."""
+        home = kimi_code_home()
+        for name, content in kimi_hook_shims().items():
+            dst = home / "hooks" / name
+            write_generated(dst, content, force, installed)
+            with contextlib.suppress(OSError):
+                dst.chmod(0o755)
+        config_path = home / "config.toml"
+        existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+        updated = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))
+        if updated != existing:
+            _atomic_write_text(config_path, updated)
+            installed.append(f"[ok]   {config_path}")
+        else:
+            installed.append(f"[skip] {config_path}")
+
     def _install_scripts(
         self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
     ) -> None:
@@ -1166,6 +1233,34 @@ class FileSystemPublicAssetManager:
         if dst.read_text(encoding="utf-8") != expected:
             return f"[drift] {label}"
         return f"[ok] {label}"
+
+    def _check_kimi_user_hooks(self) -> list[str]:
+        """Doctor the user-level kimi wiring: shim currency + managed config block.
+
+        Shims are content-compared against the generated bodies (and must stay
+        executable); the config block is compared through the same upsert the
+        installer performs, so a missing/stale block reads ``[missing]``/``[drift]``
+        and foreign config content outside the markers never false-fails.
+        """
+        home = kimi_code_home()
+        reports: list[str] = []
+        for name, content in kimi_hook_shims().items():
+            dst = home / "hooks" / name
+            label = f"kimi-code:hooks/{name}"
+            line = self._compare_content(content, dst, label)
+            if line.startswith("[ok]") and not os.access(dst, os.X_OK):
+                line = f"[drift] {label} (not executable)"
+            reports.append(line)
+        config_path = home / "config.toml"
+        block_label = "kimi-code:config.toml managed hooks block"
+        if not config_path.exists():
+            reports.append(f"[missing] {block_label}")
+        else:
+            existing = config_path.read_text(encoding="utf-8")
+            expected = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))
+            status = "[ok]" if expected == existing else "[drift]"
+            reports.append(f"{status} {block_label}")
+        return reports
 
     def _check_public_privacy(self) -> list[str]:
         """Fail doctor if public distributed assets contain known private identifiers."""

@@ -29,6 +29,7 @@ _WHITELIST: frozenset[str] = frozenset(
         ".claude",
         ".codex",
         ".dadaia",
+        ".kimi-code",
         ".pi",
         "repos",
         "AGENTS.md",

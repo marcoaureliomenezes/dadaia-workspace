@@ -44,6 +44,9 @@ def _ctx_inject_commands(claude_dir: Path) -> list[str]:
         # --harness codex,pi → .codex/ (+ .dadaia/hooks/codex-*) + .pi/, NO .claude/
         # agents.
         ("codex_and_pi", "codex,pi", ("codex", "pi"), ("claude",)),
+        # v0.2.8: --harness kimi-code → .kimi-code/ (+ user-level shim/block wiring
+        # redirected by the conftest KIMI_CODE_HOME guard), NO .claude/ / .codex/ / .pi/.
+        ("kimi_only", "kimi-code", ("kimi-code",), ("claude", "codex", "pi")),
     ],
 )
 def test_harness_scopes_scaffold(
@@ -74,7 +77,11 @@ def test_harness_scopes_scaffold(
 def test_harness_omitted_scaffolds_all_four(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``--harness`` omitted → all-four scaffold (back-compat with pre-v0.1.58 init)."""
+    """``--harness`` omitted → full-harness scaffold (back-compat with pre-v0.1.58 init).
+
+    The roster grew (kimi-code, v0.2.8); the back-compat contract is "the full
+    L1_ENTRY_HARNESSES set", so the new ``.kimi-code/`` projection is asserted too.
+    """
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["init", "--workspace", str(tmp_path)])
     assert result.exit_code == 0, result.output
@@ -82,6 +89,7 @@ def test_harness_omitted_scaffolds_all_four(
     assert (tmp_path / ".claude").is_dir()
     assert (tmp_path / ".codex").is_dir()
     assert (tmp_path / ".pi").is_dir()
+    assert (tmp_path / ".kimi-code").is_dir()
 
 
 def test_harness_bad_value_is_bad_parameter(

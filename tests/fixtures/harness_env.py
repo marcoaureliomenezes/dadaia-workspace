@@ -74,6 +74,7 @@ __all__ = [
     "HookResult",
     "claude_hook_env",
     "codex_hook_env",
+    "kimi_hook_env",
     "run_hook_subprocess",
     "scrub_entry_signal_env",
 ]
@@ -189,8 +190,12 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 #: an in-process ``setenv`` — a behavior test passes them through the *subprocess* env
 #: (:func:`run_hook_subprocess`), which is the harness-real channel. :func:`claude_hook_env`
 #: / :func:`codex_hook_env` accept them in ``extra`` for exactly that purpose.
+#:
+#: ``DADAIA_RUNTIME`` (v0.2.8): the kimi-code shims export it (``kimi-code``) before
+#: delegating to the Python hook modules, so presence records carry the right runtime —
+#: the same wiring-set category as the codex output-contract vars.
 HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
-    {"DADAIA_HOOK_OUTPUT", "DADAIA_HOOK_EVENT"}
+    {"DADAIA_HOOK_OUTPUT", "DADAIA_HOOK_EVENT", "DADAIA_RUNTIME"}
 )
 
 #: ``DADAIA_*`` / persona / mode vars that the harness NEVER provides to a hook and that
@@ -309,6 +314,39 @@ def codex_hook_env(
         session_id=session_id,
         extra=extra,
     )
+
+
+def kimi_hook_env(
+    workspace: Path,
+    *,
+    extra: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Pinned-minimal env a real Kimi Code hook subprocess receives (v0.2.8).
+
+    Kimi Code delivers **no native session-id env var** to a hook process — the session
+    id travels exclusively in the stdin JSON payload (``session_id`` field), exactly what
+    ``hooks/_common.resolve_session_id`` reads second. The env is therefore the scrubbed
+    operator shell plus ``WORKSPACE_ROOT`` only; ``extra`` may add the shim-exported
+    wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
+    non-allowlisted ``DADAIA_*`` raises ``ValueError``.
+    """
+    env = _base_env()
+    env["WORKSPACE_ROOT"] = str(workspace)
+    if extra:
+        for key, value in extra.items():
+            if (
+                key.startswith("DADAIA_")
+                and key not in ALLOWLISTED_DADAIA_ENV
+                and key not in HARNESS_CONTROL_DADAIA_ENV
+            ):
+                raise ValueError(
+                    f"{key!r} is not a harness-provided var; do not inject it into a "
+                    "hook env (see tests/fixtures/harness_env.py for the contract). "
+                    "Operator-shell vars go in ALLOWLISTED_DADAIA_ENV; the hook output "
+                    "contract vars go in HARNESS_CONTROL_DADAIA_ENV."
+                )
+            env[key] = value
+    return env
 
 
 @dataclass(frozen=True)

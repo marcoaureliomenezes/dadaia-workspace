@@ -149,7 +149,7 @@ def remove_legacy_workflow_projections(
     installed: list[str],
 ) -> None:
     """Remove retired Markdown workflow projections without touching operator files."""
-    for harness_dir in (".agents", ".claude", ".codex"):
+    for harness_dir in (".agents", ".claude", ".codex", ".kimi-code"):
         legacy_dir = workspace_root / harness_dir / "workflows"
         if not legacy_dir.is_dir():
             continue
