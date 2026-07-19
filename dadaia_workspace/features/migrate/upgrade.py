@@ -24,9 +24,9 @@ from pathlib import Path
 
 from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core import specs_version as _version
+from dadaia_workspace.core.specs_repair import remove_placeholder_atoms
 from dadaia_workspace.features.migrate import registry as _registry
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
-from dadaia_workspace.features.specs.doctor_memory import remove_placeholder_atoms
 
 
 def _utc_now() -> datetime:

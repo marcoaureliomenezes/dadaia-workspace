@@ -17,6 +17,10 @@ from pathlib import Path
 import yaml
 
 from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
+from dadaia_workspace.core.specs_repair import (  # noqa: F401
+    is_placeholder_atom,
+    remove_placeholder_atoms,
+)
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
     SpecsDoctorIssue,
@@ -45,30 +49,6 @@ _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 _MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 _MD_H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
-
-#: Exact template tokens of the retired placeholder feature atom (bug
-#: scaffold-repair-cannot-remediate-invalid-placeholder-atom). An atom carrying ANY of
-#: them was never filled by a human — it is a template artifact, never real content
-#: (the tokens are shouty constants; a filled atom cannot contain them verbatim).
-_PLACEHOLDER_TOKENS: tuple[str, ...] = (
-    "SLUG_PLACEHOLDER",
-    "TITLE_PLACEHOLDER",
-    "RELEASE_PLACEHOLDER",
-)
-
-
-def is_placeholder_atom(path: Path) -> bool:
-    """True when *path* is an unfilled placeholder memory atom (template artifact).
-
-    Detection is exact-token based and never fires on filled content: a real atom
-    cannot carry ``SLUG_PLACEHOLDER``/``TITLE_PLACEHOLDER``/``RELEASE_PLACEHOLDER``
-    verbatim. Read errors degrade to False (never delete on uncertainty).
-    """
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return False
-    return any(token in text for token in _PLACEHOLDER_TOKENS)
 
 
 def _parse_memory_md(path: Path) -> _MemoryMdSummary:
@@ -171,6 +151,8 @@ class MemoryValidator:
 
     def fix_placeholder_atom(self, issue: SpecsDoctorIssue) -> None:
         """Remove an unfilled placeholder atom — re-verified before any delete."""
+        if not issue.path:
+            return
         path = Path(issue.path)
         if is_placeholder_atom(path):
             path.unlink()
@@ -537,24 +519,3 @@ class MemoryValidator:
             )
 
         return issues
-
-
-def remove_placeholder_atoms(specs_dir: Path, *, dry_run: bool = False) -> list[Path]:
-    """Remove every unfilled placeholder atom under ``specs_dir/memory/``; return removed paths.
-
-    Shared repair for the retired placeholder feature atom (bug
-    scaffold-repair-cannot-remediate-invalid-placeholder-atom), consumed by
-    ``specs upgrade`` and by ``specs doctor --fix``'s issue-level fix. Exact-token
-    detection (:func:`is_placeholder_atom`) — filled atoms are never touched.
-    ``dry_run=True`` only reports what would be removed.
-    """
-    mem_dir = specs_dir / "memory"
-    removed: list[Path] = []
-    if not mem_dir.is_dir():
-        return removed
-    for path in sorted(mem_dir.rglob("*.md")):
-        if is_placeholder_atom(path):
-            removed.append(path)
-            if not dry_run:
-                path.unlink()
-    return removed
