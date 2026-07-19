@@ -441,3 +441,56 @@ def test_run_record_revision_note_roundtrip_and_old_records() -> None:
     legacy = run.to_dict()
     legacy.pop("revision_note")
     assert LifecycleRun.from_dict(legacy).revision_note is None
+
+
+def test_revision_retries_spec_create_with_the_reviewer_feedback_injected(tmp_path: Path) -> None:
+    """Bug release-definition-review-feedback-not-reinjected: the bounded revision must
+    re-run the create step WITH the reviewer's verdict_reason in its prompt — a blind
+    retry repeats the same defect and exhausts the budget for nothing.
+    """
+    store = _MemoryRunStore()
+    requests: list[tuple[str, str]] = []
+    calls = 0
+
+    class _FeedbackFake:
+        def __init__(self, kind: AgentRuntimeKind) -> None:
+            self.kind = kind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self.kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            nonlocal calls
+            calls += 1
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            requests.append((step, request.prompt))
+            if self.kind is AgentRuntimeKind.CODEX_EXEC:
+                return AgentRunResult(
+                    status=AgentRunStatus.SUCCEEDED,
+                    summary="rejected",
+                    artifact_refs=(
+                        f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json",
+                    ),
+                    structured_output={
+                        "verdict": "REJECTED",
+                        "verdict_reason": "SPEC defines `python -m saudacao` without src/saudacao/__main__.py",
+                    },
+                )
+            return _approved()
+
+    sequence = tuple(
+        replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
+        if step.label == "spec_review"
+        else step
+        for step in _SEQUENCE
+    )
+    wf = _workflow(tmp_path, store, lambda kind: _FeedbackFake(kind))
+    result = wf.run("rd-feedback", sequence)
+
+    assert result.completed is False
+    create_prompts = [prompt for step, prompt in requests if step == "spec_create"]
+    # spec_create ran twice (initial + the bounded revision).
+    assert len(create_prompts) == 2
+    # The RETRY prompt carries the reviewer's actual finding — never a blind retry.
+    assert "src/saudacao/__main__.py" in create_prompts[1]
+    assert "Prior rejection feedback" in create_prompts[1]
