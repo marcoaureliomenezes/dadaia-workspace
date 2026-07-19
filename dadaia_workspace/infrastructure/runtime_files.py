@@ -7,6 +7,7 @@ import json
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.hygiene import HygieneSnapshot
 from dadaia_workspace.core.protocols.runtime_files import (
     RuntimeFileKind,
@@ -16,8 +17,15 @@ from dadaia_workspace.core.protocols.runtime_files import (
 from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 
-class RuntimeFilePathError(ValueError):
-    """Raised when a runtime artifact name would leave its canonical zone."""
+class RuntimeFilePathError(DadaiaError, ValueError):
+    """Raised when a runtime artifact name would leave its canonical zone, or a
+    write would collide with an existing immutable payload.
+
+    Inherits ``ValueError`` (back-compat: existing callers/tests catch ValueError) AND
+    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line, not a raw
+    traceback — e.g. re-running an already-completed workflow with the same ``--run-id``
+    must fail cleanly with guidance, not crash (bug
+    lifecycle-rerun-immutable-payload-traceback)."""
 
 
 class FilesystemRuntimeFileAdapter:
@@ -107,11 +115,42 @@ class FilesystemRuntimeFileAdapter:
         path = self._canonical_path("runs", "lifecycle", run_id, "steps", filename)
         if path.exists():
             raise RuntimeFilePathError(
-                f"step payload already exists (immutable): {self._workspace_ref(path)}"
+                f"run {run_id!r} already recorded step {producer_step!r} (immutable payload "
+                f"at {self._workspace_ref(path)}). Re-run with a NEW --run-id, or resume the "
+                "existing run with --resume-from; a completed run is never overwritten."
             )
         ref = self._write_text(RuntimeFileKind.RUN_ARTIFACT, path, content)
         assert ref.content_hash is not None
         return StepPayloadRef(payload_ref=ref.path, content_hash=ref.content_hash)
+
+    def read_step_payload_by_identity(
+        self,
+        *,
+        run_id: str,
+        producer_step: str,
+        attempt: int,
+        context: str,
+        release_id: str | None,
+    ) -> tuple[str, str] | None:
+        """Locate a persisted step-payload envelope by its addressable identity.
+
+        Reconciliation seam (bug release-commit-gate-ignores-existing-plan-review-payload):
+        an interrupted worker between resets/resumes can drop a ledger record while its
+        immutable payload file survives. Probes the release-aware zone first, then the
+        legacy run zone; returns ``(workspace_ref, content)`` or ``None``.
+        """
+        filename = f"{self._safe_segment(producer_step)}-attempt-{attempt}.step-payload.json"
+        candidates = [
+            self._release_zone_dir(run_id, context=context, release_id=release_id) / filename,
+            self._canonical_path("runs", "lifecycle", run_id, "steps", filename),
+        ]
+        for path in candidates:
+            try:
+                if path.is_file():
+                    return self._workspace_ref(path), path.read_text(encoding="utf-8")
+            except (OSError, RuntimeFilePathError):
+                continue
+        return None
 
     def purge_step_payloads(
         self, run_id: str, producer_steps: frozenset[str] | set[str] | None = None
@@ -240,7 +279,9 @@ class FilesystemRuntimeFileAdapter:
         path = zone / filename
         if path.exists():
             raise RuntimeFilePathError(
-                f"step payload already exists (immutable): {self._workspace_ref(path)}"
+                f"run {run_id!r} already recorded step {producer_step!r} (immutable payload "
+                f"at {self._workspace_ref(path)}). Re-run with a NEW --run-id, or resume the "
+                "existing run with --resume-from; a completed run is never overwritten."
             )
         ref = self._write_text(RuntimeFileKind.RUN_ARTIFACT, path, content)
         assert ref.content_hash is not None

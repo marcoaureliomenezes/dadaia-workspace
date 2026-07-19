@@ -20,6 +20,16 @@ Do NOT mark FAIL for "not fully demonstrated": every statement here has a crisp
 assertion — if the commands ran and the assertion holds, it is PASS. If a command uses
 a flag/subcommand that does not exist, THAT is a real FAIL (contract/CLI mismatch).
 
+**Sweep the whole matrix, never one bug per cycle.** A validation run is a FULL sweep:
+run EVERY statement every time, never stop at the first FAIL, and report ALL failures
+of the run in one batch (one bug event each, full evidence). When a defect is found,
+immediately probe the SAME defect class across every sibling surface in the SAME run —
+e.g. a worker-step defect in `backlog-definition` means you also probe
+`release-definition`, `audit`, and `implementation-reviews` for that class before
+reporting — so the operator fixes a CLASS, not an instance, and the next candidate does
+not fail on the sibling you never tried. A run that reports one bug and stops is an
+incomplete validation, not a verdict.
+
 Setup once:
 
 ```bash
@@ -30,8 +40,10 @@ D=/tmp/val-venv/bin/dadaia
 
 `DADAIA_BOOTSTRAP_PACKAGE` makes every workspace-venv bootstrap (`init`, `certify`,
 `reconcile`) install the CANDIDATE wheel itself instead of pinning the version from
-PyPI — an unpublished candidate is the validation norm, and without this export every
-`init` fails with "No matching distribution found". Destructive statements use
+PyPI — the fast path for a candidate under validation. The bootstrap also
+self-heals WITHOUT the export by re-packing the running installed distribution as a
+local wheel when the index cannot resolve the exact version — F-25 asserts that path
+deliberately unset. Destructive statements use
 throwaway dirs under `/tmp` — never the production workspace. Where a statement needs
 an initialized workspace, create it:
 `mkdir -p /tmp/f<NN> && cd /tmp/f<NN> && $D init --harness all`.
@@ -51,10 +63,17 @@ an initialized workspace, create it:
   and `.dadaia/tmp/legacy-quarantine/<run>/manifest.json` exists while `.dadaia/bugs`
   and `.dadaia/src` are gone (moved, not deleted — content present under quarantine).
 
-### F-03 — Certify agrees with reconcile
+### F-03 — Certify agrees with reconcile AND proves the workflow chain
 - Run: `$D certify --json`.
-- **PASS if:** exit 0 and all checks report pass; and this verdict does not contradict
-  F-02 (certify-green while reconcile-red, or vice versa, is a FAIL of this statement).
+- **PASS if:** exit 0 and all checks report pass; the verdict does not contradict F-02
+  (certify-green while reconcile-red, or vice versa, is a FAIL); AND the check ledger
+  proves a COMPLETE chain, not gate reachability: `workflow-backlog-definition`,
+  `workflow-release-definition`, `workflow-audit`, and
+  `workflow-implementation-reviews` all PASS with `completed` detail (a certification
+  that reports ok:true while its workflow checks only reached deterministic blocks is a
+  FAIL of this statement), plus the honest-failure canaries
+  (`workflow-audit-undefined-release-refused`, `workflow-completed-run-rerun-refused`)
+  PASS with "no traceback".
 
 ### F-04 — Doctors
 - Run in an initialized workspace: `$D doctor`; `$D public doctor`; and a specs tree
@@ -65,7 +84,11 @@ an initialized workspace, create it:
   created.
 - **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree, the root
   `specs init` refusal holds, and seeding one violation (`mkdir .dadaia/nonsense`)
-  makes `$D doctor` exit non-zero naming ROOT-4.
+  makes `$D doctor` exit non-zero naming ROOT-4. Evidence discipline for the ROOT-4
+  probe: capture the `mkdir`, the `pwd`, and the doctor invocation in the SAME log —
+  the seeded dir and the doctor run must share the workspace root (a doctor run from
+  another cwd resolves a different workspace and proves nothing), and assert the exit
+  code directly, never through a pipe.
 
 ### F-05 — Projections
 - Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
@@ -79,9 +102,13 @@ an initialized workspace, create it:
   `$D context dead alpha`.
 - **PASS if:** create→list shows alpha `state:"dead"`; `alive` clones, scaffolds AND
   commits its own scaffold (repo left clean — `git status --porcelain` empty of
-  tool-created files); `dead` flips back WITHOUT the untracked-consent refusal (the
-  tool must never refuse its own scaffold); and a guard fails cleanly (`$D context
-  dead ghost` exits non-zero with a clear message, no traceback).
+  tool-created files); the freshly-scaffolded context is doctor-clean —
+  `$D specs doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
+  init path must reach a fully clean tree, with `ACTIVE.md`, catalog, and no raw
+  placeholder atom — a fresh context that doctor rejects is a FAIL); `dead` flips back
+  WITHOUT the untracked-consent refusal (the tool must never refuse its own scaffold);
+  and a guard fails cleanly (`$D context dead ghost` exits non-zero with a clear
+  message, no traceback).
 
 ### F-07 — Bind & session identity
 - Setup: initialized workspace with one alive context `beta`; export a STABLE id:
@@ -112,28 +139,58 @@ an initialized workspace, create it:
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
   do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run: `$D bugs append --event reported --bug-id valbug ...all required fields...
-  --specs-dir repos/vp/specs`; `$D bugs status --specs-dir repos/vp/specs`; then
-  `$D bugs append --event reported --bug-id x --specs-dir repos/vp/specs` (missing fields).
+- Run the complete append with EVERY required `reported` field —
+  `--event reported --bug-id valbug --reported-by selfrun --title t --severity LOW
+  --surface s --component c --context vp --tag x --symptom sy --repro rp --expected ex
+  --notes no --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
+  then an INCOMPLETE append `$D bugs append --event reported --bug-id x --specs-dir
+  repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
-  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]`
-  under `repos/valproj/specs/backlog/` and run the backlog doctor path.
-- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; the malformed backlog
-  item is flagged BL-SCHEMA.
+  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]` at
+  status `candidate` under `repos/valproj/specs/backlog/`, then run the backlog-specific
+  doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT `specs doctor`, which
+  validates candidates.md format; BL-SCHEMA is the `backlog doctor` path). Assert its exit
+  code directly, not through a pipe.
+- **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
+  flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
 
 ### F-11 — Lifecycle workflows present & gated
 - Run: `$D lifecycle --help` and each of `backlog-definition|release-definition|
   implementation-reviews|audit --help`.
-- **PASS if:** all four subcommands exist and their help renders (options, purpose).
-  Actually EXECUTING a workflow needs a Layer-2 model/harness; if none is reachable in
-  the validation env, mark **EXCEPTION** for the live-run portion (not FAIL).
+- Also assert the **undefined-input guards** (deterministic, no live worker needed):
+  in a context whose `specs/releases/` has NO `<bogus-id>` dir, run
+  `$D lifecycle audit --context <ctx> --release-id <bogus-id> --harness codex` and
+  `$D lifecycle implementation-reviews --context <ctx> --release-id <bogus-id> --harness
+  fake`. Each MUST exit non-zero and MUST NOT create `specs/releases/<bogus-id>/` — a
+  lifecycle verb must reject an undefined release, never synthesize a release tree for it
+  (audit runs against an EXISTING release). Check the exit code directly, not through a pipe.
+- Also assert a **live worker step executes** (not just the deterministic guards): in a
+  context with an EXISTING release dir, run `$D lifecycle audit --context <ctx>
+  --release-id <existing> --harness codex`. The Codex worker must actually run its
+  `audit_report` step (`"runtime":"codex_exec"`, step `accepted`) — the workflow then
+  completes or blocks honestly at a gate. In a nested/unprivileged container, set
+  `DADAIA_CODEX_SANDBOX=danger-bypass` so codex runs without a sandbox namespace (the outer
+  container is the trust boundary); a `bwrap`/"No permissions to create a new namespace"
+  failure is now a **FAIL**, not an EXCEPTION — dadaia's adapter supports the bypass.
+- **PASS if:** all four subcommands exist and their help renders (options, purpose); the
+  two undefined-release invocations are rejected (non-zero) with no synthesized release
+  dir; AND the live Codex `audit_report` step executes (no sandbox namespace error). Mark
+  **EXCEPTION** for the live-run portion ONLY if NO Layer-2 harness is installed at all
+  (no codex and no pi binary) — never for a sandbox-namespace failure, which the
+  `danger-bypass` mode fixes.
 
 ### F-12 — Reports & handoffs
-- Setup: write a minimal valid handoff JSON to a file, and a tampered copy.
+- Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
+  write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
+  `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
+  `scope`, `metrics:{}`, `self_pull:{"refs":[<one ref that EXISTS on disk, e.g. "AGENTS.md">]}`,
+  `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
+  `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
+  Also write a tampered copy (e.g. `schema_version:"handoff-BOGUS"` and drop `agent`).
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
   (non-zero, names the failure).
@@ -159,17 +216,25 @@ an initialized workspace, create it:
   which masks them.
 
 ### F-15 — Memory & injection
-- Run in a bound context with a scaffolded specs tree:
-  `$D memory product add --help` (verb exists) and
-  `$D memory catalog generate --specs-dir <bound specs dir>`.
-- **PASS if:** both verbs exist and `catalog generate` exits 0, producing/refreshing
-  the catalog from the context's memory `.md` atoms without touching other paths.
+- Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&
+  $D specs init --specs-dir S`) that is doctor-clean — confirm `$D specs doctor
+  --specs-dir S` reports **0 errors AND 0 warnings**.
+- Run: `$D memory product add <slug> --specs-dir S`; `$D memory catalog generate
+  --specs-dir S`; then `$D specs doctor --specs-dir S` again.
+- **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
+  supported "add a feature" path leaves `specs doctor` at **0 errors AND 0 warnings** —
+  the atom emitted by `memory product add` must lint clean out of the box (its template
+  headings are allowlisted). A LINT-1 unknown-heading warning on a freshly added atom is a
+  FAIL: the tool's own template must not violate its own linter.
 
 ### F-16 — Portability
-- Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional);
-  `$D import <archive> --into /tmp/f16b/` (use the verb's real flags from `--help`).
-- **PASS if:** export produces an archive exit 0 and import reconstructs a workspace
-  that passes `$D doctor`.
+- Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional); then import
+  the archive into a NEW destination — the archive is positional and the destination is
+  `--workspace/-w` (default cwd), so either `$D import <archive> --workspace /tmp/f16b`
+  or `cd /tmp/f16b && $D import <archive>`. (There is no `--into`; confirm the real flags
+  with `$D import --help`.)
+- **PASS if:** export produces an archive exit 0 and import reconstructs a workspace at the
+  destination that passes `$D doctor`.
 
 ### F-17 — Migrations
 - Setup: seed an older specs tree (lower pattern version) in a throwaway dir.
@@ -182,18 +247,33 @@ an initialized workspace, create it:
   own destination, preserved-until-renamed by design (doctor exits 0 on warnings). Judge
   on errors + exit code, not on the presence of that warning.
 
-### F-18 — Init / onboarding
-- Run in an empty dir: `$D init --harness all`.
-- **PASS if:** exit 0, `.dadaia/` bootstrapped (venv + projections), and `$D doctor`
-  green afterward. (Init builds a venv — the env must allow PyPI; if egress is blocked
+### F-18 — Init / onboarding (bootstrap INTEGRITY, not just exit 0)
+- Run in an empty dir, with fail-fast shell discipline (`set -euo pipefail`, explicit
+  `cd` into the target workspace, exit codes asserted directly — never through a pipe):
+  `$D init --harness all` with `DADAIA_BOOTSTRAP_PACKAGE` UNSET for this statement.
+- **PASS if ALL of:**
+  1. exit 0 and `.dadaia/` bootstrapped (venv + projections), `$D doctor` green after;
+  2. the captured init output contains NO raw installer error (`ERROR:`/`Traceback`) —
+     an index miss handled by the re-pack fallback announces itself in one clean
+     `[bootstrap]` line instead;
+  3. the GENERATED venv stands alone: run
+     `env -i PATH="$PATH" <ws>/.dadaia/.venv/bin/python -c "import dadaia_workspace, importlib.metadata as m; print(m.version('dadaia-workspace'))"`
+     — it must import WITHOUT inherited PYTHONPATH/parent-workspace resolution and
+     print EXACTLY the candidate version; and the venv carries the promised CI
+     toolchain — `<ws>/.dadaia/.venv/bin/python -m pytest --version` exits 0 (without
+     it, `ci preflight` and the executed-test closure gate are unusable). A version mismatch or import failure is a
+     FAIL even when init exited 0 (bug init-succeeds-after-provider-bootstrap-failure
+     class: a bootstrap that only works through inherited runtime paths is broken).
+  (Init may reach an index — if egress is fully blocked AND the fallback cannot apply,
   mark EXCEPTION with the network cause, else FAIL.)
 
 ### F-19 — Plugins
 - Run in an initialized workspace: `$D plugin list`.
 - **PASS if:** it lists installed packs (empty set on a fresh workspace is a valid
-  answer — exit 0, "no plugins", NOT an error). Then `$D plugin install <pack>` records
-  the ledger and doctor stays green. `plugin list` in an UNINITIALIZED dir returning a
-  clean "run init first" message (non-zero) is acceptable, not a FAIL.
+  answer — exit 0, "no plugins", NOT an error). Then install one of the two in-package
+  packs — `$D plugin install frontend-design` (or `devops`) — which records the ledger and
+  leaves doctor green. `plugin list` in an UNINITIALIZED dir returning a clean "run init
+  first" message (non-zero) is acceptable, not a FAIL.
 
 ### F-20 — Academy
 - Run: `$D academy --help` and a read verb.
@@ -219,6 +299,102 @@ an initialized workspace, create it:
   NO context memory — that non-empty generic output is the CORRECT result (injection
   is bind-driven). FAIL only if it injects a context's memory without a bind, or
   crashes.
+
+### F-24 — Workflow chain E2E (fake harness, disposable context)
+- Setup: a clean disposable context `chain` (create + alive + baseline as in F-06),
+  bound with a release id `v0.0.1`.
+- Run, in order, each with `--harness fake --json` and a fresh `--run-id`:
+  1. `$D lifecycle backlog-definition --context chain --release-id v0.0.1 --demand "chain canary"`
+  2. `$D lifecycle release-definition --context chain --release-id v0.0.1`
+  3. `$D lifecycle audit --context chain --release-id v0.0.1`
+  4. commit the specs tree, then
+     `$D lifecycle implementation-reviews --skip-preflight --context chain --release-id v0.0.1`
+- **PASS if:** ALL four runs exit 0 with `"completed": true`; step (1) materialized a
+  new/changed item under `specs/backlog/`; after (2) `SPEC.md` and `PLAN.md` carry
+  `**Status:** Aprovado`, `TASKS.md` exists, and `releases/ACTIVE.md` points at the
+  release in IMPLEMENTATION; after (4) `releases/v0.0.1/CLOSURE.md` exists. The
+  documented fake path walks the WHOLE user flow — any deterministic block in this
+  chain is a FAIL (the former "honest block" behavior is retired). Also: re-running
+  ANY of the four steps with its SAME completed `--run-id` must be REFUSED cleanly —
+  non-zero exit, one line naming the refusal (`already COMPLETED`, fresh --run-id
+  guidance), no traceback, and NO re-execution of the ladder (probe at least steps (1)
+  and (4); the refusal is a shared engine guard, so a sibling that re-executes is a
+  FAIL of this statement).
+
+### F-25 — Disposable bootstrap without index or env override
+- Setup: an initialized workspace with the candidate installed. UNSET the override:
+  `unset DADAIA_BOOTSTRAP_PACKAGE` for this statement only.
+- Run: `$D certify --json`.
+- **PASS if:** certification bootstraps its disposable workspace with the EXACT
+  installed provider version even though the index does not serve it — the venv
+  bootstrap re-packs the running installed distribution as a local wheel
+  (`workspace-init-all-harnesses` and `exact-version-reconciliation` PASS). "pip could
+  not resolve dadaia-workspace==<candidate>" surfacing to the operator is a FAIL: an
+  unpublished candidate is the validation norm and must bootstrap with no env var.
+
+### F-26 — Live authoring canary (Codex materializes a real artifact)
+- Setup: a disposable canary context, bound; codex harness reachable
+  (`DADAIA_CODEX_SANDBOX=danger-bypass` in a nested container).
+- Run: `$D lifecycle backlog-definition --context <canary> --release-id <rid>
+  --run-id <fresh> --demand "<bounded fictional demand>" --harness codex --json`.
+- **PASS if:** the author step's prompt supplied the canonical anchor set (the item's
+  `intents[]` refs resolve through `dadaia backlog subjects` — an authored item whose
+  ref no canonical anchor resolves means the workflow failed to hand the author its
+  anchors, bug backlog-author-missing-canonical-subject-input class); and EITHER the
+  run completes with a real new/changed `specs/backlog/` item
+  (the worker authored a real deliverable), OR it blocks AT `backlog_author` with
+  reason "no deliverable in the step's declared zone" and a persisted worker
+  diagnostic (the blocked detail references the diagnostic; the payload is never a
+  bare "codex exec completed" that sails through to fail later at
+  `backlog_review_gate` with no worker trace). Blocking at `backlog_review_gate` with
+  an empty-payload author step marked `accepted` is a FAIL of this statement.
+  **Chain continuation:** when the live backlog run COMPLETES, the pick must be
+  CONSUMABLE — inspect the promoted `backlog_author` ledger payload (it must carry a
+  `specs/backlog/` path, e.g. `authored_backlog_paths`; a bare "codex exec completed"
+  payload is a FAIL — bug backlog-author-bare-payload-breaks-release-handoff class)
+  and then run `release-definition` for the same context/release: it must ACCEPT the
+  authoritative pick (never refuse with "produced no exact specs/backlog artifact
+  path") AND drive the live definition to APPROVAL in the fresh context — SPEC and
+  PLAN flipped to `**Status:** Aprovado`, TASKS authored. A fresh (greenfield)
+  context's embryonic memory is NEVER a valid rejection reason at `spec_review` (bug
+  live-release-definition-rejects-fresh-context class): the SPEC itself is the
+  founding structural reference there. **Closure integrity:** when the release's
+  TASKS/write set declare test paths, `implementation-reviews` may reach CLOSURE only
+  with an EXECUTED, green test run — the deterministic close gate runs pytest itself.
+  A closure whose final payload lists validation commands as "planned / not run", or
+  a CLOSURE.md produced without an executed green suite, is a FAIL (bug
+  implementation-review-approves-unexecuted-validation class). **Anchor stability:**
+  after CLOSURE (memory/catalog updates included), every intent of the consumed
+  backlog item must STILL resolve via `dadaia backlog subjects` — a regeneration that
+  renames/destroys a canonical heading anchor is a FAIL (bug
+  closure-breaks-canonical-backlog-anchor class). **Post-closure coherence:** after
+  the live cycle closes, `dadaia specs doctor` on the context must report 0 errors —
+  in particular no CAT-1 (catalog entry without its memory atom; the catalog is
+  derived and regenerated at closure — bug
+  closure-catalog-references-missing-memory-atom class). Also post-closure: the
+  context repo contains NO cache dirs (`__pycache__`, `.pytest_cache`, … — swept at
+  closure; bug lifecycle-workflows-leave-python-bytecode-in-repo class), memory atoms
+  are lint-clean (no LINT-1 warnings; bug closure-allows-memory-doctor-warnings
+  class), and a BLOCKED implementation run resumes with
+  `implementation-reviews --resume-from <step>` keeping upstream ledger payloads (bug
+  implementation-reviews-resume-token-without-cli-resume class — a published resume
+  token without a working resume command is a FAIL). **Release-id canon:** every
+  lifecycle verb refuses a noncanonical `--release-id` up front (canonical:
+  `vMAJOR.MINOR.PATCH[-suffix]`) — use e.g. `v0.1.0` for the live cycle; an accepted
+  noncanonical id that later breaks closure is a FAIL. **Blocked-close transaction:**
+  a close that BLOCKS must leave no half-written state — no CLOSURE.md, no memory
+  mutation, ACTIVE.md still pointing at the release (resume must work). **Runnable
+  product proof:** the game evidence must come from the DECLARED entrypoint
+  invocation (e.g. `python -m <pkg>.cli` with scripted moves producing real output),
+  not only direct function calls — an approved CLI that exits 0 with no I/O is a
+  FAIL (bug implementation-review-misses-nonrunnable-cli-entrypoint class).
+  **Closure commit:** a completed cycle leaves the context repo COMMITTED
+  (`git status --porcelain` empty apart from operator files; the closure commit is
+  Python-owned — bug implementation-closure-leaves-uncommitted-release-tree class).
+  **Validator setup hint:** create the disposable bare remote OUTSIDE the workspace
+  root (e.g. a sibling dir) — a `src.git` at the root is a ROOT-1 finding of the
+  validator's own setup, not a candidate defect. Mark **EXCEPTION** only if no codex binary/credentials exist in the
+  environment.
 
 ---
 **Verdict line (Telegram-short, last line of output):**

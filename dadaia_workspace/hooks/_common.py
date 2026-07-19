@@ -150,8 +150,14 @@ def emit_block(reason: str) -> None:
 
 
 def emit_allow() -> None:
-    """Allow a tool call: the hooks signal allow by emitting nothing and exiting 0."""
-    return None
+    """Print the ``{"decision":"allow"}`` envelope (explicit, verifiable allow).
+
+    Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
+    automation could not distinguish an explicit allow from a hook that never ran. Every
+    harness treats a non-block envelope (or unrecognized JSON) as allow, so the explicit
+    envelope changes no gating behavior — it only makes the contract observable.
+    """
+    print(json.dumps({"decision": "allow"}))
 
 
 def default_python_bin(workspace: Path) -> str:

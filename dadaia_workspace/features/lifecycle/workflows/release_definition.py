@@ -23,6 +23,7 @@ IMPLEMENTATION only when every prior gate passed and the workflow-step handoff g
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -30,6 +31,7 @@ from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
+    LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
@@ -69,6 +71,11 @@ class ReleaseStep:
     # release-definition-create-steps-cannot-write-specs). Placeholders {context} and
     # {release_id} are expanded by the shared ``_scope``.
     extra_allowed_paths: tuple[str, ...] = ()
+    #: The EXACT release-artifact filename this create step must persist (bug
+    #: release-definition-completes-without-persisting-artifacts): the zone-wide glob
+    #: let a worker "pass" spec_create by writing anything in the release dir. When
+    #: set, the structural gate requires THIS file among the step's refs/changed paths.
+    deliverable: str | None = None
 
 
 @dataclass(frozen=True)
@@ -109,6 +116,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="spec_create",
         role="product-engineer",
+        deliverable="SPEC.md",
         fragment_id="release_definition.spec_create",
         shared_fragment_ids=(
             "shared.anti_slop",
@@ -134,6 +142,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="plan_create",
         role="product-engineer",
+        deliverable="PLAN.md",
         fragment_id="release_definition.plan_create",
         shared_fragment_ids=(
             "shared.anti_slop",
@@ -159,6 +168,7 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
         label="tasks_create",
         role="product-engineer",
+        deliverable="TASKS.md",
         fragment_id="release_definition.tasks_create",
         shared_fragment_ids=("shared.anti_slop",),
         produces="generic-step-handoff-v1",
@@ -335,16 +345,29 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         if not path.is_file():
             return self._plan_dependency_block("PLAN.md was not created")
         lines = path.read_text(encoding="utf-8").splitlines()
-        try:
-            heading = next(
-                index
-                for index, line in enumerate(lines)
-                if re.fullmatch(
-                    r"##\s+(?:\d+\s*[.)-]?\s+)?validation dependency table",
-                    line.strip(),
-                    flags=re.IGNORECASE,
-                )
+
+        # Presentation tolerance (bug release-plan-author-does-not-converge-
+        # validation-contract): a live worker may legitimately localize the section
+        # heading and column titles. The heading is matched by NORMALIZED content
+        # (case/accents stripped, canonical English OR a translated
+        # dependency+validation table title); semantics below stay strict.
+        def _normalize(text: str) -> str:
+            stripped = "".join(
+                ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)
             )
+            return " ".join(stripped.lower().split())
+
+        def _is_table_heading(line: str) -> bool:
+            candidate = line.strip()
+            if not candidate.startswith("##"):
+                return False
+            title = _normalize(re.sub(r"^#+\s*(?:\d+\s*[.)-]?\s+)?", "", candidate))
+            if title == "validation dependency table":
+                return True
+            return ("valida" in title) and ("depend" in title) and ("tab" in title)
+
+        try:
+            heading = next(index for index, line in enumerate(lines) if _is_table_heading(line))
         except StopIteration:
             return self._plan_dependency_block(
                 "PLAN.md is missing the required 'Validation Dependency Table' section"
@@ -368,10 +391,13 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             "validation dependencies",
             "deferred integration evidence",
         ]
-        if header != expected:
+        # Column titles: canonical English exactly, OR a positional 5-column fallback
+        # (localized titles keep the canonical order; the semantic checks below —
+        # WS ids in column 1, dependency refs in column 4 — still bind strictly).
+        if header != expected and len(header) != len(expected):
             return self._plan_dependency_block(
                 "validation dependency table columns must match the workflow contract "
-                f"(case/whitespace-insensitive): expected {expected}, got {header}"
+                f"(five columns, canonical order): expected {expected}, got {header}"
             )
 
         seen: set[int] = set()
@@ -410,6 +436,50 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             ),
             detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
         )
+
+    def _terminal_semantic_block(
+        self,
+        run: LifecycleRun,
+        step: ReleaseStep,
+        sequence: tuple[ReleaseStep, ...],
+    ) -> BlockedState | None:
+        """Refuse to complete a definition whose artifacts are not persisted+approved.
+
+        Bug release-definition-completes-without-persisting-artifacts: a live worker
+        can satisfy the transport gate without writing its artifact. The terminal gate
+        re-reads DISK truth: SPEC.md/PLAN.md/TASKS.md must exist and SPEC/PLAN must
+        carry the review-flipped ``**Status:** Aprovado`` before ACTIVE.md is
+        repointed or ``completed`` is reported.
+        """
+        release_dir = self._selector.spec_context.specs_dir / "releases" / self._release_id
+        labels = {s.label for s in sequence}
+        # Run-scoped requirements: an artifact is required only when ITS create step ran
+        # in this sequence; the Aprovado flip only when its review gate ran too.
+        required = {
+            "SPEC.md": ("spec_create" in labels, "spec_review" in labels),
+            "PLAN.md": ("plan_create" in labels, "plan_review" in labels),
+            "TASKS.md": ("tasks_create" in labels, False),
+        }
+        missing: list[str] = []
+        for name, (must_exist, must_be_approved) in required.items():
+            if not must_exist:
+                continue
+            path = release_dir / name
+            if not path.is_file():
+                missing.append(f"{name} (absent)")
+                continue
+            if must_be_approved and "**Status:** Aprovado" not in path.read_text(encoding="utf-8"):
+                missing.append(f"{name} (not Aprovado)")
+        if missing:
+            return BlockedState(
+                reason=(
+                    "definition_commit_gate: release artifacts are not persisted/approved "
+                    "on disk: " + ", ".join(missing)
+                ),
+                blocked_at_step=step.label,
+                detail={"unpersisted_artifacts": ", ".join(missing)},
+            )
+        return None
 
     def _on_sequence_completed(self) -> None:
         """Repoint ACTIVE.md to the newly defined release (deterministic Python).

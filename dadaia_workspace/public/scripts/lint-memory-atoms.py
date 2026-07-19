@@ -60,6 +60,11 @@ _HEADING_GROUP_A_EN: frozenset[str] = frozenset(
         "Differentiator",
         "Runtime state touched",
         "Dependencies",
+        # Canonical headings emitted by the `dadaia memory product add` template
+        # (public/templates/memory-feature.md). A supported "add a feature" atom must
+        # lint clean out of the box (test_memory_feature_template_headings_are_allowlisted).
+        "Current behavior",
+        "Boundaries",
     ]
 )
 
@@ -278,11 +283,19 @@ _FORBIDDEN_HEADING_LOWER: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_SCHEMA_PATH = _SCRIPT_DIR.parent / "schemas" / "memory" / "memory-frontmatter-v1.schema.json"
+_SCHEMA_REL = Path("schemas") / "memory" / "memory-frontmatter-v1.schema.json"
+_SCHEMA_PATH = _SCRIPT_DIR.parent / _SCHEMA_REL
+#: Projected-workspace layout (bug projected-memory-linter-cannot-find-schema):
+#: `dadaia init` projects this script to `.dadaia/scripts/` and the schemas to
+#: `.dadaia/agentic/schemas/` — sibling `agentic/` dir, not `schemas/` next to the
+#: script's parent.
+_PROJECTED_SCHEMA_PATH = _SCRIPT_DIR.parent / "agentic" / _SCHEMA_REL
 
 
 def _load_schema() -> dict[str, Any]:
-    """Load the frontmatter JSON schema from the canonical path."""
+    """Load the frontmatter JSON schema from the canonical or projected path."""
+    if _PROJECTED_SCHEMA_PATH.exists():
+        return cast(dict[str, Any], json.loads(_PROJECTED_SCHEMA_PATH.read_text(encoding="utf-8")))
     if not _SCHEMA_PATH.exists():
         # Fallback: search relative to the repo root (dev/editable install)
         for parent in _SCRIPT_DIR.parents:

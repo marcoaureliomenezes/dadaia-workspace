@@ -690,3 +690,109 @@ def test_reset_run_zone_purges_ledger_and_exact_worker_outputs(tmp_path: Path) -
     assert removed == 2
     assert writer.files == {}
     assert writer.worker_outputs == set()
+
+
+# ── bug audit-fragment-schema-envelope-mismatch (Hermes 0.3.x live canary) ──────────
+#
+# The audit fragment instructs the worker to emit its domain fields (question, lenses,
+# findings, dispositions) TOP-LEVEL in the agent-run-result-v1 object. A worker that
+# obeys AND also carries a structured_output dict used to lose every top-level domain
+# field — durable_payload_from_result preferred the nested dict exclusively, so the
+# audit-report-v1 gate rejected a fully compliant report.
+
+
+def test_durable_payload_keeps_top_level_domain_fields_alongside_nested() -> None:
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        durable_payload_from_result,
+    )
+
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="audit pass complete",
+        structured_output={"verdict": "APPROVED"},
+        domain_payload={
+            "status": "succeeded",
+            "summary": "audit pass complete",
+            "question": "does the audit chain hold?",
+            "lenses": ["architecture"],
+            "findings": [
+                {
+                    "id": "f-1",
+                    "severity": "LOW",
+                    "lens": "architecture",
+                    "summary": "concrete divergence",
+                }
+            ],
+            "dispositions": [{"finding_id": "f-1", "route": "accepted-risk"}],
+            # The worker ALSO carried a structured_output dict — this must not erase
+            # the top-level domain fields above.
+            "structured_output": {"verdict": "APPROVED"},
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="audit_report", is_review=False)
+
+    assert payload["question"] == "does the audit chain hold?"
+    assert payload["lenses"] == ["architecture"]
+    assert isinstance(payload["findings"], list) and payload["findings"][0]["id"] == "f-1"
+    assert payload["dispositions"] == [{"finding_id": "f-1", "route": "accepted-risk"}]
+
+
+def test_durable_payload_nested_handoff_still_wins_when_top_level_is_transport_only() -> None:
+    from dadaia_workspace.core.models.lifecycle import AgentRunResult, AgentRunStatus
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        durable_payload_from_result,
+    )
+
+    result = AgentRunResult(
+        status=AgentRunStatus.SUCCEEDED,
+        summary="ok",
+        domain_payload={
+            "schema": "agent-run-result-v1",
+            "task_id": "r:step",
+            "handoff": {"summary": "the real domain payload", "detail_key": "value"},
+        },
+    )
+
+    payload = durable_payload_from_result(result, fallback_summary="step", is_review=False)
+    assert payload["detail_key"] == "value"
+    assert payload["summary"] == "the real domain payload"
+
+
+def test_render_digest_is_bounded_for_huge_payloads() -> None:
+    """Bug implementation-retry-overflows-codex-context-window: a rejection digest
+    injected into a retry prompt must be BOUNDED — a review with enormous findings
+    used to blow the worker's context window mid-correction.
+    """
+    from dadaia_workspace.core.models.workflow_handoff import (
+        RetentionMode,
+        WorkflowStepRecord,
+    )
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
+        ResolvedHandoff,
+        WorkflowHandoffResolver,
+    )
+
+    record = WorkflowStepRecord(
+        run_id="r",
+        producer_step="review_combined",
+        attempt=0,
+        output_schema="combined-review-handoff-v1",
+        payload_ref="x.json",
+        content_hash="0" * 64,
+        produced_at="2026-07-19T00:00:00Z",
+        retention_mode=RetentionMode.DELETE_AFTER_CONSUMED,
+    )
+    huge = {
+        "verdict": "REJECTED",
+        "verdict_reason": "y" * 5000,
+        "summary": "z" * 5000,
+        "findings": [
+            {"id": f"f-{i}", "severity": "HIGH", "message": "m" * 2000} for i in range(50)
+        ],
+    }
+    digest = WorkflowHandoffResolver.render_digest(ResolvedHandoff(record=record, payload=huge))
+
+    assert len(digest) <= 9000, len(digest)
+    assert "truncated" in digest or len(digest) < 9000

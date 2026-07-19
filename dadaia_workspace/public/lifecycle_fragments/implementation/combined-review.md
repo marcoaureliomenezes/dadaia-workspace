@@ -57,3 +57,13 @@ One verdict — `APPROVED` or `REJECTED` — with a one-sentence reason and a fi
 list. Tag each finding with its angle (`qa`, `security`, or `code`), a severity, the
 exact file/line, and the concrete required change. Reject on any failed check in any
 angle; do not approve to be agreeable.
+
+## Runnable-entrypoint proof (hard requirement)
+
+When the SPEC/PLAN declare a runnable surface (a CLI module, script, or service
+entrypoint), the review verdict must cite EXECUTED evidence of that exact surface:
+run the declared invocation (e.g. `python -m <pkg>.cli`) with realistic scripted
+input and quote the observed output. A module that imports cleanly and exits 0 with
+no I/O is NOT runnable — approving it is a review failure (bug
+implementation-review-misses-nonrunnable-cli-entrypoint class). Direct function
+calls in tests do not substitute for the declared invocation.

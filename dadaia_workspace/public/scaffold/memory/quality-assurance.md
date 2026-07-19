@@ -15,4 +15,14 @@ release_origin: v0.2.1
 
 ## Padrões de qualidade
 
-Padrões de qualidade ainda não documentados. Descrever as regras anti-slop, disciplina TDD e sequência de gates aqui.
+**Base greenfield (vale até a primeira release consolidar padrões próprios):**
+
+- TDD: todo comportamento novo nasce com um teste que falha primeiro; correção de bug
+  reproduz o defeito em teste antes do fix.
+- Testes rodam com `pytest -p no:cacheprovider` (nenhum cache dentro do repo) e devem
+  passar verdes antes de qualquer commit de fechamento de task.
+- Anti-slop: nenhum teste fabricado que não asserta comportamento real; nenhum
+  requisito sem critério de aceitação observável (entrada, saída ou falha verificável
+  de fora).
+- Revisões julgam o artefato apresentado pelos critérios acima; num contexto novo, a
+  ausência de histórico não é motivo de rejeição — o SPEC vigente define a base.

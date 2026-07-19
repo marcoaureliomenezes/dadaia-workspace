@@ -643,3 +643,80 @@ def test_no_runner_injected_and_no_live_flag_raises_guard_error_instead_of_real_
 
     with pytest.raises(RuntimeError, match="real pi/codex binary invocation attempted"):
         adapter.run(_request())
+
+
+def _capture_argv(cfg: CodexExecConfig) -> list[str]:
+    """Run the adapter with a fake runner and return the argv it built."""
+    captured: dict[str, list[str]] = {}
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        captured["argv"] = argv
+        Path(argv[argv.index("--output-last-message") + 1]).write_text(
+            json.dumps({"summary": "ok", "artifact_refs": [], "structured_output": {}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    CodexExecAdapter(cfg, runner=fake_runner, environ={"PATH": "/bin", "HOME": "/h"}).run(
+        _request()
+    )
+    return captured["argv"]
+
+
+def test_sandbox_bypass_mode_emits_dangerously_bypass_and_omits_sandbox(tmp_path: Path) -> None:
+    """Bug codex-adapter-cannot-run-in-nested-container: dadaia's Codex adapter always
+    passed `--sandbox <mode>`, which needs namespace creation (bwrap) that fails in a
+    nested/unprivileged container (e.g. the Hermes worker) — so Codex-harness workflows
+    could not run there, even though the same container runs Codex fine with the bypass
+    flag. The opt-in `danger-bypass` mode emits `--dangerously-bypass-approvals-and-sandbox`
+    (mutually exclusive with `--sandbox`) so a trusted containerized consumer can run."""
+    argv = _capture_argv(
+        CodexExecConfig(
+            cwd=tmp_path,
+            codex_bin="/usr/bin/codex",
+            model="m",
+            reasoning_effort="medium",
+            sandbox="danger-bypass",
+        )
+    )
+    assert "--dangerously-bypass-approvals-and-sandbox" in argv
+    assert "--sandbox" not in argv, "bypass and --sandbox are mutually exclusive"
+
+
+def test_normal_sandbox_mode_emits_sandbox_and_no_bypass(tmp_path: Path) -> None:
+    """The default/secure path is unchanged: a normal mode emits `--sandbox <mode>` and
+    never the bypass flag."""
+    argv = _capture_argv(
+        CodexExecConfig(
+            cwd=tmp_path,
+            codex_bin="/usr/bin/codex",
+            model="m",
+            reasoning_effort="medium",
+            sandbox="read-only",
+        )
+    )
+    assert argv[argv.index("--sandbox") :][:2] == ["--sandbox", "read-only"]
+    assert "--dangerously-bypass-approvals-and-sandbox" not in argv
+
+
+def test_sandbox_bypass_selectable_via_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The single env choke point DADAIA_CODEX_SANDBOX accepts the bypass sentinel."""
+    monkeypatch.setenv("DADAIA_CODEX_SANDBOX", "danger-bypass")
+    cfg = CodexExecConfig(
+        cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium"
+    )
+    assert cfg.bypass_sandbox is True
+
+
+def test_invalid_sandbox_error_is_dadaia_error_for_clean_cli(tmp_path: Path) -> None:
+    """An unknown DADAIA_CODEX_SANDBOX value must fail CLEANLY, not as a raw traceback: the
+    error is a DadaiaError (so _safe_app renders one line) AND a ValueError (back-compat).
+    A stale dadaia predating a newer sandbox value must not crash with a traceback."""
+    from dadaia_workspace.core.exceptions import CodexConfigError, DadaiaError
+
+    with pytest.raises(CodexConfigError) as exc:
+        CodexExecConfig(cwd=tmp_path, sandbox="totally-bogus")
+    assert isinstance(exc.value, DadaiaError)
+    assert isinstance(exc.value, ValueError)

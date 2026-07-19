@@ -144,6 +144,13 @@ def test_verb_persists_resolver_derived_snapshot(
 
         monkeypatch.setattr(container, "_release_definition_runtime_factory", factory_builder)
 
+    if subcmd == ["audit"]:
+        # Audit runs against an EXISTING release (bug
+        # audit-accepts-undefined-release-and-creates-release-tree). Pre-create the release
+        # dir the audit build resolves (repos/<ctx>/specs or the workspace-root specs).
+        for base in (workspace / "repos" / _CONTEXT / "specs", workspace / "specs"):
+            (base / "releases" / _RELEASE).mkdir(parents=True, exist_ok=True)
+
     argv = [
         "lifecycle",
         *subcmd,

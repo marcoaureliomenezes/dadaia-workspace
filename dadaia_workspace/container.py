@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import contextlib
 import datetime as dt
 import os
 from collections.abc import Callable
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
+    ReleaseNotFoundError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.harness_models import HarnessModelOption
@@ -1189,6 +1191,7 @@ def build_lifecycle_pipeline(
     """
     from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
     from dadaia_workspace.infrastructure.git_evidence import (
+        build_executed_test_gate,
         build_git_diff_provider,
         build_test_output_provider,
     )
@@ -1226,7 +1229,9 @@ def build_lifecycle_pipeline(
             phase=_active_phase(specs_dir),
         ),
         diff_provider=build_git_diff_provider(repo_root, paths=repo_write_set),
-        test_output_provider=build_test_output_provider(repo_root, paths=repo_write_set),
+        test_output_provider=build_test_output_provider(
+            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
+        ),
     )
     return LifecyclePipeline(
         context=context,
@@ -1250,7 +1255,221 @@ def build_lifecycle_pipeline(
         # step-artifact zone.
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
         max_review_retries=max_review_retries,
+        # Bug implementation-review-approves-unexecuted-validation: closure requires an
+        # EXECUTED, green test run over the release's declared test paths.
+        executed_test_gate=build_executed_test_gate(
+            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
+        ),
+        # Bug closure-catalog-references-missing-memory-atom: the catalog is derived
+        # from the atoms — closure regenerates catalog.json + index.md so phantom
+        # entries cannot survive the cycle.
+        memory_catalog_regenerator=_memory_catalog_regenerator(specs_dir),
+        # Bug closure-allows-memory-doctor-warnings: closure leaves memory lint-clean
+        # or blocks with the findings digest.
+        memory_lint_gate=_memory_lint_gate(specs_dir),
+        # Bug lifecycle-workflows-leave-python-bytecode-in-repo: a completed cycle
+        # sweeps cache dirs out of the context repo.
+        repo_hygiene_sweeper=_repo_hygiene_sweeper(repo_root),
+        # Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
+        # commits the repo's release/implementation/memory changes.
+        closure_committer=_closure_committer(repo_root, release_id),
     )
+
+
+def _workspace_python_bin(workspace_root: Path) -> str | None:
+    """The workspace venv interpreter, when provisioned — the runtime the bootstrap
+    guarantees carries pytest (bug implementation-review-uses-parent-venv-without-
+    pytest: the CLI may itself run from a foreign venv with no test toolchain).
+    """
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+    candidate = VenvPythonEnvironmentManager().python_executable(str(workspace_root))
+    return candidate if Path(candidate).is_file() else None
+
+
+#: Cache/artifact dirs that must never survive inside a context repo
+#: (tmp-file-guardrail zero-tolerance list).
+_REPO_CACHE_DIR_NAMES = (
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".hypothesis",
+)
+
+
+def _repo_hygiene_sweeper(repo_root: Path) -> "Callable[[], None]":
+    """Build the closure-time cache sweep for one context repo."""
+
+    def _sweep() -> None:
+        import shutil
+
+        for name in _REPO_CACHE_DIR_NAMES:
+            for path in repo_root.rglob(name):
+                if path.is_dir() and ".git" not in path.parts:
+                    shutil.rmtree(path, ignore_errors=True)
+
+    return _sweep
+
+
+def _closure_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
+    """Build the closure-time commit of the context repo (Python-owned, post-success).
+
+    Commits everything the cycle produced (implementation, specs artifacts, memory)
+    with a conventional message. Uses per-invocation identity fallbacks so a repo
+    without user config still commits deterministically. ``None`` when the repo is not
+    a git checkout (self-hosting fixtures).
+    """
+    if not (repo_root / ".git").exists():
+        return None
+
+    def _commit() -> None:
+        import subprocess
+
+        subprocess.run(  # noqa: S603 — fixed argv
+            ["git", "-C", str(repo_root), "add", "-A"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        subprocess.run(  # noqa: S603 — fixed argv
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "-c",
+                "user.email=closure@dadaia.invalid",
+                "-c",
+                "user.name=dadaia-closure",
+                "commit",
+                "-m",
+                f"closure({release_id}): finalize release artifacts",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+    return _commit
+
+
+def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None":
+    """Build the closure-time memory-atom lint gate for one context specs dir.
+
+    Runs the packaged ``lint-memory-atoms.py`` (the same script doctor LINT-1 shells
+    out to); the gate passes only on exit 0 with no ``WARN:`` findings. ``None`` when
+    the context has no memory dir or the script is not packaged (nothing to lint —
+    never a silent fake-green: the doctor still covers drift after the fact).
+    """
+    memory_dir = specs_dir / "memory"
+    script = Path(__file__).resolve().parent / "public" / "scripts" / "lint-memory-atoms.py"
+    if not memory_dir.is_dir() or not script.is_file():
+        return None
+
+    def _gate() -> tuple[bool, str]:
+        import subprocess
+        import sys as _sys
+
+        try:
+            proc = subprocess.run(  # noqa: S603 — fixed argv, read-only lint run
+                [_sys.executable, "-B", str(script), "--memory-dir", str(memory_dir)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return True, f"memory lint could not run ({exc}); doctor covers it after the fact"
+        merged = (proc.stdout + "\n" + proc.stderr).strip()
+        ok = proc.returncode == 0 and "WARN:" not in merged
+        # SPEC-DOC-002 leg (bug closure-generates-memory-atom-without-heading): the
+        # lint script validates the headings PRESENT; a body with no markdown heading
+        # at all sails through it — but doctor flags it post-closure. Enforce the
+        # has-a-heading contract here so a heading-less atom never rides a green close.
+        import re as _re
+
+        heading_re = _re.compile(r"^#{1,6}\s+\S", _re.MULTILINE)
+        fm_re = _re.compile(r"^---\n.*?\n---\n", _re.DOTALL)
+        headingless: list[str] = []
+        for md in sorted(memory_dir.rglob("*.md")):
+            if md.name == "index.md":
+                continue
+            try:
+                body = fm_re.sub("", md.read_text(encoding="utf-8"), count=1)
+            except OSError:
+                continue
+            if heading_re.search(body) is None:
+                headingless.append(str(md.relative_to(memory_dir)))
+        if headingless:
+            ok = False
+            merged += "\nERROR: memory atom(s) with no markdown heading (doctor " + (
+                "SPEC-DOC-002): " + ", ".join(headingless)
+            )
+        tail = "\n".join(merged.splitlines()[-30:])
+        return ok, tail
+
+    return _gate
+
+
+def _normalize_memory_token_estimates(specs_dir: Path) -> None:
+    """Recompute drifting ``token_estimate`` frontmatter values (derived data).
+
+    Same formula as the packaged linter (``round(word_count * 1.35)``, contract-pinned
+    by the render/lint suites). Only rewrites when the declared value drifts >20% —
+    the linter's own warning threshold — so hand-tuned close values stay untouched.
+    """
+    import re as _re
+
+    memory_dir = specs_dir / "memory"
+    if not memory_dir.is_dir():
+        return
+    fm_re = _re.compile(r"^---\n(.*?)\n---\n", _re.DOTALL)
+    for md in memory_dir.rglob("*.md"):
+        try:
+            content = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = fm_re.match(content)
+        if match is None:
+            continue
+        body = content[match.end() :]
+        declared_match = _re.search(r"^token_estimate:\s*(\d+)\s*$", match.group(1), _re.MULTILINE)
+        if declared_match is None:
+            continue
+        declared = int(declared_match.group(1))
+        actual = round(len(body.split()) * 1.35)
+        if declared <= 0 or actual <= 0:
+            continue
+        if abs(actual - declared) / declared <= 0.20:
+            continue
+        updated = content.replace(f"token_estimate: {declared}", f"token_estimate: {actual}", 1)
+        with contextlib.suppress(OSError):
+            md.write_text(updated, encoding="utf-8")
+
+
+def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
+    """Build the closure-time derived-catalog refresh for one context specs dir.
+
+    Returns ``None`` when the context has no product-memory zone (nothing to derive).
+    """
+    if not (specs_dir / "memory" / "product").is_dir():
+        return None
+
+    def _regenerate() -> None:
+        from dadaia_workspace.features.specs.catalog import (
+            generate_catalog,
+            write_catalog,
+            write_index,
+        )
+
+        _normalize_memory_token_estimates(specs_dir)
+        catalog = generate_catalog(specs_dir)
+        write_catalog(specs_dir, catalog)
+        write_index(specs_dir, catalog)
+
+    return _regenerate
 
 
 def _release_definition_runtime_factory(
@@ -1283,6 +1502,33 @@ def _release_definition_runtime_factory(
         "tasks_create": "TASKS.md",
     }
 
+    # Deliverable stubs must be VALID under the workflow's own deterministic gates
+    # (bug fake-backlog-definition-cannot-complete-user-flow, release-definition leg):
+    # PLAN.md carries the mandatory Validation Dependency Table so the plan lint passes
+    # and `--harness fake` walks the WHOLE §6.1 sequence to the terminal commit gate.
+    _STUB_CONTENT = {
+        "SPEC.md": (
+            "# SPEC: driving-fake stub\n\n> **Status:** Draft\n\n## Scope\n\nDeterministic driving-fake deliverable.\n"
+        ),
+        "PLAN.md": (
+            "# PLAN: driving-fake stub\n\n> **Status:** Draft\n\n"
+            "## Validation Dependency Table\n\n"
+            "| Workstream | Produces by end | Direct validation | "
+            "Validation dependencies | Deferred integration evidence |\n"
+            "|---|---|---|---|---|\n"
+            "| WS-1 | driving-fake stub deliverable | deterministic gate walk | "
+            "none | none |\n"
+        ),
+        "TASKS.md": (
+            "# TASKS: driving-fake stub\n\n> **Status:** Draft\n\n"
+            "Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.\n\n"
+            "## Tasks\n\n"
+            "- [ ] T-1 - driving-fake stub task\n"
+            "  - **Owner:** software-engineer\n"
+            "  - **Acceptance:** deterministic gate walk completes\n"
+        ),
+    }
+
     class _ReleaseDefinitionDrivingFake:
         def __init__(self, kind: AgentRuntimeKind) -> None:
             self._kind = kind
@@ -1307,12 +1553,14 @@ def _release_definition_runtime_factory(
                 target = run_cwd / ref
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(
-                        '{"fake": true, "summary": "driving-fake stub artifact"}\n'
-                        if ref.endswith(".json")
-                        else "# driving-fake stub artifact\n\n> **Status:** Draft\n",
-                        encoding="utf-8",
-                    )
+                    if ref.endswith(".json"):
+                        content = '{"fake": true, "summary": "driving-fake stub artifact"}\n'
+                    else:
+                        content = _STUB_CONTENT.get(
+                            Path(ref).name,
+                            "# driving-fake stub artifact\n\n> **Status:** Draft\n",
+                        )
+                    target.write_text(content, encoding="utf-8")
             return AgentRunResult(
                 status=AgentRunStatus.SUCCEEDED,
                 summary="fake release-definition worker: APPROVED",
@@ -1396,6 +1644,25 @@ def build_release_definition_workflow(
     )
 
 
+#: The single idempotent slug the backlog driving fake upserts. One fixed slug means
+#: re-runs EDIT the same canary item (a changed ``change`` text) instead of accumulating
+#: near-duplicate NEW items that would trip the overlap classifier.
+_FAKE_BACKLOG_CANARY_SLUG = "dadaia-fake-harness-canary"
+
+
+def _fake_backlog_canary_ref() -> str:
+    """Pick a live ``cli``-kind anchor for the canary item's intent.
+
+    Derived from the real CLI command tree at write time so the canary always binds
+    through the R1 registry regardless of command renames. ``backlog doctor`` is the
+    stable first choice; any derived anchor works as a fallback.
+    """
+    from dadaia_workspace.cli.anchors import derive_cli_anchors
+
+    anchors = derive_cli_anchors()
+    return "backlog doctor" if "backlog doctor" in anchors else min(anchors)
+
+
 def _backlog_definition_runtime_factory(
     *,
     context: str,
@@ -1405,31 +1672,77 @@ def _backlog_definition_runtime_factory(
 
     Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
     model reaches each adapter through ``request.resolved_model`` (threaded from the step's
-    ``resolved_model``), not a construction-time model; ``FAKE`` resolves to a *driving*
-    fake that returns an APPROVED step output with an in-scope artifact_ref, so ``--harness
-    fake`` walks the whole §4 sequence deterministically (mirrors the release-definition
-    fake factory).
+    ``resolved_model``), not a construction-time model. ``FAKE`` resolves to a *driving*,
+    STEP-AWARE fake (bug fake-backlog-definition-cannot-complete-user-flow, mirroring the
+    release-definition driving fake): ``backlog_author`` upserts a REAL synthetic backlog
+    item (valid ``intents[]`` binding a live cli anchor, ``change`` text unique per run)
+    so the real post-authoring review gate validates real disk state and the whole §4
+    sequence COMPLETES deterministically.
     """
     from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
         AgentRunResult,
         AgentRunStatus,
     )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
 
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary="fake backlog-definition worker: APPROVED",
-        artifact_refs=(
-            f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json",
-        ),
-        structured_output={"verdict": "APPROVED"},
-    )
+    class _BacklogDefinitionDrivingFake:
+        def __init__(self, kind: AgentRuntimeKind) -> None:
+            self._kind = kind
+
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return self._kind
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            task_id = request.task_id or ""
+            label = task_id.rsplit(":", 1)[-1]
+            refs = [
+                f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
+            ]
+            if label == "backlog_author":
+                specs_prefix = (
+                    f"repos/{context}/specs"
+                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    else "specs"
+                )
+                item_ref = f"{specs_prefix}/backlog/{_FAKE_BACKLOG_CANARY_SLUG}.md"
+                refs.append(item_ref)
+                target = run_cwd / item_ref
+                target.parent.mkdir(parents=True, exist_ok=True)
+                # Upsert (never append): the change text carries the task id so a re-run
+                # is a detectable EDIT of the one canary item.
+                target.write_text(
+                    "---\n"
+                    "status: proposed\n"
+                    "intents:\n"
+                    "  - subject:\n"
+                    "      kind: cli\n"
+                    f"      ref: {_fake_backlog_canary_ref()}\n"
+                    f"    change: driving-fake canary authored by run '{task_id}'\n"
+                    "---\n\n"
+                    "# Driving-fake backlog canary\n\n"
+                    "Synthetic item written by `--harness fake` so the documented\n"
+                    "backlog-definition flow completes deterministically. Safe to delete.\n",
+                    encoding="utf-8",
+                )
+            for ref in refs:
+                if ref.endswith(".json"):
+                    target = run_cwd / ref
+                    if not target.exists():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(
+                            '{"fake": true, "summary": "driving-fake stub artifact"}\n',
+                            encoding="utf-8",
+                        )
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="fake backlog-definition worker: APPROVED",
+                artifact_refs=tuple(refs),
+                structured_output={"verdict": "APPROVED"},
+            )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
         if kind is AgentRuntimeKind.FAKE:
-            # materialize_root: the gate now verifies declared refs EXIST (bug
-            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
-            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
+            return _BacklogDefinitionDrivingFake(kind)
         return build_agent_runtime(kind, cwd=run_cwd)
 
     return factory
@@ -1518,6 +1831,7 @@ def _step_output_driving_fake_factory(
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
+    domain_payload: dict[str, object] | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build a runtime factory whose FAKE returns one in-scope raw step output.
 
@@ -1527,6 +1841,10 @@ def _step_output_driving_fake_factory(
     harnesses (pi/codex) resolve to their live adapters; the policy-resolved concrete model
     reaches each adapter through ``request.resolved_model`` (threaded from the step's
     ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
+    ``domain_payload`` (bug certification-passes-without-complete-workflow-chain) lets a
+    workflow whose step schema is stricter than the generic handoff (e.g. audit's
+    ``audit-report-v1``) hand the fake a schema-VALID payload so ``--harness fake`` walks
+    that sequence to completion instead of always blocking on payload validation.
     """
     from dadaia_workspace.core.models.lifecycle import (
         AgentRunResult,
@@ -1539,6 +1857,7 @@ def _step_output_driving_fake_factory(
         summary=summary,
         artifact_refs=(artifact_ref,),
         structured_output={"verdict": "APPROVED"},
+        domain_payload=domain_payload or {},
     )
 
     def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
@@ -1583,6 +1902,16 @@ def build_audit_workflow(
     specs_dir = workspace_root / "repos" / context_name / "specs"
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
+    # Bug audit-accepts-undefined-release-and-creates-release-tree: audit runs against an
+    # EXISTING release. Its step payloads route to specs/releases/<release_id>/handoffs/
+    # (release-scoped, unlike backlog_definition), so an undefined id would synthesize a
+    # bogus release tree. Reject before any run/write.
+    if not (specs_dir / "releases" / release_id).is_dir():
+        raise ReleaseNotFoundError(
+            f"Audit target release '{release_id}' does not exist under "
+            f"{specs_dir.as_posix()}/releases/. Audit runs against an existing release — "
+            "define/approve the release first, or pass an existing --release-id."
+        )
     handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
     selector = ContextSelector(
         SpecContext(
@@ -1601,6 +1930,23 @@ def build_audit_workflow(
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
             artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
+            # A schema-VALID audit-report-v1 canary (one INFO finding routed to
+            # accepted-risk) so the fake exercises the real referential-integrity gate
+            # and the sequence COMPLETES (bug
+            # certification-passes-without-complete-workflow-chain).
+            domain_payload={
+                "question": "driving-fake audit canary: does the audit chain complete?",
+                "lenses": ["workflow-wiring"],
+                "findings": [
+                    {
+                        "id": "F-FAKE-1",
+                        "severity": "INFO",
+                        "lens": "workflow-wiring",
+                        "summary": "driving-fake canary finding (no real defect)",
+                    }
+                ],
+                "dispositions": [{"finding_id": "F-FAKE-1", "route": "accepted-risk"}],
+            },
         ),
         context_selector=selector,
         default_runtime_kind=default_runtime_kind,

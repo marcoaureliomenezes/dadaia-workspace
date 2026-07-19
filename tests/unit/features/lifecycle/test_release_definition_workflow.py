@@ -289,3 +289,102 @@ def test_approved_spec_review_inserts_one_canonical_status(
     assert normalized.count("> **Status:** Aprovado") == 1
     assert "Status: Draft" not in normalized
     assert "status: Draft" not in normalized
+
+
+# ── bug release-plan-author-does-not-converge-validation-contract (game cycle 4) ────
+#
+# A live pt-BR worker translated the section heading and column titles; the lint then
+# blocked on presentation while the table's SEMANTICS were valid. Presentation is now
+# matched structurally (normalized heading, positional 5-column fallback); semantics
+# (canonical WS ids, five non-empty cells, no forward dependencies) stay strict.
+
+
+def _wf_with_plan(tmp_path: Path, plan_body: str) -> ReleaseDefinitionWorkflow:
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(plan_body, encoding="utf-8")
+    return wf
+
+
+def test_plan_lint_accepts_translated_headings_with_valid_semantics(tmp_path: Path) -> None:
+    translated = (
+        "# PLAN\n\n## Tabela de Dependências de Validação\n\n"
+        "| Fluxo de trabalho | Produz ao final | Validação direta | "
+        "Dependências de validação | Evidência de integração adiada |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | módulo board | testes unitários | None | None |\n"
+        "| WS-2 | CLI do jogo | testes de integração | WS-1 | None |\n"
+    )
+    wf = _wf_with_plan(tmp_path, translated)
+    assert wf._validate_plan_dependency_table() is None
+
+
+def test_plan_lint_still_blocks_forward_dependency_in_translated_table(tmp_path: Path) -> None:
+    translated_bad = (
+        "# PLAN\n\n## Tabela de Dependências de Validação\n\n"
+        "| Fluxo | Produz | Validação | Dependências | Evidência |\n"
+        "|---|---|---|---|---|\n"
+        "| WS-1 | board | unit | None | None |\n"
+        "| WS-2 | cli | integração | WS-3 | None |\n"
+        "| WS-3 | e2e | partida | WS-2 | None |\n"
+    )
+    wf = _wf_with_plan(tmp_path, translated_bad)
+    block = wf._validate_plan_dependency_table()
+    assert block is not None
+    assert "WS-2" in block.reason and "WS-3" in block.reason
+
+
+# ── bug release-definition-completes-without-persisting-artifacts (game cycle 6) ────
+#
+# A live worker "passed" spec_create without persisting SPEC.md (the zone-wide
+# deliverable glob was satisfied by any write) and the terminal gate advanced the
+# release to IMPLEMENTATION with 2 doctor errors. Create steps now declare their
+# EXACT file deliverable, and definition_commit_gate refuses to complete unless
+# SPEC/PLAN/TASKS exist with the review-approved status on disk.
+
+
+class _SkipsSpecFake:
+    """Approves every step; writes PLAN/TASKS but never SPEC.md (the cycle-6 shape)."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def runtime_kind(self) -> AgentRuntimeKind:
+        return AgentRuntimeKind.FAKE
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        refs = [f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"]
+        deliverable = {"plan_create": "PLAN.md", "tasks_create": "TASKS.md"}.get(label)
+        if deliverable is not None:
+            ref = f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/{deliverable}"
+            refs.append(ref)
+        for ref in refs:
+            target = self.root / ref
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('{"fake": true}\n', encoding="utf-8")
+        return AgentRunResult(
+            status=AgentRunStatus.SUCCEEDED,
+            summary="ok",
+            artifact_refs=tuple(refs),
+            structured_output={"verdict": "APPROVED"},
+        )
+
+
+def test_definition_never_completes_without_spec_on_disk(tmp_path: Path) -> None:
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _SkipsSpecFake(tmp_path))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    # Remove the pre-seeded SPEC so only the worker could create it (it won't).
+    (specs / "releases" / _RELEASE / "SPEC.md").unlink()
+
+    result = wf.run("no-spec-run")
+
+    assert result.completed is False, "definition must NEVER complete without SPEC.md on disk"
+    assert result.blocked is not None
+    # ACTIVE.md must not have been repointed to IMPLEMENTATION.
+    active = specs / "releases" / "ACTIVE.md"
+    if active.exists():
+        assert "IMPLEMENTATION" not in active.read_text(encoding="utf-8")

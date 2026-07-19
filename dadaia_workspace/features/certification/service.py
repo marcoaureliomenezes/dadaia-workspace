@@ -105,15 +105,15 @@ def certify(
             )
         return proc.stdout
 
-    def cli_expect_block(
-        expected_step: str, *args: str, extra_env: dict[str, str] | None = None
-    ) -> str:
-        """Run a lifecycle verb on the PLAIN fake and assert the v0.2.3 honest-block contract.
+    def cli_expect_complete(*args: str, extra_env: dict[str, str] | None = None) -> dict[str, Any]:
+        """Run a lifecycle verb on the driving fake and assert the run COMPLETES.
 
-        Since v0.2.3 the plain ``--harness fake`` worker deliberately produces no
-        gate-satisfying artifact: the engine must RUN and then BLOCK (exit 3) at the
-        known deterministic gate. That block IS the certification proof — engine,
-        step order, and gate all executed for real (a stub would raise instead).
+        Bug certification-passes-without-complete-workflow-chain: a green certification
+        must prove one coherent canonical workflow chain (backlog materialization →
+        approved definition → implementation → reviews → closure), not merely that each
+        verb can reach some deterministic block. The ``--harness fake`` driving worker
+        materializes gate-VALID deliverables, so every Python gate executes for real on
+        real disk state and the run must end COMPLETED (exit 0).
         """
         child_env = {**env, **(extra_env or {})}
         proc = process.run(
@@ -122,19 +122,39 @@ def certify(
             env=child_env,
             timeout=180,
         )
-        if proc.returncode != 3:
+        if proc.returncode != 0:
             raise RuntimeError(
-                f"expected honest-block exit 3 at '{expected_step}', got {proc.returncode}: "
+                f"expected COMPLETED exit 0, got {proc.returncode}: "
                 f"{(proc.stderr or proc.stdout).strip()[:400]}"
             )
-        payload = json.loads(proc.stdout)
-        blocked_at = (payload.get("blocked") or {}).get("blocked_at_step")
-        if payload.get("status") != "BLOCKED" or blocked_at != expected_step:
+        payload: dict[str, Any] = json.loads(proc.stdout)
+        if payload.get("completed") is not True:
             raise RuntimeError(
-                f"expected BLOCKED at '{expected_step}', got status={payload.get('status')} "
-                f"blocked_at={blocked_at}"
+                f"expected completed=true, got status={payload.get('status')} "
+                f"blocked={payload.get('blocked')}"
             )
-        return f"engine ran and honestly blocked at deterministic gate '{expected_step}'"
+        return payload
+
+    def cli_expect_clean_failure(*args: str, extra_env: dict[str, str] | None = None) -> str:
+        """Run a verb that MUST fail — non-zero exit, one clean line, NEVER a traceback.
+
+        The F-22 class: a raw Python traceback from any dadaia CLI verb is a defect.
+        This proves the honest-failure half of the contract the completion checks no
+        longer exercise (a wrong invocation is refused loudly and cleanly).
+        """
+        child_env = {**env, **(extra_env or {})}
+        proc = process.run(
+            [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
+            cwd=target,
+            env=child_env,
+            timeout=180,
+        )
+        combined = f"{proc.stdout}\n{proc.stderr}"
+        if proc.returncode == 0:
+            raise RuntimeError(f"expected a non-zero refusal, got exit 0: {combined.strip()[:400]}")
+        if "Traceback (most recent call last)" in combined:
+            raise RuntimeError(f"raw traceback leaked (F-22 class): {combined.strip()[:400]}")
+        return f"refused cleanly (exit {proc.returncode}, no traceback)"
 
     def check(name: str, action: Callable[[], str | None]) -> None:
         try:
@@ -246,10 +266,108 @@ def certify(
         "context-specs-doctor",
         lambda: doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json"),
     )
+    consumer_specs = target / "repos" / "certified-consumer" / "specs"
+
+    def backlog_chain() -> str:
+        cli_expect_complete(
+            "lifecycle",
+            "backlog-definition",
+            "--context",
+            "certified-consumer",
+            "--release-id",
+            "v0.0.1",
+            "--run-id",
+            "cert-backlog",
+            "--demand",
+            "certify deterministic workflow",
+            "--harness",
+            "fake",
+            "--json",
+            extra_env=harness_env,
+        )
+        items = sorted(
+            p.name
+            for p in (consumer_specs / "backlog").glob("*.md")
+            if p.stem not in {"README", "ideas", "candidates"}
+        )
+        if not items:
+            raise RuntimeError("backlog-definition completed but wrote no backlog item")
+        return f"completed; materialized backlog item(s): {', '.join(items)}"
+
+    check("workflow-backlog-definition", backlog_chain)
+
+    def release_chain() -> str:
+        cli_expect_complete(
+            "lifecycle",
+            "release-definition",
+            "--context",
+            "certified-consumer",
+            "--release-id",
+            "v0.0.1",
+            "--run-id",
+            "cert-release",
+            "--harness",
+            "fake",
+            "--json",
+        )
+        release_dir = consumer_specs / "releases" / "v0.0.1"
+        for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
+            path = release_dir / name
+            if not path.is_file():
+                raise RuntimeError(f"release-definition completed but {name} is missing")
+            if name != "TASKS.md" and "**Status:** Aprovado" not in path.read_text(
+                encoding="utf-8"
+            ):
+                raise RuntimeError(f"{name} was not flipped to Aprovado by its review gate")
+        active = (consumer_specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
+        if "v0.0.1" not in active or "IMPLEMENTATION" not in active:
+            raise RuntimeError(f"ACTIVE.md was not repointed to the defined release: {active!r}")
+        return "completed; SPEC/PLAN approved, TASKS authored, ACTIVE.md repointed"
+
+    check("workflow-release-definition", release_chain)
+
+    def audit_chain() -> str:
+        cli_expect_complete(
+            "lifecycle",
+            "audit",
+            "--context",
+            "certified-consumer",
+            "--release-id",
+            "v0.0.1",
+            "--run-id",
+            "cert-audit",
+            "--harness",
+            "fake",
+            "--json",
+        )
+        return "completed; audit report validated and dispositions gate passed"
+
+    check("workflow-audit", audit_chain)
+
+    # Honest-failure canaries (F-22 class): wrong invocations refuse cleanly — non-zero
+    # exit, no raw traceback, no side effects.
+    def audit_missing_release_refused() -> str:
+        detail = cli_expect_clean_failure(
+            "lifecycle",
+            "audit",
+            "--context",
+            "certified-consumer",
+            "--release-id",
+            "v9.9.9",
+            "--run-id",
+            "cert-audit-missing",
+            "--harness",
+            "fake",
+            "--json",
+        )
+        if (consumer_specs / "releases" / "v9.9.9").exists():
+            raise RuntimeError("audit against an undefined release created a release tree")
+        return detail + "; no phantom release tree created"
+
+    check("workflow-audit-undefined-release-refused", audit_missing_release_refused)
     check(
-        "workflow-backlog-definition",
-        lambda: cli_expect_block(
-            "backlog_review_gate",
+        "workflow-completed-run-rerun-refused",
+        lambda: cli_expect_clean_failure(
             "lifecycle",
             "backlog-definition",
             "--context",
@@ -266,40 +384,6 @@ def certify(
             extra_env=harness_env,
         ),
     )
-    check(
-        "workflow-release-definition",
-        lambda: cli_expect_block(
-            "plan_create",
-            "lifecycle",
-            "release-definition",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-release",
-            "--harness",
-            "fake",
-            "--json",
-        ),
-    )
-    check(
-        "workflow-audit",
-        lambda: cli_expect_block(
-            "audit_report",
-            "lifecycle",
-            "audit",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-audit",
-            "--harness",
-            "fake",
-            "--json",
-        ),
-    )
 
     def commit_definition() -> str:
         repo = target / "repos" / "certified-consumer"
@@ -309,10 +393,9 @@ def certify(
         return "definition committed and pushed for implementation preflight"
 
     check("workflow-definition-git-baseline", commit_definition)
-    check(
-        "workflow-implementation-reviews",
-        lambda: cli_expect_block(
-            "implement",
+
+    def implementation_chain() -> str:
+        cli_expect_complete(
             "lifecycle",
             "implementation-reviews",
             "--skip-preflight",
@@ -326,8 +409,13 @@ def certify(
             "fake",
             "--json",
             extra_env=harness_env,
-        ),
-    )
+        )
+        closure = consumer_specs / "releases" / "v0.0.1" / "CLOSURE.md"
+        if not closure.is_file():
+            raise RuntimeError("implementation-reviews completed but CLOSURE.md is missing")
+        return "completed; implement→review→close ladder reached CLOSURE.md"
+
+    check("workflow-implementation-reviews", implementation_chain)
 
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"

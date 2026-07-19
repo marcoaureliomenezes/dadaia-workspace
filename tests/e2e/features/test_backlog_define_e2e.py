@@ -75,19 +75,23 @@ def test_backlog_define_runs_the_real_workflow_and_exits_clean(workspace: Path) 
             "--json",
         ],
     )
-    # The author-first workflow runs for real; the fake worker writes no backlog item,
-    # so the REAL post-authoring gate honestly BLOCKS (exit 3) — proof the workflow ran
-    # (a _deferred stub would have raised and produced no step list at all).
-    assert result.exit_code == 3, result.output
+    # The author-first workflow runs for real; the driving fake authors a REAL synthetic
+    # backlog item, so the REAL post-authoring gate validates it on disk and the run
+    # COMPLETES (bug fake-backlog-definition-cannot-complete-user-flow) — proof the
+    # workflow ran (a _deferred stub would have raised and produced no step list at all).
+    assert result.exit_code == 0, result.output
 
     payload = json.loads(result.output)
-    assert payload["status"] == "BLOCKED", payload
+    assert payload["status"] == "OK", payload
     labels = [step["label"] for step in payload["steps"]]
     assert labels == _EXPECTED_SEQUENCE, labels
     # Model steps carry their real fragment id (not a generic "Run the step" prompt).
     author = next(s for s in payload["steps"] if s["label"] == "backlog_author")
     assert author["fragment_id"] == "backlog_definition.backlog_authoring", author
-    assert payload["blocked"]["blocked_at_step"] == "backlog_review_gate", payload
+    # The gate validated a real on-disk item the fake materialized.
+    assert list((workspace / "specs" / "backlog").glob("*.md")), (
+        "driving fake must materialize a backlog item under specs/backlog/"
+    )
 
 
 def test_backlog_define_rejects_claude_harness_law1(workspace: Path) -> None:

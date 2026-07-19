@@ -23,6 +23,7 @@ honest diff text for a prompt.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -130,12 +131,69 @@ def build_git_diff_provider(
     return _provider
 
 
+def build_executed_test_gate(
+    repo_root: Path,
+    *,
+    paths: tuple[str, ...] = (),
+    timeout_seconds: float = 300.0,
+    python_bin: str | None = None,
+) -> Callable[[], tuple[bool | None, str]]:
+    """Build the deterministic executed-test CLOSE gate (container DI seam).
+
+    Bug implementation-review-approves-unexecuted-validation: closure must never rest
+    on a worker's "planned / not run" self-report. The gate RUNS pytest
+    (``-p no:cacheprovider``) over the test paths inside the release's declared write
+    set and yields ``(ok, evidence)``: ``ok=True``/``False`` is the real exit status,
+    ``ok=None`` means the release declares no test paths (gate does not apply). The
+    evidence string carries the exact command + bounded output tail.
+    """
+    test_targets = tuple(
+        prefix
+        for prefix in (raw.split("*", 1)[0].rstrip("/") for raw in paths)
+        if prefix.startswith("tests") and ".." not in prefix.split("/")
+    )
+
+    def _gate() -> tuple[bool | None, str]:
+        if not test_targets:
+            return None, "no test paths declared in the release write set"
+        existing = [t for t in test_targets if (repo_root / t).exists()]
+        if not existing:
+            return None, "declared test paths do not exist on disk"
+        cmd = [
+            python_bin or sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            *existing,
+        ]
+        try:
+            proc = subprocess.run(  # noqa: S603 — fixed argv, read-only evidence run
+                cmd,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"pytest run failed to execute: {exc}"
+        merged = (proc.stdout + "\n" + proc.stderr).strip().splitlines()
+        note = f"$ {' '.join(cmd)}  (exit {proc.returncode})"
+        return proc.returncode == 0, "\n".join([note, *merged[-40:]])
+
+    return _gate
+
+
 def build_test_output_provider(
     repo_root: Path,
     *,
     paths: tuple[str, ...] = (),
     max_lines: int = 120,
     timeout_seconds: float = 300.0,
+    python_bin: str | None = None,
 ) -> Callable[[], str]:
     """Build a zero-arg executed-test-evidence provider (container DI seam).
 
@@ -158,7 +216,7 @@ def build_test_output_provider(
         if not existing:
             return "no test evidence: declared test paths do not exist yet"
         cmd = [
-            sys.executable,
+            python_bin or sys.executable,
             "-m",
             "pytest",
             "-p",
@@ -174,6 +232,7 @@ def build_test_output_provider(
                 text=True,
                 timeout=timeout_seconds,
                 check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return f"no test evidence: pytest run failed to execute ({exc})"

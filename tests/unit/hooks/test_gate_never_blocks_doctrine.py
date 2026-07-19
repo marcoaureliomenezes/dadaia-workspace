@@ -116,7 +116,11 @@ def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_pat
     assert result_b.block_envelope() is None
     # The advisory line (when emitted) is stdout/stderr diagnostic text, never the block
     # envelope, and it names the other live session.
-    combined = result_b.stdout + result_b.stderr
+    combined = "\n".join(
+        line
+        for line in (result_b.stdout + result_b.stderr).splitlines()
+        if line.strip() and line.strip() != '{"decision": "allow"}'
+    )
     if combined.strip():
         assert sid_a in combined
 

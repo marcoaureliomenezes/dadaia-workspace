@@ -32,7 +32,10 @@ UNSTAMPED_VERSION = 0
 #: ``features/spec_artifacts/new_artifacts.py``. Every consumer imports THIS object; the
 #: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
 #: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
-RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+#: The ONE release-id canon every public entry point validates against (bug
+#: lifecycle-accepts-noncanonical-release-id): vMAJOR.MINOR.PATCH with an optional
+#: -suffix segment (rc/canary/hotfix flows are legitimate release identities).
+RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _STAMP_RE = re.compile(r"^specs_pattern_version:\s*(\d+)\s*$", re.MULTILINE)

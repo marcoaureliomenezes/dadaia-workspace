@@ -531,6 +531,22 @@ def test_scaffold_atom_headings_are_allowlisted() -> None:
     assert missing == [], f"scaffold headings missing from allowlist: {missing}"
 
 
+def test_memory_feature_template_headings_are_allowlisted() -> None:
+    """Bug: `dadaia memory product add` emits an atom from
+    ``public/templates/memory-feature.md``; every ``##`` heading it writes must be
+    curated-allowlisted, or the supported "add a feature" path yields an atom that
+    ``specs doctor`` immediately flags LINT-1 (unknown heading) — the product's own
+    template contradicting its own linter, so a context can never reach 0 warnings."""
+    template = _REPO_ROOT / "dadaia_workspace" / "public" / "templates" / "memory-feature.md"
+    assert template.is_file()
+    missing = [
+        heading
+        for heading in _lint_mod._extract_h2_headings(template.read_text(encoding="utf-8"))
+        if heading not in _lint_mod.HEADING_ALLOWLIST
+    ]
+    assert missing == [], f"memory-feature template headings missing from allowlist: {missing}"
+
+
 # ---------------------------------------------------------------------------
 # Allowlist content pins — kept in one param fn so the giant string tables stay
 # auditable without 4 separate bodies.

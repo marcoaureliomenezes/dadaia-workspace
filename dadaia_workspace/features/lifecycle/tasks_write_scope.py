@@ -103,14 +103,36 @@ def write_scope_from_release_tasks(specs_dir: Path, release_id: str) -> tuple[st
         return ()
     globs: list[str] = []
     seen: set[str] = set()
+
+    def _add(path: str) -> None:
+        if path not in seen:
+            seen.add(path)
+            globs.append(path)
+
     for block in _incomplete_task_blocks(tasks_path.read_text(encoding="utf-8")):
         value = _write_set_line(block)
         if value is None:
             continue
         for path in _extract_globs(value):
-            if path not in seen:
-                seen.add(path)
-                globs.append(path)
+            _add(path)
+            # Bug implementation-write-scope-omits-declared-python-module-entrypoint:
+            # a write set naming FILES denied creating sibling files the contract
+            # itself requires (src/<pkg>/__main__.py next to src/<pkg>/cli.py). A file
+            # path also contributes its parent-directory glob — the declared zone is
+            # the directory, not the single filename; explicit globs pass unchanged.
+            if "*" not in path and "/" in path and "." in path.rsplit("/", 1)[-1]:
+                parent, filename = path.rsplit("/", 1)
+                parent_glob = parent + "/**"
+                # NEVER emit a repo-wide (repos/<slug>/**) or workspace-wide glob —
+                # the prompt-scope security guard forbids them (they would grant
+                # specs/ writes; bug implementation-prompt-scope-rejects-repo-glob).
+                segments = parent.split("/")
+                repo_wide = parent == "" or (len(segments) == 2 and segments[0] == "repos")
+                if not repo_wide:
+                    _add(parent_glob)
+                elif "." in filename:
+                    # Root-level file: allow same-extension siblings only.
+                    _add(f"{parent}/*.{filename.rsplit('.', 1)[-1]}")
     return tuple(globs)
 
 

@@ -168,3 +168,15 @@ def test_purge_worker_outputs_rejects_unconfined_refs(tmp_path: Path, ref: str) 
     adapter = FilesystemRuntimeFileAdapter(tmp_path)
     with pytest.raises(RuntimeFilePathError):
         adapter.purge_worker_outputs((ref,))
+
+
+def test_runtime_file_path_error_is_dadaia_error_for_clean_cli() -> None:
+    """Bug lifecycle-rerun-immutable-payload-traceback: re-running a completed workflow
+    with the same --run-id collides with the immutable step payload and raises
+    RuntimeFilePathError. It must surface as a clean CLI line (DadaiaError) — not a raw
+    traceback — while staying a ValueError for existing callers."""
+    from dadaia_workspace.core.exceptions import DadaiaError
+    from dadaia_workspace.infrastructure.runtime_files import RuntimeFilePathError
+
+    assert issubclass(RuntimeFilePathError, DadaiaError)
+    assert issubclass(RuntimeFilePathError, ValueError)

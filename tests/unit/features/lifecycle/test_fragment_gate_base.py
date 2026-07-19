@@ -3,7 +3,7 @@
 Three properties the golden lock cannot catch (the golden run uses each body's module-global
 ``_SEQUENCE``, so a module-global-vs-threaded regression is invisible to it):
 
-* **Run-scoped iteration.** ``_produce_payload`` + ``_graph_completeness_block`` iterate the
+* **Run-scoped iteration.** ``_produce_payload`` + ``_graph_completeness_check`` iterate the
   sequence THREADED through ``run()``, never a module-global ``_SEQUENCE``. A base subclass run
   with a **custom** sequence produces + validates THAT sequence — the exact single-seam defect
   the dedup removes (AC-10(a) sabotages this: point ``_produce_payload`` back at a module-global
@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import CompletedRunRerunError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
@@ -137,7 +138,7 @@ def test_base_iterates_run_scoped_sequence_not_module_global(tmp_path: Path) -> 
     The custom sequence's producer + consumer labels (``cs_a`` / ``cs_b``) exist in NO
     module-global ``_SEQUENCE``. Run-scoped iteration ⇒ the run completes (graph whole) AND the
     ``cs_a`` payload records ``cs_b`` as its declared consumer. If ``_produce_payload`` /
-    ``_graph_completeness_block`` iterated a module-global ``_SEQUENCE`` (the removed defect):
+    ``_graph_completeness_check`` iterated a module-global ``_SEQUENCE`` (the removed defect):
     ``cs_a``'s declared_consumers would be empty (no module step consumes ``cs_a``) AND the gate
     would BLOCK (the module producers never ran) — both assertions below would FAIL (AC-10(a)).
     """
@@ -312,7 +313,7 @@ _GATE_MEMBERS = (
     "_resolve_upstream",
     "_record_consumptions",
     "_produce_payload",
-    "_graph_completeness_block",
+    "_graph_completeness_check",
     "_payload_from_result",
     "_with_step_outcome",
 )
@@ -484,8 +485,12 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
     assert "review verdict REJECTED: fix spec" in resumed_review_prompt
     assert "verdict_reason: fix spec" in resumed_review_prompt
 
-    # One-shot: a fresh full re-run of the same run id carries no stale digest.
-    fresh = wf.run("resume-digest-run", sequence=custom)
+    # Completed-rerun guard (bug completed-workflow-rerun-not-refused): a fresh full
+    # re-run of the now-COMPLETED run id refuses cleanly instead of re-executing.
+    with pytest.raises(CompletedRunRerunError):
+        wf.run("resume-digest-run", sequence=custom)
+    # One-shot: a fresh run (new id) carries no stale digest.
+    fresh = wf.run("resume-digest-run-2", sequence=custom)
     assert fresh.completed is True
     assert "Prior rejection feedback" not in fake.received_requests[-1].prompt
 

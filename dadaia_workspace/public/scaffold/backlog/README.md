@@ -52,7 +52,7 @@ Discover the bindable anchors for this repo with:
 
 ```bash
 dadaia backlog subjects            # list canonical anchors (optionally --kind <kind>)
-dadaia backlog subjects <ref> --kind <kind>   # preview how one subject resolves
+dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subject resolves
 ```
 
 ### Non-Python repos

@@ -49,7 +49,7 @@ def _scope(
     return PromptScope(
         role=role,
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         task_id=task_id,
         prompt=prompt,
         allowed_paths=(".dadaia/handoff/dadaia-workspace/**",),

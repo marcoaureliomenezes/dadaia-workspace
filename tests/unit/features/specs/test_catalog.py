@@ -237,7 +237,7 @@ def test_subdirectory_discovery_and_area_derivation(tmp_path: Path) -> None:
 
     # index.md groups by area, not a single "product" bucket.
     index_md = render_index_md(catalog)
-    assert "## Features by area" in index_md
+    assert "## Catálogo de features" in index_md
     assert "### sdd" in index_md
     assert "### platform" in index_md
 
@@ -309,3 +309,72 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
         assert feature["tldr"] in index_text, (
             f"index.md is out of sync with catalog for {feature['slug']}"
         )
+
+
+# ── bug closure-breaks-canonical-backlog-anchor (Hermes real game cycle) ────────────
+#
+# `memory catalog generate` used to REPLACE index.md wholesale with a template whose
+# headings differ from the scaffold's — destroying canonical doc anchors
+# (memory/product/index.md#Catálogo de features) that accepted backlog intents bind.
+# Regeneration now surgically updates ONLY the `## Catálogo de features` section and
+# preserves every other heading/anchor; a fresh file is born with the canonical heading.
+
+
+def _scaffold_index(specs_dir) -> str:
+    text = (
+        "---\nslug: index\ntitle: Catálogo de Produtos\ncategory: product\n---\n\n"
+        "## Visão atômica\n\nVisão do produto.\n\n"
+        "## Usuários\n\n| Usuário | Descrição |\n|---|---|\n| dev | usa |\n\n"
+        "## Catálogo de features\n\n"
+        "| Slug | Título | TL;DR |\n|------|--------|-------|\n"
+        "| placeholder | placeholder | placeholder |\n\n"
+        "## Mapa de capacidades\n\nmapa\n\n"
+        "## Limites conhecidos\n\nnenhum\n"
+    )
+    out = specs_dir / "memory" / "product" / "index.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    return text
+
+
+def test_write_index_preserves_existing_headings_and_updates_catalog_section(
+    tmp_path,
+) -> None:
+    from dadaia_workspace.features.specs.catalog import write_index
+
+    specs = tmp_path / "specs"
+    _scaffold_index(specs)
+    catalog = {
+        "context": "valgame",
+        "features": [{"slug": "ttt", "title": "Tic Tac Toe", "tldr": "CLI game", "area": "core"}],
+    }
+
+    write_index(specs, catalog)
+
+    text = (specs / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+    # Every pre-existing heading/anchor survives regeneration.
+    for heading in (
+        "## Visão atômica",
+        "## Usuários",
+        "## Catálogo de features",
+        "## Mapa de capacidades",
+        "## Limites conhecidos",
+    ):
+        assert heading in text, heading
+    # The catalog section carries the regenerated table (placeholder gone).
+    assert "`ttt`" in text
+    assert "| placeholder | placeholder | placeholder |" not in text
+    # Section order intact: catalog table sits between Usuários and Mapa.
+    assert text.index("## Usuários") < text.index("`ttt`") < text.index("## Mapa de capacidades")
+
+
+def test_write_index_fresh_file_carries_canonical_catalog_heading(tmp_path) -> None:
+    from dadaia_workspace.features.specs.catalog import write_index
+
+    specs = tmp_path / "specs"
+    catalog = {"context": "valgame", "features": []}
+
+    write_index(specs, catalog)
+
+    text = (specs / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+    assert "## Catálogo de features" in text

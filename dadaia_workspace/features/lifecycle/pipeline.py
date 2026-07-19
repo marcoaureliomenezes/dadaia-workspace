@@ -11,6 +11,7 @@ and persists progress at every step (resumable).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import uuid
@@ -19,6 +20,7 @@ from dataclasses import Field, dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Protocol
 
+from dadaia_workspace.core.exceptions import TasksMarkerStateError
 from dadaia_workspace.core.harness_models import (
     CODEX_HARNESS,
     HarnessModelOption,
@@ -40,6 +42,7 @@ from dadaia_workspace.core.models.workflow_execution import (
     WorkflowPolicySnapshot,
     WorkflowPolicyStepEntry,
 )
+from dadaia_workspace.core.models.workflow_handoff import WorkflowStepLedger
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStore
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
@@ -72,6 +75,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
+from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
@@ -191,11 +195,43 @@ class LifecyclePipeline:
         specs_dir: Path | None = None,
         runtime_files: RuntimeFilePort | None = None,
         artifact_root: Path | None = None,
+        executed_test_gate: Callable[[], tuple[bool | None, str]] | None = None,
+        memory_catalog_regenerator: Callable[[], None] | None = None,
+        memory_lint_gate: Callable[[], tuple[bool, str]] | None = None,
+        repo_hygiene_sweeper: Callable[[], None] | None = None,
+        closure_committer: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
         self._run_store = run_store
         self._runtime_factory = runtime_factory
+        # Bug implementation-review-approves-unexecuted-validation: when wired
+        # (production composition), the terminal `close` step COMPLETES only on an
+        # EXECUTED, GREEN test run — Python-owned evidence, never a worker self-report.
+        # The gate yields (ok, evidence): ok=False blocks close; ok=None means the
+        # release declares no test paths (unaffected). ``None`` (fixtures) keeps
+        # behavior byte-identical.
+        self._executed_test_gate = executed_test_gate
+        # Bug closure-catalog-references-missing-memory-atom: the memory catalog is
+        # DERIVED from the atoms on disk. After a successful close, Python regenerates
+        # catalog.json + index.md so a hand-edited phantom entry cannot survive the
+        # cycle and doctor CAT-1 stays impossible post-closure. Best-effort: a
+        # regeneration failure never un-closes the release.
+        self._memory_catalog_regenerator = memory_catalog_regenerator
+        # Bug closure-allows-memory-doctor-warnings: when wired, the close step refuses
+        # to complete while the context's memory atoms carry lint findings — closure
+        # leaves memory lint-clean or blocks with the findings digest.
+        self._memory_lint_gate = memory_lint_gate
+        # Bug lifecycle-workflows-leave-python-bytecode-in-repo: when wired, a
+        # completed cycle deterministically sweeps cache dirs (__pycache__,
+        # .pytest_cache, ...) out of the context repo. Best-effort, never un-closes.
+        self._repo_hygiene_sweeper = repo_hygiene_sweeper
+        # Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
+        # commits the context repo's release/implementation/memory changes — closure is
+        # a durable state, not a dirty working tree. Best-effort, never un-closes.
+        self._closure_committer = closure_committer
+        # One-shot prior-block digest injected into the first resumed step's prompt.
+        self._resume_digest: str | None = None
         self._prefix = prefix
         self._prompt_builder = prompt_builder or LifecyclePromptBuilder()
         self._state_machine = state_machine or LifecycleStateMachine()
@@ -259,41 +295,113 @@ class LifecyclePipeline:
         )
         return run, replace(scope, prompt=prompt)
 
-    def run(self, run_id: str, steps: tuple[PipelineStep, ...]) -> PipelineResult:
+    def run(
+        self,
+        run_id: str,
+        steps: tuple[PipelineStep, ...],
+        *,
+        resume_from: str | None = None,
+    ) -> PipelineResult:
         if not steps:
             raise ValueError("pipeline requires at least one step")
+        # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
+        # id is immutable history — refuse cleanly before any marker rewrite or zone
+        # reclaim; blocked/failed run ids remain restartable.
+        refuse_completed_rerun(self._run_store, run_id)
         # Python owns task-marker state because the implementation worker's write scope
         # deliberately excludes TASKS.md. Reservations survive retries and blocked runs;
         # completion happens only after the entire review + close ladder succeeds.
         self._rewrite_task_markers(" ", "-")
         self._require_task_markers(("-", "x"), boundary="implementation start")
-        # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
-        # replacing the run record discards its ledger, so reclaim the orphaned payload
-        # zone before the new generation's attempt-0 writes.
-        if self._handoff_resolver is not None:
-            self._handoff_resolver.reset_run_zone(
-                run_id,
-                worker_output_refs=tuple(
-                    canonical_worker_output_ref(
-                        self._context, f"{run_id}:{step.label}:attempt-{attempt}"
-                    )
-                    for step in steps
-                    for attempt in range(self._max_review_retries + 1)
-                ),
+        if resume_from is not None:
+            # Bug implementation-reviews-resume-token-without-cli-resume: the ledger
+            # advertised a resume token with no command honoring it. A blocked run now
+            # resumes from the named step — upstream ledger records are KEPT (their
+            # payloads stay addressable), only the resumed-step-onward zone is reclaimed.
+            labels = tuple(step.label for step in steps)
+            if resume_from not in labels:
+                raise ValueError(
+                    f"resume_from step {resume_from!r} is not in the pipeline sequence {labels}"
+                )
+            prior = self._run_store.load(run_id)
+            if prior is not None and prior.blocked is not None:
+                # Parity with the fragment-gate engines: the resumed step's prompt
+                # carries the prior rejection/block digest — a blind re-run repeats
+                # the identical findings forever.
+                blocked_prior = prior.blocked
+                resume_digest_lines = [
+                    "## Prior rejection feedback (resumed run)",
+                    f"The previous run blocked at step {blocked_prior.blocked_at_step!r}: "
+                    f"{blocked_prior.reason}",
+                ]
+                for key, value in sorted(blocked_prior.detail.items()):
+                    resume_digest_lines.append(f"- {key}: {value}")
+                resume_digest_lines.append(
+                    "Revise the deliverable so every point above is addressed."
+                )
+                self._resume_digest = "\n".join(resume_digest_lines)
+            if prior is None:
+                raise ValueError(
+                    f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run"
+                )
+            index = labels.index(resume_from)
+            resumed_labels = set(labels[index:])
+            if self._handoff_resolver is not None:
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    producer_steps=resumed_labels,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(
+                            self._context, f"{run_id}:{step.label}:attempt-{attempt}"
+                        )
+                        for step in steps[index:]
+                        for attempt in range(self._max_review_retries + 1)
+                    ),
+                    context=self._context,
+                    release_id=self._release_id,
+                )
+            kept = tuple(
+                record
+                for record in prior.workflow_steps.records
+                if record.producer_step not in resumed_labels
+            )
+            run = replace(
+                prior,
+                phase=steps[index].from_phase,
+                status=LifecycleRunStatus.RUNNING,
+                current_step=resume_from,
+                blocked=None,
+                workflow_steps=WorkflowStepLedger(records=kept),
+            )
+            steps = steps[index:]
+        else:
+            # Restart semantics (bug rerun-of-run-id-collides-with-immutable-payload-zone):
+            # replacing the run record discards its ledger, so reclaim the orphaned payload
+            # zone before the new generation's attempt-0 writes.
+            if self._handoff_resolver is not None:
+                self._handoff_resolver.reset_run_zone(
+                    run_id,
+                    worker_output_refs=tuple(
+                        canonical_worker_output_ref(
+                            self._context, f"{run_id}:{step.label}:attempt-{attempt}"
+                        )
+                        for step in steps
+                        for attempt in range(self._max_review_retries + 1)
+                    ),
+                    context=self._context,
+                    release_id=self._release_id,
+                )
+            run = LifecycleRun(
+                run_id=run_id,
                 context=self._context,
                 release_id=self._release_id,
+                command="pipeline",
+                phase=steps[0].from_phase,
+                status=LifecycleRunStatus.RUNNING,
+                current_step=steps[0].label,
+                idempotency_key=run_id,
+                workflow_policy=self._policy_snapshot,
             )
-        run = LifecycleRun(
-            run_id=run_id,
-            context=self._context,
-            release_id=self._release_id,
-            command="pipeline",
-            phase=steps[0].from_phase,
-            status=LifecycleRunStatus.RUNNING,
-            current_step=steps[0].label,
-            idempotency_key=run_id,
-            workflow_policy=self._policy_snapshot,
-        )
         self._run_store.save(run)
 
         results: list[PipelineStepResult] = []
@@ -301,8 +409,19 @@ class LifecyclePipeline:
         retry_source: tuple[str, int] | None = None
         while True:
             retry_requested = False
-            for step in steps:
+            for index, step in enumerate(steps, start=1):
                 digest: str | None = None
+                if self._resume_digest is not None:
+                    digest = self._resume_digest
+                    self._resume_digest = None
+                live_step = step.runtime_kind is not AgentRuntimeKind.FAKE
+                if live_step:
+                    self._progress(
+                        f"implementation-reviews step {step.label!r} ({index}/{len(steps)}) "
+                        f"started on {step.runtime_kind.value} — a live worker step may take "
+                        "several minutes; it times out and blocks cleanly on its own"
+                    )
+                close_zone_snapshot = self._snapshot_close_zone() if step.label == "close" else None
                 if step.label == "implement" and retry_source is not None:
                     assert self._handoff_resolver is not None
                     producer_step, producer_attempt = retry_source
@@ -341,11 +460,22 @@ class LifecyclePipeline:
                     current_step=step.label,
                     is_review=step.is_review,
                     deliverable_globs=(
-                        (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
-                        f"specs/releases/{self._release_id}/CLOSURE.md",
-                    )
-                    if step.label == "close"
-                    else (),
+                        (
+                            (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
+                            f"specs/releases/{self._release_id}/CLOSURE.md",
+                        )
+                        if step.label == "close"
+                        # Bug lifecycle-worker-executes-at-workspace-root-not-context-repo:
+                        # when the implement step carries a derived write set, at least
+                        # one delivered path must land INSIDE it — a worker writing at
+                        # the workspace root (outside repos/<ctx>/) blocks AT the step
+                        # with the correct zone in its retry digest.
+                        else (
+                            self._implement_deliverable_globs(step)
+                            if step.label == "implement" and step.extra_allowed_paths
+                            else ()
+                        )
+                    ),
                 )
                 if step.target_phase is None:
                     worker_result, blocked = runner.evaluate_gate_with_result(run, runner_input)
@@ -368,6 +498,54 @@ class LifecyclePipeline:
                     run = decision.run
                     accepted = decision.advanced
 
+                if accepted and step.label == "close" and self._memory_lint_gate is not None:
+                    lint_ok, lint_evidence = self._memory_lint_gate()
+                    if not lint_ok:
+                        blocked_lint = BlockedState(
+                            reason=(
+                                "close blocked: memory atoms carry lint findings — closure "
+                                "must leave specs/memory lint-clean (fix the atom headings/"
+                                "frontmatter per the memory template, then resume)"
+                            ),
+                            blocked_at_step="close",
+                            resume_token=run.idempotency_key,
+                            detail={"memory_lint": lint_evidence[-1500:]},
+                        )
+                        decision = self._state_machine.transition(
+                            run,
+                            TransitionInput(
+                                target_phase=LifecyclePhase.BLOCKED,
+                                blocked_state=blocked_lint,
+                                current_step=step.label,
+                            ),
+                        )
+                        run = decision.run
+                        accepted = False
+
+                if accepted and step.label == "close" and self._executed_test_gate is not None:
+                    tests_ok, tests_evidence = self._executed_test_gate()
+                    if tests_ok is False:
+                        blocked_close = BlockedState(
+                            reason=(
+                                "close blocked: executed test validation is not green — "
+                                "closure requires the declared test suite to RUN and pass "
+                                "(planned-but-unexecuted validation never closes a release)"
+                            ),
+                            blocked_at_step="close",
+                            resume_token=run.idempotency_key,
+                            detail={"executed_tests": tests_evidence[-1500:]},
+                        )
+                        decision = self._state_machine.transition(
+                            run,
+                            TransitionInput(
+                                target_phase=LifecyclePhase.BLOCKED,
+                                blocked_state=blocked_close,
+                                current_step=step.label,
+                            ),
+                        )
+                        run = decision.run
+                        accepted = False
+
                 verdict = worker_result.structured_output.get("verdict")
                 rejected_review = (
                     step.is_review
@@ -383,6 +561,15 @@ class LifecyclePipeline:
                         worker_result,
                         attempt=attempt,
                         declared_consumers=("implement",) if will_retry else (),
+                    )
+                if step.label == "close" and not accepted:
+                    # Transactional close (bug blocked-close-materializes-closure-...):
+                    # a blocked close leaves no half-written closure/memory state.
+                    self._restore_close_zone(close_zone_snapshot)
+                if live_step:
+                    self._progress(
+                        f"implementation-reviews step {step.label!r} ({index}/{len(steps)}) "
+                        + ("accepted" if accepted else "blocked")
                     )
                 self._run_store.save(run)
                 results.append(
@@ -426,6 +613,17 @@ class LifecyclePipeline:
         run = replace(run, status=LifecycleRunStatus.COMPLETED)
         self._rewrite_task_markers("-", "x")
         self._require_task_markers(("x",), boundary="implementation completion")
+        if self._memory_catalog_regenerator is not None:
+            # Derived-state refresh must never un-close a completed release.
+            with contextlib.suppress(Exception):
+                self._memory_catalog_regenerator()
+        if self._repo_hygiene_sweeper is not None:
+            with contextlib.suppress(Exception):
+                self._repo_hygiene_sweeper()
+        self._reset_active_md()
+        if self._closure_committer is not None:
+            with contextlib.suppress(Exception):
+                self._closure_committer()
         self._run_store.save(run)
         return PipelineResult(
             run_id=run_id,
@@ -471,6 +669,98 @@ class LifecyclePipeline:
             raise
         return count
 
+    def _implement_deliverable_globs(self, step: PipelineStep) -> tuple[str, ...]:
+        """The implement step's deliverable zone in BOTH canonical spellings.
+
+        Bug implementation-deliverable-zone-misses-context-repo: TASKS write sets are
+        commonly repo-relative (``src/**``) while workers report workspace-relative
+        paths (``repos/<ctx>/src/...``) — both name the same zone, so both must match.
+        A glob already qualified with ``repos/`` passes through unchanged.
+        """
+        globs: list[str] = []
+        for raw in step.extra_allowed_paths:
+            path = raw.format(context=self._context, release_id=self._release_id)
+            if path not in globs:
+                globs.append(path)
+            if not path.startswith("repos/"):
+                qualified = f"repos/{self._context}/{path}"
+                if qualified not in globs:
+                    globs.append(qualified)
+        return tuple(globs)
+
+    @staticmethod
+    def _progress(message: str) -> None:
+        """One human progress line on STDERR (bug
+        release-definition-codex-hangs-after-spec-create, visibility half): a live
+        multi-minute run must never be silent — validators kill healthy workers.
+        stdout stays machine-pure for --json consumers.
+        """
+        import sys as _sys
+
+        print(f"[lifecycle] {message}", file=_sys.stderr, flush=True)
+
+    def _snapshot_close_zone(self) -> dict[str, bytes | None] | None:
+        """Capture the closure-mutable zone before the close worker runs.
+
+        Bug blocked-close-materializes-closure-and-leaves-specs-incoherent: the close
+        worker legitimately writes CLOSURE.md + memory atoms, but a BLOCKED close must
+        be transactional. Captures every file under ``specs/memory/`` plus the
+        release's CLOSURE.md (``None`` marks paths that did not exist).
+        """
+        if self._specs_dir is None:
+            return None
+        snapshot: dict[str, bytes | None] = {}
+        memory_dir = self._specs_dir / "memory"
+        if memory_dir.is_dir():
+            for path in memory_dir.rglob("*"):
+                if path.is_file():
+                    with contextlib.suppress(OSError):
+                        snapshot[str(path)] = path.read_bytes()
+        closure = self._specs_dir / "releases" / self._release_id / "CLOSURE.md"
+        snapshot[str(closure)] = closure.read_bytes() if closure.is_file() else None
+        # Sentinel key so restore can prune NEW files created under memory/.
+        snapshot["__memory_dir__"] = str(memory_dir).encode("utf-8")
+        return snapshot
+
+    def _restore_close_zone(self, snapshot: dict[str, bytes | None] | None) -> None:
+        """Roll the closure-mutable zone back to its pre-close-worker state."""
+        if snapshot is None or self._specs_dir is None:
+            return
+        memory_dir_raw = snapshot.get("__memory_dir__")
+        memory_dir = Path(memory_dir_raw.decode("utf-8")) if memory_dir_raw else None
+        known = {key for key in snapshot if key != "__memory_dir__"}
+        # Remove files CREATED by the blocked close attempt.
+        if memory_dir is not None and memory_dir.is_dir():
+            for path in memory_dir.rglob("*"):
+                if path.is_file() and str(path) not in known:
+                    with contextlib.suppress(OSError):
+                        path.unlink()
+        # Restore pre-existing content; drop files that did not exist.
+        for key in known:
+            path = Path(key)
+            content = snapshot[key]
+            with contextlib.suppress(OSError):
+                if content is None:
+                    if path.is_file():
+                        path.unlink()
+                else:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+
+    def _reset_active_md(self) -> None:
+        """Point ACTIVE.md at none/none — the Python-owned effect of a SUCCESSFUL close.
+
+        Bug implementation-close-block-resets-active-release-and-breaks-resume: the
+        worker must never touch ACTIVE.md (it is out of the close scope now); Python
+        rewrites it only after the whole ladder completes.
+        """
+        if self._specs_dir is None:
+            return
+        releases = self._specs_dir / "releases"
+        with contextlib.suppress(OSError):
+            releases.mkdir(parents=True, exist_ok=True)
+            (releases / "ACTIVE.md").write_text("release: none\nphase: none\n", encoding="utf-8")
+
     def _require_task_markers(self, allowed: tuple[str, ...], *, boundary: str) -> None:
         """Fail closed when TASKS marker state does not match a pipeline boundary."""
         if self._specs_dir is None:
@@ -483,7 +773,9 @@ class LifecyclePipeline:
             # artifacts. The normal CLI preflight owns the missing-file gate.
             return
         except OSError as exc:
-            raise RuntimeError(f"cannot validate task markers at {boundary}: {path}") from exc
+            raise TasksMarkerStateError(
+                f"cannot validate task markers at {boundary}: {path}"
+            ) from exc
 
         markers: list[str] = []
         for line in text.splitlines():
@@ -493,11 +785,15 @@ class LifecyclePipeline:
                     markers.append(match.group("marker"))
                     break
         if not markers:
-            raise RuntimeError(f"no recognizable task markers at {boundary}: {path}")
+            raise TasksMarkerStateError(
+                f"no recognizable task markers at {boundary}: {path}. TASKS.md must "
+                "declare at least one task line the pipeline grammar recognizes "
+                "(e.g. '- [ ] T-1 - <title>')."
+            )
         unexpected = sorted({marker for marker in markers if marker not in allowed})
         if unexpected:
             rendered = ", ".join(f"[{marker}]" for marker in unexpected)
-            raise RuntimeError(
+            raise TasksMarkerStateError(
                 f"invalid task marker state at {boundary}: found {rendered} in {path}"
             )
 
@@ -563,10 +859,19 @@ class LifecyclePipeline:
         # (ARCHITECT MEDIUM-2) — never a label string match — so review steps
         # (review_qa/review_security/review_code, is_review=True) ALWAYS stay
         # handoff-only regardless of what extra_allowed_paths carries.
-        expanded_paths = tuple(
-            path.format(context=self._context, release_id=self._release_id)
-            for path in step.extra_allowed_paths
-        )
+        expanded_paths_list: list[str] = []
+        for _raw in step.extra_allowed_paths:
+            _path = _raw.format(context=self._context, release_id=self._release_id)
+            if _path not in expanded_paths_list:
+                expanded_paths_list.append(_path)
+            # Dual spelling (bug implementation-deliverable-zone-misses-context-repo):
+            # repo-relative write sets and workspace-relative worker reports name the
+            # same zone.
+            if not _path.startswith("repos/"):
+                _qualified = f"repos/{self._context}/{_path}"
+                if _qualified not in expanded_paths_list:
+                    expanded_paths_list.append(_qualified)
+        expanded_paths = tuple(expanded_paths_list)
         expanded_paths = filter_context_spec_paths(
             expanded_paths,
             workspace_root=self._artifact_root,
@@ -759,10 +1064,11 @@ def implementation_ladder(
             fragment_id="implementation.close_release",
             shared_fragment_ids=("shared.memory_selection",),
             extra_allowed_paths=(
+                # ACTIVE.md is deliberately NOT here: pointing it at none/none is a
+                # Python-owned effect of a SUCCESSFUL close (bug
+                # implementation-close-block-resets-active-release-and-breaks-resume).
                 "repos/{context}/specs/releases/{release_id}/**",
                 "specs/releases/{release_id}/**",
-                "repos/{context}/specs/releases/ACTIVE.md",
-                "specs/releases/ACTIVE.md",
                 "repos/{context}/specs/memory/**",
                 "specs/memory/**",
             ),

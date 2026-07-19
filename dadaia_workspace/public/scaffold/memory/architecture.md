@@ -15,24 +15,31 @@ release_origin: memory-markdown-source-v1
 
 ## Visão geral
 
-Visão geral ainda não documentada. Descrever o propósito central da arquitetura aqui.
+**Contexto greenfield.** Este contexto ainda não tem arquitetura consolidada: a
+arquitetura NASCE com a primeira release aprovada. Enquanto este atom estiver neste
+estado, o SPEC da release vigente é a referência estrutural fundadora — ele deve
+propor o layout inicial de módulos, e revisores avaliam o SPEC pela coerência interna
+e pelos critérios observáveis que ele mesmo define (nunca rejeitar por "memória de
+arquitetura vazia": este é o estado legítimo de um contexto novo). No CLOSURE da
+release fundadora, este atom é atualizado com a arquitetura realmente implementada.
 
 ## Camadas
 
 | Camada | Responsabilidade |
 |--------|-----------------|
-| placeholder | Descrever responsabilidades desta camada aqui. |
+| (a definir na release fundadora) | O SPEC vigente propõe o layout inicial; o CLOSURE o registra aqui. |
 
 ## Regras de dependência
 
 ```mermaid
 graph TD
-  A[Sem dados]
+  A[Release fundadora define as regras]
 ```
 
 ## Contratos entre módulos
 
-Contratos ainda não documentados.
+Sem contratos consolidados ainda — os contratos da release fundadora valem como base e
+são registrados aqui no CLOSURE.
 
 ## Estado runtime
 

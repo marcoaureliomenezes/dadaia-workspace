@@ -76,6 +76,16 @@ class NoActiveReleaseError(DadaiaError):
     """
 
 
+class ReleaseNotFoundError(DadaiaError):
+    """Raised when a lifecycle verb targets a ``--release-id`` that has no release directory.
+
+    ``lifecycle audit`` runs against an EXISTING release; accepting an undefined id would
+    synthesize a bogus ``specs/releases/<id>/`` tree by writing its handoff there (bug
+    ``audit-accepts-undefined-release-and-creates-release-tree``). The CLI maps this to a
+    non-zero exit with an orienting message — never a traceback.
+    """
+
+
 class NoAgentSequenceError(DadaiaError):
     """Raised when the active release's PLAN.md declares no identifiable agent owners.
 
@@ -144,3 +154,34 @@ class PlatformCapabilityError(DadaiaError):
 
 class WorkspaceVenvBootstrapError(RuntimeError):
     """Workspace venv bootstrap could not install the running distribution."""
+
+
+class CodexConfigError(DadaiaError, ValueError):
+    """Invalid Codex adapter configuration (e.g. an unknown ``DADAIA_CODEX_SANDBOX`` value).
+
+    Inherits ``ValueError`` (back-compat: existing callers catch ValueError) AND
+    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
+    traceback (bug doctor-uninitialized-workspace-traceback class). A stale dadaia that
+    predates a newer sandbox value must fail cleanly, not crash.
+    """
+
+
+class TasksMarkerStateError(DadaiaError, RuntimeError):
+    """TASKS.md marker state does not match a pipeline boundary contract.
+
+    Inherits ``RuntimeError`` (back-compat: pre-existing callers catch RuntimeError) AND
+    ``DadaiaError`` so the CLI entrypoint surfaces it as one concise line instead of a raw
+    traceback (bug implementation-reviews-tasks-marker-traceback, F-22 class): running
+    ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
+    recognizable task markers is an operator-facing condition, never a crash.
+    """
+
+
+class CompletedRunRerunError(DadaiaError):
+    """Re-invoking a COMPLETED lifecycle run id is refused (idempotency contract).
+
+    Bug completed-workflow-rerun-not-refused (Hermes 0.3.2 run-2): the pipeline
+    silently re-executed a completed run id while the fragment workflows only blocked
+    by accident of identical content. Every workflow engine now refuses explicitly and
+    cleanly — a completed run is immutable history; new work takes a fresh --run-id.
+    """

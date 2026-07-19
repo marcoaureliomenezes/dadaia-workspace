@@ -89,7 +89,7 @@ def _no_verdict() -> AgentRunResult:
 def _pipeline(store: _MemoryRunStore, factory: object) -> LifecyclePipeline:
     return LifecyclePipeline(
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         run_store=store,
         runtime_factory=factory,  # type: ignore[arg-type]
     )
@@ -336,7 +336,7 @@ def test_pipeline_reuses_cacheable_prefix_and_applies_step_tiers() -> None:
     prefix = PromptPrefix.from_sections({"constitution": "C", "memory": "M"})
     pipe = LifecyclePipeline(
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         run_store=store,
         runtime_factory=lambda kind: _RecordingFake(kind, captured),
         prefix=prefix,
@@ -544,9 +544,7 @@ def test_scope_extra_allowed_paths_union_for_create_steps_ignored_for_review_ac7
     close_scope = _pipeline(_MemoryRunStore(), lambda kind: _KindFake(kind, _approved()))._scope(
         close_step, "close-scope"
     )
-    assert "repos/dadaia-workspace/specs/releases/multiharness-engine-v0116/**" in (
-        close_scope.allowed_paths
-    )
+    assert "repos/dadaia-workspace/specs/releases/v0.1.16/**" in (close_scope.allowed_paths)
     assert all("{" not in path for path in close_scope.allowed_paths)
 
 
@@ -564,7 +562,7 @@ def test_close_requires_real_closure_deliverable(tmp_path: Path) -> None:
     store = _MemoryRunStore()
     pipe = LifecyclePipeline(
         context="dadaia-workspace",
-        release_id="multiharness-engine-v0116",
+        release_id="v0.1.16",
         run_store=store,
         runtime_factory=lambda kind: _KindFake(kind, _approved()),
         artifact_root=tmp_path,

@@ -40,6 +40,7 @@ A resumed step whose prior attempt blocked receives a one-shot digest of that
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -83,6 +84,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     build_fragment_suffix,
     canonical_worker_output_ref,
 )
+from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
@@ -319,10 +321,22 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # ONCE, before any step in THIS call runs). ``backlog_review_gate`` diffs the
         # post-authoring snapshot against this to find what ``backlog_author`` actually wrote.
         before = self._backlog_snapshot()
+        # Kept for the author-step payload promotion (bug
+        # backlog-author-bare-payload-breaks-release-handoff): the promoted evidence is
+        # enriched with the DISK-diffed authored path(s), never a worker self-report.
+        self._before_snapshot = before
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
-        for step in remaining:
+        for step_index, step in enumerate(remaining, start=1):
+            live_step = (step.runtime_kind or self._default_kind) is not AgentRuntimeKind.FAKE and (
+                step.kind is BacklogStepKind.MODEL
+            )
+            if live_step:
+                emit_progress(
+                    f"backlog-definition step {step.label!r} "
+                    f"({step_index}/{len(remaining)}) started"
+                )
             if step.kind is BacklogStepKind.REVIEW_GATE:
                 overlap_list, run, sr = self._run_review_gate(run, step, before)
                 overlap = overlap_list
@@ -335,6 +349,11 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 )
             else:
                 run, sr = self._run_model_step(run, step)
+            if live_step:
+                # Bug live-backlog-progress-misses-accepted-event: every started step
+                # also reports its outcome — a silent tail reads as a hang.
+                outcome = "skipped" if sr.skipped else ("accepted" if sr.accepted else "blocked")
+                emit_progress(f"backlog-definition step {step.label!r} {outcome}")
             self._run_store.save(run)
             results.append(sr)
             if not sr.accepted:
@@ -362,6 +381,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
     def _start_run(
         self, run_id: str, sequence: tuple[BacklogStep, ...]
     ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
+        # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
+        # id refuses cleanly; blocked runs stay restartable via resume_from.
+        refuse_completed_rerun(self._run_store, run_id)
         if self._handoff_resolver is not None:
             self._handoff_resolver.reset_run_zone(
                 run_id,
@@ -459,6 +481,35 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             snapshot[item.slug] = BoundItem(slug=item.slug, anchor_changes=anchor_changes)
         return snapshot
 
+    def _authored_backlog_paths(self) -> list[str]:
+        """Disk-diffed paths of the item(s) this run's author actually wrote.
+
+        Compares the live backlog snapshot against the pre-authoring snapshot captured
+        at ``run()`` start. Paths are workspace-relative when the artifact root is
+        known (the shape every downstream consumer scans for), else specs-dir-relative.
+        """
+        before = getattr(self, "_before_snapshot", None)
+        if before is None:
+            return []
+        after = self._backlog_snapshot()
+        changed = sorted(
+            slug
+            for slug, bound in after.items()
+            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        )
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        paths: list[str] = []
+        for slug in changed:
+            target = backlog_dir / f"{slug}.md"
+            rendered = target.as_posix()
+            if self._artifact_root is not None:
+                with contextlib.suppress(ValueError):
+                    rendered = (
+                        target.resolve().relative_to(self._artifact_root.resolve()).as_posix()
+                    )
+            paths.append(rendered)
+        return paths
+
     # -- Python step: backlog_review_gate (the real post-authoring gate) ---
 
     def _run_review_gate(
@@ -550,6 +601,44 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
         return overlap, self._still_running(run, step.label), self._ok_sr(step)
 
+    # -- canonical anchors digest (bug backlog-author-missing-canonical-subject-input) --
+
+    #: Per-kind cap for the anchors digest — keeps the prompt bounded on large source
+    #: trees while every kind stays represented.
+    _ANCHORS_PER_KIND_CAP = 40
+
+    def _canonical_anchors_digest(self) -> str | None:
+        """Render the registry's resolvable anchor set for the author's prompt.
+
+        The post-authoring gate binds every ``intents[]`` subject through THIS registry;
+        handing the author the same anchor list is what makes a completed author step
+        unable to emit a ref its next mandatory gate rejects. Bounded per kind; a
+        truncated kind says so and points at ``dadaia backlog subjects``.
+        """
+        anchors = self._registry.list_anchors(None)
+        if not anchors:
+            return None
+        by_kind: dict[str, list[str]] = {}
+        for anchor in anchors:
+            by_kind.setdefault(anchor.kind.value, []).append(anchor.id)
+        lines = [
+            "## Canonical subject anchors",
+            "",
+            "Bind EVERY `intents[]` subject to one of these anchors — `kind` must match "
+            "the anchor's kind and `ref` must be copied verbatim from this list. A ref "
+            "outside this list is rejected by `backlog_review_gate` (unresolved "
+            "subject). Explore the full set with `dadaia backlog subjects`.",
+            "",
+        ]
+        for kind in sorted(by_kind):
+            ids = sorted(by_kind[kind])
+            shown = ids[: self._ANCHORS_PER_KIND_CAP]
+            lines.append(f"- {kind}:")
+            lines.extend(f"  - `{anchor_id}`" for anchor_id in shown)
+            if len(ids) > len(shown):
+                lines.append(f"  - … {len(ids) - len(shown)} more (see `dadaia backlog subjects`)")
+        return "\n".join(lines)
+
     # -- opt-in grill digest (item 2: consumed, not decorative) ----------
 
     def _intake_grill_digest(self, run: LifecycleRun) -> str | None:
@@ -596,6 +685,13 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             digest = self._intake_grill_digest(run)
             if digest:
                 selected = "\n\n".join(filter(None, (selected, digest)))
+            # Bug backlog-author-missing-canonical-subject-input: the author must be
+            # HANDED the resolvable anchor set — without it a live worker invents refs
+            # (e.g. specs/backlog/README.md#Backlog) that its own next mandatory gate
+            # rejects. Same registry the gate binds against, so prompt and gate agree.
+            anchors_digest = self._canonical_anchors_digest()
+            if anchors_digest:
+                selected = "\n\n".join(filter(None, (selected, anchors_digest)))
         # One-shot resume-rejection digest for the resume-point step.
         resume_digest = self._resume_feedback.pop(step.label, None)
         if resume_digest:
@@ -639,12 +735,36 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 # Every backlog model step is a CREATE step: it must pass on a schema-valid
                 # payload, never a verdict (L1).
                 is_review=False,
+                # Bug codex-live-workflow-sandbox-unavailable-in-hermes-worker (0.3.1
+                # retest): a worker that "completes" without writing a backlog item must
+                # BLOCK AT THIS STEP with the worker's own diagnostic (and get the one
+                # bounded structural-correction retry), not sail through on its
+                # step-output envelope and fail later at backlog_review_gate with no
+                # trace of what the worker actually returned.
+                deliverable_globs=(
+                    (
+                        f"repos/{self._context}/specs/backlog/**",
+                        "specs/backlog/**",
+                    )
+                    if step.label == "backlog_author"
+                    else ()
+                ),
             ),
         )
         if blocked is None and self._handoff_resolver is not None:
             payload = durable_payload_from_result(
                 worker_result, fallback_summary=step.label, is_review=False
             )
+            if step.label == "backlog_author":
+                # Bug backlog-author-bare-payload-breaks-release-handoff: a live worker
+                # can write the item yet transport a bare payload ("codex exec
+                # completed"), leaving downstream consumers (release-definition's
+                # authoritative-pick resolver) with no specs/backlog path. Python owns
+                # the disk truth — enrich the promoted evidence with the diffed
+                # authored path(s).
+                authored = self._authored_backlog_paths()
+                if authored:
+                    payload["authored_backlog_paths"] = authored
             run, _ = self._handoff_resolver.produce(
                 run,
                 producer_step=step.label,

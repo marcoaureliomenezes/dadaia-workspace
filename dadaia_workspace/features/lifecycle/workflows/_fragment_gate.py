@@ -26,7 +26,7 @@ Two collaborators live here:
   class ``_WORKFLOW_LABEL`` so each body keeps its exact current text.
 
 **Refactor trap — sequence-scoped iteration (the exact single-seam defect the dedup removes).**
-``_produce_payload`` and ``_graph_completeness_block`` iterate the sequence threaded through
+``_produce_payload`` and ``_graph_completeness_check`` iterate the sequence threaded through
 ``run()`` — never a module-global ``_SEQUENCE``. Each body keeps its module-global
 ``_SEQUENCE`` by name (three guardrail suites import it), used only as ``run()``'s default
 ``sequence`` argument.
@@ -82,6 +82,7 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
+from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     _NO_RELEASE_CONTEXT_COMMANDS,
@@ -440,6 +441,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # the static inputs its own fragments declare) — never unioned across the whole
         # sequence, which taxed every step with every other step's inputs.
         if resume_from is None:
+            # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED
+            # run id refuses cleanly; blocked runs stay restartable/resumable.
+            refuse_completed_rerun(self._run_store, run_id)
             # Restart semantics: a fresh run over an existing run_id replaces the record
             # (and its ledger), so reclaim the orphaned payload zone first — otherwise the
             # prior generation's immutable attempt-0 files block this run's produce() (bug
@@ -523,10 +527,26 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         idx = 0
         while idx < len(steps_seq):
             step = steps_seq[idx]
+            live_step = (
+                step.fragment_id is not None
+                and (getattr(step, "runtime_kind", None) or self._default_kind)
+                is not AgentRuntimeKind.FAKE
+            )
+            if live_step:
+                emit_progress(
+                    f"{self._WORKFLOW_LABEL} step {step.label!r} ({idx + 1}/{len(steps_seq)}) "
+                    "started — a live worker step may take several minutes; it times out "
+                    "and blocks cleanly on its own"
+                )
             if step.fragment_id is None:
                 run, outcome = self._run_terminal_gate(run, step, sequence)
             else:
                 run, outcome = self._run_model_step(run, step, sequence)
+            if live_step:
+                emit_progress(
+                    f"{self._WORKFLOW_LABEL} step {step.label!r} "
+                    + ("accepted" if outcome.accepted else "blocked")
+                )
             self._run_store.save(run)
             outcomes.append(outcome)
             if outcome.accepted:
@@ -759,10 +779,20 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # Deliverable-zone requirement (bug
         # create-step-gate-accepts-refusal-handoff-as-success): a create step that
         # declares extra write paths must actually deliver inside them.
-        deliverable_globs = tuple(
-            pattern.format(context=self._context, release_id=self._release_id)
-            for pattern in getattr(step, "extra_allowed_paths", ())
-        )
+        step_deliverable = getattr(step, "deliverable", None)
+        if step_deliverable:
+            # Exact-file deliverable (bug
+            # release-definition-completes-without-persisting-artifacts): the step
+            # passes only when ITS artifact was written, not any write in the zone.
+            deliverable_globs = (
+                f"repos/{self._context}/specs/releases/{self._release_id}/{step_deliverable}",
+                f"specs/releases/{self._release_id}/{step_deliverable}",
+            )
+        else:
+            deliverable_globs = tuple(
+                pattern.format(context=self._context, release_id=self._release_id)
+                for pattern in getattr(step, "extra_allowed_paths", ())
+            )
         worker_result, blocked = runner.evaluate_gate_with_result(
             run,
             AgentRunnerInput(
@@ -943,7 +973,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             return run, _StepOutcome(
                 label=step.label, accepted=False, is_gate=True, blocked=run.blocked
             )
-        graph_block = self._graph_completeness_block(run, step, sequence)
+        run, graph_block = self._graph_completeness_check(run, step, sequence)
         if graph_block is not None:
             blocked_run = self._with_step_outcome(run, step.label, graph_block)
             return blocked_run, _StepOutcome(
@@ -975,46 +1005,68 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             )
         return completed, _StepOutcome(label=step.label, accepted=True, is_gate=True)
 
-    def _graph_completeness_block(
+    def _graph_completeness_check(
         self, run: LifecycleRun, step: StepT, sequence: tuple[StepT, ...]
-    ) -> BlockedState | None:
-        """Return a BlockedState if the workflow-step handoff graph is incomplete.
+    ) -> tuple[LifecycleRun, BlockedState | None]:
+        """Validate the workflow-step handoff graph; reconcile lost records from disk.
 
         For every model step in the RUN-SCOPED *sequence*: a ``produces`` step must have a
         ledger record; for every ``consumes`` edge the consumer must have recorded a
-        consumption of that producer. No-op when no resolver is wired. Iterates the threaded
-        ``sequence`` — never a module-global ``_SEQUENCE``.
+        consumption of that producer. A record missing from the in-memory ledger is first
+        RECONCILED from its persisted immutable payload (bug
+        release-commit-gate-ignores-existing-plan-review-payload — an interrupted worker
+        between resets/resumes can drop the record while the disk truth survives); only
+        when the disk has no valid payload either does the gate block. No-op when no
+        resolver is wired. Iterates the threaded ``sequence`` — never a module-global
+        ``_SEQUENCE``.
         """
         if self._handoff_resolver is None:
-            return None
+            return run, None
+        resolver = self._handoff_resolver
+        recovered: set[str] = set()
+
+        def _find_or_recover(label: str) -> LifecycleRun | None:
+            nonlocal run
+            if run.workflow_steps.find(label, 0) is not None:
+                return run
+            restored = resolver.recover_persisted_record(run, producer_step=label, attempt=0)
+            if restored is None:
+                return None
+            run, _record = restored
+            recovered.add(label)
+            return run
+
         for s in sequence:
             if s.fragment_id is None:
                 continue
-            if s.produces is not None and run.workflow_steps.find(s.label, 0) is None:
-                return BlockedState(
+            if s.produces is not None and _find_or_recover(s.label) is None:
+                return run, BlockedState(
                     reason=f"workflow-step graph incomplete: step {s.label!r} declared "
-                    f"produces={s.produces!r} but wrote no ledger payload",
+                    f"produces={s.produces!r} but wrote no ledger payload (and no "
+                    "persisted payload could be reconciled from disk)",
                     blocked_at_step=step.label,
                     detail={"missing_producer": s.label},
                 )
             for producer in s.consumes:
-                record = run.workflow_steps.find(producer, 0)
-                if record is None:
-                    return BlockedState(
+                if _find_or_recover(producer) is None:
+                    return run, BlockedState(
                         reason=f"workflow-step graph incomplete: {s.label!r} consumes "
-                        f"{producer!r} which has no ledger payload",
+                        f"{producer!r} which has no ledger payload (and no persisted "
+                        "payload could be reconciled from disk)",
                         blocked_at_step=step.label,
                         detail={"consumer": s.label, "missing_producer": producer},
                     )
+                record = run.workflow_steps.find(producer, 0)
+                assert record is not None
                 acked = any(c.consumer_step == s.label for c in record.consumptions)
-                if not acked:
-                    return BlockedState(
+                if not acked and producer not in recovered:
+                    return run, BlockedState(
                         reason=f"workflow-step graph incomplete: {s.label!r} never recorded "
                         f"consumption of {producer!r}",
                         blocked_at_step=step.label,
                         detail={"consumer": s.label, "unconsumed_producer": producer},
                     )
-        return None
+        return run, None
 
 
 __all__ = [

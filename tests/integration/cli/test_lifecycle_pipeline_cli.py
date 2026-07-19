@@ -13,6 +13,21 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
+
+def _json_from_output(output: str) -> dict:
+    """Parse the CLI's JSON payload, ignoring [lifecycle] progress lines.
+
+    CliRunner mixes stderr into output; live-kind runs emit per-step progress there
+    (bug release-definition-codex-hangs-after-spec-create, visibility half).
+    """
+    import json as _json
+
+    lines = [ln for ln in output.splitlines() if not ln.startswith("[lifecycle]")]
+    text = "\n".join(lines).strip()
+    start = text.index("{")
+    return _json.loads(text[start:])
+
+
 _runner = CliRunner()
 
 
@@ -70,7 +85,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
             "implementation-reviews",
             "--skip-preflight",
             "--release-id",
-            "multiharness-engine-v0116",
+            "v0.1.16",
             "--run-id",
             "pipe-it",
             "--harness",
@@ -82,7 +97,7 @@ def test_pipeline_runs_engine_and_blocks_at_first_step_on_fake(
     )
 
     assert result.exit_code == 3, result.output
-    payload = json.loads(result.output)
+    payload = _json_from_output(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
     # First step ran the engine on the fake harness and blocked on the missing evidence.
@@ -175,7 +190,7 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
             "implementation-reviews",
             "--skip-preflight",
             "--release-id",
-            "multiharness-engine-v0116",
+            "v0.1.16",
             "--run-id",
             "pipe-pi",
             "--harness",
@@ -185,7 +200,7 @@ def test_pipeline_runs_first_step_on_pi_harness_end_to_end(
     )
 
     assert result.exit_code == 3, result.output
-    payload = json.loads(result.output)
+    payload = _json_from_output(result.output)
     assert payload["status"] == "BLOCKED"
     assert payload["completed"] is False
     # `calls` proves the FAKE was invoked — a real-binary run leaves this list empty
@@ -294,7 +309,7 @@ def test_pi_openrouter_kimi_profile_reaches_command_with_valid_id(
             "implementation-reviews",
             "--skip-preflight",
             "--release-id",
-            "multiharness-engine-v0116",
+            "v0.1.16",
             "--run-id",
             "pipe-kimi",
             "--harness",
@@ -428,7 +443,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
                 "implementation-reviews",
                 "--skip-preflight",
                 "--release-id",
-                "multiharness-engine-v0116",
+                "v0.1.16",
                 "--run-id",
                 run_id,
                 "--harness",
@@ -455,7 +470,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
         f"expected '--skip-git-repo-check' in the real codex argv, got {trust_argv!r} — the "
         f"fake returned codex's trust error because the flag was absent"
     )
-    trust_payload = json.loads(trust_result.output)
+    trust_payload = _json_from_output(trust_result.output)
     trust_reason = (trust_payload.get("blocked") or {}).get("reason", "")
     assert "trusted directory" not in trust_reason, (
         f"pipeline still blocked on the codex trust error: {trust_reason!r} (argv={trust_argv!r})"
@@ -478,7 +493,7 @@ def test_codex_pipeline_trust_flag_and_sandbox_override_default(
         f"expected '--sandbox workspace-write' in the real codex argv, got {sandbox_argv!r} — "
         f"the fake returned the bwrap failure because the env override never reached argv"
     )
-    sandbox_payload = json.loads(sandbox_result.output)
+    sandbox_payload = _json_from_output(sandbox_result.output)
     sandbox_reason = (sandbox_payload.get("blocked") or {}).get("reason", "")
     assert "bwrap" not in sandbox_reason, (
         f"pipeline still blocked on the container bwrap failure: "

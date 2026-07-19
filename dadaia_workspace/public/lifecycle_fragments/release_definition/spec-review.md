@@ -40,6 +40,16 @@ Judge only what is in front of you; do not re-author the SPEC.
 | Edge cases | Failure modes, boundaries, and error paths are covered, not only the happy path. |
 | Regression safety | Changes to existing behavior name what must keep working and how that is confirmed. |
 
+## Greenfield rule
+
+A NEW context legitimately starts with embryonic memory: when `architecture_summary`
+and/or `quality_assurance_atom` are placeholders, empty, or explicitly marked
+greenfield, that absence is NEVER a rejection reason. In that state the SPEC itself is
+the founding structural reference — judge it on internal coherence, on the initial
+module layout it proposes, and on its own observable acceptance criteria. Reject a
+greenfield SPEC only for defects IN the SPEC (untestable requirements, incoherent
+layout, missing acceptance criteria), never for the absence of pre-existing memory.
+
 ## Output
 
 One verdict — `APPROVED` or `REJECTED` — with a one-sentence reason and a findings

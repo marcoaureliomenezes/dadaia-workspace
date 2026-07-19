@@ -166,7 +166,7 @@ def test_end_to_end_multi_atom_catalog_shape_ranks_wikilinks_index_and_idempoten
     index_md = index_out.read_text(encoding="utf-8")
     assert "aaa-feature" in index_md
     assert "ccc-feature" in index_md
-    assert "## Features by area" in index_md
+    assert "## Catálogo de features" in index_md
     assert "### product" in index_md
     assert "### sdd" in index_md
 

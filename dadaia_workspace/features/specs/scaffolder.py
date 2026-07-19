@@ -394,6 +394,12 @@ _SEGMENT_PLAN_STUB = """\
 ## Approach
 
 (Define the implementation approach for this segment.)
+
+## Validation Dependency Table
+
+| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |
+|---|---|---|---|---|
+| WS-1 | (deliverable of this segment) | (how it is validated in isolation) | none | none |
 """
 
 _SEGMENT_TASKS_STUB = """\
@@ -411,11 +417,9 @@ Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.
 
 ## Tasks
 
-### T1 — (Add tasks here)
-
-- **Status:** [ ]
-- **Owner:** software-engineer
-- **Acceptance:** (acceptance criteria)
+- [ ] T1 - (Add tasks here)
+  - **Owner:** software-engineer
+  - **Acceptance:** (acceptance criteria)
 """
 
 
