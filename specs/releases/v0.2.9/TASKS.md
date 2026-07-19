@@ -170,7 +170,7 @@ release.
 
 ---
 
-- [ ] **T7 - Hermes convergence rounds until zero real-use failures**
+- [x] **T7 - Hermes convergence rounds until zero real-use failures**
 
 **Owner role:** qa-engineer
 
@@ -195,7 +195,7 @@ sibling surfaces before reporting any round done.
 
 ---
 
-- [ ] **T8 - Docs, memory, 0.4.1 gates, deploy**
+- [x] **T8 - Docs, memory, 0.4.1 gates, deploy**
 
 **Owner role:** product-engineer
 

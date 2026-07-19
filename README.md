@@ -101,6 +101,13 @@ block).
 | **PI** (`@earendil-works/pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` | CLI-headless (`pi --mode json`) |
 | **Kimi Code** | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi has no project-level config) | — (Layer-1 only) | — |
 
+**Hermes agent (supported consumer).** The hermes agent (dd-chain-capture
+hermes-crawler) is the canonical consumer and release gate of dadaia-workspace — and,
+since v0.2.9, a declared **supported environment**: the shipped consumer validation
+recipe carries a Real-use matrix (R-01…R-08) built from the hermes day-to-day
+inventory, and every candidate must pass a full real-use round with zero failures
+before deploy.
+
 **Harness profiles.** `dadaia init --harness <set>` scaffolds only the harnesses you
 use (persisted in `.dadaia/states/harness_profile.json`). `dadaia public install` and
 `dadaia public doctor` are **profile-aware**: a claude-only workspace projects and

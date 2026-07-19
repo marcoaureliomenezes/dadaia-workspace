@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T06:11:37Z",
+  "generated_at": "2026-07-19T20:23:46Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -398,6 +398,30 @@
     },
     {
       "rank": 18,
+      "slug": "hermes-agent-support",
+      "title": "Hermes agent — supported consumer environment",
+      "category": "product",
+      "area": "platform",
+      "tldr": "Hermes agent is a first-class supported consumer of dadaia-workspace: certified end-to-end via the consumer recipe plus the Real-use matrix (R-01..R-08), converged to zero real-use failures in v0.2.9.",
+      "summary": "The hermes agent (dd-chain-capture hermes-crawler) is the canonical consumer and release gate of dadaia-workspace. Since v0.2.9 it is a declared SUPPORTED environment: the consumer validation recipe carries a Real-use matrix built from the hermes day-to-day inventory, and the 0.4.1 candidate converged to a full real-use round with zero failures (CERTIFIED_100, 35/35).",
+      "path": "specs/memory/product/platform/hermes-agent-support.md",
+      "tags": [
+        "hermes",
+        "consumer-validation",
+        "release-gate",
+        "sdd"
+      ],
+      "token_estimate": 400,
+      "depends_on": [
+        "workspace-init",
+        "tech-stack",
+        "spec-context-project",
+        "sdd-gate-v3",
+        "workspace-doctor"
+      ]
+    },
+    {
+      "rank": 19,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -422,7 +446,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -442,7 +466,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -463,7 +487,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -485,7 +509,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -507,7 +531,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -528,7 +552,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "dadaia-workflows",
       "title": "dadaia-workflows",
       "category": "product",
@@ -553,7 +577,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "lifecycle-foundation",
       "title": "lifecycle-foundation",
       "category": "product",
@@ -578,7 +602,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -602,7 +626,7 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 28,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -626,7 +650,7 @@
       ]
     },
     {
-      "rank": 28,
+      "rank": 29,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
