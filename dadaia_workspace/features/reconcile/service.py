@@ -178,10 +178,17 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
     preflight names the offending path, its owner, and the exact repair command —
     the transaction never starts on a guaranteed failure. Returns ``None`` when every
     checked path is writable by the current effective uid (or ownership cannot be
-    determined, e.g. non-POSIX platforms).
+    determined, e.g. non-POSIX platforms such as Windows, where ``pwd``/``geteuid``
+    do not exist).
     """
     import os
-    import pwd
+
+    if not hasattr(os, "geteuid"):
+        return None  # Non-POSIX platform: ownership semantics do not apply.
+    try:
+        import pwd
+    except ImportError:  # pragma: no cover — Windows has no account database
+        pwd = None  # type: ignore[assignment]
 
     def _check(path: Path) -> str | None:
         if not path.exists():
@@ -191,9 +198,13 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
         except OSError:
             return None
         if st.st_uid != os.geteuid():
-            try:
-                owner = pwd.getpwuid(st.st_uid).pw_name
-            except KeyError:
+            owner: str
+            if pwd is not None:
+                try:
+                    owner = pwd.getpwuid(st.st_uid).pw_name
+                except KeyError:
+                    owner = str(st.st_uid)
+            else:
                 owner = str(st.st_uid)
             return (
                 f"{path} is owned by '{owner}' (uid {st.st_uid}), not by the current user "

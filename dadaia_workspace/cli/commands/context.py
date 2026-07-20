@@ -262,10 +262,11 @@ def show(
             if not session_id:
                 # Same marker-only fallback as the heartbeat (bug
                 # context-bind-session-id-mismatch): show reports the session the bind
-                # actually minted, not a divergent/absent identity.
-                from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+                # actually minted, not a divergent/absent identity — routed through
+                # the sanctioned seam (FR3).
+                from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-                bound_ctx = resolve_bound_context_name()
+                bound_ctx = resolve_context_for_cli(None)
                 if bound_ctx:
                     session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
             session_obj = None
@@ -614,10 +615,11 @@ def heartbeat() -> None:
         # Bug context-heartbeat-requires-env-after-persisted-bind: fall back to the
         # persisted bind-epoch marker — the bound shell resolves the recorded session
         # id by ancestry attribution (the W1-8 marker-only resolution extended to
-        # session identity; no exported DADAIA_SESSION_ID needed).
-        from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+        # session identity; no exported DADAIA_SESSION_ID needed). Routed through the
+        # sanctioned seam (FR3: no verb imports core.specs_resolver directly).
+        from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-        bound_ctx = resolve_bound_context_name()
+        bound_ctx = resolve_context_for_cli(None)
         if bound_ctx:
             workspace_root = resolve_workspace_root()
             session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
