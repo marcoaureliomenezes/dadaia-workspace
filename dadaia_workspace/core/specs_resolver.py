@@ -64,6 +64,32 @@ def _record_context(record: dict[str, object] | None) -> str | None:
     return str(context) if context else None
 
 
+def _context_registered(workspace_root: Path, name: str) -> bool:
+    """True while *name* still exists in the context registry (fail-soft, read-only).
+
+    Bug context-delete-leaves-stale-session-bind: a bind (session record or bind-epoch
+    marker) must stop resolving the moment its context is deleted — otherwise the next
+    command resolves a deleted context's specs dir and fails with an unrelated-looking
+    error. A missing registry file means NO context is registered (False); a read error
+    on an existing file fails OPEN (True) so a transient FS hiccup never invalidates
+    every live bind at once.
+    """
+    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
+    if not registry.is_file():
+        return False
+    try:
+        data = json.loads(registry.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, ValueError):
+        return True
+    contexts = data.get("contexts", []) if isinstance(data, dict) else []
+    if not isinstance(contexts, list):
+        return True
+    return any(
+        isinstance(entry, dict) and (entry.get("name") == name or entry.get("repo_slug") == name)
+        for entry in contexts
+    )
+
+
 def _session_record_live(record: dict[str, object]) -> bool:
     """FR4 staleness guard: a harness-keyed session record is live iff its heartbeat is fresh.
 
@@ -99,13 +125,23 @@ def _session_context(workspace_root: Path) -> str | None:
     """
     session_id = os.environ.get("DADAIA_SESSION_ID")
     if session_id:
-        return _record_context(_read_session_record(workspace_root, session_id))
+        context = _record_context(_read_session_record(workspace_root, session_id))
+        # Bug context-delete-leaves-stale-session-bind: a bind to a DELETED context
+        # resolves as unbound on EVERY channel. (The eval flow's documented no-gate
+        # exemption covers heartbeat-TTL staleness, never context existence.)
+        if context and not _context_registered(workspace_root, context):
+            return None
+        return context
 
     harness_id = harness_session_id()
     if harness_id:
         record = _read_session_record(workspace_root, harness_id)
         if record is not None and _session_record_live(record):
-            return _record_context(record)
+            context = _record_context(record)
+            # Same deleted-context law on the implicit channel.
+            if context and not _context_registered(workspace_root, context):
+                return None
+            return context
     return None
 
 
@@ -178,7 +214,12 @@ def _persisted_bind_context(
         if chain and not effective.isdisjoint(chain):
             matched.append(entry.name)
     if len(matched) == 1:
-        return matched[0]
+        name = matched[0]
+        # Bug context-delete-leaves-stale-session-bind: a marker whose context was
+        # deleted resolves as unbound, never as a stale pointer.
+        if not _context_registered(workspace_root, name):
+            return None
+        return name
     return None
 
 

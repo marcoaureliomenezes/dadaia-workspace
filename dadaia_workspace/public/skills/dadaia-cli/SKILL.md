@@ -113,4 +113,10 @@ dadaia bugs status        # open bugs
 
 ## When a command fails
 
-A failed workspace operation is a **product bug of the library** — register it with `dadaia bugs append` before working around it. Never hand-edit a projected asset to fake a result; fix the source and re-project (`dadaia public stage && dadaia public install --target all && dadaia public doctor`).
+Classify BEFORE registering anything (hermes deep-dive, v0.2.9): a failure is a
+**product bug of the library** only when the library's own contract is violated.
+Environment (quota/rate limits, network, sandbox), invalid input, and wrong usage are
+NOT product bugs — diagnose first, register with evidence second. When it IS a
+product bug, register it with `dadaia bugs append` before working around it. Never
+hand-edit a projected asset to fake a result; fix the source and re-project
+(`dadaia public stage && dadaia public install --target all && dadaia public doctor`).
