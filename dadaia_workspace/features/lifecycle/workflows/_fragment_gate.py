@@ -34,6 +34,7 @@ Two collaborators live here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import ClassVar, Protocol
@@ -355,6 +356,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         artifact_root: Path | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        definition_committer: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -381,6 +383,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # artifact ref to EXIST under this root.
         self._artifact_root = artifact_root
         self._runtime_files = runtime_files
+        # Bug fake-release-definition-leaves-dirty-worktree: when wired (production
+        # builders), a COMPLETED definition commits the context repo's definition
+        # artifacts — implementation preflight never inherits a dirty tree. ``None``
+        # (fixtures) keeps behavior byte-identical; the call is best-effort.
+        self._definition_committer = definition_committer
         # Bug resumed-definition-step-blind-to-rejecting-review-feedback: on a resume of a
         # run that blocked on a review rejection, the resume-point step's prompt carries a
         # compact digest of that prior BlockedState (the definition-sequence analogue of

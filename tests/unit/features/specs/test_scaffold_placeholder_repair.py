@@ -155,3 +155,29 @@ def test_catalog_stays_valid_json_after_repair(tmp_path: Path) -> None:
     remove_placeholder_atoms(specs)
     catalog = json.loads((specs / "memory" / "product" / "catalog.json").read_text())
     assert catalog["features"] == []
+
+
+def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:
+    """Bug reconcile-root-owned-agentic: a mixed-ownership workspace gets an actionable
+    ownership error (path + owner + chown command), never a bare Permission denied."""
+    import os
+    import pwd
+
+    from dadaia_workspace.features.reconcile.service import _ownership_preflight
+
+    # Writable tree: no error.
+    (tmp_path / ".dadaia" / "agentic").mkdir(parents=True)
+    assert _ownership_preflight(tmp_path) is None
+
+    # Foreign-owned agentic dir (simulate with chown when root is available; otherwise
+    # chmod to an unwritable mode, which the same preflight reports).
+    agentic = tmp_path / ".dadaia" / "agentic"
+    agentic.chmod(0o500)
+    error = _ownership_preflight(tmp_path)
+    assert error is not None
+    if "owned by" in error:
+        current = pwd.getpwuid(os.geteuid()).pw_name
+        assert "chown" in error and current in error
+    else:
+        assert "not writable" in error
+    agentic.chmod(0o755)

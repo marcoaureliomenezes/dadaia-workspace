@@ -85,6 +85,21 @@ def reconcile_workspace(
     backup_root, snapshots = _snapshot_state(workspace_root)
     projections_started = False
     try:
+        # Bug reconcile-root-owned-agentic: a mixed-ownership workspace (e.g.
+        # .dadaia/agentic owned by root from a previous sudo run) fails the projection
+        # step mid-transaction with a bare "Permission denied". Preflight it: the
+        # transaction never starts, and the operator gets the exact path + repair
+        # command instead of a rollback-flavored ok:false.
+        ownership_error = _ownership_preflight(workspace_root)
+        if ownership_error is not None:
+            return ReconcileResult(
+                ok=False,
+                expected_version=expected_version,
+                actual_version=actual,
+                steps=(),
+                error=ownership_error,
+            )
+
         states_dir = workspace_root / ".dadaia" / "states"
         plan = plan_migration(states_dir)
         if not plan.already_v2:
@@ -152,3 +167,50 @@ def reconcile_workspace(
         actual_version=actual,
         steps=tuple(steps),
     )
+
+
+def _ownership_preflight(workspace_root: Path) -> str | None:
+    """Return an actionable error when the runtime user cannot write under ``.dadaia``.
+
+    Bug reconcile-root-owned-agentic: a previous elevated run may leave
+    ``.dadaia/agentic`` (or ``.dadaia`` itself) owned by another user (root), so the
+    projection step later dies mid-transaction with a bare PermissionError. This
+    preflight names the offending path, its owner, and the exact repair command —
+    the transaction never starts on a guaranteed failure. Returns ``None`` when every
+    checked path is writable by the current effective uid (or ownership cannot be
+    determined, e.g. non-POSIX platforms).
+    """
+    import os
+    import pwd
+
+    def _check(path: Path) -> str | None:
+        if not path.exists():
+            return None
+        try:
+            st = path.stat()
+        except OSError:
+            return None
+        if st.st_uid != os.geteuid():
+            try:
+                owner = pwd.getpwuid(st.st_uid).pw_name
+            except KeyError:
+                owner = str(st.st_uid)
+            return (
+                f"{path} is owned by '{owner}' (uid {st.st_uid}), not by the current user "
+                f"(uid {os.geteuid()}) — reconcile cannot write projections there. "
+                f"Repair with: sudo chown -R {os.geteuid()}:{os.getegid()} "
+                f"{workspace_root / '.dadaia'} (or fix the elevated process that created it)."
+            )
+        if not os.access(path, os.W_OK):
+            return (
+                f"{path} is not writable by the current user (mode {oct(st.st_mode & 0o777)}) — "
+                "reconcile cannot write projections there."
+            )
+        return None
+
+    dadaia_dir = workspace_root / ".dadaia"
+    for candidate in (dadaia_dir, dadaia_dir / "agentic"):
+        problem = _check(candidate)
+        if problem is not None:
+            return problem
+    return None

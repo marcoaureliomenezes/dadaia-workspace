@@ -495,6 +495,15 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             f"release: {self._release_id}\nphase: IMPLEMENTATION\n",
             encoding="utf-8",
         )
+        # Bug fake-release-definition-leaves-dirty-worktree: the completed definition
+        # commits the context repo's definition artifacts (Python-owned, best-effort —
+        # like the closure commit), so implementation preflight never inherits a dirty
+        # tree. Fixtures wire no committer and stay byte-identical.
+        if self._definition_committer is not None:
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                self._definition_committer()
 
     def _make_result(
         self,

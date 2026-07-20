@@ -137,7 +137,12 @@ def bind_epoch_path(workspace: Path, ctx: str, *, create: bool = False) -> Path:
     return bind_epoch_dir(workspace, create=create) / ctx
 
 
-def write_bind_epoch(workspace: Path, ctx: str, pids: Sequence[int] | None = None) -> None:
+def write_bind_epoch(
+    workspace: Path,
+    ctx: str,
+    pids: Sequence[int] | None = None,
+    session_id: str | None = None,
+) -> None:
     """Stamp the bind-epoch marker for ``ctx`` (create-or-refresh mtime), recording *pids*.
 
     Written on every successful bind. The marker dir is created on demand. Re-binding
@@ -155,10 +160,18 @@ def write_bind_epoch(workspace: Path, ctx: str, pids: Sequence[int] | None = Non
     single-line legacy marker still reads back as a one-element chain, and ``pids`` empty
     or ``None`` writes an EMPTY marker (the legacy shape) that reads back as "no
     attribution" (ignored for injection, never a crash). Raises on validation/OS error.
+
+    ``session_id`` (v0.2.9 follow-up, bug context-heartbeat-requires-env-after-persisted-
+    bind): when given, a trailing ``sid:<id>`` line is appended AFTER the pid chain. Pid
+    parsers skip non-integer lines, so old readers are byte-compatible; new consumers
+    (:func:`read_bind_epoch_sid`) resolve the bound session record from the marker alone —
+    the heartbeat/show commands then work in the bound shell WITHOUT an exported
+    ``DADAIA_SESSION_ID`` (the W1-8 marker-only resolution extended to session identity).
     """
     path = bind_epoch_path(workspace, ctx, create=True)
     valid = [p for p in (pids or ()) if isinstance(p, int) and p > 0][:_BIND_EPOCH_MAX_CHAIN]
-    if not valid:
+    sid_line = f"sid:{session_id}\n" if session_id else ""
+    if not valid and not sid_line:
         # Legacy shape: an empty marker. ``Path.touch`` + ``os.utime`` bumps mtime to now
         # whether or not the file already existed (the epoch-refresh contract).
         path.touch()
@@ -166,7 +179,25 @@ def write_bind_epoch(workspace: Path, ctx: str, pids: Sequence[int] | None = Non
         return
     # An atomic content write refreshes mtime to now (new inode via os.replace) — the
     # epoch-refresh contract is preserved while the chain is recorded for attribution.
-    _atomic_write_text(path, "".join(f"{p}\n" for p in valid))
+    _atomic_write_text(path, "".join(f"{p}\n" for p in valid) + sid_line)
+
+
+def read_bind_epoch_sid(workspace: Path, ctx: str) -> str | None:
+    """Return the bound session id recorded in ``ctx``'s marker (``sid:<id>``), else ``None``.
+
+    The ``sid:`` line is appended by :func:`write_bind_epoch` after the pid chain; pid
+    parsers skip it, so this reader is the only consumer. Fail-soft: absent marker, no
+    sid line (legacy markers), or any read error yields ``None``.
+    """
+    try:
+        text = bind_epoch_path(workspace, ctx).read_text(encoding="utf-8")
+    except (ValueError, OSError):
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("sid:") and stripped[4:].strip():
+            return stripped[4:].strip()
+    return None
 
 
 def read_bind_epoch_pids(workspace: Path, ctx: str) -> list[int]:
