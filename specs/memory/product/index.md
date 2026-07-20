@@ -52,6 +52,7 @@
 |------|-------|------|
 | `context-management` | context-management | ALIVE/DEAD context registry, caller-owned session binding, bind-driven memory injection, and advisory presence with no concurrency locks. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests. |
+| `hermes-agent-support` | Hermes agent — supported consumer environment | Hermes agent is a first-class supported consumer of dadaia-workspace: certified end-to-end via the consumer recipe plus the Real-use matrix (R-01..R-08), converged to zero real-use failures in v0.2.9. |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
 | `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |

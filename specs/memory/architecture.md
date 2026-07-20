@@ -165,7 +165,17 @@ workspace passes its own doctor.
 No repo may contain `.dadaia/`, a virtualenv, cache directories, test-results,
 Playwright reports, or coverage artifacts.
 
+## Core file-I/O authorized set
+
+`core/` is stdlib-pure; file I/O is allowed only in the ratchet-authorized set:
+`specs_backup` (consumer-tree migration), `specs_version` (pattern-version stamp),
+`specs_resolver` and `workspace_resolver` (tree walks), and — since v0.2.9 —
+`specs_repair` (removal of unfilled placeholder atoms from old-scaffold trees; the
+single home both repair surfaces, `features.specs` and `features.migrate`, may
+import without a forbidden sibling edge).
+
 ## Agentic Layers
+
 
 Layer 1 is the interactive agent surface: nine core roles with two dispatchers. Layer 2
 is a bounded Codex/PI workflow worker governed by one of eight non-PM personas. Personas

@@ -91,7 +91,8 @@ def doctor(
         "--fix",
         help=(
             "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with README + .gitkeep). "
+            "TREE-4: create missing dirs with README + .gitkeep; MEM-PLACEHOLDER-1: "
+            "remove unfilled placeholder atoms from old scaffolds). "
             "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never auto-fixed. "
             "After fixing, re-checks and reports residual issues."
         ),
@@ -201,7 +202,17 @@ def upgrade(
     goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
 
     if current >= goal:
-        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
+        # Still run the template-artifact repair (bug
+        # scaffold-repair-cannot-remediate-invalid-placeholder-atom): a current-version
+        # tree may carry an unfilled placeholder atom from an old scaffold.
+        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=dry_run)
+        verb = "would remove" if dry_run else "removed"
+        for path in result.placeholder_removed:
+            typer.echo(f"[placeholder-repair] {verb} {path}")
+        if result.no_op:
+            typer.echo(
+                f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op."
+            )
         sys.exit(0)
 
     if dry_run:
@@ -235,6 +246,8 @@ def upgrade(
     result = _upgrade_feat.upgrade(resolved, target=target)
     typer.echo(f"[upgrade] {result.from_version} → {result.to_version}")
     typer.echo(f"  backup: {result.backup_path}")
+    for path in result.placeholder_removed:
+        typer.echo(f"[placeholder-repair] removed {path}")
     for key, step_result in result.steps:
         for src, dst in step_result.moved:
             typer.echo(f"  [{key}] moved {src} → {dst}")

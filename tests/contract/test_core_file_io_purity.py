@@ -44,10 +44,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 
 # Modules whose file I/O is architecture-authorized (specs_backup migrates consumer trees;
-# specs_version rewrites the pattern-version file; specs_resolver + workspace_resolver walk
+# specs_version rewrites the pattern-version file; specs_repair removes unfilled
+# placeholder atoms from old-scaffold trees (v0.2.9 — the one home both repair surfaces,
+# features.specs and features.migrate, may import without a forbidden sibling edge);
+# specs_resolver + workspace_resolver walk
 # the filesystem). architecture.md pins this exact set.
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
-    {"specs_backup", "specs_version", "specs_resolver", "workspace_resolver"}
+    {"specs_backup", "specs_repair", "specs_version", "specs_resolver", "workspace_resolver"}
 )
 
 # pathlib.Path (and os.PathLike) write/read/traversal helpers flagged by attribute name.

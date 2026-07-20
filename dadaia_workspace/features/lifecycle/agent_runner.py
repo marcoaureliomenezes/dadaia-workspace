@@ -100,6 +100,30 @@ def replace_injected_context(
     return replace(lifecycle_run, injected_context=entries)
 
 
+def _compact_block_detail(detail: dict[str, str], *, limit: int = 8000) -> str:
+    """Render a blocked-detail map as a bounded correction-attempt brief.
+
+    Bounded (bug impl-reviews-retry-prompt-exceeds-codex-window): each value is
+    compacted and the whole brief is capped — an unbounded findings dump once pushed
+    the retry prompt past the Codex context window. The full findings stay reachable
+    through the artifact/diagnostic refs the gate persists in the detail map.
+    """
+
+    def _compact(value: str, cap: int = 320) -> str:
+        compact = " ".join(value.split())
+        if len(compact) <= cap:
+            return compact
+        return compact[: cap - 3].rstrip() + "..."
+
+    rendered = "\n".join(f"- {key}: {_compact(value)}" for key, value in sorted(detail.items()))
+    if len(rendered) > limit:
+        rendered = (
+            rendered[:limit]
+            + "\n- [digest truncated: full findings at the artifact/diagnostic refs above]"
+        )
+    return rendered
+
+
 def _safe_filename_segment(value: str) -> str:
     """Sanitize *value* into a single filesystem-safe filename segment.
 
@@ -125,6 +149,12 @@ class AgentRunnerInput:
     # zone or the gate BLOCKs — a step whose worker only wrote an explanatory handoff
     # never counts as having delivered.
     deliverable_globs: tuple[str, ...] = ()
+    # Delta mode (bug codex-backlog-author-no-materialization-regression-040): when set
+    # to a ``{zone-relative-posix-path: sha256}`` map captured BEFORE the step runs, the
+    # deliverable check requires a file in the zone that is NEW or whose hash CHANGED —
+    # zone-mere-existence (e.g. scaffold files) can never satisfy it. ``None`` keeps the
+    # legacy existence semantics for every other step.
+    deliverable_before_hashes: dict[str, str] | None = None
     # Whether this is a REVIEW step (v0.1.31 / L1). The verdict gate
     # (``structured_output["verdict"] == "APPROVED"``) applies ONLY to review steps. A
     # create step (``is_review=False``) passes on a schema-valid payload — which is what
@@ -254,9 +284,10 @@ class LifecycleAgentRunner:
             "agent result references nonexistent artifact(s)",
             "agent result missing APPROVED verdict",
             "agent result carries no deliverable in the step's declared zone",
+            "agent result carries no NEW or CHANGED deliverable in the step's declared zone",
         }:
             return result, blocked
-        detail = "\n".join(f"- {key}: {value}" for key, value in sorted(blocked.detail.items()))
+        detail = _compact_block_detail(blocked.detail)
         correction = (
             "## Automatic structural correction attempt (2 of 2)\n"
             f"The Python gate rejected the first attempt: {blocked.reason}.\n"
@@ -509,6 +540,24 @@ class LifecycleAgentRunner:
                     result=result,
                 )
         if data.deliverable_globs and self._artifact_root is not None:
+            if data.deliverable_before_hashes is not None:
+                # Delta mode (bug codex-backlog-author-no-materialization-regression-040):
+                # disk truth ONLY — a file in the zone must be NEW or hash-CHANGED vs the
+                # pre-step snapshot. Self-reported refs never satisfy this mode, and a
+                # zone that was already non-empty (scaffold files) cannot either: a
+                # do-nothing worker BLOCKS at THIS step and gets the structural retry.
+                delivered = self._zone_delta_files(
+                    data.deliverable_globs, data.deliverable_before_hashes
+                )
+                if not delivered:
+                    return self._blocked(
+                        lifecycle_run,
+                        data,
+                        "agent result carries no NEW or CHANGED deliverable in the step's declared zone",
+                        detail={"deliverable_zone": ",".join(data.deliverable_globs)},
+                        result=result,
+                    )
+                return None
             candidates = (*result.artifact_refs, *self._changed_paths(result))
             outside = out_of_scope_paths(candidates, allowed=data.deliverable_globs, forbidden=())
             delivered = [path for path in candidates if path not in set(outside)]
@@ -561,6 +610,33 @@ class LifecycleAgentRunner:
                 except OSError:
                     continue
         return found
+
+    def _zone_delta_files(
+        self, deliverable_globs: tuple[str, ...], before_hashes: dict[str, str]
+    ) -> list[str]:
+        """Zone files that are NEW or whose sha256 CHANGED vs *before_hashes*.
+
+        ``before_hashes`` keys are the same artifact-root-relative posix paths
+        :meth:`_zone_files` returns. A file that cannot be read is NOT counted as
+        delivered (fail-strict: an unreadable candidate never fakes a deliverable).
+        """
+        import hashlib
+
+        delivered: list[str] = []
+        if self._artifact_root is None:
+            return delivered
+        for rel in self._zone_files(deliverable_globs):
+            before = before_hashes.get(rel)
+            if before is None:
+                delivered.append(rel)  # NEW file in the zone
+                continue
+            try:
+                current = hashlib.sha256((self._artifact_root / rel).read_bytes()).hexdigest()
+            except OSError:
+                continue
+            if current != before:
+                delivered.append(rel)  # CHANGED file in the zone
+        return delivered
 
     def _blocked(
         self,

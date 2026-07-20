@@ -259,6 +259,18 @@ def show(
             workspace_root = resolve_workspace_root()
             sessions_dir = _sessions_dir(workspace_root)
             session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
+            if not session_id:
+                # Same marker-only fallback as the heartbeat (bug
+                # context-bind-session-id-mismatch): show reports the session the bind
+                # actually minted, not a divergent/absent identity — routed through
+                # the sanctioned seam (FR3).
+                from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+
+                bound_ctx = None
+                with contextlib.suppress(Exception):
+                    bound_ctx = resolve_context_for_cli(None)
+                if bound_ctx:
+                    session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
             session_obj = None
             if session_id:
                 session_data = _load_session(sessions_dir, session_id)
@@ -521,6 +533,7 @@ def bind(
         workspace_root,
         name,
         pids=container.build_ancestry_pid_chain(os.getppid()),
+        session_id=session_id,
     )
 
     # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
@@ -600,6 +613,23 @@ def heartbeat() -> None:
     Run: dadaia context heartbeat
     """
     session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
+    if not session_id:
+        # Bug context-heartbeat-requires-env-after-persisted-bind: fall back to the
+        # persisted bind-epoch marker — the bound shell resolves the recorded session
+        # id by ancestry attribution (the W1-8 marker-only resolution extended to
+        # session identity; no exported DADAIA_SESSION_ID needed). Routed through the
+        # sanctioned seam (FR3: no verb imports core.specs_resolver directly).
+        from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+
+        # Degrade silently on any resolution failure (no bind / no workspace): the
+        # unbound case must keep the original actionable error, never a resolution
+        # exception leaking out of the fallback.
+        bound_ctx = None
+        with contextlib.suppress(Exception):
+            bound_ctx = resolve_context_for_cli(None)
+        if bound_ctx:
+            workspace_root = resolve_workspace_root()
+            session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
     if not session_id:
         err_console.print(
             "[red]Error:[/red] No caller-owned session identity. Run "

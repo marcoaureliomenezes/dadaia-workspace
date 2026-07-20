@@ -34,6 +34,7 @@ Two collaborators live here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import ClassVar, Protocol
@@ -89,6 +90,7 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
     RequiredHandoffMissingError,
     WorkflowHandoffResolver,
+    _compact_digest_text,
     durable_payload_from_result,
 )
 
@@ -354,6 +356,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         policy_snapshot: WorkflowPolicySnapshot | None = None,
         artifact_root: Path | None = None,
         runtime_files: RuntimeFilePort | None = None,
+        definition_committer: Callable[[], None] | None = None,
     ) -> None:
         self._context = context
         self._release_id = release_id
@@ -380,6 +383,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # artifact ref to EXIST under this root.
         self._artifact_root = artifact_root
         self._runtime_files = runtime_files
+        # Bug fake-release-definition-leaves-dirty-worktree: when wired (production
+        # builders), a COMPLETED definition commits the context repo's definition
+        # artifacts — implementation preflight never inherits a dirty tree. ``None``
+        # (fixtures) keeps behavior byte-identical; the call is best-effort.
+        self._definition_committer = definition_committer
         # Bug resumed-definition-step-blind-to-rejecting-review-feedback: on a resume of a
         # run that blocked on a review rejection, the resume-point step's prompt carries a
         # compact digest of that prior BlockedState (the definition-sequence analogue of
@@ -517,6 +525,10 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 current_step=resume_from,
                 blocked=None,
                 workflow_steps=WorkflowStepLedger(records=kept),
+                # Same observability law as the in-run revision: a resumed run rewinds
+                # to RUNNING + kept-ledger, and the record must SAY so (bug
+                # release-definition-retry-stalls-with-empty-workflow-steps-041).
+                revision_note=f"resumed run from step {resume_from!r}",
             )
             remaining = sequence[index:]
         self._run_store.save(run)
@@ -701,6 +713,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             current_step=target_label,
             blocked=None,
             workflow_steps=WorkflowStepLedger(records=kept),
+            # Bug release-definition-retry-stalls-with-empty-workflow-steps-041: make
+            # the bounded revision OBSERVABLE in the persisted record — a bare RUNNING
+            # + reclaimed ledger reads exactly like the old stall to any watcher.
+            revision_note=(
+                f"bounded revision 1/1 of {target_label!r} after "
+                f"{blocked.blocked_at_step!r} rejected: {blocked.reason}"
+            ),
         )
         self._run_store.save(run)
         return run, target_idx
@@ -847,6 +866,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         verdict + its reason since bug blocked-reason-misreports-rejected-verdict), and
         every detail entry — notably ``verdict``/``verdict_reason`` and any artifact or
         diagnostic refs the worker can open for the full findings.
+
+        Bounded (bug impl-reviews-retry-prompt-exceeds-codex-window): each detail value
+        is compacted and the whole brief is capped — an unbounded findings dump once
+        pushed the resumed step's prompt past the Codex context window. The full
+        findings stay reachable through the artifact/diagnostic refs in the brief.
         """
         lines = [
             "## Prior rejection feedback (resumed run)",
@@ -854,12 +878,19 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             f"'{blocked.blocked_at_step}': {blocked.reason}",
         ]
         for key, value in sorted(blocked.detail.items()):
-            lines.append(f"- {key}: {value}")
+            lines.append(f"- {key}: {_compact_digest_text(str(value))}")
         lines.append(
             "Revise the artifact so every point above is addressed; the same reviewer "
             "gate runs again after this step."
         )
-        return "\n".join(lines)
+        rendered = "\n".join(lines)
+        limit = 8000
+        if len(rendered) > limit:
+            rendered = (
+                rendered[:limit]
+                + "\n- [digest truncated: full findings at the artifact/diagnostic refs above]"
+            )
+        return rendered
 
     @staticmethod
     def _with_step_outcome(

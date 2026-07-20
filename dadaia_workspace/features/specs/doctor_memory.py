@@ -17,6 +17,10 @@ from pathlib import Path
 import yaml
 
 from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
+from dadaia_workspace.core.specs_repair import (  # noqa: F401
+    is_placeholder_atom,
+    remove_placeholder_atoms,
+)
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
     SpecsDoctorIssue,
@@ -114,6 +118,44 @@ class MemoryValidator:
         # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
         # production when not provided.
         self._process_runner: ProcessRunner | None = process_runner
+
+    def check_placeholder_atoms(self) -> list[SpecsDoctorIssue]:
+        """MEM-PLACEHOLDER-1: unfilled placeholder atoms under ``specs/memory/**``.
+
+        Old scaffolds shipped a raw ``feature.md`` template (``SLUG_PLACEHOLDER`` and
+        friends) that no verb could remediate (bug
+        scaffold-repair-cannot-remediate-invalid-placeholder-atom). The issue is
+        ``fixable=True``: the fix removes the template artifact — never real content
+        (exact-token detection).
+        """
+        issues: list[SpecsDoctorIssue] = []
+        mem_dir = self.specs_dir / "memory"
+        if not mem_dir.is_dir():
+            return issues
+        for path in sorted(mem_dir.rglob("*.md")):
+            if is_placeholder_atom(path):
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="MEM-PLACEHOLDER-1",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"{path.relative_to(self.specs_dir)} is an unfilled placeholder "
+                            "atom (template markers never replaced) — remove it or fill it "
+                            "with real content (`dadaia specs doctor --fix` removes it)"
+                        ),
+                        path=str(path),
+                        fixable=True,
+                    )
+                )
+        return issues
+
+    def fix_placeholder_atom(self, issue: SpecsDoctorIssue) -> None:
+        """Remove an unfilled placeholder atom — re-verified before any delete."""
+        if not issue.path:
+            return
+        path = Path(issue.path)
+        if is_placeholder_atom(path):
+            path.unlink()
 
     def check_memory_files(self) -> list[SpecsDoctorIssue]:
         """Check #2: required memory .md atoms exist with non-empty heading.

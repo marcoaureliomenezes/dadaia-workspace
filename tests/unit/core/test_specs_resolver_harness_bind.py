@@ -157,6 +157,12 @@ def test_dadaia_session_id_still_wins_over_harness_channel(
     harness channel only engages when ``DADAIA_SESSION_ID`` is absent."""
     ws = _mk_ws(tmp_path, slug="proj")
     (ws / "repos" / "other" / "specs").mkdir(parents=True)
+    # Register "other" like a real bind requires (context create always registers it);
+    # the v0.2.9 deleted-context law never resolves a bind to an unregistered context.
+    registry = ws / ".dadaia" / "states" / "spec_contexts.json"
+    _data = json.loads(registry.read_text(encoding="utf-8"))
+    _data["contexts"].append({"repo_slug": "other", "state": "alive"})
+    registry.write_text(json.dumps(_data), encoding="utf-8")
     # Eval-flow record (no liveness gate) → ctx=other; harness record → ctx=proj.
     (ws / ".dadaia" / "sessions" / "sess_eval01.json").write_text(
         json.dumps({"session_id": "sess_eval01", "context": "other"}), encoding="utf-8"

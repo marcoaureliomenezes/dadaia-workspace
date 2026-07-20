@@ -1312,6 +1312,51 @@ def _repo_hygiene_sweeper(repo_root: Path) -> "Callable[[], None]":
     return _sweep
 
 
+def _definition_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
+    """Build the definition-time commit of the context repo (Python-owned, post-success).
+
+    Bug fake-release-definition-leaves-dirty-worktree: a completed release-definition
+    leaves SPEC/PLAN/TASKS/backlog/ACTIVE.md uncommitted, and implementation-reviews
+    then blocks at preflight on the dirty tree. Mirror of :func:`_closure_committer`
+    — commits everything the definition produced with a conventional message and
+    per-invocation identity fallbacks; ``None`` when the repo is not a git checkout
+    (self-hosting fixtures). Push stays out of scope here (the baseline owns it).
+    """
+    if not (repo_root / ".git").exists():
+        return None
+
+    def _commit() -> None:
+        import subprocess
+
+        subprocess.run(  # noqa: S603 — fixed argv
+            ["git", "-C", str(repo_root), "add", "-A"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        subprocess.run(  # noqa: S603 — fixed argv
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "-c",
+                "user.email=definition@dadaia.invalid",
+                "-c",
+                "user.name=dadaia-definition",
+                "commit",
+                "-m",
+                f"definition({release_id}): approved release definition artifacts",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+    return _commit
+
+
 def _closure_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
     """Build the closure-time commit of the context repo (Python-owned, post-success).
 
@@ -1641,6 +1686,12 @@ def build_release_definition_workflow(
         # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
         artifact_root=workspace_root,
         runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
+        # Bug fake-release-definition-leaves-dirty-worktree: a completed definition
+        # commits the context repo's definition artifacts so implementation preflight
+        # never inherits a dirty tree (None for non-git fixtures).
+        definition_committer=_definition_committer(
+            workspace_root / "repos" / context_name, release_id
+        ),
     )
 
 

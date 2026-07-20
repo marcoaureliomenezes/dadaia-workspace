@@ -11,8 +11,10 @@ gates, a procedural multi-harness **workflow engine** (the *dadaia-workflows*), 
 persona-based agent roster with installable **plugin packs**, canonical agentic-asset
 projection across **four** AI harnesses, and a real-time monitoring panel.
 
-It runs agents at **two distinct layers** (explained below) and supports
-**Claude Code, Codex, PI, and Kimi Code** as peers. It is designed to be operated by **humans
+It runs agents at **two distinct layers** (explained below) and supports, as
+peers: **Claude Code, Codex, PI (`pi-coding-agent`), and Kimi Code (the `kimi` CLI)**
+at the entry layer, **Codex and PI** as workflow workers, and the **Hermes agent** as
+the canonical consumer and release gate. It is designed to be operated by **humans
 and by agents**: every capability is reachable through a discoverable CLI, and every
 state surface has a machine-readable form.
 
@@ -62,11 +64,10 @@ flowchart TB
     end
     GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
     CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(a procedural Python workflow)"]
-    subgraph L2["LAYER 2 — worker harness (inside the workflow engine)"]
+    subgraph L2["LAYER 2 — dadaia-workflows worker (inside the workflow engine)"]
         direction LR
-        FK["FAKE"]:::w
+        FK["FAKE (test adapter)"]:::w
         CXk["CODEX_EXEC"]:::w
-        CLk["CLAUDE_SDK"]:::w
         PIk["PI_HEADLESS"]:::w
     end
     OP --> L1 --> GOV
@@ -76,30 +77,60 @@ flowchart TB
     classDef w fill:#238636,color:#fff,stroke:#238636;
 ```
 
-- **Layer 1 — the entry harness.** The AI coding agent a human launches in the
-  terminal: `claude`, `codex`, `pi`, or `kimi`. It is governed by the workspace-root
-  `AGENTS.md` (read natively up the directory tree) plus the projected per-runtime
-  asset trees (`.claude/`, `.codex/`, `.pi/`, `.kimi-code/`).
-- **Layer 2 — the worker harness.** The bounded agent workers that `dadaia lifecycle`
-  drives, one selectable per step, behind a single `AgentRuntimePort`. Four runtime
-  kinds — `FAKE`, `CODEX_EXEC`, `CLAUDE_SDK`, `PI_HEADLESS` — over two transports:
-  **SDK** (Claude, in-process) and **CLI-headless** (`codex exec`, `pi --mode json`).
+- **Layer 1 — the entry harness (the CLI you launch).** The AI coding agent a
+  human launches in the terminal: **Claude Code, Codex, PI (`pi-coding-agent`), or
+  Kimi Code** (the `kimi` CLI). It is governed by the workspace-root `AGENTS.md`
+  (read natively up the directory tree) plus the projected per-runtime asset trees
+  (`.claude/`, `.codex/`, `.pi/`, `.kimi-code/`) and the deterministic gate wiring
+  each harness gets (hooks, rules, skills, sub-agents where the harness supports
+  them). **All four are supported entry harnesses.**
+- **Layer 2 — the workflow engine (the dadaia-workflows).** The four procedural
+  Python workflows invoked through the dadaia CLI — `dadaia lifecycle
+  backlog-definition | release-definition | implementation-reviews | audit`. Each
+  workflow step is executed by a bounded **worker agent**, selected per step behind a
+  single `AgentRuntimePort`. **Supported worker harnesses: Codex (`codex exec`
+  headless) and PI (`pi --mode json` headless) — only these two.** `FAKE` is the
+  deterministic test adapter, not a production worker. Claude Code is **never** a
+  workflow worker (cost bound, LAW 1), and Kimi Code is Layer-1 only.
 
-A harness can exist at one layer and not the other (`FAKE` is Layer-2 only). PI
-exists at both: a `.pi/` Layer-1 projection and a `PI_HEADLESS` Layer-2 worker.
-Kimi Code is Layer-1 only (`.kimi-code/` projection plus the managed user-level hook
-block).
+A harness can exist at one layer and not the other: PI exists at both (a `.pi/`
+Layer-1 projection and a `PI_HEADLESS` Layer-2 worker); Codex is a Layer-1 entry
+harness AND the default Layer-2 worker; Claude Code and Kimi Code are Layer-1 only.
 
 ---
 
 ## Supported harnesses & harness profiles
 
-| Harness | Layer 1 (entry) | Layer 2 (worker) | Layer-2 transport |
-|---|---|---|---|
-| **Claude Code** | ✅ `.claude/` + PreToolUse hook + chokepoints | ✅ `CLAUDE_SDK` (only adapter with a pre-disk Ring-1 boundary) | SDK (in-process) |
-| **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; `codex exec` headless is chokepoints-only) | ✅ `CODEX_EXEC` | CLI-headless (`codex exec`) |
-| **PI** (`@earendil-works/pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` | CLI-headless (`pi --mode json`) |
-| **Kimi Code** | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi has no project-level config) | — (Layer-1 only) | — |
+| Harness | Layer 1 (entry harness) | Layer 2 (dadaia-workflows worker) |
+|---|---|---|
+| **Claude Code** | ✅ `.claude/` + PreToolUse hook + git chokepoints | ❌ never a workflow worker (cost bound, LAW 1) |
+| **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; headless `codex exec` is chokepoints-only) | ✅ `CODEX_EXEC` — CLI-headless (`codex exec`) |
+| **PI** (`pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` — CLI-headless (`pi --mode json`) |
+| **Kimi Code** (`kimi` CLI) | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi Code has no project-level config file) | ❌ Layer-1 only |
+
+Layer-2 workers are selected per workflow step by the model policy
+(`--harness codex|pi`, or an operator overlay).
+
+## Hermes agent — the canonical consumer & release gate
+
+The **Hermes agent** (the hermes-crawler runtime in `dd-chain-capture`) is the
+canonical consumer of dadaia-workspace: it certifies every candidate wheel before
+deploy, and no version is published without its `CERTIFIED_100` verdict. Since
+v0.2.9 it is a declared **supported environment** — meaning its day-to-day
+activities run on dadaia-workspace without product bugs, proven (not assumed):
+
+- The shipped consumer validation recipe
+  (`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`) carries a
+  **Real-use matrix (R-01…R-08)** built from the hermes day-to-day inventory:
+  the live Codex chain with per-link artifact proofs, canonical backlog
+  consumption, fresh/old-context doctor-clean repair, terminal-state honesty,
+  bug-ledger round-trip, fake-chain honesty, and the Kimi Code harness surface.
+- The deterministic certification (structural + F-01…F-26) is necessary but
+  **never sufficient alone** — a candidate is green only when the full real-use
+  round reports zero failures.
+- Hermes' own bug stream must converge to **zero open bugs** (product fixes land by
+  root-cause class; environment and wrong-usage findings are classified, never
+  patched over).
 
 **Harness profiles.** `dadaia init --harness <set>` scaffolds only the harnesses you
 use (persisted in `.dadaia/states/harness_profile.json`). `dadaia public install` and

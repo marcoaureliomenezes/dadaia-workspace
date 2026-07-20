@@ -132,3 +132,21 @@ def test_pi_gpt_profiles_use_codex_subscription_ids() -> None:
         "pi-reasoning-high",
         "pi-reasoning-low",
     }
+
+
+def test_terra_profile_is_a_governed_codex_option() -> None:
+    """v0.2.9 follow-up: gpt-5.6-terra (medium reasoning) is selectable via a governed
+    codex profile — the fallback for workspaces whose gpt-5.3-codex-spark credit is
+    exhausted. Resolves to the discrete codex catalog option and carries no registry
+    pricing row (cost reports 'unknown', never fabricated).
+    """
+    profile = model_profiles.resolve("codex-implementation-terra")
+    assert profile.harness == "codex"
+    assert profile.model_id == "gpt-5.6-terra"
+    assert profile.effort == "medium"
+    option = model_profiles.to_option(profile)
+    assert option in harness_models.options_for("codex")
+    assert option == HarnessModelOption("gpt-5.6-terra", "medium")
+    assert "gpt-5.6-terra" in harness_models.known_layer2_model_ids()
+    assert "gpt-5.6-terra" not in {entry.codex_id for entry in harness_models.REGISTRY}
+    assert profile in model_profiles.profiles_for("codex")
