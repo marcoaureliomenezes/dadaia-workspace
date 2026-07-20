@@ -266,7 +266,9 @@ def show(
                 # the sanctioned seam (FR3).
                 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-                bound_ctx = resolve_context_for_cli(None)
+                bound_ctx = None
+                with contextlib.suppress(Exception):
+                    bound_ctx = resolve_context_for_cli(None)
                 if bound_ctx:
                     session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
             session_obj = None
@@ -619,7 +621,12 @@ def heartbeat() -> None:
         # sanctioned seam (FR3: no verb imports core.specs_resolver directly).
         from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-        bound_ctx = resolve_context_for_cli(None)
+        # Degrade silently on any resolution failure (no bind / no workspace): the
+        # unbound case must keep the original actionable error, never a resolution
+        # exception leaking out of the fallback.
+        bound_ctx = None
+        with contextlib.suppress(Exception):
+            bound_ctx = resolve_context_for_cli(None)
         if bound_ctx:
             workspace_root = resolve_workspace_root()
             session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
