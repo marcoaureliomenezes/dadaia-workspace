@@ -49,8 +49,9 @@ def test_gpt_only_invariant_no_claude_id_anywhere_and_every_id_in_allowlist() ->
 
 def test_catalog_golden() -> None:
     # v0.1.44: pi opened to the curated OpenRouter set (moonshotai/kimi-k2.5), so 3 → 4.
+    # v0.2.9 follow-up: codex gains the governed gpt-5.6-terra option, so 2 → 3.
     assert len(options_for(PI_HARNESS)) == 4
-    assert len(options_for(CODEX_HARNESS)) == 2
+    assert len(options_for(CODEX_HARNESS)) == 3
 
     assert options_for(PI_HARNESS) == (
         HarnessModelOption("openai-codex/gpt-5.3-codex-spark", "high"),
@@ -61,11 +62,13 @@ def test_catalog_golden() -> None:
     assert options_for(CODEX_HARNESS) == (
         HarnessModelOption("gpt-5.3-codex-spark", "high"),
         HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+        HarnessModelOption("gpt-5.6-terra", "medium"),
     )
 
     assert model_choices(CODEX_HARNESS) == (
         "gpt-5.3-codex-spark:high",
         "gpt-5.3-codex-spark:medium",
+        "gpt-5.6-terra:medium",
     )
     assert model_choices(PI_HARNESS) == (
         "openai-codex/gpt-5.3-codex-spark:high",
@@ -160,7 +163,7 @@ def test_layer2_allowlist_law() -> None:
     # The allowlist is a minimal, explicitly-named set (no wildcard) — this release:
     # Only the explicitly governed non-GPT OpenRouter id is allowed. PI GPT ids
     # carry the explicit Codex-subscription provider prefix.
-    assert set(harness_models.LAYER2_EXTRA_MODEL_IDS) == {"moonshotai/kimi-k2.5"}
+    assert set(harness_models.LAYER2_EXTRA_MODEL_IDS) == {"moonshotai/kimi-k2.5", "gpt-5.6-terra"}
 
     # The single public membership helper unions registry codex ids with the allowlist.
     known = harness_models.known_layer2_model_ids()

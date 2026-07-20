@@ -73,6 +73,17 @@ _BUILT_IN: tuple[WorkflowModelProfile, ...] = (
         purpose="Deep-reasoning review/gate effort on Codex.",
     ),
     WorkflowModelProfile(
+        id="codex-implementation-terra",
+        harness="codex",
+        label="Codex — implementation (terra)",
+        model_id="gpt-5.6-terra",
+        effort="medium",
+        purpose="Standard implementation/worker effort on Codex with gpt-5.6-terra "
+        "(medium reasoning) — the governed fallback for workspaces whose "
+        "gpt-5.3-codex-spark credit is exhausted (v0.2.9 follow-up). Carries no "
+        "registry pricing row — cost reports 'unknown', never fabricated.",
+    ),
+    WorkflowModelProfile(
         id="pi-implementation-standard",
         harness="pi",
         label="PI — implementation (standard)",

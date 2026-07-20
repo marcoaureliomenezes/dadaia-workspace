@@ -83,6 +83,11 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
     CODEX_HARNESS: (
         HarnessModelOption("gpt-5.3-codex-spark", "high"),
         HarnessModelOption("gpt-5.3-codex-spark", "medium"),
+        # v0.2.9 follow-up: gpt-5.6-terra (medium reasoning) as a governed Layer-2-native
+        # codex option — subscription-less workspaces whose gpt-5.3-codex-spark credit is
+        # exhausted can select terra via the operator overlay. No registry pricing row
+        # (cost reports "unknown", never fabricated).
+        HarnessModelOption("gpt-5.6-terra", "medium"),
     ),
 }
 
@@ -102,7 +107,7 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
 # ``telemetry.pricing.compute_cost`` returns ``None`` ("unknown" — never fabricated)
 # for them. Membership is named and explicit — no wildcard.
 # ---------------------------------------------------------------------------
-LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"moonshotai/kimi-k2.5"})
+LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"moonshotai/kimi-k2.5", "gpt-5.6-terra"})
 
 
 def _known_codex_ids() -> frozenset[str]:
