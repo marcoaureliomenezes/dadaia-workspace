@@ -435,15 +435,61 @@ def kimi_hooks_block(home: Path) -> str:
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"
 
 
+def _strip_unmanaged_kimi_rules(existing: str) -> str:
+    """Remove every ``[[hooks]]`` table referencing the dadaia-kimi shims OUTSIDE the markers.
+
+    Bug kimi-install-duplicates-hooks-on-legacy-config: a pre-v0.2.8 install wrote the
+    four dadaia rules WITHOUT the managed-block markers, and a naive append then
+    double-registered every event (4 → 8 rules). Any un-marked table whose body names
+    ``dadaia-kimi-`` is provably dadaia-managed (a legacy install or a botched
+    duplicate — the reserved shim prefix is never operator content), so it is stripped
+    before the managed block is appended/replaced. Tables INSIDE the marker span are
+    owned by the block itself; non-dadaia tables are operator content, preserved
+    byte-for-byte. Line-oriented by design (the upsert is a pure text transform); a
+    ``[[hooks]]`` line inside a TOML string literal is a documented non-goal for the
+    config shapes this file manages.
+    """
+    begin = existing.find(KIMI_BLOCK_BEGIN)
+    end = existing.find(KIMI_BLOCK_END)
+    span = (begin, end + len(KIMI_BLOCK_END)) if begin != -1 and end != -1 and begin < end else None
+    lines = existing.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    pos = 0  # char offset of lines[i] in the original text
+    while i < len(lines):
+        if lines[i].strip() == "[[hooks]]":
+            table_end = pos + len(lines[i])
+            j = i + 1
+            while j < len(lines) and not lines[j].strip().startswith("[["):
+                table_end += len(lines[j])
+                j += 1
+            table = "".join(lines[i:j])
+            # A table is inside the managed span when it STARTS within it (the END
+            # marker line is absorbed into the last table's extent, so an end-position
+            # check would misclassify that table — and the marker with it).
+            inside_span = span is not None and span[0] <= pos < span[1]
+            if "dadaia-kimi-" not in table or inside_span:
+                out.extend(lines[i:j])
+            i = j
+            pos = table_end
+        else:
+            out.append(lines[i])
+            pos += len(lines[i])
+            i += 1
+    return "".join(out)
+
+
 def upsert_kimi_hooks_block(existing: str, block: str) -> str:
     """Return *existing* config.toml text with the managed kimi block replaced or appended.
 
-    Pure text transform (the caller owns file IO). Replace-or-append semantics:
-    when both markers are present and ordered, the span between them (inclusive) is
-    swapped for *block*; otherwise the block is appended at end of file — TOML allows
-    extending the ``hooks`` array-of-tables from a later position. Content outside the
-    markers is preserved byte-for-byte.
+    Pure text transform (the caller owns file IO). Legacy un-marked dadaia rules are
+    ADOPTED first (:func:`_strip_unmanaged_kimi_rules` — never duplicated). Then
+    replace-or-append semantics: when both markers are present and ordered, the span
+    between them (inclusive) is swapped for *block*; otherwise the block is appended
+    at end of file — TOML allows extending the ``hooks`` array-of-tables from a later
+    position. Content outside the markers is preserved byte-for-byte.
     """
+    existing = _strip_unmanaged_kimi_rules(existing)
     begin = existing.find(KIMI_BLOCK_BEGIN)
     end = existing.find(KIMI_BLOCK_END)
     if begin != -1 and end != -1 and begin < end:
