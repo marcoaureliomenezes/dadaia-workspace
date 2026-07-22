@@ -1984,7 +1984,9 @@ def build_audit_workflow(
             # A schema-VALID audit-report-v1 canary (one INFO finding routed to
             # accepted-risk) so the fake exercises the real referential-integrity gate
             # and the sequence COMPLETES (bug
-            # certification-passes-without-complete-workflow-chain).
+            # certification-passes-without-complete-workflow-chain). The finding MUST
+            # carry evidence — the validator requires it (bug
+            # lifecycle-audit-worker-sandbox-cannot-read-bound-repo).
             domain_payload={
                 "question": "driving-fake audit canary: does the audit chain complete?",
                 "lenses": ["workflow-wiring"],
@@ -1994,6 +1996,7 @@ def build_audit_workflow(
                         "severity": "INFO",
                         "lens": "workflow-wiring",
                         "summary": "driving-fake canary finding (no real defect)",
+                        "evidence": "certify canary: synthetic finding by construction",
                     }
                 ],
                 "dispositions": [{"finding_id": "F-FAKE-1", "route": "accepted-risk"}],
