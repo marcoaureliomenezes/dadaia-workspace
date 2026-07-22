@@ -362,14 +362,16 @@ def test_pre_fix_payload_shape_with_no_session_id_documents_the_closed_bug(
 def test_main_emits_explicit_allow_envelope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Bug claude-pre-gate-envelope-contract: allow must be Claude-Code contract-valid.
+    """Bug pre-gate-allow-envelope-fails-claude-schema: allow must validate silently.
 
-    Bug projected-pre-gate-silent-allow established the observable-allow doctrine (an
-    allowed probe EMITS its decision). This pins the contract-valid shape: the top-level
-    ``"decision": "allow"`` marker stays (recipe F-08 / codex / kimi observability — every
-    non-Claude consumer treats a non-block envelope as allow), and the operative Claude
-    Code field is ``hookSpecificOutput.permissionDecision: "defer"`` — the documented
-    "run the normal permission flow" verdict (PreToolUse decision control).
+    Claude Code's PreToolUse output schema restricts the top-level ``decision`` enum to
+    ``["approve", "block"]`` — ``"allow"`` is invalid and makes the harness reject the
+    WHOLE envelope ("Hook JSON output validation failed") on every allowed call. And
+    ``permissionDecision: "defer"`` is print-mode only: interactive sessions log a warn
+    and ignore it. The contract-valid allow envelope therefore carries NO permission
+    verdict at all — the gate steps aside into the normal permission flow. It stays
+    non-empty (observable-allow doctrine, bug projected-pre-gate-silent-allow); codex
+    and the kimi shim treat any non-block envelope as allow.
     """
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     payload = {
@@ -380,13 +382,30 @@ def test_main_emits_explicit_allow_envelope(
 
     assert pre_gate.main() == 0
     out = capsys.readouterr().out.strip()
-    assert json.loads(out.splitlines()[-1]) == {
-        "decision": "allow",
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "defer",
-        },
+    envelope = json.loads(out.splitlines()[-1])
+    assert envelope == {
+        "continue": True,
+        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
     }
+    assert "decision" not in envelope
+    assert "permissionDecision" not in envelope["hookSpecificOutput"]
+    assert "defer" not in out
+
+
+def test_allow_envelope_has_no_kimi_block_marker(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The kimi shim greps the literal ``"decision": "block"`` — allow must not carry it."""
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    raw = capsys.readouterr().out.strip().splitlines()[-1]
+    assert '"decision": "block"' not in raw
 
 
 def test_main_block_envelope_carries_claude_permission_deny(

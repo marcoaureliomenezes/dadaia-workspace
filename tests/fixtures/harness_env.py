@@ -379,15 +379,17 @@ class HookResult:
 def is_allow_envelope(line: str) -> bool:
     """True when *line* is the gate's explicit allow envelope (any envelope revision).
 
-    Keyed on ``decision == "allow"`` rather than a byte-exact literal so consumers
-    (advisory-line filters) survive envelope evolution — e.g. the Claude-contract merge
-    that added ``hookSpecificOutput`` (bug claude-pre-gate-envelope-contract).
+    Keyed on "JSON envelope that is not a block" rather than a byte-exact literal so
+    consumers (advisory-line filters) survive envelope evolution — the same non-block
+    reading the codex hooks and the kimi shim apply. The allow envelope carries no
+    ``decision`` at all since bug pre-gate-allow-envelope-fails-claude-schema (Claude
+    Code's top-level enum is ``["approve", "block"]``).
     """
     try:
         data = json.loads(line)
     except (json.JSONDecodeError, ValueError):
         return False
-    return isinstance(data, dict) and data.get("decision") == "allow"
+    return isinstance(data, dict) and data.get("decision") != "block"
 
 
 def run_hook_subprocess(

@@ -174,25 +174,28 @@ def emit_block(reason: str) -> None:
 
 
 def emit_allow() -> None:
-    """Print the explicit allow envelope (observable AND Claude-Code contract-valid).
+    """Print the explicit allow envelope (observable AND Claude-Code schema-valid).
 
     Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
-    automation could not distinguish an explicit allow from a hook that never ran. The
-    top-level ``"decision": "allow"`` marker keeps that observability (codex/kimi/recipe
-    F-08 treat any non-block envelope as allow). Bug claude-pre-gate-envelope-contract:
-    ``"allow"`` was never a valid top-level value for Claude Code, so the envelope now
-    also carries the documented field — ``permissionDecision: "defer"``, the explicit
-    "run the normal permission flow" verdict. The gate never auto-approves
-    (``"allow"`` there would BYPASS the user's permission prompts); it only steps aside.
+    automation could not distinguish an explicit allow from a hook that never ran — the
+    envelope must stay non-empty. Bug pre-gate-allow-envelope-fails-claude-schema: it
+    must also carry NO permission verdict, because Claude Code's PreToolUse output
+    schema rejects everything else this gate could say:
+
+    - top-level ``decision`` enum is ``["approve", "block"]`` — ``"allow"`` fails
+      validation of the WHOLE envelope on every allowed call, and ``"approve"`` would
+      BYPASS the user's permission prompts;
+    - ``permissionDecision: "defer"`` is print-mode only — interactive sessions warn
+      and ignore it (and ``"allow"`` there also bypasses prompts).
+
+    So the gate steps aside with only schema-neutral fields. Codex hooks and the kimi
+    shim treat any envelope without the literal ``"decision": "block"`` as allow.
     """
     print(
         json.dumps(
             {
-                "decision": "allow",
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "defer",
-                },
+                "continue": True,
+                "hookSpecificOutput": {"hookEventName": "PreToolUse"},
             }
         )
     )

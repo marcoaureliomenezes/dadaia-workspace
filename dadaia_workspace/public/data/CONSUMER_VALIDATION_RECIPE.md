@@ -132,17 +132,24 @@ an initialized workspace, create it:
     whitelist.
 - **PASS if:** all four decisions match. (Each is one deterministic hook invocation —
   that IS the demonstration.)
-- **Envelope contract (bug claude-pre-gate-envelope-contract):** each verdict must be
-  the MERGED envelope, valid for every harness at once —
+- **Envelope contract (bugs claude-pre-gate-envelope-contract +
+  pre-gate-allow-envelope-fails-claude-schema):** each verdict must be a single JSON
+  envelope that validates against the Claude Code PreToolUse output schema (top-level
+  `decision` enum is `["approve", "block"]` — nothing else may appear there) while
+  staying readable by codex/kimi —
   - block: top-level `"decision": "block"` AND
     `hookSpecificOutput.permissionDecision == "deny"` with `hookEventName ==
     "PreToolUse"` and `permissionDecisionReason` equal to the top-level `reason`,
     which must be the LAST key (the kimi shim's sed capture depends on it);
-  - allow: top-level `"decision": "allow"` AND
-    `hookSpecificOutput.permissionDecision == "defer"` (the documented Claude Code
-    "normal permission flow" verdict — NEVER `"allow"` there, which would bypass the
-    operator's permission prompts).
-  A bare legacy envelope (either field family missing) is a FAIL.
+  - allow: a non-empty JSON envelope carrying NO permission verdict of any kind —
+    exactly `{"continue": true, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}`.
+    A top-level `"decision": "allow"` is a FAIL (invalid enum value — the harness
+    rejects the whole envelope, "Hook JSON output validation failed", on every allowed
+    call). `permissionDecision: "defer"` is a FAIL (print-mode only; interactive
+    sessions warn and ignore it). `"approve"`/`permissionDecision: "allow"` are a FAIL
+    (they would bypass the operator's permission prompts). The literal
+    `"decision": "block"` must NOT appear (the kimi shim greps it).
+  A bare legacy block envelope (`hookSpecificOutput` family missing) is a FAIL.
 
 ### F-09 — Bugs ledger
 - Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
