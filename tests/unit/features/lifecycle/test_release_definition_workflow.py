@@ -494,3 +494,114 @@ def test_revision_retries_spec_create_with_the_reviewer_feedback_injected(tmp_pa
     # The RETRY prompt carries the reviewer's actual finding — never a blind retry.
     assert "src/saudacao/__main__.py" in create_prompts[1]
     assert "Prior rejection feedback" in create_prompts[1]
+
+
+# ── bug release-definition-approved-plan-not-persisted-041 (hermes 0.4.1) ─────
+#
+# plan_review returned APPROVED but PLAN.md stayed Draft on disk: the status flip
+# silently skipped (``path.is_file() → return None``) and the terminal gate blocked
+# 3+ model steps later with no remedy. Python is the SOLE owner of the Status
+# token: the flip must fail LOUD with an actionable remedy, tolerate worker
+# status-line variants, and the terminal gate must name the resume point that
+# re-asserts the flip.
+
+
+def _step(label: str):  # noqa: ANN202 - tiny fixture helper
+    return next(s for s in _SEQUENCE if s.label == label)
+
+
+def test_flip_blocks_loud_when_reviewed_artifact_missing(tmp_path: Path) -> None:
+    """An approved review over a MISSING artifact must block at the review step with
+    the create-step resume as remedy — never skip the flip silently."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan.unlink()
+
+    blocked = wf._on_step_accepted(_step("plan_review"))  # noqa: SLF001
+
+    assert blocked is not None, "missing artifact at flip time must fail LOUD, not skip"
+    assert "PLAN.md" in blocked.reason
+    assert blocked.blocked_at_step == "plan_create"
+    assert blocked.operator_command is not None
+    assert "--resume-from plan_create" in blocked.operator_command
+
+
+def test_flip_is_single_writer_over_worker_status_variants(tmp_path: Path) -> None:
+    """Worker-authored status lines (colon-outside-bold, bullets, lowercase) are all
+    removed — after the flip the file carries exactly ONE Python-owned token."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan.write_text(
+        "# plan\n\n**Status**: Draft\n\n- **Status:** Em revisão\n\n* Status: draft\n\nbody\n",
+        encoding="utf-8",
+    )
+
+    assert wf._on_step_accepted(_step("plan_review")) is None  # noqa: SLF001
+
+    text = plan.read_text(encoding="utf-8")
+    assert text.count("> **Status:** Aprovado") == 1
+    for variant in ("Draft", "draft", "Em revisão"):
+        assert variant not in text
+
+
+def test_terminal_gate_names_resume_remedy_for_unflipped_artifact(tmp_path: Path) -> None:
+    """A Draft artifact with an APPROVED ledger (resumed/rewritten mid-run) blocks at
+    the terminal gate WITH the resume command that re-asserts the flip."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text(
+        "# spec\n\n> **Status:** Aprovado\n", encoding="utf-8"
+    )
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# plan\n\n> **Status:** Draft\n", encoding="utf-8"
+    )
+
+    blocked = wf._terminal_semantic_block(None, _step("definition_commit_gate"), _SEQUENCE)  # type: ignore[arg-type]  # noqa: SLF001
+
+    assert blocked is not None
+    assert "PLAN.md" in blocked.reason
+    assert blocked.operator_command is not None
+    assert "--resume-from plan_review" in blocked.operator_command
+
+
+def test_approved_review_with_unwritten_artifact_blocks_at_review_not_terminal_gate(
+    tmp_path: Path,
+) -> None:
+    """Full-run repro of the hermes symptom: the review worker's verdict arrives but
+    the artifact vanished before the flip — the run must block AT THE REVIEW with a
+    remedy, never glide into a terminal-gate block steps later."""
+    store = _MemoryRunStore()
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+
+    class _DeletesPlanFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.CODEX_EXEC
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            plan.unlink(missing_ok=True)
+            return _approved()
+
+    sequence = tuple(
+        replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
+        if step.label == "plan_review"
+        else step
+        for step in _SEQUENCE
+    )
+
+    def factory(kind: AgentRuntimeKind):  # noqa: ANN202
+        if kind is AgentRuntimeKind.CODEX_EXEC:
+            return _DeletesPlanFake()
+        return _KindFake(kind, _approved())
+
+    wf = _workflow(tmp_path, store, factory)
+    result = wf.run("rd-flip-loud", sequence)
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "PLAN.md" in result.blocked.reason
+    assert result.blocked.blocked_at_step == "plan_create"
+    assert result.blocked.operator_command is not None
+    assert "--resume-from plan_create" in result.blocked.operator_command

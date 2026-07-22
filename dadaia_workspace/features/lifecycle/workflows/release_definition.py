@@ -246,12 +246,31 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         "tasks_implementability_review": "TASKS.md",
     }
 
+    #: Artifact → the create step that re-authors it (bug
+    #: release-definition-approved-plan-not-persisted-041 — flip-failure remedy).
+    _CREATE_STEP_BY_ARTIFACT: ClassVar[dict[str, str]] = {
+        "SPEC.md": "spec_create",
+        "PLAN.md": "plan_create",
+        "TASKS.md": "tasks_create",
+    }
+
+    #: Artifact → the review step whose re-run re-asserts the Aprovado flip (the
+    #: terminal gate's remedy for a Draft artifact with an APPROVED ledger).
+    _REVIEW_STEP_BY_ARTIFACT: ClassVar[dict[str, str]] = {
+        "SPEC.md": "spec_review",
+        "PLAN.md": "plan_review",
+    }
+
     def _on_step_accepted(self, step: ReleaseStep) -> BlockedState | None:
         """Validate PLAN dependencies, then approve reviewed artifacts.
 
         Deterministic Python, not model output: the workflow's own review gate IS the
         approval authority, so the canonical ``> **Status:**`` token must reflect it —
         otherwise downstream workers correctly refuse to build on a Draft artifact.
+        Python is the SOLE owner of that token (bug
+        release-definition-approved-plan-not-persisted-041): an approved review over a
+        MISSING artifact fails LOUD here with the create-step resume as remedy — never
+        a silent skip that surfaces 3+ model steps later at the terminal gate.
         """
         if step.label == "plan_create":
             dependency_block = self._validate_plan_dependency_table()
@@ -266,10 +285,27 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             return None
         path = self._selector.spec_context.specs_dir / "releases" / self._release_id / filename
         if not path.is_file():
-            return None
+            create_step = self._CREATE_STEP_BY_ARTIFACT[filename]
+            return BlockedState(
+                reason=(
+                    f"{step.label} approved but {filename} is missing on disk — the "
+                    "artifact the review approved was never persisted (worker write lost "
+                    "or written out of scope)"
+                ),
+                blocked_at_step=create_step,
+                operator_command=(
+                    f"re-run release-definition with --resume-from {create_step} "
+                    f"(only the {filename} authoring step re-executes)"
+                ),
+                detail={"artifact": filename, "gate": "review-status-flip-v1"},
+            )
         text = path.read_text(encoding="utf-8")
+        # Single-writer law over the Status token: remove EVERY worker-authored status
+        # variant — blockquote or not, bullet-prefixed, colon inside or outside the bold
+        # markers, any case ((?i) covers Draft/draft and Status/status) — then insert
+        # the one canonical Python-owned line.
         status_line = (
-            r"(?mi)^(?:>\s*)?(?:\*\*Status:\*\*|Status:)\s*"
+            r"(?mi)^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*Status:?\*\*:?|Status:)\s*"
             r"(?:Draft|Em revisão|Em revisao|Aprovado)\s*$"
         )
         updated = re.sub(status_line + r"\n?", "", text)
@@ -461,6 +497,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             "TASKS.md": ("tasks_create" in labels, False),
         }
         missing: list[str] = []
+        remedies: list[str] = []
         for name, (must_exist, must_be_approved) in required.items():
             if not must_exist:
                 continue
@@ -470,6 +507,12 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 continue
             if must_be_approved and "**Status:** Aprovado" not in path.read_text(encoding="utf-8"):
                 missing.append(f"{name} (not Aprovado)")
+                # Bug release-definition-approved-plan-not-persisted-041: a Draft
+                # artifact with an APPROVED ledger (resumed/rewritten mid-run) recovers
+                # by re-running ONLY its review — the flip is re-asserted on acceptance.
+                review_step = self._REVIEW_STEP_BY_ARTIFACT.get(name)
+                if review_step is not None:
+                    remedies.append(f"--resume-from {review_step}")
         if missing:
             return BlockedState(
                 reason=(
@@ -477,6 +520,13 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                     "on disk: " + ", ".join(missing)
                 ),
                 blocked_at_step=step.label,
+                operator_command=(
+                    "re-run release-definition with "
+                    + " ".join(sorted(remedies))
+                    + " (the review re-executes and re-asserts the Aprovado flip)"
+                    if remedies
+                    else None
+                ),
                 detail={"unpersisted_artifacts": ", ".join(missing)},
             )
         return None
