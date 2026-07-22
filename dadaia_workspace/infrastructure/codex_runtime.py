@@ -81,6 +81,44 @@ _DEFAULT_CODEX_SANDBOX = "read-only"
 _MAX_DIAGNOSTIC_TAIL = 4_000
 
 
+#: Sandbox-failure stderr signatures (exit-0 deception guards). Matched against STDERR
+#: ONLY: codex-cli/bwrap write namespace errors to stderr, while the worker event
+#: stream (stdout) legitimately echoes source files that merely MENTION these strings
+#: (e.g. this repo's own tests) — scanning stdout would false-positive every
+#: self-hosting audit. Each tuple's parts must ALL appear (lowercased).
+_SANDBOX_FAILURE_SIGNATURES: tuple[tuple[str, ...], ...] = (
+    ("rtm_newaddr",),  # bwrap loopback setup failure (nested/unprivileged container)
+    ("no permissions to create a new namespace",),  # codex-adapter-cannot-run-in-nested-container
+    ("bwrap:", "permission denied"),
+    ("landlock", "operation not permitted"),
+)
+
+
+def _sandbox_failure_signature(stderr_text: str) -> str | None:
+    """Return an actionable error when *stderr_text* carries a sandbox-failure signature.
+
+    Bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo +
+    codex-exec-sandbox-unusable-in-container: codex exec can exit 0 while its sandbox
+    (bwrap namespace / landlock) made every tool call fail — the signature means the
+    worker could not have inspected or written anything, so its result is fake
+    evidence. ``None`` means no signature (the zero-exit happy path is untouched).
+    """
+    lowered = stderr_text.lower()
+    for parts in _SANDBOX_FAILURE_SIGNATURES:
+        if all(part in lowered for part in parts):
+            return (
+                "codex exec exited 0 but its stderr carries a sandbox-failure "
+                f"signature ({' + '.join(parts)!r}): the sandbox namespace (bwrap/"
+                "landlock) could not be created or denied workspace writes, so the "
+                "worker inspected/wrote nothing. Remedies: set "
+                "DADAIA_CODEX_SANDBOX=danger-bypass (nested container — runs codex "
+                "without a sandbox; the outer container is the trust boundary) or "
+                "DADAIA_CODEX_SANDBOX=danger-full-access (landlock write-denial), then "
+                "re-run the workflow."
+            )
+    return None
+
+
 def _as_codex_effort(effort: str) -> CodexEffort:
     """Narrow a resolved reasoning string to the ``CodexEffort`` literal.
 
@@ -257,6 +295,19 @@ class CodexExecAdapter(SubprocessAdapterMixin):
                     status=AgentRunStatus.FAILED,
                     summary=summary,
                     error=self._redact(error),
+                )
+            # Bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo +
+            # codex-exec-sandbox-unusable-in-container: codex exec can EXIT 0 while every
+            # tool call died inside the sandbox (bwrap namespace creation fails in a
+            # nested/unprivileged container; landlock denies workspace writes). A zero
+            # exit carrying the failure signature must NOT read as SUCCEEDED — otherwise
+            # a read-nothing worker's vacuous report is accepted as real evidence.
+            sandbox_error = _sandbox_failure_signature(proc.stderr or "")
+            if sandbox_error is not None:
+                return AgentRunResult(
+                    status=AgentRunStatus.FAILED,
+                    summary="codex sandbox unusable in this environment",
+                    error=self._redact(sandbox_error),
                 )
             result = self._result_from_output(request, output_path, proc)
             return self._with_changed_paths(result, before_snapshot)

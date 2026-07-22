@@ -720,3 +720,63 @@ def test_invalid_sandbox_error_is_dadaia_error_for_clean_cli(tmp_path: Path) -> 
         CodexExecConfig(cwd=tmp_path, sandbox="totally-bogus")
     assert isinstance(exc.value, DadaiaError)
     assert isinstance(exc.value, ValueError)
+
+
+def test_exit_zero_with_bwrap_namespace_failure_classifies_as_failed(tmp_path: Path) -> None:
+    """Bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo +
+    codex-exec-sandbox-unusable-in-container: codex exec can EXIT 0 while every tool
+    call died inside the sandbox (bwrap namespace failure in a nested container, or
+    landlock write-denial under workspace-write). A zero exit must NOT read as
+    SUCCEEDED when the output carries the sandbox-failure signature — the adapter
+    classifies it FAILED with an actionable remediation instead of letting a
+    read-nothing worker's vacuous report be accepted."""
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        Path(argv[argv.index("--output-last-message") + 1]).write_text(
+            json.dumps({"summary": "audit done", "artifact_refs": [], "structured_output": {}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout="",
+            stderr="bwrap: setting up loopback device: RTM_NEWADDR: Permission denied",
+        )
+
+    result = CodexExecAdapter(
+        CodexExecConfig(
+            cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium"
+        ),
+        runner=fake_runner,
+        environ={"PATH": "/bin", "HOME": "/h"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.FAILED
+    assert "sandbox" in result.summary.lower()
+    assert result.error is not None
+    assert "DADAIA_CODEX_SANDBOX" in result.error
+    assert "danger-bypass" in result.error
+
+
+def test_exit_zero_without_sandbox_signature_stays_succeeded(tmp_path: Path) -> None:
+    """Guard against over-classification: an ordinary zero-exit run (no sandbox-failure
+    signature in the output) keeps the happy path byte-identical."""
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        Path(argv[argv.index("--output-last-message") + 1]).write_text(
+            json.dumps({"summary": "ok", "artifact_refs": [], "structured_output": {}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    result = CodexExecAdapter(
+        CodexExecConfig(
+            cwd=tmp_path, codex_bin="/usr/bin/codex", model="m", reasoning_effort="medium"
+        ),
+        runner=fake_runner,
+        environ={"PATH": "/bin", "HOME": "/h"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED

@@ -473,6 +473,11 @@ def _validate_audit_report_handoff(payload: dict[str, object]) -> list[str]:
             reasons.append(f"findings[{index}].severity is invalid")
         _require_non_empty_string(finding, "lens", reasons)
         _require_non_empty_string(finding, "summary", reasons)
+        # Bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo: the fragment always
+        # mandated `evidence` but the gate never enforced it — an evidence-free
+        # (read-nothing) audit sailed through as accepted. Evidence is what separates a
+        # finding from a guess; require it on every finding.
+        _require_non_empty_string(finding, "evidence", reasons)
         if finding_id is not None:
             finding_ids.append(finding_id)
     if len(finding_ids) != len(set(finding_ids)):
