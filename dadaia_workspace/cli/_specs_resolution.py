@@ -53,20 +53,24 @@ from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_reso
 _SELF_HOSTING_SLUG = "dadaia-workspace"
 
 
-def current_ancestry_pids() -> frozenset[int] | None:
-    """This ``dadaia`` process's nearest-first ancestry pid chain (bind attribution).
+def current_ancestry_pids() -> tuple[int, ...] | None:
+    """This ``dadaia`` process's nearest-first ORDERED ancestry pid chain (bind attribution).
 
     W1-8 (v0.1.47): the persisted-bind fallback attributes a bind-epoch marker by
     ancestry-chain MEMBERSHIP. A marker written from an ephemeral harness shell
     records the bind process's chain (incl. the long-lived harness pid); this CLI
     runs under a DIFFERENT short-lived shell but shares that harness pid deeper in
-    ITS chain. Any failure ⇒ ``None`` ⇒ the resolver degrades to single-getppid
-    equality.
+    ITS chain. ORDER PRESERVED (bug ancestry-attribution-cross-session-ambiguity):
+    the resolver scores each marker by its shallowest shared pid — session-unique
+    pids (this process's harness) sit at low indices, host-level ancestors shared
+    with foreign sessions at high ones — so the caller's own bind outranks foreign
+    markers instead of collapsing to ambiguity. Any failure ⇒ ``None`` ⇒ the
+    resolver degrades to single-getppid equality.
     """
     try:
         from dadaia_workspace import container
 
-        return frozenset(container.build_ancestry_pid_chain(os.getppid()))
+        return tuple(container.build_ancestry_pid_chain(os.getppid()))
     except Exception:  # noqa: BLE001 — attribution is best-effort; never break resolution.
         return None
 
