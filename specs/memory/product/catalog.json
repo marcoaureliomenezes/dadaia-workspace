@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T20:23:46Z",
+  "generated_at": "2026-07-22T02:17:38Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -172,7 +172,7 @@
         "layer-1",
         "projection"
       ],
-      "token_estimate": 500,
+      "token_estimate": 520,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -402,7 +402,7 @@
       "title": "Hermes agent — supported consumer environment",
       "category": "product",
       "area": "platform",
-      "tldr": "Hermes agent is a first-class supported consumer of dadaia-workspace: certified end-to-end via the consumer recipe plus the Real-use matrix (R-01..R-08), converged to zero real-use failures in v0.2.9.",
+      "tldr": "Hermes agent is a supported consumer: certified end-to-end via the consumer recipe Real-use matrix, converged to zero failures in v0.2.9.",
       "summary": "The hermes agent (dd-chain-capture hermes-crawler) is the canonical consumer and release gate of dadaia-workspace. Since v0.2.9 it is a declared SUPPORTED environment: the consumer validation recipe carries a Real-use matrix built from the hermes day-to-day inventory, and the 0.4.1 candidate converged to a full real-use round with zero failures (CERTIFIED_100, 35/35).",
       "path": "specs/memory/product/platform/hermes-agent-support.md",
       "tags": [

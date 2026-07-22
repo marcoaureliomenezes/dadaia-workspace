@@ -376,6 +376,20 @@ class HookResult:
         return None
 
 
+def is_allow_envelope(line: str) -> bool:
+    """True when *line* is the gate's explicit allow envelope (any envelope revision).
+
+    Keyed on ``decision == "allow"`` rather than a byte-exact literal so consumers
+    (advisory-line filters) survive envelope evolution — e.g. the Claude-contract merge
+    that added ``hookSpecificOutput`` (bug claude-pre-gate-envelope-contract).
+    """
+    try:
+        data = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("decision") == "allow"
+
+
 def run_hook_subprocess(
     hook_module: str,
     payload: dict[str, Any],

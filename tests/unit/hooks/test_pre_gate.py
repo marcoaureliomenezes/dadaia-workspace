@@ -362,12 +362,14 @@ def test_pre_fix_payload_shape_with_no_session_id_documents_the_closed_bug(
 def test_main_emits_explicit_allow_envelope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Bug projected-pre-gate-silent-allow: an allowed probe must EMIT its decision.
+    """Bug claude-pre-gate-envelope-contract: allow must be Claude-Code contract-valid.
 
-    The block path prints a {"decision":"block",...} envelope; the allow path used to
-    print nothing, so external automation (recipe F-08) could not distinguish an
-    explicit allow from a hook that never evaluated. Allow now prints
-    {"decision":"allow"} — same envelope family, verifiable contract.
+    Bug projected-pre-gate-silent-allow established the observable-allow doctrine (an
+    allowed probe EMITS its decision). This pins the contract-valid shape: the top-level
+    ``"decision": "allow"`` marker stays (recipe F-08 / codex / kimi observability — every
+    non-Claude consumer treats a non-block envelope as allow), and the operative Claude
+    Code field is ``hookSpecificOutput.permissionDecision: "defer"`` — the documented
+    "run the normal permission flow" verdict (PreToolUse decision control).
     """
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     payload = {
@@ -378,4 +380,63 @@ def test_main_emits_explicit_allow_envelope(
 
     assert pre_gate.main() == 0
     out = capsys.readouterr().out.strip()
-    assert json.loads(out.splitlines()[-1]) == {"decision": "allow"}
+    assert json.loads(out.splitlines()[-1]) == {
+        "decision": "allow",
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "defer",
+        },
+    }
+
+
+def test_main_block_envelope_carries_claude_permission_deny(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Bug claude-pre-gate-envelope-contract: block must be Claude-Code contract-valid.
+
+    The legacy ``"decision": "block"`` field rides an undocumented fallback in current
+    Claude Code — the documented PreToolUse verdict is
+    ``hookSpecificOutput.permissionDecision: "deny"``. The merged envelope carries BOTH
+    (legacy for codex hooks + the kimi shim, modern for Claude Code) with one identical
+    reason string.
+    """
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    envelope = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert envelope["decision"] == "block"
+    assert envelope["reason"]
+    hso = envelope["hookSpecificOutput"]
+    assert hso["hookEventName"] == "PreToolUse"
+    assert hso["permissionDecision"] == "deny"
+    assert hso["permissionDecisionReason"] == envelope["reason"]
+
+
+def test_block_envelope_raw_string_keeps_kimi_shim_markers(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The kimi pre-gate shim string-matches the raw stdout — its two anchors are law.
+
+    The shim's ``case`` pattern greps the literal ``"decision": "block"`` and its ``sed``
+    reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only when the
+    top-level ``reason`` is the LAST key in the envelope. Both anchors must survive the
+    Claude-contract merge byte-exactly.
+    """
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    raw = capsys.readouterr().out.strip().splitlines()[-1]
+    assert '"decision": "block"' in raw
+    assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "'), (
+        "top-level reason must stay the LAST key so the kimi sed capture stays clean"
+    )

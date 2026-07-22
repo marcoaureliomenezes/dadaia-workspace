@@ -85,6 +85,24 @@ def test_idempotent_reinit_and_absent_profile_reads_none(
     assert JsonHarnessProfileStore().read(states_dir) is None
 
 
+def test_reinit_with_subset_merges_previously_persisted_harnesses(
+    service: WorkspaceService, tmp_path: Path
+) -> None:
+    """Bug init-harness-profile-silent-narrowing: a subset re-init MERGES the profile.
+
+    init deletes no projection, so it must never un-manage one: re-running init with a
+    harness subset (e.g. adding kimi-code to a claude+codex workspace) merges into the
+    persisted profile in canonical L1 order instead of replacing it — otherwise the
+    previously scaffolded harnesses silently drop out of install/doctor scope
+    ([warn] out-of-profile) and their projections rot.
+    """
+    service.init(tmp_path, skip_assets=True, harnesses=("claude", "codex"))
+    service.init(tmp_path, skip_assets=True, harnesses=("kimi-code",))
+
+    data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
+    assert data == {"schema_version": "1", "harnesses": ["claude", "codex", "kimi-code"]}
+
+
 def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
     service: WorkspaceService, tmp_path: Path
 ) -> None:

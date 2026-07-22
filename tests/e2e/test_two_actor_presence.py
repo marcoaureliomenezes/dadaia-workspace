@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, is_allow_envelope, run_hook_subprocess
 
 pytestmark = pytest.mark.e2e
 
@@ -97,7 +97,7 @@ def test_two_actors_same_context_both_writes_allow_and_are_mutually_visible(
     combined_b = "\n".join(
         line
         for line in (result_b.stdout + result_b.stderr).splitlines()
-        if line.strip() and line.strip() != '{"decision": "allow"}'
+        if line.strip() and not is_allow_envelope(line.strip())
     )
     if combined_b.strip():
         assert sid_a in combined_b

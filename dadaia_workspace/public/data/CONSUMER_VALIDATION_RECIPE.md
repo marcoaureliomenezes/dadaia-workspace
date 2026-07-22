@@ -132,6 +132,17 @@ an initialized workspace, create it:
     whitelist.
 - **PASS if:** all four decisions match. (Each is one deterministic hook invocation —
   that IS the demonstration.)
+- **Envelope contract (bug claude-pre-gate-envelope-contract):** each verdict must be
+  the MERGED envelope, valid for every harness at once —
+  - block: top-level `"decision": "block"` AND
+    `hookSpecificOutput.permissionDecision == "deny"` with `hookEventName ==
+    "PreToolUse"` and `permissionDecisionReason` equal to the top-level `reason`,
+    which must be the LAST key (the kimi shim's sed capture depends on it);
+  - allow: top-level `"decision": "allow"` AND
+    `hookSpecificOutput.permissionDecision == "defer"` (the documented Claude Code
+    "normal permission flow" verdict — NEVER `"allow"` there, which would bypass the
+    operator's permission prompts).
+  A bare legacy envelope (either field family missing) is a FAIL.
 
 ### F-09 — Bugs ledger
 - Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
@@ -299,6 +310,14 @@ an initialized workspace, create it:
   NO context memory — that non-empty generic output is the CORRECT result (injection
   is bind-driven). FAIL only if it injects a context's memory without a bind, or
   crashes.
+- **Compact re-injection (bug claude-compact-reinjection-missing):** the projected
+  `.claude/settings.json` must register `SessionStart` entries with matchers `compact`
+  AND `clear` pointing at `dadaia_workspace.hooks.ctx_inject`. Drive ctx-inject with a
+  Claude SessionStart payload (`{"hook_event_name": "SessionStart", "source":
+  "compact", "session_id": ...}`) on a session whose sentinel records a bound slug:
+  the bootstrap must re-emit AT THE EVENT and the NEXT UserPromptSubmit must stay
+  silent (exactly-once — no compact marker left behind). A missing SessionStart block
+  in settings.json, silence at the event, or a double injection is a FAIL.
 
 ### F-24 — Workflow chain E2E (fake harness, disposable context)
 - Setup: a clean disposable context `chain` (create + alive + baseline as in F-06),

@@ -11,8 +11,8 @@ tags:
 - claude-code
 - layer-1
 - projection
-token_estimate: 500
-last_updated: '2026-07-16'
+token_estimate: 520
+last_updated: '2026-07-22'
 release_origin: v0.1.58
 ---
 
@@ -36,8 +36,17 @@ sub-agents; dadaia-workflows remain available but drive pi/codex workers.
    injection.
 3. Work proceeds under the deterministic gate: PreToolUse `pre_gate` (matcher
    `Edit|Write|MultiEdit|NotebookEdit|Bash`), PostToolUse heartbeat/reconciler
-   (match-all), plus the git chokepoints.
-4. Coordinators (project-manager, project-auditor) dispatch role sub-agents from
+   (match-all), plus the git chokepoints. The pre-gate emits the MERGED envelope —
+   `hookSpecificOutput.permissionDecision` `deny`/`defer` is the operative documented
+   Claude Code contract; the top-level `decision`/`reason` pair rides along for codex
+   hooks and the kimi shim (bug claude-pre-gate-envelope-contract; the gate never
+   answers `permissionDecision: allow`, which would bypass the permission prompts).
+4. Compaction survival: `.claude/settings.json` registers `SessionStart` matchers
+   `compact` and `clear` on ctx-inject — after a compact (or /clear) the bootstrap
+   re-emits at the event and the sentinel restamps, so the next prompt stays silent
+   (bug claude-compact-reinjection-missing; parity with kimi's PostCompact shim and
+   the codex SessionStart wrapper).
+5. Coordinators (project-manager, project-auditor) dispatch role sub-agents from
    `.claude/agents/`; skills load on invocation.
 
 ## Typical trigger

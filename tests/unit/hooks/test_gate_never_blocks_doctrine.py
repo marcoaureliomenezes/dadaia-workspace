@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.spec_context import session_identity
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, is_allow_envelope, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
 
@@ -119,7 +119,7 @@ def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_pat
     combined = "\n".join(
         line
         for line in (result_b.stdout + result_b.stderr).splitlines()
-        if line.strip() and line.strip() != '{"decision": "allow"}'
+        if line.strip() and not is_allow_envelope(line.strip())
     )
     if combined.strip():
         assert sid_a in combined

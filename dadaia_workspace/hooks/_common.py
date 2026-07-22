@@ -145,19 +145,57 @@ def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
 
 
 def emit_block(reason: str) -> None:
-    """Print the ``{"decision":"block",...}`` envelope (the harness then blocks the tool)."""
-    print(json.dumps({"decision": "block", "reason": reason}))
+    """Print the merged block envelope: legacy + documented Claude Code contract.
+
+    Bug claude-pre-gate-envelope-contract: the documented Claude Code PreToolUse verdict
+    is ``hookSpecificOutput.permissionDecision: "deny"`` — the top-level
+    ``"decision": "block"`` only rides an undocumented legacy fallback there. Both are
+    carried in ONE envelope because each has its own consumer:
+
+    - ``decision``/``reason`` — codex hooks and the kimi pre-gate shim. Key placement is
+      part of the contract: the shim greps the literal ``"decision": "block"`` and its
+      sed reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only while
+      the top-level ``reason`` stays the LAST key.
+    - ``hookSpecificOutput`` — Claude Code's documented PreToolUse decision control.
+    """
+    print(
+        json.dumps(
+            {
+                "decision": "block",
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                },
+                "reason": reason,
+            }
+        )
+    )
 
 
 def emit_allow() -> None:
-    """Print the ``{"decision":"allow"}`` envelope (explicit, verifiable allow).
+    """Print the explicit allow envelope (observable AND Claude-Code contract-valid).
 
     Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
-    automation could not distinguish an explicit allow from a hook that never ran. Every
-    harness treats a non-block envelope (or unrecognized JSON) as allow, so the explicit
-    envelope changes no gating behavior — it only makes the contract observable.
+    automation could not distinguish an explicit allow from a hook that never ran. The
+    top-level ``"decision": "allow"`` marker keeps that observability (codex/kimi/recipe
+    F-08 treat any non-block envelope as allow). Bug claude-pre-gate-envelope-contract:
+    ``"allow"`` was never a valid top-level value for Claude Code, so the envelope now
+    also carries the documented field — ``permissionDecision: "defer"``, the explicit
+    "run the normal permission flow" verdict. The gate never auto-approves
+    (``"allow"`` there would BYPASS the user's permission prompts); it only steps aside.
     """
-    print(json.dumps({"decision": "allow"}))
+    print(
+        json.dumps(
+            {
+                "decision": "allow",
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "defer",
+                },
+            }
+        )
+    )
 
 
 def default_python_bin(workspace: Path) -> str:

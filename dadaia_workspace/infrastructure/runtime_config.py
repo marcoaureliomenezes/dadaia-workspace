@@ -159,6 +159,36 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                     "matcher": "",
                 }
             ],
+            # Bug claude-compact-reinjection-missing: a compact erases the injected
+            # bootstrap and /clear wipes the context; ctx_inject re-emits it at the event
+            # (Claude Code adds SessionStart stdout back to context) and restamps the
+            # sentinel. Matchers are the exact documented source names — startup/resume/
+            # fork stay on the bind-driven UserPromptSubmit path (FR-W2). Parity with the
+            # kimi-code PostCompact shim (v0.2.8) and the codex SessionStart wrapper.
+            "SessionStart": [
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "compact",
+                },
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "clear",
+                },
+            ],
         }
     }
 

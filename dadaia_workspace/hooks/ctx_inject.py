@@ -450,6 +450,33 @@ def main() -> int:
             _emit(_generic_preflight(workspace))
         return 0
 
+    # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
+    # a compact erased the injected bootstrap; a /clear wiped the whole context. Claude
+    # Code ADDS SessionStart stdout back to context (unlike Kimi's discard-stdout
+    # PostCompact), so the bootstrap re-emits at the event ITSELF and the sentinel is
+    # restamped immediately — the next prompt stays silent (exactly-once discipline) and
+    # no compact marker is stamped (it would double-inject at the next prompt). Detection
+    # is payload-driven (hook_event_name + source), never an env prefix — the settings
+    # command stays a plain, Windows-safe module invocation. Sources outside
+    # {compact, clear} (startup/resume/fork) fall through to the normal bind-driven flow.
+    if str(payload.get("hook_event_name") or "") == "SessionStart" and str(
+        payload.get("source") or ""
+    ) in ("compact", "clear"):
+        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+        sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
+        harness_pid = _resolve_harness_pid(payload)
+        # Same resolution chain + recorded-slug fallback as PostCompact above.
+        context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
+        if not context:
+            context = recorded_slug
+        if context and (workspace / "repos" / context / "specs").is_dir():
+            _emit_bootstrap(workspace, context)
+            _stamp_sentinel(tmp_dir, sentinel, context)
+        else:
+            _emit(_generic_preflight(workspace))
+            _stamp_sentinel(tmp_dir, sentinel, "")
+        return 0
+
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     _gc_stale_sentinels(tmp_dir)
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
