@@ -23,8 +23,34 @@ validation agent, or self-found — the responsible agent executes this flow
 5. **GREEN** — prove the new test passes and the full suite stays green.
 6. **Close** the bug: append the `resolved` event carrying the resolution
    evidence (reproducing test, fix, suite result).
-7. **Deliver**: build a new wheel and hand it to the operator's consumer-side
+7. **Commit** the fix (see the commit gate below) — a solved bug never leaves
+   a dirty worktree.
+8. **Deliver**: build a new wheel and hand it to the operator's consumer-side
    validator for end-to-end workspace validation.
+
+## Commit gate — a solved bug is ALWAYS committed
+
+A bug is not solved at GREEN — it is solved when the fix is **committed**. The
+turn that closes a bug MUST leave a clean worktree: stage and commit every file
+the fix touched — source, tests, ledger events, regenerated projections — with
+a conventional `fix(...)` message naming the bug id. **No dirty worktree is
+allowed after a solved bug**, on any Layer-1 entry harness (Claude Code, Codex,
+PI, Kimi Code), in any repo the fix touched.
+
+This is the bug-flow counterpart of the commit gates the ordered workflows
+already own: release-definition commits its definition artifacts
+(`definition_commit_gate`), closure commits its artifacts, and implementation
+preflight BLOCKS on a dirty tree. The bug flow has no Python committer, so this
+gate is discipline every agent enforces on itself:
+
+- Commit **before the turn ends** — never "commit later", never hand a dirty
+  tree to the next session, workflow, or preflight.
+- Commit **only what the fix touched** — never `git add -A` over a tree that
+  may carry another session's in-progress work (NO-LOCKS doctrine: the tree is
+  shared; your commit must not sweep up foreign changes).
+- No new blocking machinery: the pre-commit gate stays WARN-only and the
+  pre-push security/CI gates are unchanged — this rule makes "solved bug ⇒
+  committed tree" part of the definition of done.
 
 ## Approval
 

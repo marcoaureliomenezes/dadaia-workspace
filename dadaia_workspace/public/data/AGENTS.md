@@ -171,6 +171,11 @@ your own throwaway script or for a validation the tool is *designed* to emit
 blocking an unauthorized write). See the `bug-registration-guardrail` rule for
 the `dadaia bugs append` event contract and redaction requirement.
 
+A bug is not done at the fix — it is done when the fix is **committed**. Every
+solved bug MUST leave a clean worktree in the same turn, on every harness
+(Claude Code, Codex, PI, Kimi Code): **no dirty worktree is allowed after a
+solved bug**. See the `bug-hotfix-doctrine` rule's commit gate.
+
 ## SDD Gate — NO-LOCKS DOCTRINE (v0.1.76)
 
 Races between sessions are ACCEPTED and SURFACED, never prevented. No path in
