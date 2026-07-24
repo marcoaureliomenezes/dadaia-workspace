@@ -121,6 +121,73 @@ def _resolver(tmp_path: Path, writer: _FakeWriter) -> WorkflowHandoffResolver:
     return WorkflowHandoffResolver(run_store=_store(tmp_path), payload_writer=writer, clock=_clock)
 
 
+# --- ledger-owned immutability: orphan files never deadlock resume ---------------------
+
+
+def test_produce_reclaims_orphan_payload_file_after_ledger_rewind(tmp_path: Path) -> None:
+    """Bug release-definition-retry-collides-with-immutable-tasks-payload: a resume or
+    bounded revision rewinds the ledger (drops the step's records) and purges the
+    step's payload files — but when the reclaim is interrupted (crash between produce
+    and save, killed worker window, partial purge), the attempt-0 FILE survives with
+    no ledger record addressing it. The next produce() then collided forever: the
+    error prescribed --resume-from, and --resume-from died on the same orphan — a
+    contradiction loop with no operator exit. Immutability is the LEDGER's contract:
+    a key with no record is a dead generation's orphan and must be reclaimed."""
+    from dataclasses import replace
+
+    from dadaia_workspace.core.models.workflow_handoff import WorkflowStepLedger
+    from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
+
+    writer = FilesystemRuntimeFileAdapter(tmp_path)
+    resolver = _resolver(tmp_path, writer)
+    run, record = resolver.produce(
+        _run(),
+        producer_step="tasks_create",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "first generation"},
+    )
+    assert (tmp_path / record.payload_ref).is_file()
+
+    # The resume rewound the ledger, but the interrupted reclaim left the file behind.
+    rewound = replace(run, workflow_steps=WorkflowStepLedger(records=()))
+
+    run2, record2 = resolver.produce(
+        rewound,
+        producer_step="tasks_create",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "resumed generation"},
+    )
+    assert run2.workflow_steps.find("tasks_create", 0) is not None
+    envelope = json.loads((tmp_path / record2.payload_ref).read_text(encoding="utf-8"))
+    assert envelope["payload"] == {"summary": "resumed generation"}
+
+
+def test_produce_still_refuses_replay_of_a_live_recorded_key(tmp_path: Path) -> None:
+    """In-run immutability is unchanged: a key the ledger still addresses is live
+    history — re-producing it must keep raising, never silently overwrite."""
+    from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
+
+    writer = FilesystemRuntimeFileAdapter(tmp_path)
+    resolver = _resolver(tmp_path, writer)
+    run, _ = resolver.produce(
+        _run(),
+        producer_step="tasks_create",
+        attempt=0,
+        output_schema="release-scope-handoff-v1",
+        payload={"summary": "live"},
+    )
+    with pytest.raises(ValueError, match="already recorded"):
+        resolver.produce(
+            run,
+            producer_step="tasks_create",
+            attempt=0,
+            output_schema="release-scope-handoff-v1",
+            payload={"summary": "replay"},
+        )
+
+
 # --- ① produce: envelope+ledger+persist + idempotent consumption + digest is compact ----
 
 

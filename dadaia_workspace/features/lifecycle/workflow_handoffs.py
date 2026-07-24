@@ -790,6 +790,16 @@ class WorkflowHandoffResolver:
         self._validate_named_payload(output_schema, payload)
 
         content = json.dumps(envelope, indent=2, sort_keys=True) + "\n"
+        # Ledger-owned immutability (bug
+        # release-definition-retry-collides-with-immutable-tasks-payload): the control
+        # plane decides whether this key is live. A ledger record for the key means an
+        # in-run re-produce — the write below keeps refusing it. NO record for the step
+        # means any file at the key's path is a dead generation's orphan (resume/
+        # revision dropped the step's records; an interrupted reclaim — crash or killed
+        # worker window between produce and save — can leave the file). Reclaim it here
+        # so the documented --resume-from path can never deadlock on its own leftovers.
+        if not any(r.producer_step == producer_step for r in run.workflow_steps.records):
+            self._reclaim_step_files(run, producer_step)
         ref = self._write_payload(
             run, producer_step=producer_step, attempt=attempt, content=content
         )
@@ -1021,6 +1031,22 @@ class WorkflowHandoffResolver:
         )
         updated = self._persist(run, run.workflow_steps.upsert(record))
         return updated, record
+
+    def _reclaim_step_files(self, run: LifecycleRun, producer_step: str) -> None:
+        """Purge *producer_step*'s payload files when the ledger no longer addresses it.
+
+        Same zone routing as :meth:`_write_payload`. Called only when the step has NO
+        ledger records at all, so no live record's file can be swept.
+        """
+        if isinstance(self._writer, ReleaseAwareWorkflowStepPayloadWriter):
+            self._writer.purge_release_scoped_step_payloads(
+                run.run_id,
+                {producer_step},
+                context=run.context,
+                release_id=_zone_release_id(run),
+            )
+        else:
+            self._writer.purge_step_payloads(run.run_id, {producer_step})
 
     def _write_payload(
         self, run: LifecycleRun, *, producer_step: str, attempt: int, content: str
