@@ -201,6 +201,40 @@ def test_gate_blocks_new_item_overlapping_existing_anchor(tmp_path: Path) -> Non
     assert "twin-item" in result.blocked.reason
 
 
+def test_gate_sees_prose_only_edit_of_existing_item(tmp_path: Path) -> None:
+    """Bug backlog-dedupe-updated-payload-not-gate-visible-043: the dedupe EDIT path
+    refines an existing item's body/acceptance WITHOUT touching its bound ``intents[]``
+    anchors. The gate diffed only bound anchor-changes, so a real, hash-verifiable
+    disk edit was invisible — the run blocked on "no new/changed item" and the same
+    block repeated on every resume. Disk truth: any content change to a backlog item
+    is a gate-visible authored change."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    existing = specs / "backlog" / "existing-a.md"
+    existing.write_text(_ITEM_A.format(slug="existing-a", change="rework A"), encoding="utf-8")
+
+    @dataclass
+    class _ProseEditFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                existing.write_text(
+                    existing.read_text(encoding="utf-8")
+                    + "\nRefined acceptance criteria for the deduped demand.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _ProseEditFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-edit", operator_demand="refine existing-a acceptance")
+
+    assert result.completed is True, result.blocked.reason if result.blocked else result
+    assert result.final_phase is LifecyclePhase.RELEASE_DEFINITION
+
+
 def test_grill_opt_in_runs_and_its_digest_reaches_the_author_prompt(tmp_path: Path) -> None:
     fake = _AuthoringFake(root=tmp_path)
     wf = _workflow(tmp_path, _MemoryRunStore(), fake)

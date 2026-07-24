@@ -321,6 +321,12 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # ONCE, before any step in THIS call runs). ``backlog_review_gate`` diffs the
         # post-authoring snapshot against this to find what ``backlog_author`` actually wrote.
         before = self._backlog_snapshot()
+        # Raw per-item content hashes at the same instant (bug
+        # backlog-dedupe-updated-payload-not-gate-visible-043): the dedupe EDIT path
+        # legitimately refines an item's body/acceptance WITHOUT touching its bound
+        # ``intents[]``, so the gate must also diff raw content — an anchor-only diff
+        # is blind to exactly the class of change the EDIT path exists to make.
+        self._before_content_hashes = self._backlog_content_hashes()
         # Kept for the author-step payload promotion (bug
         # backlog-author-bare-payload-breaks-release-handoff): the promoted evidence is
         # enriched with the DISK-diffed authored path(s), never a worker self-report.
@@ -498,6 +504,44 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                     ).hexdigest()
         return hashes
 
+    def _backlog_content_hashes(self) -> dict[str, str]:
+        """sha256 of every ``specs/backlog/*.md`` item, keyed by slug — raw disk truth."""
+        import hashlib
+
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        hashes: dict[str, str] = {}
+        if not backlog_dir.is_dir():
+            return hashes
+        for path in sorted(backlog_dir.glob("*.md")):
+            with contextlib.suppress(OSError):
+                hashes[path.stem] = hashlib.sha256(path.read_bytes()).hexdigest()
+        return hashes
+
+    def _changed_slugs(
+        self, before: dict[str, BoundItem], after: dict[str, BoundItem]
+    ) -> list[str]:
+        """Slugs authored THIS run: bound-anchor diff ∪ raw content-hash diff.
+
+        The anchor diff catches intent-level changes; the content diff catches the
+        dedupe EDIT path's prose/acceptance refinements (bug
+        backlog-dedupe-updated-payload-not-gate-visible-043). Only slugs the loader
+        resolves as real items (present in *after*) participate — a stray non-item
+        ``.md`` never reaches ``classify()``.
+        """
+        anchor_changed = {
+            slug
+            for slug, bound in after.items()
+            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        }
+        before_hashes = getattr(self, "_before_content_hashes", None) or {}
+        after_hashes = self._backlog_content_hashes()
+        hash_changed = {
+            slug
+            for slug, digest in after_hashes.items()
+            if slug in after and before_hashes.get(slug) != digest
+        }
+        return sorted(anchor_changed | hash_changed)
+
     def _backlog_snapshot(self) -> dict[str, BoundItem]:
         """Every real ``specs/backlog/*.md`` item, reduced to slug -> bound anchor changes.
 
@@ -525,11 +569,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         if before is None:
             return []
         after = self._backlog_snapshot()
-        changed = sorted(
-            slug
-            for slug, bound in after.items()
-            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
-        )
+        changed = self._changed_slugs(before, after)
         backlog_dir = self._selector.spec_context.specs_dir / "backlog"
         paths: list[str] = []
         for slug in changed:
@@ -570,11 +610,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             if unresolved:
                 unresolved_by_slug[item.slug] = tuple(unresolved)
 
-        changed = sorted(
-            slug
-            for slug, bound in after.items()
-            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
-        )
+        changed = self._changed_slugs(before, after)
         if not changed:
             blocked = BlockedState(
                 reason=(
