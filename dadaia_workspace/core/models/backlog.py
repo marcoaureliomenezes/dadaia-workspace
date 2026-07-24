@@ -78,16 +78,28 @@ def _validate_code_ref(ref: str) -> None:
         )
 
 
+#: Valid ``Subject.surface`` values: ``existing`` (the ref must resolve to a registry
+#: anchor — the default and the only pre-0.4.3 behavior) and ``new`` (the item
+#: INTRODUCES this surface; there is deliberately no anchor to resolve). Bugs
+#: backlog-independent-cli-items-false-conflict-044 /
+#: backlog-cli-intent-hallucinated-anchor-045: without a first-class new-surface
+#: declaration, an item about a new CLI command must either mis-bind an existing
+#: anchor (false DIVERGENT_CONFLICT) or invent a ref (unrecoverable unresolved block).
+_SUBJECT_SURFACES = ("existing", "new")
+
+
 @dataclass(frozen=True)
 class Subject:
     """A typed reference to one canonical subject of a change. Never free text.
 
     Validation here is *shape only* (well-formed for the kind). Resolution of the ref to a
-    live registry anchor is the registry's job (T-25-02).
+    live registry anchor is the registry's job (T-25-02). ``surface: new`` marks a subject
+    the item itself introduces — bound by declared identity, not registry resolution.
     """
 
     kind: SubjectKind
     ref: str
+    surface: str = "existing"
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, SubjectKind):
@@ -95,7 +107,13 @@ class Subject:
         ref = self.ref.strip() if isinstance(self.ref, str) else self.ref
         if not ref:
             raise ValueError(f"subject ref must be a non-empty string for kind {self.kind}")
+        if self.surface not in _SUBJECT_SURFACES:
+            raise ValueError(
+                f"subject surface must be one of {_SUBJECT_SURFACES}, got {self.surface!r}"
+            )
         if self.kind is SubjectKind.CODE:
+            # Shape (and the §3.8 privacy invariant) applies to NEW code surfaces too —
+            # a not-yet-existing module still must be declared module-relative.
             _validate_code_ref(ref)
 
 
@@ -141,19 +159,34 @@ def parse_intents(raw: object) -> list[Intent]:
         ref_raw = subject_raw.get("ref")
         if not isinstance(ref_raw, str):
             raise ValueError(f"intents[{idx}] subject ref must be a string")
+        surface_raw = subject_raw.get("surface", "existing")
+        if not isinstance(surface_raw, str) or surface_raw not in _SUBJECT_SURFACES:
+            raise ValueError(
+                f"intents[{idx}] subject surface must be one of {_SUBJECT_SURFACES}, "
+                f"got {surface_raw!r}"
+            )
         change_raw = entry.get("change")
         if not isinstance(change_raw, str):
             raise ValueError(f"intents[{idx}] missing a 'change' string")
-        intents.append(Intent(subject=Subject(kind=kind, ref=ref_raw), change=change_raw))
+        intents.append(
+            Intent(subject=Subject(kind=kind, ref=ref_raw, surface=surface_raw), change=change_raw)
+        )
     return intents
 
 
 def serialize_intents(intents: Sequence[Intent]) -> list[dict[str, object]]:
-    """Serialize :class:`Intent` objects back to the frontmatter-mapping shape."""
-    return [
-        {
-            "subject": {"kind": intent.subject.kind.value, "ref": intent.subject.ref},
-            "change": intent.change,
+    """Serialize :class:`Intent` objects back to the frontmatter-mapping shape.
+
+    ``surface`` is emitted only when ``new`` so every existing item round-trips
+    byte-stable.
+    """
+    out: list[dict[str, object]] = []
+    for intent in intents:
+        subject: dict[str, object] = {
+            "kind": intent.subject.kind.value,
+            "ref": intent.subject.ref,
         }
-        for intent in intents
-    ]
+        if intent.subject.surface != "existing":
+            subject["surface"] = intent.subject.surface
+        out.append({"subject": subject, "change": intent.change})
+    return out

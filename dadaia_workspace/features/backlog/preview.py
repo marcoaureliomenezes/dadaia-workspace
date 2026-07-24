@@ -189,10 +189,30 @@ def bound_anchor_changes(item: BacklogItem, registry: Registry) -> tuple[dict[st
     that resolved, plus the list of HALT messages for intents that did not (BL-SCHEMA fodder).
     When two intents bind to the same anchor with differing changes, the first wins for the
     map (the intra-item duplicate is an authoring error the doctor surfaces separately).
+    A ``surface: new`` subject binds by declared identity (``new:<kind>:<ref>``) instead of
+    registry resolution, so items introducing disjoint new surfaces classify UNRELATED.
     """
     anchor_changes: dict[str, str] = {}
     unresolved: list[str] = []
     for intent in item.intents:
+        if intent.subject.surface == "new":
+            # Bugs backlog-independent-cli-items-false-conflict-044 +
+            # backlog-cli-intent-hallucinated-anchor-045: a declared NEW surface binds
+            # by its own identity — never forced onto an existing anchor (false
+            # conflicts) and never unresolved (dead-end blocks). Guard the dual error:
+            # a "new" surface the registry already resolves is an authoring mistake.
+            result = registry.bind(intent.subject.ref, intent.subject.kind)
+            if result.status is BindStatus.RESOLVED and result.anchor is not None:
+                unresolved.append(
+                    f"subject ref {intent.subject.ref!r} (kind="
+                    f"{intent.subject.kind.value}) is declared 'surface: new' but "
+                    f"already resolves to existing anchor {result.anchor.id!r}; bind "
+                    "it as existing (drop 'surface: new') or choose a new name."
+                )
+                continue
+            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            anchor_changes.setdefault(declared, intent.change)
+            continue
         result = registry.bind(intent.subject.ref, intent.subject.kind)
         if result.status is BindStatus.RESOLVED and result.anchor is not None:
             anchor_changes.setdefault(result.anchor.id, intent.change)

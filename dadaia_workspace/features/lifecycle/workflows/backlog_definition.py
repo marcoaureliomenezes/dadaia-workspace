@@ -610,6 +610,14 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             if unresolved:
                 unresolved_by_slug[item.slug] = tuple(unresolved)
 
+        # Every gate block prescribes the exact recovery (bug
+        # backlog-cli-intent-hallucinated-anchor-045, remedy half): a block without an
+        # operator_command is an unrecoverable chain dead end.
+        resume_command = (
+            f"dadaia lifecycle backlog-definition --context {self._context} "
+            f"--release-id {self._release_id} --run-id {run.run_id} "
+            "--resume-from backlog_author"
+        )
         changed = self._changed_slugs(before, after)
         if not changed:
             blocked = BlockedState(
@@ -619,6 +627,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 ),
                 blocked_at_step=step.label,
                 resume_token=run.idempotency_key,
+                operator_command=resume_command,
             )
             return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
 
@@ -628,10 +637,14 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 blocked = BlockedState(
                     reason=(
                         f"backlog_review_gate: authored item {slug!r} carries unresolved "
-                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}"
+                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}. Correct each "
+                        "ref against `dadaia backlog subjects`, or — when the item "
+                        "INTRODUCES that surface — declare it with 'surface: new' on the "
+                        "intent subject; then resume."
                     ),
                     blocked_at_step=step.label,
                     resume_token=run.idempotency_key,
+                    operator_command=resume_command,
                     detail={"slug": slug},
                 )
                 return (
@@ -657,9 +670,15 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             if offending:
                 classes = ", ".join(f"{c.other_slug}:{c.verdict.value}" for c in offending)
                 blocked = BlockedState(
-                    reason=f"backlog_review_gate: {slug!r} {reason_kind} ({classes})",
+                    reason=(
+                        f"backlog_review_gate: {slug!r} {reason_kind} ({classes}). Fold "
+                        "the change into the named item (EDIT), or — when the overlap is "
+                        "a shared coarse anchor and this item introduces its own NEW "
+                        "surface — declare that intent with 'surface: new'; then resume."
+                    ),
                     blocked_at_step=step.label,
                     resume_token=run.idempotency_key,
+                    operator_command=resume_command,
                     detail={"slug": slug},
                 )
                 return (
@@ -693,10 +712,17 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         lines = [
             "## Canonical subject anchors",
             "",
-            "Bind EVERY `intents[]` subject to one of these anchors — `kind` must match "
-            "the anchor's kind and `ref` must be copied verbatim from this list. A ref "
-            "outside this list is rejected by `backlog_review_gate` (unresolved "
-            "subject). Explore the full set with `dadaia backlog subjects`.",
+            "Bind every `intents[]` subject about an EXISTING surface to one of these "
+            "anchors — `kind` must match the anchor's kind and `ref` must be copied "
+            "verbatim from this list. A ref outside this list is rejected by "
+            "`backlog_review_gate` (unresolved subject). Explore the full set with "
+            "`dadaia backlog subjects`.",
+            "",
+            "When the item INTRODUCES a surface that does not exist yet (e.g. a new "
+            "CLI command), do NOT bind it to a nearby existing anchor and do NOT "
+            "invent a ref from this list — declare it as new: "
+            "`subject: { kind: cli, ref: <new-name>, surface: new }`. Disjoint new "
+            "surfaces never conflict with each other or with existing anchors.",
             "",
         ]
         for kind in sorted(by_kind):

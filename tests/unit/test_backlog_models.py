@@ -136,6 +136,34 @@ def test_parse_intents_round_trip_and_none_is_empty() -> None:
     assert parse_intents(None) == []
 
 
+def test_subject_surface_new_round_trip_and_default() -> None:
+    """Bugs backlog-independent-cli-items-false-conflict-044 +
+    backlog-cli-intent-hallucinated-anchor-045: an item introducing a genuinely NEW
+    surface (e.g. a new CLI command) has NO existing registry anchor to bind — the
+    author was forced to mis-bind an existing anchor (false conflict) or invent a ref
+    (unrecoverable unresolved block). ``surface: new`` declares the new surface as a
+    first-class subject; the default stays ``existing`` and serialization stays
+    byte-stable for every existing item."""
+    raw = [
+        {
+            "subject": {"kind": "cli", "ref": "hello", "surface": "new"},
+            "change": "add a hello command printing a greeting",
+        },
+        {
+            "subject": {"kind": "doc", "ref": "SPEC-DOC-031"},
+            "change": "document it",
+        },
+    ]
+    intents = parse_intents(raw)
+    assert intents[0].subject.surface == "new"
+    assert intents[1].subject.surface == "existing"
+    # Round trip: `surface` is emitted only when new — existing items stay byte-stable.
+    assert serialize_intents(intents) == raw
+
+    with pytest.raises(ValueError, match="surface"):
+        parse_intents([{"subject": {"kind": "cli", "ref": "x", "surface": "bogus"}, "change": "c"}])
+
+
 @pytest.mark.parametrize(
     ("name", "payload", "match"),
     [

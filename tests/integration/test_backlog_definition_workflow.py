@@ -201,6 +201,154 @@ def test_gate_blocks_new_item_overlapping_existing_anchor(tmp_path: Path) -> Non
     assert "twin-item" in result.blocked.reason
 
 
+_ITEM_NEW_CLI = """\
+---
+slug: {slug}
+status: OPEN
+intents:
+  - subject: {{ kind: cli, ref: {command}, surface: new }}
+    change: {change}
+---
+
+# {slug}
+
+Body of {slug}.
+"""
+
+
+def test_independent_new_cli_commands_do_not_conflict(tmp_path: Path) -> None:
+    """Bug backlog-independent-cli-items-false-conflict-044 (Hermes R1-C1c): a 'hello'
+    command item and an independent 'version' command item for the same CLI were both
+    forced onto the CLI's coarse existing anchor and classified DIVERGENT_CONFLICT —
+    a conflict that does not exist. With ``surface: new`` each item's intent carries
+    its OWN command identity, so disjoint new commands are UNRELATED and the chain
+    flows."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    (specs / "backlog" / "hello-cli-command.md").write_text(
+        _ITEM_NEW_CLI.format(slug="hello-cli-command", command="hello", change="add hello command"),
+        encoding="utf-8",
+    )
+
+    @dataclass
+    class _NewCommandFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "version-cli-command.md").write_text(
+                    _ITEM_NEW_CLI.format(
+                        slug="version-cli-command",
+                        command="version",
+                        change="add version command",
+                    ),
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _NewCommandFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-version", operator_demand="add a version command")
+
+    assert result.completed is True, result.blocked.reason if result.blocked else result
+
+
+def test_new_surface_that_already_exists_blocks_with_actionable_remedy(tmp_path: Path) -> None:
+    """The dual guard: declaring ``surface: new`` for a ref the registry already
+    resolves is an authoring error — surfaced with the exact recovery, never a dead
+    end."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    item = """\
+---
+slug: fake-new
+status: OPEN
+intents:
+  - subject: { kind: code, ref: pkg/a.py#A, surface: new }
+    change: add A
+---
+
+# fake-new
+"""
+
+    @dataclass
+    class _FakeNewFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "fake-new.md").write_text(item, encoding="utf-8")
+            return result
+
+    fake = _FakeNewFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-fakenew")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "already" in result.blocked.reason
+    assert result.blocked.operator_command is not None
+
+
+def test_review_gate_blocks_carry_operator_command(tmp_path: Path) -> None:
+    """Bug backlog-cli-intent-hallucinated-anchor-045 (remedy half, Hermes R1-C1d): a
+    review-gate block without an ``operator_command`` is an unrecoverable chain dead
+    end. Every gate block names the exact resume command."""
+    fake = _AuthoringFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-remedy")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.operator_command is not None
+    assert "--resume-from backlog_author" in result.blocked.operator_command
+    assert "--run-id bd-remedy" in result.blocked.operator_command
+
+
+def test_hallucinated_anchor_block_names_surface_new_recovery(tmp_path: Path) -> None:
+    """Bug backlog-cli-intent-hallucinated-anchor-045: an authored item binding a
+    nonexistent anchor blocks WITH the recovery paths named — correct the ref against
+    `dadaia backlog subjects`, or declare the surface as new."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    item = """\
+---
+slug: canary-version-cli
+status: OPEN
+intents:
+  - subject: { kind: cli, ref: reports validate }
+    change: add a version command
+---
+
+# canary-version-cli
+"""
+
+    @dataclass
+    class _HallucinatingFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "canary-version-cli.md").write_text(item, encoding="utf-8")
+            return result
+
+    fake = _HallucinatingFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-halluc")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "unresolved" in result.blocked.reason
+    assert "surface: new" in result.blocked.reason
+    assert result.blocked.operator_command is not None
+
+
 def test_gate_sees_prose_only_edit_of_existing_item(tmp_path: Path) -> None:
     """Bug backlog-dedupe-updated-payload-not-gate-visible-043: the dedupe EDIT path
     refines an existing item's body/acceptance WITHOUT touching its bound ``intents[]``
