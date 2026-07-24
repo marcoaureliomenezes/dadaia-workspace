@@ -173,8 +173,15 @@ def emit_block(reason: str) -> None:
     )
 
 
-def emit_allow() -> None:
+def emit_allow(system_message: str | None = None) -> None:
     """Print the explicit allow envelope (observable AND Claude-Code schema-valid).
+
+    ``system_message`` (bug pre-gate-drops-live-presence-advisory-042) carries the
+    NO-LOCKS presence advisory of an allowed MUTATING write: it rides the envelope's
+    ``systemMessage`` field (shown to the user, no permission verdict attached) and is
+    additionally echoed to stderr so grep-based consumers (kimi shim, codex hooks,
+    logs) see it without parsing JSON. Absent → the envelope is byte-identical to the
+    pre-advisory shape.
 
     Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
     automation could not distinguish an explicit allow from a hook that never ran — the
@@ -191,14 +198,14 @@ def emit_allow() -> None:
     So the gate steps aside with only schema-neutral fields. Codex hooks and the kimi
     shim treat any envelope without the literal ``"decision": "block"`` as allow.
     """
-    print(
-        json.dumps(
-            {
-                "continue": True,
-                "hookSpecificOutput": {"hookEventName": "PreToolUse"},
-            }
-        )
-    )
+    envelope: dict[str, object] = {
+        "continue": True,
+        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
+    }
+    if system_message:
+        envelope["systemMessage"] = system_message
+        print(system_message, file=sys.stderr)
+    print(json.dumps(envelope))
 
 
 def default_python_bin(workspace: Path) -> str:

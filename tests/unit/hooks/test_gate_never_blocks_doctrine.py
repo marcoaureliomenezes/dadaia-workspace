@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.spec_context import session_identity
-from tests.fixtures.harness_env import claude_hook_env, is_allow_envelope, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
 
@@ -114,15 +114,16 @@ def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_pat
     assert result_b.returncode == 0, result_b.stderr
     # ALLOW: no block envelope on stdout.
     assert result_b.block_envelope() is None
-    # The advisory line (when emitted) is stdout/stderr diagnostic text, never the block
-    # envelope, and it names the other live session.
-    combined = "\n".join(
-        line
-        for line in (result_b.stdout + result_b.stderr).splitlines()
-        if line.strip() and not is_allow_envelope(line.strip())
+    # Bug pre-gate-drops-live-presence-advisory-042 (Hermes R1-B): the doctrine
+    # MANDATES the throttled advisory on detection — a neutral allow envelope that
+    # swallows it blinds concurrency diagnosis. The advisory rides the allow
+    # envelope's systemMessage and names the other live session.
+    combined = result_b.stdout + result_b.stderr
+    assert "[PRESENCE]" in combined, (
+        f"allowed write with a live foreign presence must surface the advisory; "
+        f"got stdout={result_b.stdout!r} stderr={result_b.stderr!r}"
     )
-    if combined.strip():
-        assert sid_a in combined
+    assert sid_a in combined
 
 
 def test_advisory_is_throttled_within_the_window(tmp_path: Path) -> None:
