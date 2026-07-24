@@ -196,7 +196,11 @@ class ReleaseValidator:
                         path=str(fpath),
                     )
                 )
-            elif status != "Aprovado" and phase != "ARCHIVED":
+            elif status != "Aprovado" and phase in ("IMPLEMENTATION", "CLOSURE"):
+                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/Em
+                # revisão IS the legitimate state of an authoring-phase release
+                # (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS) — the scaffolder emits exactly
+                # that. Only implementation-bound phases expect Aprovado artifacts.
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-004",

@@ -1761,9 +1761,13 @@ def _backlog_definition_runtime_factory(
                 target.parent.mkdir(parents=True, exist_ok=True)
                 # Upsert (never append): the change text carries the task id so a re-run
                 # is a detectable EDIT of the one canary item.
+                # `candidate` is the documented vocabulary token for an intents-carrying
+                # item (scaffold README + backlog doctor _KNOWN_STATUSES) — the fake's
+                # output must pass the workflow's own doctor (bug
+                # fake-backlog-workflow-materializes-doctor-invalid-status-042).
                 target.write_text(
                     "---\n"
-                    "status: proposed\n"
+                    "status: candidate\n"
                     "intents:\n"
                     "  - subject:\n"
                     "      kind: cli\n"

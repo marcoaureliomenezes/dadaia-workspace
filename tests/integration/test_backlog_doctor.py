@@ -49,6 +49,42 @@ def _write_item(specs: Path, slug: str, frontmatter: str) -> None:
     )
 
 
+def test_driving_fake_canary_item_is_doctor_valid(tmp_path: Path) -> None:
+    """Bug fake-backlog-workflow-materializes-doctor-invalid-status-042 (Hermes R1-B):
+    the backlog-definition driving fake materialized `status: proposed`, a token
+    outside the documented vocabulary — the workflow's own output failed the
+    workflow's own doctor. Producer and validator must agree on the status set."""
+    from dadaia_workspace.container import _backlog_definition_runtime_factory
+    from dadaia_workspace.core.models.lifecycle import AgentRunRequest, AgentRuntimeKind
+
+    specs, src = _build_specs(tmp_path)
+    factory = _backlog_definition_runtime_factory(context="ctx", run_cwd=tmp_path)
+    fake = factory(AgentRuntimeKind.FAKE)
+    fake.run(
+        AgentRunRequest(
+            role="product-engineer",
+            prompt="author the item",
+            runtime=AgentRuntimeKind.FAKE,
+            context="ctx",
+            release_id="v0.1.0",
+            task_id="bd-canary:backlog_author",
+        )
+    )
+    item = specs / "backlog" / "dadaia-fake-harness-canary.md"
+    assert item.is_file(), "driving fake must materialize the canary item"
+
+    findings = run_backlog_doctor(
+        specs_dir=specs,
+        source_root=src,
+        catalog_path=specs / "memory" / "product" / "catalog.json",
+        alias_map_path=specs / "no-aliases.txt",
+        archive_root=specs / "_archive",
+        cli_anchors=frozenset({"backlog doctor"}),
+    )
+    invalid = [f for f in findings if "invalid status" in f.message]
+    assert not invalid, [f.message for f in invalid]
+
+
 def _run(specs: Path, src: Path) -> list:
     return run_backlog_doctor(
         specs_dir=specs,

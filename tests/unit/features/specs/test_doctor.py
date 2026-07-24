@@ -228,6 +228,37 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
     assert errors == [], errors
 
 
+def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
+    """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042 (Hermes R1-A): the
+    canonical 'specs release open' output — Draft SPEC/PLAN/TASKS with ACTIVE.md
+    phase SPEC — instantly drew three SPEC-DOC-004 warnings. Draft IS the legitimate
+    state of an authoring-phase release; the scaffolder and the doctor must agree on
+    the fresh state (0 errors, 0 warnings)."""
+    from dadaia_workspace.features.specs.scaffolder import scaffold_release_segment
+
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
+    # Re-open as the real scaffolder does: scaffold the segment + phase SPEC.
+    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        (specs / "releases" / "v0.1.0" / fname).unlink()
+    result = scaffold_release_segment(specs, "v0.1.0", "alpha-1")
+    assert not result.errors, result.errors
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: v0.1.0\nsegment: alpha-1\nphase: SPEC\n", encoding="utf-8"
+    )
+
+    issues = SpecsDoctor(specs).check()
+    doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
+    assert doc004 == [], [i.to_dict() for i in doc004]
+
+    # The warning is NOT lost where it matters: a Draft artifact in an
+    # implementation-bound phase still warns.
+    (specs / "releases" / "ACTIVE.md").write_text(
+        "release: v0.1.0\nsegment: alpha-1\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
+    issues_impl = SpecsDoctor(specs).check()
+    assert any(i.code == "SPEC-DOC-004" for i in issues_impl)
+
+
 def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     """A freshly scaffolded workspace produces no TREE errors."""
     from dadaia_workspace.features.specs.scaffolder import scaffold
