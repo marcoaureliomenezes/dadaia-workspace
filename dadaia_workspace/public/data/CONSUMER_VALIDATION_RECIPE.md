@@ -518,6 +518,69 @@ never exercised the live backlog path was false confidence).
   `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
   `dadaia public doctor` flags a tampered shim/block and `install` heals it.
 
+### R-09 — Resume of a sandbox-blocked run completes (echo-classification class)
+
+- Force a codex backlog/definition run to block on the sandbox signature (no bypass),
+  then run the PRESCRIBED remedy: same run-id, `--resume-from <blocked step>`, with
+  `DADAIA_CODEX_SANDBOX=danger-bypass`.
+- **PASS if:** the resumed run persists `completed` in `.dadaia/states/lifecycle/` AND
+  downstream consumption works (`release-definition --backlog-run-id <id>` accepts it).
+  A resumed run re-blocked with the OLD sandbox reason while its deliverables landed on
+  disk is the bug class (real-codex-resume-output-not-committed-to-ledger-042: the
+  prompt's own block digest echoed into stderr must never re-classify a bypass run).
+
+### R-10 — Dedupe EDIT path is gate-visible (disk truth, not anchors only)
+
+- Run backlog-definition twice over the same demand: the second run's worker refines
+  the existing item's BODY/acceptance without touching `intents[]`.
+- **PASS if:** the run COMPLETES (the review gate detects the content-hash change);
+  and a worker that claims 'updated' while writing NOTHING blocks at the author step
+  with the worker diagnostic — never an accepted-then-unexplained gate block (bug
+  backlog-dedupe-updated-payload-not-gate-visible-043).
+
+### R-11 — Resume never collides with its own leftovers (ledger-owned immutability)
+
+- Drive release-definition to a spent-revision-budget block (review rejects twice);
+  then run the prescribed `--resume-from <create step>` on the SAME run-id. Also:
+  interrupt a run between payload write and state save (or plant a stray
+  `<step>-attempt-0.step-payload.json` with no ledger record) and resume.
+- **PASS if:** every prescribed resume executes — no `already recorded step ...
+  (immutable payload ...)` error ever surfaces on a path the error text itself
+  prescribed (bug release-definition-retry-collides-with-immutable-tasks-payload).
+
+### R-12 — New-surface backlog intents classify by their own identity
+
+- Author two independent NEW CLI-command items (e.g. `hello`, then `version`) using
+  `subject: { kind: cli, ref: <name>, surface: new }`.
+- **PASS if ALL of:** both runs complete (no DIVERGENT_CONFLICT over a shared coarse
+  anchor — bug backlog-independent-cli-items-false-conflict-044); a `surface: new`
+  ref that ALREADY resolves blocks with the exact remedy; an unresolved EXISTING ref
+  blocks with a reason naming both recoveries (`dadaia backlog subjects` /
+  `surface: new`) AND a non-null `operator_command` naming the resume invocation
+  (bug backlog-cli-intent-hallucinated-anchor-045 — no gate block is a dead end).
+
+### R-13 — Producers pass their own validators (scaffold / fake / baseline)
+
+- `specs release open v0.1.0` then `specs doctor`; `specs segment open alpha-2` then
+  doctor again; `lifecycle backlog-definition --harness fake` then `backlog doctor`;
+  fresh context: `context create` → `alive` → `specs init` → `context baseline`.
+- **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
+  scaffold (Draft + phase SPEC is the legitimate authoring state — bug
+  fresh-release-scaffold-emits-spec-doctor-warnings-042); the fake-materialized item
+  is BL-SCHEMA-valid (bug fake-backlog-workflow-materializes-doctor-invalid-status-042);
+  and baseline COMPLETES after the official scaffold follow-up while still refusing a
+  tree carrying operator files (bug context-baseline-rejects-official-scaffold-followup).
+
+### R-14 — Live foreign presence is SURFACED on the allowed write
+
+- Bind two sessions in implementation mode on one context; drive a real `pre_gate`
+  MUTATING write payload for each.
+- **PASS if:** the second write is ALLOWED and its hook output visibly carries the
+  throttled `[PRESENCE]` advisory naming the other session (id, runtime, heartbeat
+  age) — in the allow envelope's `systemMessage` and on stderr; a neutral allow with
+  live foreign presence is the bug (pre-gate-drops-live-presence-advisory-042).
+  Repeat writes inside the throttle window stay quiet (at most one advisory).
+
 ---
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
