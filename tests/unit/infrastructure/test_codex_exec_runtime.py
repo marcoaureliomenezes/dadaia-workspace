@@ -730,6 +730,7 @@ def test_exit_zero_with_bwrap_namespace_failure_classifies_as_failed(tmp_path: P
     SUCCEEDED when the output carries the sandbox-failure signature — the adapter
     classifies it FAILED with an actionable remediation instead of letting a
     read-nothing worker's vacuous report be accepted."""
+
     def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0]
         assert isinstance(argv, list)
@@ -759,9 +760,61 @@ def test_exit_zero_with_bwrap_namespace_failure_classifies_as_failed(tmp_path: P
     assert "danger-bypass" in result.error
 
 
+def test_bypass_mode_ignores_echoed_sandbox_signature_in_stderr(tmp_path: Path) -> None:
+    """Bug real-codex-resume-output-not-committed-to-ledger-042: under `danger-bypass`
+    codex runs with NO sandbox at all, so a sandbox-failure signature on stderr cannot
+    be a true positive — codex exec mirrors the agent event stream (which echoes the
+    prompt) to stderr, and a resumed run's prompt carries the PRIOR block reason,
+    which quotes the signature phrase verbatim. Classifying that echo as a sandbox
+    failure makes every resume of a sandbox-blocked run fail forever, even though the
+    worker verifiably wrote its deliverables."""
+    (tmp_path / "artifact.md").write_text("# real deliverable\n", encoding="utf-8")
+
+    def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        argv = args[0]
+        assert isinstance(argv, list)
+        Path(argv[argv.index("--output-last-message") + 1]).write_text(
+            json.dumps(
+                {
+                    "summary": "item authored",
+                    "artifact_refs": ["artifact.md"],
+                    "structured_output": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout="",
+            stderr=(
+                "[agent] ## Prior rejection feedback (resumed run)\n"
+                "[agent] The previous run blocked: codex exec exited 0 but its stderr "
+                "carries a sandbox-failure signature ('no permissions to create a new "
+                "namespace') ...\n"
+            ),
+        )
+
+    result = CodexExecAdapter(
+        CodexExecConfig(
+            cwd=tmp_path,
+            codex_bin="/usr/bin/codex",
+            model="m",
+            reasoning_effort="medium",
+            sandbox="danger-bypass",
+        ),
+        runner=fake_runner,
+        environ={"PATH": "/bin", "HOME": "/h"},
+    ).run(_request())
+
+    assert result.status is AgentRunStatus.SUCCEEDED, result.error
+    assert result.artifact_refs == ("artifact.md",)
+
+
 def test_exit_zero_without_sandbox_signature_stays_succeeded(tmp_path: Path) -> None:
     """Guard against over-classification: an ordinary zero-exit run (no sandbox-failure
     signature in the output) keeps the happy path byte-identical."""
+
     def fake_runner(*args: object, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         argv = args[0]
         assert isinstance(argv, list)

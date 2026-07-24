@@ -302,7 +302,17 @@ class CodexExecAdapter(SubprocessAdapterMixin):
             # nested/unprivileged container; landlock denies workspace writes). A zero
             # exit carrying the failure signature must NOT read as SUCCEEDED — otherwise
             # a read-nothing worker's vacuous report is accepted as real evidence.
-            sandbox_error = _sandbox_failure_signature(proc.stderr or "")
+            # Bug real-codex-resume-output-not-committed-to-ledger-042: under
+            # `danger-bypass` codex runs with NO sandbox, so a signature on stderr can
+            # never be a true positive — codex mirrors the agent event stream (which
+            # echoes the prompt) to stderr, and a resumed run's prompt quotes the prior
+            # sandbox block reason verbatim. Scanning it would fail every resume of a
+            # sandbox-blocked run forever, even when the worker verifiably delivered.
+            sandbox_error = (
+                None
+                if self._config.bypass_sandbox
+                else _sandbox_failure_signature(proc.stderr or "")
+            )
             if sandbox_error is not None:
                 return AgentRunResult(
                     status=AgentRunStatus.FAILED,
