@@ -152,8 +152,16 @@ class PlatformCapabilityError(DadaiaError):
         super().__init__(message)
 
 
-class WorkspaceVenvBootstrapError(RuntimeError):
-    """Workspace venv bootstrap could not install the running distribution."""
+class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
+    """Workspace venv bootstrap could not create the venv or install the distribution.
+
+    Inherits ``DadaiaError`` so the CLI entrypoint renders it as ONE operator-facing
+    line (bug r3b-portability-import-venv-permission, F-22 class): as a bare
+    ``RuntimeError`` it slipped past ``cli/main``'s ``except DadaiaError`` and every
+    venv-bootstrap failure — ``init``, ``import``, ``certify``, ``reconcile`` alike —
+    reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
+    existing ``except RuntimeError`` call sites keep working.
+    """
 
 
 class CodexConfigError(DadaiaError, ValueError):
