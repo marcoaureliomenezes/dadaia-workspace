@@ -137,7 +137,7 @@ def test_install_codex_agents_keeps_authored_model_for_plugin_body(tmp_path: Pat
     installed: list[str] = []
     install_codex_agents(agentic, tmp_path, False, installed, resolved_models={})
     toml = (tmp_path / ".codex" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
-    assert 'model = "gpt-5.3-codex"' in toml
+    assert 'model = "gpt-5.6-terra"' in toml
 
 
 def test_install_codex_agents_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
@@ -151,7 +151,7 @@ def test_install_codex_agents_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -
     installed: list[str] = []
     install_codex_agents(agentic, tmp_path, False, installed, resolved_models=resolved)
     toml = (tmp_path / ".codex" / "agents" / "software-engineer.toml").read_text(encoding="utf-8")
-    assert 'model = "gpt-5.3-codex"' in toml
+    assert 'model = "gpt-5.6-terra"' in toml
     assert 'model_reasoning_effort = "high"' in toml
 
 

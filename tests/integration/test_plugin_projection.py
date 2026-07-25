@@ -230,7 +230,7 @@ def test_plugin_install_projects_body_idempotent_core_precedence_claude_only_and
     ledger = JsonPluginStore().read(ws / ".dadaia" / "states")
     assert ledger is not None and ledger.plugins == (_PACK,)
     codex_toml = (ws / ".codex" / "agents" / f"{_AGENT}.toml").read_text(encoding="utf-8")
-    assert 'model = "gpt-5.3-codex"' in codex_toml
+    assert 'model = "gpt-5.6-terra"' in codex_toml
     assert "gpt-5.5" not in codex_toml
 
     # Idempotent re-install: every projected file is a hash-compare [skip].

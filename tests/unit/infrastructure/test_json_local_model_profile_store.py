@@ -50,7 +50,7 @@ def _valid_profile() -> dict[str, object]:
         "id": "pi-operator-fast",
         "harness": "pi",
         "label": "PI — operator fast",
-        "model_id": "openai-codex/gpt-5.5",
+        "model_id": "openai-codex/gpt-5.6-sol",
         "effort": "low",
         "purpose": "Operator's low-cost PI profile.",
     }
@@ -196,7 +196,7 @@ def test_l8_secret_field_rejected_never_echoes_value(
     ("model_id", "should_load"),
     [
         pytest.param(
-            "openai-codex/gpt-5.5",
+            "openai-codex/gpt-5.6-sol",
             True,
             id="codex-subscription-gpt-id-accepted",
         ),

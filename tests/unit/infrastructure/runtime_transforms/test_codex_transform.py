@@ -106,7 +106,7 @@ def test_codex_transform_replacement_matrix(case: str) -> None:
     elif case == "maps-known-claude-model-identifiers-only":
         body = "Model row: claude-sonnet-4-6. Skill row: ai-harness-claude-code."
         result = transform_for_codex(body, "ai-engineer")
-        assert "gpt-5.3-codex" in result
+        assert "gpt-5.6-terra" in result
         assert "claude-sonnet-4-6" not in result
         assert "ai-harness-claude-code" in result
 

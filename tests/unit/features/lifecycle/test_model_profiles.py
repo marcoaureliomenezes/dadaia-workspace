@@ -18,6 +18,7 @@ from dadaia_workspace.core import harness_models
 from dadaia_workspace.core.harness_models import HarnessModelOption
 from dadaia_workspace.features.lifecycle import model_profiles
 from dadaia_workspace.features.lifecycle.model_profiles import UnknownProfileError
+from dadaia_workspace.features.telemetry.pricing import PRICING_TABLE
 
 # ---------------------------------------------------------------------------
 # ① registry↔catalog invariants param
@@ -137,8 +138,14 @@ def test_pi_gpt_profiles_use_codex_subscription_ids() -> None:
 def test_terra_profile_is_a_governed_codex_option() -> None:
     """v0.2.9 follow-up: gpt-5.6-terra (medium reasoning) is selectable via a governed
     codex profile — the fallback for workspaces whose gpt-5.3-codex-spark credit is
-    exhausted. Resolves to the discrete codex catalog option and carries no registry
-    pricing row (cost reports 'unknown', never fabricated).
+    exhausted. Resolves to the discrete codex catalog option.
+
+    The operator codex remap made terra ALSO the plugin-tier ``codex_id``, retiring the
+    former "terra is never a registry codex_id" pin. The two protections that pin
+    actually bought are asserted directly instead, so retiring it costs no coverage:
+    terra resolves no pricing row of its own (``PRICING_TABLE`` is keyed by
+    ``claude_id``), and it collapses no tier (``codex_tier_views`` stays injective on
+    the ``(codex_id, effort)`` pair — pinned by its own test).
     """
     profile = model_profiles.resolve("codex-implementation-terra")
     assert profile.harness == "codex"
@@ -148,5 +155,12 @@ def test_terra_profile_is_a_governed_codex_option() -> None:
     assert option in harness_models.options_for("codex")
     assert option == HarnessModelOption("gpt-5.6-terra", "medium")
     assert "gpt-5.6-terra" in harness_models.known_layer2_model_ids()
-    assert "gpt-5.6-terra" not in {entry.codex_id for entry in harness_models.REGISTRY}
+    # Reachable through BOTH sets now — and still listed in the curated Layer-2
+    # allowlist, which ``json_local_model_profile_store`` validates against WITHOUT the
+    # registry codex ids (dropping it would revoke the credit-exhaustion escape hatch).
+    assert "gpt-5.6-terra" in {entry.codex_id for entry in harness_models.REGISTRY}
+    assert "gpt-5.6-terra" in harness_models.LAYER2_EXTRA_MODEL_IDS
+    # No fabricated pricing: the pricing table is keyed by claude_id, so a codex id
+    # never resolves a row of its own.
+    assert "gpt-5.6-terra" not in PRICING_TABLE
     assert profile in model_profiles.profiles_for("codex")
