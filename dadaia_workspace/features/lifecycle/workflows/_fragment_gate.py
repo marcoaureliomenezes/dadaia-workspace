@@ -71,7 +71,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
 from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
-from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
+from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError, RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     FragmentBundle,
     LifecyclePromptBuilder,
@@ -482,10 +482,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         else:
             labels = tuple(step.label for step in sequence)
             if resume_from not in labels:
-                raise ValueError(
-                    f"resume_from step {resume_from!r} is not in the "
-                    f"{self._WORKFLOW_LABEL} sequence {labels}"
-                )
+                raise InvalidResumeStepError.for_labels(resume_from, labels)
             prior = self._run_store.load(run_id)
             if prior is None:
                 raise ValueError(

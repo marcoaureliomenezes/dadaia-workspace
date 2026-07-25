@@ -514,8 +514,15 @@ def test_resume_from_unknown_step_or_missing_run_raises(tmp_path: Path) -> None:
         ),
         ReleaseStep(label="cs_gate", role="python", fragment_id=None),
     )
-    with pytest.raises(ValueError, match="not in the"):
+    # Bug r4d-resume-preflight-invalid-step-traceback: an unknown --resume-from is now a
+    # DadaiaError (rendered as ONE operator line, never a raw traceback) that NAMES the
+    # valid steps. It still subclasses ValueError, so this call site is unchanged.
+    from dadaia_workspace.core.exceptions import DadaiaError
+
+    with pytest.raises(ValueError, match="is not a step of this workflow") as excinfo:
         wf.run("never-ran", sequence=custom, resume_from="ghost_step")
+    assert isinstance(excinfo.value, DadaiaError)
+    assert "cs_a" in str(excinfo.value) and "cs_gate" in str(excinfo.value)
     with pytest.raises(ValueError, match="no persisted run"):
         wf.run("never-ran", sequence=custom, resume_from="cs_a")
 

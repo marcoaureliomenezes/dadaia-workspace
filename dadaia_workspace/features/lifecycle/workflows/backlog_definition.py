@@ -77,7 +77,7 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
 )
 from dadaia_workspace.features.lifecycle.context_selector import ContextSelector
 from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
-from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
+from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError, RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
     PromptPrefix,
@@ -425,10 +425,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
     ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
         labels = tuple(step.label for step in sequence)
         if resume_from not in labels:
-            raise ValueError(
-                f"resume_from step {resume_from!r} is not in the backlog-definition "
-                f"sequence {labels}"
-            )
+            raise InvalidResumeStepError.for_labels(resume_from, labels)
         prior = self._run_store.load(run_id)
         if prior is None:
             raise ValueError(f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run")
