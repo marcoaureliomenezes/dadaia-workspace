@@ -581,6 +581,38 @@ never exercised the live backlog path was false confidence).
   live foreign presence is the bug (pre-gate-drops-live-presence-advisory-042).
   Repeat writes inside the throttle window stay quiet (at most one advisory).
 
+### R-15 — L1 agent-model roster resolves, projects and RUNS on the mapped models
+
+The L1 roster is data (`core/agent_model_templates.py` + `core/model_registry.py`)
+rendered at projection time into BOTH harness surfaces. A remap that resolves and
+renders cleanly can still name a model the runtime cannot reach — a class internal
+gates cannot catch, because they never call the model.
+
+- **Reachability (the load-bearing check):** for every DISTINCT `model` string in
+  `.codex/agents/*.toml`, run one minimal `codex exec --model <id>` and require
+  exit 0. A projected model that 403s/404s at runtime is a FAIL even when every
+  doctor is green.
+- **Lockstep:** with no overlay, `.claude/agents/<a>.md` frontmatter (`model`,
+  `effort`) and `.codex/agents/<a>.toml` (`model`, `model_reasoning_effort`) must
+  render from the SAME resolved roster for all 9 core agents; the codex effort is
+  the D-3 clamp of the claude effort (`xhigh` → `high`).
+- **Overlay round-trip:** apply a template + a per-agent override through the panel
+  API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved
+  together; `GET /api/agent-model-templates` offers every registry `claude_id` as a
+  selectable model and the full effort vocabulary.
+- **Tier invariants:** `dadaia public doctor` reports `[ok] model-resolution`; each
+  registry tier resolves to exactly ONE codex id, and no two tiers collapse to an
+  identical `(codex_id, reasoning_effort)` pair.
+- **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
+  `security-reviewer`, under any template or override.
+- **Layer-2 is NOT collateral:** the four lifecycle workflows keep running on their
+  own profiles (`features/lifecycle/model_profiles.py`) — an L1 remap must not
+  change which model a workflow worker runs, and must not drop a Layer-2 id the
+  operator overlay depends on (credit-exhaustion escape hatch).
+- **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
+  provider-qualified PI id that no longer maps) must fail LOUDLY at load with a
+  message naming the rejected id — never silently accept an unmapped model.
+
 ---
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
