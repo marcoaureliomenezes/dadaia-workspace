@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import ClassVar, Protocol
 
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
@@ -161,6 +162,43 @@ def _is_rejected_verdict(blocked: BlockedState | None) -> bool:
     if str(blocked.detail.get("verdict", "")).upper() == "REJECTED":
         return True
     return "rejected" in blocked.reason.lower()
+
+
+def prescribe_review_recovery(
+    blocked: BlockedState,
+    *,
+    command: str,
+    context: str,
+    release_id: str,
+    run_id: str,
+    create_step: str,
+    runtime_kind: AgentRuntimeKind,
+) -> BlockedState:
+    """Attach the exact recovery command to a rejected-review block.
+
+    A reviewer returns a verdict and findings; it never fills ``operator_command``. The
+    engine spends one bounded in-run revision and then returned that RAW block, so a
+    release whose review rejected twice handed the operator a rejection and no way
+    forward — the validator's report was that it could not proceed "without inventing a
+    change" (bug r9-plan-review-missing-operator-command). Every other gate prescribes
+    its recovery; this is the one a real release hits most often.
+
+    The command names the SAME run, the create step this review consumes, and the run's
+    OWN harness — a remedy that silently switches runtime is its own bug
+    (r6h-backlog-remedy-command-loses-fake-harness). An ``operator_command`` that is
+    already set is never overwritten: a more specific gate remedy always wins.
+    """
+    if blocked.operator_command:
+        return blocked
+    verb = command.replace("_", "-")
+    return replace(
+        blocked,
+        operator_command=(
+            f"dadaia lifecycle {verb} --context {context} --release-id {release_id} "
+            f"--run-id {run_id} --harness {HARNESS_CLI_NAMES.get(runtime_kind, 'codex')} "
+            f"--resume-from {create_step}  # address the review findings above, then re-run"
+        ),
+    )
 
 
 class _FragmentAssemblyMixin:
@@ -613,6 +651,23 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     if revised is not None:
                         run, idx = revised
                         continue
+                # Revision budget spent: the raw reviewer block carries no recovery, so
+                # prescribe it here rather than leaving the operator at a dead end
+                # (bug r9-plan-review-missing-operator-command).
+                if target is not None and run.blocked is not None:
+                    run = replace(
+                        run,
+                        blocked=prescribe_review_recovery(
+                            run.blocked,
+                            command=self._COMMAND,
+                            context=self._context,
+                            release_id=self._release_id,
+                            run_id=run_id,
+                            create_step=target,
+                            runtime_kind=getattr(step, "runtime_kind", None) or self._default_kind,
+                        ),
+                    )
+                    self._run_store.save(run)
             return self._make_result(
                 run_id=run_id,
                 completed=False,

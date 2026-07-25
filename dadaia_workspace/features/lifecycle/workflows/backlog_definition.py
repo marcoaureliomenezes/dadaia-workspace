@@ -47,6 +47,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRuntimeKind,
     BlockedState,
     GateVerdict,
@@ -693,7 +694,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         resume_command = (
             f"dadaia lifecycle backlog-definition --context {self._context} "
             f"--release-id {self._release_id} --run-id {run.run_id} "
-            f"--harness {self._default_kind.value} "
+            f"--harness {HARNESS_CLI_NAMES.get(self._default_kind, 'codex')} "
             "--resume-from backlog_author"
         )
         changed = self._changed_slugs(before, after)

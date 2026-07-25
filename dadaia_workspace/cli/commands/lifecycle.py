@@ -13,6 +13,7 @@ import typer
 
 from dadaia_workspace.core.exceptions import ReleaseNotFoundError, ScopeNotConsumedError
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
@@ -32,11 +33,9 @@ if TYPE_CHECKING:
 # Layer-1 entry harness; running it as a Layer-2 worker spends credits outside the
 # operator's subscription. The CLAUDE_SDK adapter + enum value remain in code (Layer-1)
 # but are not selectable as a workflow harness.
-_HARNESS_KINDS = {
-    "fake": AgentRuntimeKind.FAKE,
-    "codex": AgentRuntimeKind.CODEX_EXEC,
-    "pi": AgentRuntimeKind.PI_HEADLESS,
-}
+#: Derived from the ONE canonical map in core so the parser and every prescribed-remedy
+#: renderer can never disagree about what '--harness codex' means.
+_HARNESS_KINDS = {name: kind for kind, name in HARNESS_CLI_NAMES.items()}
 
 # Harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer. Claude is a
 # Layer-1 entry harness; OpenCode was removed as a Layer-2 worker in v0.1.24. Layer-2
