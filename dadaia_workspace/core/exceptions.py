@@ -196,6 +196,15 @@ class ScopeNotConsumedError(DadaiaError):
     """
 
 
+class CiPreflightScopeError(DadaiaError):
+    """``ci preflight`` was invoked outside the dadaia-workspace source tree.
+
+    Its checks target the library's own paths, so anywhere else it could only report a
+    lint failure for a path that does not exist
+    (bug ci-preflight-unusable-outside-the-source-repo).
+    """
+
+
 class CodexConfigError(DadaiaError, ValueError):
     """Invalid Codex adapter configuration (e.g. an unknown ``DADAIA_CODEX_SANDBOX`` value).
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -17,6 +18,7 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
+from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 
@@ -53,6 +55,19 @@ def preflight(
     never reach a push.
     """
     root = _repo_root()
+    # The checks are structurally bound to this repo: they lint `dadaia_workspace/` and
+    # `tests/`, type-check `dadaia_workspace/`, and read this repo's setup.cfg. In a
+    # consumer repo none of those paths exist and the consumer venv has no ruff/mypy, so
+    # the gate reported a phantom lint FAIL and blamed a missing poetry — sending the
+    # operator to install a tool that would not have helped
+    # (bug ci-preflight-unusable-outside-the-source-repo). Refuse honestly instead. The
+    # source-repo test is the existing one, not a second definition.
+    if not _is_source_repo_root(root):
+        raise CiPreflightScopeError(
+            f"`dadaia ci preflight` targets the dadaia-workspace source repo; "
+            f"{str(root)!r} is not it. The gate lints and type-checks the library's own "
+            "paths, which do not exist here. Run your repo's own CI checks instead."
+        )
     checks = checks_for(quick=quick)
     typer.echo(f"Running {len(checks)} preflight check(s){' (quick)' if quick else ''}…")
     results = run_preflight(checks, subprocess_runner(root), fail_fast=fail_fast)

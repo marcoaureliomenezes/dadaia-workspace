@@ -23,6 +23,12 @@ _runner = CliRunner()
 @pytest.mark.parametrize("all_pass", [True, False], ids=["pass", "fail"])
 def test_preflight_pass_and_fail(monkeypatch, tmp_path: Path, all_pass: bool) -> None:
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
+    # The verb refuses outside the dadaia-workspace source tree
+    # (bug ci-preflight-unusable-outside-the-source-repo), and this test's repo root is a
+    # tmp_path. Stub that precondition so these cases keep asserting what they are about —
+    # how the gate renders pass and fail. The guard itself is covered by
+    # tests/integration/cli/test_ci_preflight_repo_scope.py.
+    monkeypatch.setattr(ci, "_is_source_repo_root", lambda _root: True)
 
     if all_pass:
         monkeypatch.setattr(ci, "subprocess_runner", lambda root: lambda argv: (0, "ok"))

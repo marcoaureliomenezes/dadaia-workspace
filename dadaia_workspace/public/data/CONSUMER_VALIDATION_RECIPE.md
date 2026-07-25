@@ -205,9 +205,15 @@ an initialized workspace, create it:
 - Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
   write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
   `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
-  `scope`, `metrics:{}`, `self_pull:{"refs":[<one ref that EXISTS on disk, e.g. "AGENTS.md">]}`,
+  `scope`, `metrics:{}`, `self_pull:{"refs":[<the agent's ROLE-MAPPED memory atom>, ...]}`,
   `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
+  `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
+  rejects it — correctly: an agent's handoff has to show it read its own memory. For
+  `agent:"qa-engineer"` that is `specs/memory/quality-assurance.md` (context-relative, and
+  it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
+  (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
+  that, so following the recipe verbatim produced a FAIL against a healthy product).
   Also write a tampered copy (e.g. `schema_version:"handoff-BOGUS"` and drop `agent`).
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
@@ -297,12 +303,21 @@ an initialized workspace, create it:
 - Run: `$D academy --help` and a read verb.
 - **PASS if:** the academy verbs exist and read without touching governed paths.
 
-### F-21 — CI preflight
-- Run inside a git repo working tree with the wheel installed: `$D ci preflight` (it
-  gates format/lint/type/tests). Consult `$D ci preflight --help` for required context.
-- **PASS if:** it runs the gate and its exit code truthfully reflects pass/fail. Running
-  it OUTSIDE a repo returning a clear usage error is expected, not a FAIL — run it in a
-  prepared repo to demonstrate the gate.
+### F-21 — CI preflight (scope-aware)
+- Run `$D ci preflight` from a git repo that is NOT the dadaia-workspace source tree
+  (any consumer Spec Context repo will do).
+- **PASS if:** it refuses in ONE clear line saying the gate targets the dadaia-workspace
+  source repo, exit non-zero, no traceback — and it does NOT report a lint failure or
+  blame a missing `poetry`. The gate's checks lint and type-check the library's own
+  paths (`dadaia_workspace/`, `tests/`, this repo's `setup.cfg`), which do not exist in a
+  consumer repo, and a consumer venv carries no ruff/mypy — so the old behaviour reported
+  `[FAIL] ruff format --check` / `command not found: poetry` and sent the operator to
+  install a tool that would not have helped
+  (bug ci-preflight-unusable-outside-the-source-repo).
+- Running it OUTSIDE any git repo returning a clear usage error is also expected.
+- The in-source-repo path (where the gate actually runs format/lint/type/tests) is not
+  reachable from a consumer validation workspace; mark it **EXCEPTION** with that reason
+  rather than installing the library source just to exercise it.
 
 ### F-22 — Help & docs quality
 - Run `--help` on every top-level verb.
