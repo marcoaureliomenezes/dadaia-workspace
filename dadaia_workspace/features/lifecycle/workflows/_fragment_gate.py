@@ -84,7 +84,11 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import (
+    emit_progress,
+    refuse_blocked_restart,
+    refuse_completed_rerun,
+)
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     _NO_RELEASE_CONTEXT_COMMANDS,
@@ -490,6 +494,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED
             # run id refuses cleanly; blocked runs stay restartable/resumable.
             refuse_completed_rerun(self._run_store, run_id)
+            refuse_blocked_restart(self._run_store, run_id)
             # Restart semantics: a fresh run over an existing run_id replaces the record
             # (and its ledger), so reclaim the orphaned payload zone first — otherwise the
             # prior generation's immutable attempt-0 files block this run's produce() (bug

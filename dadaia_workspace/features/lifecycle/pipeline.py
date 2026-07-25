@@ -75,7 +75,10 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import (
+    refuse_blocked_restart,
+    refuse_completed_rerun,
+)
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
@@ -341,6 +344,11 @@ class LifecyclePipeline:
         # id is immutable history — refuse cleanly before any marker rewrite or zone
         # reclaim; blocked/failed run ids remain restartable.
         refuse_completed_rerun(self._run_store, run_id)
+        if resume_from is None:
+            # Only a FRESH start would discard a recorded block; an explicit --resume-from
+            # is the sanctioned recovery and must never be refused
+            # (bug r10-release-resume-blocked-run-restarts-and-loses-remedy).
+            refuse_blocked_restart(self._run_store, run_id)
         # Python owns task-marker state because the implementation worker's write scope
         # deliberately excludes TASKS.md. Reservations survive retries and blocked runs;
         # completion happens only after the entire review + close ladder succeeds.

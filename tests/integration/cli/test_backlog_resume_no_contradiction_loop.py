@@ -201,3 +201,53 @@ def test_first_attempt_with_a_non_writing_worker_still_blocks(workspace: Path) -
     assert result.blocked is not None, "a worker that writes nothing must BLOCK"
     assert result.blocked.blocked_at_step == "backlog_author", result.blocked
     assert "NEW or CHANGED deliverable" in result.blocked.reason, result.blocked.reason
+
+
+def test_rerunning_a_blocked_run_is_refused_and_hands_over_the_remedy(workspace: Path) -> None:
+    """Bug r10-release-resume-blocked-run-restarts-and-loses-remedy (validator-reported).
+
+    Re-running the identical command after a block is the most natural operator move, and
+    it used to restart the sequence from step one — discarding the block's reason, its
+    findings and the operator_command prescribing the recovery. On a LIVE run it also
+    re-spent real worker budget re-doing already-accepted work; the validator watched a
+    plan_review block vanish and the release restart at spec_create.
+
+    Starting over stays possible, deliberately, with a fresh --run-id.
+    """
+    bad = _backlog_dir(workspace) / "preexisting-bad.md"
+    bad.write_text("---\nstatus: candidate\n---\n\n# no intents\n", encoding="utf-8")
+
+    code, blocked = _define(workspace)
+    assert code != 0
+    remedy = (blocked.get("blocked") or {}).get("operator_command")
+    assert remedy
+
+    proc = _dadaia(
+        workspace,
+        "lifecycle",
+        "backlog-definition",
+        "--context",
+        _CONTEXT,
+        "--release-id",
+        _RELEASE,
+        "--run-id",
+        "loop-run",
+        "--harness",
+        "fake",
+        "--demand",
+        "probe",
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "is BLOCKED" in combined, combined
+    # The refusal must hand over the remedy and the reason, not just say no.
+    assert "--resume-from backlog_author" in combined, combined
+    assert "fresh --run-id" in combined, combined
+    assert "NO intents" in combined, combined
+    assert "Traceback" not in combined
+
+    # And the prescribed resume still works after the operator fixes what was asked.
+    bad.write_text("---\nstatus: idea\n---\n\n# an unbound brainstorm\n", encoding="utf-8")
+    code, payload = _define(workspace, "--resume-from", "backlog_author")
+    assert code == 0, payload
+    assert payload["completed"] is True

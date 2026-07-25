@@ -226,6 +226,16 @@ class TasksMarkerStateError(DadaiaError, RuntimeError):
     """
 
 
+class BlockedRunRestartError(DadaiaError):
+    """Re-invoking a BLOCKED lifecycle run id without ``--resume-from`` is refused.
+
+    Bug r10-release-resume-blocked-run-restarts-and-loses-remedy: the restart discarded
+    the run's block, findings and prescribed recovery and re-executed from step one —
+    losing exactly the information the operator needed, and on a live run re-spending on
+    accepted work. Starting over stays possible; it just needs a fresh ``--run-id``.
+    """
+
+
 class CompletedRunRerunError(DadaiaError):
     """Re-invoking a COMPLETED lifecycle run id is refused (idempotency contract).
 
