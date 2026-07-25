@@ -283,6 +283,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # resumed-definition-step-blind-to-rejecting-review-feedback), implemented locally
         # per Ruling C (backlog keeps its own loop, no full base join).
         self._resume_feedback: dict[str, str] = {}
+        #: Backlog paths this run authored in an earlier attempt, captured on resume
+        #: before the ledger is truncated (see :meth:`_resume_run`).
+        self._resumed_authored_paths: tuple[str, ...] = ()
 
     # -- public entrypoint ----------------------------------------------
 
@@ -338,6 +341,33 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # or CHANGED file blocks at the step (with the structural retry), instead of
         # sailing through on a merely non-empty zone.
         self._before_deliverable_hashes = self._deliverable_before_hashes()
+        if resume_from is not None:
+            # The delta gate must answer "did this RUN deliver?", not "did this ATTEMPT
+            # deliver?". On a resume the snapshot above is taken AFTER the run's earlier
+            # attempt already wrote its item, so the run's own deliverable looks
+            # pre-existing, the delta comes back empty, and the step blocks with "no NEW
+            # or CHANGED deliverable" — a dead end whose only prescribed remedy is the
+            # resume that just failed. Combined with the gate prescribing that same
+            # resume, an operator who fixed exactly what the gate asked for could never
+            # finish the run (bug
+            # backlog-resume-contradiction-loop-after-fixing-a-preexisting-item).
+            #
+            # Dropping this run's own authored paths from the "before" snapshot restores
+            # the intended meaning without weakening the guard the delta mode exists for:
+            # a FIRST attempt whose worker writes nothing still sees a full snapshot and
+            # still blocks (bug codex-backlog-author-no-materialization-regression-040).
+            for authored in self._resumed_authored_paths:
+                self._before_deliverable_hashes.pop(authored, None)
+                # The review gate diffs the SAME question one layer up ("what did
+                # backlog_author write?"), against snapshots taken at this attempt's start —
+                # which already contain the run's own item. Dropping the run's own slugs
+                # here too lets the gate see the deliverable the run really produced,
+                # instead of reporting "no new/changed item found" about the item sitting
+                # in front of it. Both sites must agree, or fixing one just moves the
+                # dead end.
+                slug = authored.rsplit("/", 1)[-1].removesuffix(".md")
+                before.pop(slug, None)
+                self._before_content_hashes.pop(slug, None)
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
@@ -434,6 +464,12 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         resumed_labels = set(labels[index:])
         if prior.blocked is not None:
             self._resume_feedback[resume_from] = self._render_prior_block_digest(prior.blocked)
+        # Capture what THIS run already authored BEFORE the ledger is truncated below —
+        # resuming a step legitimately discards that step's records, which is also the
+        # only record of the run's own deliverable. Without capturing it here the delta
+        # gate sees the run's own item as pre-existing and blocks forever
+        # (bug backlog-resume-contradiction-loop-after-fixing-a-preexisting-item).
+        self._resumed_authored_paths = self._run_authored_paths(prior)
         if self._handoff_resolver is not None:
             self._handoff_resolver.reset_run_zone(
                 run_id,
@@ -474,6 +510,31 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         return "\n".join(lines)
 
     # -- real disk state: the backlog snapshot ---------------------------
+
+    def _run_authored_paths(self, run: LifecycleRun) -> tuple[str, ...]:
+        """Backlog paths THIS run already authored, from its own recorded author payload.
+
+        Read from the run's persisted ``backlog_author`` evidence — the payload Python
+        enriches with the disk-diffed authored path(s), never a worker self-report — so a
+        resume can tell the run's own deliverable apart from a genuinely pre-existing item.
+        Returns empty when there is no resolver or no recorded payload, which keeps the
+        strict delta semantics for a run that never authored anything.
+        """
+        if self._handoff_resolver is None:
+            return ()
+        paths: list[str] = []
+        with contextlib.suppress(Exception):
+            resolved = self._handoff_resolver.resolve_required(
+                run, producer_step="backlog_author", attempt=0
+            )
+            refs = resolved.payload.get("artifact_refs")
+            if isinstance(refs, list):
+                paths = [
+                    ref.strip().lstrip("/")
+                    for ref in refs
+                    if isinstance(ref, str) and "specs/backlog/" in ref and ref.endswith(".md")
+                ]
+        return tuple(dict.fromkeys(paths))
 
     def _deliverable_before_hashes(self) -> dict[str, str]:
         """sha256 of every file currently in the backlog zone, keyed artifact-root-relative.

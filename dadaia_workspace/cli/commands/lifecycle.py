@@ -535,11 +535,15 @@ def release_define(
         except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the run.
             post_step_error = f"{type(exc).__name__}: {exc}"
 
-    status = (
-        LifecycleCommandStatus.OK.value
-        if result.completed
-        else LifecycleCommandStatus.BLOCKED.value
-    )
+    # A post-step failure is a FAILURE of this command, not a footnote on a success. The
+    # status used to come purely from result.completed and the non-zero exit only from a
+    # blocked run, so a release whose post-step raised (e.g. it consumed none of the
+    # backlog its own scope directive declared mandatory) still reported status OK and
+    # exited 0 — the detection was real and the verdict was not
+    # (bug r6f-release-completes-with-unconsumed-authoritative-backlog, reported by the
+    # consumer-side validator against a live worker).
+    succeeded = result.completed and post_step_error is None
+    status = LifecycleCommandStatus.OK.value if succeeded else LifecycleCommandStatus.BLOCKED.value
     if json_output:
         _emit_json(
             {
@@ -571,7 +575,7 @@ def release_define(
             typer.echo(f"  post_step: {post_step_result}")
         if post_step_error is not None:
             typer.echo(f"  post_step ERROR: {post_step_error}")
-    if not result.completed:
+    if not succeeded:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 

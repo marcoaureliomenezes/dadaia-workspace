@@ -578,3 +578,36 @@ def test_declared_scope_not_consumed_is_a_loud_post_step_failure(tmp_path: Path)
     assert _apply_release_consume(
         workspace, context=_CONTEXT, release_id=_RELEASE, scope_slugs=()
     ) == {"consumed_slugs": [], "shipped_anchors": [], "ledger": None}
+
+
+def test_post_step_failure_makes_the_command_verdict_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug r6f-release-completes-with-unconsumed-authoritative-backlog (validator-reported).
+
+    The scope verification detected the failure and recorded it in ``post_step_error`` —
+    but ``status`` was computed purely from ``result.completed`` and the non-zero exit was
+    raised only when the run did not complete. So a release that consumed none of the
+    backlog its own directive declared mandatory still reported ``status: OK`` and exit 0.
+
+    A detection that does not change the verdict is not a gate.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    from dadaia_workspace.cli.commands import lifecycle as lifecycle_cli
+    from dadaia_workspace.core.exceptions import ScopeNotConsumedError
+
+    def _boom(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise ScopeNotConsumedError("release declared 3 item(s) but consumes: capability-two")
+
+    monkeypatch.setattr(lifecycle_cli, "_apply_release_consume", _boom)
+
+    result = _define(["--run-id", "post-step-fail", "--harness", "fake"])
+
+    assert result.exit_code != 0, result.output
+    payload = json.loads(result.output)
+    assert payload["post_step_error"] is not None
+    assert "capability-two" in payload["post_step_error"]
+    assert payload["status"] != "OK", payload["status"]
