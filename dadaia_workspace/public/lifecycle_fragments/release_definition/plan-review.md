@@ -29,6 +29,7 @@ provable against the SPEC's acceptance.
 
 | Angle | Check | Pass condition |
 |---|---|---|
+| Architecture | Contract bindings present | Every NEW or CHANGED caller-facing surface carries its explicit contract binding: exact public type/function/method name, parameter and return signature, field names and types, and module/export path. A PLAN that leaves any of these to TASKS or implementation is REJECTED. Not a style note: `tasks-create` is forbidden to invent a binding the PLAN omitted, while `tasks-review-implementability` requires it present — so a PLAN approved without bindings traps the TASKS author between two rules it cannot both satisfy, and the failure surfaces at the one step that cannot repair it (bug plan-review-approves-a-plan-missing-its-contract-bindings). Catch it HERE, where it is fixable. |
 | Architecture | Boundary fidelity | No workstream crosses a forbidden layer boundary or invents a parallel seam. |
 | Architecture | Sequencing | Dependencies between workstreams are correct and ordered; neither implementation nor validation depends on work scheduled later. |
 | Architecture | Prior art | The plan reuses existing mechanisms where they fit rather than building bespoke. |

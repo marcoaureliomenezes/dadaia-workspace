@@ -76,3 +76,26 @@ def test_the_parser_and_the_prompt_agree_on_the_token() -> None:
     assert example is not None, "spec-create must show a literal example line"
     parsed = parse_consumes_line(example.replace("<slug>", "example-slug"))
     assert parsed, f"the parser reads nothing from the line the prompt teaches: {example!r}"
+
+
+def test_plan_review_requires_the_contract_bindings_tasks_cannot_invent() -> None:
+    """The PLAN review must catch a missing contract binding, where it is still fixable.
+
+    Bug plan-review-approves-a-plan-missing-its-contract-bindings. ``plan-create``
+    requires exact signatures, field types and module paths for every caller-facing
+    surface; ``tasks-create`` FORBIDS inventing a binding the PLAN omitted; and
+    ``tasks-review-implementability`` REQUIRES them present. A PLAN approved without them
+    therefore traps the TASKS author between two rules it cannot both satisfy — observed
+    live as five consecutive TASKS rejections that stopped narrowing and began restating.
+
+    A downstream gate must never be the first place an upstream omission is detected when
+    the downstream step is forbidden from repairing it.
+    """
+    review = (_FRAGMENTS / "plan-review.md").read_text(encoding="utf-8")
+    create = (_FRAGMENTS / "plan-create.md").read_text(encoding="utf-8")
+    assert "signature" in create, "plan-create must demand the bindings in the first place"
+    assert "Contract bindings present" in review, (
+        "plan-review must have a check for the contract bindings, or the omission is only "
+        "detected at tasks_implementability_review, which cannot repair it"
+    )
+    assert "REJECTED" in review
