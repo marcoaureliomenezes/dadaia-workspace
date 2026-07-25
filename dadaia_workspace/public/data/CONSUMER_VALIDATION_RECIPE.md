@@ -570,6 +570,13 @@ never exercised the live backlog path was false confidence).
   is BL-SCHEMA-valid (bug fake-backlog-workflow-materializes-doctor-invalid-status-042);
   and baseline COMPLETES after the official scaffold follow-up while still refusing a
   tree carrying operator files (bug context-baseline-rejects-official-scaffold-followup).
+- **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take
+  what a workflow's own gate ACCEPTED and run the matching doctor over it. A run that
+  completes while `backlog doctor` / `specs doctor` rejects its output is a FAIL — the
+  gate and the doctor must never hold two opinions. Probe the degenerate inputs
+  specifically: an item with NO `intents[]` at `candidate` status (must block; `idea`
+  stays exempt), and an empty/absent field where the gate's checks could be *vacuously*
+  satisfied rather than actually passed.
 
 ### R-14 — Live foreign presence is SURFACED on the allowed write
 
@@ -612,6 +619,37 @@ gates cannot catch, because they never call the model.
 - **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
   provider-qualified PI id that no longer maps) must fail LOUDLY at load with a
   message naming the rejected id — never silently accept an unmapped model.
+
+### R-16 — Every prescribed remedy actually WORKS (no contradiction loops)
+
+A block that names a command which cannot run is worse than a block with no advice:
+the operator burns a cycle proving the tool wrong. This class has now appeared twice
+(bug release-definition-retry-collides-with-immutable-tasks-payload, bug
+r4d-resume-preflight-invalid-step-traceback), so it gets its own sweep.
+
+- For every BLOCKED state you can reach in this run, take its `operator_command` (and
+  any command named in `reason`) and **execute it verbatim**.
+- **PASS if ALL of:** the prescribed command is executable as written — the step it
+  names exists in that workflow's sequence, the run-id/flags it cites are valid, and it
+  changes the state (or explains precisely why it cannot); no prescribed remedy raises a
+  raw traceback; and a gate that is NOT resumable says so in-band rather than reporting
+  a `blocked_at_step` that invites `--resume-from <gate>` (preflight is the known case).
+- Probe an INVALID `--resume-from <unknown-step>` on each of the three workflows that
+  accept it: each must fail as ONE clean `DadaiaError` line naming the VALID steps —
+  never a raw `ValueError`.
+
+### R-17 — Bootstrap survives a hostile filesystem, cleanly
+
+- Point `init` (and `import`, if exercised) at a target on a **noexec** mount — `/tmp` is
+  mounted this way on many hardened hosts and containers, including this worker.
+- **PASS if:** exit code is non-zero, output is ONE actionable line naming the path and
+  the likely cause, and there are ZERO traceback lines (bug
+  r3b-portability-import-venv-permission). The filesystem limit is legitimate and not the
+  product's to fix; crashing on it is.
+- **Also assert the success path did not regress:** a normal bootstrap on an exec-capable
+  filesystem still creates the venv and installs the distribution, with and without
+  `DADAIA_BOOTSTRAP_PACKAGE`. An error-path fix that starts swallowing legitimate
+  failures, or that breaks valid bootstrap, is its own FAIL.
 
 ---
 **Verdict line (Telegram-short, last line of output):**
