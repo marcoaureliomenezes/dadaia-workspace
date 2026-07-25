@@ -257,7 +257,9 @@ def _persisted_bind_context(
 
 
 def resolve_bound_context_name(
-    explicit: str | None = None, *, ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None
+    explicit: str | None = None,
+    *,
+    ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None,
 ) -> str | None:
     """Resolve the session-bound context name.
 
@@ -285,7 +287,9 @@ def resolve_bound_context_name(
 
 
 def resolve_specs_dir(
-    specs_dir: str | None, *, ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None
+    specs_dir: str | None,
+    *,
+    ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None,
 ) -> Path:
     """Resolve a specs/ directory from explicit input or bound session context.
 
