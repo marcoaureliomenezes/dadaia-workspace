@@ -672,6 +672,41 @@ Probe the boundary directly, not just the verbs you happen to know about:
   argument and grep the combined output for `Traceback (most recent call last)`. Any hit
   is a FAIL, regardless of which verb produced it.
 
+### R-19 — THE FULL DEVELOPMENT LIFECYCLE (mandatory; the flow the workspace exists for)
+
+Everything else in this recipe validates parts. This statement validates the whole product:
+N backlog items authored, consumed by ONE release, then implemented — driven entirely by the
+dadaia-workflows. Run it in a FRESH consumer workspace with `--harness fake` (deterministic,
+zero credits). Every step below must be asserted on DISK, never from the run's own summary:
+
+1. `init` a fresh workspace, `context create` + `context alive` a scratch context.
+2. Run `lifecycle backlog-definition` **THREE times** with three DISTINCT `--run-id` and
+   three distinct `--demand`. **PASS if:** all three complete AND `specs/backlog/` gains
+   **THREE** items, each with its own `ref:` anchor. One item, or three items sharing one
+   anchor, is a FAIL (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow):
+   a run that reports success while overwriting a previous run's deliverable is the exact
+   class this recipe exists to catch.
+3. Run `lifecycle release-definition` ONCE for the same release id, with NO
+   `--backlog-run-id`. **PASS if:** it completes without demanding you pick one producer,
+   and `post_step.consumed_slugs` names **ALL THREE** items, `post_step.shipped_anchors`
+   names all three anchors, and the `consumed_backlog.json` ledger EXISTS on disk
+   (bugs release-definition-refuses-multiple-backlog-producers and
+   release-definition-consumes-nothing-while-scope-declares-items). An empty
+   `consumed_slugs` with `status: OK` is a FAIL, not a no-op.
+4. Assert the negative too: hand-edit the SPEC to drop one slug from `**Consumes:**`, re-run
+   the post-step path, and confirm it FAILS naming the dropped slug. A verification that
+   cannot fail is not a verification.
+5. Run `lifecycle implementation-reviews`. If preflight blocks with `context is not bound`,
+   run its `operator_command` verbatim and re-run — that prescribed remedy MUST work (R-16).
+   **PASS if:** it completes, `final_phase` is `closure`, and `closure_gate.removed` names
+   ALL THREE consumed items.
+6. Run `lifecycle audit` against the release. **PASS if:** it completes and writes its
+   report.
+
+Report each numbered step's verdict separately with the disk evidence you checked. A FAIL
+anywhere here outranks every F-statement: it means the product cannot do the one thing it
+exists to do.
+
 ---
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`

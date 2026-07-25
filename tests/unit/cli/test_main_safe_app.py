@@ -66,6 +66,25 @@ def test_unexpected_exception_is_one_clean_line_not_a_traceback(
     assert "DADAIA_TRACEBACK=1" in err
 
 
+def test_traceback_opt_in_applies_to_dadaia_errors_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bug r6a-traceback-escape-hatch-suppressed (validator-reported).
+
+    The opt-in was honoured only for *unexpected* exceptions, so it silently stopped
+    working for any failure that was moved into the DadaiaError hierarchy — the developer
+    debugging that very error is the one who loses the traceback.
+    """
+    monkeypatch.setenv("DADAIA_TRACEBACK", "1")
+
+    def _boom() -> None:
+        raise TasksMarkerStateError("marker gate")
+
+    monkeypatch.setattr(cli_main, "app", _boom)
+    with pytest.raises(TasksMarkerStateError, match="marker gate"):
+        cli_main._safe_app()
+
+
 def test_traceback_stays_available_behind_an_explicit_opt_in(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

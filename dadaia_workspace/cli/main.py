@@ -131,13 +131,20 @@ def _safe_app() -> None:
     DADAIA_BOOTSTRAP_PACKAGE; bug f22-cli-boundary-is-a-whitelist-not-a-boundary), because
     a whitelist is maintained by discipline. A boundary cannot leak.
 
-    Debuggability is not traded away: ``DADAIA_TRACEBACK=1`` re-raises untouched.
+    Debuggability is not traded away: ``DADAIA_TRACEBACK=1`` re-raises untouched, and it
+    applies to EVERY failure — including a ``DadaiaError``. Honouring the opt-in only for
+    unexpected exceptions made the escape hatch disappear the moment a specific failure was
+    (correctly) moved into the DadaiaError hierarchy, which is exactly how a developer
+    debugging a misfiring DadaiaError loses the traceback they need
+    (bug r6a-traceback-escape-hatch-suppressed, reported by the consumer-side validator).
     ``SystemExit`` and ``KeyboardInterrupt`` derive from ``BaseException``, so Click's
     normal exits and Ctrl-C pass through this handler unchanged.
     """
     try:
         app()
     except DadaiaError as exc:
+        if _traceback_requested():
+            raise
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1) from None
     except Exception as exc:

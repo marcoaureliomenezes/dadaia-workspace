@@ -34,6 +34,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
+import typer
 from click.testing import Result
 from typer.testing import CliRunner
 
@@ -252,13 +253,95 @@ def test_release_scope_consumes_exact_backlog_author_run(
         workspace,
         context=_CONTEXT,
         release_id=_RELEASE,
-        backlog_run_id="tetris-backlog-run",
+        backlog_run_ids=("tetris-backlog-run",),
     )
 
     assert prefix is not None
-    assert "Exact producer run: `tetris-backlog-run`" in prefix.text
+    assert "Exact producer run(s): `tetris-backlog-run`" in prefix.text
     assert "`specs/backlog/deterministic-tetris-engine.md`" in prefix.text
     assert "must not substitute a different candidate" in prefix.text
+
+
+def test_release_scope_aggregates_every_completed_backlog_producer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug release-definition-refuses-multiple-backlog-producers.
+
+    Three completed backlog-definition runs used to make release-definition exit 2 and
+    demand a single ``--backlog-run-id``, so the flow a release exists for — consuming a
+    SET of authored items — was unreachable: two of the three items had to be discarded.
+
+    Multiplicity is not ambiguity. There is no candidate for a model to choose between, so
+    all completed producers for the target release ARE the scope, and every authored path
+    must appear in the directive.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import _authoritative_backlog_prefix
+    from dadaia_workspace.core.models.lifecycle import (
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    store = container.build_lifecycle_run_store(workspace)
+    resolver = container.build_workflow_handoff_resolver(workspace)
+    slugs = {
+        "bl-1": "specs/backlog/capability-one.md",
+        "bl-2": "specs/backlog/capability-two.md",
+        "bl-3": "specs/backlog/capability-three.md",
+    }
+    for run_id, item_path in slugs.items():
+        handoff_ref = f".dadaia/handoff/{_CONTEXT}/{run_id}.handoff.json"
+        handoff = workspace / handoff_ref
+        handoff.parent.mkdir(parents=True, exist_ok=True)
+        handoff.write_text(
+            json.dumps({"artifact": {"type": "other", "path": item_path}}), encoding="utf-8"
+        )
+        run = LifecycleRun(
+            run_id=run_id,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            command="backlog_definition",
+            phase=LifecyclePhase.RELEASE_DEFINITION,
+            status=LifecycleRunStatus.COMPLETED,
+            current_step="backlog_review_gate",
+            idempotency_key=run_id,
+        )
+        store.save(run)
+        resolver.produce(
+            run,
+            producer_step="backlog_author",
+            attempt=0,
+            output_schema="backlog-item-v1",
+            payload={"summary": f"authored {run_id}", "artifact_refs": [handoff_ref]},
+        )
+
+    prefix = _authoritative_backlog_prefix(
+        workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=()
+    )
+    assert prefix is not None
+    for run_id, item_path in slugs.items():
+        assert run_id in prefix.text, f"producer {run_id} missing from the scope directive"
+        assert f"`{item_path}`" in prefix.text, f"{item_path} missing from the scope directive"
+
+    # Narrowing is still possible, and is now repeatable.
+    narrowed = _authoritative_backlog_prefix(
+        workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=("bl-1", "bl-3")
+    )
+    assert narrowed is not None
+    assert "`specs/backlog/capability-one.md`" in narrowed.text
+    assert "`specs/backlog/capability-three.md`" in narrowed.text
+    assert "capability-two" not in narrowed.text
+
+    # A named run that is not a completed producer is still a loud usage error, and the
+    # message must name the offending id rather than the whole set.
+    with pytest.raises(typer.BadParameter, match="bl-9"):
+        _authoritative_backlog_prefix(
+            workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=("bl-1", "bl-9")
+        )
 
 
 # 3 -- rejected review blocks advancement -----------------------------------
@@ -445,3 +528,53 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     model_labels = {s.label for s in _SEQUENCE if s.fragment_id is not None}
     emitted_with_prompt = {s.label for s in out_pi.steps if s.prompt_text is not None}
     assert model_labels <= emitted_with_prompt
+
+
+def test_declared_scope_not_consumed_is_a_loud_post_step_failure(tmp_path: Path) -> None:
+    """Bug release-definition-consumes-nothing-while-scope-declares-items.
+
+    The producer post-step used to no-op on an absent ``**Consumes:**`` line unconditionally,
+    so a definition that dropped every item its own scope directive declared mandatory
+    reported success with an empty ledger. A no-op is right for a direct definition with no
+    producer; it is wrong when the run itself named the items.
+
+    The negative case is asserted deliberately: a verification that cannot fail is not one.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import _apply_release_consume
+    from dadaia_workspace.core.exceptions import ScopeNotConsumedError
+
+    workspace = _init_workspace(tmp_path)
+    spec = container.build_release_spec_path(workspace, context=_CONTEXT, release_id=_RELEASE)
+    spec.parent.mkdir(parents=True, exist_ok=True)
+
+    # No Consumes line at all, but the run declared three mandatory items.
+    spec.write_text("# SPEC\n\n> **Status:** Draft\n\n## Scope\n\nnothing\n", encoding="utf-8")
+    with pytest.raises(ScopeNotConsumedError, match="capability-two"):
+        _apply_release_consume(
+            workspace,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            scope_slugs=("capability-one", "capability-two", "capability-three"),
+        )
+
+    # A PARTIAL consumption is also a failure, and it must name only what was dropped.
+    spec.write_text(
+        "# SPEC\n\n> **Status:** Draft\n**Consumes:** capability-one, capability-three\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ScopeNotConsumedError) as exc:
+        _apply_release_consume(
+            workspace,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            scope_slugs=("capability-one", "capability-two", "capability-three"),
+        )
+    assert "capability-two" in str(exc.value)
+    assert "capability-one" not in str(exc.value)
+
+    # With no declared scope, an absent Consumes line still no-ops cleanly — a direct
+    # release definition with no backlog producer is legitimate and must not start failing.
+    spec.write_text("# SPEC\n\n> **Status:** Draft\n\n## Scope\n\nnothing\n", encoding="utf-8")
+    assert _apply_release_consume(
+        workspace, context=_CONTEXT, release_id=_RELEASE, scope_slugs=()
+    ) == {"consumed_slugs": [], "shipped_anchors": [], "ledger": None}

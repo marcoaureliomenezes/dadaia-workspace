@@ -76,26 +76,51 @@ def test_fake_harness_drives_the_real_workflow_to_completion(workspace: Path) ->
     assert items, "driving fake must materialize a backlog item under specs/backlog/"
 
 
-def test_fake_harness_rerun_edits_the_canary_item_and_completes(workspace: Path) -> None:
-    """A second fake run must not block on 'no new/changed item' — it EDITs the canary."""
-    for run_id in ("it-backlog-a", "it-backlog-b"):
-        result = _runner.invoke(
-            app,
-            [
-                "lifecycle",
-                "backlog-definition",
-                "--release-id",
-                "v0.1.26",
-                "--run-id",
-                run_id,
-                "--harness",
-                "fake",
-                "--json",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["completed"] is True
-    # Idempotent slug: re-runs edit ONE canary item, never accumulate near-duplicates
-    # (which would trip the overlap classifier on the third run).
-    items = list((workspace / "specs" / "backlog").glob("*.md"))
-    assert len(items) == 1, sorted(p.name for p in items)
+def _define_backlog(run_id: str) -> None:
+    result = _runner.invoke(
+        app,
+        [
+            "lifecycle",
+            "backlog-definition",
+            "--release-id",
+            "v0.1.26",
+            "--run-id",
+            run_id,
+            "--harness",
+            "fake",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["completed"] is True
+
+
+def test_three_fake_runs_author_three_distinct_non_colliding_items(workspace: Path) -> None:
+    """Three consecutive fake runs must each complete AND each leave their own item.
+
+    Contract change (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow):
+    this test previously asserted that two distinct run ids collapse to ONE item, because
+    the fake upserted a single hardcoded slug. That made the flow the operator actually
+    validates — author N items, then define one release consuming the set — impossible to
+    drive with the fake. The properties worth keeping are preserved and still asserted
+    here: no run blocks on "no new/changed item", and the classifier is not tripped by
+    near-duplicates because each item claims its own anchor.
+
+    Re-run idempotence is asserted at the fake level instead
+    (``test_distinct_runs_author_distinct_non_colliding_items``): re-invoking a COMPLETED
+    run id through the CLI is refused upstream by ``CompletedRunRerunError``, a separate
+    and correct contract, so the CLI cannot exercise that property here.
+    """
+    for run_id in ("it-backlog-a", "it-backlog-b", "it-backlog-c"):
+        _define_backlog(run_id)
+
+    items = sorted((workspace / "specs" / "backlog").glob("*.md"))
+    assert len(items) == 3, sorted(p.name for p in items)
+
+    anchors = [
+        line.split("ref:", 1)[1].strip()
+        for item in items
+        for line in item.read_text(encoding="utf-8").splitlines()
+        if "ref:" in line
+    ]
+    assert len(set(anchors)) == 3, f"items must not collide on one anchor: {anchors}"

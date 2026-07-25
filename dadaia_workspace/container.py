@@ -3,6 +3,7 @@
 import contextlib
 import datetime as dt
 import os
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -1517,6 +1518,30 @@ def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
     return _regenerate
 
 
+#: Matches an authored backlog item path in the injected authoritative-scope directive,
+#: e.g. ``- `specs/backlog/capability-one.md```.
+_SCOPE_ITEM_RE = re.compile(r"`(?:[^`]*/)?specs/backlog/(?P<slug>[a-z][a-z0-9-]*)\.md`")
+
+
+def _fake_spec_stub(prompt: str) -> str:
+    """The driving fake's SPEC, declaring ``**Consumes:**`` for its own declared scope.
+
+    The release-definition run injects an authoritative-scope directive naming the backlog
+    items the definition MUST pick. A stub that ignored it completed the release flow while
+    consuming nothing, so the half of the flow that matters — N authored items consumed by
+    one release — could not be driven deterministically
+    (bug release-definition-consumes-nothing-while-scope-declares-items). Reading its own
+    prompt is exactly how a *driving* fake drives.
+    """
+    slugs = list(dict.fromkeys(m.group("slug") for m in _SCOPE_ITEM_RE.finditer(prompt)))
+    consumes = f"\n**Consumes:** {', '.join(slugs)}\n" if slugs else ""
+    return (
+        "# SPEC: driving-fake stub\n\n> **Status:** Draft\n"
+        f"{consumes}"
+        "\n## Scope\n\nDeterministic driving-fake deliverable.\n"
+    )
+
+
 def _release_definition_runtime_factory(
     *,
     context: str,
@@ -1552,9 +1577,10 @@ def _release_definition_runtime_factory(
     # PLAN.md carries the mandatory Validation Dependency Table so the plan lint passes
     # and `--harness fake` walks the WHOLE §6.1 sequence to the terminal commit gate.
     _STUB_CONTENT = {
-        "SPEC.md": (
-            "# SPEC: driving-fake stub\n\n> **Status:** Draft\n\n## Scope\n\nDeterministic driving-fake deliverable.\n"
-        ),
+        # SPEC.md is built per-run by _fake_spec_stub: it must declare the **Consumes:**
+        # line for the items its own scope directive named, or the consumption half of the
+        # flow cannot be driven at all (bug
+        # release-definition-consumes-nothing-while-scope-declares-items).
         "PLAN.md": (
             "# PLAN: driving-fake stub\n\n> **Status:** Draft\n\n"
             "## Validation Dependency Table\n\n"
@@ -1600,6 +1626,8 @@ def _release_definition_runtime_factory(
                     target.parent.mkdir(parents=True, exist_ok=True)
                     if ref.endswith(".json"):
                         content = '{"fake": true, "summary": "driving-fake stub artifact"}\n'
+                    elif Path(ref).name == "SPEC.md":
+                        content = _fake_spec_stub(request.prompt)
                     else:
                         content = _STUB_CONTENT.get(
                             Path(ref).name,
@@ -1695,23 +1723,53 @@ def build_release_definition_workflow(
     )
 
 
-#: The single idempotent slug the backlog driving fake upserts. One fixed slug means
-#: re-runs EDIT the same canary item (a changed ``change`` text) instead of accumulating
-#: near-duplicate NEW items that would trip the overlap classifier.
+#: Slug prefix of the items the backlog driving fake upserts. The slug is scoped by RUN id:
+#: re-running one run EDITs that run's own item (idempotent, which is what the former single
+#: fixed slug was protecting), while distinct runs author DISTINCT items — without which the
+#: documented "author N items, then define one release consuming the set" flow is unreachable
+#: with the fake (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow).
 _FAKE_BACKLOG_CANARY_SLUG = "dadaia-fake-harness-canary"
 
 
-def _fake_backlog_canary_ref() -> str:
-    """Pick a live ``cli``-kind anchor for the canary item's intent.
+def _fake_backlog_canary_slug(run_id: str) -> str:
+    """Run-scoped canary slug, conforming to the backlog ``^[a-z][a-z0-9-]+$`` rule."""
+    suffix = re.sub(r"[^a-z0-9]+", "-", run_id.lower()).strip("-")
+    return f"{_FAKE_BACKLOG_CANARY_SLUG}-{suffix}" if suffix else _FAKE_BACKLOG_CANARY_SLUG
 
-    Derived from the real CLI command tree at write time so the canary always binds
-    through the R1 registry regardless of command renames. ``backlog doctor`` is the
-    stable first choice; any derived anchor works as a fallback.
+
+def _fake_backlog_canary_ref(backlog_dir: Path, slug: str) -> str:
+    """Pick a live ``cli``-kind anchor for this run's canary item, unique per run.
+
+    Anchors come from the real CLI command tree at write time, so the canary always binds
+    through the R1 registry regardless of command renames.
+
+    Uniqueness is not cosmetic: two items sharing an anchor with differing ``change`` text
+    are a fail-closed ``DIVERGENT_CONFLICT``, so a set of same-anchor canaries could never
+    be consumed by one release. This run keeps the anchor already recorded in its own item
+    (idempotent re-run) and otherwise claims the first anchor no sibling canary holds.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
 
     anchors = derive_cli_anchors()
-    return "backlog doctor" if "backlog doctor" in anchors else min(anchors)
+    preferred = ["backlog doctor", *sorted(anchors)]
+
+    own = backlog_dir / f"{slug}.md"
+    claimed: set[str] = set()
+    for item in sorted(backlog_dir.glob(f"{_FAKE_BACKLOG_CANARY_SLUG}*.md")):
+        for line in item.read_text(encoding="utf-8").splitlines():
+            if "ref:" in line:
+                ref = line.split("ref:", 1)[1].strip()
+                if item == own:
+                    return ref
+                claimed.add(ref)
+
+    for anchor in preferred:
+        if anchor in anchors and anchor not in claimed:
+            return anchor
+    # Every derived anchor is already claimed by a sibling canary: fall back to the stable
+    # first choice rather than inventing an anchor the registry cannot resolve. The
+    # resulting collision is visible to the classifier, not silent.
+    return preferred[0] if preferred[0] in anchors else min(anchors)
 
 
 def _backlog_definition_runtime_factory(
@@ -1755,10 +1813,13 @@ def _backlog_definition_runtime_factory(
                     if (run_cwd / "repos" / context / "specs").is_dir()
                     else "specs"
                 )
-                item_ref = f"{specs_prefix}/backlog/{_FAKE_BACKLOG_CANARY_SLUG}.md"
+                run_id = task_id.rsplit(":", 1)[0]
+                slug = _fake_backlog_canary_slug(run_id)
+                item_ref = f"{specs_prefix}/backlog/{slug}.md"
                 refs.append(item_ref)
                 target = run_cwd / item_ref
                 target.parent.mkdir(parents=True, exist_ok=True)
+                anchor = _fake_backlog_canary_ref(target.parent, slug)
                 # Upsert (never append): the change text carries the task id so a re-run
                 # is a detectable EDIT of the one canary item.
                 # `candidate` is the documented vocabulary token for an intents-carrying
@@ -1771,7 +1832,7 @@ def _backlog_definition_runtime_factory(
                     "intents:\n"
                     "  - subject:\n"
                     "      kind: cli\n"
-                    f"      ref: {_fake_backlog_canary_ref()}\n"
+                    f"      ref: {anchor}\n"
                     f"    change: driving-fake canary authored by run '{task_id}'\n"
                     "---\n\n"
                     "# Driving-fake backlog canary\n\n"
