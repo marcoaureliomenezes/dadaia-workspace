@@ -1,5 +1,7 @@
 """Domain exceptions for dadaia-workspace."""
 
+from __future__ import annotations
+
 
 class DadaiaError(Exception):
     """Base class for all dadaia-workspace domain errors."""
@@ -162,6 +164,25 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
     existing ``except RuntimeError`` call sites keep working.
     """
+
+
+class BootstrapPackageError(DadaiaError, ValueError):
+    """``DADAIA_BOOTSTRAP_PACKAGE`` does not name an existing local wheel.
+
+    A dangling value is the normal state after a candidate wheel is replaced, so the
+    message must name the offending value and what is required of it — a bare
+    ``ValueError`` said neither and (before the CLI boundary landed) tracebacked
+    (bug f22-cli-boundary-is-a-whitelist-not-a-boundary). ``ValueError`` is kept in the
+    bases so existing ``except ValueError`` call sites keep working.
+    """
+
+    @classmethod
+    def for_value(cls, raw: str) -> BootstrapPackageError:
+        return cls(
+            f"DADAIA_BOOTSTRAP_PACKAGE={raw!r} does not name an existing local wheel. "
+            "It must be a path to an existing .whl file; unset it to resolve the "
+            "distribution normally instead."
+        )
 
 
 class CodexConfigError(DadaiaError, ValueError):

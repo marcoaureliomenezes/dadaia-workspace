@@ -651,6 +651,27 @@ r4d-resume-preflight-invalid-step-traceback), so it gets its own sweep.
   `DADAIA_BOOTSTRAP_PACKAGE`. An error-path fix that starts swallowing legitimate
   failures, or that breaks valid bootstrap, is its own FAIL.
 
+### R-18 — F-22 holds as a BOUNDARY: no verb tracebacks, for ANY failure
+
+F-22 ("no raw traceback from any CLI verb") was long enforced as a *whitelist*: the entry
+point caught only `DadaiaError`, so the contract held only for raises that happened to be
+inside that hierarchy — and the package raises ~138 bare builtin exceptions. It leaked one
+verb at a time (`WorkspaceVenvBootstrapError`, then a dangling `DADAIA_BOOTSTRAP_PACKAGE`).
+Probe the boundary directly, not just the verbs you happen to know about:
+
+- Provoke a NON-`DadaiaError` failure through the real console entry point. The
+  reproducible one: export `DADAIA_BOOTSTRAP_PACKAGE=/does/not/exist.whl` and run `init`.
+  **PASS if:** exit non-zero, ZERO traceback lines, the message names the offending value
+  and what is required of it, and — for an unexpected defect — names the exception type
+  and how to get a traceback.
+- Assert the debug escape hatch works: the SAME command with `DADAIA_TRACEBACK=1` DOES
+  print the traceback. A boundary that removes all debuggability is its own defect.
+- Assert the boundary did not swallow normal exits: `--help` exits 0, an unknown option
+  exits non-zero with usage (not a "defect" line), and neither is relabeled.
+- **Sweep, do not spot-check:** run every top-level verb with a deliberately invalid
+  argument and grep the combined output for `Traceback (most recent call last)`. Any hit
+  is a FAIL, regardless of which verb produced it.
+
 ---
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`

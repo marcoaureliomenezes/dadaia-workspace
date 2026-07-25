@@ -15,7 +15,10 @@ from importlib import metadata
 from pathlib import Path
 
 import dadaia_workspace
-from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
+from dadaia_workspace.core.exceptions import (
+    BootstrapPackageError,
+    WorkspaceVenvBootstrapError,
+)
 from dadaia_workspace.core.platform import PLATFORM
 
 __all__ = [
@@ -118,7 +121,7 @@ class VenvPythonEnvironmentManager:
         if candidate:
             candidate_path = Path(candidate).expanduser().resolve()
             if not candidate_path.is_file() or candidate_path.suffix != ".whl":
-                raise ValueError("DADAIA_BOOTSTRAP_PACKAGE must name an existing local wheel")
+                raise BootstrapPackageError.for_value(candidate)
             return str(candidate_path)
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():

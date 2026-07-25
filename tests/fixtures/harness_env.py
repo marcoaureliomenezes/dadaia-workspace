@@ -145,6 +145,10 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
+        # Read by cli/main._traceback_requested BY DESIGN: the operator's opt-in for a full
+        # traceback, since the CLI boundary otherwise renders every failure as one line
+        # (bug f22-cli-boundary-is-a-whitelist-not-a-boundary).
+        "DADAIA_TRACEBACK",
         # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
         # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
         # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
