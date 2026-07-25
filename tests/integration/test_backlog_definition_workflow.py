@@ -512,3 +512,69 @@ def test_live_backlog_progress_emits_started_and_accepted(tmp_path: Path, capsys
     assert "backlog_author" in err
     assert "started" in err
     assert "accepted" in err, err
+
+
+def test_gate_blocks_authored_item_with_no_intents_at_candidate_status(tmp_path: Path) -> None:
+    """Bug r4g-backlog-surface-new-existing-accepted (Hermes R4-G), real mechanism.
+
+    Hermes reported this as "surface: new accepted on a resolvable anchor". His own
+    evidence says otherwise: `backlog doctor` failed with "no intents[] declared" — the
+    authored item carried NO `intents[]` at all, at status `candidate`, and the review
+    gate ACCEPTED it. (The surface:new guard itself is correct and is pinned by
+    test_new_surface_that_already_exists_blocks_with_actionable_remedy.)
+
+    With zero intents, `bound_anchor_changes` yields no unresolved messages and
+    `classify()` sees an empty anchor set, so every block arm is vacuously satisfied —
+    the workflow materializes output its OWN doctor rejects as BL-SCHEMA. Same
+    producer/validator drift family as
+    fake-backlog-workflow-materializes-doctor-invalid-status-042.
+    """
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    @dataclass
+    class _NoIntentsFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "no-intents.md").write_text(
+                    "---\nslug: no-intents\nstatus: candidate\n---\n\n# no-intents\n\nBody.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _NoIntentsFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-nointents")
+
+    assert result.completed is False, "gate accepted an item its own doctor rejects"
+    assert result.blocked is not None
+    assert "intents" in result.blocked.reason.lower()
+    assert result.blocked.operator_command is not None
+
+
+def test_gate_allows_idea_status_without_intents(tmp_path: Path) -> None:
+    """Guard against over-blocking: `idea` is the documented intents-exempt stage, so an
+    unbound brainstorm must still pass — the same status gate the doctor applies."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    @dataclass
+    class _IdeaFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "just-an-idea.md").write_text(
+                    "---\nslug: just-an-idea\nstatus: idea\n---\n\n# idea\n\nBrainstorm.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _IdeaFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-idea")
+    assert result.completed is True, result.blocked.reason if result.blocked else result

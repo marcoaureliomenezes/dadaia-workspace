@@ -67,6 +67,7 @@ from dadaia_workspace.features.backlog.classifier import (
     Verdict,
     classify,
 )
+from dadaia_workspace.features.backlog.doctor import is_intents_exempt
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import Registry
 from dadaia_workspace.features.lifecycle.agent_runner import (
@@ -602,10 +603,21 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         after = self._backlog_snapshot()
         backlog_dir = self._selector.spec_context.specs_dir / "backlog"
         unresolved_by_slug: dict[str, tuple[str, ...]] = {}
+        # Bug r4g-backlog-surface-new-existing-accepted (real mechanism): an item with
+        # ZERO ``intents[]`` at a non-``idea`` status used to sail through every arm of
+        # this gate — ``bound_anchor_changes`` yields no unresolved messages and
+        # ``classify()`` sees an empty anchor set, so both blocks are vacuously satisfied
+        # — while ``backlog doctor`` rejects it as BL-SCHEMA. Producer/validator drift,
+        # same family as fake-backlog-workflow-materializes-doctor-invalid-status-042.
+        # The status gate is REUSED from the doctor (``is_intents_exempt``) so the two
+        # can never drift into a third opinion.
+        missing_intents_by_slug: dict[str, str] = {}
         for item in load_backlog_items(backlog_dir):
             _anchor_changes, unresolved = bound_anchor_changes(item, self._registry)
             if unresolved:
                 unresolved_by_slug[item.slug] = tuple(unresolved)
+            if not item.intents and not is_intents_exempt(item.status):
+                missing_intents_by_slug[item.slug] = item.status or "(missing)"
 
         # Every gate block prescribes the exact recovery (bug
         # backlog-cli-intent-hallucinated-anchor-045, remedy half): a block without an
@@ -630,6 +642,29 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
         overlap: list[Classification] = []
         for slug in changed:
+            if slug in missing_intents_by_slug:
+                blocked = BlockedState(
+                    reason=(
+                        f"backlog_review_gate: authored item {slug!r} declares NO "
+                        f"intents[] at status {missing_intents_by_slug[slug]!r}. Every item "
+                        "at 'candidate' or beyond must carry bound intents[] — this is the "
+                        "same BL-SCHEMA rule `dadaia backlog doctor` enforces, so accepting "
+                        "it here would materialize output the workspace's own doctor "
+                        "rejects. Add the typed intents[] (bind each subject to a canonical "
+                        "anchor from `dadaia backlog subjects`, or declare a new surface "
+                        "with 'surface: new'), or set status to 'idea' if it is genuinely "
+                        "an unbound brainstorm; then resume."
+                    ),
+                    blocked_at_step=step.label,
+                    resume_token=run.idempotency_key,
+                    operator_command=resume_command,
+                    detail={"slug": slug, "status": missing_intents_by_slug[slug]},
+                )
+                return (
+                    overlap,
+                    self._with_block(run, step.label, blocked),
+                    self._blocked_sr(step, blocked),
+                )
             if slug in unresolved_by_slug:
                 blocked = BlockedState(
                     reason=(

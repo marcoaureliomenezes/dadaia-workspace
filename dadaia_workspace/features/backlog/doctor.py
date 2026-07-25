@@ -119,7 +119,7 @@ class DoctorContext:
 # ── the four checks (each a pure function over the shared context) ───────────────
 
 
-def _is_intents_exempt(status: str | None) -> bool:
+def is_intents_exempt(status: str | None) -> bool:
     """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
 
     An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
@@ -157,7 +157,7 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                 )
             )
             continue
-        exempt = _is_intents_exempt(item.status)
+        exempt = is_intents_exempt(item.status)
         # FR5 status gate: the no-intents and unresolved-subject errors are held for an
         # ``idea`` (unbound brainstorm) and become mandatory at ``candidate`` and beyond.
         if not item.intents and not exempt:
