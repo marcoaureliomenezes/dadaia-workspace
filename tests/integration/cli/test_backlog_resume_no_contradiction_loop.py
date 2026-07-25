@@ -152,3 +152,52 @@ def test_prescribed_remedy_preserves_the_runs_own_harness(workspace: Path) -> No
         "the prescribed command must reproduce the run's own invocation, including the "
         f"harness it ran with; got: {remedy!r}"
     )
+
+
+def test_first_attempt_with_a_non_writing_worker_still_blocks(workspace: Path) -> None:
+    """The delta guard must not have been weakened by the resume fix.
+
+    Relaxing "demand a fresh delta" on RESUME must not become "stop demanding a
+    deliverable at all". A live model cannot be reliably coerced into writing nothing —
+    asked to, it writes a file explaining that it wrote nothing — so this asserts the
+    guard with a runtime that provably writes nothing
+    (bug codex-backlog-author-no-materialization-regression-040).
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import (
+        AgentRunRequest,
+        AgentRunResult,
+        AgentRunStatus,
+        AgentRuntimeKind,
+    )
+
+    class _NonWritingRuntime:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            # Claims success and cites a file that ALREADY existed (the scaffold README),
+            # writing nothing itself. That is the precise shape the delta mode exists to
+            # catch: a merely non-empty zone must never satisfy the deliverable check.
+            return AgentRunResult(
+                status=AgentRunStatus.SUCCEEDED,
+                summary="worker claims APPROVED while pointing at a pre-existing file",
+                artifact_refs=(f"repos/{_CONTEXT}/specs/backlog/README.md",),
+                structured_output={"verdict": "APPROVED"},
+            )
+
+    from dataclasses import replace as _replace
+
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import _SEQUENCE
+
+    workflow = container.build_backlog_definition_workflow(
+        workspace, context=_CONTEXT, release_id=_RELEASE
+    )
+    workflow._runtime_factory = lambda _kind: _NonWritingRuntime()
+    sequence = tuple(_replace(step, runtime_kind=AgentRuntimeKind.FAKE) for step in _SEQUENCE)
+
+    result = workflow.run(run_id="no-write-run", sequence=sequence)
+
+    assert result.blocked is not None, "a worker that writes nothing must BLOCK"
+    assert result.blocked.blocked_at_step == "backlog_author", result.blocked
+    assert "NEW or CHANGED deliverable" in result.blocked.reason, result.blocked.reason
