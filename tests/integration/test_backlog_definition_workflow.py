@@ -578,3 +578,35 @@ def test_gate_allows_idea_status_without_intents(tmp_path: Path) -> None:
 
     result = wf.run("bd-idea")
     assert result.completed is True, result.blocked.reason if result.blocked else result
+
+
+def test_gate_blocks_preexisting_candidate_without_intents(tmp_path: Path) -> None:
+    """Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents (Hermes R5-C).
+
+    Gap in the first fix: the missing-intents check only swept the slugs CHANGED by this
+    run, so an already-invalid item that the author never touched sailed through — while
+    `backlog doctor` sweeps EVERY item and rejects it. The gate and the doctor were still
+    holding two opinions, just one layer deeper.
+
+    The gate's contract is not "the author behaved" — it is "the backlog this run leaves
+    behind is valid". A pre-existing offender must block too, with a message that says it
+    pre-existed so the operator knows the author is not at fault.
+    """
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    # Invalid item present BEFORE the run; the author never touches it.
+    (specs / "backlog" / "stale-invalid.md").write_text(
+        "---\nslug: stale-invalid\nstatus: candidate\n---\n\n# stale\n\nNo intents.\n",
+        encoding="utf-8",
+    )
+
+    fake = _AuthoringFake(root=tmp_path, slug="fresh-item", change="add A")
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-preexisting")
+
+    assert result.completed is False, "gate left a doctor-invalid backlog behind"
+    assert result.blocked is not None
+    assert "stale-invalid" in result.blocked.reason
+    assert "intents" in result.blocked.reason.lower()
+    assert result.blocked.operator_command is not None

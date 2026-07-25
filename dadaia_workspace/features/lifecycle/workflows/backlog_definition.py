@@ -640,31 +640,49 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             )
             return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
 
+        # Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents: the first
+        # fix swept only the CHANGED slugs, so an already-invalid item the author never
+        # touched still sailed through while `backlog doctor` — which sweeps EVERY item —
+        # rejected the same tree. The gate's contract is not "the author behaved"; it is
+        # "the backlog this run leaves behind is valid". So sweep ALL items, and say
+        # whether the offender was authored by this run or pre-existed, because the
+        # remedy differs for the reader.
+        for slug in sorted(missing_intents_by_slug):
+            authored = slug in changed
+            origin = (
+                f"authored item {slug!r}"
+                if authored
+                else f"pre-existing item {slug!r} (NOT written by this run)"
+            )
+            blocked = BlockedState(
+                reason=(
+                    f"backlog_review_gate: {origin} declares NO intents[] at status "
+                    f"{missing_intents_by_slug[slug]!r}. Every item at 'candidate' or "
+                    "beyond must carry bound intents[] — the same BL-SCHEMA rule "
+                    "`dadaia backlog doctor` enforces, so completing here would leave a "
+                    "backlog the workspace's own doctor rejects. Add the typed intents[] "
+                    "(bind each subject to a canonical anchor from `dadaia backlog "
+                    "subjects`, or declare a new surface with 'surface: new'), or set "
+                    "status to 'idea' if it is genuinely an unbound brainstorm; then "
+                    "resume. Run `dadaia backlog doctor` to see every offender at once."
+                ),
+                blocked_at_step=step.label,
+                resume_token=run.idempotency_key,
+                operator_command=resume_command,
+                detail={
+                    "slug": slug,
+                    "status": missing_intents_by_slug[slug],
+                    "authored_by_this_run": "true" if authored else "false",
+                },
+            )
+            return (
+                [],
+                self._with_block(run, step.label, blocked),
+                self._blocked_sr(step, blocked),
+            )
+
         overlap: list[Classification] = []
         for slug in changed:
-            if slug in missing_intents_by_slug:
-                blocked = BlockedState(
-                    reason=(
-                        f"backlog_review_gate: authored item {slug!r} declares NO "
-                        f"intents[] at status {missing_intents_by_slug[slug]!r}. Every item "
-                        "at 'candidate' or beyond must carry bound intents[] — this is the "
-                        "same BL-SCHEMA rule `dadaia backlog doctor` enforces, so accepting "
-                        "it here would materialize output the workspace's own doctor "
-                        "rejects. Add the typed intents[] (bind each subject to a canonical "
-                        "anchor from `dadaia backlog subjects`, or declare a new surface "
-                        "with 'surface: new'), or set status to 'idea' if it is genuinely "
-                        "an unbound brainstorm; then resume."
-                    ),
-                    blocked_at_step=step.label,
-                    resume_token=run.idempotency_key,
-                    operator_command=resume_command,
-                    detail={"slug": slug, "status": missing_intents_by_slug[slug]},
-                )
-                return (
-                    overlap,
-                    self._with_block(run, step.label, blocked),
-                    self._blocked_sr(step, blocked),
-                )
             if slug in unresolved_by_slug:
                 blocked = BlockedState(
                     reason=(
