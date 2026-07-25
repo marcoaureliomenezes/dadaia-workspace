@@ -34,6 +34,11 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
+from dadaia_workspace.core.spec_status import (
+    ANY_STATUS_LINE,
+    APPROVED_LINE,
+    is_approved,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
     FragmentGateWorkflow,
     _StepOutcome,
@@ -304,11 +309,8 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         # variant — blockquote or not, bullet-prefixed, colon inside or outside the bold
         # markers, any case ((?i) covers Draft/draft and Status/status) — then insert
         # the one canonical Python-owned line.
-        status_line = (
-            r"(?mi)^\s*(?:[-*]\s*)?(?:>\s*)?(?:\*\*Status:?\*\*:?|Status:)\s*"
-            r"(?:Draft|Em revisão|Em revisao|Aprovado)\s*$"
-        )
-        updated = re.sub(status_line + r"\n?", "", text)
+        updated = ANY_STATUS_LINE.sub("", text)
+        updated = re.sub(r"\n{3,}", "\n\n", updated)
         frontmatter = re.match(r"\A---\n.*?\n---\n?", updated, flags=re.DOTALL)
         if frontmatter is not None:
             insertion_at = frontmatter.end()
@@ -317,7 +319,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             insertion_at = heading.end() if heading is not None else 0
         updated = (
             updated[:insertion_at].rstrip()
-            + "\n\n> **Status:** Aprovado\n\n"
+            + f"\n\n{APPROVED_LINE}\n\n"
             + updated[insertion_at:].lstrip()
         )
         path.write_text(updated, encoding="utf-8")
@@ -505,7 +507,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             if not path.is_file():
                 missing.append(f"{name} (absent)")
                 continue
-            if must_be_approved and "**Status:** Aprovado" not in path.read_text(encoding="utf-8"):
+            if must_be_approved and not is_approved(path.read_text(encoding="utf-8")):
                 missing.append(f"{name} (not Aprovado)")
                 # Bug release-definition-approved-plan-not-persisted-041: a Draft
                 # artifact with an APPROVED ledger (resumed/rewritten mid-run) recovers

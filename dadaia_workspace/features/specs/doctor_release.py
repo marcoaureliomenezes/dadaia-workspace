@@ -14,6 +14,8 @@ import re
 from datetime import date
 from pathlib import Path
 
+from dadaia_workspace.core.spec_status import APPROVED, extract_status
+from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
@@ -22,7 +24,9 @@ from dadaia_workspace.features.specs.doctor_common import (
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
-CANONICAL_STATUS = {"Draft", "Em revisão", "Aprovado"}
+# Vocabulary + parser live in core.spec_status (single definition); re-exported here
+# because doctor_release has been the documented import site for both.
+CANONICAL_STATUS = _CANONICAL_STATUS
 CANONICAL_PHASES = {
     "DISCOVERY",
     "DEFINITION",  # v0.1.7: release-definition phase; product-engineer authors memory here
@@ -79,13 +83,10 @@ _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 
 
 def _extract_status(md_path: Path) -> str | None:
+    """Read a release artifact's declared status. Parsing itself is core.spec_status."""
     if not md_path.exists():
         return None
-    for line in md_path.read_text(encoding="utf-8").splitlines()[:30]:
-        m = re.search(r"\*\*Status:\*\*\s*(.+?)\s*$", line)
-        if m:
-            return m.group(1).strip()
-    return None
+    return extract_status(md_path.read_text(encoding="utf-8"))
 
 
 def _extract_created_date(md_path: Path) -> date | None:
@@ -196,7 +197,7 @@ class ReleaseValidator:
                         path=str(fpath),
                     )
                 )
-            elif status != "Aprovado" and phase in ("IMPLEMENTATION", "CLOSURE"):
+            elif status != APPROVED and phase in ("IMPLEMENTATION", "CLOSURE"):
                 # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/Em
                 # revisão IS the legitimate state of an authoring-phase release
                 # (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS) — the scaffolder emits exactly
@@ -376,7 +377,7 @@ class ReleaseValidator:
                         path=str(tasks),
                     )
                 )
-            elif _extract_status(tasks) != "Aprovado":
+            elif _extract_status(tasks) != APPROVED:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-024",
