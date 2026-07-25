@@ -404,6 +404,13 @@ def release_define(
     ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
+    demand: str | None = typer.Option(
+        None,
+        "--demand",
+        help="Operator guidance injected into every executed model step as an "
+        "'## Operator demand' block — the channel for supplying the decision a "
+        "review asked for when resuming after a REJECTED verdict.",
+    ),
     backlog_run_id: list[str] | None = typer.Option(
         None,
         "--backlog-run-id",
@@ -512,6 +519,7 @@ def release_define(
         sequence,
         resume_from=resume_from,
         skip_scope=upstream_prefix is not None,
+        operator_demand=demand,
     )
 
     # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's

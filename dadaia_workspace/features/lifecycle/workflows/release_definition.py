@@ -221,6 +221,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         *,
         resume_from: str | None = None,
         skip_scope: bool = False,
+        operator_demand: str | None = None,
     ) -> ReleaseDefinitionResult:
         """Execute the sequence; stop at the first blocked gate; advance on success.
 
@@ -229,6 +230,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         the ``release_scope`` model step is a redundant restatement — it is dropped from
         the sequence and its ``consumes`` edges are erased, saving one worker session.
         """
+        self._operator_demand = operator_demand
         if skip_scope:
             from dataclasses import replace as _replace
 

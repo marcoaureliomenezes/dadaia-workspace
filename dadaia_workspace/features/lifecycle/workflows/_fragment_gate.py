@@ -810,6 +810,14 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
+        # Bug release-definition-has-no-demand-channel-for-review-corrections: when a
+        # review REJECTS, the operator's only channel into the next attempt was the
+        # engine's own rejection digest — they could not supply the decision the reviewer
+        # asked for, only re-roll. An operator demand, when supplied, is injected into
+        # every executed model step exactly as backlog-definition already does.
+        demand_text = getattr(self, "_operator_demand", None)
+        if demand_text:
+            selected = "\n\n".join(filter(None, (f"## Operator demand\n\n{demand_text}", selected)))
         # One-shot prior-rejection digest for the resume-point step (bug
         # resumed-definition-step-blind-to-rejecting-review-feedback).
         resume_digest = self._resume_feedback.pop(step.label, None)
