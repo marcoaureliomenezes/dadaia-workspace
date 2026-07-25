@@ -37,7 +37,7 @@ def refuse_completed_rerun(run_store: LifecycleRunStore, run_id: str) -> None:
 
 
 def refuse_blocked_restart(run_store: LifecycleRunStore, run_id: str) -> None:
-    """Refuse to silently RESTART a BLOCKED run id from step one.
+    """Refuse to silently RESTART a BLOCKED or interrupted RUNNING run id from step one.
 
     Re-running the identical command after a block is the most natural thing an operator
     does, and it used to discard the run's recorded block — its reason, its findings, and
@@ -55,8 +55,26 @@ def refuse_blocked_restart(run_store: LifecycleRunStore, run_id: str) -> None:
     from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
 
     prior = run_store.load(run_id)
-    if prior is None or prior.status is not LifecycleRunStatus.BLOCKED:
+    if prior is None or prior.status not in (
+        LifecycleRunStatus.BLOCKED,
+        LifecycleRunStatus.RUNNING,
+    ):
         return
+    if prior.status is LifecycleRunStatus.RUNNING:
+        # An INTERRUPTED run (driver killed, worker orphaned, machine died) is left
+        # `running` with no block and therefore no remedy: the operator sees a run that
+        # is not finished, not failed, and offers no guidance, and re-running the command
+        # silently restarts from step one (bug r11-interrupt-leaves-release-run-running,
+        # reported by the consumer-side validator). The recovery is the same as for a
+        # block — resume from where it stopped — so say so.
+        step = prior.current_step or "<step>"
+        raise BlockedRunRestartError(
+            f"lifecycle run {run_id!r} is still RUNNING at step {step!r} — it was "
+            "interrupted before reaching a terminal state (a killed driver or an orphaned "
+            "worker leaves this). Re-running it without --resume-from would restart from "
+            "the first step and redo accepted work. Resume it: --resume-from "
+            f"{step} — or pass a fresh --run-id to start over deliberately."
+        )
     blocked = prior.blocked
     remedy = (blocked.operator_command if blocked else None) or (
         f"re-run with --resume-from {blocked.blocked_at_step}" if blocked else None

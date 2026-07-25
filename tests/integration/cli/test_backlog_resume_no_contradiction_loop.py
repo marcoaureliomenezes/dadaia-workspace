@@ -251,3 +251,50 @@ def test_rerunning_a_blocked_run_is_refused_and_hands_over_the_remedy(workspace:
     code, payload = _define(workspace, "--resume-from", "backlog_author")
     assert code == 0, payload
     assert payload["completed"] is True
+
+
+def test_an_interrupted_running_run_tells_the_operator_how_to_recover(workspace: Path) -> None:
+    """Bug r11-interrupt-leaves-release-run-running (validator-reported).
+
+    A killed driver or an orphaned worker leaves a run persisted as RUNNING: not
+    finished, not failed, carrying no block and therefore no remedy. The operator saw a
+    run that offered no guidance, and re-running the command silently restarted from step
+    one — redoing accepted live work. The recovery was always the same as for a block;
+    nothing said so.
+    """
+    import json as _json
+
+    _define(workspace)  # a completed run to mutate into the interrupted shape
+    state = workspace / ".dadaia" / "states" / "lifecycle" / "loop-run.json"
+    payload = _json.loads(state.read_text(encoding="utf-8"))
+    payload["run"]["status"] = "running"
+    payload["run"]["blocked"] = None
+    payload["run"]["current_step"] = "backlog_author"
+    state.write_text(_json.dumps(payload), encoding="utf-8")
+
+    proc = _dadaia(
+        workspace,
+        "lifecycle",
+        "backlog-definition",
+        "--context",
+        _CONTEXT,
+        "--release-id",
+        _RELEASE,
+        "--run-id",
+        "loop-run",
+        "--harness",
+        "fake",
+        "--demand",
+        "probe",
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, combined
+    assert "still RUNNING" in combined, combined
+    assert "--resume-from backlog_author" in combined, combined
+    assert "fresh --run-id" in combined, combined
+    assert "Traceback" not in combined
+
+    # The prescribed resume recovers it.
+    code, payload = _define(workspace, "--resume-from", "backlog_author")
+    assert code == 0, payload
+    assert payload["completed"] is True
