@@ -683,9 +683,17 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # Every gate block prescribes the exact recovery (bug
         # backlog-cli-intent-hallucinated-anchor-045, remedy half): a block without an
         # operator_command is an unrecoverable chain dead end.
+        # The command must reproduce THIS run's invocation, harness included. Without it
+        # the remedy falls back to --harness auto, which in a real environment resolves to
+        # a live worker — so pasting the command literally resumed the run on a DIFFERENT
+        # runtime than the one that created it and re-blocked on a conflict with what the
+        # first attempt had authored (bug r6h-backlog-remedy-command-loses-fake-harness,
+        # reported by the consumer-side validator). A remedy that only works if the
+        # operator silently re-adds a flag is not a remedy.
         resume_command = (
             f"dadaia lifecycle backlog-definition --context {self._context} "
             f"--release-id {self._release_id} --run-id {run.run_id} "
+            f"--harness {self._default_kind.value} "
             "--resume-from backlog_author"
         )
         changed = self._changed_slugs(before, after)

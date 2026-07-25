@@ -131,3 +131,24 @@ def test_a_fresh_run_carries_no_authored_path_exemption(workspace: Path) -> None
         workspace, context=_CONTEXT, release_id=_RELEASE
     )
     assert workflow._resumed_authored_paths == ()
+
+
+def test_prescribed_remedy_preserves_the_runs_own_harness(workspace: Path) -> None:
+    """Bug r6h-backlog-remedy-command-loses-fake-harness (validator-reported).
+
+    The prescribed command carried no ``--harness``, so pasting it literally fell back to
+    ``auto`` — which in a real validation environment resolves to Codex. The remedy then
+    resumed the run on a DIFFERENT runtime than the one that created it and re-blocked on
+    a conflict with what the first attempt had authored. A remedy that only works if the
+    operator silently re-adds a flag is not a remedy.
+    """
+    bad = _backlog_dir(workspace) / "preexisting-bad.md"
+    bad.write_text("---\nstatus: candidate\n---\n\n# no intents\n", encoding="utf-8")
+
+    _code, blocked = _define(workspace)
+    remedy = (blocked.get("blocked") or {}).get("operator_command") or ""
+
+    assert "--harness fake" in remedy, (
+        "the prescribed command must reproduce the run's own invocation, including the "
+        f"harness it ran with; got: {remedy!r}"
+    )
