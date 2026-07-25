@@ -36,6 +36,7 @@ Judge only what is in front of you; do not re-author the SPEC.
 | Check | Pass condition |
 |---|---|
 | Verifiable acceptance | Every requirement states a concrete, testable acceptance criterion. |
+| Consumes line present and complete | The SPEC carries a `**Consumes:**` line naming the bare slug of EVERY backlog item in scope — all of the items in any `authoritative-backlog-definition` block, none missing. Python parses this exact line to write the consumed_backlog ledger and to remove the items at closure, and the commit gate REFUSES a definition that drops one, so a missing or partial line is a REJECT, not a nit. |
 | Observable behavior | Defined behavior can be observed and asserted from outside. |
 | Edge cases | Failure modes, boundaries, and error paths are covered, not only the happy path. |
 | Regression safety | Changes to existing behavior name what must keep working and how that is confirmed. |
