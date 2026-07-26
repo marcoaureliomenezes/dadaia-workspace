@@ -350,8 +350,18 @@ def test_release_scope_aggregates_every_completed_backlog_producer(
 def test_rejected_review_blocks_before_commit_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A REJECTED verdict at spec_review stops the run before the commit gate
-    (after the single bounded in-run revision of spec_create is spent)."""
+    """A REJECTED verdict costs ONE bounded revision, then becomes advisory.
+
+    Contract change, deliberate: this test used to assert that a rejected review STOPS the
+    run before the commit gate. That made three non-deterministic LLM verdicts terminal
+    inside a deterministic pipeline, so a reviewer could restate an objection forever and
+    the run never converged — an autonomous agent could not finish a release at all, and a
+    real one only did because an operator hand-fed corrections through eight cycles.
+
+    A model verdict is now advisory: one revision, then the step proceeds carrying the
+    objection as a warning. What still stops a release is every DETERMINISTIC gate, which
+    is what the rest of this suite covers.
+    """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
     monkeypatch.setenv(
@@ -365,20 +375,18 @@ def test_rejected_review_blocks_before_commit_gate(
 
     result = _define(["--harness", "pi", "--step-harness", "spec_review=codex"])
 
-    assert result.exit_code == 3, result.output
+    assert result.exit_code == 0, result.output
     payload = _payload(result.output)
-    assert payload["status"] == "BLOCKED"
-    assert payload["completed"] is False
-    # The release never advanced to IMPLEMENTATION.
-    assert payload["final_phase"] != "implementation"
+    assert payload["completed"] is True
+    assert payload["blocked"] is None
+    # The rejection was spent on one revision and then recorded, not swallowed.
+    warnings = payload.get("warnings") or []
+    assert any("spec_review" in w and "review-advisory" in w for w in warnings), warnings
     steps = payload["steps"]
     assert isinstance(steps, list)
     labels = [step["label"] for step in steps]
-    assert labels[-1] == "spec_review"
-    assert "definition_commit_gate" not in labels
-    assert steps[-1]["accepted"] is False
-    blocked = payload["blocked"]
-    assert isinstance(blocked, dict)
+    # The run reached its terminal deterministic gate instead of dying at the verdict.
+    assert "definition_commit_gate" in labels
 
 
 # 4 -- adjacent-harness seam (the key §8.5 assertion) -----------------------
@@ -611,3 +619,50 @@ def test_post_step_failure_makes_the_command_verdict_a_failure(
     assert payload["post_step_error"] is not None
     assert "capability-two" in payload["post_step_error"]
     assert payload["status"] != "OK", payload["status"]
+
+
+# ---------------------------------------------------------------------------
+# A model verdict is ADVISORY, never terminal.
+# ---------------------------------------------------------------------------
+
+
+def test_a_reviewer_that_never_approves_does_not_deadlock_the_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run terminates instead of blocking forever on a non-deterministic verdict.
+
+    Three LLM review gates sat inside a deterministic pipeline, each able to block
+    indefinitely — so the pipeline did not converge BY CONSTRUCTION. A real release only
+    ever finished because an operator hand-fed corrections through eight cycles, which is
+    not an autonomous workflow. Each review now gets one bounded revision and then ACCEPTS,
+    recording its objection as a warning that travels with the release.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    # Reuse the production-shaped fake so every DETERMINISTIC gate (artifact exists, in
+    # scope, status flip) is genuinely satisfied — the only thing failing is the verdict.
+    def fake_factory(*, context: str, run_cwd: Path, release_id: str | None = None) -> object:  # noqa: ARG001
+        def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
+            return _KindReportingFake(kind, _rejecting_result())
+
+        return factory
+
+    monkeypatch.setattr(container, "_release_definition_runtime_factory", fake_factory)
+
+    result = _define(["--run-id", "never-approves", "--harness", "fake"])
+    payload = json.loads(result.output)
+
+    assert payload["completed"] is True, (
+        f"a reviewer that always rejects must not be able to stop the run: {payload.get('blocked')}"
+    )
+    assert payload["blocked"] is None
+
+    # Accepted is not the same as silent: every objection is reported.
+    warnings = payload.get("warnings") or []
+    assert warnings, "the accepted objections must be surfaced, not swallowed"
+    assert any("review-advisory" in w for w in warnings), warnings
+    assert any("REJECTED" in w or "rejected" in w for w in warnings), (
+        "the reviewer's actual reason must survive into the warning"
+    )

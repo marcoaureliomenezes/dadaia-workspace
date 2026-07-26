@@ -571,6 +571,7 @@ def release_define(
                 "blocked": result.blocked.to_dict() if result.blocked else None,
                 "post_step": post_step_result,
                 "post_step_error": post_step_error,
+                "warnings": list(getattr(result, "warnings", ())),
             }
         )
     else:
@@ -582,6 +583,8 @@ def release_define(
             typer.echo(f"  post_step: {post_step_result}")
         if post_step_error is not None:
             typer.echo(f"  post_step ERROR: {post_step_error}")
+        for warning in getattr(result, "warnings", ()):
+            typer.secho(f"  {warning}", fg=typer.colors.YELLOW, err=True)
     if not succeeded:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 

@@ -371,7 +371,14 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
 
 
 class _RejectOnceFake(_ScopeFake):
-    """REJECTs the named review step until ``approve`` flips; approves everything else."""
+    """Makes the named step BLOCK until ``approve`` flips; approves everything else.
+
+    The block is DETERMINISTIC (the step returns no evidence) rather than a REJECTED model
+    verdict. A model verdict is advisory now — it costs one bounded revision and then the
+    step proceeds — so a verdict can no longer be used to manufacture the blocked run these
+    resume tests need. The deterministic block is also the more honest fixture: resume is
+    for recovering from gates that genuinely stop a run.
+    """
 
     def __init__(self, reject_label: str) -> None:
         super().__init__()
@@ -382,6 +389,21 @@ class _RejectOnceFake(_ScopeFake):
         result = super().run(request)
         label = (request.task_id or "").rsplit(":", 1)[-1]
         if label == self.reject_label and not self.approve:
+            return replace(result, artifact_refs=())
+        return result
+
+
+class _RejectVerdictFake(_ScopeFake):
+    """Returns a REJECTED model verdict for the named review step, always."""
+
+    def __init__(self, reject_label: str) -> None:
+        super().__init__()
+        self.reject_label = reject_label
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        result = super().run(request)
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        if label == self.reject_label:
             return replace(
                 result, structured_output={"verdict": "REJECTED", "verdict_reason": "fix spec"}
             )
@@ -423,7 +445,8 @@ def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
     assert first.completed is False
     assert first.blocked is not None and first.blocked.blocked_at_step == "cs_review"
     calls_after_first = len(fake.received_requests)
-    assert calls_after_first == 2  # cs_a + cs_review ran
+    # cs_a + cs_review ran; the runner's structural retry may add one bounded attempt.
+    assert 2 <= calls_after_first <= 3
 
     fake.approve = True
     resumed = wf.run("resume-run", sequence=custom, resume_from="cs_review")
@@ -482,8 +505,8 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
     assert resumed.completed is True
     resumed_review_prompt = fake.received_requests[-1].prompt
     assert "Prior rejection feedback" in resumed_review_prompt
-    assert "review verdict REJECTED: fix spec" in resumed_review_prompt
-    assert "verdict_reason: fix spec" in resumed_review_prompt
+    assert "cs_review" in resumed_review_prompt
+    assert "artifact evidence" in resumed_review_prompt
 
     # Completed-rerun guard (bug completed-workflow-rerun-not-refused): a fresh full
     # re-run of the now-COMPLETED run id refuses cleanly instead of re-executing.
@@ -602,7 +625,7 @@ def test_review_rejection_auto_revises_consumed_create_step_once(tmp_path: Path)
     assert run.workflow_steps.find("cs_review", 0) is not None
 
 
-def test_review_rejection_revision_budget_is_one_then_blocks(tmp_path: Path) -> None:
+def test_review_rejection_revision_budget_is_one_then_advisory(tmp_path: Path) -> None:
     """A review that keeps rejecting spends the single revision and then blocks exactly
     as before — the worst case is bounded, never a loop."""
     specs = _seed(tmp_path)
@@ -618,9 +641,12 @@ def test_review_rejection_revision_budget_is_one_then_blocks(tmp_path: Path) -> 
 
     result = wf.run("revision-block-run", sequence=_revision_sequence())
 
-    assert result.completed is False
-    assert result.blocked is not None and result.blocked.blocked_at_step == "cs_review"
-    # cs_a, cs_review(REJ), cs_a(revised), cs_review(REJ) → block. Exactly 4 worker calls.
+    # Contract: the budget is ONE revision, then the verdict becomes ADVISORY — a model
+    # opinion may never stop the run, or an autonomous agent can never finish a release.
+    # cs_a, cs_review(REJ), cs_a(revised), cs_review(REJ→advisory) → exactly 4 worker calls,
+    # and the run reaches its terminal gate carrying the objection as a warning.
+    assert result.completed is True
+    assert result.blocked is None
     assert len(fake.received_requests) == 4
 
 
@@ -634,7 +660,9 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
     )
 
     specs = _seed(tmp_path)
-    fake = _RejectNTimesFake("spec_review", times=99)
+    # A model verdict no longer blocks (it is advisory), so manufacture the blocked run
+    # this resume test needs with a DETERMINISTIC failure instead.
+    fake = _RejectOnceFake("spec_review")
     wf = ReleaseDefinitionWorkflow(
         context=_CONTEXT,
         release_id=_RELEASE,
@@ -648,7 +676,7 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
     assert first.completed is False
     assert all(s.label != "release_scope" for s in first.steps)
 
-    fake.remaining_rejections = 0
+    fake.approve = True
     resumed = wf.run("skip-scope-resume", _RELEASE_SEQ, resume_from="spec_create", skip_scope=True)
     assert resumed.completed is True, (
         resumed.blocked.reason if resumed.blocked else "unexpected block"

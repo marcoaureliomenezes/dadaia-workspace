@@ -105,6 +105,9 @@ class ReleaseDefinitionResult:
     final_phase: LifecyclePhase
     steps: tuple[ReleaseStepResult, ...] = field(default_factory=tuple)
     blocked: BlockedState | None = None
+    #: Review objections accepted after their bounded revision was spent. A model verdict is
+    #: advisory, never terminal — but never silent: these travel with the release.
+    warnings: tuple[str, ...] = field(default_factory=tuple)
 
 
 #: The §6.1 release-definition sequence. ``runtime_kind=None`` on a model step means the
@@ -574,6 +577,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             final_phase=final_phase,
             steps=tuple(_to_step_result(outcome) for outcome in outcomes),
             blocked=blocked,
+            warnings=self._last_warnings,
         )
 
 

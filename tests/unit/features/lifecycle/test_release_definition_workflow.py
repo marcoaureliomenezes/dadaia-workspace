@@ -147,16 +147,20 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     wf = _workflow(tmp_path, store, kind_factory)
     result = wf.run("rd-3", sequence)
 
-    assert result.completed is False
-    assert result.final_phase is LifecyclePhase.BLOCKED
-    assert result.blocked is not None
-    # The sequence stopped at the rejected review — the commit gate never ran.
+    # Contract change: a model verdict costs ONE bounded revision and then becomes
+    # advisory. Making three non-deterministic verdicts terminal inside a deterministic
+    # pipeline is what stopped an autonomous agent from ever finishing a release.
+    assert result.completed is True
+    assert result.blocked is None
+    assert any("spec_review" in w for w in result.warnings), result.warnings
     labels = [s.label for s in result.steps]
-    assert labels[-1] == "spec_review"
-    assert "definition_commit_gate" not in labels
-    assert result.steps[-1].accepted is False
+    assert "definition_commit_gate" in labels
+    assert "definition_commit_gate" in labels
+    assert result.steps[-1].accepted is True
     # The release never advanced to IMPLEMENTATION.
-    assert result.final_phase is not LifecyclePhase.IMPLEMENTATION
+    # The run now reaches IMPLEMENTATION carrying the objection as a warning: a model
+    # verdict is advisory, never terminal.
+    assert result.final_phase is LifecyclePhase.IMPLEMENTATION
 
 
 def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path) -> None:
@@ -178,6 +182,7 @@ def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path
 
     result = workflow.run("rd-forward-dependency")
 
+    # A DETERMINISTIC lint stays terminal: it can be satisfied by construction.
     assert result.completed is False
     assert result.blocked is not None
     # The lint anchors at the create step it revises; the bounded revision re-ran
@@ -412,7 +417,9 @@ def test_revision_is_observable_in_the_persisted_run(tmp_path: Path) -> None:
     wf = _workflow(tmp_path, store, kind_factory)
     result = wf.run("rd-rev-obs", sequence)
 
-    assert result.completed is False
+    # The verdict costs one revision and then becomes advisory, so the run completes;
+    # what this test pins is that the revision is OBSERVABLE on the persisted run.
+    assert result.completed is True
     run = store.load("rd-rev-obs")
     assert run is not None
     assert run.revision_note is not None
@@ -487,7 +494,9 @@ def test_revision_retries_spec_create_with_the_reviewer_feedback_injected(tmp_pa
     wf = _workflow(tmp_path, store, lambda kind: _FeedbackFake(kind))
     result = wf.run("rd-feedback", sequence)
 
-    assert result.completed is False
+    # The revision still runs and still injects the reviewer digest; only the FINAL
+    # verdict is advisory, so the run completes instead of dying at the gate.
+    assert result.completed is True
     create_prompts = [prompt for step, prompt in requests if step == "spec_create"]
     # spec_create ran twice (initial + the bounded revision).
     assert len(create_prompts) == 2
