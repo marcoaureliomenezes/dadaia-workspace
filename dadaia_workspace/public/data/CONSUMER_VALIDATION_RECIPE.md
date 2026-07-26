@@ -748,6 +748,29 @@ it replaces any earlier expectation of a 7-step release definition.
   `plan-create` / `tasks-create` / `*-review` fragment is dead weight and a FAIL.
 
 ---
+### R-21 — An unrepairable environment limit is never reported as repairable drift
+
+A status carries a promised remedy. `[drift]`/`[missing]` mean "re-run
+`dadaia public install`"; if install cannot possibly repair the condition, that status is a
+lie that sends the consumer into an infinite repair loop and fails `reconcile` with
+`rollback_required`. Two known limits, both real on hardened hosts:
+
+- **A `noexec` `KIMI_CODE_HOME`.** Point `KIMI_CODE_HOME` at a directory on a `noexec`
+  mount (a tmpfs `/tmp` is the common case), run `dadaia public install --target kimi-code`,
+  then `dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
+  `[unsupported]`, name the `noexec` mount as the cause and `KIMI_CODE_HOME` as the remedy,
+  `public doctor` exits 0, and `dadaia reconcile --expect-version <ver>` succeeds. **FAIL
+  if** any line reads `[drift]`/`[missing]`, or `reconcile` reports `rollback_required` —
+  reinstalling cannot clear a mount flag, so the run would never converge.
+- **The repairable boundary must survive.** `chmod 0o644` one shim on a NORMAL filesystem
+  and re-run the doctor. **PASS if** it reads `[drift] … (not executable)` and a plain
+  `dadaia public install --target kimi-code` clears it. Turning every executability failure
+  into `[unsupported]` is the opposite defect and also a FAIL.
+
+Generalize while you sweep: any doctor/gate line that prescribes a remedy must be a remedy
+that WORKS. Apply the prescribed command literally; if it cannot resolve the condition it
+names, that is a product FAIL of this statement (see also R-16).
+
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 
