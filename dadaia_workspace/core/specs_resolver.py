@@ -90,6 +90,41 @@ def _context_registered(workspace_root: Path, name: str) -> bool:
     )
 
 
+def repo_slug_for_context(workspace_root: Path, name: str) -> str:
+    """The DIRECTORY a context's repo lives in, from the registry — never the context name.
+
+    A context has two identities and they are not the same string: ``name`` is how the
+    operator and every session record refer to it, ``repo_slug`` is the directory under
+    ``repos/``. ``dadaia context create meu-projeto --repo repo-diferente`` makes them
+    differ, which is ordinary usage.
+
+    28 call sites across 9 modules derived the directory by interpolating the NAME, so any
+    context whose name differed from its slug resolved to a path that does not exist — and
+    the workflow then reported success while writing nothing
+    (bug a1-context-specs-resolution-ignores-repo-slug, reported by the consumer-side
+    validator). This is the one place that answers the question; callers must not re-derive
+    it.
+
+    Falls back to *name* when the registry is unreadable or the context is absent, which
+    keeps every existing name-equals-slug workspace working unchanged.
+    """
+    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
+    try:
+        data = json.loads(registry.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, ValueError):
+        return name
+    contexts = data.get("contexts", []) if isinstance(data, dict) else []
+    if not isinstance(contexts, list):
+        return name
+    for entry in contexts:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("name") == name:
+            slug = entry.get("repo_slug") or entry.get("repo")
+            return slug if isinstance(slug, str) and slug else name
+    return name
+
+
 def _session_record_live(record: dict[str, object]) -> bool:
     """FR4 staleness guard: a harness-keyed session record is live iff its heartbeat is fresh.
 
@@ -310,7 +345,8 @@ def resolve_specs_dir(
     if workspace_root is not None:
         context = resolve_bound_context_name(ancestry_pids=ancestry_pids)
         if context:
-            return (workspace_root / "repos" / context / "specs").resolve()
+            slug = repo_slug_for_context(workspace_root, context)
+            return (workspace_root / "repos" / slug / "specs").resolve()
 
     candidate = cwd / "specs"
     if candidate.exists():

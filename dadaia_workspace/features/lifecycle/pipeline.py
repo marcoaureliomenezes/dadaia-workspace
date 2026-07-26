@@ -500,7 +500,9 @@ class LifecyclePipeline:
                     is_review=step.is_review,
                     deliverable_globs=(
                         (
-                            (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
+                            (
+                                f"repos/{self._repo_slug}/specs/releases/{self._release_id}/CLOSURE.md"
+                            ),
                             f"specs/releases/{self._release_id}/CLOSURE.md",
                         )
                         if step.label == "close"
@@ -681,6 +683,23 @@ class LifecyclePipeline:
             steps=tuple(results),
         )
 
+    @property
+    def _repo_slug(self) -> str:
+        """The repo DIRECTORY name for this context — derived from the resolved specs_dir.
+
+        Formatting ``repos/{context}/…`` with the context NAME broke every context whose
+        name differs from its ``--repo`` slug: the declared write scope pointed at a
+        directory that does not exist, the worker's write fell out of scope, and the run
+        reported success having written nothing
+        (bug a1-context-specs-resolution-ignores-repo-slug).
+
+        Falls back to the context name when no ``specs_dir`` was injected (fixture
+        pipelines), which is exactly the name-equals-slug case.
+        """
+        if self._specs_dir is not None:
+            return self._specs_dir.parent.name
+        return self._context
+
     def _rewrite_task_markers(self, source: str, target: str) -> int:
         """Atomically rewrite generated checklist task markers in active TASKS.md."""
         if self._specs_dir is None:
@@ -728,11 +747,11 @@ class LifecyclePipeline:
         """
         globs: list[str] = []
         for raw in step.extra_allowed_paths:
-            path = raw.format(context=self._context, release_id=self._release_id)
+            path = raw.format(context=self._repo_slug, release_id=self._release_id)
             if path not in globs:
                 globs.append(path)
             if not path.startswith("repos/"):
-                qualified = f"repos/{self._context}/{path}"
+                qualified = f"repos/{self._repo_slug}/{path}"
                 if qualified not in globs:
                     globs.append(qualified)
         return tuple(globs)
@@ -910,14 +929,14 @@ class LifecyclePipeline:
         # handoff-only regardless of what extra_allowed_paths carries.
         expanded_paths_list: list[str] = []
         for _raw in step.extra_allowed_paths:
-            _path = _raw.format(context=self._context, release_id=self._release_id)
+            _path = _raw.format(context=self._repo_slug, release_id=self._release_id)
             if _path not in expanded_paths_list:
                 expanded_paths_list.append(_path)
             # Dual spelling (bug implementation-deliverable-zone-misses-context-repo):
             # repo-relative write sets and workspace-relative worker reports name the
             # same zone.
             if not _path.startswith("repos/"):
-                _qualified = f"repos/{self._context}/{_path}"
+                _qualified = f"repos/{self._repo_slug}/{_path}"
                 if _qualified not in expanded_paths_list:
                     expanded_paths_list.append(_qualified)
         expanded_paths = tuple(expanded_paths_list)

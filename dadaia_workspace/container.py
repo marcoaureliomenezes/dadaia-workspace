@@ -58,7 +58,7 @@ from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.session_env import harness_session_id
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context, resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -501,7 +501,9 @@ def build_reports_next_service(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
             "or pass --context <name>."
         )
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )
@@ -747,7 +749,7 @@ def build_lifecycle_preflight_input(
 
     _guard_initialized(workspace_root)
     specs_dir = _context_specs_dir(workspace_root, context)
-    repo_dir = workspace_root / "repos" / context
+    repo_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context)
 
     # --- active-release ← ACTIVE.md ------------------------------------------------
     active_md_release, _segment, active_md_phase, _err = read_active_md(
@@ -1095,7 +1097,9 @@ def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
     """
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     return specs_dir
@@ -1613,9 +1617,10 @@ def _release_definition_runtime_factory(
             ]
             deliverables = _CREATE_DELIVERABLES.get(label, ())
             if deliverables and release_id is not None:
+                slug = repo_slug_for_context(run_cwd, context)
                 specs_prefix = (
-                    f"repos/{context}/specs"
-                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    f"repos/{slug}/specs"
+                    if (run_cwd / "repos" / slug / "specs").is_dir()
                     else "specs"
                 )
                 refs.extend(f"{specs_prefix}/releases/{release_id}/{name}" for name in deliverables)
@@ -1682,7 +1687,9 @@ def build_release_definition_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         # Self-hosting library repo: specs live at the workspace-root tree.
         specs_dir = workspace_root / "specs"
@@ -1717,7 +1724,8 @@ def build_release_definition_workflow(
         # commits the context repo's definition artifacts so implementation preflight
         # never inherits a dirty tree (None for non-git fixtures).
         definition_committer=_definition_committer(
-            workspace_root / "repos" / context_name, release_id
+            workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name),
+            release_id,
         ),
     )
 
@@ -1807,9 +1815,10 @@ def _backlog_definition_runtime_factory(
                 f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
             ]
             if label == "backlog_author":
+                slug = repo_slug_for_context(run_cwd, context)
                 specs_prefix = (
-                    f"repos/{context}/specs"
-                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    f"repos/{slug}/specs"
+                    if (run_cwd / "repos" / slug / "specs").is_dir()
                     else "specs"
                 )
                 run_id = task_id.rsplit(":", 1)[0]
@@ -1897,7 +1906,9 @@ def build_backlog_definition_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     source_root = workspace_root / "repos" / context_name
     if not specs_dir.is_dir():
         # Self-hosting library repo: specs live at the workspace-root tree.
@@ -1946,6 +1957,7 @@ def _step_output_driving_fake_factory(
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
+    extra_artifact_refs: tuple[str, ...] = (),
     domain_payload: dict[str, object] | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build a runtime factory whose FAKE returns one in-scope raw step output.
@@ -1970,7 +1982,7 @@ def _step_output_driving_fake_factory(
     approving = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary=summary,
-        artifact_refs=(artifact_ref,),
+        artifact_refs=(artifact_ref, *extra_artifact_refs),
         structured_output={"verdict": "APPROVED"},
         domain_payload=domain_payload or {},
     )
@@ -2014,7 +2026,9 @@ def build_audit_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     # Bug audit-accepts-undefined-release-and-creates-release-tree: audit runs against an
@@ -2045,6 +2059,13 @@ def build_audit_workflow(
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
             artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
+            # The audit step must land a REPORT in specs/audits/, not just a payload: an
+            # audit whose findings live only in a transient handoff cannot be dispositioned
+            # or archived (bug a1-audit-completes-without-audit-report).
+            extra_artifact_refs=(
+                f"{specs_dir.relative_to(workspace_root).as_posix()}/audits/"
+                "driving-fake-audit-canary.md",
+            ),
             # A schema-VALID audit-report-v1 canary (one INFO finding routed to
             # accepted-risk) so the fake exercises the real referential-integrity gate
             # and the sequence COMPLETES (bug
@@ -2086,7 +2107,9 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
     """
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     source_root = workspace_root / "repos" / context_name
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"

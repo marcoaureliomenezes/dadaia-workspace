@@ -220,6 +220,22 @@ class _FragmentAssemblyMixin:
     _context: str
     _release_id: str
 
+    @property
+    def _repo_slug(self) -> str:
+        """The repo DIRECTORY name for this context — derived, never assumed.
+
+        Path templates carry ``repos/{context}/…``, and formatting them with the context
+        NAME broke every context whose name differs from its ``--repo`` slug: the write
+        scope pointed at a directory that does not exist, so the worker's write fell out of
+        scope and the run reported success having written nothing
+        (bug a1-context-specs-resolution-ignores-repo-slug).
+
+        Taken from the already-resolved ``specs_dir`` (``<ws>/repos/<slug>/specs``) rather
+        than re-derived from the registry, so there is exactly one resolution and the
+        template can never disagree with the directory the selector actually reads.
+        """
+        return self._selector.spec_context.specs_dir.parent.name
+
     # -- static-input injection (folded into the cacheable prefix) -------
 
     def _prefix_with_static_inputs(self, sequence: tuple[AssemblyStep, ...]) -> PromptPrefix | None:
@@ -330,7 +346,7 @@ class _FragmentAssemblyMixin:
         # specs/releases/) declares it on the step model; placeholders are expanded
         # against this workflow's context/release.
         extra = tuple(
-            pattern.format(context=self._context, release_id=self._release_id)
+            pattern.format(context=self._repo_slug, release_id=self._release_id)
             for pattern in getattr(step, "extra_allowed_paths", ())
         )
         extra = filter_context_spec_paths(
@@ -891,12 +907,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             # release-definition-completes-without-persisting-artifacts): the step
             # passes only when ITS artifact was written, not any write in the zone.
             deliverable_globs = (
-                f"repos/{self._context}/specs/releases/{self._release_id}/{step_deliverable}",
+                f"repos/{self._repo_slug}/specs/releases/{self._release_id}/{step_deliverable}",
                 f"specs/releases/{self._release_id}/{step_deliverable}",
             )
         else:
             deliverable_globs = tuple(
-                pattern.format(context=self._context, release_id=self._release_id)
+                pattern.format(context=self._repo_slug, release_id=self._release_id)
                 for pattern in getattr(step, "extra_allowed_paths", ())
             )
         worker_result, blocked = runner.evaluate_gate_with_result(

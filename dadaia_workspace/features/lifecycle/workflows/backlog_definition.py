@@ -555,7 +555,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         if self._artifact_root is None:
             return hashes
         for root in (
-            self._artifact_root / "repos" / self._context / "specs" / "backlog",
+            self._artifact_root / "repos" / self._repo_slug / "specs" / "backlog",
             self._artifact_root / "specs" / "backlog",
         ):
             if not root.is_dir():
@@ -933,7 +933,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 scope,
                 allowed_paths=(
                     *scope.allowed_paths,
-                    f"repos/{self._context}/specs/backlog/**",
+                    f"repos/{self._repo_slug}/specs/backlog/**",
                     "specs/backlog/**",
                 ),
             )
@@ -963,7 +963,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 # trace of what the worker actually returned.
                 deliverable_globs=(
                     (
-                        f"repos/{self._context}/specs/backlog/**",
+                        f"repos/{self._repo_slug}/specs/backlog/**",
                         "specs/backlog/**",
                     )
                     if step.label == "backlog_author"
