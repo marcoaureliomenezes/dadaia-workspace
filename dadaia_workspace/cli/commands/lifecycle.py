@@ -426,7 +426,7 @@ def release_define(
         None,
         "--step-harness",
         help="Per-step harness override 'step=harness' (repeatable); steps are the "
-        "§6.1 labels (release_scope, spec_create, spec_arch_review, ...).",
+        "step labels (definition_draft, definition_review).",
     ),
     step_model: list[str] | None = typer.Option(
         None,

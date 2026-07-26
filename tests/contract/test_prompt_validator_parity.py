@@ -36,26 +36,26 @@ _PARITY: tuple[tuple[str, str, str, str], ...] = (
     (
         "**Consumes:**",
         "features/backlog/consumes.py",
-        "release_definition/spec-create.md",
+        "release_definition/definition_draft.md",
         "Python parses this line to write the consumed_backlog ledger and remove the items "
         "at closure; a SPEC without it consumes nothing",
     ),
     (
         "**Consumes:**",
         "features/backlog/consumes.py",
-        "release_definition/spec-review.md",
+        "release_definition/definition_review.md",
         "an authoring rule with no reviewer check drifts back out",
     ),
     (
         "no:cacheprovider",
         "features/lifecycle/workflows/release_definition.py",
-        "release_definition/tasks-create.md",
+        "release_definition/definition_draft.md",
         "a deterministic TASKS lint rejects any pytest command without it",
     ),
     (
         "Validation Dependency Table",
         "features/lifecycle/workflows/release_definition.py",
-        "release_definition/plan-create.md",
+        "release_definition/definition_draft.md",
         "a Python lint blocks the step when the PLAN omits this section",
     ),
 )

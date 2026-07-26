@@ -8,7 +8,7 @@ Covers:
   stays green and is never re-implemented. The doctor is a pure CODE-coherence check —
   FRAG-COH-4 grounds against a self-contained oracle, so it is ambient-tree-independent.
 * **AC-5 (RED-first)** — an unregistered ``dynamic_inputs`` entry on the selector-wired
-  ``release_definition.spec_create`` MAIN fragment (a sabotaged loader copy, NOT the shipped
+  ``release_definition.definition_draft`` MAIN fragment (a sabotaged loader copy, NOT the shipped
   file) fires **FRAG-COH-2** (ERROR), flips ``ok`` to False, and the rendered output contains
   the literal ``FRAG-COH-2``.
 * **FRAG-COH-1 / FRAG-COH-3 / FRAG-COH-4** unit bites — an unmapped fragment role fires
@@ -47,7 +47,7 @@ from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, Fragm
 
 pytestmark = pytest.mark.unit
 
-_SPEC_CREATE = "release_definition.spec_create"
+_SPEC_CREATE = "release_definition.definition_draft"
 
 
 def _seed_specs(tmp_path: Path) -> Path:
@@ -62,7 +62,7 @@ class _SabotagedLoader(FragmentLoader):
     """Shipped fragments, but the ``spec_create`` main fragment gains an unregistered input.
 
     Subclasses the real loader (so it IS a ``FragmentLoader``) and rewrites ONLY the
-    ``release_definition.spec_create`` copy in-memory — the shipped file on disk is untouched.
+    ``release_definition.definition_draft`` copy in-memory — the shipped file on disk is untouched.
     """
 
     def list_fragments(self, workflow: str | None = None) -> list[Fragment]:

@@ -182,16 +182,9 @@ _CASES = (
         "release_definition",
         ReleaseDefinitionWorkflow,
         release_definition,
-        (
-            "release_scope",
-            "spec_create",
-            "spec_review",
-            "plan_create",
-            "plan_review",
-            "tasks_create",
-            "tasks_implementability_review",
-            "definition_commit_gate",
-        ),
+        # Collapsed from 7 steps to 3: one draft authors SPEC+PLAN+TASKS, one review
+        # judges all three, one deterministic commit gate.
+        ("definition_draft", "definition_review", "definition_commit_gate"),
     ),
 )
 

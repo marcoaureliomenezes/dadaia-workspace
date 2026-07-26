@@ -299,16 +299,16 @@ def test_ac3_base_records_and_injects_each_mapped_role(tmp_path: Path) -> None:
 
     # product-engineer step records the catalog ref; software-architect → architecture.md;
     # qa-engineer → quality-assurance.md; the multi-role plan_review records BOTH.
-    assert _CATALOG_REF in _refs_for(run, "release_scope")
-    assert _ARCH_REF in _refs_for(run, "spec_review")
-    assert _QA_REF in _refs_for(run, "spec_review")
-    assert _QA_REF in _refs_for(run, "plan_review")
-    assert _ARCH_REF in _refs_for(run, "plan_review")
+    assert _CATALOG_REF in _refs_for(run, "definition_draft")
+    assert _ARCH_REF in _refs_for(run, "definition_review")
+    assert _QA_REF in _refs_for(run, "definition_review")
+    assert _QA_REF in _refs_for(run, "definition_review")
+    assert _ARCH_REF in _refs_for(run, "definition_review")
 
     # the atom CONTENT appears in the assembled prompt for the mapped steps.
-    assert "FIXTURE QA BODY." in fake.request_for("spec_review").prompt
-    assert "FIXTURE ARCH BODY." in fake.request_for("spec_review").prompt
-    assert "FIXTURE CATALOG BODY" in fake.request_for("release_scope").prompt
+    assert "FIXTURE QA BODY." in fake.request_for("definition_review").prompt
+    assert "FIXTURE ARCH BODY." in fake.request_for("definition_review").prompt
+    assert "FIXTURE CATALOG BODY" in fake.request_for("definition_draft").prompt
 
 
 # ---------------------------------------------------------------------------

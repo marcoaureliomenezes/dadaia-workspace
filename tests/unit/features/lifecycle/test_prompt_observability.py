@@ -209,7 +209,7 @@ def test_run_record_persists_composition_and_round_trips_through_json_store(
     # Static inputs fold into a PER-STEP prefix (each step pays only for its own
     # fragments' declared inputs), so hashes may legitimately differ across steps.
     # A step that declares static inputs records a hash differing from the bare prefix.
-    spec_create_hash = by_step["spec_create"].prefix_hash
+    spec_create_hash = by_step["definition_draft"].prefix_hash
     assert spec_create_hash is not None
     assert spec_create_hash != prefix.content_hash
     # Every model step recorded a full composition record.
@@ -242,7 +242,7 @@ def test_run_record_persists_composition_and_round_trips_through_json_store(
         e.prefix_hash for e in reloaded.injected_context if e.prefix_hash is not None
     }
     assert reloaded_hashes
-    arch_review = next(e for e in reloaded.injected_context if e.step == "spec_review")
+    arch_review = next(e for e in reloaded.injected_context if e.step == "definition_review")
     assert arch_review.prefix_hash in reloaded_hashes
     assert arch_review.runtime_kind == AgentRuntimeKind.FAKE.value
     assert arch_review.output_schema
@@ -288,8 +288,8 @@ def test_prefix_bytes_are_byte_identical_across_steps(tmp_path: Path) -> None:
             f"step {step.label}'s recorded prefix hash does not match its prompt bytes"
         )
     # spec_review and plan_review declare the same static inputs -> identical prefixes.
-    if "spec_review" in prefix_bytes and "plan_review" in prefix_bytes:
-        assert prefix_bytes["spec_review"] == prefix_bytes["plan_review"]
+    if "definition_review" in prefix_bytes and "definition_review" in prefix_bytes:
+        assert prefix_bytes["definition_review"] == prefix_bytes["definition_review"]
 
     # No whole-memory injection by default (cost regression guard). The sentinel lives
     # deep in architecture.md's body. The release-definition fragments only ever pull
@@ -328,16 +328,18 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
     assert model_steps
     # Per-step static inputs: constitution.md is declared ONLY by spec_create — it must
     # reach spec_create and must NOT tax steps that never declared it.
-    spec_create = model_steps["spec_create"]
+    spec_create = model_steps["definition_draft"]
     assert spec_create.prompt_text is not None
     assert "STATIC_CONST_MARKER_42" in spec_create.prompt_text
     assert _ARCH_STATIC_MARKER in spec_create.prompt_text
-    scope = model_steps["release_scope"]
+    # definition_review declares only architecture.md, so it must NOT be taxed with the
+    # constitution the draft step declared — that union tax is what this pins.
+    scope = model_steps["definition_review"]
     assert scope.prompt_text is not None
     assert "STATIC_CONST_MARKER_42" not in scope.prompt_text, (
-        "release_scope declares no static inputs — the cross-sequence union tax is back"
+        "definition_review does not declare the constitution — the union tax is back"
     )
-    review = model_steps["spec_review"]
+    review = model_steps["definition_review"]
     assert review.prompt_text is not None
     assert _ARCH_STATIC_MARKER in review.prompt_text
 
@@ -366,4 +368,4 @@ def test_declared_static_inputs_reach_prompt_and_degrade_gracefully_when_missing
     for step in missing_steps.values():
         assert step.prompt_text is not None
         assert "STATIC_CONST_MARKER_42" not in step.prompt_text
-    assert _ARCH_STATIC_MARKER in (missing_steps["spec_create"].prompt_text or "")
+    assert _ARCH_STATIC_MARKER in (missing_steps["definition_draft"].prompt_text or "")

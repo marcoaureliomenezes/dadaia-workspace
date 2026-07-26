@@ -1566,10 +1566,9 @@ def _release_definition_runtime_factory(
         AgentRunStatus,
     )
 
+    #: The ONE draft step authors all three artifacts (v0.2.x: 7 steps collapsed to 3).
     _CREATE_DELIVERABLES = {
-        "spec_create": "SPEC.md",
-        "plan_create": "PLAN.md",
-        "tasks_create": "TASKS.md",
+        "definition_draft": ("SPEC.md", "PLAN.md", "TASKS.md"),
     }
 
     # Deliverable stubs must be VALID under the workflow's own deterministic gates
@@ -1612,14 +1611,14 @@ def _release_definition_runtime_factory(
             refs = [
                 f".dadaia/tmp/lifecycle-worker/{context}/release-definition-step.step-output.json"
             ]
-            deliverable = _CREATE_DELIVERABLES.get(label)
-            if deliverable is not None and release_id is not None:
+            deliverables = _CREATE_DELIVERABLES.get(label, ())
+            if deliverables and release_id is not None:
                 specs_prefix = (
                     f"repos/{context}/specs"
                     if (run_cwd / "repos" / context / "specs").is_dir()
                     else "specs"
                 )
-                refs.append(f"{specs_prefix}/releases/{release_id}/{deliverable}")
+                refs.extend(f"{specs_prefix}/releases/{release_id}/{name}" for name in deliverables)
             for ref in refs:
                 target = run_cwd / ref
                 if not target.exists():

@@ -69,17 +69,16 @@ class _KindReportingFake:
         # materialize like the production driving fake.
         parts = (request.task_id or "").split(":")
         label = parts[-2] if parts and parts[-1].startswith("attempt-") else parts[-1]
-        deliverable = {
-            "spec_create": "SPEC.md",
-            "plan_create": "PLAN.md",
-            "tasks_create": "TASKS.md",
-            "close": "CLOSURE.md",
-        }.get(label)
+        # The ONE draft step authors all three artifacts (7 steps collapsed to 3).
+        deliverables = {
+            "definition_draft": ("SPEC.md", "PLAN.md", "TASKS.md"),
+            "close": ("CLOSURE.md",),
+        }.get(label, ())
         refs = list(self.result.artifact_refs)
-        if deliverable is not None:
+        if deliverables:
             zone = Path.cwd() / "repos" / _CONTEXT / "specs"
             prefix = f"repos/{_CONTEXT}/specs" if zone.is_dir() else "specs"
-            refs.append(f"{prefix}/releases/{_RELEASE}/{deliverable}")
+            refs.extend(f"{prefix}/releases/{_RELEASE}/{name}" for name in deliverables)
         for ref in refs:
             target = Path.cwd() / ref
             if not target.exists():

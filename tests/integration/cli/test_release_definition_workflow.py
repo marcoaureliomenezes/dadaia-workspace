@@ -106,16 +106,13 @@ class _KindReportingFake:
         # / create-step-gate-accepts-refusal-handoff-as-success): be step-aware and
         # materialize like the production driving fake.
         label = (request.task_id or "").rsplit(":", 1)[-1]
-        deliverable = {
-            "spec_create": "SPEC.md",
-            "plan_create": "PLAN.md",
-            "tasks_create": "TASKS.md",
-        }.get(label)
+        # The ONE draft step authors all three artifacts (7 steps collapsed to 3).
+        deliverables = ("SPEC.md", "PLAN.md", "TASKS.md") if label == "definition_draft" else ()
         refs = list(self.result.artifact_refs)
-        if deliverable is not None:
+        if deliverables:
             zone = Path.cwd() / "repos" / _CONTEXT / "specs"
             prefix = f"repos/{_CONTEXT}/specs" if zone.is_dir() else "specs"
-            refs.append(f"{prefix}/releases/{_RELEASE}/{deliverable}")
+            refs.extend(f"{prefix}/releases/{_RELEASE}/{name}" for name in deliverables)
         for ref in refs:
             target = Path.cwd() / ref
             if not target.exists():
@@ -373,7 +370,7 @@ def test_rejected_review_blocks_before_commit_gate(
     # not the model — decides the block.
     _install_fake_factory(monkeypatch, reject_kind=AgentRuntimeKind.CODEX_EXEC)
 
-    result = _define(["--harness", "pi", "--step-harness", "spec_review=codex"])
+    result = _define(["--harness", "pi", "--step-harness", "definition_review=codex"])
 
     assert result.exit_code == 0, result.output
     payload = _payload(result.output)
@@ -381,7 +378,7 @@ def test_rejected_review_blocks_before_commit_gate(
     assert payload["blocked"] is None
     # The rejection was spent on one revision and then recorded, not swallowed.
     warnings = payload.get("warnings") or []
-    assert any("spec_review" in w and "review-advisory" in w for w in warnings), warnings
+    assert any("definition_review" in w and "review-advisory" in w for w in warnings), warnings
     steps = payload["steps"]
     assert isinstance(steps, list)
     labels = [step["label"] for step in steps]
@@ -398,7 +395,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     """§8.5: adjacent steps run on different harnesses, same bundle, same gate, same result.
 
     Default ``--harness pi`` runs every step on PI_HEADLESS; ``--step-harness
-    spec_create=codex`` overrides the single ``spec_create`` step onto CODEX_EXEC — so
+    definition_draft=codex`` overrides the single ``spec_create`` step onto CODEX_EXEC — so
     ``release_scope`` (PI) and its adjacent ``spec_create`` (Codex) genuinely run on two
     different harnesses. Both are FAKE-backed via the monkeypatched factory.
 
@@ -407,7 +404,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
       (b) both harnesses pass through the same Python gate logic (both accepted);
       (c) the mixed-harness run completes identically to the single-harness path.
 
-    The single-harness baseline below IS the full happy-path proof (all 7 model steps +
+    The single-harness baseline below IS the full happy-path proof (both model steps +
     terminal Python commit gate, release advances to IMPLEMENTATION) — absorbing the
     former standalone happy-path test. Fragment-scoped (non-generic) prompt assertions
     are folded in as this fn already builds workflow objects directly.
@@ -431,13 +428,8 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_payload["final_phase"] == "implementation"
     baseline_labels = [step["label"] for step in baseline_payload["steps"]]
     assert baseline_labels == [
-        "release_scope",
-        "spec_create",
-        "spec_review",
-        "plan_create",
-        "plan_review",
-        "tasks_create",
-        "tasks_implementability_review",
+        "definition_draft",
+        "definition_review",
         "definition_commit_gate",
     ]
     baseline_commit_gate = baseline_payload["steps"][-1]
@@ -445,10 +437,18 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_commit_gate["is_gate"] is True
     assert baseline_commit_gate["accepted"] is True
 
-    # Mixed: release_scope on pi, adjacent spec_create on codex — real --step-harness path.
+    # Mixed: definition_draft on pi, the adjacent definition_review on codex — the real
+    # --step-harness path across two ADJACENT steps of the collapsed sequence.
     # Distinct run id: the completed-rerun guard refuses re-using the baseline's id.
     mixed = _define(
-        ["--harness", "pi", "--step-harness", "spec_create=codex", "--run-id", "adjacent-mixed"]
+        [
+            "--harness",
+            "pi",
+            "--step-harness",
+            "definition_review=codex",
+            "--run-id",
+            "adjacent-mixed",
+        ]
     )
     assert mixed.exit_code == 0, mixed.output
     mixed_payload = _payload(mixed.output)
@@ -462,16 +462,19 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     # The two adjacent steps genuinely ran on two DIFFERENT harnesses in the mixed run.
     # The JSON envelope reports the AgentRuntimeKind value (pi -> pi_headless,
     # codex -> codex_exec).
-    assert by_label_mixed["release_scope"]["runtime"] == AgentRuntimeKind.PI_HEADLESS.value
-    assert by_label_mixed["spec_create"]["runtime"] == AgentRuntimeKind.CODEX_EXEC.value
-    assert by_label_mixed["release_scope"]["runtime"] != by_label_mixed["spec_create"]["runtime"]
+    assert by_label_mixed["definition_draft"]["runtime"] == AgentRuntimeKind.PI_HEADLESS.value
+    assert by_label_mixed["definition_review"]["runtime"] == AgentRuntimeKind.CODEX_EXEC.value
+    assert (
+        by_label_mixed["definition_draft"]["runtime"]
+        != by_label_mixed["definition_review"]["runtime"]
+    )
 
     # (a) SAME fragment bundle for the role regardless of harness: the bundle is keyed by
     # the step, not the runtime. spec_create's fragment id is identical pi-vs-codex.
     assert (
-        by_label_mixed["spec_create"]["fragment_id"]
-        == by_label_baseline["spec_create"]["fragment_id"]
-        == "release_definition.spec_create"
+        by_label_mixed["definition_draft"]["fragment_id"]
+        == by_label_baseline["definition_draft"]["fragment_id"]
+        == "release_definition.definition_draft"
     )
 
     # (a, stronger) byte-identical assembled prompt for the same step across harnesses —
@@ -497,14 +500,14 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     store = container.build_lifecycle_run_store(workspace)
     next(store.root.glob("*seam-identity*")).unlink()
     out_codex = wf_codex.run("seam-identity")
-    bundle_pi = next(s for s in out_pi.steps if s.label == "spec_create").prompt_text
-    bundle_codex = next(s for s in out_codex.steps if s.label == "spec_create").prompt_text
+    bundle_pi = next(s for s in out_pi.steps if s.label == "definition_draft").prompt_text
+    bundle_codex = next(s for s in out_codex.steps if s.label == "definition_draft").prompt_text
     assert bundle_pi is not None and bundle_codex is not None
     assert bundle_pi == bundle_codex  # harness-independent fragment bundle.
 
     # (b) both harnesses passed through the same Python gate logic — both accepted.
-    assert by_label_mixed["spec_create"]["accepted"] is True
-    assert by_label_mixed["release_scope"]["accepted"] is True
+    assert by_label_mixed["definition_draft"]["accepted"] is True
+    assert by_label_mixed["definition_draft"]["accepted"] is True
 
     # (c) the mixed-harness run completes identically to the single-harness path: same
     # labels, same accepted flags, same terminal phase.
@@ -515,10 +518,10 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
 
     # Scoped (non-generic) fragment prompts: at least one step prompt carries
     # fragment-sourced content; no generic suffix. Reuses the wf_pi/out_pi run built above.
-    scope_step = next(s for s in out_pi.steps if s.label == "release_scope")
+    scope_step = next(s for s in out_pi.steps if s.label == "definition_draft")
     assert scope_step.prompt_text is not None
     # Fragment-sourced content: the explicit fragment id is present...
-    assert "fragment:release_definition.release_scope" in scope_step.prompt_text
+    assert "fragment:release_definition.definition_draft" in scope_step.prompt_text
     # ...along with the coherent worker-output contract (v0.1.32 / D-1): the single
     # transport schema is the worker emit target via `schema`; the fragment's domain schema
     # is NOT surfaced as a competing schema-to-emit in the "## Required output" section.

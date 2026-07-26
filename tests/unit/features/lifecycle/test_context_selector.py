@@ -390,10 +390,10 @@ def test_select_all_and_run_record_seam_records_round_trips_and_accumulates(
         step="spec_create",
         names=("approved_spec", "memory/architecture.md", "relevant_product_atoms"),
         policy="exact-files-only",
-        fragment_ids=("release_definition.spec_create",),
+        fragment_ids=("release_definition.definition_draft",),
     )
     assert wide_audit.step == "spec_create"
-    assert wide_audit.fragment_ids == ("release_definition.spec_create",)
+    assert wide_audit.fragment_ids == ("release_definition.definition_draft",)
     assert any(ref.endswith("SPEC.md") for ref in wide_audit.refs)
     assert any(ref.endswith("architecture.md") for ref in wide_audit.refs)
     assert any("brand-identity.md" in ref for ref in wide_audit.refs)
@@ -410,14 +410,14 @@ def test_select_all_and_run_record_seam_records_round_trips_and_accumulates(
         step="spec_create",
         names=("approved_spec", "memory/architecture.md"),
         policy="exact-files-only",
-        fragment_ids=("release_definition.spec_create",),
+        fragment_ids=("release_definition.definition_draft",),
     )
     run = record_injected_context(_run(), audit)
 
     assert len(run.injected_context) == 1
     entry = run.injected_context[0]
     assert entry.step == "spec_create"
-    assert entry.fragment_ids == ("release_definition.spec_create",)
+    assert entry.fragment_ids == ("release_definition.definition_draft",)
     assert any(ref.endswith("SPEC.md") for ref in entry.refs)
     assert any(ref.endswith("architecture.md") for ref in entry.refs)
     assert "exact-files-only" in entry.policies

@@ -37,7 +37,7 @@ _FRAGMENTS = (
 
 
 def test_spec_create_demands_the_consumes_line() -> None:
-    text = (_FRAGMENTS / "spec-create.md").read_text(encoding="utf-8")
+    text = (_FRAGMENTS / "definition_draft.md").read_text(encoding="utf-8")
     assert "**Consumes:**" in text, (
         "spec-create must instruct the author to write the `**Consumes:**` line; without "
         "it a live release consumes nothing and the commit gate refuses the definition."
@@ -52,7 +52,7 @@ def test_spec_create_demands_the_consumes_line() -> None:
 
 
 def test_spec_review_checks_the_consumes_line() -> None:
-    text = (_FRAGMENTS / "spec-review.md").read_text(encoding="utf-8")
+    text = (_FRAGMENTS / "definition_review.md").read_text(encoding="utf-8")
     assert "**Consumes:**" in text, (
         "the SPEC review must verify the Consumes line — an authoring instruction with no "
         "reviewer check is how it drifts back out"
@@ -68,7 +68,7 @@ def test_the_parser_and_the_prompt_agree_on_the_token() -> None:
     """
     from dadaia_workspace.features.backlog.consumes import parse_consumes_line
 
-    text = (_FRAGMENTS / "spec-create.md").read_text(encoding="utf-8")
+    text = (_FRAGMENTS / "definition_draft.md").read_text(encoding="utf-8")
     example = next(
         (line for line in text.splitlines() if line.strip().startswith("**Consumes:**")),
         None,
@@ -91,8 +91,8 @@ def test_plan_review_requires_the_contract_bindings_tasks_cannot_invent() -> Non
     A downstream gate must never be the first place an upstream omission is detected when
     the downstream step is forbidden from repairing it.
     """
-    review = (_FRAGMENTS / "plan-review.md").read_text(encoding="utf-8")
-    create = (_FRAGMENTS / "plan-create.md").read_text(encoding="utf-8")
+    review = (_FRAGMENTS / "definition_review.md").read_text(encoding="utf-8")
+    create = (_FRAGMENTS / "definition_draft.md").read_text(encoding="utf-8")
     assert "signature" in create, "plan-create must demand the bindings in the first place"
     assert "Contract bindings present" in review, (
         "plan-review must have a check for the contract bindings, or the omission is only "

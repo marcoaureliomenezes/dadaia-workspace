@@ -157,13 +157,13 @@ def test_base_iterates_run_scoped_sequence_not_module_global(tmp_path: Path) -> 
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_b",
             role="product-engineer",
-            fragment_id="release_definition.spec_create",
+            fragment_id="release_definition.definition_draft",
             shared_fragment_ids=("shared.anti_slop",),
             produces="generic-step-handoff-v1",
             consumes=("cs_a",),
@@ -198,13 +198,13 @@ def test_completed_definition_repoints_active_md(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
             consumes=("cs_a",),
@@ -428,13 +428,13 @@ def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -482,13 +482,13 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -532,7 +532,7 @@ def test_resume_from_unknown_step_or_missing_run_raises(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(label="cs_gate", role="python", fragment_id=None),
@@ -581,13 +581,13 @@ def _revision_sequence() -> tuple[ReleaseStep, ...]:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
             consumes=("cs_a",),
@@ -662,7 +662,7 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
     specs = _seed(tmp_path)
     # A model verdict no longer blocks (it is advisory), so manufacture the blocked run
     # this resume test needs with a DETERMINISTIC failure instead.
-    fake = _RejectOnceFake("spec_review")
+    fake = _RejectOnceFake("definition_review")
     wf = ReleaseDefinitionWorkflow(
         context=_CONTEXT,
         release_id=_RELEASE,
@@ -674,11 +674,16 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
 
     first = wf.run("skip-scope-resume", _RELEASE_SEQ, skip_scope=True)
     assert first.completed is False
-    assert all(s.label != "release_scope" for s in first.steps)
+    # skip_scope used to drop the separate release_scope step. That step no longer
+    # exists — the collapsed sequence is draft → review → gate — so the flag is a
+    # harmless no-op and what matters is that the shape stays stable across a resume.
+    assert [s.label for s in first.steps][0] == "definition_draft"
 
     fake.approve = True
-    resumed = wf.run("skip-scope-resume", _RELEASE_SEQ, resume_from="spec_create", skip_scope=True)
+    resumed = wf.run(
+        "skip-scope-resume", _RELEASE_SEQ, resume_from="definition_draft", skip_scope=True
+    )
     assert resumed.completed is True, (
         resumed.blocked.reason if resumed.blocked else "unexpected block"
     )
-    assert all(s.label != "release_scope" for s in resumed.steps)
+    assert [s.label for s in resumed.steps][-1] == "definition_commit_gate"
