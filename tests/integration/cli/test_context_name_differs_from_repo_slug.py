@@ -132,3 +132,67 @@ def test_audit_cannot_complete_without_materializing_a_report(workspace: Path) -
         "alone and materialize no report"
     )
     assert any("specs/audits/" in p for p in report_step.extra_allowed_paths)
+
+
+def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Path) -> None:
+    """Two more sites that assumed name == slug, both validator-reported.
+
+    `bugs append --context <name>` validated `repos/<name>/specs` and REFUSED a perfectly
+    valid context (a2-bugs-append-context-resolution-ignores-repo-slug); and the close
+    step's CLOSURE.md was written under the name, landing outside its declared write scope
+    so the step was refused (a2-fake-implementation-close-closure-out-of-scope).
+
+    Both are the same disease as the first fix — a directory derived from the wrong
+    identity — which is why they are pinned here next to it.
+    """
+    proc = _dadaia(
+        workspace,
+        "bugs",
+        "append",
+        "--bug-id",
+        "probe",
+        "--event",
+        "reported",
+        "--reported-by",
+        "test",
+        "--title",
+        "t",
+        "--severity",
+        "LOW",
+        "--surface",
+        "s",
+        "--component",
+        "c",
+        "--context",
+        _NAME,
+        "--tag",
+        "x",
+        "--symptom",
+        "sy",
+        "--repro",
+        "rp",
+        "--expected",
+        "ex",
+        "--notes",
+        "no",
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "bugs.jsonl").is_file(), (
+        "the event must land in the context's real ledger, under its SLUG"
+    )
+
+
+def test_no_release_gate_can_block_without_a_remedy() -> None:
+    """A block with `operator_command: None` is a dead end.
+
+    The commit gate mapped each artifact to the review that re-asserts its flip; an
+    artifact missing ENTIRELY maps to no review, so the remedy list came back empty and the
+    gate blocked with nothing to run (a2-release-missing-spec-gate-lacks-resume-remedy).
+    Re-authoring is always valid, so it is now the floor.
+    """
+    from dadaia_workspace.features.lifecycle.workflows import release_definition
+
+    body = Path(release_definition.__file__).read_text(encoding="utf-8")
+    assert 'or ["--resume-from definition_draft"]' in body, (
+        "the commit gate must fall back to re-authoring instead of emitting a null remedy"
+    )

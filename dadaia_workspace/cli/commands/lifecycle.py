@@ -20,6 +20,7 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.session_env import entry_harness
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus
@@ -1074,9 +1075,13 @@ def _implementation_runtime_factory(
         label = parts[1] if len(parts) > 1 else ""
         refs = [step_output_ref]
         if label == "close" and release_id is not None:
+            # The repo DIRECTORY is the registered slug, not the context name — using the
+            # name put CLOSURE.md outside the declared write scope, so the close step was
+            # refused (bug a2-fake-implementation-close-closure-out-of-scope).
+            slug = repo_slug_for_context(workspace_root, context)
             specs_prefix = (
-                f"repos/{context}/specs"
-                if (workspace_root / "repos" / context / "specs").is_dir()
+                f"repos/{slug}/specs"
+                if (workspace_root / "repos" / slug / "specs").is_dir()
                 else "specs"
             )
             closure_ref = f"{specs_prefix}/releases/{release_id}/CLOSURE.md"

@@ -475,12 +475,14 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                     "on disk: " + ", ".join(missing)
                 ),
                 blocked_at_step=step.label,
+                # NEVER None. An artifact that is missing entirely maps to no review, so
+                # `remedies` came back empty and the gate blocked with no way forward
+                # (bug a2-release-missing-spec-gate-lacks-resume-remedy). Re-authoring is
+                # always a valid recovery, so it is the floor.
                 operator_command=(
                     "re-run release-definition with "
-                    + " ".join(sorted(remedies))
-                    + " (the review re-executes and re-asserts the Aprovado flip)"
-                    if remedies
-                    else None
+                    + " ".join(sorted(remedies) or ["--resume-from definition_draft"])
+                    + " (the step re-executes and the review re-asserts the Aprovado flip)"
                 ),
                 detail={"unpersisted_artifacts": ", ".join(missing)},
             )

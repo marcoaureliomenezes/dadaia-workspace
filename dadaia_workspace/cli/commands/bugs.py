@@ -26,6 +26,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BugEvent, BugEventKind
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
 from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore
@@ -61,13 +62,19 @@ def _resolve_append_specs_dir(specs_dir: str | None, event_context: str | None) 
         except WorkspaceNotInitializedError:
             workspace_root = None
         if workspace_root is not None:
-            candidate = workspace_root / "repos" / resolved_name / "specs"
+            # The repo DIRECTORY comes from the registry, never from the context name: a
+            # context created with `--repo <slug>` legitimately has a name that differs,
+            # and assuming they match refused a perfectly valid context
+            # (bug a2-bugs-append-context-resolution-ignores-repo-slug).
+            slug = repo_slug_for_context(workspace_root, resolved_name)
+            candidate = workspace_root / "repos" / slug / "specs"
             if candidate.is_dir():
                 return candidate.resolve()
             raise typer.BadParameter(
-                f"--context {resolved_name!r} names no 'repos/{resolved_name}/specs' "
-                "directory in this workspace. Fix the context name or pass --specs-dir "
-                "explicitly — refusing to land the event in a different context's ledger."
+                f"--context {resolved_name!r} resolves to repo slug {slug!r}, but no "
+                f"'repos/{slug}/specs' directory exists in this workspace. Check the "
+                "context is registered and ALIVE, or pass --specs-dir explicitly — "
+                "refusing to land the event in a different context's ledger."
             )
     return resolve_specs_dir_for_cli(specs_dir)
 
