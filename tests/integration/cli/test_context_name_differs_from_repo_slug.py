@@ -196,3 +196,27 @@ def test_no_release_gate_can_block_without_a_remedy() -> None:
     assert 'or ["--resume-from definition_draft"]' in body, (
         "the commit gate must fall back to re-authoring instead of emitting a null remedy"
     )
+
+
+def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
+    """`create` must refuse exactly what the rest of the CLI refuses.
+
+    Bug a3-context-create-accepts-unusable-name: `create` accepted names with spaces or
+    non-ASCII characters, and then `bind`, `bugs append` and every workflow rejected that
+    same context against the `[A-Za-z0-9_-]+` allowlist. The operator was left holding a
+    context they could create and never use — a trap whose only exit is deleting it.
+
+    The check reuses the resolver's own allowlist rather than inventing a second, stricter
+    opinion, so "created" and "usable" cannot drift apart.
+    """
+    for bad in ("meu projeto", "projeto-café", "../escape"):
+        proc = _dadaia(workspace, "context", "create", bad, "--repo", "r", "--url", "x")
+        combined = proc.stdout + proc.stderr
+        assert proc.returncode != 0, f"create accepted the unusable name {bad!r}"
+        assert "Traceback" not in combined
+        assert "letters, digits" in combined, combined
+
+    ok = _dadaia(
+        workspace, "context", "create", "outro_valido-2", "--repo", "slug_ok", "--url", "x"
+    )
+    assert ok.returncode == 0, ok.stdout + ok.stderr

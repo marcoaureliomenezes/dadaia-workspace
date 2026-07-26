@@ -25,6 +25,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
+from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
@@ -131,6 +132,20 @@ def create(
     ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
+    # Refuse at CREATE what every downstream verb refuses. `create` accepted names with
+    # spaces or Unicode, and then `bind`, `bugs append` and every workflow rejected that
+    # same context — so the operator ended up with a context they could create and never
+    # use, which is a trap with no way out except deleting it
+    # (bug a3-context-create-accepts-unusable-name). The rule is the ONE allowlist the
+    # resolver already enforces; it is not a second, stricter opinion.
+    for label, value in (("context name", name), ("repo slug", repo)):
+        if not _CONTEXT_NAME_RE.fullmatch(value):
+            err_console.print(
+                f"[red]Error:[/red] invalid {label} {value!r}. Use only letters, digits, "
+                "'-' and '_' — the same allowlist every other verb enforces, so a context "
+                "that is created is always usable."
+            )
+            raise typer.Exit(1) from None
     workspace_root = resolve_workspace_root()
     # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
     # look up repo_url from the repos catalog, failing gracefully if unavailable.
