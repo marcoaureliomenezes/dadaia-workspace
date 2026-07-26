@@ -397,7 +397,7 @@ an initialized workspace, create it:
   authoritative pick (never refuse with "produced no exact specs/backlog artifact
   path") AND drive the live definition to APPROVAL in the fresh context — SPEC and
   PLAN flipped to `**Status:** Aprovado`, TASKS authored. A fresh (greenfield)
-  context's embryonic memory is NEVER a valid rejection reason at `spec_review` (bug
+  context's embryonic memory is NEVER a valid rejection reason at `definition_review` (bug
   live-release-definition-rejects-fresh-context class): the SPEC itself is the
   founding structural reference there. **Closure integrity:** when the release's
   TASKS/write set declare test paths, `implementation-reviews` may reach CLOSURE only
@@ -721,6 +721,31 @@ zero credits). Every step below must be asserted on DISK, never from the run's o
 Report each numbered step's verdict separately with the disk evidence you checked. A FAIL
 anywhere here outranks every F-statement: it means the product cannot do the one thing it
 exists to do.
+
+### R-20 — The workflow is SIMPLE and cannot deadlock (v0.2.x re-architecture)
+
+Four architectural defects were fixed together; this statement is how you prove them, and
+it replaces any earlier expectation of a 7-step release definition.
+
+- **Three steps, not seven.** `release-definition` runs exactly
+  `definition_draft` → `definition_review` → `definition_commit_gate`. Assert the step
+  labels from the `--json` output. TWO model calls, not six: a longer sequence is a FAIL of
+  this statement, because the whole point is context and cost.
+- **A model verdict can never stop a run.** Drive a release whose review REJECTS every
+  time. **PASS if:** the run still reaches a terminal state (it does not sit blocked on the
+  verdict), and the objection appears in `warnings[]` — accepted is never silent. A run
+  that blocks forever on a reviewer is the deadlock this removed.
+- **Deterministic gates DID stay terminal.** A definition whose SPEC never lands on disk,
+  or whose PLAN omits the `## Validation Dependency Table`, or whose TASKS carry a `pytest`
+  without `-p no:cacheprovider`, must still BLOCK — with a remedy naming
+  `--resume-from definition_draft`. If any of these now passes, the fix went too far and
+  that is a FAIL.
+- **Prompt and validator agree.** For every rule Python enforces, the fragment teaches it:
+  `**Consumes:**`, the contract bindings, the pytest flag, the dependency table. Grep the
+  two shipped fragments (`definition_draft`, `definition_review`) and confirm each is
+  taught. A rule enforced but never taught is the bug class that cost weeks.
+- **Only two fragments ship** for `release_definition`. Any leftover `spec-create` /
+  `plan-create` / `tasks-create` / `*-review` fragment is dead weight and a FAIL.
 
 ---
 **Verdict line (Telegram-short, last line of output):**
