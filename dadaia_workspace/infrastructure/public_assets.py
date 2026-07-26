@@ -6,6 +6,7 @@ import contextlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
@@ -1254,7 +1255,19 @@ class FileSystemPublicAssetManager:
             label = f"kimi-code:hooks/{name}"
             line = self._compare_content(content, dst, label)
             if line.startswith("[ok]") and not os.access(dst, os.X_OK):
-                line = f"[drift] {label} (not executable)"
+                # The installer chmods 0o755, so cleared mode bits ARE repairable drift.
+                # Intact mode bits with X_OK denied means the MOUNT forbids execution
+                # (noexec) — reinstalling can never fix that, so reporting it as drift
+                # sent every consumer into a repair loop and failed `reconcile` with
+                # rollback_required (bug kimi-hooks-noexec-home-reported-as-repairable-drift).
+                if dst.stat().st_mode & stat.S_IXUSR:
+                    line = (
+                        f"[unsupported] {label} (filesystem mounted noexec — the exec bits "
+                        "are set but the mount forbids execution; point KIMI_CODE_HOME at a "
+                        "path on an executable filesystem)"
+                    )
+                else:
+                    line = f"[drift] {label} (not executable)"
             reports.append(line)
         config_path = home / "config.toml"
         block_label = "kimi-code:config.toml managed hooks block"
