@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
+from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _CLAUDE_MD_STUB,
     FileSystemPublicAssetManager,
@@ -208,7 +209,13 @@ def _claude_settings_case(
     def run(force: bool, installed: list[str]) -> None:
         manager._install_claude(agentic_dir, workspace_root, force=force, installed=installed)
 
-    return run, settings_path, canonical, '{"existing": true}\n'
+    # The stale content must be a file dadaia OWNS end to end, so the hash-compare sweep
+    # asserts drift repair — NOT operator data loss. `{"existing": true}` used to sit here,
+    # which made this sweep formally certify that operator JSON in settings.json is wiped
+    # (bug claude-install-destroys-operator-settings). Operator-key preservation is now
+    # asserted by test_install_preserves_operator_settings.
+    stale = json.dumps({"hooks": {"PreToolUse": []}}, indent=2, sort_keys=True) + "\n"
+    return run, settings_path, canonical, stale
 
 
 def _codex_runtime_adapters_case(
@@ -398,3 +405,63 @@ def test_codex_force_install_removes_stale_agents_and_workflows(tmp_path: Path) 
     assert not stale_workflow.exists()
     assert any("[rm]" in item and "stale-agent.toml" in item for item in installed)
     assert any("[rm]" in item and "stale.workflow.md" in item for item in installed)
+
+
+def test_install_preserves_operator_settings(tmp_path: Path) -> None:
+    """``.claude/settings.json`` belongs to the OPERATOR; dadaia owns only its own hooks.
+
+    Bug ``claude-install-destroys-operator-settings``: a plain install wrote the whole file
+    from the generator, erasing ``permissions``, ``model``, ``env`` and any operator hook —
+    silently, while printing ``[ok]``. Worse, ``doctor`` labelled the operator's own config
+    ``[drift]``, and the documented remedy for drift is to run install, so the tool routed
+    the operator into the destruction.
+
+    Asserts the four things the merge must guarantee: foreign top-level keys survive,
+    foreign hook EVENTS survive, a foreign entry INSIDE a dadaia-wired event survives, and
+    dadaia's own wiring is still canonical.
+    """
+    agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+    manager = FileSystemPublicAssetManager()
+    manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    settings_path = workspace_root / ".claude" / "settings.json"
+
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    settings["permissions"] = {"allow": ["Bash(git status:*)"]}
+    settings["model"] = "claude-opus-4-8"
+    settings["hooks"]["Stop"] = [{"hooks": [{"type": "command", "command": "operator.sh"}]}]
+    settings["hooks"]["PreToolUse"].append(
+        {"matcher": "Read", "hooks": [{"type": "command", "command": "operator-audit.sh"}]}
+    )
+    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+    manager._install_claude(agentic_dir, workspace_root, force=False, installed=[])
+    after = json.loads(settings_path.read_text(encoding="utf-8"))
+
+    assert after.get("permissions") == {"allow": ["Bash(git status:*)"]}
+    assert after.get("model") == "claude-opus-4-8"
+    assert after["hooks"].get("Stop") == [
+        {"hooks": [{"type": "command", "command": "operator.sh"}]}
+    ]
+    commands = [entry["hooks"][0]["command"] for entry in after["hooks"]["PreToolUse"]]
+    assert "operator-audit.sh" in commands, commands
+    assert any("dadaia_workspace.hooks.pre_gate" in c for c in commands), commands
+    # And doctor stays green: an operator key is not drift.
+    lines = [line for line in manager.doctor(workspace_root) if "claude:settings.json" in line]
+    assert lines == ["[ok] claude:settings.json"], lines
+
+
+def test_install_refuses_to_clobber_unreadable_settings(tmp_path: Path) -> None:
+    """Unparseable ``settings.json`` is refused loudly, never overwritten.
+
+    Overwriting is the one outcome the operator can neither detect nor undo, so a file we
+    cannot merge into must stop the install with an actionable message.
+    """
+    agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
+    manager = FileSystemPublicAssetManager()
+    manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    settings_path = workspace_root / ".claude" / "settings.json"
+    settings_path.write_text("{ not json at all", encoding="utf-8")
+
+    with pytest.raises(PublicAssetError, match="not readable JSON"):
+        manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    assert settings_path.read_text(encoding="utf-8") == "{ not json at all"

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
@@ -18,7 +19,6 @@ from dadaia_workspace.features.ci_preflight import (
     run_preflight,
     subprocess_runner,
 )
-from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
 
 app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
 

@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.hooks import _common, pre_gate
+from dadaia_workspace.hooks import _common, pre_gate, root_whitelist, sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -459,3 +459,66 @@ def test_block_envelope_raw_string_keeps_kimi_shim_markers(
     assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "'), (
         "top-level reason must stay the LAST key so the kimi sed capture stays clean"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Wiring ratchets — every PreToolUse policy must be reachable through the SHIPPED
+# entrypoint, and the block must carry the verdict Claude Code actually reads.
+# --------------------------------------------------------------------------- #
+
+
+def test_bash_venv_guard_blocks_through_the_shipped_entrypoint(tmp_path: Path) -> None:
+    """``Bash`` is in the PreToolUse matcher and ``venv_guard`` is its ONLY policy.
+
+    Every venv-guard case called ``venv_guard.evaluate_payload`` directly, so the policy
+    could be unwired from ``pre_gate._POLICIES`` — or deleted outright — while the whole
+    hook suite stayed green (proven by mutation: neutering the policy left 141/141
+    passing). This drives the real ``python -m dadaia_workspace.hooks.pre_gate`` with a
+    ``Bash`` payload that MUST block, so the Bash arm of the matcher is pinned end to end.
+    """
+    env = claude_hook_env(tmp_path)
+    result = run_hook_subprocess(
+        "pre_gate",
+        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    envelope = result.block_envelope()
+    assert envelope is not None, f"Bash venv-guard did not block: {result.stdout!r}"
+    reason = str(envelope.get("reason", ""))
+    assert "VENV GUARD" in reason.upper(), reason
+    # The corrected command must ride the block — a gate that names no remedy is a toll.
+    assert ".dadaia/.venv/bin" in reason, reason
+
+
+def test_pre_gate_stdout_is_exactly_one_json_object(tmp_path: Path) -> None:
+    """Whole stdout must parse as ONE object — for allow AND for block.
+
+    The envelope assertions parsed ``stdout.splitlines()[-1]``, which tolerates anything
+    printed before the JSON. Claude Code parses the stream, so a stray ``print`` upstream
+    of the envelope corrupts the verdict. Assert on the WHOLE stdout instead.
+    """
+    env = claude_hook_env(tmp_path)
+    for payload in (
+        {"tool_name": "Read", "tool_input": {"file_path": "x"}},
+        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+    ):
+        result = run_hook_subprocess("pre_gate", payload, env)
+        raw = result.stdout.strip()
+        assert raw, f"the gate must always emit an observable envelope: {payload}"
+        parsed = json.loads(raw)  # raises on any pollution before/after the object
+        assert isinstance(parsed, dict), parsed
+
+
+def test_policies_tuple_is_the_wired_composition() -> None:
+    """The real ``_POLICIES`` membership and ORDER — first-block-wins is documented law.
+
+    The existing short-circuit test installs its own fake tuple and asserts its own string
+    back, so it proves the ``for`` loop stops early and nothing about which policies are
+    actually wired. This pins the shipped composition.
+    """
+    assert (  # noqa: SLF001
+        root_whitelist.evaluate_payload,
+        pre_gate._venv_guard_reason,  # noqa: SLF001
+        sdd_gate.evaluate_payload_with_advisory,
+    ) == pre_gate._POLICIES

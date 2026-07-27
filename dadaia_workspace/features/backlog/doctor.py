@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, is_intents_exempt
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import (
@@ -49,7 +50,7 @@ _TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
 #: BL-SCHEMA errors are held until the item matures to ``candidate`` and beyond. This is a
 #: STATUS gate, NOT a blanket exemption — a malformed ``intents:`` frontmatter and an invalid
 #: status still fire at ANY status.
-_INTENTS_EXEMPT_STATUS = "idea"
+_INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
 #: informal — see ``release-governance``). ``None``/empty is the only invalid case here.
@@ -117,16 +118,6 @@ class DoctorContext:
 
 
 # ── the four checks (each a pure function over the shared context) ───────────────
-
-
-def is_intents_exempt(status: str | None) -> bool:
-    """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
-
-    An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
-    requirement. Every other status (candidate and beyond, or a missing status) must carry
-    bound, resolvable intents.
-    """
-    return status is not None and status.strip().lower() == _INTENTS_EXEMPT_STATUS
 
 
 def _check_schema(ctx: DoctorContext) -> list[Finding]:

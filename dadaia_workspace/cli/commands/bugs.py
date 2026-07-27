@@ -21,12 +21,12 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 from dadaia_workspace.cli._specs_resolution import (
+    repo_slug_for_context,
     resolve_context_for_cli,
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BugEvent, BugEventKind
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
 from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore

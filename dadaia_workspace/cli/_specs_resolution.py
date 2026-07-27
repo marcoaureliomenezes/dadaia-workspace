@@ -45,8 +45,26 @@ import os
 from pathlib import Path
 
 from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name as _resolve_bound_name
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
+
+#: Re-exports so a verb never reaches ``core.specs_resolver`` directly (FR3,
+#: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
+#: so every consumer of the context-name allowlist or the name->repo-slug mapping routes
+#: through this seam.
+CONTEXT_NAME_RE = _CONTEXT_NAME_RE
+
+
+def repo_slug_for_context(workspace_root: Path, name: str) -> str:
+    """The on-disk ``repos/<slug>`` directory for a context NAME (registry-backed).
+
+    A context's NAME and its repo SLUG are two identities; deriving the directory from
+    the name is the defect class fixed in the 0.4.2 arc. Verbs call this seam so the one
+    registry-backed resolution stays the single source of truth.
+    """
+    return _core_repo_slug(workspace_root, name)
+
 
 #: Self-hosting source checkout slug. It is returned only when the current working
 #: directory is recognizably this library checkout, never as a consumer-workspace fallback.

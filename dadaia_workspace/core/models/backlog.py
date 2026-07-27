@@ -21,12 +21,34 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 __all__ = [
+    "INTENTS_EXEMPT_STATUS",
     "Intent",
     "Subject",
     "SubjectKind",
+    "is_intents_exempt",
     "parse_intents",
     "serialize_intents",
 ]
+
+#: The one backlog stage exempt from the resolvable-typed-intents requirement.
+INTENTS_EXEMPT_STATUS = "idea"
+
+
+def is_intents_exempt(status: str | None) -> bool:
+    """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
+
+    An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
+    requirement. Every other status (candidate and beyond, or a missing status) must
+    carry bound, resolvable intents.
+
+    Lives in ``core`` so the backlog doctor and the backlog-definition gate share ONE
+    predicate. They previously diverged — the gate accepted a pre-existing ``candidate``
+    with no intents that the doctor then rejected as ``BL-SCHEMA`` (bug
+    ``r5c-backlog-gate-accepts-preexisting-candidate-without-intents``) — and the layering
+    contract forbids ``features.lifecycle`` importing ``features.backlog``, so the one
+    shared home has to be here.
+    """
+    return status is not None and status.strip().lower() == INTENTS_EXEMPT_STATUS
 
 
 class SubjectKind(StrEnum):

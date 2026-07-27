@@ -98,10 +98,16 @@ from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
 )
 from dadaia_workspace.infrastructure.runtime_config import (
+    dadaia_owned_claude_settings as _dadaia_owned_claude_settings,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
     kimi_code_home,
     kimi_hook_shims,
     kimi_hooks_block,
     upsert_kimi_hooks_block,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
+    merge_claude_settings as _merge_claude_settings,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
@@ -918,13 +924,7 @@ class FileSystemPublicAssetManager:
 
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:
-            reports.append(
-                self._compare_content(
-                    _json_dump(_build_claude_settings(workspace_root)),
-                    workspace_root / ".claude" / "settings.json",
-                    "claude:settings.json",
-                )
-            )
+            reports.append(self._doctor_claude_settings(workspace_root))
         elif (workspace_root / ".claude").exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
 
@@ -1072,12 +1072,56 @@ class FileSystemPublicAssetManager:
                 continue
             copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
         if only is None:
-            write_generated(
-                claude_dir / "settings.json",
-                _json_dump(_build_claude_settings(workspace_root)),
-                force,
-                installed,
-            )
+            self._install_claude_settings(claude_dir, workspace_root, force, installed)
+
+    def _install_claude_settings(
+        self, claude_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Fold dadaia's hook wiring into ``.claude/settings.json``, preserving the rest.
+
+        ``settings.json`` belongs to the OPERATOR — Claude Code documents it as the home of
+        ``permissions``, ``model``, ``env`` and their own hooks. The previous whole-file
+        write erased all of it silently while printing ``[ok]``
+        (bug ``claude-install-destroys-operator-settings``). An unparseable file is never
+        clobbered: we refuse loudly instead, because overwriting is the one outcome the
+        operator can neither detect nor undo.
+        """
+        dst = claude_dir / "settings.json"
+        existing: dict[str, object] | None = None
+        if dst.exists():
+            try:
+                loaded = json.loads(dst.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, ValueError, OSError) as exc:
+                raise PublicAssetError(
+                    f"{dst} is not readable JSON ({exc}). It carries operator settings, so "
+                    "dadaia will not overwrite it. Fix or move the file, then re-run install."
+                ) from None
+            existing = loaded if isinstance(loaded, dict) else None
+        write_generated(
+            dst, _json_dump(_merge_claude_settings(existing, workspace_root)), force, installed
+        )
+
+    def _doctor_claude_settings(self, workspace_root: Path) -> str:
+        """Doctor ONLY the dadaia-owned hook wiring inside ``.claude/settings.json``.
+
+        Comparing the whole file made an operator's own ``permissions`` key read ``[drift]``
+        — and the documented remedy for drift is to re-run install, which is exactly what
+        used to destroy it.
+        """
+        label = "claude:settings.json"
+        dst = workspace_root / ".claude" / "settings.json"
+        if not dst.exists():
+            return f"[missing] {label}"
+        try:
+            loaded = json.loads(dst.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, ValueError, OSError):
+            return f"[drift] {label} (not readable JSON)"
+        if not isinstance(loaded, dict):
+            return f"[drift] {label} (not a JSON object)"
+        expected = _dadaia_owned_claude_settings(_build_claude_settings(workspace_root))
+        if _dadaia_owned_claude_settings(loaded) != expected:
+            return f"[drift] {label}"
+        return f"[ok] {label}"
 
     def _install_codex(
         self,

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import typer
 
+from dadaia_workspace.cli._specs_resolution import repo_slug_for_context
 from dadaia_workspace.core.exceptions import ReleaseNotFoundError, ScopeNotConsumedError
 from dadaia_workspace.core.models.lifecycle import (
     HARNESS_CLI_NAMES,
@@ -20,7 +21,6 @@ from dadaia_workspace.core.models.lifecycle import (
 )
 from dadaia_workspace.core.models.workflow_execution import WorkflowPolicySnapshot
 from dadaia_workspace.core.session_env import entry_harness
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.lifecycle.service import LifecycleCommandStatus

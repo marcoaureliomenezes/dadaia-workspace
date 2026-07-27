@@ -45,7 +45,7 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
-from dadaia_workspace.core.models.backlog import SubjectKind
+from dadaia_workspace.core.models.backlog import SubjectKind, is_intents_exempt
 from dadaia_workspace.core.models.lifecycle import (
     HARNESS_CLI_NAMES,
     AgentRuntimeKind,
@@ -68,7 +68,6 @@ from dadaia_workspace.features.backlog.classifier import (
     Verdict,
     classify,
 )
-from dadaia_workspace.features.backlog.doctor import is_intents_exempt
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import Registry
 from dadaia_workspace.features.lifecycle.agent_runner import (

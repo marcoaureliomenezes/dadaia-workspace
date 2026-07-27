@@ -375,7 +375,26 @@ class HookResult:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return None
-        if isinstance(data, dict) and data.get("decision") == "block":
+        if not isinstance(data, dict):
+            return None
+        # A block is only a block if Claude Code READS it as one. The verdict Claude Code
+        # acts on is `hookSpecificOutput.permissionDecision == "deny"`; the top-level
+        # `decision` key is the legacy fallback the codex hooks and the kimi shim grep.
+        # Keying this predicate on the legacy field alone left every subprocess block
+        # assertion blind to the field that actually enforces: stripping
+        # `permissionDecision` from `emit_block` cost exactly ONE test out of 180 while
+        # turning every deny into a silent allow in production.
+        specific = data.get("hookSpecificOutput")
+        denies = isinstance(specific, dict) and specific.get("permissionDecision") == "deny"
+        if denies or data.get("decision") == "block":
+            assert denies, (
+                "block envelope carries no hookSpecificOutput.permissionDecision='deny' — "
+                f"Claude Code would read this as ALLOW: {data!r}"
+            )
+            assert data.get("decision") == "block", (
+                "block envelope lost the legacy top-level decision the codex hooks and the "
+                f"kimi shim grep: {data!r}"
+            )
             return data
         return None
 

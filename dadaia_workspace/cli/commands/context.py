@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._specs_resolution import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -25,7 +26,6 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
-from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (

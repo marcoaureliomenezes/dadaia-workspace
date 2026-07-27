@@ -129,7 +129,6 @@ def _adopt_attributed_bind(workspace: Path, sess_id: str, payload: dict[str, obj
     # Lazy imports: the unattributed hot path (no bind anywhere) must stay cheap and the
     # DI container is heavy for a per-tool-call hook.
     from dadaia_workspace import container
-    from dadaia_workspace.core import specs_resolver
 
     chain = tuple(container.build_ancestry_pid_chain(os.getppid()))
     if not chain:
@@ -139,7 +138,7 @@ def _adopt_attributed_bind(workspace: Path, sess_id: str, payload: dict[str, obj
     # cwd and would attribute against a DIFFERENT tree than the one this hook writes.
     # ``DADAIA_CONTEXT`` remains the operator-shell override (same precedence as
     # ctx_inject's own chain).
-    attributed = os.environ.get("DADAIA_CONTEXT") or specs_resolver._persisted_bind_context(  # noqa: SLF001
+    attributed = os.environ.get("DADAIA_CONTEXT") or container.resolve_persisted_bind_context(
         workspace, chain
     )
     if not attributed:

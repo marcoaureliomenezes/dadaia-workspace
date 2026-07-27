@@ -279,6 +279,36 @@ def build_process_ancestry() -> ProcessAncestry:
 _ANCESTRY_CHAIN_CAP = 8
 
 
+def is_source_repo_root(path: Path) -> bool:
+    """Composition-root seam for the source-repo test (``cli`` may not import ``infrastructure``).
+
+    ``ci preflight`` refuses outside the library checkout, and the test it uses must be the
+    EXISTING one in ``infrastructure.workspace_guardrail`` — a second definition is how the
+    two drift. The CLI reaches it here instead of importing infrastructure directly
+    (``cli-no-infrastructure``).
+    """
+    from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
+
+    return _is_source_repo_root(path)
+
+
+def resolve_persisted_bind_context(
+    workspace_root: Path, ancestry_pids: tuple[int, ...] | list[int] | None = None
+) -> str | None:
+    """Composition-root seam for ancestry-attributed bind resolution (hooks path).
+
+    ``core.specs_resolver`` is a forbidden direct import for ``hooks``
+    (``bind-resolution-seam-is-a-single-home``, ZERO ignore_imports): the CLI routes
+    through ``cli._specs_resolution`` and everything else routes here. Hooks need the
+    attribution against the workspace THEY resolved — not the public
+    ``resolve_bound_context_name``, which re-resolves from the process cwd and would
+    attribute against a different tree than the one the hook writes.
+    """
+    from dadaia_workspace.core import specs_resolver
+
+    return specs_resolver._persisted_bind_context(workspace_root, ancestry_pids)  # noqa: SLF001
+
+
 def build_ancestry_pid_chain(start_pid: int, *, cap: int = _ANCESTRY_CHAIN_CAP) -> list[int]:
     """Return ``[start_pid, parent, grandparent, …]`` nearest-first, capped at ``cap``.
 

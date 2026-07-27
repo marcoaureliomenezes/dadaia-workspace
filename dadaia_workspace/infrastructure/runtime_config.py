@@ -113,6 +113,85 @@ _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 _CLAUDE_MATCH_ALL = "*"
 
 
+#: The marker that identifies a hook entry as dadaia-owned. Every command this module
+#: generates invokes a ``dadaia_workspace.hooks.*`` module, so ownership is decidable from
+#: the emitted content alone — no side-car state, and an operator's own entry in the SAME
+#: event is never mistaken for ours.
+_DADAIA_HOOK_MARKER = "dadaia_workspace.hooks."
+
+
+def _is_dadaia_hook_entry(entry: object) -> bool:
+    """True iff *entry* is a hook entry this module generated."""
+    if not isinstance(entry, dict):
+        return False
+    hooks = entry.get("hooks")
+    if not isinstance(hooks, list):
+        return False
+    return any(
+        isinstance(h, dict) and _DADAIA_HOOK_MARKER in str(h.get("command", "")) for h in hooks
+    )
+
+
+def merge_claude_settings(
+    existing: dict[str, object] | None, workspace_root: Path
+) -> dict[str, object]:
+    """Fold dadaia's hook wiring into an operator's ``.claude/settings.json``.
+
+    ``settings.json`` is the file Claude Code documents for the operator's own
+    ``permissions``, ``model``, ``env``, ``statusLine`` and custom hooks — it is NOT a
+    dadaia-owned artifact. Writing it wholesale erased all of that silently, printing
+    ``[ok]`` (bug ``claude-install-destroys-operator-settings``). dadaia owns exactly the
+    hook entries whose command invokes ``dadaia_workspace.hooks.*``:
+
+    * top-level keys other than ``hooks`` are preserved untouched;
+    * hook EVENTS dadaia does not wire are preserved untouched;
+    * inside an event dadaia does wire, the operator's own entries are preserved and only
+      dadaia-owned entries are replaced by the canonical wiring.
+
+    This is the same ownership discipline :func:`upsert_kimi_hooks_block` applies to the
+    kimi config; the claude path had a naive whole-file writer instead.
+    """
+    canonical = claude_settings(workspace_root)
+    canonical_hooks = canonical["hooks"]
+    assert isinstance(canonical_hooks, dict)
+    if not existing:
+        return canonical
+
+    merged: dict[str, object] = dict(existing)
+    existing_hooks_raw = existing.get("hooks")
+    existing_hooks: dict[str, object] = (
+        dict(existing_hooks_raw) if isinstance(existing_hooks_raw, dict) else {}
+    )
+    for event, entries in canonical_hooks.items():
+        prior = existing_hooks.get(event)
+        foreign = (
+            [e for e in prior if not _is_dadaia_hook_entry(e)] if isinstance(prior, list) else []
+        )
+        assert isinstance(entries, list)
+        existing_hooks[event] = [*entries, *foreign]
+    merged["hooks"] = existing_hooks
+    return merged
+
+
+def dadaia_owned_claude_settings(settings: dict[str, object]) -> dict[str, object]:
+    """Project *settings* down to the dadaia-owned hook wiring, for drift comparison.
+
+    The doctor must compare what dadaia owns, not the whole file — otherwise an operator
+    who legitimately adds ``permissions`` reads ``[drift]`` forever, and the documented
+    remedy for drift (re-run install) is exactly what used to destroy their config.
+    """
+    hooks_raw = settings.get("hooks")
+    hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
+    owned: dict[str, object] = {}
+    for event, entries in hooks.items():
+        if not isinstance(entries, list):
+            continue
+        mine = [e for e in entries if _is_dadaia_hook_entry(e)]
+        if mine:
+            owned[event] = mine
+    return {"hooks": owned}
+
+
 def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {
