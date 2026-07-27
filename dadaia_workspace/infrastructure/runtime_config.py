@@ -173,6 +173,34 @@ def merge_claude_settings(
     return merged
 
 
+def foreign_claude_hook_commands(
+    settings: dict[str, object], canonical: dict[str, object]
+) -> list[str]:
+    """Commands in dadaia-WIRED hook events that dadaia did not generate.
+
+    Preserving the operator's own hooks is correct; going blind to them is not. A foreign
+    command inside ``PreToolUse`` runs on every gated write, so it is exactly where a local
+    injection would sit. This lists them so the doctor can surface them — the file belongs
+    to the operator, so the finding is advisory, never drift.
+    """
+    canonical_hooks = canonical.get("hooks")
+    wired = set(canonical_hooks) if isinstance(canonical_hooks, dict) else set()
+    hooks_raw = settings.get("hooks")
+    hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
+    found: list[str] = []
+    for event in sorted(wired):
+        entries = hooks.get(event)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if _is_dadaia_hook_entry(entry) or not isinstance(entry, dict):
+                continue
+            for hook in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
+                if isinstance(hook, dict) and hook.get("command"):
+                    found.append(f"{event}:{hook['command']}")
+    return found
+
+
 def dadaia_owned_claude_settings(settings: dict[str, object]) -> dict[str, object]:
     """Project *settings* down to the dadaia-owned hook wiring, for drift comparison.
 

@@ -101,6 +101,9 @@ from dadaia_workspace.infrastructure.runtime_config import (
     dadaia_owned_claude_settings as _dadaia_owned_claude_settings,
 )
 from dadaia_workspace.infrastructure.runtime_config import (
+    foreign_claude_hook_commands as _foreign_claude_hook_commands,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
     kimi_code_home,
     kimi_hook_shims,
     kimi_hooks_block,
@@ -924,7 +927,7 @@ class FileSystemPublicAssetManager:
 
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:
-            reports.append(self._doctor_claude_settings(workspace_root))
+            reports.extend(self._doctor_claude_settings(workspace_root))
         elif (workspace_root / ".claude").exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
 
@@ -1101,7 +1104,7 @@ class FileSystemPublicAssetManager:
             dst, _json_dump(_merge_claude_settings(existing, workspace_root)), force, installed
         )
 
-    def _doctor_claude_settings(self, workspace_root: Path) -> str:
+    def _doctor_claude_settings(self, workspace_root: Path) -> list[str]:
         """Doctor ONLY the dadaia-owned hook wiring inside ``.claude/settings.json``.
 
         Comparing the whole file made an operator's own ``permissions`` key read ``[drift]``
@@ -1111,17 +1114,29 @@ class FileSystemPublicAssetManager:
         label = "claude:settings.json"
         dst = workspace_root / ".claude" / "settings.json"
         if not dst.exists():
-            return f"[missing] {label}"
+            return [f"[missing] {label}"]
         try:
             loaded = json.loads(dst.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, ValueError, OSError):
-            return f"[drift] {label} (not readable JSON)"
+            return [f"[drift] {label} (not readable JSON)"]
         if not isinstance(loaded, dict):
-            return f"[drift] {label} (not a JSON object)"
-        expected = _dadaia_owned_claude_settings(_build_claude_settings(workspace_root))
-        if _dadaia_owned_claude_settings(loaded) != expected:
-            return f"[drift] {label}"
-        return f"[ok] {label}"
+            return [f"[drift] {label} (not a JSON object)"]
+        canonical = _build_claude_settings(workspace_root)
+        if _dadaia_owned_claude_settings(loaded) != _dadaia_owned_claude_settings(canonical):
+            return [f"[drift] {label}"]
+        reports = [f"[ok] {label}"]
+        # Preserving the operator's hooks must not mean going BLIND to them. Narrowing the
+        # comparison to the owned slice (so an operator key is no longer called drift) also
+        # silenced a foreign entry added to a dadaia-wired event — a local hook-injection
+        # foothold. It is the operator's file, so this is never [drift]; it is surfaced as a
+        # non-blocking [warn] naming every foreign command, so "doctor green" cannot hide it.
+        foreign = _foreign_claude_hook_commands(loaded, canonical)
+        if foreign:
+            reports.append(
+                f"[warn] {label}: non-dadaia hook command(s) in gated event(s) — "
+                + ", ".join(foreign)
+            )
+        return reports
 
     def _install_codex(
         self,

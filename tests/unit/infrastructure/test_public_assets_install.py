@@ -445,9 +445,19 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     commands = [entry["hooks"][0]["command"] for entry in after["hooks"]["PreToolUse"]]
     assert "operator-audit.sh" in commands, commands
     assert any("dadaia_workspace.hooks.pre_gate" in c for c in commands), commands
-    # And doctor stays green: an operator key is not drift.
-    lines = [line for line in manager.doctor(workspace_root) if "claude:settings.json" in line]
-    assert lines == ["[ok] claude:settings.json"], lines
+    # doctor stays green — an operator key is not drift — but it is NOT blind: a foreign
+    # command inside a gated event runs on every write, so it is surfaced as a visible,
+    # non-blocking advisory. Preserving the operator's hooks must not mean hiding them.
+    # Asserted on the settings doctor directly: the full ``doctor()`` gates this block on
+    # "claude in the harness profile", which this minimal fixture does not carry.
+    lines = manager._doctor_claude_settings(workspace_root)
+    assert lines[0] == "[ok] claude:settings.json", lines
+    warns = [line for line in lines if line.startswith("[warn]")]
+    assert warns, f"a foreign PreToolUse hook must be surfaced: {lines}"
+    assert "operator-audit.sh" in warns[0], warns
+    assert "PreToolUse" in warns[0], warns
+    # Advisory only: [warn] must not fail the doctor.
+    assert not [line for line in lines if line.startswith(("[drift]", "[missing]"))], lines
 
 
 def test_install_refuses_to_clobber_unreadable_settings(tmp_path: Path) -> None:
