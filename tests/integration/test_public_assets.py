@@ -452,13 +452,13 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     se = _claude_frontmatter(ws, "software-engineer")
     assert (se["model"], se["effort"]) == ("claude-sonnet-5", "xhigh")
     sec = _claude_frontmatter(ws, "security-reviewer")
-    assert sec["model"] == "claude-opus-4-8", "never Fable on security-reviewer (G-1)"
+    assert sec["model"] == "claude-opus-5", "never Fable on security-reviewer (G-1)"
 
     pm_toml = _codex_toml_fields(ws, "project-manager")
-    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
     se_toml = _codex_toml_fields(ws, "software-engineer")
     assert (se_toml["model"], se_toml["model_reasoning_effort"]) == (
-        "gpt-5.3-codex",
+        "gpt-5.6-terra",
         "high",  # xhigh clamps to high (D-3)
     )
 
@@ -480,12 +480,12 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     se2 = _claude_frontmatter(ws, "software-engineer")
     assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "xhigh")
     pm2 = _claude_frontmatter(ws, "project-manager")
-    assert (pm2["model"], pm2["effort"]) == ("claude-opus-4-8", "high")
+    assert (pm2["model"], pm2["effort"]) == ("claude-opus-5", "high")
 
     se2_toml = _codex_toml_fields(ws, "software-engineer")
-    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
     pm2_toml = _codex_toml_fields(ws, "project-manager")
-    assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.5", "high")
+    assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
 
     # Byte-stable repeated install: every agent projection line is a [skip].
     third = manager.install(ws, target="all")

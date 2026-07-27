@@ -1,5 +1,7 @@
 """Domain exceptions for dadaia-workspace."""
 
+from __future__ import annotations
+
 
 class DadaiaError(Exception):
     """Base class for all dadaia-workspace domain errors."""
@@ -152,8 +154,55 @@ class PlatformCapabilityError(DadaiaError):
         super().__init__(message)
 
 
-class WorkspaceVenvBootstrapError(RuntimeError):
-    """Workspace venv bootstrap could not install the running distribution."""
+class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
+    """Workspace venv bootstrap could not create the venv or install the distribution.
+
+    Inherits ``DadaiaError`` so the CLI entrypoint renders it as ONE operator-facing
+    line (bug r3b-portability-import-venv-permission, F-22 class): as a bare
+    ``RuntimeError`` it slipped past ``cli/main``'s ``except DadaiaError`` and every
+    venv-bootstrap failure — ``init``, ``import``, ``certify``, ``reconcile`` alike —
+    reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
+    existing ``except RuntimeError`` call sites keep working.
+    """
+
+
+class BootstrapPackageError(DadaiaError, ValueError):
+    """``DADAIA_BOOTSTRAP_PACKAGE`` does not name an existing local wheel.
+
+    A dangling value is the normal state after a candidate wheel is replaced, so the
+    message must name the offending value and what is required of it — a bare
+    ``ValueError`` said neither and (before the CLI boundary landed) tracebacked
+    (bug f22-cli-boundary-is-a-whitelist-not-a-boundary). ``ValueError`` is kept in the
+    bases so existing ``except ValueError`` call sites keep working.
+    """
+
+    @classmethod
+    def for_value(cls, raw: str) -> BootstrapPackageError:
+        return cls(
+            f"DADAIA_BOOTSTRAP_PACKAGE={raw!r} does not name an existing local wheel. "
+            "It must be a path to an existing .whl file; unset it to resolve the "
+            "distribution normally instead."
+        )
+
+
+class ScopeNotConsumedError(DadaiaError):
+    """A release definition did not consume the backlog scope its own run declared.
+
+    The run injects an authoritative scope directive naming the items the definition MUST
+    pick; nothing verified the produced SPEC against it, so a definition that dropped every
+    item still reported success with an empty consumed_backlog ledger
+    (bug release-definition-consumes-nothing-while-scope-declares-items). Raised by the
+    producer post-step and surfaced as ``post_step_error`` — never a silent skip.
+    """
+
+
+class CiPreflightScopeError(DadaiaError):
+    """``ci preflight`` was invoked outside the dadaia-workspace source tree.
+
+    Its checks target the library's own paths, so anywhere else it could only report a
+    lint failure for a path that does not exist
+    (bug ci-preflight-unusable-outside-the-source-repo).
+    """
 
 
 class CodexConfigError(DadaiaError, ValueError):
@@ -174,6 +223,16 @@ class TasksMarkerStateError(DadaiaError, RuntimeError):
     traceback (bug implementation-reviews-tasks-marker-traceback, F-22 class): running
     ``lifecycle implementation-reviews`` against a release whose TASKS.md carries no
     recognizable task markers is an operator-facing condition, never a crash.
+    """
+
+
+class BlockedRunRestartError(DadaiaError):
+    """Re-invoking a BLOCKED lifecycle run id without ``--resume-from`` is refused.
+
+    Bug r10-release-resume-blocked-run-restarts-and-loses-remedy: the restart discarded
+    the run's block, findings and prescribed recovery and re-executed from step one —
+    losing exactly the information the operator needed, and on a live run re-spending on
+    accepted work. Starting over stays possible; it just needs a fresh ``--run-id``.
     """
 
 

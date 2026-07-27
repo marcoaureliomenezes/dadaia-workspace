@@ -83,20 +83,20 @@ _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
     "balanced": {
         "project-manager": ("claude-fable-5", "high"),
         "software-architect": ("claude-fable-5", "high"),
-        "product-engineer": ("claude-opus-4-8", "high"),
-        "project-auditor": ("claude-opus-4-8", "xhigh"),
-        "security-reviewer": ("claude-opus-4-8", "xhigh"),
-        "code-reviewer": ("claude-opus-4-8", "high"),
+        "product-engineer": ("claude-opus-5", "high"),
+        "project-auditor": ("claude-opus-5", "xhigh"),
+        "security-reviewer": ("claude-opus-5", "xhigh"),
+        "code-reviewer": ("claude-opus-5", "high"),
         "ai-engineer": ("claude-sonnet-5", "high"),
         "software-engineer": ("claude-sonnet-5", "xhigh"),
         "qa-engineer": ("claude-sonnet-5", "high"),
     },
     "subscription-saver": {
-        "project-manager": ("claude-opus-4-8", "high"),
-        "software-architect": ("claude-opus-4-8", "high"),
+        "project-manager": ("claude-opus-5", "high"),
+        "software-architect": ("claude-opus-5", "high"),
         "product-engineer": ("claude-sonnet-5", "xhigh"),
         "project-auditor": ("claude-sonnet-5", "xhigh"),
-        "security-reviewer": ("claude-opus-4-8", "high"),
+        "security-reviewer": ("claude-opus-5", "high"),
         "code-reviewer": ("claude-sonnet-5", "xhigh"),
         "ai-engineer": ("claude-sonnet-5", "high"),
         "software-engineer": ("claude-sonnet-5", "xhigh"),
@@ -107,18 +107,18 @@ _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
         "software-architect": ("claude-fable-5", "high"),
         "product-engineer": ("claude-fable-5", "high"),
         "project-auditor": ("claude-fable-5", "high"),
-        "security-reviewer": ("claude-opus-4-8", "xhigh"),
-        "code-reviewer": ("claude-opus-4-8", "xhigh"),
-        "ai-engineer": ("claude-opus-4-8", "medium"),
+        "security-reviewer": ("claude-opus-5", "xhigh"),
+        "code-reviewer": ("claude-opus-5", "xhigh"),
+        "ai-engineer": ("claude-opus-5", "medium"),
         "software-engineer": ("claude-sonnet-5", "xhigh"),
-        "qa-engineer": ("claude-opus-4-8", "high"),
+        "qa-engineer": ("claude-opus-5", "high"),
     },
 }
 
 #: (d) the registry tier each template model must resolve to.
 _MODEL_TIER: dict[str, str] = {
     "claude-fable-5": "deep",
-    "claude-opus-4-8": "dispatch",
+    "claude-opus-5": "dispatch",
     "claude-sonnet-5": "plugin",
 }
 

@@ -90,6 +90,41 @@ def _context_registered(workspace_root: Path, name: str) -> bool:
     )
 
 
+def repo_slug_for_context(workspace_root: Path, name: str) -> str:
+    """The DIRECTORY a context's repo lives in, from the registry — never the context name.
+
+    A context has two identities and they are not the same string: ``name`` is how the
+    operator and every session record refer to it, ``repo_slug`` is the directory under
+    ``repos/``. ``dadaia context create meu-projeto --repo repo-diferente`` makes them
+    differ, which is ordinary usage.
+
+    28 call sites across 9 modules derived the directory by interpolating the NAME, so any
+    context whose name differed from its slug resolved to a path that does not exist — and
+    the workflow then reported success while writing nothing
+    (bug a1-context-specs-resolution-ignores-repo-slug, reported by the consumer-side
+    validator). This is the one place that answers the question; callers must not re-derive
+    it.
+
+    Falls back to *name* when the registry is unreadable or the context is absent, which
+    keeps every existing name-equals-slug workspace working unchanged.
+    """
+    registry = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
+    try:
+        data = json.loads(registry.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, ValueError):
+        return name
+    contexts = data.get("contexts", []) if isinstance(data, dict) else []
+    if not isinstance(contexts, list):
+        return name
+    for entry in contexts:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("name") == name:
+            slug = entry.get("repo_slug") or entry.get("repo")
+            return slug if isinstance(slug, str) and slug else name
+    return name
+
+
 def _session_record_live(record: dict[str, object]) -> bool:
     """FR4 staleness guard: a harness-keyed session record is live iff its heartbeat is fresh.
 
@@ -174,37 +209,70 @@ def _marker_chain(entry: Path) -> list[int]:
 
 
 def _persisted_bind_context(
-    workspace_root: Path, ancestry_pids: frozenset[int] | None = None
+    workspace_root: Path, ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None
 ) -> str | None:
     """Resolve the context of the single bind-epoch marker attributed to this session.
 
     W1-8 (T-47-17), v0.1.47 ancestry-chain amendment. After the ``DADAIA_CONTEXT`` env var
     and the bound session record, a workspace shell that ran ``dadaia context bind <ctx>``
     still exports no env — but the bind wrote ``.dadaia/states/bind_epoch/<ctx>`` recording
-    the bind process's nearest-first ancestry pid chain (W1-7). A marker is attributable to
-    this session when its recorded chain **shares at least one pid** with ``ancestry_pids``
-    — the current process's own ancestry chain, supplied by the CLI seam. Membership (not
-    single-pid equality) is what survives the ephemeral harness shell: bind and this
-    resolver run under DIFFERENT short-lived shells but share the long-lived harness pid
-    deeper in both chains.
+    the bind process's nearest-first ancestry pid chain (W1-7). Attribution matches the
+    caller's own ancestry chain against each marker's recorded chain.
 
-    ``ancestry_pids=None`` is the DEGRADED mode preserving the pre-v0.1.47 single-getppid
-    equality: attribution then uses ``frozenset({os.getppid()})`` (this ``dadaia`` CLI
-    child's parent), which for the in-process / same-shell case is exactly the marker's
-    recorded pid. It stays pure-stdlib so this ``core`` module needs no upward import
-    (constitution §6): exactly like ``_session_context`` above, it performs a
-    self-contained, read-only, fail-soft read of the canonical bind-epoch path.
+    Two attribution modes, by input shape:
 
-    Exactly ONE attributable marker ⇒ that context name. None, or MORE THAN ONE (ambiguous),
-    ⇒ ``None`` (the caller's cwd fallback / error path is unchanged). Legacy/empty markers,
-    markers with a disjoint chain, and any OS/parse error are ignored — the fallback is
-    best-effort and never raises.
+    - **Ordered chain** (``tuple``/``list``, nearest-first — the shape the CLI seam
+      supplies): DEPTH attribution (bug ancestry-attribution-cross-session-ambiguity).
+      A marker's score is the caller-chain index of its shallowest shared pid; the
+      unique lowest score wins. Session-unique pids (the caller's harness pid) sit at
+      LOW indices, host-level ancestors shared by every session on the box (tmux/sshd)
+      at HIGH ones — so the caller's OWN bind outranks any foreign marker that matches
+      only through deep shared pids, and the old any-membership ambiguity collapse
+      (``context show`` → ``null`` right after a bind) cannot occur. A depth TIE stays
+      ambiguous (``None``) — never a newest/mtime guess that could cross-attribute.
+    - **Unordered set / ``None``** (degraded, back-compat): exactly-one-membership —
+      a marker sharing ≥1 pid with the set is attributable; exactly ONE attributable
+      marker resolves, zero or MORE THAN ONE ⇒ ``None``. ``None`` degrades further to
+      ``frozenset({os.getppid()})`` (pre-v0.1.47 single-getppid equality).
+
+    Legacy/empty markers, markers with a disjoint chain, and any OS/parse error are
+    ignored — the fallback is best-effort and never raises.
     """
     epoch_dir = workspace_root / ".dadaia" / "states" / "bind_epoch"
     try:
         entries = list(epoch_dir.iterdir())
     except OSError:
         return None
+
+    if isinstance(ancestry_pids, (tuple, list)):
+        # Ordered nearest-first chain ⇒ depth attribution (see docstring).
+        depth_of: dict[int, int] = {}
+        for idx, pid in enumerate(ancestry_pids):
+            depth_of.setdefault(pid, idx)
+        scored: list[tuple[int, str]] = []
+        for entry in entries:
+            if not _CONTEXT_NAME_RE.fullmatch(entry.name) or not entry.is_file():
+                continue
+            chain = _marker_chain(entry)
+            if not chain:
+                continue
+            depths = [depth_of[pid] for pid in set(chain) if pid in depth_of]
+            if not depths:
+                continue
+            scored.append((min(depths), entry.name))
+        if not scored:
+            return None
+        min_depth = min(depth for depth, _name in scored)
+        winners = [name for depth, name in scored if depth == min_depth]
+        if len(winners) != 1:
+            return None
+        name = winners[0]
+        # Bug context-delete-leaves-stale-session-bind: a marker whose context was
+        # deleted resolves as unbound, never as a stale pointer.
+        if not _context_registered(workspace_root, name):
+            return None
+        return name
+
     effective = ancestry_pids if ancestry_pids is not None else frozenset({os.getppid()})
     matched: list[str] = []
     for entry in entries:
@@ -224,7 +292,9 @@ def _persisted_bind_context(
 
 
 def resolve_bound_context_name(
-    explicit: str | None = None, *, ancestry_pids: frozenset[int] | None = None
+    explicit: str | None = None,
+    *,
+    ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None,
 ) -> str | None:
     """Resolve the session-bound context name.
 
@@ -252,7 +322,9 @@ def resolve_bound_context_name(
 
 
 def resolve_specs_dir(
-    specs_dir: str | None, *, ancestry_pids: frozenset[int] | None = None
+    specs_dir: str | None,
+    *,
+    ancestry_pids: frozenset[int] | tuple[int, ...] | list[int] | None = None,
 ) -> Path:
     """Resolve a specs/ directory from explicit input or bound session context.
 
@@ -273,7 +345,8 @@ def resolve_specs_dir(
     if workspace_root is not None:
         context = resolve_bound_context_name(ancestry_pids=ancestry_pids)
         if context:
-            return (workspace_root / "repos" / context / "specs").resolve()
+            slug = repo_slug_for_context(workspace_root, context)
+            return (workspace_root / "repos" / slug / "specs").resolve()
 
     candidate = cwd / "specs"
     if candidate.exists():

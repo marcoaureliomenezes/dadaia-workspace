@@ -70,12 +70,12 @@ def test_registry_invariant_sweep_with_content_pins() -> None:
     assert haiku_pricing.input_per_mtok == 0.80
     assert haiku_pricing.output_per_mtok == 4.00
 
-    # Content pin (FR6/D-2, v0.1.65): claude-sonnet-5 -> gpt-5.3-codex, tier 'plugin'
-    # (forced cost-axis label, sonnet cost class), pricing 3.00/15.00/3.75/0.30 from
-    # 2026-07-01.
+    # Content pin (FR6/D-2, v0.1.65; codex id remapped by the operator codex remap):
+    # claude-sonnet-5 -> gpt-5.6-terra, tier 'plugin' (forced cost-axis label, sonnet
+    # cost class), pricing 3.00/15.00/3.75/0.30 from 2026-07-01.
     assert "claude-sonnet-5" in index
     sonnet5 = index["claude-sonnet-5"]
-    assert sonnet5.codex_id == "gpt-5.3-codex"
+    assert sonnet5.codex_id == "gpt-5.6-terra"
     assert sonnet5.tier == "plugin"
     sonnet_pricing = current_pricing(sonnet5)
     assert (
@@ -140,7 +140,7 @@ def test_current_pricing_picks_most_recent_row() -> None:
 
 def test_codex_tier_views_yield_effort_map_and_deep_dispatch_share_id() -> None:
     """Each registry tier renders to a Codex (model id, reasoning effort) pair; deep and
-    dispatch share gpt-5.5 today but stay distinct via effort; codex_effort_for_tier
+    dispatch share gpt-5.6-sol today but stay distinct via effort; codex_effort_for_tier
     matches the same map.
     """
     views = codex_tier_views()

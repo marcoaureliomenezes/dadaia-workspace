@@ -3,6 +3,7 @@
 import contextlib
 import datetime as dt
 import os
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -57,7 +58,7 @@ from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.session_env import harness_session_id
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context, resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -276,6 +277,36 @@ def build_process_ancestry() -> ProcessAncestry:
 #: Default cap on ancestry pids collected into a bind-epoch marker / a resolver-side
 #: attribution set (W1-7/W1-8, v0.1.47). Mirrors ``session_identity._BIND_EPOCH_MAX_CHAIN``.
 _ANCESTRY_CHAIN_CAP = 8
+
+
+def is_source_repo_root(path: Path) -> bool:
+    """Composition-root seam for the source-repo test (``cli`` may not import ``infrastructure``).
+
+    ``ci preflight`` refuses outside the library checkout, and the test it uses must be the
+    EXISTING one in ``infrastructure.workspace_guardrail`` — a second definition is how the
+    two drift. The CLI reaches it here instead of importing infrastructure directly
+    (``cli-no-infrastructure``).
+    """
+    from dadaia_workspace.infrastructure.workspace_guardrail import _is_source_repo_root
+
+    return _is_source_repo_root(path)
+
+
+def resolve_persisted_bind_context(
+    workspace_root: Path, ancestry_pids: tuple[int, ...] | list[int] | None = None
+) -> str | None:
+    """Composition-root seam for ancestry-attributed bind resolution (hooks path).
+
+    ``core.specs_resolver`` is a forbidden direct import for ``hooks``
+    (``bind-resolution-seam-is-a-single-home``, ZERO ignore_imports): the CLI routes
+    through ``cli._specs_resolution`` and everything else routes here. Hooks need the
+    attribution against the workspace THEY resolved — not the public
+    ``resolve_bound_context_name``, which re-resolves from the process cwd and would
+    attribute against a different tree than the one the hook writes.
+    """
+    from dadaia_workspace.core import specs_resolver
+
+    return specs_resolver._persisted_bind_context(workspace_root, ancestry_pids)  # noqa: SLF001
 
 
 def build_ancestry_pid_chain(start_pid: int, *, cap: int = _ANCESTRY_CHAIN_CAP) -> list[int]:
@@ -500,7 +531,9 @@ def build_reports_next_service(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
             "or pass --context <name>."
         )
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )
@@ -746,7 +779,7 @@ def build_lifecycle_preflight_input(
 
     _guard_initialized(workspace_root)
     specs_dir = _context_specs_dir(workspace_root, context)
-    repo_dir = workspace_root / "repos" / context
+    repo_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context)
 
     # --- active-release ← ACTIVE.md ------------------------------------------------
     active_md_release, _segment, active_md_phase, _err = read_active_md(
@@ -1094,7 +1127,9 @@ def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
     """
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     return specs_dir
@@ -1517,6 +1552,30 @@ def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
     return _regenerate
 
 
+#: Matches an authored backlog item path in the injected authoritative-scope directive,
+#: e.g. ``- `specs/backlog/capability-one.md```.
+_SCOPE_ITEM_RE = re.compile(r"`(?:[^`]*/)?specs/backlog/(?P<slug>[a-z][a-z0-9-]*)\.md`")
+
+
+def _fake_spec_stub(prompt: str) -> str:
+    """The driving fake's SPEC, declaring ``**Consumes:**`` for its own declared scope.
+
+    The release-definition run injects an authoritative-scope directive naming the backlog
+    items the definition MUST pick. A stub that ignored it completed the release flow while
+    consuming nothing, so the half of the flow that matters — N authored items consumed by
+    one release — could not be driven deterministically
+    (bug release-definition-consumes-nothing-while-scope-declares-items). Reading its own
+    prompt is exactly how a *driving* fake drives.
+    """
+    slugs = list(dict.fromkeys(m.group("slug") for m in _SCOPE_ITEM_RE.finditer(prompt)))
+    consumes = f"\n**Consumes:** {', '.join(slugs)}\n" if slugs else ""
+    return (
+        "# SPEC: driving-fake stub\n\n> **Status:** Draft\n"
+        f"{consumes}"
+        "\n## Scope\n\nDeterministic driving-fake deliverable.\n"
+    )
+
+
 def _release_definition_runtime_factory(
     *,
     context: str,
@@ -1541,10 +1600,9 @@ def _release_definition_runtime_factory(
         AgentRunStatus,
     )
 
+    #: The ONE draft step authors all three artifacts (v0.2.x: 7 steps collapsed to 3).
     _CREATE_DELIVERABLES = {
-        "spec_create": "SPEC.md",
-        "plan_create": "PLAN.md",
-        "tasks_create": "TASKS.md",
+        "definition_draft": ("SPEC.md", "PLAN.md", "TASKS.md"),
     }
 
     # Deliverable stubs must be VALID under the workflow's own deterministic gates
@@ -1552,9 +1610,10 @@ def _release_definition_runtime_factory(
     # PLAN.md carries the mandatory Validation Dependency Table so the plan lint passes
     # and `--harness fake` walks the WHOLE §6.1 sequence to the terminal commit gate.
     _STUB_CONTENT = {
-        "SPEC.md": (
-            "# SPEC: driving-fake stub\n\n> **Status:** Draft\n\n## Scope\n\nDeterministic driving-fake deliverable.\n"
-        ),
+        # SPEC.md is built per-run by _fake_spec_stub: it must declare the **Consumes:**
+        # line for the items its own scope directive named, or the consumption half of the
+        # flow cannot be driven at all (bug
+        # release-definition-consumes-nothing-while-scope-declares-items).
         "PLAN.md": (
             "# PLAN: driving-fake stub\n\n> **Status:** Draft\n\n"
             "## Validation Dependency Table\n\n"
@@ -1586,20 +1645,23 @@ def _release_definition_runtime_factory(
             refs = [
                 f".dadaia/tmp/lifecycle-worker/{context}/release-definition-step.step-output.json"
             ]
-            deliverable = _CREATE_DELIVERABLES.get(label)
-            if deliverable is not None and release_id is not None:
+            deliverables = _CREATE_DELIVERABLES.get(label, ())
+            if deliverables and release_id is not None:
+                slug = repo_slug_for_context(run_cwd, context)
                 specs_prefix = (
-                    f"repos/{context}/specs"
-                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    f"repos/{slug}/specs"
+                    if (run_cwd / "repos" / slug / "specs").is_dir()
                     else "specs"
                 )
-                refs.append(f"{specs_prefix}/releases/{release_id}/{deliverable}")
+                refs.extend(f"{specs_prefix}/releases/{release_id}/{name}" for name in deliverables)
             for ref in refs:
                 target = run_cwd / ref
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
                     if ref.endswith(".json"):
                         content = '{"fake": true, "summary": "driving-fake stub artifact"}\n'
+                    elif Path(ref).name == "SPEC.md":
+                        content = _fake_spec_stub(request.prompt)
                     else:
                         content = _STUB_CONTENT.get(
                             Path(ref).name,
@@ -1655,7 +1717,9 @@ def build_release_definition_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         # Self-hosting library repo: specs live at the workspace-root tree.
         specs_dir = workspace_root / "specs"
@@ -1690,28 +1754,59 @@ def build_release_definition_workflow(
         # commits the context repo's definition artifacts so implementation preflight
         # never inherits a dirty tree (None for non-git fixtures).
         definition_committer=_definition_committer(
-            workspace_root / "repos" / context_name, release_id
+            workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name),
+            release_id,
         ),
     )
 
 
-#: The single idempotent slug the backlog driving fake upserts. One fixed slug means
-#: re-runs EDIT the same canary item (a changed ``change`` text) instead of accumulating
-#: near-duplicate NEW items that would trip the overlap classifier.
+#: Slug prefix of the items the backlog driving fake upserts. The slug is scoped by RUN id:
+#: re-running one run EDITs that run's own item (idempotent, which is what the former single
+#: fixed slug was protecting), while distinct runs author DISTINCT items — without which the
+#: documented "author N items, then define one release consuming the set" flow is unreachable
+#: with the fake (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow).
 _FAKE_BACKLOG_CANARY_SLUG = "dadaia-fake-harness-canary"
 
 
-def _fake_backlog_canary_ref() -> str:
-    """Pick a live ``cli``-kind anchor for the canary item's intent.
+def _fake_backlog_canary_slug(run_id: str) -> str:
+    """Run-scoped canary slug, conforming to the backlog ``^[a-z][a-z0-9-]+$`` rule."""
+    suffix = re.sub(r"[^a-z0-9]+", "-", run_id.lower()).strip("-")
+    return f"{_FAKE_BACKLOG_CANARY_SLUG}-{suffix}" if suffix else _FAKE_BACKLOG_CANARY_SLUG
 
-    Derived from the real CLI command tree at write time so the canary always binds
-    through the R1 registry regardless of command renames. ``backlog doctor`` is the
-    stable first choice; any derived anchor works as a fallback.
+
+def _fake_backlog_canary_ref(backlog_dir: Path, slug: str) -> str:
+    """Pick a live ``cli``-kind anchor for this run's canary item, unique per run.
+
+    Anchors come from the real CLI command tree at write time, so the canary always binds
+    through the R1 registry regardless of command renames.
+
+    Uniqueness is not cosmetic: two items sharing an anchor with differing ``change`` text
+    are a fail-closed ``DIVERGENT_CONFLICT``, so a set of same-anchor canaries could never
+    be consumed by one release. This run keeps the anchor already recorded in its own item
+    (idempotent re-run) and otherwise claims the first anchor no sibling canary holds.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
 
     anchors = derive_cli_anchors()
-    return "backlog doctor" if "backlog doctor" in anchors else min(anchors)
+    preferred = ["backlog doctor", *sorted(anchors)]
+
+    own = backlog_dir / f"{slug}.md"
+    claimed: set[str] = set()
+    for item in sorted(backlog_dir.glob(f"{_FAKE_BACKLOG_CANARY_SLUG}*.md")):
+        for line in item.read_text(encoding="utf-8").splitlines():
+            if "ref:" in line:
+                ref = line.split("ref:", 1)[1].strip()
+                if item == own:
+                    return ref
+                claimed.add(ref)
+
+    for anchor in preferred:
+        if anchor in anchors and anchor not in claimed:
+            return anchor
+    # Every derived anchor is already claimed by a sibling canary: fall back to the stable
+    # first choice rather than inventing an anchor the registry cannot resolve. The
+    # resulting collision is visible to the classifier, not silent.
+    return preferred[0] if preferred[0] in anchors else min(anchors)
 
 
 def _backlog_definition_runtime_factory(
@@ -1750,24 +1845,32 @@ def _backlog_definition_runtime_factory(
                 f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
             ]
             if label == "backlog_author":
+                slug = repo_slug_for_context(run_cwd, context)
                 specs_prefix = (
-                    f"repos/{context}/specs"
-                    if (run_cwd / "repos" / context / "specs").is_dir()
+                    f"repos/{slug}/specs"
+                    if (run_cwd / "repos" / slug / "specs").is_dir()
                     else "specs"
                 )
-                item_ref = f"{specs_prefix}/backlog/{_FAKE_BACKLOG_CANARY_SLUG}.md"
+                run_id = task_id.rsplit(":", 1)[0]
+                slug = _fake_backlog_canary_slug(run_id)
+                item_ref = f"{specs_prefix}/backlog/{slug}.md"
                 refs.append(item_ref)
                 target = run_cwd / item_ref
                 target.parent.mkdir(parents=True, exist_ok=True)
+                anchor = _fake_backlog_canary_ref(target.parent, slug)
                 # Upsert (never append): the change text carries the task id so a re-run
                 # is a detectable EDIT of the one canary item.
+                # `candidate` is the documented vocabulary token for an intents-carrying
+                # item (scaffold README + backlog doctor _KNOWN_STATUSES) — the fake's
+                # output must pass the workflow's own doctor (bug
+                # fake-backlog-workflow-materializes-doctor-invalid-status-042).
                 target.write_text(
                     "---\n"
-                    "status: proposed\n"
+                    "status: candidate\n"
                     "intents:\n"
                     "  - subject:\n"
                     "      kind: cli\n"
-                    f"      ref: {_fake_backlog_canary_ref()}\n"
+                    f"      ref: {anchor}\n"
                     f"    change: driving-fake canary authored by run '{task_id}'\n"
                     "---\n\n"
                     "# Driving-fake backlog canary\n\n"
@@ -1833,7 +1936,9 @@ def build_backlog_definition_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     source_root = workspace_root / "repos" / context_name
     if not specs_dir.is_dir():
         # Self-hosting library repo: specs live at the workspace-root tree.
@@ -1882,6 +1987,7 @@ def _step_output_driving_fake_factory(
     run_cwd: Path,
     summary: str,
     artifact_ref: str,
+    extra_artifact_refs: tuple[str, ...] = (),
     domain_payload: dict[str, object] | None = None,
 ) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
     """Build a runtime factory whose FAKE returns one in-scope raw step output.
@@ -1906,7 +2012,7 @@ def _step_output_driving_fake_factory(
     approving = AgentRunResult(
         status=AgentRunStatus.SUCCEEDED,
         summary=summary,
-        artifact_refs=(artifact_ref,),
+        artifact_refs=(artifact_ref, *extra_artifact_refs),
         structured_output={"verdict": "APPROVED"},
         domain_payload=domain_payload or {},
     )
@@ -1950,7 +2056,9 @@ def build_audit_workflow(
     _guard_initialized(workspace_root)
     run_cwd = cwd or workspace_root
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     # Bug audit-accepts-undefined-release-and-creates-release-tree: audit runs against an
@@ -1981,10 +2089,19 @@ def build_audit_workflow(
             run_cwd=run_cwd,
             summary="fake audit worker: APPROVED",
             artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
+            # The audit step must land a REPORT in specs/audits/, not just a payload: an
+            # audit whose findings live only in a transient handoff cannot be dispositioned
+            # or archived (bug a1-audit-completes-without-audit-report).
+            extra_artifact_refs=(
+                f"{specs_dir.relative_to(workspace_root).as_posix()}/audits/"
+                "driving-fake-audit-canary.md",
+            ),
             # A schema-VALID audit-report-v1 canary (one INFO finding routed to
             # accepted-risk) so the fake exercises the real referential-integrity gate
             # and the sequence COMPLETES (bug
-            # certification-passes-without-complete-workflow-chain).
+            # certification-passes-without-complete-workflow-chain). The finding MUST
+            # carry evidence — the validator requires it (bug
+            # lifecycle-audit-worker-sandbox-cannot-read-bound-repo).
             domain_payload={
                 "question": "driving-fake audit canary: does the audit chain complete?",
                 "lenses": ["workflow-wiring"],
@@ -1994,6 +2111,7 @@ def build_audit_workflow(
                         "severity": "INFO",
                         "lens": "workflow-wiring",
                         "summary": "driving-fake canary finding (no real defect)",
+                        "evidence": "certify canary: synthetic finding by construction",
                     }
                 ],
                 "dispositions": [{"finding_id": "F-FAKE-1", "route": "accepted-risk"}],
@@ -2019,7 +2137,9 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
     """
     context_name = resolve_bound_context_name(context) or context
-    specs_dir = workspace_root / "repos" / context_name / "specs"
+    specs_dir = (
+        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
+    )
     source_root = workspace_root / "repos" / context_name
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"

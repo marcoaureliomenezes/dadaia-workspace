@@ -60,9 +60,7 @@ _KNOWN_SEQUENCE_MODULES = {
 # v0.2.x simplification: anti-slop rides on CREATE steps only — reviews judge, they
 # do not author, and every removed restatement is prompt tax on a weak model.
 _REQUIRED_ANTI_SLOP = {
-    "release_definition.spec_create",
-    "release_definition.plan_create",
-    "release_definition.tasks_create",
+    "release_definition.definition_draft",
     "backlog_definition.backlog_author",
     "implementation_reviews.implement",
 }
@@ -75,8 +73,7 @@ _REQUIRED_OUTPUT_HANDOFF: set[str] = set()
 # WS-2c (narrowed): shared.memory_selection rides on the SPEC/PLAN create steps
 # (the memory-grounded authoring work); reviews and TASKS authoring stay lean.
 _REQUIRED_MEMORY_SELECTION = {
-    "release_definition.spec_create",
-    "release_definition.plan_create",
+    "release_definition.definition_draft",
 }
 
 

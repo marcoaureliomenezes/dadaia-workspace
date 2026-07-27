@@ -201,6 +201,188 @@ def test_gate_blocks_new_item_overlapping_existing_anchor(tmp_path: Path) -> Non
     assert "twin-item" in result.blocked.reason
 
 
+_ITEM_NEW_CLI = """\
+---
+slug: {slug}
+status: OPEN
+intents:
+  - subject: {{ kind: cli, ref: {command}, surface: new }}
+    change: {change}
+---
+
+# {slug}
+
+Body of {slug}.
+"""
+
+
+def test_independent_new_cli_commands_do_not_conflict(tmp_path: Path) -> None:
+    """Bug backlog-independent-cli-items-false-conflict-044 (Hermes R1-C1c): a 'hello'
+    command item and an independent 'version' command item for the same CLI were both
+    forced onto the CLI's coarse existing anchor and classified DIVERGENT_CONFLICT —
+    a conflict that does not exist. With ``surface: new`` each item's intent carries
+    its OWN command identity, so disjoint new commands are UNRELATED and the chain
+    flows."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    (specs / "backlog" / "hello-cli-command.md").write_text(
+        _ITEM_NEW_CLI.format(slug="hello-cli-command", command="hello", change="add hello command"),
+        encoding="utf-8",
+    )
+
+    @dataclass
+    class _NewCommandFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "version-cli-command.md").write_text(
+                    _ITEM_NEW_CLI.format(
+                        slug="version-cli-command",
+                        command="version",
+                        change="add version command",
+                    ),
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _NewCommandFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-version", operator_demand="add a version command")
+
+    assert result.completed is True, result.blocked.reason if result.blocked else result
+
+
+def test_new_surface_that_already_exists_blocks_with_actionable_remedy(tmp_path: Path) -> None:
+    """The dual guard: declaring ``surface: new`` for a ref the registry already
+    resolves is an authoring error — surfaced with the exact recovery, never a dead
+    end."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    item = """\
+---
+slug: fake-new
+status: OPEN
+intents:
+  - subject: { kind: code, ref: pkg/a.py#A, surface: new }
+    change: add A
+---
+
+# fake-new
+"""
+
+    @dataclass
+    class _FakeNewFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "fake-new.md").write_text(item, encoding="utf-8")
+            return result
+
+    fake = _FakeNewFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-fakenew")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "already" in result.blocked.reason
+    assert result.blocked.operator_command is not None
+
+
+def test_review_gate_blocks_carry_operator_command(tmp_path: Path) -> None:
+    """Bug backlog-cli-intent-hallucinated-anchor-045 (remedy half, Hermes R1-C1d): a
+    review-gate block without an ``operator_command`` is an unrecoverable chain dead
+    end. Every gate block names the exact resume command."""
+    fake = _AuthoringFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-remedy")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.operator_command is not None
+    assert "--resume-from backlog_author" in result.blocked.operator_command
+    assert "--run-id bd-remedy" in result.blocked.operator_command
+
+
+def test_hallucinated_anchor_block_names_surface_new_recovery(tmp_path: Path) -> None:
+    """Bug backlog-cli-intent-hallucinated-anchor-045: an authored item binding a
+    nonexistent anchor blocks WITH the recovery paths named — correct the ref against
+    `dadaia backlog subjects`, or declare the surface as new."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    item = """\
+---
+slug: canary-version-cli
+status: OPEN
+intents:
+  - subject: { kind: cli, ref: reports validate }
+    change: add a version command
+---
+
+# canary-version-cli
+"""
+
+    @dataclass
+    class _HallucinatingFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "canary-version-cli.md").write_text(item, encoding="utf-8")
+            return result
+
+    fake = _HallucinatingFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-halluc")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "unresolved" in result.blocked.reason
+    assert "surface: new" in result.blocked.reason
+    assert result.blocked.operator_command is not None
+
+
+def test_gate_sees_prose_only_edit_of_existing_item(tmp_path: Path) -> None:
+    """Bug backlog-dedupe-updated-payload-not-gate-visible-043: the dedupe EDIT path
+    refines an existing item's body/acceptance WITHOUT touching its bound ``intents[]``
+    anchors. The gate diffed only bound anchor-changes, so a real, hash-verifiable
+    disk edit was invisible — the run blocked on "no new/changed item" and the same
+    block repeated on every resume. Disk truth: any content change to a backlog item
+    is a gate-visible authored change."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    existing = specs / "backlog" / "existing-a.md"
+    existing.write_text(_ITEM_A.format(slug="existing-a", change="rework A"), encoding="utf-8")
+
+    @dataclass
+    class _ProseEditFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                existing.write_text(
+                    existing.read_text(encoding="utf-8")
+                    + "\nRefined acceptance criteria for the deduped demand.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _ProseEditFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-edit", operator_demand="refine existing-a acceptance")
+
+    assert result.completed is True, result.blocked.reason if result.blocked else result
+    assert result.final_phase is LifecyclePhase.RELEASE_DEFINITION
+
+
 def test_grill_opt_in_runs_and_its_digest_reaches_the_author_prompt(tmp_path: Path) -> None:
     fake = _AuthoringFake(root=tmp_path)
     wf = _workflow(tmp_path, _MemoryRunStore(), fake)
@@ -330,3 +512,101 @@ def test_live_backlog_progress_emits_started_and_accepted(tmp_path: Path, capsys
     assert "backlog_author" in err
     assert "started" in err
     assert "accepted" in err, err
+
+
+def test_gate_blocks_authored_item_with_no_intents_at_candidate_status(tmp_path: Path) -> None:
+    """Bug r4g-backlog-surface-new-existing-accepted (Hermes R4-G), real mechanism.
+
+    Hermes reported this as "surface: new accepted on a resolvable anchor". His own
+    evidence says otherwise: `backlog doctor` failed with "no intents[] declared" — the
+    authored item carried NO `intents[]` at all, at status `candidate`, and the review
+    gate ACCEPTED it. (The surface:new guard itself is correct and is pinned by
+    test_new_surface_that_already_exists_blocks_with_actionable_remedy.)
+
+    With zero intents, `bound_anchor_changes` yields no unresolved messages and
+    `classify()` sees an empty anchor set, so every block arm is vacuously satisfied —
+    the workflow materializes output its OWN doctor rejects as BL-SCHEMA. Same
+    producer/validator drift family as
+    fake-backlog-workflow-materializes-doctor-invalid-status-042.
+    """
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    @dataclass
+    class _NoIntentsFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "no-intents.md").write_text(
+                    "---\nslug: no-intents\nstatus: candidate\n---\n\n# no-intents\n\nBody.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _NoIntentsFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-nointents")
+
+    assert result.completed is False, "gate accepted an item its own doctor rejects"
+    assert result.blocked is not None
+    assert "intents" in result.blocked.reason.lower()
+    assert result.blocked.operator_command is not None
+
+
+def test_gate_allows_idea_status_without_intents(tmp_path: Path) -> None:
+    """Guard against over-blocking: `idea` is the documented intents-exempt stage, so an
+    unbound brainstorm must still pass — the same status gate the doctor applies."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+
+    @dataclass
+    class _IdeaFake(_AuthoringFake):
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            result = super().run(request)
+            step = (request.task_id or "").rsplit(":", 1)[-1]
+            if step == "backlog_author":
+                (specs / "backlog" / "just-an-idea.md").write_text(
+                    "---\nslug: just-an-idea\nstatus: idea\n---\n\n# idea\n\nBrainstorm.\n",
+                    encoding="utf-8",
+                )
+            return result
+
+    fake = _IdeaFake(root=tmp_path, writes_item=False)
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-idea")
+    assert result.completed is True, result.blocked.reason if result.blocked else result
+
+
+def test_gate_blocks_preexisting_candidate_without_intents(tmp_path: Path) -> None:
+    """Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents (Hermes R5-C).
+
+    Gap in the first fix: the missing-intents check only swept the slugs CHANGED by this
+    run, so an already-invalid item that the author never touched sailed through — while
+    `backlog doctor` sweeps EVERY item and rejects it. The gate and the doctor were still
+    holding two opinions, just one layer deeper.
+
+    The gate's contract is not "the author behaved" — it is "the backlog this run leaves
+    behind is valid". A pre-existing offender must block too, with a message that says it
+    pre-existed so the operator knows the author is not at fault.
+    """
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True, exist_ok=True)
+    # Invalid item present BEFORE the run; the author never touches it.
+    (specs / "backlog" / "stale-invalid.md").write_text(
+        "---\nslug: stale-invalid\nstatus: candidate\n---\n\n# stale\n\nNo intents.\n",
+        encoding="utf-8",
+    )
+
+    fake = _AuthoringFake(root=tmp_path, slug="fresh-item", change="add A")
+    wf = _workflow(tmp_path, _MemoryRunStore(), fake)
+
+    result = wf.run("bd-preexisting")
+
+    assert result.completed is False, "gate left a doctor-invalid backlog behind"
+    assert result.blocked is not None
+    assert "stale-invalid" in result.blocked.reason
+    assert "intents" in result.blocked.reason.lower()
+    assert result.blocked.operator_command is not None

@@ -31,20 +31,24 @@ _RELEASE = "v0.1.30"
 
 
 def _report_payload(
-    *, with_finding: bool = False, drop_disposition: bool = False, phantom: bool = False
+    *,
+    with_finding: bool = False,
+    drop_disposition: bool = False,
+    phantom: bool = False,
+    evidence_free: bool = False,
 ) -> dict[str, object]:
     findings: list[dict[str, object]] = []
     dispositions: list[dict[str, object]] = []
     if with_finding:
-        findings.append(
-            {
-                "id": "architecture-drift",
-                "severity": "HIGH",
-                "lens": "architecture",
-                "summary": "Implementation differs from memory.",
-                "evidence": "src/games.py:1",
-            }
-        )
+        finding: dict[str, object] = {
+            "id": "architecture-drift",
+            "severity": "HIGH",
+            "lens": "architecture",
+            "summary": "Implementation differs from memory.",
+        }
+        if not evidence_free:
+            finding["evidence"] = "src/games.py:1"
+        findings.append(finding)
         if not drop_disposition:
             dispositions.append(
                 {
@@ -76,6 +80,7 @@ class _ReportFake:
     with_finding: bool = False
     drop_disposition: bool = False
     phantom: bool = False
+    evidence_free: bool = False
 
     def runtime_kind(self) -> AgentRuntimeKind:
         return self.kind
@@ -87,6 +92,7 @@ class _ReportFake:
             with_finding=self.with_finding,
             drop_disposition=self.drop_disposition,
             phantom=self.phantom,
+            evidence_free=self.evidence_free,
         )
         return AgentRunResult(
             status=AgentRunStatus.SUCCEEDED,
@@ -261,3 +267,56 @@ def test_build_audit_workflow_rejects_undefined_release_id(tmp_path: Path) -> No
     with pytest.raises(ReleaseNotFoundError):
         container.build_audit_workflow(tmp_path, context=_CONTEXT, release_id=bogus)
     assert not (specs / "releases" / bogus).exists(), "audit must not create a bogus release dir"
+
+
+# ── bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo (hermes) ────────
+#
+# Both audit runs returned ACCEPTED dispositions while every lens was
+# UNVERIFIABLE: the codex worker died before file inspection (bwrap namespace
+# failure) yet exited 0, and the report validator never required the
+# fragment-mandated `evidence` key. Two gates now close the acceptance hole:
+# the adapter classifies sandbox-failure output as FAILED (see
+# test_codex_exec_runtime.py), and every finding MUST carry evidence.
+
+
+def test_finding_without_evidence_blocks_at_the_schema_gate(tmp_path: Path) -> None:
+    """The fragment mandates `evidence` on every finding; the Python validator now
+    enforces it — an evidence-free (read-nothing) report can no longer be accepted."""
+    wf = _workflow(
+        tmp_path,
+        _ReportFake(AgentRuntimeKind.FAKE, with_finding=True, evidence_free=True),
+    )
+
+    result = wf.run("audit-evidence-free")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "audit_report"
+    assert "evidence" in result.blocked.reason
+
+
+def test_failed_worker_blocks_the_audit_with_the_diagnostic(tmp_path: Path) -> None:
+    """A sandbox-crippled worker FAILS at the adapter (classification fix) — the audit
+    blocks with the diagnostic surfaced instead of accepting an unread report."""
+
+    class _FailedFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            return AgentRunResult(
+                status=AgentRunStatus.FAILED,
+                summary="codex sandbox namespace unusable in this container",
+                error=(
+                    "codex exec exited 0 but its output carries a sandbox-failure "
+                    "signature. Set DADAIA_CODEX_SANDBOX=danger-bypass in nested "
+                    "containers or danger-full-access for landlock write-denial."
+                ),
+            )
+
+    wf = _workflow(tmp_path, _FailedFake())
+    result = wf.run("audit-sandbox-dead")
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "sandbox" in result.blocked.reason.lower()

@@ -28,7 +28,7 @@ never create a twin of an existing item.
 | Input | Use |
 |---|---|
 | `backlog_index` | The existing items' bound intents + status, so an EDIT folds into the right item and a NEW item does not duplicate one. |
-| `Canonical subject anchors` | The registry's resolvable anchor list injected into this prompt — the ONLY refs `intents[]` may bind. Copy `ref` verbatim from it; match the `kind`. |
+| `Canonical subject anchors` | The registry's resolvable anchor list injected into this prompt — the only refs an `intents[]` subject about an EXISTING surface may bind. Copy `ref` verbatim from it; match the `kind`. A surface the item INTRODUCES is declared with `surface: new` instead (see Rules). |
 
 ## What the item must carry
 
@@ -43,9 +43,15 @@ never create a twin of an existing item.
 - **NEW file XOR edit EXISTING — never both, never a twin.** A NEW item is permitted only
   when the review found every existing item `UNRELATED`. Any overlap means an EDIT/MERGE
   into the existing item, folding the new scope in.
-- Keep subjects canonical: every `subject.ref` is copied VERBATIM from the "Canonical
-  subject anchors" list in this prompt (kind must match the anchor's kind). Never invent
-  a ref — an unlisted ref is rejected by `backlog_review_gate` as an unresolved subject.
+- Keep subjects canonical: every `subject.ref` about an EXISTING surface is copied
+  VERBATIM from the "Canonical subject anchors" list in this prompt (kind must match the
+  anchor's kind). Never invent a ref — an unlisted existing ref is rejected by
+  `backlog_review_gate` as an unresolved subject.
+- **A surface the item introduces is declared, not bound.** When the demand adds something
+  that does not exist yet (e.g. a new CLI command), write
+  `subject: { kind: cli, ref: <new-name>, surface: new }` — never bind it to a nearby
+  existing anchor (that manufactures a false conflict with other new-surface items) and
+  never invent an "existing" ref. Disjoint new surfaces never conflict.
 - Anchors stay module-relative `path#symbol` (or a non-path anchor id) — never an
   operator-local absolute path or a private name.
 - Author content, not history: the item states current intended scope, not a changelog.

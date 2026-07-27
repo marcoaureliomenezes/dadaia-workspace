@@ -126,13 +126,13 @@ def test_shipped_library_existence_derived_from_sequence_and_ladder() -> None:
 
 
 def test_load_by_id_and_path_round_trip_unknown_id_raises() -> None:
-    fragment = load_fragment("release_definition.spec_review")
-    assert fragment.id == "release_definition.spec_review"
+    fragment = load_fragment("release_definition.definition_review")
+    assert fragment.id == "release_definition.definition_review"
     assert fragment.workflow == "release_definition"
-    assert fragment.step == "spec_review"
-    assert fragment.output_schema == "spec-review-verdict-v1"
+    assert fragment.step == "definition_review"
+    assert fragment.output_schema == "combined-review-handoff-v1"
     assert "specs/memory/architecture.md" in fragment.static_inputs
-    assert fragment.body.startswith("# SPEC review")
+    assert fragment.body.startswith("# Definition review")
 
     loader = FragmentLoader()
     by_path = loader.load_fragment(Path("shared") / "anti-slop.md")
@@ -144,10 +144,10 @@ def test_load_by_id_and_path_round_trip_unknown_id_raises() -> None:
 
 def test_release_definition_prompts_treat_validation_as_dependency() -> None:
     """Regression: an early task must not require a later integration surface to pass."""
-    plan_create = load_fragment("release_definition.plan_create").body
-    plan_review = load_fragment("release_definition.plan_review").body
-    tasks_create = load_fragment("release_definition.tasks_create").body
-    tasks_review = load_fragment("release_definition.tasks_review_implementability").body
+    plan_create = load_fragment("release_definition.definition_draft").body
+    plan_review = load_fragment("release_definition.definition_review").body
+    tasks_create = load_fragment("release_definition.definition_draft").body
+    tasks_review = load_fragment("release_definition.definition_review").body
 
     assert "validation dependency-safe" in plan_create
     assert "validation depends on work scheduled later" in plan_review
@@ -157,7 +157,7 @@ def test_release_definition_prompts_treat_validation_as_dependency() -> None:
 
 def test_spec_create_requires_proof_for_internal_negative_constraints() -> None:
     """Regression: internal "must not" claims need evidence beyond equal outputs."""
-    spec_create = load_fragment("release_definition.spec_create").body
+    spec_create = load_fragment("release_definition.definition_draft").body
 
     assert "concrete verification path for every acceptance criterion" in spec_create
     assert "controlled probe/fake" in spec_create
@@ -166,10 +166,10 @@ def test_spec_create_requires_proof_for_internal_negative_constraints() -> None:
 
 
 def test_release_definition_binds_public_contract_before_implementation() -> None:
-    plan_create = load_fragment("release_definition.plan_create").body
-    plan_review = load_fragment("release_definition.plan_review").body
-    tasks_create = load_fragment("release_definition.tasks_create").body
-    tasks_review = load_fragment("release_definition.tasks_review_implementability").body
+    plan_create = load_fragment("release_definition.definition_draft").body
+    plan_review = load_fragment("release_definition.definition_review").body
+    tasks_create = load_fragment("release_definition.definition_draft").body
+    tasks_review = load_fragment("release_definition.definition_review").body
 
     for body in (plan_create, plan_review, tasks_create, tasks_review):
         assert "module/export path" in body
@@ -200,7 +200,7 @@ def test_workflow_dir_shape_matrix() -> None:
         "implementation.close_release",
     }
     assert len(loader.list_fragments(workflow="shared")) == 4
-    assert len(loader.list_fragments(workflow="release_definition")) == 7
+    assert len(loader.list_fragments(workflow="release_definition")) == 2
 
     dirs = set(loader.list_workflow_dirs())
     assert dirs >= _DEFERRED_WORKFLOW_DIRS

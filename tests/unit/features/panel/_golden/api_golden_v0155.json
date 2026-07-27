@@ -66,7 +66,7 @@
     "status": 503
   },
   "api_workflow_catalog": {
-    "body": "{\"generated_at\": \"<TS>\", \"context\": \"default\", \"workflows\": [{\"workflow_id\": \"release_definition\", \"steps\": [{\"step\": \"release_scope\", \"role\": \"product-engineer\", \"harness\": \"codex\", \"default_harness\": \"codex\", \"default_profile\": \"codex-implementation-standard\", \"default_profiles\": {\"codex\": \"codex-implementation-standard\"}, \"effective_profile\": \"codex-implementation-standard\", \"model\": \"gpt-5.5\", \"reasoning\": \"medium\", \"source\": \"library-default\", \"fragments\": [\"release_definition.release_scope\"], \"output_schema\": \"agent-run-result-v1\", \"is_overridden\": false, \"harness_overridden\": false}]}]}",
+    "body": "{\"generated_at\": \"<TS>\", \"context\": \"default\", \"workflows\": [{\"workflow_id\": \"release_definition\", \"steps\": [{\"step\": \"release_scope\", \"role\": \"product-engineer\", \"harness\": \"codex\", \"default_harness\": \"codex\", \"default_profile\": \"codex-implementation-standard\", \"default_profiles\": {\"codex\": \"codex-implementation-standard\"}, \"effective_profile\": \"codex-implementation-standard\", \"model\": \"gpt-5.5\", \"reasoning\": \"medium\", \"source\": \"library-default\", \"fragments\": [\"release_definition.definition_draft\"], \"output_schema\": \"agent-run-result-v1\", \"is_overridden\": false, \"harness_overridden\": false}]}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "workflows",
     "status": 200

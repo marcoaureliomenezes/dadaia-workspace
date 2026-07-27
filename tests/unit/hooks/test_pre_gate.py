@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.hooks import _common, pre_gate
+from dadaia_workspace.hooks import _common, pre_gate, root_whitelist, sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -362,12 +362,16 @@ def test_pre_fix_payload_shape_with_no_session_id_documents_the_closed_bug(
 def test_main_emits_explicit_allow_envelope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Bug projected-pre-gate-silent-allow: an allowed probe must EMIT its decision.
+    """Bug pre-gate-allow-envelope-fails-claude-schema: allow must validate silently.
 
-    The block path prints a {"decision":"block",...} envelope; the allow path used to
-    print nothing, so external automation (recipe F-08) could not distinguish an
-    explicit allow from a hook that never evaluated. Allow now prints
-    {"decision":"allow"} — same envelope family, verifiable contract.
+    Claude Code's PreToolUse output schema restricts the top-level ``decision`` enum to
+    ``["approve", "block"]`` — ``"allow"`` is invalid and makes the harness reject the
+    WHOLE envelope ("Hook JSON output validation failed") on every allowed call. And
+    ``permissionDecision: "defer"`` is print-mode only: interactive sessions log a warn
+    and ignore it. The contract-valid allow envelope therefore carries NO permission
+    verdict at all — the gate steps aside into the normal permission flow. It stays
+    non-empty (observable-allow doctrine, bug projected-pre-gate-silent-allow); codex
+    and the kimi shim treat any non-block envelope as allow.
     """
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     payload = {
@@ -378,4 +382,143 @@ def test_main_emits_explicit_allow_envelope(
 
     assert pre_gate.main() == 0
     out = capsys.readouterr().out.strip()
-    assert json.loads(out.splitlines()[-1]) == {"decision": "allow"}
+    envelope = json.loads(out.splitlines()[-1])
+    assert envelope == {
+        "continue": True,
+        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
+    }
+    assert "decision" not in envelope
+    assert "permissionDecision" not in envelope["hookSpecificOutput"]
+    assert "defer" not in out
+
+
+def test_allow_envelope_has_no_kimi_block_marker(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The kimi shim greps the literal ``"decision": "block"`` — allow must not carry it."""
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": "repos/valproj/specs/bugs/x.md", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    raw = capsys.readouterr().out.strip().splitlines()[-1]
+    assert '"decision": "block"' not in raw
+
+
+def test_main_block_envelope_carries_claude_permission_deny(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Bug claude-pre-gate-envelope-contract: block must be Claude-Code contract-valid.
+
+    The legacy ``"decision": "block"`` field rides an undocumented fallback in current
+    Claude Code — the documented PreToolUse verdict is
+    ``hookSpecificOutput.permissionDecision: "deny"``. The merged envelope carries BOTH
+    (legacy for codex hooks + the kimi shim, modern for Claude Code) with one identical
+    reason string.
+    """
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    envelope = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert envelope["decision"] == "block"
+    assert envelope["reason"]
+    hso = envelope["hookSpecificOutput"]
+    assert hso["hookEventName"] == "PreToolUse"
+    assert hso["permissionDecision"] == "deny"
+    assert hso["permissionDecisionReason"] == envelope["reason"]
+
+
+def test_block_envelope_raw_string_keeps_kimi_shim_markers(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The kimi pre-gate shim string-matches the raw stdout — its two anchors are law.
+
+    The shim's ``case`` pattern greps the literal ``"decision": "block"`` and its ``sed``
+    reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only when the
+    top-level ``reason`` is the LAST key in the envelope. Both anchors must survive the
+    Claude-contract merge byte-exactly.
+    """
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": ".dadaia/sessions/x.json", "content": "x"},
+    }
+    monkeypatch.setattr(pre_gate._common, "read_stdin_json", lambda: payload)
+
+    assert pre_gate.main() == 0
+    raw = capsys.readouterr().out.strip().splitlines()[-1]
+    assert '"decision": "block"' in raw
+    assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "'), (
+        "top-level reason must stay the LAST key so the kimi sed capture stays clean"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Wiring ratchets — every PreToolUse policy must be reachable through the SHIPPED
+# entrypoint, and the block must carry the verdict Claude Code actually reads.
+# --------------------------------------------------------------------------- #
+
+
+def test_bash_venv_guard_blocks_through_the_shipped_entrypoint(tmp_path: Path) -> None:
+    """``Bash`` is in the PreToolUse matcher and ``venv_guard`` is its ONLY policy.
+
+    Every venv-guard case called ``venv_guard.evaluate_payload`` directly, so the policy
+    could be unwired from ``pre_gate._POLICIES`` — or deleted outright — while the whole
+    hook suite stayed green (proven by mutation: neutering the policy left 141/141
+    passing). This drives the real ``python -m dadaia_workspace.hooks.pre_gate`` with a
+    ``Bash`` payload that MUST block, so the Bash arm of the matcher is pinned end to end.
+    """
+    env = claude_hook_env(tmp_path)
+    result = run_hook_subprocess(
+        "pre_gate",
+        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    envelope = result.block_envelope()
+    assert envelope is not None, f"Bash venv-guard did not block: {result.stdout!r}"
+    reason = str(envelope.get("reason", ""))
+    assert "VENV GUARD" in reason.upper(), reason
+    # The corrected command must ride the block — a gate that names no remedy is a toll.
+    assert ".dadaia/.venv/bin" in reason, reason
+
+
+def test_pre_gate_stdout_is_exactly_one_json_object(tmp_path: Path) -> None:
+    """Whole stdout must parse as ONE object — for allow AND for block.
+
+    The envelope assertions parsed ``stdout.splitlines()[-1]``, which tolerates anything
+    printed before the JSON. Claude Code parses the stream, so a stray ``print`` upstream
+    of the envelope corrupts the verdict. Assert on the WHOLE stdout instead.
+    """
+    env = claude_hook_env(tmp_path)
+    for payload in (
+        {"tool_name": "Read", "tool_input": {"file_path": "x"}},
+        {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+    ):
+        result = run_hook_subprocess("pre_gate", payload, env)
+        raw = result.stdout.strip()
+        assert raw, f"the gate must always emit an observable envelope: {payload}"
+        parsed = json.loads(raw)  # raises on any pollution before/after the object
+        assert isinstance(parsed, dict), parsed
+
+
+def test_policies_tuple_is_the_wired_composition() -> None:
+    """The real ``_POLICIES`` membership and ORDER — first-block-wins is documented law.
+
+    The existing short-circuit test installs its own fake tuple and asserts its own string
+    back, so it proves the ``for`` loop stops early and nothing about which policies are
+    actually wired. This pins the shipped composition.
+    """
+    assert (  # noqa: SLF001
+        root_whitelist.evaluate_payload,
+        pre_gate._venv_guard_reason,  # noqa: SLF001
+        sdd_gate.evaluate_payload_with_advisory,
+    ) == pre_gate._POLICIES

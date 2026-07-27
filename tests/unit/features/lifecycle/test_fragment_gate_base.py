@@ -157,13 +157,13 @@ def test_base_iterates_run_scoped_sequence_not_module_global(tmp_path: Path) -> 
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_b",
             role="product-engineer",
-            fragment_id="release_definition.spec_create",
+            fragment_id="release_definition.definition_draft",
             shared_fragment_ids=("shared.anti_slop",),
             produces="generic-step-handoff-v1",
             consumes=("cs_a",),
@@ -198,13 +198,13 @@ def test_completed_definition_repoints_active_md(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
             consumes=("cs_a",),
@@ -371,7 +371,14 @@ def test_shared_members_exist_once_in_base_with_no_per_body_copies() -> None:
 
 
 class _RejectOnceFake(_ScopeFake):
-    """REJECTs the named review step until ``approve`` flips; approves everything else."""
+    """Makes the named step BLOCK until ``approve`` flips; approves everything else.
+
+    The block is DETERMINISTIC (the step returns no evidence) rather than a REJECTED model
+    verdict. A model verdict is advisory now — it costs one bounded revision and then the
+    step proceeds — so a verdict can no longer be used to manufacture the blocked run these
+    resume tests need. The deterministic block is also the more honest fixture: resume is
+    for recovering from gates that genuinely stop a run.
+    """
 
     def __init__(self, reject_label: str) -> None:
         super().__init__()
@@ -382,6 +389,21 @@ class _RejectOnceFake(_ScopeFake):
         result = super().run(request)
         label = (request.task_id or "").rsplit(":", 1)[-1]
         if label == self.reject_label and not self.approve:
+            return replace(result, artifact_refs=())
+        return result
+
+
+class _RejectVerdictFake(_ScopeFake):
+    """Returns a REJECTED model verdict for the named review step, always."""
+
+    def __init__(self, reject_label: str) -> None:
+        super().__init__()
+        self.reject_label = reject_label
+
+    def run(self, request: AgentRunRequest) -> AgentRunResult:
+        result = super().run(request)
+        label = (request.task_id or "").rsplit(":", 1)[-1]
+        if label == self.reject_label:
             return replace(
                 result, structured_output={"verdict": "REJECTED", "verdict_reason": "fix spec"}
             )
@@ -406,13 +428,13 @@ def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -423,7 +445,8 @@ def test_resume_from_reruns_only_blocked_step_onward(tmp_path: Path) -> None:
     assert first.completed is False
     assert first.blocked is not None and first.blocked.blocked_at_step == "cs_review"
     calls_after_first = len(fake.received_requests)
-    assert calls_after_first == 2  # cs_a + cs_review ran
+    # cs_a + cs_review ran; the runner's structural retry may add one bounded attempt.
+    assert 2 <= calls_after_first <= 3
 
     fake.approve = True
     resumed = wf.run("resume-run", sequence=custom, resume_from="cs_review")
@@ -459,13 +482,13 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
         ),
@@ -482,8 +505,8 @@ def test_resume_from_injects_prior_rejection_digest_into_resumed_step_prompt(
     assert resumed.completed is True
     resumed_review_prompt = fake.received_requests[-1].prompt
     assert "Prior rejection feedback" in resumed_review_prompt
-    assert "review verdict REJECTED: fix spec" in resumed_review_prompt
-    assert "verdict_reason: fix spec" in resumed_review_prompt
+    assert "cs_review" in resumed_review_prompt
+    assert "artifact evidence" in resumed_review_prompt
 
     # Completed-rerun guard (bug completed-workflow-rerun-not-refused): a fresh full
     # re-run of the now-COMPLETED run id refuses cleanly instead of re-executing.
@@ -509,13 +532,20 @@ def test_resume_from_unknown_step_or_missing_run_raises(tmp_path: Path) -> None:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(label="cs_gate", role="python", fragment_id=None),
     )
-    with pytest.raises(ValueError, match="not in the"):
+    # Bug r4d-resume-preflight-invalid-step-traceback: an unknown --resume-from is now a
+    # DadaiaError (rendered as ONE operator line, never a raw traceback) that NAMES the
+    # valid steps. It still subclasses ValueError, so this call site is unchanged.
+    from dadaia_workspace.core.exceptions import DadaiaError
+
+    with pytest.raises(ValueError, match="is not a step of this workflow") as excinfo:
         wf.run("never-ran", sequence=custom, resume_from="ghost_step")
+    assert isinstance(excinfo.value, DadaiaError)
+    assert "cs_a" in str(excinfo.value) and "cs_gate" in str(excinfo.value)
     with pytest.raises(ValueError, match="no persisted run"):
         wf.run("never-ran", sequence=custom, resume_from="cs_a")
 
@@ -551,13 +581,13 @@ def _revision_sequence() -> tuple[ReleaseStep, ...]:
         ReleaseStep(
             label="cs_a",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             produces="release-scope-handoff-v1",
         ),
         ReleaseStep(
             label="cs_review",
             role="qa-engineer",
-            fragment_id="release_definition.spec_review",
+            fragment_id="release_definition.definition_review",
             is_review=True,
             produces="spec-review-handoff-v1",
             consumes=("cs_a",),
@@ -595,7 +625,7 @@ def test_review_rejection_auto_revises_consumed_create_step_once(tmp_path: Path)
     assert run.workflow_steps.find("cs_review", 0) is not None
 
 
-def test_review_rejection_revision_budget_is_one_then_blocks(tmp_path: Path) -> None:
+def test_review_rejection_revision_budget_is_one_then_advisory(tmp_path: Path) -> None:
     """A review that keeps rejecting spends the single revision and then blocks exactly
     as before — the worst case is bounded, never a loop."""
     specs = _seed(tmp_path)
@@ -611,9 +641,12 @@ def test_review_rejection_revision_budget_is_one_then_blocks(tmp_path: Path) -> 
 
     result = wf.run("revision-block-run", sequence=_revision_sequence())
 
-    assert result.completed is False
-    assert result.blocked is not None and result.blocked.blocked_at_step == "cs_review"
-    # cs_a, cs_review(REJ), cs_a(revised), cs_review(REJ) → block. Exactly 4 worker calls.
+    # Contract: the budget is ONE revision, then the verdict becomes ADVISORY — a model
+    # opinion may never stop the run, or an autonomous agent can never finish a release.
+    # cs_a, cs_review(REJ), cs_a(revised), cs_review(REJ→advisory) → exactly 4 worker calls,
+    # and the run reaches its terminal gate carrying the objection as a warning.
+    assert result.completed is True
+    assert result.blocked is None
     assert len(fake.received_requests) == 4
 
 
@@ -627,7 +660,9 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
     )
 
     specs = _seed(tmp_path)
-    fake = _RejectNTimesFake("spec_review", times=99)
+    # A model verdict no longer blocks (it is advisory), so manufacture the blocked run
+    # this resume test needs with a DETERMINISTIC failure instead.
+    fake = _RejectOnceFake("definition_review")
     wf = ReleaseDefinitionWorkflow(
         context=_CONTEXT,
         release_id=_RELEASE,
@@ -639,11 +674,16 @@ def test_skip_scope_resume_keeps_the_scopeless_sequence_shape(tmp_path: Path) ->
 
     first = wf.run("skip-scope-resume", _RELEASE_SEQ, skip_scope=True)
     assert first.completed is False
-    assert all(s.label != "release_scope" for s in first.steps)
+    # skip_scope used to drop the separate release_scope step. That step no longer
+    # exists — the collapsed sequence is draft → review → gate — so the flag is a
+    # harmless no-op and what matters is that the shape stays stable across a resume.
+    assert [s.label for s in first.steps][0] == "definition_draft"
 
-    fake.remaining_rejections = 0
-    resumed = wf.run("skip-scope-resume", _RELEASE_SEQ, resume_from="spec_create", skip_scope=True)
+    fake.approve = True
+    resumed = wf.run(
+        "skip-scope-resume", _RELEASE_SEQ, resume_from="definition_draft", skip_scope=True
+    )
     assert resumed.completed is True, (
         resumed.blocked.reason if resumed.blocked else "unexpected block"
     )
-    assert all(s.label != "release_scope" for s in resumed.steps)
+    assert [s.label for s in resumed.steps][-1] == "definition_commit_gate"

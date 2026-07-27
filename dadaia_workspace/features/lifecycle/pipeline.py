@@ -20,7 +20,7 @@ from dataclasses import Field, dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Protocol
 
-from dadaia_workspace.core.exceptions import TasksMarkerStateError
+from dadaia_workspace.core.exceptions import DadaiaError, TasksMarkerStateError
 from dadaia_workspace.core.harness_models import (
     CODEX_HARNESS,
     HarnessModelOption,
@@ -75,12 +75,48 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.run_store import refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import (
+    refuse_blocked_restart,
+    refuse_completed_rerun,
+)
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine, TransitionInput
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
     durable_payload_from_result,
 )
+
+
+class InvalidResumeStepError(DadaiaError, ValueError):
+    """``--resume-from`` named a step that is not in the workflow's sequence.
+
+    Bug r4d-resume-preflight-invalid-step-traceback (F-22 class): a blocked preflight
+    reports ``blocked_at_step: "preflight"``, so the operator naturally runs
+    ``--resume-from preflight`` — but preflight is a GATE evaluated before any run
+    exists, never a resumable step. The old bare ``ValueError`` crashed with a raw
+    traceback, so an impossible remedy became an unexplained crash: the same
+    contradiction-loop class as
+    ``release-definition-retry-collides-with-immutable-tasks-payload``.
+
+    Inherits ``DadaiaError`` so the CLI renders one operator-facing line, and keeps
+    ``ValueError`` so existing ``except ValueError`` call sites are unaffected.
+    """
+
+    @classmethod
+    def for_labels(cls, resume_from: str, labels: tuple[str, ...]) -> InvalidResumeStepError:
+        """Build the message: name the bad step, the VALID ones, and the real remedy."""
+        valid = ", ".join(labels) if labels else "(none)"
+        message = (
+            f"--resume-from {resume_from!r} is not a step of this workflow. Valid steps: {valid}."
+        )
+        if resume_from == "preflight":
+            message += (
+                " 'preflight' is a GATE evaluated BEFORE any run is created, not a "
+                "resumable step — there is nothing to resume from it. Fix the condition "
+                "the preflight reported (it names one), then re-run the verb normally; "
+                "use --skip-preflight only as a deliberate, visible override."
+            )
+        return cls(message)
+
 
 #: ``kind -> adapter`` — injected so tests can supply fakes per harness.
 RuntimeFactory = Callable[[AgentRuntimeKind], AgentRuntimePort]
@@ -308,6 +344,11 @@ class LifecyclePipeline:
         # id is immutable history — refuse cleanly before any marker rewrite or zone
         # reclaim; blocked/failed run ids remain restartable.
         refuse_completed_rerun(self._run_store, run_id)
+        if resume_from is None:
+            # Only a FRESH start would discard a recorded block; an explicit --resume-from
+            # is the sanctioned recovery and must never be refused
+            # (bug r10-release-resume-blocked-run-restarts-and-loses-remedy).
+            refuse_blocked_restart(self._run_store, run_id)
         # Python owns task-marker state because the implementation worker's write scope
         # deliberately excludes TASKS.md. Reservations survive retries and blocked runs;
         # completion happens only after the entire review + close ladder succeeds.
@@ -320,9 +361,7 @@ class LifecyclePipeline:
             # payloads stay addressable), only the resumed-step-onward zone is reclaimed.
             labels = tuple(step.label for step in steps)
             if resume_from not in labels:
-                raise ValueError(
-                    f"resume_from step {resume_from!r} is not in the pipeline sequence {labels}"
-                )
+                raise InvalidResumeStepError.for_labels(resume_from, labels)
             prior = self._run_store.load(run_id)
             if prior is not None and prior.blocked is not None:
                 # Parity with the fragment-gate engines: the resumed step's prompt
@@ -461,7 +500,9 @@ class LifecyclePipeline:
                     is_review=step.is_review,
                     deliverable_globs=(
                         (
-                            (f"repos/{self._context}/specs/releases/{self._release_id}/CLOSURE.md"),
+                            (
+                                f"repos/{self._repo_slug}/specs/releases/{self._release_id}/CLOSURE.md"
+                            ),
                             f"specs/releases/{self._release_id}/CLOSURE.md",
                         )
                         if step.label == "close"
@@ -642,6 +683,23 @@ class LifecyclePipeline:
             steps=tuple(results),
         )
 
+    @property
+    def _repo_slug(self) -> str:
+        """The repo DIRECTORY name for this context — derived from the resolved specs_dir.
+
+        Formatting ``repos/{context}/…`` with the context NAME broke every context whose
+        name differs from its ``--repo`` slug: the declared write scope pointed at a
+        directory that does not exist, the worker's write fell out of scope, and the run
+        reported success having written nothing
+        (bug a1-context-specs-resolution-ignores-repo-slug).
+
+        Falls back to the context name when no ``specs_dir`` was injected (fixture
+        pipelines), which is exactly the name-equals-slug case.
+        """
+        if self._specs_dir is not None:
+            return self._specs_dir.parent.name
+        return self._context
+
     def _rewrite_task_markers(self, source: str, target: str) -> int:
         """Atomically rewrite generated checklist task markers in active TASKS.md."""
         if self._specs_dir is None:
@@ -689,11 +747,11 @@ class LifecyclePipeline:
         """
         globs: list[str] = []
         for raw in step.extra_allowed_paths:
-            path = raw.format(context=self._context, release_id=self._release_id)
+            path = raw.format(context=self._repo_slug, release_id=self._release_id)
             if path not in globs:
                 globs.append(path)
             if not path.startswith("repos/"):
-                qualified = f"repos/{self._context}/{path}"
+                qualified = f"repos/{self._repo_slug}/{path}"
                 if qualified not in globs:
                     globs.append(qualified)
         return tuple(globs)
@@ -871,14 +929,14 @@ class LifecyclePipeline:
         # handoff-only regardless of what extra_allowed_paths carries.
         expanded_paths_list: list[str] = []
         for _raw in step.extra_allowed_paths:
-            _path = _raw.format(context=self._context, release_id=self._release_id)
+            _path = _raw.format(context=self._repo_slug, release_id=self._release_id)
             if _path not in expanded_paths_list:
                 expanded_paths_list.append(_path)
             # Dual spelling (bug implementation-deliverable-zone-misses-context-repo):
             # repo-relative write sets and workspace-relative worker reports name the
             # same zone.
             if not _path.startswith("repos/"):
-                _qualified = f"repos/{self._context}/{_path}"
+                _qualified = f"repos/{self._repo_slug}/{_path}"
                 if _qualified not in expanded_paths_list:
                     expanded_paths_list.append(_qualified)
         expanded_paths = tuple(expanded_paths_list)

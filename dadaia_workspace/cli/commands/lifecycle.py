@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+import re
+from collections.abc import Callable, Sequence
 from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import typer
 
-from dadaia_workspace.core.exceptions import ReleaseNotFoundError
+from dadaia_workspace.cli._specs_resolution import repo_slug_for_context
+from dadaia_workspace.core.exceptions import ReleaseNotFoundError, ScopeNotConsumedError
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRuntimeKind,
     BlockedState,
     LifecyclePhase,
@@ -31,11 +34,9 @@ if TYPE_CHECKING:
 # Layer-1 entry harness; running it as a Layer-2 worker spends credits outside the
 # operator's subscription. The CLAUDE_SDK adapter + enum value remain in code (Layer-1)
 # but are not selectable as a workflow harness.
-_HARNESS_KINDS = {
-    "fake": AgentRuntimeKind.FAKE,
-    "codex": AgentRuntimeKind.CODEX_EXEC,
-    "pi": AgentRuntimeKind.PI_HEADLESS,
-}
+#: Derived from the ONE canonical map in core so the parser and every prescribed-remedy
+#: renderer can never disagree about what '--harness codex' means.
+_HARNESS_KINDS = {name: kind for kind, name in HARNESS_CLI_NAMES.items()}
 
 # Harness names rejected as Layer-2 workflow harnesses (LAW 1) with a pointer. Claude is a
 # Layer-1 entry harness; OpenCode was removed as a Layer-2 worker in v0.1.24. Layer-2
@@ -86,14 +87,20 @@ def _authoritative_backlog_prefix(
     *,
     context: str,
     release_id: str,
-    backlog_run_id: str | None,
+    backlog_run_ids: Sequence[str] = (),
 ) -> PromptPrefix | None:
-    """Resolve one exact completed backlog-definition producer for release scope.
+    """Resolve the exact completed backlog-definition producers for release scope.
 
-    Direct release definition remains valid when no matching backlog workflow exists.
-    When one does exist, its run-scoped ``backlog_author`` payload is authoritative;
-    ambiguity is an operator-visible usage error rather than a model choice over stale
-    candidates.
+    Direct release definition remains valid when no matching backlog workflow exists. When
+    any exist, their run-scoped ``backlog_author`` payloads are authoritative: EVERY
+    completed producer for this context+release contributes its authored item paths, so a
+    release can consume the SET of items that N backlog-definition runs authored
+    (bug release-definition-refuses-multiple-backlog-producers — multiplicity used to be a
+    usage error, which made that flow unreachable and forced N-1 items to be discarded).
+
+    Multiplicity is not ambiguity: the paths come from producer evidence, so there is no
+    stale candidate for a model to choose between. ``backlog_run_ids`` narrows the set;
+    every id named must be a completed producer, or it is a loud usage error.
     """
     from dadaia_workspace import container
     from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
@@ -104,37 +111,47 @@ def _authoritative_backlog_prefix(
     )
 
     run_store = container.build_lifecycle_run_store(workspace_root)
-    matches = [
+    completed = [
         run
         for run in run_store.list_runs()
         if run.command == "backlog_definition"
         and run.context == context
         and run.release_id == release_id
         and run.status is LifecycleRunStatus.COMPLETED
-        and (backlog_run_id is None or run.run_id == backlog_run_id)
     ]
-    if backlog_run_id is not None and not matches:
-        raise typer.BadParameter(
-            f"--backlog-run-id {backlog_run_id!r} is not a completed backlog-definition "
-            f"run for context={context!r}, release={release_id!r}"
-        )
+    requested = tuple(dict.fromkeys(backlog_run_ids))
+    if requested:
+        available = {run.run_id for run in completed}
+        unknown = [run_id for run_id in requested if run_id not in available]
+        if unknown:
+            known = ", ".join(sorted(available)) or "(none)"
+            raise typer.BadParameter(
+                f"--backlog-run-id {', '.join(repr(i) for i in unknown)} is not a completed "
+                f"backlog-definition run for context={context!r}, release={release_id!r}. "
+                f"Completed producers: {known}"
+            )
+        matches = [run for run in completed if run.run_id in set(requested)]
+    else:
+        matches = completed
     if not matches:
         return None
-    if len(matches) != 1:
-        ids = ", ".join(sorted(run.run_id for run in matches))
-        raise typer.BadParameter(
-            "multiple completed backlog-definition runs match this release; pass "
-            f"--backlog-run-id explicitly ({ids})"
-        )
-    upstream = matches[0]
-    try:
-        resolved = container.build_workflow_handoff_resolver(workspace_root).resolve_required(
-            upstream, producer_step="backlog_author", attempt=0
-        )
-    except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
-        raise typer.BadParameter(
-            f"backlog-definition run {upstream.run_id!r} has no valid backlog_author payload: {exc}"
-        ) from exc
+    matches.sort(key=lambda run: run.run_id)
+
+    resolver = container.build_workflow_handoff_resolver(workspace_root)
+    resolved_payloads = []
+    for upstream in matches:
+        try:
+            resolved_payloads.append(
+                (
+                    upstream,
+                    resolver.resolve_required(upstream, producer_step="backlog_author", attempt=0),
+                )
+            )
+        except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
+            raise typer.BadParameter(
+                f"backlog-definition run {upstream.run_id!r} has no valid backlog_author "
+                f"payload: {exc}"
+            ) from exc
 
     authored_paths: set[str] = set()
 
@@ -158,38 +175,46 @@ def _authoritative_backlog_prefix(
             for item in value.values():
                 _walk_payload(item)
 
-    _walk_payload(resolved.payload)
-    raw_refs = resolved.payload.get("artifact_refs")
-    refs = (
-        tuple(ref for ref in raw_refs if isinstance(ref, str)) if isinstance(raw_refs, list) else ()
-    )
     root = workspace_root.resolve()
-    for ref in refs:
-        _record_backlog_path(ref)
-        target = (root / ref).resolve()
-        if root not in target.parents or not target.is_file() or not ref.endswith(".json"):
-            continue
-        try:
-            document = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        artifact = document.get("artifact") if isinstance(document, dict) else None
-        if isinstance(artifact, dict):
-            _record_backlog_path(artifact.get("path"))
-    if not authored_paths:
-        raise typer.BadParameter(
-            f"backlog-definition run {upstream.run_id!r} produced no exact specs/backlog "
-            "artifact path in its backlog_author evidence"
+    # Every producer is swept, and a producer that authored nothing is a loud error rather
+    # than a silent hole in the release scope — the union being non-empty is not enough.
+    for upstream, resolved in resolved_payloads:
+        before = set(authored_paths)
+        _walk_payload(resolved.payload)
+        raw_refs = resolved.payload.get("artifact_refs")
+        refs = (
+            tuple(ref for ref in raw_refs if isinstance(ref, str))
+            if isinstance(raw_refs, list)
+            else ()
         )
+        for ref in refs:
+            _record_backlog_path(ref)
+            target = (root / ref).resolve()
+            if root not in target.parents or not target.is_file() or not ref.endswith(".json"):
+                continue
+            try:
+                document = json.loads(target.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            artifact = document.get("artifact") if isinstance(document, dict) else None
+            if isinstance(artifact, dict):
+                _record_backlog_path(artifact.get("path"))
+        if authored_paths == before:
+            raise typer.BadParameter(
+                f"backlog-definition run {upstream.run_id!r} produced no exact specs/backlog "
+                "artifact path in its backlog_author evidence"
+            )
+
+    producers = ", ".join(f"`{upstream.run_id}`" for upstream, _ in resolved_payloads)
     paths = "\n".join(f"- `{path}`" for path in sorted(authored_paths))
     directive = (
-        f"Exact producer run: `{upstream.run_id}`.\n"
+        f"Exact producer run(s): {producers}.\n"
         "The following authored backlog artifact(s) are the authoritative scope input "
         "for this release:\n"
         f"{paths}\n"
-        "Pick these items. Candidate-backlog scanning may sanitize or identify stale "
-        "neighbors, but it must not substitute a different candidate for this exact "
-        "producer output."
+        "Pick these items — ALL of them. Candidate-backlog scanning may sanitize or "
+        "identify stale neighbors, but it must not substitute a different candidate for, "
+        "or drop any of, this exact producer output."
     )
     return PromptPrefix.from_sections({"authoritative-backlog-definition": directive})
 
@@ -380,10 +405,18 @@ def release_define(
     ),
     release_id: str = typer.Option(..., "--release-id", help="Release id."),
     run_id: str = typer.Option("release-define", "--run-id", help="Lifecycle run id."),
-    backlog_run_id: str | None = typer.Option(
+    demand: str | None = typer.Option(
+        None,
+        "--demand",
+        help="Operator guidance injected into every executed model step as an "
+        "'## Operator demand' block — the channel for supplying the decision a "
+        "review asked for when resuming after a REJECTED verdict.",
+    ),
+    backlog_run_id: list[str] | None = typer.Option(
         None,
         "--backlog-run-id",
-        help="Exact completed backlog-definition run to consume. Auto-resolves only when unique.",
+        help="Completed backlog-definition run(s) to consume (repeatable). Default: every "
+        "completed producer for this context and release.",
     ),
     harness: str = typer.Option(
         "auto",
@@ -394,7 +427,7 @@ def release_define(
         None,
         "--step-harness",
         help="Per-step harness override 'step=harness' (repeatable); steps are the "
-        "§6.1 labels (release_scope, spec_create, spec_arch_review, ...).",
+        "step labels (definition_draft, definition_review).",
     ),
     step_model: list[str] | None = typer.Option(
         None,
@@ -467,7 +500,7 @@ def release_define(
         workspace_root,
         context=context,
         release_id=release_id,
-        backlog_run_id=backlog_run_id,
+        backlog_run_ids=tuple(backlog_run_id or ()),
     )
     workflow = container.build_release_definition_workflow(
         workspace_root,
@@ -487,6 +520,7 @@ def release_define(
         sequence,
         resume_from=resume_from,
         skip_scope=upstream_prefix is not None,
+        operator_demand=demand,
     )
 
     # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
@@ -501,16 +535,23 @@ def release_define(
     if result.completed:
         try:
             post_step_result = _apply_release_consume(
-                workspace_root, context=context, release_id=release_id
+                workspace_root,
+                context=context,
+                release_id=release_id,
+                scope_slugs=_scope_slugs(upstream_prefix),
             )
         except Exception as exc:  # noqa: BLE001 — surface, never swallow; do not corrupt the run.
             post_step_error = f"{type(exc).__name__}: {exc}"
 
-    status = (
-        LifecycleCommandStatus.OK.value
-        if result.completed
-        else LifecycleCommandStatus.BLOCKED.value
-    )
+    # A post-step failure is a FAILURE of this command, not a footnote on a success. The
+    # status used to come purely from result.completed and the non-zero exit only from a
+    # blocked run, so a release whose post-step raised (e.g. it consumed none of the
+    # backlog its own scope directive declared mandatory) still reported status OK and
+    # exited 0 — the detection was real and the verdict was not
+    # (bug r6f-release-completes-with-unconsumed-authoritative-backlog, reported by the
+    # consumer-side validator against a live worker).
+    succeeded = result.completed and post_step_error is None
+    status = LifecycleCommandStatus.OK.value if succeeded else LifecycleCommandStatus.BLOCKED.value
     if json_output:
         _emit_json(
             {
@@ -531,6 +572,7 @@ def release_define(
                 "blocked": result.blocked.to_dict() if result.blocked else None,
                 "post_step": post_step_result,
                 "post_step_error": post_step_error,
+                "warnings": list(getattr(result, "warnings", ())),
             }
         )
     else:
@@ -542,8 +584,21 @@ def release_define(
             typer.echo(f"  post_step: {post_step_result}")
         if post_step_error is not None:
             typer.echo(f"  post_step ERROR: {post_step_error}")
-    if not result.completed:
+        for warning in getattr(result, "warnings", ()):
+            typer.secho(f"  {warning}", fg=typer.colors.YELLOW, err=True)
+    if not succeeded:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
+
+
+#: Matches an authored backlog item path inside the authoritative-scope directive.
+_SCOPE_ITEM_RE = re.compile(r"`(?:[^`]*/)?specs/backlog/(?P<slug>[a-z][a-z0-9-]*)\.md`")
+
+
+def _scope_slugs(prefix: PromptPrefix | None) -> tuple[str, ...]:
+    """The backlog slugs the run declared as mandatory release scope (empty when none)."""
+    if prefix is None:
+        return ()
+    return tuple(dict.fromkeys(m.group("slug") for m in _SCOPE_ITEM_RE.finditer(prefix.text)))
 
 
 def _apply_release_consume(
@@ -551,6 +606,7 @@ def _apply_release_consume(
     *,
     context: str,
     release_id: str,
+    scope_slugs: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Write the consumed_backlog ledger from the release SPEC's ``**Consumes:**`` line.
 
@@ -570,6 +626,20 @@ def _apply_release_consume(
     )
     spec_text = spec_path.read_text(encoding="utf-8") if spec_path.exists() else ""
     slugs = parse_consumes_line(spec_text)
+
+    # A run that declared an authoritative scope must consume it. Reporting success with an
+    # empty ledger while the run's own directive named N mandatory items is the
+    # declared-but-never-verified failure mode (bug
+    # release-definition-consumes-nothing-while-scope-declares-items): the operator cannot
+    # tell a definition that consumed the set from one that silently dropped it.
+    dropped = [slug for slug in scope_slugs if slug not in set(slugs)]
+    if dropped:
+        raise ScopeNotConsumedError(
+            f"release {release_id!r} declared {len(scope_slugs)} backlog item(s) as "
+            f"authoritative scope but its SPEC does not consume: {', '.join(dropped)}. "
+            "Add them to the SPEC's `**Consumes:**` line, or narrow the scope with "
+            "--backlog-run-id."
+        )
 
     if not slugs:
         return {"consumed_slugs": [], "shipped_anchors": [], "ledger": None}
@@ -1005,9 +1075,13 @@ def _implementation_runtime_factory(
         label = parts[1] if len(parts) > 1 else ""
         refs = [step_output_ref]
         if label == "close" and release_id is not None:
+            # The repo DIRECTORY is the registered slug, not the context name — using the
+            # name put CLOSURE.md outside the declared write scope, so the close step was
+            # refused (bug a2-fake-implementation-close-closure-out-of-scope).
+            slug = repo_slug_for_context(workspace_root, context)
             specs_prefix = (
-                f"repos/{context}/specs"
-                if (workspace_root / "repos" / context / "specs").is_dir()
+                f"repos/{slug}/specs"
+                if (workspace_root / "repos" / slug / "specs").is_dir()
                 else "specs"
             )
             closure_ref = f"{specs_prefix}/releases/{release_id}/CLOSURE.md"

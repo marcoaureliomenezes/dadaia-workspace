@@ -98,7 +98,7 @@ def test_banner_does_not_exempt_dehydrated_agents_md(tmp_path: Path) -> None:
             id="bannered-skill-with-ritual-passes",
         ),
         pytest.param(
-            "lifecycle_fragments/release_definition/spec-create.md",
+            "lifecycle_fragments/release_definition/definition_draft.md",
             lambda: _NUMBERED_RESERVE_RITUAL + _SDD_HARD_STOP_BLOCK,
             False,
             None,

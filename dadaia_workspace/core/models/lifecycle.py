@@ -55,6 +55,19 @@ class AgentRuntimeKind(StrEnum):
     PI_HEADLESS = "pi_headless"
 
 
+#: The ``--harness`` name the CLI accepts for each Layer-2 runtime kind. The enum VALUE is
+#: not that name (``codex_exec`` is not a valid ``--harness``), so anything that renders an
+#: operator-facing command must map through here — a prescribed remedy that names a harness
+#: the CLI rejects is unusable as printed
+#: (bugs r6h-backlog-remedy-command-loses-fake-harness, r9-plan-review-missing-operator-command).
+#: One definition, shared by the CLI's parser and by every workflow that prescribes a resume.
+HARNESS_CLI_NAMES: dict[AgentRuntimeKind, str] = {
+    AgentRuntimeKind.FAKE: "fake",
+    AgentRuntimeKind.CODEX_EXEC: "codex",
+    AgentRuntimeKind.PI_HEADLESS: "pi",
+}
+
+
 class AgentRunStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"

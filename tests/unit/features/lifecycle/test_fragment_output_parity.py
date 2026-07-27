@@ -48,16 +48,11 @@ _ARTIFACT_REFS = (".dadaia/handoff/dadaia-workspace/step.handoff.json",)
 #: adapters stringify structured_output values during extraction. Every value the
 #: fragment workflow reads downstream lives in ``structured_output`` so the two native
 #: transports extract a byte-identical dict.
+#: release_definition now ships exactly TWO schemas: one draft step and one review.
+#: Collapsing 7 steps to 3 removed the per-artifact draft/verdict schema zoo.
 _SCHEMA_PAYLOADS: dict[str, dict[str, str]] = {
-    # review-verdict schemas
-    "spec-review-verdict-v1": {"verdict": "APPROVED", "task_group": "spec_review_architecture"},
-    "plan-review-verdict-v1": {"verdict": "REJECTED", "task_group": "plan_review"},
-    "tasks-review-verdict-v1": {"verdict": "APPROVED", "task_group": "tasks_review"},
-    # draft / handoff schemas
-    "release-scope-handoff-v1": {"verdict": "APPROVED", "scope_id": "scope-1"},
-    "release-spec-draft-v1": {"verdict": "APPROVED", "draft": "spec"},
-    "release-plan-draft-v1": {"verdict": "APPROVED", "draft": "plan"},
-    "release-tasks-draft-v1": {"verdict": "APPROVED", "draft": "tasks"},
+    "generic-step-handoff-v1": {"verdict": "APPROVED", "scope_id": "scope-1"},
+    "combined-review-handoff-v1": {"verdict": "APPROVED", "task_group": "definition_review"},
 }
 
 

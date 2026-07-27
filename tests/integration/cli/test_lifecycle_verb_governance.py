@@ -45,8 +45,8 @@ _VERBS: list[tuple[str, list[str], str, str, str, str]] = [
         ["release-definition"],
         "gov-reldef",
         "release_definition",
-        "release_scope",
-        "release_scope",
+        "definition_draft",
+        "definition_draft",
     ),
     (
         "backlog-define",

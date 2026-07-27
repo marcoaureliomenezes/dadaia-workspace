@@ -6,6 +6,7 @@ import contextlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
@@ -97,10 +98,19 @@ from dadaia_workspace.infrastructure.runtime_config import (
     codex_hooks as _build_codex_hooks,
 )
 from dadaia_workspace.infrastructure.runtime_config import (
+    dadaia_owned_claude_settings as _dadaia_owned_claude_settings,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
+    foreign_claude_hook_commands as _foreign_claude_hook_commands,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
     kimi_code_home,
     kimi_hook_shims,
     kimi_hooks_block,
     upsert_kimi_hooks_block,
+)
+from dadaia_workspace.infrastructure.runtime_config import (
+    merge_claude_settings as _merge_claude_settings,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex import transform_for_codex
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
@@ -917,13 +927,7 @@ class FileSystemPublicAssetManager:
 
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:
-            reports.append(
-                self._compare_content(
-                    _json_dump(_build_claude_settings(workspace_root)),
-                    workspace_root / ".claude" / "settings.json",
-                    "claude:settings.json",
-                )
-            )
+            reports.extend(self._doctor_claude_settings(workspace_root))
         elif (workspace_root / ".claude").exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
 
@@ -1071,12 +1075,68 @@ class FileSystemPublicAssetManager:
                 continue
             copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
         if only is None:
-            write_generated(
-                claude_dir / "settings.json",
-                _json_dump(_build_claude_settings(workspace_root)),
-                force,
-                installed,
+            self._install_claude_settings(claude_dir, workspace_root, force, installed)
+
+    def _install_claude_settings(
+        self, claude_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+    ) -> None:
+        """Fold dadaia's hook wiring into ``.claude/settings.json``, preserving the rest.
+
+        ``settings.json`` belongs to the OPERATOR — Claude Code documents it as the home of
+        ``permissions``, ``model``, ``env`` and their own hooks. The previous whole-file
+        write erased all of it silently while printing ``[ok]``
+        (bug ``claude-install-destroys-operator-settings``). An unparseable file is never
+        clobbered: we refuse loudly instead, because overwriting is the one outcome the
+        operator can neither detect nor undo.
+        """
+        dst = claude_dir / "settings.json"
+        existing: dict[str, object] | None = None
+        if dst.exists():
+            try:
+                loaded = json.loads(dst.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, ValueError, OSError) as exc:
+                raise PublicAssetError(
+                    f"{dst} is not readable JSON ({exc}). It carries operator settings, so "
+                    "dadaia will not overwrite it. Fix or move the file, then re-run install."
+                ) from None
+            existing = loaded if isinstance(loaded, dict) else None
+        write_generated(
+            dst, _json_dump(_merge_claude_settings(existing, workspace_root)), force, installed
+        )
+
+    def _doctor_claude_settings(self, workspace_root: Path) -> list[str]:
+        """Doctor ONLY the dadaia-owned hook wiring inside ``.claude/settings.json``.
+
+        Comparing the whole file made an operator's own ``permissions`` key read ``[drift]``
+        — and the documented remedy for drift is to re-run install, which is exactly what
+        used to destroy it.
+        """
+        label = "claude:settings.json"
+        dst = workspace_root / ".claude" / "settings.json"
+        if not dst.exists():
+            return [f"[missing] {label}"]
+        try:
+            loaded = json.loads(dst.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, ValueError, OSError):
+            return [f"[drift] {label} (not readable JSON)"]
+        if not isinstance(loaded, dict):
+            return [f"[drift] {label} (not a JSON object)"]
+        canonical = _build_claude_settings(workspace_root)
+        if _dadaia_owned_claude_settings(loaded) != _dadaia_owned_claude_settings(canonical):
+            return [f"[drift] {label}"]
+        reports = [f"[ok] {label}"]
+        # Preserving the operator's hooks must not mean going BLIND to them. Narrowing the
+        # comparison to the owned slice (so an operator key is no longer called drift) also
+        # silenced a foreign entry added to a dadaia-wired event — a local hook-injection
+        # foothold. It is the operator's file, so this is never [drift]; it is surfaced as a
+        # non-blocking [warn] naming every foreign command, so "doctor green" cannot hide it.
+        foreign = _foreign_claude_hook_commands(loaded, canonical)
+        if foreign:
+            reports.append(
+                f"[warn] {label}: non-dadaia hook command(s) in gated event(s) — "
+                + ", ".join(foreign)
             )
+        return reports
 
     def _install_codex(
         self,
@@ -1254,7 +1314,19 @@ class FileSystemPublicAssetManager:
             label = f"kimi-code:hooks/{name}"
             line = self._compare_content(content, dst, label)
             if line.startswith("[ok]") and not os.access(dst, os.X_OK):
-                line = f"[drift] {label} (not executable)"
+                # The installer chmods 0o755, so cleared mode bits ARE repairable drift.
+                # Intact mode bits with X_OK denied means the MOUNT forbids execution
+                # (noexec) — reinstalling can never fix that, so reporting it as drift
+                # sent every consumer into a repair loop and failed `reconcile` with
+                # rollback_required (bug kimi-hooks-noexec-home-reported-as-repairable-drift).
+                if dst.stat().st_mode & stat.S_IXUSR:
+                    line = (
+                        f"[unsupported] {label} (filesystem mounted noexec — the exec bits "
+                        "are set but the mount forbids execution; point KIMI_CODE_HOME at a "
+                        "path on an executable filesystem)"
+                    )
+                else:
+                    line = f"[drift] {label} (not executable)"
             reports.append(line)
         config_path = home / "config.toml"
         block_label = "kimi-code:config.toml managed hooks block"

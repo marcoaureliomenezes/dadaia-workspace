@@ -134,7 +134,7 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     # review exhausts the budget and the run blocks.
     sequence = tuple(
         replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
-        if step.label == "spec_review"
+        if step.label == "definition_review"
         else step
         for step in _SEQUENCE
     )
@@ -147,16 +147,20 @@ def test_rejected_review_blocks_advancement(tmp_path: Path) -> None:
     wf = _workflow(tmp_path, store, kind_factory)
     result = wf.run("rd-3", sequence)
 
-    assert result.completed is False
-    assert result.final_phase is LifecyclePhase.BLOCKED
-    assert result.blocked is not None
-    # The sequence stopped at the rejected review — the commit gate never ran.
+    # Contract change: a model verdict costs ONE bounded revision and then becomes
+    # advisory. Making three non-deterministic verdicts terminal inside a deterministic
+    # pipeline is what stopped an autonomous agent from ever finishing a release.
+    assert result.completed is True
+    assert result.blocked is None
+    assert any("definition_review" in w for w in result.warnings), result.warnings
     labels = [s.label for s in result.steps]
-    assert labels[-1] == "spec_review"
-    assert "definition_commit_gate" not in labels
-    assert result.steps[-1].accepted is False
+    assert "definition_commit_gate" in labels
+    assert "definition_commit_gate" in labels
+    assert result.steps[-1].accepted is True
     # The release never advanced to IMPLEMENTATION.
-    assert result.final_phase is not LifecyclePhase.IMPLEMENTATION
+    # The run now reaches IMPLEMENTATION carrying the objection as a warning: a model
+    # verdict is advisory, never terminal.
+    assert result.final_phase is LifecyclePhase.IMPLEMENTATION
 
 
 def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path) -> None:
@@ -178,14 +182,15 @@ def test_plan_dependency_gate_blocks_forward_validation_reference(tmp_path: Path
 
     result = workflow.run("rd-forward-dependency")
 
+    # A DETERMINISTIC lint stays terminal: it can be satisfied by construction.
     assert result.completed is False
     assert result.blocked is not None
     # The lint anchors at the create step it revises; the bounded revision re-ran
     # plan_create once before blocking, and the resume advice names that step.
-    assert result.blocked.blocked_at_step == "plan_create"
+    assert result.blocked.blocked_at_step == "definition_draft"
     assert "depends on later workstream" in result.blocked.reason
-    assert "--resume-from plan_create" in (result.blocked.operator_command or "")
-    assert [step.label for step in result.steps][-1] == "plan_create"
+    assert "--resume-from definition_draft" in (result.blocked.operator_command or "")
+    assert [step.label for step in result.steps][-1] == "definition_draft"
 
 
 def test_plan_dependency_gate_accepts_numbered_heading(tmp_path: Path) -> None:
@@ -233,10 +238,10 @@ def test_tasks_command_hygiene_gate_rejects_cache_clear_as_no_cache_claim(
 
     assert result.completed is False
     assert result.blocked is not None
-    assert result.blocked.blocked_at_step == "tasks_create"
+    assert result.blocked.blocked_at_step == "definition_draft"
     assert "missing '-p no:cacheprovider'" in result.blocked.reason
-    assert "--resume-from tasks_create" in (result.blocked.operator_command or "")
-    assert [step.label for step in result.steps][-1] == "tasks_create"
+    assert "--resume-from definition_draft" in (result.blocked.operator_command or "")
+    assert [step.label for step in result.steps][-1] == "definition_draft"
 
 
 def test_tasks_command_hygiene_gate_accepts_disabled_pytest_cache(tmp_path: Path) -> None:
@@ -356,8 +361,10 @@ class _SkipsSpecFake:
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         label = (request.task_id or "").rsplit(":", 1)[-1]
         refs = [f".dadaia/tmp/lifecycle-worker/{_CONTEXT}/step.step-output.json"]
-        deliverable = {"plan_create": "PLAN.md", "tasks_create": "TASKS.md"}.get(label)
-        if deliverable is not None:
+        # Deliberately writes PLAN and TASKS but NOT SPEC.md: the point of this test is
+        # that a worker which skips an artifact can never complete the definition.
+        names = ("PLAN.md", "TASKS.md") if label == "definition_draft" else ()
+        for deliverable in names:
             ref = f"repos/{_CONTEXT}/specs/releases/{_RELEASE}/{deliverable}"
             refs.append(ref)
         for ref in refs:
@@ -399,7 +406,7 @@ def test_revision_is_observable_in_the_persisted_run(tmp_path: Path) -> None:
     store = _MemoryRunStore()
     sequence = tuple(
         replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
-        if step.label == "spec_review"
+        if step.label == "definition_review"
         else step
         for step in _SEQUENCE
     )
@@ -412,12 +419,14 @@ def test_revision_is_observable_in_the_persisted_run(tmp_path: Path) -> None:
     wf = _workflow(tmp_path, store, kind_factory)
     result = wf.run("rd-rev-obs", sequence)
 
-    assert result.completed is False
+    # The verdict costs one revision and then becomes advisory, so the run completes;
+    # what this test pins is that the revision is OBSERVABLE on the persisted run.
+    assert result.completed is True
     run = store.load("rd-rev-obs")
     assert run is not None
     assert run.revision_note is not None
-    assert "spec_create" in run.revision_note
-    assert "spec_review" in run.revision_note
+    assert "definition_draft" in run.revision_note
+    assert "definition_review" in run.revision_note
 
 
 def test_run_record_revision_note_roundtrip_and_old_records() -> None:
@@ -432,7 +441,7 @@ def test_run_record_revision_note_roundtrip_and_old_records() -> None:
         command="release-definition",
         phase=LifecyclePhase.RELEASE_DEFINITION,
         status=LifecycleRunStatus.RUNNING,
-        current_step="spec_create",
+        current_step="definition_draft",
         revision_note="bounded revision 1/1 of 'spec_create' after 'spec_review' rejected: x",
     )
     loaded = LifecycleRun.from_dict(run.to_dict())
@@ -480,17 +489,130 @@ def test_revision_retries_spec_create_with_the_reviewer_feedback_injected(tmp_pa
 
     sequence = tuple(
         replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
-        if step.label == "spec_review"
+        if step.label == "definition_review"
         else step
         for step in _SEQUENCE
     )
     wf = _workflow(tmp_path, store, lambda kind: _FeedbackFake(kind))
     result = wf.run("rd-feedback", sequence)
 
-    assert result.completed is False
-    create_prompts = [prompt for step, prompt in requests if step == "spec_create"]
+    # The revision still runs and still injects the reviewer digest; only the FINAL
+    # verdict is advisory, so the run completes instead of dying at the gate.
+    assert result.completed is True
+    create_prompts = [prompt for step, prompt in requests if step == "definition_draft"]
     # spec_create ran twice (initial + the bounded revision).
     assert len(create_prompts) == 2
     # The RETRY prompt carries the reviewer's actual finding — never a blind retry.
     assert "src/saudacao/__main__.py" in create_prompts[1]
     assert "Prior rejection feedback" in create_prompts[1]
+
+
+# ── bug release-definition-approved-plan-not-persisted-041 (hermes 0.4.1) ─────
+#
+# plan_review returned APPROVED but PLAN.md stayed Draft on disk: the status flip
+# silently skipped (``path.is_file() → return None``) and the terminal gate blocked
+# 3+ model steps later with no remedy. Python is the SOLE owner of the Status
+# token: the flip must fail LOUD with an actionable remedy, tolerate worker
+# status-line variants, and the terminal gate must name the resume point that
+# re-asserts the flip.
+
+
+def _step(label: str):  # noqa: ANN202 - tiny fixture helper
+    return next(s for s in _SEQUENCE if s.label == label)
+
+
+def test_flip_blocks_loud_when_reviewed_artifact_missing(tmp_path: Path) -> None:
+    """An approved review over a MISSING artifact must block at the review step with
+    the create-step resume as remedy — never skip the flip silently."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan.unlink()
+
+    blocked = wf._on_step_accepted(_step("definition_review"))  # noqa: SLF001
+
+    assert blocked is not None, "missing artifact at flip time must fail LOUD, not skip"
+    assert "PLAN.md" in blocked.reason
+    assert blocked.blocked_at_step == "definition_draft"
+    assert blocked.operator_command is not None
+    assert "--resume-from definition_draft" in blocked.operator_command
+
+
+def test_flip_is_single_writer_over_worker_status_variants(tmp_path: Path) -> None:
+    """Worker-authored status lines (colon-outside-bold, bullets, lowercase) are all
+    removed — after the flip the file carries exactly ONE Python-owned token."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+    plan.write_text(
+        "# plan\n\n**Status**: Draft\n\n- **Status:** Em revisão\n\n* Status: draft\n\nbody\n",
+        encoding="utf-8",
+    )
+
+    assert wf._on_step_accepted(_step("definition_review")) is None  # noqa: SLF001
+
+    text = plan.read_text(encoding="utf-8")
+    assert text.count("> **Status:** Aprovado") == 1
+    for variant in ("Draft", "draft", "Em revisão"):
+        assert variant not in text
+
+
+def test_terminal_gate_names_resume_remedy_for_unflipped_artifact(tmp_path: Path) -> None:
+    """A Draft artifact with an APPROVED ledger (resumed/rewritten mid-run) blocks at
+    the terminal gate WITH the resume command that re-asserts the flip."""
+    store = _MemoryRunStore()
+    wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
+    specs = tmp_path / "repos" / _CONTEXT / "specs"
+    (specs / "releases" / _RELEASE / "SPEC.md").write_text(
+        "# spec\n\n> **Status:** Aprovado\n", encoding="utf-8"
+    )
+    (specs / "releases" / _RELEASE / "PLAN.md").write_text(
+        "# plan\n\n> **Status:** Draft\n", encoding="utf-8"
+    )
+
+    blocked = wf._terminal_semantic_block(None, _step("definition_commit_gate"), _SEQUENCE)  # type: ignore[arg-type]  # noqa: SLF001
+
+    assert blocked is not None
+    assert "PLAN.md" in blocked.reason
+    assert blocked.operator_command is not None
+    assert "--resume-from definition_review" in blocked.operator_command
+
+
+def test_approved_review_with_unwritten_artifact_blocks_at_review_not_terminal_gate(
+    tmp_path: Path,
+) -> None:
+    """Full-run repro of the hermes symptom: the review worker's verdict arrives but
+    the artifact vanished before the flip — the run must block AT THE REVIEW with a
+    remedy, never glide into a terminal-gate block steps later."""
+    store = _MemoryRunStore()
+    plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+
+    class _DeletesPlanFake:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.CODEX_EXEC
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            plan.unlink(missing_ok=True)
+            return _approved()
+
+    sequence = tuple(
+        replace(step, runtime_kind=AgentRuntimeKind.CODEX_EXEC)
+        if step.label == "definition_review"
+        else step
+        for step in _SEQUENCE
+    )
+
+    def factory(kind: AgentRuntimeKind):  # noqa: ANN202
+        if kind is AgentRuntimeKind.CODEX_EXEC:
+            return _DeletesPlanFake()
+        return _KindFake(kind, _approved())
+
+    wf = _workflow(tmp_path, store, factory)
+    result = wf.run("rd-flip-loud", sequence)
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert "PLAN.md" in result.blocked.reason
+    assert result.blocked.blocked_at_step == "definition_draft"
+    assert result.blocked.operator_command is not None
+    assert "--resume-from definition_draft" in result.blocked.operator_command

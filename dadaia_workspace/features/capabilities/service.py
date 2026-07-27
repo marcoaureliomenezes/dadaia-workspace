@@ -5,6 +5,7 @@ from __future__ import annotations
 from importlib import metadata
 from typing import Any
 
+from dadaia_workspace.core.spec_status import CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 
 CAPABILITY_SCHEMA_VERSION = "dadaia-capabilities-v1"
@@ -27,7 +28,12 @@ def build_capabilities() -> dict[str, Any]:
         },
         "specs": {
             "pattern_version": CANONICAL_SPECS_VERSION,
-            "status_tokens": ["Draft", "Em revisão", "Aprovado"],
+            # DERIVED, never a second copy: capabilities is what consumer-side
+            # validators read to learn the contract, so a hardcoded list here drifts
+            # from the doctor that actually enforces it (the class behind
+            # doctor-root-whitelist-contradicts-root-law and
+            # root-whitelist-message-drifts-from-policy). Sorted for a stable payload.
+            "status_tokens": sorted(CANONICAL_STATUS),
             "commands": [
                 "dadaia specs init",
                 "dadaia specs doctor --json",

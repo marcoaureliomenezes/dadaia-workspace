@@ -106,25 +106,34 @@ def current_pricing(entry: ModelEntry) -> ModelPricing:
 REGISTRY: tuple[ModelEntry, ...] = (
     ModelEntry(
         claude_id="claude-fable-5",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026, 6, 1)),),
         tier="deep",
     ),
     ModelEntry(
         claude_id="claude-opus-4-7",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),),
         tier="dispatch",
     ),
     ModelEntry(
         claude_id="claude-opus-4-8",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),),
         tier="dispatch",
     ),
     ModelEntry(
+        # Claude Opus 5 — the current Opus-tier model (operator remap). Shares the
+        # dispatch tier with 4.7/4.8, so it MUST carry their codex_id: a tier
+        # resolving to two Codex ids raises in ``_codex_id_for_tier``.
+        claude_id="claude-opus-5",
+        codex_id="gpt-5.6-sol",
+        pricing=(ModelPricing(5.00, 25.00, 6.25, 0.50, date(2026, 7, 1)),),
+        tier="dispatch",
+    ),
+    ModelEntry(
         claude_id="claude-sonnet-4-6",
-        codex_id="gpt-5.3-codex",
+        codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),),
         tier="plugin",
     ),
@@ -135,7 +144,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         # violates the _codex_id_for_tier / codex_tier_views invariants. The
         # 'plugin' tier-NAME mismatch is a tracked backlog return.
         claude_id="claude-sonnet-5",
-        codex_id="gpt-5.3-codex",
+        codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2026, 7, 1)),),
         tier="plugin",
     ),

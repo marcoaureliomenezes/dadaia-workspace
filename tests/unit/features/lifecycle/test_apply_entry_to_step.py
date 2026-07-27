@@ -110,7 +110,7 @@ _STRUCTURAL_CASES = (
         ReleaseStep(
             label="release_scope",
             role="product-engineer",
-            fragment_id="release_definition.release_scope",
+            fragment_id="release_definition.definition_draft",
             runtime_kind=AgentRuntimeKind.CODEX_EXEC,
         ),
         "release_scope",

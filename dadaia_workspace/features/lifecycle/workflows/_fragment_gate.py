@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import ClassVar, Protocol
 
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRunResult,
     AgentRuntimeKind,
     BlockedState,
@@ -71,7 +72,7 @@ from dadaia_workspace.features.lifecycle.context_selector import (
 )
 from dadaia_workspace.features.lifecycle.fragments.loader import Fragment, FragmentLoader
 from dadaia_workspace.features.lifecycle.personas.loader import resolve_persona_for_role
-from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
+from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError, RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     FragmentBundle,
     LifecyclePromptBuilder,
@@ -83,7 +84,11 @@ from dadaia_workspace.features.lifecycle.prompt_builder import (
     worker_output_glob,
 )
 from dadaia_workspace.features.lifecycle.role_atoms import inject_role_atoms
-from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import (
+    emit_progress,
+    refuse_blocked_restart,
+    refuse_completed_rerun,
+)
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     _NO_RELEASE_CONTEXT_COMMANDS,
@@ -163,6 +168,43 @@ def _is_rejected_verdict(blocked: BlockedState | None) -> bool:
     return "rejected" in blocked.reason.lower()
 
 
+def prescribe_review_recovery(
+    blocked: BlockedState,
+    *,
+    command: str,
+    context: str,
+    release_id: str,
+    run_id: str,
+    create_step: str,
+    runtime_kind: AgentRuntimeKind,
+) -> BlockedState:
+    """Attach the exact recovery command to a rejected-review block.
+
+    A reviewer returns a verdict and findings; it never fills ``operator_command``. The
+    engine spends one bounded in-run revision and then returned that RAW block, so a
+    release whose review rejected twice handed the operator a rejection and no way
+    forward — the validator's report was that it could not proceed "without inventing a
+    change" (bug r9-plan-review-missing-operator-command). Every other gate prescribes
+    its recovery; this is the one a real release hits most often.
+
+    The command names the SAME run, the create step this review consumes, and the run's
+    OWN harness — a remedy that silently switches runtime is its own bug
+    (r6h-backlog-remedy-command-loses-fake-harness). An ``operator_command`` that is
+    already set is never overwritten: a more specific gate remedy always wins.
+    """
+    if blocked.operator_command:
+        return blocked
+    verb = command.replace("_", "-")
+    return replace(
+        blocked,
+        operator_command=(
+            f"dadaia lifecycle {verb} --context {context} --release-id {release_id} "
+            f"--run-id {run_id} --harness {HARNESS_CLI_NAMES.get(runtime_kind, 'codex')} "
+            f"--resume-from {create_step}  # address the review findings above, then re-run"
+        ),
+    )
+
+
 class _FragmentAssemblyMixin:
     """Pure fragment-assembly helpers shared by the base and ``BacklogDefinitionWorkflow``.
 
@@ -177,6 +219,22 @@ class _FragmentAssemblyMixin:
     _selector: ContextSelector
     _context: str
     _release_id: str
+
+    @property
+    def _repo_slug(self) -> str:
+        """The repo DIRECTORY name for this context — derived, never assumed.
+
+        Path templates carry ``repos/{context}/…``, and formatting them with the context
+        NAME broke every context whose name differs from its ``--repo`` slug: the write
+        scope pointed at a directory that does not exist, so the worker's write fell out of
+        scope and the run reported success having written nothing
+        (bug a1-context-specs-resolution-ignores-repo-slug).
+
+        Taken from the already-resolved ``specs_dir`` (``<ws>/repos/<slug>/specs``) rather
+        than re-derived from the registry, so there is exactly one resolution and the
+        template can never disagree with the directory the selector actually reads.
+        """
+        return self._selector.spec_context.specs_dir.parent.name
 
     # -- static-input injection (folded into the cacheable prefix) -------
 
@@ -288,7 +346,7 @@ class _FragmentAssemblyMixin:
         # specs/releases/) declares it on the step model; placeholders are expanded
         # against this workflow's context/release.
         extra = tuple(
-            pattern.format(context=self._context, release_id=self._release_id)
+            pattern.format(context=self._repo_slug, release_id=self._release_id)
             for pattern in getattr(step, "extra_allowed_paths", ())
         )
         extra = filter_context_spec_paths(
@@ -338,6 +396,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
     #: The phase the terminal gate transitions to on success, or ``None`` to COMPLETE in place
     #: with no transition (``release_definition`` → IMPLEMENTATION; audit keeps its phase).
     _TERMINAL_PHASE: ClassVar[LifecyclePhase | None] = None
+
+    #: Advisory review objections from the last ``run()`` — reviews accepted after their
+    #: bounded revision was spent. A model verdict is advisory, never terminal, but it is
+    #: never silent either: bodies attach these to their result so the operator sees them.
+    _last_warnings: tuple[str, ...] = ()
+    #: Advisory objections collected during the current ``run()`` (drained into the result).
+    _advisories: list[str]
 
     def __init__(
         self,
@@ -452,6 +517,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED
             # run id refuses cleanly; blocked runs stay restartable/resumable.
             refuse_completed_rerun(self._run_store, run_id)
+            refuse_blocked_restart(self._run_store, run_id)
             # Restart semantics: a fresh run over an existing run_id replaces the record
             # (and its ledger), so reclaim the orphaned payload zone first — otherwise the
             # prior generation's immutable attempt-0 files block this run's produce() (bug
@@ -482,10 +548,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         else:
             labels = tuple(step.label for step in sequence)
             if resume_from not in labels:
-                raise ValueError(
-                    f"resume_from step {resume_from!r} is not in the "
-                    f"{self._WORKFLOW_LABEL} sequence {labels}"
-                )
+                raise InvalidResumeStepError.for_labels(resume_from, labels)
             prior = self._run_store.load(run_id)
             if prior is None:
                 raise ValueError(
@@ -535,6 +598,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
 
         outcomes: list[_StepOutcome] = []
         revisions_used: dict[str, int] = {}
+        self._advisories = []
         steps_seq = list(remaining)
         idx = 0
         while idx < len(steps_seq):
@@ -553,7 +617,24 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             if step.fragment_id is None:
                 run, outcome = self._run_terminal_gate(run, step, sequence)
             else:
-                run, outcome = self._run_model_step(run, step, sequence)
+                run, outcome = self._run_model_step(
+                    run,
+                    step,
+                    sequence,
+                    # Once this review has spent its one bounded revision its verdict becomes
+                    # ADVISORY: a further REJECTED is recorded as a warning, never a block.
+                    # A model verdict is never terminal: it is advisory once its one
+                    # bounded revision is spent, AND immediately when there is no create
+                    # step to revise (otherwise such a review would block forever, which is
+                    # the very deadlock this rule removes).
+                    review_is_advisory=bool(
+                        getattr(step, "is_review", False)
+                        and (
+                            revisions_used.get(f"review:{step.label}", 0) >= 1
+                            or self._revision_target(step, list(sequence)) is None
+                        )
+                    ),
+                )
             if live_step:
                 emit_progress(
                     f"{self._WORKFLOW_LABEL} step {step.label!r} "
@@ -590,6 +671,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     if revised is not None:
                         run, idx = revised
                         continue
+                    self._last_warnings = tuple(self._advisories)
                     return self._make_result(
                         run_id=run_id,
                         completed=False,
@@ -600,15 +682,15 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 idx += 1
                 continue
             # Review REJECTED verdict: one bounded in-run revision of the create step
-            # this review consumes, with the rejection digest injected — the automatic
-            # replacement for a block-and-manual-resume round-trip.
+            # this review consumes, with the rejection digest injected.
             if step.is_review and run.blocked is not None and _is_rejected_verdict(run.blocked):
                 target = self._revision_target(step, steps_seq)
+                rejection = run.blocked
                 if target is not None:
                     revised = self._begin_revision(
                         run,
                         target_label=target,
-                        blocked=run.blocked,
+                        blocked=rejection,
                         steps_seq=steps_seq,
                         revisions_used=revisions_used,
                         budget_key=f"review:{step.label}",
@@ -616,6 +698,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     if revised is not None:
                         run, idx = revised
                         continue
+                # The budget is now spent, so the NEXT attempt of this review runs in
+                # ADVISORY mode (see the ``review_is_advisory`` argument at the call site):
+                # a further REJECTED verdict is recorded as a warning and the step proceeds,
+                # payload and all. Reaching this line therefore means the block is not a
+                # model verdict — fall through and report it like any deterministic block.
+                del rejection
+            self._last_warnings = tuple(self._advisories)
             return self._make_result(
                 run_id=run_id,
                 completed=False,
@@ -628,6 +717,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         # (e.g. release_definition rewrites ACTIVE.md). Runs only on a FULLY completed
         # sequence — a blocked run never reaches it.
         self._on_sequence_completed()
+        self._last_warnings = tuple(self._advisories)
         return self._make_result(
             run_id=run_id,
             completed=True,
@@ -727,7 +817,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
     # -- model step ------------------------------------------------------
 
     def _run_model_step(
-        self, run: LifecycleRun, step: StepT, sequence: tuple[StepT, ...]
+        self,
+        run: LifecycleRun,
+        step: StepT,
+        sequence: tuple[StepT, ...],
+        *,
+        review_is_advisory: bool = False,
     ) -> tuple[LifecycleRun, _StepOutcome]:
         assert step.fragment_id is not None
         fragment = self._loader.load_fragment(step.fragment_id)
@@ -753,6 +848,14 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         run = record_injected_context(run, audit)
 
         selected = self._render_selection(audit)
+        # Bug release-definition-has-no-demand-channel-for-review-corrections: when a
+        # review REJECTS, the operator's only channel into the next attempt was the
+        # engine's own rejection digest — they could not supply the decision the reviewer
+        # asked for, only re-roll. An operator demand, when supplied, is injected into
+        # every executed model step exactly as backlog-definition already does.
+        demand_text = getattr(self, "_operator_demand", None)
+        if demand_text:
+            selected = "\n\n".join(filter(None, (f"## Operator demand\n\n{demand_text}", selected)))
         # One-shot prior-rejection digest for the resume-point step (bug
         # resumed-definition-step-blind-to-rejecting-review-feedback).
         resume_digest = self._resume_feedback.pop(step.label, None)
@@ -804,12 +907,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             # release-definition-completes-without-persisting-artifacts): the step
             # passes only when ITS artifact was written, not any write in the zone.
             deliverable_globs = (
-                f"repos/{self._context}/specs/releases/{self._release_id}/{step_deliverable}",
+                f"repos/{self._repo_slug}/specs/releases/{self._release_id}/{step_deliverable}",
                 f"specs/releases/{self._release_id}/{step_deliverable}",
             )
         else:
             deliverable_globs = tuple(
-                pattern.format(context=self._context, release_id=self._release_id)
+                pattern.format(context=self._repo_slug, release_id=self._release_id)
                 for pattern in getattr(step, "extra_allowed_paths", ())
             )
         worker_result, blocked = runner.evaluate_gate_with_result(
@@ -822,6 +925,20 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 deliverable_globs=deliverable_globs,
             ),
         )
+        # A MODEL VERDICT IS ADVISORY, NEVER TERMINAL. Once this review has spent its one
+        # bounded revision, a further REJECTED verdict is recorded as a warning and the step
+        # proceeds — including producing its payload, so the ledger stays complete and the
+        # commit gate is not starved downstream. Only the model's opinion is downgraded:
+        # every deterministic block (missing evidence, out-of-scope write, malformed handoff)
+        # is left exactly as it was, because those can be satisfied by construction.
+        if review_is_advisory and _is_rejected_verdict(blocked):
+            self._advisories.append(
+                f"[review-advisory] {step.label}: {blocked.reason if blocked else ''} "
+                "— accepted after the bounded revision was spent; a model verdict is "
+                "advisory, never terminal. Address it in the next release, or re-run "
+                "with --demand."
+            )
+            blocked = None
         # Write the produced payload before acknowledging upstream consumption. A worker can
         # satisfy the generic transport gate yet still violate its domain handoff schema; that
         # is a deterministic BLOCK, not an exception and not a consumed upstream message.

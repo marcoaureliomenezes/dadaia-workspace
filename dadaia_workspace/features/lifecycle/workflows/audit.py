@@ -77,6 +77,11 @@ class AuditStep:
     # to the request. Additive-optional, mirroring ``ReleaseStep``.
     resolved_model: ResolvedModelConfig | None = None
     model_profile: str | None = None
+    #: The zone this step's deliverable MUST land in. Without it the step passed on a
+    #: handoff payload alone: `audit` reported completed while materializing no report at
+    #: all (bug a1-audit-completes-without-audit-report) — an audit whose findings exist
+    #: only inside a transient payload cannot be dispositioned, archived, or read by anyone.
+    extra_allowed_paths: tuple[str, ...] = ()
     # A failed audit verdict is domain evidence that must still be routed. Structural
     # output failures block; REJECTED itself does not abort this workflow.
     blocks_on_rejection: bool = True
@@ -115,6 +120,10 @@ _SEQUENCE: tuple[AuditStep, ...] = (
         role="project-auditor",
         fragment_id="audit.audit_report",
         produces="audit-report-v1",
+        extra_allowed_paths=(
+            "repos/{context}/specs/audits/**",
+            "specs/audits/**",
+        ),
     ),
     AuditStep(
         label="audit_disposition_gate",

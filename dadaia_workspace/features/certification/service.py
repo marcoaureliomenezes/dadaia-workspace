@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.protocols.certification_process import CertificationProcess
+from dadaia_workspace.core.spec_status import is_approved
 
 
 @dataclass(frozen=True)
@@ -315,9 +316,7 @@ def certify(
             path = release_dir / name
             if not path.is_file():
                 raise RuntimeError(f"release-definition completed but {name} is missing")
-            if name != "TASKS.md" and "**Status:** Aprovado" not in path.read_text(
-                encoding="utf-8"
-            ):
+            if name != "TASKS.md" and not is_approved(path.read_text(encoding="utf-8")):
                 raise RuntimeError(f"{name} was not flipped to Aprovado by its review gate")
         active = (consumer_specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
         if "v0.0.1" not in active or "IMPLEMENTATION" not in active:

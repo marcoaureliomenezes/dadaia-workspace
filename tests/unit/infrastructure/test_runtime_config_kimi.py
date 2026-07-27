@@ -221,3 +221,60 @@ def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> N
     )
     assert proc.returncode == 0
     assert proc.stderr == ""
+
+
+# ---------------------------------------------------------------------------
+# upsert legacy adoption — bug kimi-install-duplicates-hooks-on-legacy-config
+# ---------------------------------------------------------------------------
+
+_LEGACY_UNMARKED_RULES = (
+    '[[hooks]]\nevent = "PreToolUse"\nmatcher = "^(Edit|Write|Bash)$"\n'
+    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 10\n\n'
+    '[[hooks]]\nevent = "PostToolUse"\n'
+    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-post-gate.sh"\ntimeout = 10\n\n'
+    '[[hooks]]\nevent = "UserPromptSubmit"\n'
+    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-ctx-inject.sh"\ntimeout = 10\n\n'
+    '[[hooks]]\nevent = "PostCompact"\nmatcher = "manual|auto"\n'
+    'command = "/home/u/.kimi-code/hooks/dadaia-kimi-post-compact.sh"\ntimeout = 10\n'
+)
+
+
+def test_upsert_adopts_legacy_unmarked_rules_instead_of_duplicating() -> None:
+    """A pre-v0.2.8 config carries the 4 dadaia [[hooks]] rules WITHOUT the markers.
+    The upsert must ADOPT them (strip, then append the managed block) — appending a
+    second copy (4 -> 8 rules, every event double-registered) is the bug."""
+    existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES
+    out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
+    parsed = tomllib.loads(out)
+    assert len(parsed["hooks"]) == 4, "legacy rules must be replaced, not duplicated"
+    assert out.count(KIMI_BLOCK_BEGIN) == 1
+    assert parsed["default_model"] == "k3"
+    events = [h["event"] for h in parsed["hooks"]]
+    assert events.count("PreToolUse") == 1
+    assert out.count("dadaia-kimi-pre-gate.sh") == 1
+
+
+def test_upsert_preserves_operator_rules_while_stripping_legacy() -> None:
+    """An operator's own non-dadaia hook rule is content we never touch — it survives
+    the legacy adoption byte-for-byte."""
+    operator_rule = '[[hooks]]\nevent = "Notification"\ncommand = "terminal-notifier"\n'
+    existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES + "\n" + operator_rule
+    out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
+    parsed = tomllib.loads(out)
+    assert len(parsed["hooks"]) == 5  # managed 4 + the operator's Notification rule
+    assert 'command = "terminal-notifier"' in out
+
+
+def test_upsert_repairs_stray_duplicates_outside_existing_markers() -> None:
+    """A previously botched state (managed block AND a stray un-marked dadaia rule) is
+    repaired to exactly one copy — strays outside the markers never survive."""
+    stray = (
+        '[[hooks]]\nevent = "PreToolUse"\n'
+        'command = "/x/hooks/dadaia-kimi-pre-gate.sh"\ntimeout = 3\n'
+    )
+    botched = 'default_model = "k3"\n\n' + kimi_hooks_block(_HOME) + "\n" + stray
+    out = upsert_kimi_hooks_block(botched, kimi_hooks_block(_HOME))
+    assert out.count("dadaia-kimi-pre-gate.sh") == 1
+    assert out.count(KIMI_BLOCK_BEGIN) == 1
+    parsed = tomllib.loads(out)
+    assert len(parsed["hooks"]) == 4

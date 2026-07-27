@@ -509,6 +509,16 @@ class LifecyclePreflightService:
                 "context": data.context,
                 "release_id": data.release_id,
                 "expected_phase": data.expected_phase.value,
+                # Bug r4d-resume-preflight-invalid-step-traceback: a reader seeing
+                # blocked_at_step="preflight" naturally reaches for
+                # `--resume-from preflight`, which cannot work — preflight is a GATE
+                # evaluated BEFORE any run exists, so there is no run to resume. Say so
+                # in-band; the remedy is the operator_command above, then re-run the verb.
+                "resumable": "false",
+                "resume_hint": (
+                    "preflight is a gate, not a resumable step — do NOT pass "
+                    "--resume-from preflight; apply operator_command, then re-run the verb"
+                ),
                 **(detail or {}),
             },
         )

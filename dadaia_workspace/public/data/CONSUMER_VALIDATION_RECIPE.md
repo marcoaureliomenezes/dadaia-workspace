@@ -132,6 +132,24 @@ an initialized workspace, create it:
     whitelist.
 - **PASS if:** all four decisions match. (Each is one deterministic hook invocation —
   that IS the demonstration.)
+- **Envelope contract (bugs claude-pre-gate-envelope-contract +
+  pre-gate-allow-envelope-fails-claude-schema):** each verdict must be a single JSON
+  envelope that validates against the Claude Code PreToolUse output schema (top-level
+  `decision` enum is `["approve", "block"]` — nothing else may appear there) while
+  staying readable by codex/kimi —
+  - block: top-level `"decision": "block"` AND
+    `hookSpecificOutput.permissionDecision == "deny"` with `hookEventName ==
+    "PreToolUse"` and `permissionDecisionReason` equal to the top-level `reason`,
+    which must be the LAST key (the kimi shim's sed capture depends on it);
+  - allow: a non-empty JSON envelope carrying NO permission verdict of any kind —
+    exactly `{"continue": true, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}`.
+    A top-level `"decision": "allow"` is a FAIL (invalid enum value — the harness
+    rejects the whole envelope, "Hook JSON output validation failed", on every allowed
+    call). `permissionDecision: "defer"` is a FAIL (print-mode only; interactive
+    sessions warn and ignore it). `"approve"`/`permissionDecision: "allow"` are a FAIL
+    (they would bypass the operator's permission prompts). The literal
+    `"decision": "block"` must NOT appear (the kimi shim greps it).
+  A bare legacy block envelope (`hookSpecificOutput` family missing) is a FAIL.
 
 ### F-09 — Bugs ledger
 - Setup: an in-repo specs tree (`mkdir -p repos/vp && $D specs init --specs-dir
@@ -187,9 +205,15 @@ an initialized workspace, create it:
 - Setup: run inside an INITIALIZED workspace (`reports validate` resolves workspace state);
   write a minimal VALID `handoff-v1.2` JSON to a file. Minimal valid = these keys:
   `schema_version:"handoff-v1.2"`, `agent`, `context`, `produced_at` (UTC ISO),
-  `scope`, `metrics:{}`, `self_pull:{"refs":[<one ref that EXISTS on disk, e.g. "AGENTS.md">]}`,
+  `scope`, `metrics:{}`, `self_pull:{"refs":[<the agent's ROLE-MAPPED memory atom>, ...]}`,
   `artifact:{"type":"other"}`, `findings:[]`, `verdict:"APPROVED"`,
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
+  `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
+  rejects it — correctly: an agent's handoff has to show it read its own memory. For
+  `agent:"qa-engineer"` that is `specs/memory/quality-assurance.md` (context-relative, and
+  it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
+  (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
+  that, so following the recipe verbatim produced a FAIL against a healthy product).
   Also write a tampered copy (e.g. `schema_version:"handoff-BOGUS"` and drop `agent`).
 - Run: `$D reports validate <good>.handoff.json`; `$D reports validate <bad>.handoff.json`.
 - **PASS if:** the valid file validates (exit 0) and the tampered one is rejected
@@ -279,12 +303,21 @@ an initialized workspace, create it:
 - Run: `$D academy --help` and a read verb.
 - **PASS if:** the academy verbs exist and read without touching governed paths.
 
-### F-21 — CI preflight
-- Run inside a git repo working tree with the wheel installed: `$D ci preflight` (it
-  gates format/lint/type/tests). Consult `$D ci preflight --help` for required context.
-- **PASS if:** it runs the gate and its exit code truthfully reflects pass/fail. Running
-  it OUTSIDE a repo returning a clear usage error is expected, not a FAIL — run it in a
-  prepared repo to demonstrate the gate.
+### F-21 — CI preflight (scope-aware)
+- Run `$D ci preflight` from a git repo that is NOT the dadaia-workspace source tree
+  (any consumer Spec Context repo will do).
+- **PASS if:** it refuses in ONE clear line saying the gate targets the dadaia-workspace
+  source repo, exit non-zero, no traceback — and it does NOT report a lint failure or
+  blame a missing `poetry`. The gate's checks lint and type-check the library's own
+  paths (`dadaia_workspace/`, `tests/`, this repo's `setup.cfg`), which do not exist in a
+  consumer repo, and a consumer venv carries no ruff/mypy — so the old behaviour reported
+  `[FAIL] ruff format --check` / `command not found: poetry` and sent the operator to
+  install a tool that would not have helped
+  (bug ci-preflight-unusable-outside-the-source-repo).
+- Running it OUTSIDE any git repo returning a clear usage error is also expected.
+- The in-source-repo path (where the gate actually runs format/lint/type/tests) is not
+  reachable from a consumer validation workspace; mark it **EXCEPTION** with that reason
+  rather than installing the library source just to exercise it.
 
 ### F-22 — Help & docs quality
 - Run `--help` on every top-level verb.
@@ -299,6 +332,14 @@ an initialized workspace, create it:
   NO context memory — that non-empty generic output is the CORRECT result (injection
   is bind-driven). FAIL only if it injects a context's memory without a bind, or
   crashes.
+- **Compact re-injection (bug claude-compact-reinjection-missing):** the projected
+  `.claude/settings.json` must register `SessionStart` entries with matchers `compact`
+  AND `clear` pointing at `dadaia_workspace.hooks.ctx_inject`. Drive ctx-inject with a
+  Claude SessionStart payload (`{"hook_event_name": "SessionStart", "source":
+  "compact", "session_id": ...}`) on a session whose sentinel records a bound slug:
+  the bootstrap must re-emit AT THE EVENT and the NEXT UserPromptSubmit must stay
+  silent (exactly-once — no compact marker left behind). A missing SessionStart block
+  in settings.json, silence at the event, or a double injection is a FAIL.
 
 ### F-24 — Workflow chain E2E (fake harness, disposable context)
 - Setup: a clean disposable context `chain` (create + alive + baseline as in F-06),
@@ -356,7 +397,7 @@ an initialized workspace, create it:
   authoritative pick (never refuse with "produced no exact specs/backlog artifact
   path") AND drive the live definition to APPROVAL in the fresh context — SPEC and
   PLAN flipped to `**Status:** Aprovado`, TASKS authored. A fresh (greenfield)
-  context's embryonic memory is NEVER a valid rejection reason at `spec_review` (bug
+  context's embryonic memory is NEVER a valid rejection reason at `definition_review` (bug
   live-release-definition-rejects-fresh-context class): the SPEC itself is the
   founding structural reference there. **Closure integrity:** when the release's
   TASKS/write set declare test paths, `implementation-reviews` may reach CLOSURE only
@@ -492,7 +533,244 @@ never exercised the live backlog path was false confidence).
   `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
   `dadaia public doctor` flags a tampered shim/block and `install` heals it.
 
+### R-09 — Resume of a sandbox-blocked run completes (echo-classification class)
+
+- Force a codex backlog/definition run to block on the sandbox signature (no bypass),
+  then run the PRESCRIBED remedy: same run-id, `--resume-from <blocked step>`, with
+  `DADAIA_CODEX_SANDBOX=danger-bypass`.
+- **PASS if:** the resumed run persists `completed` in `.dadaia/states/lifecycle/` AND
+  downstream consumption works (`release-definition --backlog-run-id <id>` accepts it).
+  A resumed run re-blocked with the OLD sandbox reason while its deliverables landed on
+  disk is the bug class (real-codex-resume-output-not-committed-to-ledger-042: the
+  prompt's own block digest echoed into stderr must never re-classify a bypass run).
+
+### R-10 — Dedupe EDIT path is gate-visible (disk truth, not anchors only)
+
+- Run backlog-definition twice over the same demand: the second run's worker refines
+  the existing item's BODY/acceptance without touching `intents[]`.
+- **PASS if:** the run COMPLETES (the review gate detects the content-hash change);
+  and a worker that claims 'updated' while writing NOTHING blocks at the author step
+  with the worker diagnostic — never an accepted-then-unexplained gate block (bug
+  backlog-dedupe-updated-payload-not-gate-visible-043).
+
+### R-11 — Resume never collides with its own leftovers (ledger-owned immutability)
+
+- Drive release-definition to a spent-revision-budget block (review rejects twice);
+  then run the prescribed `--resume-from <create step>` on the SAME run-id. Also:
+  interrupt a run between payload write and state save (or plant a stray
+  `<step>-attempt-0.step-payload.json` with no ledger record) and resume.
+- **PASS if:** every prescribed resume executes — no `already recorded step ...
+  (immutable payload ...)` error ever surfaces on a path the error text itself
+  prescribed (bug release-definition-retry-collides-with-immutable-tasks-payload).
+
+### R-12 — New-surface backlog intents classify by their own identity
+
+- Author two independent NEW CLI-command items (e.g. `hello`, then `version`) using
+  `subject: { kind: cli, ref: <name>, surface: new }`.
+- **PASS if ALL of:** both runs complete (no DIVERGENT_CONFLICT over a shared coarse
+  anchor — bug backlog-independent-cli-items-false-conflict-044); a `surface: new`
+  ref that ALREADY resolves blocks with the exact remedy; an unresolved EXISTING ref
+  blocks with a reason naming both recoveries (`dadaia backlog subjects` /
+  `surface: new`) AND a non-null `operator_command` naming the resume invocation
+  (bug backlog-cli-intent-hallucinated-anchor-045 — no gate block is a dead end).
+
+### R-13 — Producers pass their own validators (scaffold / fake / baseline)
+
+- `specs release open v0.1.0` then `specs doctor`; `specs segment open alpha-2` then
+  doctor again; `lifecycle backlog-definition --harness fake` then `backlog doctor`;
+  fresh context: `context create` → `alive` → `specs init` → `context baseline`.
+- **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
+  scaffold (Draft + phase SPEC is the legitimate authoring state — bug
+  fresh-release-scaffold-emits-spec-doctor-warnings-042); the fake-materialized item
+  is BL-SCHEMA-valid (bug fake-backlog-workflow-materializes-doctor-invalid-status-042);
+  and baseline COMPLETES after the official scaffold follow-up while still refusing a
+  tree carrying operator files (bug context-baseline-rejects-official-scaffold-followup).
+- **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take
+  what a workflow's own gate ACCEPTED and run the matching doctor over it. A run that
+  completes while `backlog doctor` / `specs doctor` rejects its output is a FAIL — the
+  gate and the doctor must never hold two opinions. Probe the degenerate inputs
+  specifically: an item with NO `intents[]` at `candidate` status (must block; `idea`
+  stays exempt), and an empty/absent field where the gate's checks could be *vacuously*
+  satisfied rather than actually passed.
+
+### R-14 — Live foreign presence is SURFACED on the allowed write
+
+- Bind two sessions in implementation mode on one context; drive a real `pre_gate`
+  MUTATING write payload for each.
+- **PASS if:** the second write is ALLOWED and its hook output visibly carries the
+  throttled `[PRESENCE]` advisory naming the other session (id, runtime, heartbeat
+  age) — in the allow envelope's `systemMessage` and on stderr; a neutral allow with
+  live foreign presence is the bug (pre-gate-drops-live-presence-advisory-042).
+  Repeat writes inside the throttle window stay quiet (at most one advisory).
+
+### R-15 — L1 agent-model roster resolves, projects and RUNS on the mapped models
+
+The L1 roster is data (`core/agent_model_templates.py` + `core/model_registry.py`)
+rendered at projection time into BOTH harness surfaces. A remap that resolves and
+renders cleanly can still name a model the runtime cannot reach — a class internal
+gates cannot catch, because they never call the model.
+
+- **Reachability (the load-bearing check):** for every DISTINCT `model` string in
+  `.codex/agents/*.toml`, run one minimal `codex exec --model <id>` and require
+  exit 0. A projected model that 403s/404s at runtime is a FAIL even when every
+  doctor is green.
+- **Lockstep:** with no overlay, `.claude/agents/<a>.md` frontmatter (`model`,
+  `effort`) and `.codex/agents/<a>.toml` (`model`, `model_reasoning_effort`) must
+  render from the SAME resolved roster for all 9 core agents; the codex effort is
+  the D-3 clamp of the claude effort (`xhigh` → `high`).
+- **Overlay round-trip:** apply a template + a per-agent override through the panel
+  API (`PUT /api/agent-model-policy`), re-install, and confirm BOTH surfaces moved
+  together; `GET /api/agent-model-templates` offers every registry `claude_id` as a
+  selectable model and the full effort vocabulary.
+- **Tier invariants:** `dadaia public doctor` reports `[ok] model-resolution`; each
+  registry tier resolves to exactly ONE codex id, and no two tiers collapse to an
+  identical `(codex_id, reasoning_effort)` pair.
+- **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
+  `security-reviewer`, under any template or override.
+- **Layer-2 is NOT collateral:** the four lifecycle workflows keep running on their
+  own profiles (`features/lifecycle/model_profiles.py`) — an L1 remap must not
+  change which model a workflow worker runs, and must not drop a Layer-2 id the
+  operator overlay depends on (credit-exhaustion escape hatch).
+- **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
+  provider-qualified PI id that no longer maps) must fail LOUDLY at load with a
+  message naming the rejected id — never silently accept an unmapped model.
+
+### R-16 — Every prescribed remedy actually WORKS (no contradiction loops)
+
+A block that names a command which cannot run is worse than a block with no advice:
+the operator burns a cycle proving the tool wrong. This class has now appeared twice
+(bug release-definition-retry-collides-with-immutable-tasks-payload, bug
+r4d-resume-preflight-invalid-step-traceback), so it gets its own sweep.
+
+- For every BLOCKED state you can reach in this run, take its `operator_command` (and
+  any command named in `reason`) and **execute it verbatim**.
+- **PASS if ALL of:** the prescribed command is executable as written — the step it
+  names exists in that workflow's sequence, the run-id/flags it cites are valid, and it
+  changes the state (or explains precisely why it cannot); no prescribed remedy raises a
+  raw traceback; and a gate that is NOT resumable says so in-band rather than reporting
+  a `blocked_at_step` that invites `--resume-from <gate>` (preflight is the known case).
+- Probe an INVALID `--resume-from <unknown-step>` on each of the three workflows that
+  accept it: each must fail as ONE clean `DadaiaError` line naming the VALID steps —
+  never a raw `ValueError`.
+
+### R-17 — Bootstrap survives a hostile filesystem, cleanly
+
+- Point `init` (and `import`, if exercised) at a target on a **noexec** mount — `/tmp` is
+  mounted this way on many hardened hosts and containers, including this worker.
+- **PASS if:** exit code is non-zero, output is ONE actionable line naming the path and
+  the likely cause, and there are ZERO traceback lines (bug
+  r3b-portability-import-venv-permission). The filesystem limit is legitimate and not the
+  product's to fix; crashing on it is.
+- **Also assert the success path did not regress:** a normal bootstrap on an exec-capable
+  filesystem still creates the venv and installs the distribution, with and without
+  `DADAIA_BOOTSTRAP_PACKAGE`. An error-path fix that starts swallowing legitimate
+  failures, or that breaks valid bootstrap, is its own FAIL.
+
+### R-18 — F-22 holds as a BOUNDARY: no verb tracebacks, for ANY failure
+
+F-22 ("no raw traceback from any CLI verb") was long enforced as a *whitelist*: the entry
+point caught only `DadaiaError`, so the contract held only for raises that happened to be
+inside that hierarchy — and the package raises ~138 bare builtin exceptions. It leaked one
+verb at a time (`WorkspaceVenvBootstrapError`, then a dangling `DADAIA_BOOTSTRAP_PACKAGE`).
+Probe the boundary directly, not just the verbs you happen to know about:
+
+- Provoke a NON-`DadaiaError` failure through the real console entry point. The
+  reproducible one: export `DADAIA_BOOTSTRAP_PACKAGE=/does/not/exist.whl` and run `init`.
+  **PASS if:** exit non-zero, ZERO traceback lines, the message names the offending value
+  and what is required of it, and — for an unexpected defect — names the exception type
+  and how to get a traceback.
+- Assert the debug escape hatch works: the SAME command with `DADAIA_TRACEBACK=1` DOES
+  print the traceback. A boundary that removes all debuggability is its own defect.
+- Assert the boundary did not swallow normal exits: `--help` exits 0, an unknown option
+  exits non-zero with usage (not a "defect" line), and neither is relabeled.
+- **Sweep, do not spot-check:** run every top-level verb with a deliberately invalid
+  argument and grep the combined output for `Traceback (most recent call last)`. Any hit
+  is a FAIL, regardless of which verb produced it.
+
+### R-19 — THE FULL DEVELOPMENT LIFECYCLE (mandatory; the flow the workspace exists for)
+
+Everything else in this recipe validates parts. This statement validates the whole product:
+N backlog items authored, consumed by ONE release, then implemented — driven entirely by the
+dadaia-workflows. Run it in a FRESH consumer workspace with `--harness fake` (deterministic,
+zero credits). Every step below must be asserted on DISK, never from the run's own summary:
+
+1. `init` a fresh workspace, `context create` + `context alive` a scratch context.
+2. Run `lifecycle backlog-definition` **THREE times** with three DISTINCT `--run-id` and
+   three distinct `--demand`. **PASS if:** all three complete AND `specs/backlog/` gains
+   **THREE** items, each with its own `ref:` anchor. One item, or three items sharing one
+   anchor, is a FAIL (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow):
+   a run that reports success while overwriting a previous run's deliverable is the exact
+   class this recipe exists to catch.
+3. Run `lifecycle release-definition` ONCE for the same release id, with NO
+   `--backlog-run-id`. **PASS if:** it completes without demanding you pick one producer,
+   and `post_step.consumed_slugs` names **ALL THREE** items, `post_step.shipped_anchors`
+   names all three anchors, and the `consumed_backlog.json` ledger EXISTS on disk
+   (bugs release-definition-refuses-multiple-backlog-producers and
+   release-definition-consumes-nothing-while-scope-declares-items). An empty
+   `consumed_slugs` with `status: OK` is a FAIL, not a no-op.
+4. Assert the negative too: hand-edit the SPEC to drop one slug from `**Consumes:**`, re-run
+   the post-step path, and confirm it FAILS naming the dropped slug. A verification that
+   cannot fail is not a verification.
+5. Run `lifecycle implementation-reviews`. If preflight blocks with `context is not bound`,
+   run its `operator_command` verbatim and re-run — that prescribed remedy MUST work (R-16).
+   **PASS if:** it completes, `final_phase` is `closure`, and `closure_gate.removed` names
+   ALL THREE consumed items.
+6. Run `lifecycle audit` against the release. **PASS if:** it completes and writes its
+   report.
+
+Report each numbered step's verdict separately with the disk evidence you checked. A FAIL
+anywhere here outranks every F-statement: it means the product cannot do the one thing it
+exists to do.
+
+### R-20 — The workflow is SIMPLE and cannot deadlock (v0.2.x re-architecture)
+
+Four architectural defects were fixed together; this statement is how you prove them, and
+it replaces any earlier expectation of a 7-step release definition.
+
+- **Three steps, not seven.** `release-definition` runs exactly
+  `definition_draft` → `definition_review` → `definition_commit_gate`. Assert the step
+  labels from the `--json` output. TWO model calls, not six: a longer sequence is a FAIL of
+  this statement, because the whole point is context and cost.
+- **A model verdict can never stop a run.** Drive a release whose review REJECTS every
+  time. **PASS if:** the run still reaches a terminal state (it does not sit blocked on the
+  verdict), and the objection appears in `warnings[]` — accepted is never silent. A run
+  that blocks forever on a reviewer is the deadlock this removed.
+- **Deterministic gates DID stay terminal.** A definition whose SPEC never lands on disk,
+  or whose PLAN omits the `## Validation Dependency Table`, or whose TASKS carry a `pytest`
+  without `-p no:cacheprovider`, must still BLOCK — with a remedy naming
+  `--resume-from definition_draft`. If any of these now passes, the fix went too far and
+  that is a FAIL.
+- **Prompt and validator agree.** For every rule Python enforces, the fragment teaches it:
+  `**Consumes:**`, the contract bindings, the pytest flag, the dependency table. Grep the
+  two shipped fragments (`definition_draft`, `definition_review`) and confirm each is
+  taught. A rule enforced but never taught is the bug class that cost weeks.
+- **Only two fragments ship** for `release_definition`. Any leftover `spec-create` /
+  `plan-create` / `tasks-create` / `*-review` fragment is dead weight and a FAIL.
+
 ---
+### R-21 — An unrepairable environment limit is never reported as repairable drift
+
+A status carries a promised remedy. `[drift]`/`[missing]` mean "re-run
+`dadaia public install`"; if install cannot possibly repair the condition, that status is a
+lie that sends the consumer into an infinite repair loop and fails `reconcile` with
+`rollback_required`. Two known limits, both real on hardened hosts:
+
+- **A `noexec` `KIMI_CODE_HOME`.** Point `KIMI_CODE_HOME` at a directory on a `noexec`
+  mount (a tmpfs `/tmp` is the common case), run `dadaia public install --target kimi-code`,
+  then `dadaia public doctor`. **PASS if:** the four `kimi-code:hooks/*.sh` lines are
+  `[unsupported]`, name the `noexec` mount as the cause and `KIMI_CODE_HOME` as the remedy,
+  `public doctor` exits 0, and `dadaia reconcile --expect-version <ver>` succeeds. **FAIL
+  if** any line reads `[drift]`/`[missing]`, or `reconcile` reports `rollback_required` —
+  reinstalling cannot clear a mount flag, so the run would never converge.
+- **The repairable boundary must survive.** `chmod 0o644` one shim on a NORMAL filesystem
+  and re-run the doctor. **PASS if** it reads `[drift] … (not executable)` and a plain
+  `dadaia public install --target kimi-code` clears it. Turning every executability failure
+  into `[unsupported]` is the opposite defect and also a FAIL.
+
+Generalize while you sweep: any doctor/gate line that prescribes a remedy must be a remedy
+that WORKS. Apply the prescribed command literally; if it cannot resolve the condition it
+names, that is a product FAIL of this statement (see also R-16).
+
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 

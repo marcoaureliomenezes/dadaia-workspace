@@ -106,6 +106,14 @@ _CATALOG: dict[str, tuple[HarnessModelOption, ...]] = {
 # Pricing stays honest: these ids carry no registry pricing row, so
 # ``telemetry.pricing.compute_cost`` returns ``None`` ("unknown" — never fabricated)
 # for them. Membership is named and explicit — no wildcard.
+#
+# NOTE (operator codex remap): ``gpt-5.6-terra`` is now ALSO the ``codex_id`` of the
+# plugin-tier registry entries, so it is reachable through two independent sets. It
+# stays listed here regardless: ``json_local_model_profile_store`` validates local
+# profiles against ``pi_codex_subscription_model_ids() | LAYER2_EXTRA_MODEL_IDS``
+# WITHOUT the registry codex ids, so dropping it would revoke the documented
+# credit-exhaustion escape hatch. Pricing is keyed by ``claude_id``, so a codex id
+# appearing in REGISTRY still resolves no pricing row of its own.
 # ---------------------------------------------------------------------------
 LAYER2_EXTRA_MODEL_IDS: frozenset[str] = frozenset({"moonshotai/kimi-k2.5", "gpt-5.6-terra"})
 

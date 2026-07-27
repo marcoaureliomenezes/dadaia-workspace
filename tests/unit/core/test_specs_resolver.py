@@ -304,3 +304,49 @@ def test_resolve_specs_dir_refuses_workspace_root_specs_and_explicit_still_wins(
     explicit = ws2 / "elsewhere"
     explicit.mkdir()
     assert specs_resolver.resolve_specs_dir(str(explicit)) == explicit.resolve()
+
+
+# --- bug ancestry-attribution-cross-session-ambiguity (kimi live repro) --------
+
+
+def test_shared_host_ancestor_pids_do_not_shadow_the_own_session_marker(
+    tmp_path: Path,
+) -> None:
+    """Live repro (kimi session, 2026-07-22): the OWN bind's marker chain contains the
+    caller's harness pid (shallow, session-unique); a FOREIGN session's marker chain
+    shares only deep host-level pids (tmux/sshd ancestors present in EVERY chain on the
+    host). With an ORDERED caller chain, depth attribution resolves the own bind — the
+    old any-membership set rule collapsed to ambiguity-None whenever >=2 live markers
+    shared those deep pids."""
+    ws = _mk_ws(tmp_path, slug="dadaia-workspace")
+    (ws / "repos" / "dd-chain-capture" / "specs").mkdir(parents=True)
+    _stamp(ws, "dadaia-workspace", chain=[2106163, 2084177, 2084140, 2064281, 2063868])
+    _stamp(ws, "dd-chain-capture", chain=[2067019, 2066011, 2064281, 2063868])
+    caller_chain = (2109665, 2084177, 2084140, 2064281, 2063868, 2063864)
+
+    assert specs_resolver._persisted_bind_context(ws, caller_chain) == "dadaia-workspace"  # type: ignore[arg-type]
+
+
+def test_ordered_depth_tie_stays_ambiguous(tmp_path: Path) -> None:
+    """No cross-session steal: two markers whose best shared pid sits at the SAME caller
+    depth (e.g. two binds from the SAME harness to different contexts) stay ambiguous —
+    never a newest/mtime guess. Matches the pre-existing frozenset behavior."""
+    ws = _mk_ws(tmp_path, slug="ctxa")
+    (ws / "repos" / "ctxb" / "specs").mkdir(parents=True)
+    _stamp(ws, "ctxa", chain=[111, 2084177, 333])
+    _stamp(ws, "ctxb", chain=[222, 2084177, 444])
+    caller_chain = (999, 2084177, 555)
+
+    assert specs_resolver._persisted_bind_context(ws, caller_chain) is None  # type: ignore[arg-type]
+
+
+def test_frozenset_degraded_mode_keeps_exactly_one_membership_rule(tmp_path: Path) -> None:
+    """Degraded (unordered) input keeps today's semantics byte-identically: exactly one
+    matching marker resolves; two matches are ambiguous."""
+    ws = _mk_ws(tmp_path, slug="ctxa")
+    (ws / "repos" / "ctxb" / "specs").mkdir(parents=True)
+    _stamp(ws, "ctxa", chain=[111, 222])
+    _stamp(ws, "ctxb", chain=[222, 333])
+    assert specs_resolver._persisted_bind_context(ws, frozenset({222})) is None
+    _stamp(ws, "ctxb", chain=[444, 555])
+    assert specs_resolver._persisted_bind_context(ws, frozenset({222})) == "ctxa"

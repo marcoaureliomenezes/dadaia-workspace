@@ -198,3 +198,46 @@ def test_doctor_without_kimi_projection_is_silent_when_out_of_profile(
     )
     reports = mgr.doctor(workspace)
     assert _kimi_lines(reports) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mount semantics")
+def test_doctor_reports_noexec_home_as_unsupported_not_repairable_drift(
+    workspace: Path, kimi_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A noexec ``KIMI_CODE_HOME`` is an environment limit, never repairable drift.
+
+    Bug ``kimi-hooks-noexec-home-reported-as-repairable-drift``: on a host whose
+    ``KIMI_CODE_HOME`` sits on a ``noexec`` mount (a tmpfs ``/tmp`` is the common case),
+    the installer's ``chmod(0o755)`` succeeds and the mode bits ARE executable, but
+    ``os.access(X_OK)`` honours the mount flag and returns False. The doctor called that
+    ``[drift]`` — the status whose remedy is "re-run install" — so every reinstall
+    reproduced it, ``reconcile`` failed with ``rollback_required`` and the certification
+    gate REJECTED the candidate, unfixably.
+
+    The mount flag cannot be simulated in-process, so the probe is the discriminator
+    itself: mode bits stay 0o755 (what the installer guarantees) while ``os.access``
+    denies X_OK (what the mount imposes). The reparable case — cleared exec bits — must
+    stay ``[drift]``; that boundary is asserted by
+    ``test_doctor_flags_shim_not_executable``.
+    """
+    mgr = FileSystemPublicAssetManager()
+    _install(workspace, mgr)
+    shim = kimi_home / "hooks" / "dadaia-kimi-pre-gate.sh"
+    assert shim.stat().st_mode & stat.S_IXUSR, "installer must leave the exec bits set"
+
+    real_access = os.access
+
+    def noexec_access(path: object, mode: int, **kwargs: object) -> bool:
+        if mode == os.X_OK and str(path).startswith(str(kimi_home)):
+            return False
+        return real_access(path, mode, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("dadaia_workspace.infrastructure.public_assets.os.access", noexec_access)
+    lines = _kimi_lines(mgr.doctor(workspace))
+    shim_lines = [line for line in lines if "hooks/dadaia-kimi-pre-gate.sh" in line]
+    assert shim_lines, lines
+    line = shim_lines[0]
+    assert not line.startswith("[drift]"), f"a noexec mount is not repairable drift: {line!r}"
+    assert line.startswith("[unsupported]"), line
+    assert "noexec" in line
+    assert "KIMI_CODE_HOME" in line

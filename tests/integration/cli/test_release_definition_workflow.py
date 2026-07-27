@@ -34,6 +34,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
+import typer
 from click.testing import Result
 from typer.testing import CliRunner
 
@@ -105,16 +106,13 @@ class _KindReportingFake:
         # / create-step-gate-accepts-refusal-handoff-as-success): be step-aware and
         # materialize like the production driving fake.
         label = (request.task_id or "").rsplit(":", 1)[-1]
-        deliverable = {
-            "spec_create": "SPEC.md",
-            "plan_create": "PLAN.md",
-            "tasks_create": "TASKS.md",
-        }.get(label)
+        # The ONE draft step authors all three artifacts (7 steps collapsed to 3).
+        deliverables = ("SPEC.md", "PLAN.md", "TASKS.md") if label == "definition_draft" else ()
         refs = list(self.result.artifact_refs)
-        if deliverable is not None:
+        if deliverables:
             zone = Path.cwd() / "repos" / _CONTEXT / "specs"
             prefix = f"repos/{_CONTEXT}/specs" if zone.is_dir() else "specs"
-            refs.append(f"{prefix}/releases/{_RELEASE}/{deliverable}")
+            refs.extend(f"{prefix}/releases/{_RELEASE}/{name}" for name in deliverables)
         for ref in refs:
             target = Path.cwd() / ref
             if not target.exists():
@@ -252,13 +250,95 @@ def test_release_scope_consumes_exact_backlog_author_run(
         workspace,
         context=_CONTEXT,
         release_id=_RELEASE,
-        backlog_run_id="tetris-backlog-run",
+        backlog_run_ids=("tetris-backlog-run",),
     )
 
     assert prefix is not None
-    assert "Exact producer run: `tetris-backlog-run`" in prefix.text
+    assert "Exact producer run(s): `tetris-backlog-run`" in prefix.text
     assert "`specs/backlog/deterministic-tetris-engine.md`" in prefix.text
     assert "must not substitute a different candidate" in prefix.text
+
+
+def test_release_scope_aggregates_every_completed_backlog_producer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug release-definition-refuses-multiple-backlog-producers.
+
+    Three completed backlog-definition runs used to make release-definition exit 2 and
+    demand a single ``--backlog-run-id``, so the flow a release exists for — consuming a
+    SET of authored items — was unreachable: two of the three items had to be discarded.
+
+    Multiplicity is not ambiguity. There is no candidate for a model to choose between, so
+    all completed producers for the target release ARE the scope, and every authored path
+    must appear in the directive.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import _authoritative_backlog_prefix
+    from dadaia_workspace.core.models.lifecycle import (
+        LifecyclePhase,
+        LifecycleRun,
+        LifecycleRunStatus,
+    )
+
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    store = container.build_lifecycle_run_store(workspace)
+    resolver = container.build_workflow_handoff_resolver(workspace)
+    slugs = {
+        "bl-1": "specs/backlog/capability-one.md",
+        "bl-2": "specs/backlog/capability-two.md",
+        "bl-3": "specs/backlog/capability-three.md",
+    }
+    for run_id, item_path in slugs.items():
+        handoff_ref = f".dadaia/handoff/{_CONTEXT}/{run_id}.handoff.json"
+        handoff = workspace / handoff_ref
+        handoff.parent.mkdir(parents=True, exist_ok=True)
+        handoff.write_text(
+            json.dumps({"artifact": {"type": "other", "path": item_path}}), encoding="utf-8"
+        )
+        run = LifecycleRun(
+            run_id=run_id,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            command="backlog_definition",
+            phase=LifecyclePhase.RELEASE_DEFINITION,
+            status=LifecycleRunStatus.COMPLETED,
+            current_step="backlog_review_gate",
+            idempotency_key=run_id,
+        )
+        store.save(run)
+        resolver.produce(
+            run,
+            producer_step="backlog_author",
+            attempt=0,
+            output_schema="backlog-item-v1",
+            payload={"summary": f"authored {run_id}", "artifact_refs": [handoff_ref]},
+        )
+
+    prefix = _authoritative_backlog_prefix(
+        workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=()
+    )
+    assert prefix is not None
+    for run_id, item_path in slugs.items():
+        assert run_id in prefix.text, f"producer {run_id} missing from the scope directive"
+        assert f"`{item_path}`" in prefix.text, f"{item_path} missing from the scope directive"
+
+    # Narrowing is still possible, and is now repeatable.
+    narrowed = _authoritative_backlog_prefix(
+        workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=("bl-1", "bl-3")
+    )
+    assert narrowed is not None
+    assert "`specs/backlog/capability-one.md`" in narrowed.text
+    assert "`specs/backlog/capability-three.md`" in narrowed.text
+    assert "capability-two" not in narrowed.text
+
+    # A named run that is not a completed producer is still a loud usage error, and the
+    # message must name the offending id rather than the whole set.
+    with pytest.raises(typer.BadParameter, match="bl-9"):
+        _authoritative_backlog_prefix(
+            workspace, context=_CONTEXT, release_id=_RELEASE, backlog_run_ids=("bl-1", "bl-9")
+        )
 
 
 # 3 -- rejected review blocks advancement -----------------------------------
@@ -267,8 +347,18 @@ def test_release_scope_consumes_exact_backlog_author_run(
 def test_rejected_review_blocks_before_commit_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A REJECTED verdict at spec_review stops the run before the commit gate
-    (after the single bounded in-run revision of spec_create is spent)."""
+    """A REJECTED verdict costs ONE bounded revision, then becomes advisory.
+
+    Contract change, deliberate: this test used to assert that a rejected review STOPS the
+    run before the commit gate. That made three non-deterministic LLM verdicts terminal
+    inside a deterministic pipeline, so a reviewer could restate an objection forever and
+    the run never converged — an autonomous agent could not finish a release at all, and a
+    real one only did because an operator hand-fed corrections through eight cycles.
+
+    A model verdict is now advisory: one revision, then the step proceeds carrying the
+    objection as a warning. What still stops a release is every DETERMINISTIC gate, which
+    is what the rest of this suite covers.
+    """
     workspace = _init_workspace(tmp_path)
     monkeypatch.chdir(workspace)
     monkeypatch.setenv(
@@ -280,22 +370,20 @@ def test_rejected_review_blocks_before_commit_gate(
     # not the model — decides the block.
     _install_fake_factory(monkeypatch, reject_kind=AgentRuntimeKind.CODEX_EXEC)
 
-    result = _define(["--harness", "pi", "--step-harness", "spec_review=codex"])
+    result = _define(["--harness", "pi", "--step-harness", "definition_review=codex"])
 
-    assert result.exit_code == 3, result.output
+    assert result.exit_code == 0, result.output
     payload = _payload(result.output)
-    assert payload["status"] == "BLOCKED"
-    assert payload["completed"] is False
-    # The release never advanced to IMPLEMENTATION.
-    assert payload["final_phase"] != "implementation"
+    assert payload["completed"] is True
+    assert payload["blocked"] is None
+    # The rejection was spent on one revision and then recorded, not swallowed.
+    warnings = payload.get("warnings") or []
+    assert any("definition_review" in w and "review-advisory" in w for w in warnings), warnings
     steps = payload["steps"]
     assert isinstance(steps, list)
     labels = [step["label"] for step in steps]
-    assert labels[-1] == "spec_review"
-    assert "definition_commit_gate" not in labels
-    assert steps[-1]["accepted"] is False
-    blocked = payload["blocked"]
-    assert isinstance(blocked, dict)
+    # The run reached its terminal deterministic gate instead of dying at the verdict.
+    assert "definition_commit_gate" in labels
 
 
 # 4 -- adjacent-harness seam (the key §8.5 assertion) -----------------------
@@ -307,7 +395,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     """§8.5: adjacent steps run on different harnesses, same bundle, same gate, same result.
 
     Default ``--harness pi`` runs every step on PI_HEADLESS; ``--step-harness
-    spec_create=codex`` overrides the single ``spec_create`` step onto CODEX_EXEC — so
+    definition_draft=codex`` overrides the single ``spec_create`` step onto CODEX_EXEC — so
     ``release_scope`` (PI) and its adjacent ``spec_create`` (Codex) genuinely run on two
     different harnesses. Both are FAKE-backed via the monkeypatched factory.
 
@@ -316,7 +404,7 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
       (b) both harnesses pass through the same Python gate logic (both accepted);
       (c) the mixed-harness run completes identically to the single-harness path.
 
-    The single-harness baseline below IS the full happy-path proof (all 7 model steps +
+    The single-harness baseline below IS the full happy-path proof (both model steps +
     terminal Python commit gate, release advances to IMPLEMENTATION) — absorbing the
     former standalone happy-path test. Fragment-scoped (non-generic) prompt assertions
     are folded in as this fn already builds workflow objects directly.
@@ -340,13 +428,8 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_payload["final_phase"] == "implementation"
     baseline_labels = [step["label"] for step in baseline_payload["steps"]]
     assert baseline_labels == [
-        "release_scope",
-        "spec_create",
-        "spec_review",
-        "plan_create",
-        "plan_review",
-        "tasks_create",
-        "tasks_implementability_review",
+        "definition_draft",
+        "definition_review",
         "definition_commit_gate",
     ]
     baseline_commit_gate = baseline_payload["steps"][-1]
@@ -354,10 +437,18 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     assert baseline_commit_gate["is_gate"] is True
     assert baseline_commit_gate["accepted"] is True
 
-    # Mixed: release_scope on pi, adjacent spec_create on codex — real --step-harness path.
+    # Mixed: definition_draft on pi, the adjacent definition_review on codex — the real
+    # --step-harness path across two ADJACENT steps of the collapsed sequence.
     # Distinct run id: the completed-rerun guard refuses re-using the baseline's id.
     mixed = _define(
-        ["--harness", "pi", "--step-harness", "spec_create=codex", "--run-id", "adjacent-mixed"]
+        [
+            "--harness",
+            "pi",
+            "--step-harness",
+            "definition_review=codex",
+            "--run-id",
+            "adjacent-mixed",
+        ]
     )
     assert mixed.exit_code == 0, mixed.output
     mixed_payload = _payload(mixed.output)
@@ -371,16 +462,19 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     # The two adjacent steps genuinely ran on two DIFFERENT harnesses in the mixed run.
     # The JSON envelope reports the AgentRuntimeKind value (pi -> pi_headless,
     # codex -> codex_exec).
-    assert by_label_mixed["release_scope"]["runtime"] == AgentRuntimeKind.PI_HEADLESS.value
-    assert by_label_mixed["spec_create"]["runtime"] == AgentRuntimeKind.CODEX_EXEC.value
-    assert by_label_mixed["release_scope"]["runtime"] != by_label_mixed["spec_create"]["runtime"]
+    assert by_label_mixed["definition_draft"]["runtime"] == AgentRuntimeKind.PI_HEADLESS.value
+    assert by_label_mixed["definition_review"]["runtime"] == AgentRuntimeKind.CODEX_EXEC.value
+    assert (
+        by_label_mixed["definition_draft"]["runtime"]
+        != by_label_mixed["definition_review"]["runtime"]
+    )
 
     # (a) SAME fragment bundle for the role regardless of harness: the bundle is keyed by
     # the step, not the runtime. spec_create's fragment id is identical pi-vs-codex.
     assert (
-        by_label_mixed["spec_create"]["fragment_id"]
-        == by_label_baseline["spec_create"]["fragment_id"]
-        == "release_definition.spec_create"
+        by_label_mixed["definition_draft"]["fragment_id"]
+        == by_label_baseline["definition_draft"]["fragment_id"]
+        == "release_definition.definition_draft"
     )
 
     # (a, stronger) byte-identical assembled prompt for the same step across harnesses —
@@ -406,14 +500,14 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     store = container.build_lifecycle_run_store(workspace)
     next(store.root.glob("*seam-identity*")).unlink()
     out_codex = wf_codex.run("seam-identity")
-    bundle_pi = next(s for s in out_pi.steps if s.label == "spec_create").prompt_text
-    bundle_codex = next(s for s in out_codex.steps if s.label == "spec_create").prompt_text
+    bundle_pi = next(s for s in out_pi.steps if s.label == "definition_draft").prompt_text
+    bundle_codex = next(s for s in out_codex.steps if s.label == "definition_draft").prompt_text
     assert bundle_pi is not None and bundle_codex is not None
     assert bundle_pi == bundle_codex  # harness-independent fragment bundle.
 
     # (b) both harnesses passed through the same Python gate logic — both accepted.
-    assert by_label_mixed["spec_create"]["accepted"] is True
-    assert by_label_mixed["release_scope"]["accepted"] is True
+    assert by_label_mixed["definition_draft"]["accepted"] is True
+    assert by_label_mixed["definition_draft"]["accepted"] is True
 
     # (c) the mixed-harness run completes identically to the single-harness path: same
     # labels, same accepted flags, same terminal phase.
@@ -424,10 +518,10 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
 
     # Scoped (non-generic) fragment prompts: at least one step prompt carries
     # fragment-sourced content; no generic suffix. Reuses the wf_pi/out_pi run built above.
-    scope_step = next(s for s in out_pi.steps if s.label == "release_scope")
+    scope_step = next(s for s in out_pi.steps if s.label == "definition_draft")
     assert scope_step.prompt_text is not None
     # Fragment-sourced content: the explicit fragment id is present...
-    assert "fragment:release_definition.release_scope" in scope_step.prompt_text
+    assert "fragment:release_definition.definition_draft" in scope_step.prompt_text
     # ...along with the coherent worker-output contract (v0.1.32 / D-1): the single
     # transport schema is the worker emit target via `schema`; the fragment's domain schema
     # is NOT surfaced as a competing schema-to-emit in the "## Required output" section.
@@ -445,3 +539,133 @@ def test_adjacent_steps_on_different_harnesses_same_bundle_same_gate(
     model_labels = {s.label for s in _SEQUENCE if s.fragment_id is not None}
     emitted_with_prompt = {s.label for s in out_pi.steps if s.prompt_text is not None}
     assert model_labels <= emitted_with_prompt
+
+
+def test_declared_scope_not_consumed_is_a_loud_post_step_failure(tmp_path: Path) -> None:
+    """Bug release-definition-consumes-nothing-while-scope-declares-items.
+
+    The producer post-step used to no-op on an absent ``**Consumes:**`` line unconditionally,
+    so a definition that dropped every item its own scope directive declared mandatory
+    reported success with an empty ledger. A no-op is right for a direct definition with no
+    producer; it is wrong when the run itself named the items.
+
+    The negative case is asserted deliberately: a verification that cannot fail is not one.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import _apply_release_consume
+    from dadaia_workspace.core.exceptions import ScopeNotConsumedError
+
+    workspace = _init_workspace(tmp_path)
+    spec = container.build_release_spec_path(workspace, context=_CONTEXT, release_id=_RELEASE)
+    spec.parent.mkdir(parents=True, exist_ok=True)
+
+    # No Consumes line at all, but the run declared three mandatory items.
+    spec.write_text("# SPEC\n\n> **Status:** Draft\n\n## Scope\n\nnothing\n", encoding="utf-8")
+    with pytest.raises(ScopeNotConsumedError, match="capability-two"):
+        _apply_release_consume(
+            workspace,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            scope_slugs=("capability-one", "capability-two", "capability-three"),
+        )
+
+    # A PARTIAL consumption is also a failure, and it must name only what was dropped.
+    spec.write_text(
+        "# SPEC\n\n> **Status:** Draft\n**Consumes:** capability-one, capability-three\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ScopeNotConsumedError) as exc:
+        _apply_release_consume(
+            workspace,
+            context=_CONTEXT,
+            release_id=_RELEASE,
+            scope_slugs=("capability-one", "capability-two", "capability-three"),
+        )
+    assert "capability-two" in str(exc.value)
+    assert "capability-one" not in str(exc.value)
+
+    # With no declared scope, an absent Consumes line still no-ops cleanly — a direct
+    # release definition with no backlog producer is legitimate and must not start failing.
+    spec.write_text("# SPEC\n\n> **Status:** Draft\n\n## Scope\n\nnothing\n", encoding="utf-8")
+    assert _apply_release_consume(
+        workspace, context=_CONTEXT, release_id=_RELEASE, scope_slugs=()
+    ) == {"consumed_slugs": [], "shipped_anchors": [], "ledger": None}
+
+
+def test_post_step_failure_makes_the_command_verdict_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug r6f-release-completes-with-unconsumed-authoritative-backlog (validator-reported).
+
+    The scope verification detected the failure and recorded it in ``post_step_error`` —
+    but ``status`` was computed purely from ``result.completed`` and the non-zero exit was
+    raised only when the run did not complete. So a release that consumed none of the
+    backlog its own directive declared mandatory still reported ``status: OK`` and exit 0.
+
+    A detection that does not change the verdict is not a gate.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    from dadaia_workspace.cli.commands import lifecycle as lifecycle_cli
+    from dadaia_workspace.core.exceptions import ScopeNotConsumedError
+
+    def _boom(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise ScopeNotConsumedError("release declared 3 item(s) but consumes: capability-two")
+
+    monkeypatch.setattr(lifecycle_cli, "_apply_release_consume", _boom)
+
+    result = _define(["--run-id", "post-step-fail", "--harness", "fake"])
+
+    assert result.exit_code != 0, result.output
+    payload = json.loads(result.output)
+    assert payload["post_step_error"] is not None
+    assert "capability-two" in payload["post_step_error"]
+    assert payload["status"] != "OK", payload["status"]
+
+
+# ---------------------------------------------------------------------------
+# A model verdict is ADVISORY, never terminal.
+# ---------------------------------------------------------------------------
+
+
+def test_a_reviewer_that_never_approves_does_not_deadlock_the_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run terminates instead of blocking forever on a non-deterministic verdict.
+
+    Three LLM review gates sat inside a deterministic pipeline, each able to block
+    indefinitely — so the pipeline did not converge BY CONSTRUCTION. A real release only
+    ever finished because an operator hand-fed corrections through eight cycles, which is
+    not an autonomous workflow. Each review now gets one bounded revision and then ACCEPTS,
+    recording its objection as a warning that travels with the release.
+    """
+    workspace = _init_workspace(tmp_path)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("DADAIA_CONTEXT", "dadaia-workspace")
+
+    # Reuse the production-shaped fake so every DETERMINISTIC gate (artifact exists, in
+    # scope, status flip) is genuinely satisfied — the only thing failing is the verdict.
+    def fake_factory(*, context: str, run_cwd: Path, release_id: str | None = None) -> object:  # noqa: ARG001
+        def factory(kind: AgentRuntimeKind) -> _KindReportingFake:
+            return _KindReportingFake(kind, _rejecting_result())
+
+        return factory
+
+    monkeypatch.setattr(container, "_release_definition_runtime_factory", fake_factory)
+
+    result = _define(["--run-id", "never-approves", "--harness", "fake"])
+    payload = json.loads(result.output)
+
+    assert payload["completed"] is True, (
+        f"a reviewer that always rejects must not be able to stop the run: {payload.get('blocked')}"
+    )
+    assert payload["blocked"] is None
+
+    # Accepted is not the same as silent: every objection is reported.
+    warnings = payload.get("warnings") or []
+    assert warnings, "the accepted objections must be surfaced, not swallowed"
+    assert any("review-advisory" in w for w in warnings), warnings
+    assert any("REJECTED" in w or "rejected" in w for w in warnings), (
+        "the reviewer's actual reason must survive into the warning"
+    )

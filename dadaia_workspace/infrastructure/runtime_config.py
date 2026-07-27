@@ -113,6 +113,123 @@ _CLAUDE_WRITE_TOOLS = "Edit|Write|MultiEdit|NotebookEdit|Bash"
 _CLAUDE_MATCH_ALL = "*"
 
 
+#: The marker that identifies a hook entry as dadaia-owned. Every command this module
+#: generates invokes a ``dadaia_workspace.hooks.*`` module, so ownership is decidable from
+#: the emitted content alone — no side-car state, and an operator's own entry in the SAME
+#: event is never mistaken for ours.
+_DADAIA_HOOK_MARKER = "dadaia_workspace.hooks."
+
+
+def _is_dadaia_hook_entry(entry: object) -> bool:
+    """True iff *entry* is a hook entry this module generated."""
+    if not isinstance(entry, dict):
+        return False
+    hooks = entry.get("hooks")
+    if not isinstance(hooks, list):
+        return False
+    return any(
+        isinstance(h, dict) and _DADAIA_HOOK_MARKER in str(h.get("command", "")) for h in hooks
+    )
+
+
+def merge_claude_settings(
+    existing: dict[str, object] | None, workspace_root: Path
+) -> dict[str, object]:
+    """Fold dadaia's hook wiring into an operator's ``.claude/settings.json``.
+
+    ``settings.json`` is the file Claude Code documents for the operator's own
+    ``permissions``, ``model``, ``env``, ``statusLine`` and custom hooks — it is NOT a
+    dadaia-owned artifact. Writing it wholesale erased all of that silently, printing
+    ``[ok]`` (bug ``claude-install-destroys-operator-settings``). dadaia owns exactly the
+    hook entries whose command invokes ``dadaia_workspace.hooks.*``:
+
+    * top-level keys other than ``hooks`` are preserved untouched;
+    * hook EVENTS dadaia does not wire are preserved untouched;
+    * inside an event dadaia does wire, the operator's own entries are preserved and only
+      dadaia-owned entries are replaced by the canonical wiring.
+
+    This is the same ownership discipline :func:`upsert_kimi_hooks_block` applies to the
+    kimi config; the claude path had a naive whole-file writer instead.
+    """
+    canonical = claude_settings(workspace_root)
+    canonical_hooks = canonical["hooks"]
+    assert isinstance(canonical_hooks, dict)
+    if not existing:
+        return canonical
+
+    merged: dict[str, object] = dict(existing)
+    existing_hooks_raw = existing.get("hooks")
+    existing_hooks: dict[str, object] = (
+        dict(existing_hooks_raw) if isinstance(existing_hooks_raw, dict) else {}
+    )
+    for event, entries in canonical_hooks.items():
+        prior = existing_hooks.get(event)
+        foreign = (
+            [e for e in prior if not _is_dadaia_hook_entry(e)] if isinstance(prior, list) else []
+        )
+        assert isinstance(entries, list)
+        existing_hooks[event] = [*entries, *foreign]
+    merged["hooks"] = existing_hooks
+    return merged
+
+
+def foreign_claude_hook_commands(
+    settings: dict[str, object], canonical: dict[str, object]
+) -> list[str]:
+    """Every hook command in the file that dadaia did not generate.
+
+    Preserving the operator's own hooks is correct; going blind to them is not. A foreign
+    command inside ``PreToolUse`` runs on every gated write, so it is exactly where a local
+    injection would sit. This lists them so the doctor can surface them — the file belongs
+    to the operator, so the finding is advisory, never drift.
+
+    The sweep covers EVERY event present in the file, not only the four dadaia wires.
+    Seeding from the canonical events alone left ``Stop``, ``PreCompact``, ``SessionEnd``,
+    ``SubagentStop`` and ``Notification`` unsurfaced — events Claude Code executes just the
+    same, so a foothold there was equally invisible and equally live.
+    """
+    canonical_hooks = canonical.get("hooks")
+    wired = set(canonical_hooks) if isinstance(canonical_hooks, dict) else set()
+    hooks_raw = settings.get("hooks")
+    hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
+    found: list[str] = []
+    for event in sorted(wired | set(hooks)):
+        entries = hooks.get(event)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if _is_dadaia_hook_entry(entry) or not isinstance(entry, dict):
+                continue
+            for hook in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
+                if isinstance(hook, dict) and hook.get("command"):
+                    # BOTH tokens are attacker-controlled and land in a printed doctor line
+                    # (CWE-117). Raw ESC/newline bytes let a crafted command forge a second
+                    # physical line reading "[ok] claude:settings.json" — the very mechanism
+                    # that exists to REVEAL a foothold, used to hide it. repr() escapes
+                    # ESC, CR and LF, so the line can only ever be one line.
+                    found.append(f"{event!r}:{hook['command']!r}")
+    return found
+
+
+def dadaia_owned_claude_settings(settings: dict[str, object]) -> dict[str, object]:
+    """Project *settings* down to the dadaia-owned hook wiring, for drift comparison.
+
+    The doctor must compare what dadaia owns, not the whole file — otherwise an operator
+    who legitimately adds ``permissions`` reads ``[drift]`` forever, and the documented
+    remedy for drift (re-run install) is exactly what used to destroy their config.
+    """
+    hooks_raw = settings.get("hooks")
+    hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
+    owned: dict[str, object] = {}
+    for event, entries in hooks.items():
+        if not isinstance(entries, list):
+            continue
+        mine = [e for e in entries if _is_dadaia_hook_entry(e)]
+        if mine:
+            owned[event] = mine
+    return {"hooks": owned}
+
+
 def claude_settings(workspace_root: Path) -> dict[str, object]:
     """Return the Claude Code settings.json dict for *workspace_root*."""
     return {
@@ -158,6 +275,36 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                     ],
                     "matcher": "",
                 }
+            ],
+            # Bug claude-compact-reinjection-missing: a compact erases the injected
+            # bootstrap and /clear wipes the context; ctx_inject re-emits it at the event
+            # (Claude Code adds SessionStart stdout back to context) and restamps the
+            # sentinel. Matchers are the exact documented source names — startup/resume/
+            # fork stay on the bind-driven UserPromptSubmit path (FR-W2). Parity with the
+            # kimi-code PostCompact shim (v0.2.8) and the codex SessionStart wrapper.
+            "SessionStart": [
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "compact",
+                },
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "clear",
+                },
             ],
         }
     }
@@ -405,15 +552,61 @@ def kimi_hooks_block(home: Path) -> str:
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"
 
 
+def _strip_unmanaged_kimi_rules(existing: str) -> str:
+    """Remove every ``[[hooks]]`` table referencing the dadaia-kimi shims OUTSIDE the markers.
+
+    Bug kimi-install-duplicates-hooks-on-legacy-config: a pre-v0.2.8 install wrote the
+    four dadaia rules WITHOUT the managed-block markers, and a naive append then
+    double-registered every event (4 → 8 rules). Any un-marked table whose body names
+    ``dadaia-kimi-`` is provably dadaia-managed (a legacy install or a botched
+    duplicate — the reserved shim prefix is never operator content), so it is stripped
+    before the managed block is appended/replaced. Tables INSIDE the marker span are
+    owned by the block itself; non-dadaia tables are operator content, preserved
+    byte-for-byte. Line-oriented by design (the upsert is a pure text transform); a
+    ``[[hooks]]`` line inside a TOML string literal is a documented non-goal for the
+    config shapes this file manages.
+    """
+    begin = existing.find(KIMI_BLOCK_BEGIN)
+    end = existing.find(KIMI_BLOCK_END)
+    span = (begin, end + len(KIMI_BLOCK_END)) if begin != -1 and end != -1 and begin < end else None
+    lines = existing.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    pos = 0  # char offset of lines[i] in the original text
+    while i < len(lines):
+        if lines[i].strip() == "[[hooks]]":
+            table_end = pos + len(lines[i])
+            j = i + 1
+            while j < len(lines) and not lines[j].strip().startswith("[["):
+                table_end += len(lines[j])
+                j += 1
+            table = "".join(lines[i:j])
+            # A table is inside the managed span when it STARTS within it (the END
+            # marker line is absorbed into the last table's extent, so an end-position
+            # check would misclassify that table — and the marker with it).
+            inside_span = span is not None and span[0] <= pos < span[1]
+            if "dadaia-kimi-" not in table or inside_span:
+                out.extend(lines[i:j])
+            i = j
+            pos = table_end
+        else:
+            out.append(lines[i])
+            pos += len(lines[i])
+            i += 1
+    return "".join(out)
+
+
 def upsert_kimi_hooks_block(existing: str, block: str) -> str:
     """Return *existing* config.toml text with the managed kimi block replaced or appended.
 
-    Pure text transform (the caller owns file IO). Replace-or-append semantics:
-    when both markers are present and ordered, the span between them (inclusive) is
-    swapped for *block*; otherwise the block is appended at end of file — TOML allows
-    extending the ``hooks`` array-of-tables from a later position. Content outside the
-    markers is preserved byte-for-byte.
+    Pure text transform (the caller owns file IO). Legacy un-marked dadaia rules are
+    ADOPTED first (:func:`_strip_unmanaged_kimi_rules` — never duplicated). Then
+    replace-or-append semantics: when both markers are present and ordered, the span
+    between them (inclusive) is swapped for *block*; otherwise the block is appended
+    at end of file — TOML allows extending the ``hooks`` array-of-tables from a later
+    position. Content outside the markers is preserved byte-for-byte.
     """
+    existing = _strip_unmanaged_kimi_rules(existing)
     begin = existing.find(KIMI_BLOCK_BEGIN)
     end = existing.find(KIMI_BLOCK_END)
     if begin != -1 and end != -1 and begin < end:

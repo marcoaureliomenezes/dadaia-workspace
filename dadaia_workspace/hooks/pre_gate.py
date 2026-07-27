@@ -48,11 +48,15 @@ def _venv_guard_reason(payload: dict[str, object]) -> str | None:
     return venv_guard.evaluate_payload(payload)
 
 
-#: Ordered PreToolUse policies. First block wins; allow requires all.
-_POLICIES: tuple[Callable[[dict[str, object]], str | None], ...] = (
+#: Ordered PreToolUse policies. First block wins; allow requires all. A policy may
+#: return either a plain ``block_reason | None`` or a ``(block_reason, allow_advisory)``
+#: tuple — the SDD gate uses the tuple form so an ALLOW's NO-LOCKS presence advisory
+#: survives to the emitted envelope (bug pre-gate-drops-live-presence-advisory-042).
+_PolicyResult = str | None | tuple[str | None, str | None]
+_POLICIES: tuple[Callable[[dict[str, object]], _PolicyResult], ...] = (
     root_whitelist.evaluate_payload,
     _venv_guard_reason,
-    sdd_gate.evaluate_payload,
+    sdd_gate.evaluate_payload_with_advisory,
 )
 
 
@@ -62,14 +66,31 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     Each policy is fail-open: a policy that raises is caught and treated as ALLOW so a
     single faulty policy can never deadlock the harness.
     """
+    block, _advisory = evaluate_payload_with_advisory(payload)
+    return block
+
+
+def evaluate_payload_with_advisory(payload: dict[str, object]) -> tuple[str | None, str | None]:
+    """Run every PreToolUse policy in order; return ``(block_reason, allow_advisory)``.
+
+    ``allow_advisory`` is the SDD gate's NO-LOCKS presence advisory for an ALLOWED
+    MUTATING write (bug pre-gate-drops-live-presence-advisory-042) — the doctrine
+    mandates surfacing it, and the old bool-shaped chain flattened it away. Each policy
+    runs exactly ONCE (a second sdd evaluation would eat its own throttle window).
+    Fail-open posture unchanged: a policy that raises is ALLOW with no advisory.
+    """
+    advisory: str | None = None
     for policy in _POLICIES:
         try:
-            reason = policy(payload)
+            result = policy(payload)
         except Exception:  # noqa: BLE001 — fail-open: a policy crash must never block
-            reason = None
-        if reason is not None:
-            return reason
-    return None
+            result = None
+        block, policy_advisory = result if isinstance(result, tuple) else (result, None)
+        if block is not None:
+            return block, None
+        if policy_advisory and advisory is None:
+            advisory = policy_advisory
+    return None, advisory
 
 
 def _append_latency(workspace: Path | None, event: str, duration_ms: float) -> None:
@@ -106,11 +127,11 @@ def main() -> int:
     """
     start = time.monotonic()
     payload = _common.read_stdin_json()
-    reason = evaluate_payload(payload)
+    reason, advisory = evaluate_payload_with_advisory(payload)
     if reason is not None:
         _common.emit_block(reason)
     else:
-        _common.emit_allow()
+        _common.emit_allow(system_message=advisory)
     duration_ms = (time.monotonic() - start) * 1000.0
     try:
         workspace: Path | None = _resolve_workspace()

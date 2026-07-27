@@ -145,6 +145,10 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
+        # Read by cli/main._traceback_requested BY DESIGN: the operator's opt-in for a full
+        # traceback, since the CLI boundary otherwise renders every failure as one line
+        # (bug f22-cli-boundary-is-a-whitelist-not-a-boundary).
+        "DADAIA_TRACEBACK",
         # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
         # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
         # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
@@ -371,9 +375,44 @@ class HookResult:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return None
-        if isinstance(data, dict) and data.get("decision") == "block":
+        if not isinstance(data, dict):
+            return None
+        # A block is only a block if Claude Code READS it as one. The verdict Claude Code
+        # acts on is `hookSpecificOutput.permissionDecision == "deny"`; the top-level
+        # `decision` key is the legacy fallback the codex hooks and the kimi shim grep.
+        # Keying this predicate on the legacy field alone left every subprocess block
+        # assertion blind to the field that actually enforces: stripping
+        # `permissionDecision` from `emit_block` cost exactly ONE test out of 180 while
+        # turning every deny into a silent allow in production.
+        specific = data.get("hookSpecificOutput")
+        denies = isinstance(specific, dict) and specific.get("permissionDecision") == "deny"
+        if denies or data.get("decision") == "block":
+            assert denies, (
+                "block envelope carries no hookSpecificOutput.permissionDecision='deny' — "
+                f"Claude Code would read this as ALLOW: {data!r}"
+            )
+            assert data.get("decision") == "block", (
+                "block envelope lost the legacy top-level decision the codex hooks and the "
+                f"kimi shim grep: {data!r}"
+            )
             return data
         return None
+
+
+def is_allow_envelope(line: str) -> bool:
+    """True when *line* is the gate's explicit allow envelope (any envelope revision).
+
+    Keyed on "JSON envelope that is not a block" rather than a byte-exact literal so
+    consumers (advisory-line filters) survive envelope evolution — the same non-block
+    reading the codex hooks and the kimi shim apply. The allow envelope carries no
+    ``decision`` at all since bug pre-gate-allow-envelope-fails-claude-schema (Claude
+    Code's top-level enum is ``["approve", "block"]``).
+    """
+    try:
+        data = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("decision") != "block"
 
 
 def run_hook_subprocess(

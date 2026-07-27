@@ -241,7 +241,7 @@ class _FakeWorkflowResolver:
             model="gpt-5.5",
             reasoning="medium",
             source=SimpleNamespace(value="library-default"),
-            fragments=("release_definition.release_scope",),
+            fragments=("release_definition.definition_draft",),
             output_schema="agent-run-result-v1",
         )
         return SimpleNamespace(step=lambda label: entry)

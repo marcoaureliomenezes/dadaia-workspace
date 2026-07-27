@@ -34,6 +34,11 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
 )
 from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
+from dadaia_workspace.core.spec_status import (
+    ANY_STATUS_LINE,
+    APPROVED_LINE,
+    is_approved,
+)
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
     FragmentGateWorkflow,
     _StepOutcome,
@@ -100,6 +105,9 @@ class ReleaseDefinitionResult:
     final_phase: LifecyclePhase
     steps: tuple[ReleaseStepResult, ...] = field(default_factory=tuple)
     blocked: BlockedState | None = None
+    #: Review objections accepted after their bounded revision was spent. A model verdict is
+    #: advisory, never terminal — but never silent: these travel with the release.
+    warnings: tuple[str, ...] = field(default_factory=tuple)
 
 
 #: The §6.1 release-definition sequence. ``runtime_kind=None`` on a model step means the
@@ -108,20 +116,11 @@ class ReleaseDefinitionResult:
 #: ``release_definition.spec_review_architecture``.
 _SEQUENCE: tuple[ReleaseStep, ...] = (
     ReleaseStep(
-        label="release_scope",
-        role="product-engineer",
-        fragment_id="release_definition.release_scope",
-        produces="release-scope-handoff-v1",
-    ),
-    ReleaseStep(
-        label="spec_create",
+        label="definition_draft",
         role="product-engineer",
         deliverable="SPEC.md",
-        fragment_id="release_definition.spec_create",
-        shared_fragment_ids=(
-            "shared.anti_slop",
-            "shared.memory_selection",
-        ),
+        fragment_id="release_definition.definition_draft",
+        shared_fragment_ids=("shared.anti_slop", "shared.memory_selection"),
         produces="generic-step-handoff-v1",
         extra_allowed_paths=(
             "repos/{context}/specs/releases/{release_id}/**",
@@ -129,70 +128,16 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
             "repos/{context}/specs/releases/ACTIVE.md",
             "specs/releases/ACTIVE.md",
         ),
-        consumes=("release_scope",),
     ),
     ReleaseStep(
-        label="spec_review",
+        label="definition_review",
         role="software-architect, qa-engineer",
-        fragment_id="release_definition.spec_review",
+        fragment_id="release_definition.definition_review",
         is_review=True,
-        produces="spec-review-handoff-v1",
-        consumes=("spec_create",),
+        produces="combined-review-handoff-v1",
+        consumes=("definition_draft",),
     ),
-    ReleaseStep(
-        label="plan_create",
-        role="product-engineer",
-        deliverable="PLAN.md",
-        fragment_id="release_definition.plan_create",
-        shared_fragment_ids=(
-            "shared.anti_slop",
-            "shared.memory_selection",
-        ),
-        produces="generic-step-handoff-v1",
-        extra_allowed_paths=(
-            "repos/{context}/specs/releases/{release_id}/**",
-            "specs/releases/{release_id}/**",
-            "repos/{context}/specs/releases/ACTIVE.md",
-            "specs/releases/ACTIVE.md",
-        ),
-        consumes=("spec_create",),
-    ),
-    ReleaseStep(
-        label="plan_review",
-        role="qa-engineer, software-architect",
-        fragment_id="release_definition.plan_review",
-        is_review=True,
-        produces="plan-review-handoff-v1",
-        consumes=("plan_create",),
-    ),
-    ReleaseStep(
-        label="tasks_create",
-        role="product-engineer",
-        deliverable="TASKS.md",
-        fragment_id="release_definition.tasks_create",
-        shared_fragment_ids=("shared.anti_slop",),
-        produces="generic-step-handoff-v1",
-        extra_allowed_paths=(
-            "repos/{context}/specs/releases/{release_id}/**",
-            "specs/releases/{release_id}/**",
-            "repos/{context}/specs/releases/ACTIVE.md",
-            "specs/releases/ACTIVE.md",
-        ),
-        consumes=("plan_create",),
-    ),
-    ReleaseStep(
-        label="tasks_implementability_review",
-        role="software-engineer",
-        fragment_id="release_definition.tasks_review_implementability",
-        is_review=True,
-        produces="tasks-review-handoff-v1",
-        consumes=("tasks_create",),
-    ),
-    ReleaseStep(
-        label="definition_commit_gate",
-        role="python",
-        fragment_id=None,
-    ),
+    ReleaseStep(label="definition_commit_gate", role="python", fragment_id=None),
 )
 
 
@@ -216,6 +161,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         *,
         resume_from: str | None = None,
         skip_scope: bool = False,
+        operator_demand: str | None = None,
     ) -> ReleaseDefinitionResult:
         """Execute the sequence; stop at the first blocked gate; advance on success.
 
@@ -224,6 +170,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         the ``release_scope`` model step is a redundant restatement — it is dropped from
         the sequence and its ``consumes`` edges are erased, saving one worker session.
         """
+        self._operator_demand = operator_demand
         if skip_scope:
             from dataclasses import replace as _replace
 
@@ -240,10 +187,25 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     #: Review-gate label → the SDD artifact it approves (bug
     #: approved-review-never-flips-artifact-status). ``spec_review`` is the single
     #: merged SPEC gate (architecture + QA angles in one call, v0.2.x simplification).
-    _STATUS_FLIP_BY_REVIEW: ClassVar[dict[str, str]] = {
-        "spec_review": "SPEC.md",
-        "plan_review": "PLAN.md",
-        "tasks_implementability_review": "TASKS.md",
+    #: The ONE review approves all three artifacts, so the flip is a list, not a 1:1 map.
+    _STATUS_FLIP_BY_REVIEW: ClassVar[dict[str, tuple[str, ...]]] = {
+        "definition_review": ("SPEC.md", "PLAN.md", "TASKS.md"),
+    }
+
+    #: Artifact → the create step that re-authors it (bug
+    #: release-definition-approved-plan-not-persisted-041 — flip-failure remedy).
+    _CREATE_STEP_BY_ARTIFACT: ClassVar[dict[str, str]] = {
+        "SPEC.md": "definition_draft",
+        "PLAN.md": "definition_draft",
+        "TASKS.md": "definition_draft",
+    }
+
+    #: Artifact → the review step whose re-run re-asserts the Aprovado flip (the
+    #: terminal gate's remedy for a Draft artifact with an APPROVED ledger).
+    _REVIEW_STEP_BY_ARTIFACT: ClassVar[dict[str, str]] = {
+        "SPEC.md": "definition_review",
+        "PLAN.md": "definition_review",
+        "TASKS.md": "definition_review",
     }
 
     def _on_step_accepted(self, step: ReleaseStep) -> BlockedState | None:
@@ -252,27 +214,53 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         Deterministic Python, not model output: the workflow's own review gate IS the
         approval authority, so the canonical ``> **Status:**`` token must reflect it —
         otherwise downstream workers correctly refuse to build on a Draft artifact.
+        Python is the SOLE owner of that token (bug
+        release-definition-approved-plan-not-persisted-041): an approved review over a
+        MISSING artifact fails LOUD here with the create-step resume as remedy — never
+        a silent skip that surfaces 3+ model steps later at the terminal gate.
         """
-        if step.label == "plan_create":
+        if step.label == "definition_draft":
+            # Both deterministic lints run on the single draft step that authors all three.
             dependency_block = self._validate_plan_dependency_table()
             if dependency_block is not None:
                 return dependency_block
-        if step.label == "tasks_create":
             hygiene_block = self._validate_tasks_command_hygiene()
             if hygiene_block is not None:
                 return hygiene_block
-        filename = self._STATUS_FLIP_BY_REVIEW.get(step.label)
-        if filename is None:
+        filenames = self._STATUS_FLIP_BY_REVIEW.get(step.label)
+        if filenames is None:
             return None
+        for filename in filenames:
+            block = self._flip_one(filename, step)
+            if block is not None:
+                return block
+        return None
+
+    def _flip_one(self, filename: str, step: ReleaseStep) -> BlockedState | None:
+        """Flip ONE reviewed artifact to Aprovado, or block naming its create step."""
         path = self._selector.spec_context.specs_dir / "releases" / self._release_id / filename
         if not path.is_file():
-            return None
+            create_step = self._CREATE_STEP_BY_ARTIFACT[filename]
+            return BlockedState(
+                reason=(
+                    f"{step.label} approved but {filename} is missing on disk — the "
+                    "artifact the review approved was never persisted (worker write lost "
+                    "or written out of scope)"
+                ),
+                blocked_at_step=create_step,
+                operator_command=(
+                    f"re-run release-definition with --resume-from {create_step} "
+                    f"(only the {filename} authoring step re-executes)"
+                ),
+                detail={"artifact": filename, "gate": "review-status-flip-v1"},
+            )
         text = path.read_text(encoding="utf-8")
-        status_line = (
-            r"(?mi)^(?:>\s*)?(?:\*\*Status:\*\*|Status:)\s*"
-            r"(?:Draft|Em revisão|Em revisao|Aprovado)\s*$"
-        )
-        updated = re.sub(status_line + r"\n?", "", text)
+        # Single-writer law over the Status token: remove EVERY worker-authored status
+        # variant — blockquote or not, bullet-prefixed, colon inside or outside the bold
+        # markers, any case ((?i) covers Draft/draft and Status/status) — then insert
+        # the one canonical Python-owned line.
+        updated = ANY_STATUS_LINE.sub("", text)
+        updated = re.sub(r"\n{3,}", "\n\n", updated)
         frontmatter = re.match(r"\A---\n.*?\n---\n?", updated, flags=re.DOTALL)
         if frontmatter is not None:
             insertion_at = frontmatter.end()
@@ -281,7 +269,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             insertion_at = heading.end() if heading is not None else 0
         updated = (
             updated[:insertion_at].rstrip()
-            + "\n\n> **Status:** Aprovado\n\n"
+            + f"\n\n{APPROVED_LINE}\n\n"
             + updated[insertion_at:].lstrip()
         )
         path.write_text(updated, encoding="utf-8")
@@ -326,9 +314,9 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     def _tasks_hygiene_block(reason: str) -> BlockedState:
         return BlockedState(
             reason=f"TASKS command hygiene lint failed: {reason}",
-            blocked_at_step="tasks_create",
+            blocked_at_step="definition_draft",
             operator_command=(
-                "re-run release-definition with --resume-from tasks_create "
+                "re-run release-definition with --resume-from definition_draft "
                 "(only the TASKS authoring step re-executes)"
             ),
             detail={"artifact": "TASKS.md", "gate": "task-command-hygiene-v1"},
@@ -429,9 +417,9 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
     def _plan_dependency_block(reason: str) -> BlockedState:
         return BlockedState(
             reason=f"plan dependency lint failed: {reason}",
-            blocked_at_step="plan_create",
+            blocked_at_step="definition_draft",
             operator_command=(
-                "re-run release-definition with --resume-from plan_create "
+                "re-run release-definition with --resume-from definition_draft "
                 "(only the PLAN authoring step re-executes)"
             ),
             detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
@@ -456,11 +444,13 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         # Run-scoped requirements: an artifact is required only when ITS create step ran
         # in this sequence; the Aprovado flip only when its review gate ran too.
         required = {
-            "SPEC.md": ("spec_create" in labels, "spec_review" in labels),
-            "PLAN.md": ("plan_create" in labels, "plan_review" in labels),
-            "TASKS.md": ("tasks_create" in labels, False),
+            # One draft step authors all three; one review approves all three.
+            "SPEC.md": ("definition_draft" in labels, "definition_review" in labels),
+            "PLAN.md": ("definition_draft" in labels, "definition_review" in labels),
+            "TASKS.md": ("definition_draft" in labels, "definition_review" in labels),
         }
         missing: list[str] = []
+        remedies: list[str] = []
         for name, (must_exist, must_be_approved) in required.items():
             if not must_exist:
                 continue
@@ -468,8 +458,16 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             if not path.is_file():
                 missing.append(f"{name} (absent)")
                 continue
-            if must_be_approved and "**Status:** Aprovado" not in path.read_text(encoding="utf-8"):
+            if must_be_approved and not is_approved(path.read_text(encoding="utf-8")):
                 missing.append(f"{name} (not Aprovado)")
+                # Bug release-definition-approved-plan-not-persisted-041: a Draft
+                # artifact with an APPROVED ledger (resumed/rewritten mid-run) recovers
+                # by re-running ONLY its review — the flip is re-asserted on acceptance.
+                review_step = self._REVIEW_STEP_BY_ARTIFACT.get(name)
+                # All three artifacts share ONE review now, so the same remedy would be
+                # emitted three times; a command repeated three times is not a command.
+                if review_step is not None and f"--resume-from {review_step}" not in remedies:
+                    remedies.append(f"--resume-from {review_step}")
         if missing:
             return BlockedState(
                 reason=(
@@ -477,6 +475,15 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                     "on disk: " + ", ".join(missing)
                 ),
                 blocked_at_step=step.label,
+                # NEVER None. An artifact that is missing entirely maps to no review, so
+                # `remedies` came back empty and the gate blocked with no way forward
+                # (bug a2-release-missing-spec-gate-lacks-resume-remedy). Re-authoring is
+                # always a valid recovery, so it is the floor.
+                operator_command=(
+                    "re-run release-definition with "
+                    + " ".join(sorted(remedies) or ["--resume-from definition_draft"])
+                    + " (the step re-executes and the review re-asserts the Aprovado flip)"
+                ),
                 detail={"unpersisted_artifacts": ", ".join(missing)},
             )
         return None
@@ -520,6 +527,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             final_phase=final_phase,
             steps=tuple(_to_step_result(outcome) for outcome in outcomes),
             blocked=blocked,
+            warnings=self._last_warnings,
         )
 
 

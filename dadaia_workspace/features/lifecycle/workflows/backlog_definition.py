@@ -45,8 +45,9 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
-from dadaia_workspace.core.models.backlog import SubjectKind
+from dadaia_workspace.core.models.backlog import SubjectKind, is_intents_exempt
 from dadaia_workspace.core.models.lifecycle import (
+    HARNESS_CLI_NAMES,
     AgentRuntimeKind,
     BlockedState,
     GateVerdict,
@@ -77,14 +78,18 @@ from dadaia_workspace.features.lifecycle.agent_runner import (
 )
 from dadaia_workspace.features.lifecycle.context_selector import ContextSelector
 from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
-from dadaia_workspace.features.lifecycle.pipeline import RuntimeFactory
+from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError, RuntimeFactory
 from dadaia_workspace.features.lifecycle.prompt_builder import (
     LifecyclePromptBuilder,
     PromptPrefix,
     build_fragment_suffix,
     canonical_worker_output_ref,
 )
-from dadaia_workspace.features.lifecycle.run_store import emit_progress, refuse_completed_rerun
+from dadaia_workspace.features.lifecycle.run_store import (
+    emit_progress,
+    refuse_blocked_restart,
+    refuse_completed_rerun,
+)
 from dadaia_workspace.features.lifecycle.state_machine import LifecycleStateMachine
 from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     MalformedHandoffError,
@@ -282,6 +287,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # resumed-definition-step-blind-to-rejecting-review-feedback), implemented locally
         # per Ruling C (backlog keeps its own loop, no full base join).
         self._resume_feedback: dict[str, str] = {}
+        #: Backlog paths this run authored in an earlier attempt, captured on resume
+        #: before the ledger is truncated (see :meth:`_resume_run`).
+        self._resumed_authored_paths: tuple[str, ...] = ()
 
     # -- public entrypoint ----------------------------------------------
 
@@ -321,6 +329,12 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # ONCE, before any step in THIS call runs). ``backlog_review_gate`` diffs the
         # post-authoring snapshot against this to find what ``backlog_author`` actually wrote.
         before = self._backlog_snapshot()
+        # Raw per-item content hashes at the same instant (bug
+        # backlog-dedupe-updated-payload-not-gate-visible-043): the dedupe EDIT path
+        # legitimately refines an item's body/acceptance WITHOUT touching its bound
+        # ``intents[]``, so the gate must also diff raw content — an anchor-only diff
+        # is blind to exactly the class of change the EDIT path exists to make.
+        self._before_content_hashes = self._backlog_content_hashes()
         # Kept for the author-step payload promotion (bug
         # backlog-author-bare-payload-breaks-release-handoff): the promoted evidence is
         # enriched with the DISK-diffed authored path(s), never a worker self-report.
@@ -331,6 +345,33 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # or CHANGED file blocks at the step (with the structural retry), instead of
         # sailing through on a merely non-empty zone.
         self._before_deliverable_hashes = self._deliverable_before_hashes()
+        if resume_from is not None:
+            # The delta gate must answer "did this RUN deliver?", not "did this ATTEMPT
+            # deliver?". On a resume the snapshot above is taken AFTER the run's earlier
+            # attempt already wrote its item, so the run's own deliverable looks
+            # pre-existing, the delta comes back empty, and the step blocks with "no NEW
+            # or CHANGED deliverable" — a dead end whose only prescribed remedy is the
+            # resume that just failed. Combined with the gate prescribing that same
+            # resume, an operator who fixed exactly what the gate asked for could never
+            # finish the run (bug
+            # backlog-resume-contradiction-loop-after-fixing-a-preexisting-item).
+            #
+            # Dropping this run's own authored paths from the "before" snapshot restores
+            # the intended meaning without weakening the guard the delta mode exists for:
+            # a FIRST attempt whose worker writes nothing still sees a full snapshot and
+            # still blocks (bug codex-backlog-author-no-materialization-regression-040).
+            for authored in self._resumed_authored_paths:
+                self._before_deliverable_hashes.pop(authored, None)
+                # The review gate diffs the SAME question one layer up ("what did
+                # backlog_author write?"), against snapshots taken at this attempt's start —
+                # which already contain the run's own item. Dropping the run's own slugs
+                # here too lets the gate see the deliverable the run really produced,
+                # instead of reporting "no new/changed item found" about the item sitting
+                # in front of it. Both sites must agree, or fixing one just moves the
+                # dead end.
+                slug = authored.rsplit("/", 1)[-1].removesuffix(".md")
+                before.pop(slug, None)
+                self._before_content_hashes.pop(slug, None)
 
         overlap: list[Classification] = []
         results: list[BacklogStepResult] = []
@@ -390,6 +431,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # Idempotency guard (bug completed-workflow-rerun-not-refused): a COMPLETED run
         # id refuses cleanly; blocked runs stay restartable via resume_from.
         refuse_completed_rerun(self._run_store, run_id)
+        refuse_blocked_restart(self._run_store, run_id)
         if self._handoff_resolver is not None:
             self._handoff_resolver.reset_run_zone(
                 run_id,
@@ -419,10 +461,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
     ) -> tuple[LifecycleRun, tuple[BacklogStep, ...]]:
         labels = tuple(step.label for step in sequence)
         if resume_from not in labels:
-            raise ValueError(
-                f"resume_from step {resume_from!r} is not in the backlog-definition "
-                f"sequence {labels}"
-            )
+            raise InvalidResumeStepError.for_labels(resume_from, labels)
         prior = self._run_store.load(run_id)
         if prior is None:
             raise ValueError(f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run")
@@ -430,6 +469,12 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         resumed_labels = set(labels[index:])
         if prior.blocked is not None:
             self._resume_feedback[resume_from] = self._render_prior_block_digest(prior.blocked)
+        # Capture what THIS run already authored BEFORE the ledger is truncated below —
+        # resuming a step legitimately discards that step's records, which is also the
+        # only record of the run's own deliverable. Without capturing it here the delta
+        # gate sees the run's own item as pre-existing and blocks forever
+        # (bug backlog-resume-contradiction-loop-after-fixing-a-preexisting-item).
+        self._resumed_authored_paths = self._run_authored_paths(prior)
         if self._handoff_resolver is not None:
             self._handoff_resolver.reset_run_zone(
                 run_id,
@@ -471,6 +516,31 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
     # -- real disk state: the backlog snapshot ---------------------------
 
+    def _run_authored_paths(self, run: LifecycleRun) -> tuple[str, ...]:
+        """Backlog paths THIS run already authored, from its own recorded author payload.
+
+        Read from the run's persisted ``backlog_author`` evidence — the payload Python
+        enriches with the disk-diffed authored path(s), never a worker self-report — so a
+        resume can tell the run's own deliverable apart from a genuinely pre-existing item.
+        Returns empty when there is no resolver or no recorded payload, which keeps the
+        strict delta semantics for a run that never authored anything.
+        """
+        if self._handoff_resolver is None:
+            return ()
+        paths: list[str] = []
+        with contextlib.suppress(Exception):
+            resolved = self._handoff_resolver.resolve_required(
+                run, producer_step="backlog_author", attempt=0
+            )
+            refs = resolved.payload.get("artifact_refs")
+            if isinstance(refs, list):
+                paths = [
+                    ref.strip().lstrip("/")
+                    for ref in refs
+                    if isinstance(ref, str) and "specs/backlog/" in ref and ref.endswith(".md")
+                ]
+        return tuple(dict.fromkeys(paths))
+
     def _deliverable_before_hashes(self) -> dict[str, str]:
         """sha256 of every file currently in the backlog zone, keyed artifact-root-relative.
 
@@ -484,7 +554,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         if self._artifact_root is None:
             return hashes
         for root in (
-            self._artifact_root / "repos" / self._context / "specs" / "backlog",
+            self._artifact_root / "repos" / self._repo_slug / "specs" / "backlog",
             self._artifact_root / "specs" / "backlog",
         ):
             if not root.is_dir():
@@ -497,6 +567,44 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                         path.read_bytes()
                     ).hexdigest()
         return hashes
+
+    def _backlog_content_hashes(self) -> dict[str, str]:
+        """sha256 of every ``specs/backlog/*.md`` item, keyed by slug — raw disk truth."""
+        import hashlib
+
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        hashes: dict[str, str] = {}
+        if not backlog_dir.is_dir():
+            return hashes
+        for path in sorted(backlog_dir.glob("*.md")):
+            with contextlib.suppress(OSError):
+                hashes[path.stem] = hashlib.sha256(path.read_bytes()).hexdigest()
+        return hashes
+
+    def _changed_slugs(
+        self, before: dict[str, BoundItem], after: dict[str, BoundItem]
+    ) -> list[str]:
+        """Slugs authored THIS run: bound-anchor diff ∪ raw content-hash diff.
+
+        The anchor diff catches intent-level changes; the content diff catches the
+        dedupe EDIT path's prose/acceptance refinements (bug
+        backlog-dedupe-updated-payload-not-gate-visible-043). Only slugs the loader
+        resolves as real items (present in *after*) participate — a stray non-item
+        ``.md`` never reaches ``classify()``.
+        """
+        anchor_changed = {
+            slug
+            for slug, bound in after.items()
+            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        }
+        before_hashes = getattr(self, "_before_content_hashes", None) or {}
+        after_hashes = self._backlog_content_hashes()
+        hash_changed = {
+            slug
+            for slug, digest in after_hashes.items()
+            if slug in after and before_hashes.get(slug) != digest
+        }
+        return sorted(anchor_changed | hash_changed)
 
     def _backlog_snapshot(self) -> dict[str, BoundItem]:
         """Every real ``specs/backlog/*.md`` item, reduced to slug -> bound anchor changes.
@@ -525,11 +633,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         if before is None:
             return []
         after = self._backlog_snapshot()
-        changed = sorted(
-            slug
-            for slug, bound in after.items()
-            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
-        )
+        changed = self._changed_slugs(before, after)
         backlog_dir = self._selector.spec_context.specs_dir / "backlog"
         paths: list[str] = []
         for slug in changed:
@@ -565,16 +669,39 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         after = self._backlog_snapshot()
         backlog_dir = self._selector.spec_context.specs_dir / "backlog"
         unresolved_by_slug: dict[str, tuple[str, ...]] = {}
+        # Bug r4g-backlog-surface-new-existing-accepted (real mechanism): an item with
+        # ZERO ``intents[]`` at a non-``idea`` status used to sail through every arm of
+        # this gate — ``bound_anchor_changes`` yields no unresolved messages and
+        # ``classify()`` sees an empty anchor set, so both blocks are vacuously satisfied
+        # — while ``backlog doctor`` rejects it as BL-SCHEMA. Producer/validator drift,
+        # same family as fake-backlog-workflow-materializes-doctor-invalid-status-042.
+        # The status gate is REUSED from the doctor (``is_intents_exempt``) so the two
+        # can never drift into a third opinion.
+        missing_intents_by_slug: dict[str, str] = {}
         for item in load_backlog_items(backlog_dir):
             _anchor_changes, unresolved = bound_anchor_changes(item, self._registry)
             if unresolved:
                 unresolved_by_slug[item.slug] = tuple(unresolved)
+            if not item.intents and not is_intents_exempt(item.status):
+                missing_intents_by_slug[item.slug] = item.status or "(missing)"
 
-        changed = sorted(
-            slug
-            for slug, bound in after.items()
-            if before.get(slug) is None or before[slug].anchor_changes != bound.anchor_changes
+        # Every gate block prescribes the exact recovery (bug
+        # backlog-cli-intent-hallucinated-anchor-045, remedy half): a block without an
+        # operator_command is an unrecoverable chain dead end.
+        # The command must reproduce THIS run's invocation, harness included. Without it
+        # the remedy falls back to --harness auto, which in a real environment resolves to
+        # a live worker — so pasting the command literally resumed the run on a DIFFERENT
+        # runtime than the one that created it and re-blocked on a conflict with what the
+        # first attempt had authored (bug r6h-backlog-remedy-command-loses-fake-harness,
+        # reported by the consumer-side validator). A remedy that only works if the
+        # operator silently re-adds a flag is not a remedy.
+        resume_command = (
+            f"dadaia lifecycle backlog-definition --context {self._context} "
+            f"--release-id {self._release_id} --run-id {run.run_id} "
+            f"--harness {HARNESS_CLI_NAMES.get(self._default_kind, 'codex')} "
+            "--resume-from backlog_author"
         )
+        changed = self._changed_slugs(before, after)
         if not changed:
             blocked = BlockedState(
                 reason=(
@@ -583,8 +710,50 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 ),
                 blocked_at_step=step.label,
                 resume_token=run.idempotency_key,
+                operator_command=resume_command,
             )
             return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
+
+        # Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents: the first
+        # fix swept only the CHANGED slugs, so an already-invalid item the author never
+        # touched still sailed through while `backlog doctor` — which sweeps EVERY item —
+        # rejected the same tree. The gate's contract is not "the author behaved"; it is
+        # "the backlog this run leaves behind is valid". So sweep ALL items, and say
+        # whether the offender was authored by this run or pre-existed, because the
+        # remedy differs for the reader.
+        for slug in sorted(missing_intents_by_slug):
+            authored = slug in changed
+            origin = (
+                f"authored item {slug!r}"
+                if authored
+                else f"pre-existing item {slug!r} (NOT written by this run)"
+            )
+            blocked = BlockedState(
+                reason=(
+                    f"backlog_review_gate: {origin} declares NO intents[] at status "
+                    f"{missing_intents_by_slug[slug]!r}. Every item at 'candidate' or "
+                    "beyond must carry bound intents[] — the same BL-SCHEMA rule "
+                    "`dadaia backlog doctor` enforces, so completing here would leave a "
+                    "backlog the workspace's own doctor rejects. Add the typed intents[] "
+                    "(bind each subject to a canonical anchor from `dadaia backlog "
+                    "subjects`, or declare a new surface with 'surface: new'), or set "
+                    "status to 'idea' if it is genuinely an unbound brainstorm; then "
+                    "resume. Run `dadaia backlog doctor` to see every offender at once."
+                ),
+                blocked_at_step=step.label,
+                resume_token=run.idempotency_key,
+                operator_command=resume_command,
+                detail={
+                    "slug": slug,
+                    "status": missing_intents_by_slug[slug],
+                    "authored_by_this_run": "true" if authored else "false",
+                },
+            )
+            return (
+                [],
+                self._with_block(run, step.label, blocked),
+                self._blocked_sr(step, blocked),
+            )
 
         overlap: list[Classification] = []
         for slug in changed:
@@ -592,10 +761,14 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 blocked = BlockedState(
                     reason=(
                         f"backlog_review_gate: authored item {slug!r} carries unresolved "
-                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}"
+                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}. Correct each "
+                        "ref against `dadaia backlog subjects`, or — when the item "
+                        "INTRODUCES that surface — declare it with 'surface: new' on the "
+                        "intent subject; then resume."
                     ),
                     blocked_at_step=step.label,
                     resume_token=run.idempotency_key,
+                    operator_command=resume_command,
                     detail={"slug": slug},
                 )
                 return (
@@ -621,9 +794,15 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             if offending:
                 classes = ", ".join(f"{c.other_slug}:{c.verdict.value}" for c in offending)
                 blocked = BlockedState(
-                    reason=f"backlog_review_gate: {slug!r} {reason_kind} ({classes})",
+                    reason=(
+                        f"backlog_review_gate: {slug!r} {reason_kind} ({classes}). Fold "
+                        "the change into the named item (EDIT), or — when the overlap is "
+                        "a shared coarse anchor and this item introduces its own NEW "
+                        "surface — declare that intent with 'surface: new'; then resume."
+                    ),
                     blocked_at_step=step.label,
                     resume_token=run.idempotency_key,
+                    operator_command=resume_command,
                     detail={"slug": slug},
                 )
                 return (
@@ -657,10 +836,17 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         lines = [
             "## Canonical subject anchors",
             "",
-            "Bind EVERY `intents[]` subject to one of these anchors — `kind` must match "
-            "the anchor's kind and `ref` must be copied verbatim from this list. A ref "
-            "outside this list is rejected by `backlog_review_gate` (unresolved "
-            "subject). Explore the full set with `dadaia backlog subjects`.",
+            "Bind every `intents[]` subject about an EXISTING surface to one of these "
+            "anchors — `kind` must match the anchor's kind and `ref` must be copied "
+            "verbatim from this list. A ref outside this list is rejected by "
+            "`backlog_review_gate` (unresolved subject). Explore the full set with "
+            "`dadaia backlog subjects`.",
+            "",
+            "When the item INTRODUCES a surface that does not exist yet (e.g. a new "
+            "CLI command), do NOT bind it to a nearby existing anchor and do NOT "
+            "invent a ref from this list — declare it as new: "
+            "`subject: { kind: cli, ref: <new-name>, surface: new }`. Disjoint new "
+            "surfaces never conflict with each other or with existing anchors.",
             "",
         ]
         for kind in sorted(by_kind):
@@ -746,7 +932,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 scope,
                 allowed_paths=(
                     *scope.allowed_paths,
-                    f"repos/{self._context}/specs/backlog/**",
+                    f"repos/{self._repo_slug}/specs/backlog/**",
                     "specs/backlog/**",
                 ),
             )
@@ -776,7 +962,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 # trace of what the worker actually returned.
                 deliverable_globs=(
                     (
-                        f"repos/{self._context}/specs/backlog/**",
+                        f"repos/{self._repo_slug}/specs/backlog/**",
                         "specs/backlog/**",
                     )
                     if step.label == "backlog_author"

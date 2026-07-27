@@ -1,5 +1,6 @@
 """dadaia CLI entry point."""
 
+import os
 import sys
 
 import typer
@@ -106,18 +107,55 @@ app.add_typer(backlog_app, name="backlog")
 app.add_typer(bugs_app, name="bugs")
 
 
+#: Values of ``DADAIA_TRACEBACK`` that do NOT enable the traceback opt-in, so an
+#: exported-but-off variable cannot silently restore the old failure mode.
+_TRACEBACK_OFF = frozenset({"", "0", "false", "no", "off"})
+
+
+def _traceback_requested() -> bool:
+    return os.environ.get("DADAIA_TRACEBACK", "").strip().lower() not in _TRACEBACK_OFF
+
+
 def _safe_app() -> None:
     """Console entry point; failures surface without creating a second bug database.
 
-    A DadaiaError is a known, operator-facing condition (uninitialized workspace, unknown
-    context, etc.) — surface it as one concise stderr line + a non-zero exit, never a
-    traceback (bug doctor-uninitialized-workspace-traceback). Every other exception keeps
-    its traceback for debugging.
+    F-22 — "no CLI verb ever emits a raw traceback" — is enforced here as a **boundary**,
+    not a whitelist. A DadaiaError is a known, operator-facing condition (uninitialized
+    workspace, unknown context, …) and renders as one concise line
+    (bug doctor-uninitialized-workspace-traceback). Anything else is a *defect*, and it
+    renders as one concise line too, naming the exception type so it can be reported.
+
+    Catching only DadaiaError was the earlier design, and it made the contract depend on
+    every raise in the package being inside that hierarchy — ~138 are not. The contract
+    then leaked one verb at a time (WorkspaceVenvBootstrapError, then a dangling
+    DADAIA_BOOTSTRAP_PACKAGE; bug f22-cli-boundary-is-a-whitelist-not-a-boundary), because
+    a whitelist is maintained by discipline. A boundary cannot leak.
+
+    Debuggability is not traded away: ``DADAIA_TRACEBACK=1`` re-raises untouched, and it
+    applies to EVERY failure — including a ``DadaiaError``. Honouring the opt-in only for
+    unexpected exceptions made the escape hatch disappear the moment a specific failure was
+    (correctly) moved into the DadaiaError hierarchy, which is exactly how a developer
+    debugging a misfiring DadaiaError loses the traceback they need
+    (bug r6a-traceback-escape-hatch-suppressed, reported by the consumer-side validator).
+    ``SystemExit`` and ``KeyboardInterrupt`` derive from ``BaseException``, so Click's
+    normal exits and Ctrl-C pass through this handler unchanged.
     """
     try:
         app()
     except DadaiaError as exc:
+        if _traceback_requested():
+            raise
         print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except Exception as exc:
+        if _traceback_requested():
+            raise
+        print(f"Error: unexpected {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(
+            "This is a dadaia-workspace defect — please report it. "
+            "Re-run with DADAIA_TRACEBACK=1 for the full traceback.",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None
 
 

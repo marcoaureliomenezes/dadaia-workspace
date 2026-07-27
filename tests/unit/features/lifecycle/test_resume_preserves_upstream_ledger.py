@@ -1,7 +1,7 @@
 """Bug release-commit-gate-ignores-existing-plan-review-payload (Hermes game cycle 3).
 
 A release-definition run blocked at tasks_create (post-accept lint), was resumed with
-resume_from="tasks_create", and then the terminal definition_commit_gate declared
+resume_from="definition_draft", and then the terminal definition_commit_gate declared
 `missing_producer: plan_review` — even though plan_review's attempt-0 payload sat
 persisted on disk. Upstream ledger records must survive a resume verbatim.
 """
@@ -100,7 +100,7 @@ def test_resume_after_tasks_block_keeps_plan_review_in_ledger(tmp_path: Path) ->
 
     first = wf.run("resume-ledger")
     assert first.completed is False
-    assert first.blocked is not None and first.blocked.blocked_at_step == "tasks_create"
+    assert first.blocked is not None and first.blocked.blocked_at_step == "definition_draft"
 
     # The operator follows the documented remediation: fix TASKS.md, resume from
     # tasks_create. Upstream ledger records (spec/plan/plan_review) must survive.
@@ -108,14 +108,14 @@ def test_resume_after_tasks_block_keeps_plan_review_in_ledger(tmp_path: Path) ->
         "# TASKS\n\n- [ ] T-1 - t\n\nRun `pytest -p no:cacheprovider tests/`\n",
         encoding="utf-8",
     )
-    resumed = wf.run("resume-ledger", resume_from="tasks_create")
+    resumed = wf.run("resume-ledger", resume_from="definition_draft")
 
     assert resumed.completed is True, resumed.blocked.reason if resumed.blocked else resumed
     run = JsonLifecycleRunStore(tmp_path).load("resume-ledger")
     assert run is not None
     producers = {record.producer_step for record in run.workflow_steps.records}
-    assert "plan_review" in producers, sorted(producers)
-    assert "spec_review" in producers, sorted(producers)
+    assert "definition_review" in producers, sorted(producers)
+    assert "definition_review" in producers, sorted(producers)
 
 
 def test_commit_gate_recovers_ledger_record_from_persisted_payload(tmp_path: Path) -> None:
@@ -139,7 +139,7 @@ def test_commit_gate_recovers_ledger_record_from_persisted_payload(tmp_path: Pat
     store = JsonLifecycleRunStore(tmp_path)
     run = store.load("recover-ledger")
     assert run is not None
-    kept = tuple(r for r in run.workflow_steps.records if r.producer_step != "plan_review")
+    kept = tuple(r for r in run.workflow_steps.records if r.producer_step != "definition_review")
     assert len(kept) == len(run.workflow_steps.records) - 1
     store.save(
         _replace(
@@ -155,4 +155,4 @@ def test_commit_gate_recovers_ledger_record_from_persisted_payload(tmp_path: Pat
     reloaded = store.load("recover-ledger")
     assert reloaded is not None
     producers = {r.producer_step for r in reloaded.workflow_steps.records}
-    assert "plan_review" in producers, sorted(producers)
+    assert "definition_review" in producers, sorted(producers)
