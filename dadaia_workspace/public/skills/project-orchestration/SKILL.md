@@ -235,9 +235,9 @@ Use when the operator wants a new release built from reported bugs + backlog.
 `project-manager` dispatches `product-engineer` with the
 `dadaia-release-definition` skill. Steps: (1) sanitize stale bugs/backlog
 (`deferred`/`rejected` + reason, never delete); (2) pick the bug + backlog set;
-(3) apply bug-always-solved — every picked bug is fixed in the release unless a
-picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
-note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
+(3) apply the `bug-hotfix-doctrine` rule — bugs are hotfixed, never released; the
+only release-side disposition is a picked backlog item superseding an open bug
+(`superseded_by: <slug>` on the bug + SPEC note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
 the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
 SPEC without the grill report. See the `release-governance` rule.
 

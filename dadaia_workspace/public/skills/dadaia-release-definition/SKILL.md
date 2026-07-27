@@ -1,6 +1,6 @@
 ---
 name: dadaia-release-definition
-description: "Use when: the operator wants to turn reported bugs and/or backlog items into a release. The protocol product-engineer follows (dispatched by project-manager) to pick, sanitize, and refine bugs + backlog into a SPEC. Enforces bug-always-solved (unless subsumed), staleness sanitization, and a MANDATORY dadaia-grill-me session before the SPEC is written. Invoke at the start of release definition, before authoring SPEC/PLAN/TASKS."
+description: "Use when: the operator wants to turn reported bugs and/or backlog items into a release. The protocol product-engineer follows (dispatched by project-manager) to pick, sanitize, and refine bugs + backlog into a SPEC. Enforces the `bug-hotfix-doctrine` rule (bugs are hotfixed, never released; supersession is the only release-side disposition), staleness sanitization, and a MANDATORY dadaia-grill-me session before the SPEC is written. Invoke at the start of release definition, before authoring SPEC/PLAN/TASKS."
 applyTo: "specs/backlog/**"
 ---
 
@@ -46,9 +46,11 @@ Select the bugs + backlog items this release will address. This is discovery
 stays out of product-engineer's lane). Record the picked set; it becomes the
 SPEC's scope.
 
-### 3. Apply the bug-always-solved rule
-Every **picked bug must be solved in the release**, with exactly one exception:
-- If a **picked backlog item supersedes the bug** with a more complete solution,
+### 3. Dispose any open bug per the `bug-hotfix-doctrine` rule
+Bugs are **not release material**. A reported bug is fixed on the spot — register,
+root-cause, RED test, fix, GREEN, `resolved` event, commit — never by opening a
+release for it. The only bug disposition a release still makes is **supersession**:
+- If a **picked backlog item supersedes an open bug** with a more complete solution,
   record the subsumption:
   - add `superseded_by: <backlog-slug>` to the bug's frontmatter,
   - note it in the release SPEC,
@@ -104,7 +106,8 @@ release-definition playbook and the `release-governance` rule.
 
 - [ ] Stale bugs/backlog sanitized (`deferred`/`rejected` + reason; nothing deleted).
 - [ ] Picked set recorded.
-- [ ] Every picked bug fixed-in-release OR `superseded_by` a picked backlog item.
+- [ ] Every open bug hotfixed on the spot OR `superseded_by` a picked backlog item —
+      never carried into the release as scope.
 - [ ] `dadaia-grill-me` session completed (report emitted).
 - [ ] SPEC authored from the refined, picked set.
 - [ ] `**Consumes:**` line declared for any fully-consumed backlog item (or omitted if none).

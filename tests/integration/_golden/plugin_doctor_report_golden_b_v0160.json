@@ -66,7 +66,7 @@
   "[ok] claude:skills/project-orchestration/SKILL.md",
   "[ok] codex:config.toml",
   "[ok] codex:hooks.json",
-  "[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)",
+  "[ok] rule-corpus-reachable (WS-CDX-PROTOCOL)",
   "[ok] codex:rules/dadaia-command-policy.rules",
   "[ok] dadaia:AGENTS.md",
   "[ok] dadaia:hooks/codex-ctx-inject",

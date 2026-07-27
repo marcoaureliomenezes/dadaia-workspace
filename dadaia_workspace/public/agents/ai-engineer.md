@@ -305,7 +305,9 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
    smoke-runs the parse).
 5. Run `dadaia public stage && dadaia public install --target all` IF the changes touch
    files projected to runtime trees — but this is normally `devops-engineer`'s task in
-   the release pipeline, not ai-engineer's. Confirm in the active TASKS.md.
+   the release pipeline, not ai-engineer's. Confirm in the active TASKS.md. Never edit a
+   projected file in place: the `dadaia-workspace-dev-guardrail` rule holds the
+   source→stage→install order and the drift-repair procedure.
 6. Flip `[-]` -> `[x]` and commit closing change with conventional-commit message
    referencing the task id.
 

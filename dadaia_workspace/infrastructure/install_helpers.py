@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import shutil
 from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
@@ -207,7 +208,8 @@ def install_claude_agents(
     installed: list[str],
     iter_files_fn: Callable[[Path], Iterable[Path]],
     resolved_models: Mapping[str, ResolvedAgentModel],
-) -> None:
+    owned: Iterable[str] | None = None,
+) -> set[str]:
     """Project staged agents into ``.claude/agents/`` through the render seam (FR5).
 
     Core agents (present in *resolved_models*) are RENDERED — staged generic body +
@@ -219,7 +221,7 @@ def install_claude_agents(
     src_dir = agentic_dir / "agents"
     dst_dir = claude_dir / "agents"
     if not src_dir.exists():
-        return
+        return set()
     managed: set[Path] = set()
     for src in iter_files_fn(src_dir):
         rel = src.relative_to(src_dir)
@@ -230,13 +232,8 @@ def install_claude_agents(
         else:
             content = render_claude_agent(src.read_text(encoding="utf-8"), resolved)
             write_generated(dst_dir / rel, content, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
+    prune_unmanaged(dst_dir, managed, installed, iter_files_fn, owned)
+    return {rel.as_posix() for rel in managed}
 
 
 def resolve_codex_agent_model(
@@ -304,28 +301,90 @@ def write_generated(dst: Path, content: str, force: bool, installed: list[str]) 
     installed.append(f"[ok]   {dst}")
 
 
+#: Where the projection ledger lives. It records, per projected directory, the set of
+#: relative paths dadaia itself wrote — the ownership boundary pruning is scoped to.
+PROJECTION_LEDGER_REL = Path(".dadaia") / "states" / "projection_ledger.json"
+
+
+def load_projection_ledger(workspace_root: Path) -> dict[str, list[str]]:
+    """Read the projection ledger; an absent or unreadable one reads as empty.
+
+    Empty means "dadaia can prove it wrote nothing here", and pruning that cannot prove
+    ownership deletes nothing — the fail-safe direction for a data-loss bug.
+    """
+    try:
+        loaded = json.loads((workspace_root / PROJECTION_LEDGER_REL).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    return {
+        str(key): [str(item) for item in value]
+        for key, value in loaded.items()
+        if isinstance(value, list)
+    }
+
+
+def save_projection_ledger(workspace_root: Path, ledger: Mapping[str, Iterable[str]]) -> None:
+    """Persist the projection ledger, sorted so a re-install is byte-stable."""
+    path = workspace_root / PROJECTION_LEDGER_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {key: sorted(value) for key, value in sorted(ledger.items())}
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def prune_unmanaged(
+    dst_dir: Path,
+    managed: set[Path],
+    installed: list[str],
+    iter_files_fn: Callable[[Path], Iterable[Path]],
+    owned: Iterable[str] | None,
+) -> None:
+    """Delete projections dadaia owns and no longer ships; never touch anything else.
+
+    Bug ``claude-install-prunes-operator-authored-files``: this used to delete every
+    file absent from staging, and an operator-authored rule/agent/skill is *always*
+    absent from staging. *owned* carries the paths a previous projection recorded in the
+    ledger. ``None`` means no ledger entry exists — dadaia cannot prove it wrote anything
+    here — and then **nothing is pruned**: an unprovable claim of ownership must never
+    justify a delete. A workspace upgrading from a pre-ledger version therefore keeps
+    every file on its first install and starts pruning once the ledger exists; the
+    doctor's unmanaged-file check is what surfaces leftovers in the meantime.
+    """
+    owned_set = {str(item) for item in owned} if owned is not None else set()
+    for dst in iter_files_fn(dst_dir):
+        rel = dst.relative_to(dst_dir)
+        if rel in managed or rel.as_posix() not in owned_set:
+            continue
+        dst.unlink(missing_ok=True)
+        installed.append(f"[prune] {dst}")
+    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
+        if not any(d.iterdir()):
+            d.rmdir()
+
+
 def copy_tree(
     src_dir: Path,
     dst_dir: Path,
     force: bool,
     installed: list[str],
     iter_files_fn: Callable[[Path], Iterable[Path]],
-) -> None:
-    """Copy all files from *src_dir* to *dst_dir*, pruning orphan projections."""
+    owned: Iterable[str] | None = None,
+) -> set[str]:
+    """Copy all files from *src_dir* to *dst_dir*, pruning orphan projections.
+
+    Returns the relative paths this projection owns, for the caller to record in the
+    ledger. Pruning is scoped by *owned* (see :func:`prune_unmanaged`).
+    """
     if not src_dir.exists():
-        return
+        return set()
     managed: set[Path] = set()
     for src in iter_files_fn(src_dir):
         rel = src.relative_to(src_dir)
         managed.add(rel)
         copy_file(src, dst_dir / rel, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
+    prune_unmanaged(dst_dir, managed, installed, iter_files_fn, owned)
+    return {rel.as_posix() for rel in managed}
 
 
 def remove_stale_files(src_dir: Path, dst_dir: Path, pattern: str, installed: list[str]) -> None:

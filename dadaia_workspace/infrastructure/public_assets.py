@@ -25,8 +25,8 @@ from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
-    check_codex_rule_corpus_reachable,
     check_memory_phase_single_source,
+    check_rule_corpus_reachable,
     codex_trust_boundary_info,
     dcx1_missing_toml,
     dcx2_config_toml_entries,
@@ -47,10 +47,12 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_handoff_agents_md,
     install_reports_agents_md,
     install_universal_skills,
+    load_projection_ledger,
     remove_legacy_workflow_projections,
     render_claude_agent,
     resolve_codex_agent_model,
     runtime_expectations,
+    save_projection_ledger,
     write_generated,
 )
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -163,8 +165,15 @@ class FileSystemPublicAssetManager:
     def _copy_file(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
         copy_file(src, dst, force, installed)
 
-    def _copy_tree(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
-        copy_tree(src, dst, force, installed, self._iter_files)
+    def _copy_tree(
+        self,
+        src: Path,
+        dst: Path,
+        force: bool,
+        installed: list[str],
+        owned: Iterable[str] | None = None,
+    ) -> set[str]:
+        return copy_tree(src, dst, force, installed, self._iter_files, owned=owned)
 
     def _write_generated(self, dst: Path, content: str, force: bool, installed: list[str]) -> None:
         write_generated(dst, content, force, installed)
@@ -928,6 +937,7 @@ class FileSystemPublicAssetManager:
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:
             reports.extend(self._doctor_claude_settings(workspace_root))
+            reports.extend(self._doctor_unmanaged_claude_files(agentic_dir, workspace_root))
         elif (workspace_root / ".claude").exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
 
@@ -997,7 +1007,10 @@ class FileSystemPublicAssetManager:
         # which would make a claude-only/pi-only `public doctor` exit 1 (AC-5 unachievable).
         if "codex" in active:
             reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
-        reports.extend(check_codex_rule_corpus_reachable(workspace_root))
+        # Harness-independent: the corpus lives in .claude/rules and is cited from every
+        # harness's artifacts, so this must NOT gate on codex (bug
+        # rule-corpus-reachability-unchecked-on-claude-path).
+        reports.extend(check_rule_corpus_reachable(workspace_root))
         if "codex" in active:
             reports.extend(codex_trust_boundary_info())
         reports.extend(check_agent_skill_refs(self._public_dir))
@@ -1065,17 +1078,89 @@ class FileSystemPublicAssetManager:
                 self._load_agent_policy(workspace_root, agentic_dir)
             )
         dirs = _CLAUDE_DIRS if only is None else tuple(d for d in _CLAUDE_DIRS if d == only)
+        # Pruning is scoped to what a previous projection recorded as ours, so an
+        # operator-authored rule/agent/skill is never deleted (bug
+        # claude-install-prunes-operator-authored-files).
+        ledger = load_projection_ledger(workspace_root)
         for name in dirs:
+            key = (claude_dir / name).relative_to(workspace_root).as_posix()
             if name == "agents":
                 # v0.1.65 FR5: core agents are RENDERED (staged generic body +
                 # resolved policy) through the D-6 seam; stubs copy verbatim.
-                install_claude_agents(
-                    agentic_dir, claude_dir, force, installed, self._iter_files, resolved_models
+                ledger[key] = sorted(
+                    install_claude_agents(
+                        agentic_dir,
+                        claude_dir,
+                        force,
+                        installed,
+                        self._iter_files,
+                        resolved_models,
+                        owned=ledger.get(key),
+                    )
                 )
                 continue
-            copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
+            ledger[key] = sorted(
+                copy_tree(
+                    agentic_dir / name,
+                    claude_dir / name,
+                    force,
+                    installed,
+                    self._iter_files,
+                    owned=ledger.get(key),
+                )
+            )
+        save_projection_ledger(workspace_root, ledger)
         if only is None:
             self._install_claude_settings(claude_dir, workspace_root, force, installed)
+
+    def install_claude_settings(self, workspace_root: Path) -> list[str]:
+        """Public seam for the one canonical ``settings.json`` writer (port method).
+
+        ``init`` used to hand-roll its own writer that registered ctx-inject and nothing
+        else, so ``init --skip-assets`` produced a settings.json with no PreToolUse gate
+        at all and exited 0 (bug ``init-skip-assets-writes-gateless-claude-settings``).
+        Both paths now go through here, so "the two writers agree" is structural instead
+        of a claim in a comment.
+        """
+        installed: list[str] = []
+        claude_dir = workspace_root / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        self._install_claude_settings(claude_dir, workspace_root, force=False, installed=installed)
+        return installed
+
+    def _doctor_unmanaged_claude_files(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
+        """Name every ``.claude/`` file that is present but not lib-originated.
+
+        Bug ``claude-doctor-blind-to-unmanaged-projection-files``: doctor only ever walked
+        staging→projection, so a file the library does not ship produced no line at all
+        and doctor exited 0. ``.claude/rules`` is loaded into every session's context, so
+        an unmanaged file there is an instruction-injection surface; after the ownership
+        fix it also survives every install. It must be seen.
+
+        These are ``[warn]`` (visible, exit-0) rather than errors on purpose: the
+        Workspace Root Law's operator exception makes an operator-authored rule/agent/
+        skill legitimate, and a check that turns doctor red on a sanctioned file would
+        just teach the operator to stop reading doctor.
+        """
+        claude_dir = workspace_root / ".claude"
+        lines: list[str] = []
+        for name in _CLAUDE_DIRS:
+            src_dir, dst_dir = agentic_dir / name, claude_dir / name
+            if not dst_dir.exists():
+                continue
+            staged = (
+                {src.relative_to(src_dir).as_posix() for src in self._iter_files(src_dir)}
+                if src_dir.exists()
+                else set()
+            )
+            for dst in sorted(self._iter_files(dst_dir)):
+                rel = dst.relative_to(dst_dir).as_posix()
+                if rel not in staged:
+                    lines.append(
+                        f"[warn] claude:{name}/{rel} unmanaged (not lib-originated; "
+                        "it is loaded into session context and install will not remove it)"
+                    )
+        return lines
 
     def _install_claude_settings(
         self, claude_dir: Path, workspace_root: Path, force: bool, installed: list[str]

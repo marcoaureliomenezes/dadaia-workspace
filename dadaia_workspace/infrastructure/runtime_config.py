@@ -120,15 +120,25 @@ _CLAUDE_MATCH_ALL = "*"
 _DADAIA_HOOK_MARKER = "dadaia_workspace.hooks."
 
 
+#: Retired dadaia hook shapes. They carry no ``dadaia_workspace.hooks.`` marker, so
+#: ownership detection would read them as the operator's and PRESERVE them — leaving a
+#: superseded hook wired alongside its replacement. They are ours; they get replaced.
+_RETIRED_DADAIA_HOOK_MARKERS = ("ctx-inject.sh",)
+
+
 def _is_dadaia_hook_entry(entry: object) -> bool:
-    """True iff *entry* is a hook entry this module generated."""
+    """True iff *entry* is a hook entry this module generated, now or in a past version."""
     if not isinstance(entry, dict):
         return False
     hooks = entry.get("hooks")
-    if not isinstance(hooks, list):
-        return False
+    candidates = hooks if isinstance(hooks, list) else [entry]
     return any(
-        isinstance(h, dict) and _DADAIA_HOOK_MARKER in str(h.get("command", "")) for h in hooks
+        isinstance(h, dict)
+        and (
+            _DADAIA_HOOK_MARKER in str(h.get("command", ""))
+            or any(marker in str(h.get("command", "")) for marker in _RETIRED_DADAIA_HOOK_MARKERS)
+        )
+        for h in candidates
     )
 
 

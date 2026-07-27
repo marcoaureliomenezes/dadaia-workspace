@@ -507,47 +507,72 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
 _CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
 
 
-def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[str]:
-    """WS-CDX-PROTOCOL (A6): every by-name rule cited by a Codex artifact is reachable.
+#: A backticked by-name rule citation — the canonical, unambiguous form.
+_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
 
-    A Codex session reaches the load-bearing rule-law corpus through the on-disk
-    surface ``.claude/rules/<rule-name>.md`` (documented in the projected root
-    ``AGENTS.md`` "Rule-Law Corpus" section). This check proves the contract: for
-    every ``\\`<name>\\` rule`` citation in any ``.codex/agents/*.toml`` artifact, the
-    file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
-    cites a law surface Codex cannot reach.
+#: An un-backticked citation, e.g. the heading "Apply the bug-always-solved rule".
+#: Requiring TWO hyphens is what keeps ordinary prose out: "the by-name rule" and "the
+#: read-only rule" are adjectives, not slugs. The stated cost of that threshold is that a
+#: one-hyphen slug cited without backticks and MISSING from the corpus goes unseen; every
+#: backticked citation is checked regardless of shape, and authors are asked to backtick.
+_RULE_CITATION_PROSE_RE: re.Pattern[str] = re.compile(
+    r"\b([a-z][a-z0-9]*(?:-[a-z0-9]+){2,})\s+rule\b"
+)
 
-    Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
-    ``[error]`` line per unreachable citation.
+#: Every artifact that cites by-name law. Rules cite each other and the root AGENTS.md
+#: cites rules, so scanning only agents/skills reported live law as uncited.
+_RULE_CITER_GLOBS: tuple[str, ...] = (
+    ".codex/agents/*.toml",
+    ".claude/agents/*.md",
+    ".claude/skills/*/SKILL.md",
+    ".claude/rules/*.md",
+    "AGENTS.md",
+)
+
+
+def check_rule_corpus_reachable(workspace_root: Path) -> list[str]:
+    """Every by-name rule cited by ANY harness artifact must resolve to a rule file.
+
+    The rule-law corpus lives at ``.claude/rules/<name>.md`` and is cited by name from
+    agent bodies and skills on every harness. The predecessor of this check
+    (``check_codex_rule_corpus_reachable``) returned immediately unless ``.codex/agents``
+    existed, so a claude-only workspace verified nothing — while the corpus and its
+    citers both sat in ``.claude/`` (bug ``rule-corpus-reachability-unchecked-on-claude-path``).
+
+    Emits one ``[error]`` per citation with no rule file — an agent that follows it gets
+    no law and no warning — and one ``[warn]`` per rule nothing cites, which is dead law
+    that still costs every session's context window.
     """
-    codex_agents = workspace_root / ".codex" / "agents"
     rules_dir = workspace_root / ".claude" / "rules"
-    out: list[str] = []
-    if not codex_agents.exists():
-        return out
+    # A missing corpus is NOT silence: if artifacts cite by-name law and the corpus is
+    # absent entirely, every one of those citations is unreachable. Silence here would
+    # hide the worst case behind the same clean output as the healthy one.
+    available = {path.stem for path in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
+    cited: set[str] = set()
+    for pattern in _RULE_CITER_GLOBS:
+        for artifact in sorted(workspace_root.glob(pattern)):
+            try:
+                text = artifact.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            cited.update(match.group(1) for match in _RULE_CITATION_RE.finditer(text))
+            cited.update(match.group(1) for match in _RULE_CITATION_PROSE_RE.finditer(text))
 
-    unreachable: set[str] = set()
-    cited_any = False
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        try:
-            text = toml_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        for match in _CODEX_RULE_CITATION_RE.finditer(text):
-            name = match.group(1)
-            cited_any = True
-            if not (rules_dir / f"{name}.md").is_file():
-                unreachable.add(name)
+    if not cited:
+        return []
 
-    if unreachable:
-        for name in sorted(unreachable):
-            out.append(
-                f"[error] codex:rule-corpus: by-name rule '{name}' cited in a Codex "
-                f"artifact has no reachable surface .claude/rules/{name}.md "
-                "(WS-CDX-PROTOCOL)"
-            )
-    elif cited_any:
-        out.append("[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)")
+    out = [
+        f"[error] rule-corpus: by-name rule '{name}' is cited but has no reachable "
+        f"surface .claude/rules/{name}.md (WS-CDX-PROTOCOL)"
+        for name in sorted(cited - available)
+    ]
+    if not out:
+        out.append("[ok] rule-corpus-reachable (WS-CDX-PROTOCOL)")
+    out.extend(
+        f"[warn] rule-corpus: rule '{name}' is cited by no agent or skill "
+        "(dead law — it still costs context in every session)"
+        for name in sorted(available - cited)
+    )
     return out
 
 

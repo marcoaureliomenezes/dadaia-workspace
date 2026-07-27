@@ -276,9 +276,10 @@ to define a release from bugs + backlog, I follow the `dadaia-release-definition
 I discover **within** `specs/bugs/` + `specs/backlog/` (not the wider codebase), then:
 1. **Sanitize** stale/invalid bugs + backlog (`deferred`/`rejected` + reason; never delete);
 2. **Pick** the release's bug + backlog set;
-3. apply **bug-always-solved** — every picked bug is fixed in the release unless a picked
-   backlog item supersedes it (record `superseded_by: <slug>` on the bug + a SPEC note,
-   and the backlog item's TASKS cover the bug's acceptance); a bug is never silently dropped;
+3. apply the `bug-hotfix-doctrine` rule — bugs are hotfixed on the spot, never released.
+   The only release-side disposition is supersession: a picked backlog item may subsume an
+   open bug (record `superseded_by: <slug>` on the bug + a SPEC note, and the backlog item's
+   TASKS cover the bug's acceptance); a bug is never silently dropped;
 4. run a **MANDATORY** `dadaia-grill-me` session on the picked set before writing the SPEC.
 
 If PM instead hands me an already-refined `discovery_report`, read it to inform the SPEC.
