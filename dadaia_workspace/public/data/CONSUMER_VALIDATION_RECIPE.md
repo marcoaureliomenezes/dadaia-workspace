@@ -54,6 +54,34 @@ an initialized workspace, create it:
 - Run: `$D --version`; `$D capabilities --json`.
 - **PASS if:** `$D --version` exits 0 and prints the candidate version; and
   `capabilities` JSON `.provider.distribution_version` equals that same version.
+- **AND — the version string is NOT identity.** Two candidates built 41 commits apart
+  both print `0.4.2`; a validation venv installed from an earlier wheel therefore looks
+  correct and silently validates dead code (this happened, and cost two days of a matrix
+  run re-finding already-fixed bugs). So compare CONTENT, not the label: for every
+  `dadaia_workspace/**/*.py` inside the candidate wheel being validated, the file
+  installed in the venv under test must have the SAME sha256.
+
+  ```bash
+  python3 - "$WHEEL" "$(dirname "$D")/../lib" <<'EOF'
+  import hashlib, pathlib, sys, zipfile
+  wheel, libroot = sys.argv[1], pathlib.Path(sys.argv[2])
+  site = next(libroot.glob("python*/site-packages"))
+  z = zipfile.ZipFile(wheel)
+  bad = []
+  for n in z.namelist():
+      if n.startswith("dadaia_workspace/") and n.endswith(".py"):
+          inst = site / n
+          if not inst.exists() or hashlib.sha256(inst.read_bytes()).digest() != \
+             hashlib.sha256(z.read(n)).digest():
+              bad.append(n)
+  print("MISMATCH", len(bad), bad[:5]) if bad else print("IDENTITY OK")
+  sys.exit(1 if bad else 0)
+  EOF
+  ```
+
+  A mismatch is a **hard stop**: rebuild the validation venv from the candidate wheel and
+  restart the round. Never reuse a venv across candidates, and never trust a `--version`
+  that agrees.
 
 ### F-02 — Reconcile with legacy quarantine
 - Setup: an initialized workspace that also contains legacy `.dadaia/bugs/` and
