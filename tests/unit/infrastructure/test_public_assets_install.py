@@ -429,6 +429,9 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     settings["permissions"] = {"allow": ["Bash(git status:*)"]}
     settings["model"] = "claude-opus-4-8"
     settings["hooks"]["Stop"] = [{"hooks": [{"type": "command", "command": "operator.sh"}]}]
+    settings["hooks"]["PreCompact"] = [
+        {"hooks": [{"type": "command", "command": "operator-precompact.sh"}]}
+    ]
     settings["hooks"]["PreToolUse"].append(
         {"matcher": "Read", "hooks": [{"type": "command", "command": "operator-audit.sh"}]}
     )
@@ -456,6 +459,13 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     assert warns, f"a foreign PreToolUse hook must be surfaced: {lines}"
     assert "operator-audit.sh" in warns[0], warns
     assert "PreToolUse" in warns[0], warns
+    # The sweep must cover EVERY event in the file, not only the four dadaia wires: Stop,
+    # PreCompact, SessionEnd, SubagentStop and Notification are executed by Claude Code
+    # just the same, so a foothold there is equally live and must be equally visible.
+    assert "operator.sh" in warns[0], warns
+    assert "Stop" in warns[0], warns
+    assert "operator-precompact.sh" in warns[0], warns
+    assert "PreCompact" in warns[0], warns
     # Advisory only: [warn] must not fail the doctor.
     assert not [line for line in lines if line.startswith(("[drift]", "[missing]"))], lines
 

@@ -176,19 +176,24 @@ def merge_claude_settings(
 def foreign_claude_hook_commands(
     settings: dict[str, object], canonical: dict[str, object]
 ) -> list[str]:
-    """Commands in dadaia-WIRED hook events that dadaia did not generate.
+    """Every hook command in the file that dadaia did not generate.
 
     Preserving the operator's own hooks is correct; going blind to them is not. A foreign
     command inside ``PreToolUse`` runs on every gated write, so it is exactly where a local
     injection would sit. This lists them so the doctor can surface them — the file belongs
     to the operator, so the finding is advisory, never drift.
+
+    The sweep covers EVERY event present in the file, not only the four dadaia wires.
+    Seeding from the canonical events alone left ``Stop``, ``PreCompact``, ``SessionEnd``,
+    ``SubagentStop`` and ``Notification`` unsurfaced — events Claude Code executes just the
+    same, so a foothold there was equally invisible and equally live.
     """
     canonical_hooks = canonical.get("hooks")
     wired = set(canonical_hooks) if isinstance(canonical_hooks, dict) else set()
     hooks_raw = settings.get("hooks")
     hooks = hooks_raw if isinstance(hooks_raw, dict) else {}
     found: list[str] = []
-    for event in sorted(wired):
+    for event in sorted(wired | set(hooks)):
         entries = hooks.get(event)
         if not isinstance(entries, list):
             continue
