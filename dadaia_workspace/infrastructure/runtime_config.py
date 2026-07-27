@@ -202,7 +202,12 @@ def foreign_claude_hook_commands(
                 continue
             for hook in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
                 if isinstance(hook, dict) and hook.get("command"):
-                    found.append(f"{event}:{hook['command']}")
+                    # BOTH tokens are attacker-controlled and land in a printed doctor line
+                    # (CWE-117). Raw ESC/newline bytes let a crafted command forge a second
+                    # physical line reading "[ok] claude:settings.json" — the very mechanism
+                    # that exists to REVEAL a foothold, used to hide it. repr() escapes
+                    # ESC, CR and LF, so the line can only ever be one line.
+                    found.append(f"{event!r}:{hook['command']!r}")
     return found
 
 
