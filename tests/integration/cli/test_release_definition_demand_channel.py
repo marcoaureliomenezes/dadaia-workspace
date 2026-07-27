@@ -16,12 +16,24 @@ pytestmark = pytest.mark.integration
 
 
 def test_the_cli_exposes_demand() -> None:
-    from typer.testing import CliRunner
+    """Assert the registered PARAMETER, never the rendered help text.
+
+    This asserted ``"--demand" in <--help output>``. That output is a rich-rendered table
+    whose column widths depend on the terminal: it passed locally and failed in CI, where
+    colour is on and the options column is narrower, so the flag never appeared as a
+    literal substring. The option list is the contract; the help rendering is presentation.
+    """
+    import typer.main
 
     from dadaia_workspace.cli.main import app
 
-    out = CliRunner().invoke(app, ["lifecycle", "release-definition", "--help"]).output
-    assert "--demand" in out, "release-definition must expose the operator demand channel"
+    group = typer.main.get_command(app)
+    lifecycle = group.commands["lifecycle"]  # type: ignore[attr-defined]
+    command = lifecycle.commands["release-definition"]  # type: ignore[attr-defined]
+    flags = {opt for param in command.params for opt in param.opts}
+    assert "--demand" in flags, (
+        f"release-definition must expose the operator demand channel; has {sorted(flags)}"
+    )
 
 
 def test_the_demand_reaches_every_model_step_prompt() -> None:
