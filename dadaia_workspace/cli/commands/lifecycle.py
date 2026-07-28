@@ -242,6 +242,25 @@ def _require_canonical_release_id(release_id: str) -> None:
         )
 
 
+def _echo_block_reason(result: object) -> None:
+    """Print WHY a run stopped, in the human output, not only under --json.
+
+    A blocked line that names only the step ("backlog_review_gate:BLOCKED") forces the
+    operator to re-run the whole command with --json just to read the reason — and a
+    reason nobody reads is a remedy nobody follows. Every block already carries its
+    prescribed recovery; this puts it where the operator is looking.
+    """
+    blocked = getattr(result, "blocked", None)
+    if blocked is None:
+        return
+    reason = getattr(blocked, "reason", "") or ""
+    if reason:
+        typer.echo(f"\n{reason}")
+    remedy = getattr(blocked, "operator_command", "") or ""
+    if remedy:
+        typer.echo(f"\nRecovery: {remedy}")
+
+
 @app.command("backlog-definition")
 def backlog_define(
     context: str | None = typer.Option(
@@ -394,6 +413,7 @@ def backlog_define(
         typer.echo(
             f"{status} backlog-define run={result.run_id} phase={result.final_phase.value} {trail}"
         )
+        _echo_block_reason(result)
     if not result.completed:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
@@ -580,6 +600,7 @@ def release_define(
         typer.echo(
             f"{status} release-define run={result.run_id} phase={result.final_phase.value} {trail}"
         )
+        _echo_block_reason(result)
         if post_step_result is not None:
             typer.echo(f"  post_step: {post_step_result}")
         if post_step_error is not None:
@@ -1366,6 +1387,7 @@ def pipeline(
             for s in result.steps
         )
         typer.echo(f"{status} run={result.run_id} phase={result.final_phase.value} {trail}")
+        _echo_block_reason(result)
     if not result.completed:
         raise typer.Exit(LifecycleExitCode.BLOCKED)
 
