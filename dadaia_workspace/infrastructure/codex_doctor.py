@@ -15,6 +15,12 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+from dadaia_workspace.core.rule_corpus import (
+    CITER_GLOBS,
+    RULES_DIR,
+    RuleCorpusScan,
+    scan_rule_corpus,
+)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
     _parse_agent_frontmatter,
@@ -507,71 +513,50 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
 _CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
 
 
-#: A backticked by-name rule citation — the canonical, unambiguous form.
-_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
+def _corpus_scan(workspace_root: Path) -> RuleCorpusScan:
+    """Read the citing artifacts and the rule names, then delegate to the core semantics.
 
-#: An un-backticked citation, e.g. the heading "Apply the bug-always-solved rule".
-#: Requiring TWO hyphens is what keeps ordinary prose out: "the by-name rule" and "the
-#: read-only rule" are adjectives, not slugs. The stated cost of that threshold is that a
-#: one-hyphen slug cited without backticks and MISSING from the corpus goes unseen; every
-#: backticked citation is checked regardless of shape, and authors are asked to backtick.
-_RULE_CITATION_PROSE_RE: re.Pattern[str] = re.compile(
-    r"\b([a-z][a-z0-9]*(?:-[a-z0-9]+){2,})\s+rule\b"
-)
-
-#: Every artifact that cites by-name law. Rules cite each other and the root AGENTS.md
-#: cites rules, so scanning only agents/skills reported live law as uncited.
-_RULE_CITER_GLOBS: tuple[str, ...] = (
-    ".codex/agents/*.toml",
-    ".claude/agents/*.md",
-    ".claude/skills/*/SKILL.md",
-    ".claude/rules/*.md",
-    "AGENTS.md",
-)
+    The traversal is here (and mirrored in the workspace-state doctor) because ``core`` is
+    I/O-pure by ratchet; the shared ``CITER_GLOBS``/``RULES_DIR`` constants are what keep
+    the two from drifting on WHICH artifacts count as citers.
+    """
+    rules_dir = workspace_root / RULES_DIR
+    available = {path.stem for path in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
+    texts: list[str] = []
+    for pattern in CITER_GLOBS:
+        for artifact in sorted(workspace_root.glob(pattern)):
+            try:
+                texts.append(artifact.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+    return scan_rule_corpus(texts, available)
 
 
 def check_rule_corpus_reachable(workspace_root: Path) -> list[str]:
     """Every by-name rule cited by ANY harness artifact must resolve to a rule file.
 
-    The rule-law corpus lives at ``.claude/rules/<name>.md`` and is cited by name from
-    agent bodies and skills on every harness. The predecessor of this check
-    (``check_codex_rule_corpus_reachable``) returned immediately unless ``.codex/agents``
-    existed, so a claude-only workspace verified nothing — while the corpus and its
-    citers both sat in ``.claude/`` (bug ``rule-corpus-reachability-unchecked-on-claude-path``).
+    The scan lives in ``core.rule_corpus`` so ``dadaia public doctor`` (here) and
+    ``dadaia doctor`` (features) give the same answer; fixing the blindness in one verb
+    and not the other is bug ``r9-doctor-omits-rule-corpus-reachable``.
 
     Emits one ``[error]`` per citation with no rule file — an agent that follows it gets
     no law and no warning — and one ``[warn]`` per rule nothing cites, which is dead law
     that still costs every session's context window.
     """
-    rules_dir = workspace_root / ".claude" / "rules"
-    # A missing corpus is NOT silence: if artifacts cite by-name law and the corpus is
-    # absent entirely, every one of those citations is unreachable. Silence here would
-    # hide the worst case behind the same clean output as the healthy one.
-    available = {path.stem for path in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
-    cited: set[str] = set()
-    for pattern in _RULE_CITER_GLOBS:
-        for artifact in sorted(workspace_root.glob(pattern)):
-            try:
-                text = artifact.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            cited.update(match.group(1) for match in _RULE_CITATION_RE.finditer(text))
-            cited.update(match.group(1) for match in _RULE_CITATION_PROSE_RE.finditer(text))
-
-    if not cited:
+    scan = _corpus_scan(workspace_root)
+    if not scan.cited:
         return []
-
     out = [
         f"[error] rule-corpus: by-name rule '{name}' is cited but has no reachable "
         f"surface .claude/rules/{name}.md (WS-CDX-PROTOCOL)"
-        for name in sorted(cited - available)
+        for name in scan.unreachable
     ]
     if not out:
         out.append("[ok] rule-corpus-reachable (WS-CDX-PROTOCOL)")
     out.extend(
         f"[warn] rule-corpus: rule '{name}' is cited by no agent or skill "
         "(dead law — it still costs context in every session)"
-        for name in sorted(available - cited)
+        for name in scan.uncited
     )
     return out
 
