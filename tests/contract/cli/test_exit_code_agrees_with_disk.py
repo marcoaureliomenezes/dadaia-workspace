@@ -73,3 +73,21 @@ def test_a_completed_run_is_left_alone(workspace: Path) -> None:
 def test_an_unreadable_store_never_masks_the_commands_own_result(workspace: Path) -> None:
     """The check is a backstop; it must not invent a failure when it cannot read."""
     assert _persisted_disagrees_with_success(workspace, "never-persisted") is None
+
+
+def test_the_check_is_actually_wired_into_release_define() -> None:
+    """The predicate is worthless if nobody calls it.
+
+    Mutation caught this: the tests above call ``_persisted_disagrees_with_success``
+    directly, so deleting its call site in ``release_define`` left every one of them
+    green. This inspects the compiled function's global references — it dies when the
+    call is removed, and unlike a source-text grep it cannot be satisfied by a comment
+    or a string that merely mentions the name.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import release_define
+
+    referenced = set(release_define.__code__.co_names)
+    assert "_persisted_disagrees_with_success" in referenced, (
+        "release_define no longer calls the disk-agreement check, so it can report "
+        f"success for an unfinished run again. Names it references: {sorted(referenced)}"
+    )
