@@ -261,6 +261,33 @@ def _echo_block_reason(result: object) -> None:
         typer.echo(f"\nRecovery: {remedy}")
 
 
+def _persisted_disagrees_with_success(workspace_root: Path, run_id: str) -> str | None:
+    """Return a message when the CLI is about to claim success the DISK does not support.
+
+    Bug ``r11-release-definition-exits-success-interrupted``: release-definition exited 0
+    after an accepted ``definition_draft`` while the run persisted as ``running`` — the
+    in-memory result said completed and the store said interrupted. An exit code that
+    disagrees with the state on disk is worse than a failure: the caller moves on, and
+    the next command trips over a run nobody knows is unfinished.
+
+    Disk wins. It is what every later step, and every operator, actually reads.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    try:
+        run = container.build_lifecycle_run_store(workspace_root).load(run_id)
+    except Exception:  # noqa: BLE001 — a store read must never mask the command's own result
+        return None
+    if run is None or run.status is LifecycleRunStatus.COMPLETED:
+        return None
+    return (
+        f"the command reports success but run {run_id!r} is persisted as "
+        f"{run.status.value.upper()} at step {run.current_step or '<step>'} — refusing to "
+        f"report OK. Inspect it with `dadaia lifecycle status --run-id {run_id}`"
+    )
+
+
 @app.command("backlog-definition")
 def backlog_define(
     context: str | None = typer.Option(
@@ -571,6 +598,11 @@ def release_define(
     # (bug r6f-release-completes-with-unconsumed-authoritative-backlog, reported by the
     # consumer-side validator against a live worker).
     succeeded = result.completed and post_step_error is None
+    if succeeded:
+        disagreement = _persisted_disagrees_with_success(workspace_root, result.run_id)
+        if disagreement is not None:
+            succeeded = False
+            post_step_error = disagreement
     status = LifecycleCommandStatus.OK.value if succeeded else LifecycleCommandStatus.BLOCKED.value
     if json_output:
         _emit_json(

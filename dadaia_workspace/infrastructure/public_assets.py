@@ -792,6 +792,28 @@ class FileSystemPublicAssetManager:
         # that skipped them left single-harness workspaces permanently red).
         if target in {"all", *L1_ENTRY_HARNESSES}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
+            # The by-name rule-law corpus is harness-independent for the same reason:
+            # the projected root AGENTS.md — which EVERY harness reads — cites rules by
+            # name and sends the agent to `.claude/rules/<name>.md`. A codex-only, pi-only
+            # or kimi-only workspace used to get those citations with no corpus behind
+            # them: the agent follows the pointer, finds nothing, and is told nothing
+            # (bug r11-codex-only-reconcile-rule-corpus-missing). `.claude/` here is the
+            # canonical HOME of the corpus, not a Claude-runtime projection.
+            # `--only <dir>` narrows what a projection writes; it must narrow this too.
+            if only is None or only == "rules":
+                key = (workspace_root / ".claude" / "rules").relative_to(workspace_root).as_posix()
+                ledger = load_projection_ledger(workspace_root)
+                ledger[key] = sorted(
+                    copy_tree(
+                        agentic_dir / "rules",
+                        workspace_root / ".claude" / "rules",
+                        force,
+                        installed,
+                        self._iter_files,
+                        owned=ledger.get(key),
+                    )
+                )
+                save_projection_ledger(workspace_root, ledger)
 
         # Projection precedence (FR3, AC-4): after the core projection, overlay any installed
         # pack's real body over its stub — scoped to the harnesses actually being projected —
