@@ -288,6 +288,12 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             return self._tasks_hygiene_block("TASKS.md was not created")
 
         text = path.read_text(encoding="utf-8")
+        # Class-level call: the sibling hygiene checks are exercised with lightweight
+        # stubs, and a `self.` lookup would demand the stub grow an attribute that has
+        # nothing to do with what those tests assert.
+        markers_block = ReleaseDefinitionWorkflow._unreadable_task_markers_block(text)
+        if markers_block is not None:
+            return markers_block
         snippets = re.findall(r"`([^`\n]+)`", text)
         snippets.extend(
             match.group(1) for match in re.finditer(r"```[^\n]*\n(.*?)```", text, flags=re.DOTALL)
@@ -309,6 +315,50 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                     f"pytest validation command is missing '-p no:cacheprovider': {compact!r}"
                 )
         return None
+
+    @staticmethod
+    def _unreadable_task_markers_block(text: str) -> BlockedState | None:
+        """BLOCK a TASKS.md whose markers ``implementation-reviews`` cannot parse.
+
+        Bug ``r10-approved-task-markers-rejected-by-implementation``: a live worker wrote
+        ``- [ ] TASK-WS1 - …``; the release was APPROVED and then refused at
+        implementation start with "no recognizable task markers". Approved-and-unrunnable
+        is the worst outcome the chain can produce — the operator is told the release is
+        ready and then hits a wall with no path back.
+
+        The check imports the implementation pipeline's OWN regexes rather than restating
+        the grammar. A second copy of the rule is how the two sides came to disagree in
+        the first place; sharing the predicate makes divergence impossible instead of
+        merely unlikely.
+        """
+        from dadaia_workspace.features.lifecycle.pipeline import _TASK_MARKER_LINE_RES
+
+        lines = text.splitlines()
+        if any(
+            pattern.match(line) is not None for line in lines for pattern in _TASK_MARKER_LINE_RES
+        ):
+            return None
+        # Only complain when the document looks like it MEANT to carry tasks: a TASKS.md
+        # with no checkbox at all is a different failure the artifact gates already own.
+        if not any("[ ]" in line or "[-]" in line or "[x]" in line for line in lines):
+            return None
+        offenders = [line.strip() for line in lines if "[ ]" in line or "[-]" in line][:3]
+        return BlockedState(
+            reason=(
+                "TASKS.md carries checkbox lines that `implementation-reviews` cannot "
+                "parse, so this release would be approved and then refused at "
+                "implementation start with 'no recognizable task markers'. Task ids must "
+                "match T-?<digits> in one of the accepted forms — '- [ ] T-1 - title', "
+                "'- [ ] **T01 - title**', '### [ ] T1 - title', or a standalone '[ ] T-1'. "
+                f"Unparseable line(s): {offenders}. Rewrite the ids and resume."
+            ),
+            blocked_at_step="definition_draft",
+            operator_command=(
+                "re-run release-definition with --resume-from definition_draft "
+                "(only the TASKS authoring step re-executes)"
+            ),
+            detail={"artifact": "TASKS.md", "gate": "task-marker-parity-v1"},
+        )
 
     @staticmethod
     def _tasks_hygiene_block(reason: str) -> BlockedState:
