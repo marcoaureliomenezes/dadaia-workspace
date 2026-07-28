@@ -705,6 +705,36 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 # model verdict — fall through and report it like any deterministic block.
                 del rejection
             self._last_warnings = tuple(self._advisories)
+            if run.blocked is None:
+                # Bug r15-release-definition-running-after-accepted-draft: a sequence that
+                # stops without a RECORDED block left the run persisted as `running` with
+                # no reason and no remedy, and the prescribed recovery reproduced the same
+                # state — a dead end the operator cannot read or escape. Stopping is
+                # allowed; stopping SILENTLY is not.
+                last = outcomes[-1].label if outcomes else (sequence[0].label if sequence else "?")
+                synthesized = BlockedState(
+                    reason=(
+                        f"the sequence stopped after step {last!r} without reaching a "
+                        "terminal state and without recording a block — the step's worker "
+                        "did not produce an acceptable result. Inspect the run's step "
+                        "payload for the worker's own output before resuming."
+                    ),
+                    blocked_at_step=last,
+                    resume_token=run.idempotency_key,
+                    operator_command=(
+                        f"dadaia lifecycle status --run-id {run_id}  # then resume from "
+                        f"the step it names, or use a fresh --run-id to start over"
+                    ),
+                    detail={"step": last, "gate": "non-terminal-stop-v1"},
+                )
+                run = replace(
+                    run,
+                    phase=LifecyclePhase.BLOCKED,
+                    status=LifecycleRunStatus.BLOCKED,
+                    current_step=last,
+                    blocked=synthesized,
+                )
+                self._run_store.save(run)
             return self._make_result(
                 run_id=run_id,
                 completed=False,
