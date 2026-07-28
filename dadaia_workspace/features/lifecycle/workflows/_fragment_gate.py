@@ -977,6 +977,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 run = self._produce_payload(run, step, worker_result, sequence)
             except MalformedHandoffError as exc:
                 blocked = BlockedState(
+                    operator_command=(
+                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                    ),
                     reason=f"worker output violates {step.produces}: {exc}",
                     blocked_at_step=step.label,
                     detail={"output_schema": str(step.produces)},
@@ -1074,6 +1077,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 )
             except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
                 blocked = BlockedState(
+                    operator_command=(
+                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                    ),
                     reason=f"required upstream handoff unavailable: {exc}",
                     blocked_at_step=step.label,
                     detail={"producer_step": producer, "consumer_step": step.label},
@@ -1219,6 +1225,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 continue
             if s.produces is not None and _find_or_recover(s.label) is None:
                 return run, BlockedState(
+                    operator_command=(
+                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                    ),
                     reason=f"workflow-step graph incomplete: step {s.label!r} declared "
                     f"produces={s.produces!r} but wrote no ledger payload (and no "
                     "persisted payload could be reconciled from disk)",
@@ -1228,6 +1237,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             for producer in s.consumes:
                 if _find_or_recover(producer) is None:
                     return run, BlockedState(
+                        operator_command=(
+                            "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                        ),
                         reason=f"workflow-step graph incomplete: {s.label!r} consumes "
                         f"{producer!r} which has no ledger payload (and no persisted "
                         "payload could be reconciled from disk)",
@@ -1239,6 +1251,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 acked = any(c.consumer_step == s.label for c in record.consumptions)
                 if not acked and producer not in recovered:
                     return run, BlockedState(
+                        operator_command=(
+                            "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                        ),
                         reason=f"workflow-step graph incomplete: {s.label!r} never recorded "
                         f"consumption of {producer!r}",
                         blocked_at_step=step.label,

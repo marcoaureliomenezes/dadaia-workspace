@@ -657,6 +657,9 @@ class LifecycleAgentRunner:
             if ref is not None:
                 full_detail["diagnostic_ref"] = ref
         return BlockedState(
+            operator_command=(
+                "re-run the workflow with --resume-from <this step>; inspect the step payload for the worker's own output first"
+            ),
             reason=reason,
             blocked_at_step=data.current_step or lifecycle_run.current_step,
             resume_token=lifecycle_run.idempotency_key,

@@ -543,6 +543,9 @@ class LifecyclePipeline:
                     lint_ok, lint_evidence = self._memory_lint_gate()
                     if not lint_ok:
                         blocked_lint = BlockedState(
+                            operator_command=(
+                                "re-run the same command with --resume-from <this step>, or use a fresh --run-id to start over deliberately"
+                            ),
                             reason=(
                                 "close blocked: memory atoms carry lint findings — closure "
                                 "must leave specs/memory lint-clean (fix the atom headings/"
@@ -567,6 +570,9 @@ class LifecyclePipeline:
                     tests_ok, tests_evidence = self._executed_test_gate()
                     if tests_ok is False:
                         blocked_close = BlockedState(
+                            operator_command=(
+                                "re-run the same command with --resume-from <this step>, or use a fresh --run-id to start over deliberately"
+                            ),
                             reason=(
                                 "close blocked: executed test validation is not green — "
                                 "closure requires the declared test suite to RUN and pass "

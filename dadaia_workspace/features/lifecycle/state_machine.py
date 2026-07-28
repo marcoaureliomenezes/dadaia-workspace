@@ -83,6 +83,9 @@ class LifecycleStateMachine:
         missing = self._missing_requirements(run, transition_input)
         if missing:
             blocked = BlockedState(
+                operator_command=(
+                    "re-run the step that produces the missing evidence with --resume-from <that step>"
+                ),
                 reason="missing required transition evidence",
                 blocked_at_step=transition_input.current_step or run.current_step,
                 resume_token=run.idempotency_key,

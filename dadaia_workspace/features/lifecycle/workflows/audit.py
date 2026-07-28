@@ -190,6 +190,9 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
             ).payload
         except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
             return BlockedState(
+                operator_command=(
+                    "re-run the audit with --resume-from audit_disposition, or inspect specs/audits/ for the missing disposition"
+                ),
                 reason=f"audit disposition evidence is unavailable: {exc}",
                 blocked_at_step=step.label,
             )
@@ -218,6 +221,9 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
         if not violations:
             return None
         return BlockedState(
+            operator_command=(
+                "re-run the audit with --resume-from audit_disposition, or inspect specs/audits/ for the missing disposition"
+            ),
             reason="audit disposition contract is incomplete",
             blocked_at_step=step.label,
             detail={"violations": "; ".join(violations)},
