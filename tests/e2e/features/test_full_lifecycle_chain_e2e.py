@@ -138,6 +138,21 @@ def test_a_demand_travels_all_the_way_to_closure(workspace: Path) -> None:
         f"the chain stopped before closure; output was:\n{implement.output}"
     )
 
+    # 6 ── closure must LEAVE THE TREE VALID. The consumed item is removed from the live
+    #      backlog and the authoritative validator agrees. Pinned after the consumer-side
+    #      validator reported the opposite on a live run
+    #      (r16-closure-leaves-consumed-backlog-item) and it did not reproduce here: a
+    #      behaviour that is right today and unasserted is a regression waiting to happen.
+    remaining = [p.stem for p in (_specs(workspace) / "backlog").glob("*.md") if p.stem != "README"]
+    assert authored not in remaining, (
+        f"closure left the consumed item {authored!r} in the live backlog, which "
+        f"`backlog doctor` rejects as BL-STALE. Remaining: {remaining}"
+    )
+    doctor = _cli("backlog", "doctor", "--specs-dir", str(_specs(workspace)))
+    assert doctor.exit_code == 0, (
+        f"the tree the chain left behind is rejected by its own validator:\n{doctor.output}"
+    )
+
 
 def test_the_release_refuses_a_pick_that_was_never_authored(workspace: Path) -> None:
     """The negative half: consuming is a real check, not a label copied forward.
