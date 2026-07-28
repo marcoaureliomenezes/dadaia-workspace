@@ -544,8 +544,16 @@ def test_flip_is_single_writer_over_worker_status_variants(tmp_path: Path) -> No
     store = _MemoryRunStore()
     wf = _workflow(tmp_path, store, lambda kind: _KindFake(kind, _approved()))
     plan = tmp_path / "repos" / _CONTEXT / "specs" / "releases" / _RELEASE / "PLAN.md"
+    # The Validation Dependency Table is kept here because the definition lints now run
+    # at APPROVAL too, not only on the draft step — a resume used to step over them
+    # (bug r13-release-plan-validation-bypassed-on-resume). This test is about the
+    # single-writer flip, so its PLAN must be lint-clean to reach the flip at all.
     plan.write_text(
-        "# plan\n\n**Status**: Draft\n\n- **Status:** Em revisão\n\n* Status: draft\n\nbody\n",
+        "# plan\n\n## Validation Dependency Table\n\n"
+        "| Workstream | Produces by end | Direct validation | Validation dependencies "
+        "| Deferred integration evidence |\n|---|---|---|---|---|\n"
+        "| WS-1 | value | unit tests | None | None |\n\n"
+        "**Status**: Draft\n\n- **Status:** Em revisão\n\n* Status: draft\n\nbody\n",
         encoding="utf-8",
     )
 

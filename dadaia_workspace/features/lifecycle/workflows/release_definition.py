@@ -219,15 +219,22 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         MISSING artifact fails LOUD here with the create-step resume as remedy — never
         a silent skip that surfaces 3+ model steps later at the terminal gate.
         """
-        if step.label == "definition_draft":
-            # Both deterministic lints run on the single draft step that authors all three.
+        filenames = self._STATUS_FLIP_BY_REVIEW.get(step.label)
+        # The deterministic lints run on the draft step (early feedback) AND again wherever
+        # artifacts are flipped to Aprovado. Attaching them ONLY to the step that PRODUCES
+        # the artifacts let `--resume-from definition_review` skip production while still
+        # performing approval, so a PLAN with no Validation column and a pytest command
+        # missing `-p no:cacheprovider` became binding unchecked (bugs
+        # r13-release-plan-validation-bypassed-on-resume and
+        # r13-release-pytest-hygiene-bypassed-on-resume). A gate a resume can step over is
+        # not a gate: approval is the moment the content starts to matter, so it holds there.
+        if step.label == "definition_draft" or filenames is not None:
             dependency_block = self._validate_plan_dependency_table()
             if dependency_block is not None:
                 return dependency_block
             hygiene_block = self._validate_tasks_command_hygiene()
             if hygiene_block is not None:
                 return hygiene_block
-        filenames = self._STATUS_FLIP_BY_REVIEW.get(step.label)
         if filenames is None:
             return None
         for filename in filenames:
