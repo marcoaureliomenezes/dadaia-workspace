@@ -501,11 +501,28 @@ never exercised the live backlog path was false confidence).
 ### R-02 — Real-demand backlog is canonical and consumable
 
 - Run a B3/CVM-style real capture demand through backlog-definition on a real or
-  disposable context, then `dadaia backlog subjects --specs-dir <ctx>/specs`.
-- **PASS if:** every emitted `intents[].ref` resolves against the live registry
-  (no unresolved subjects) AND release-definition's authoritative pick consumes the
-  item (the promoted payload carries the canonical `specs/backlog/<slug>.md` path —
-  never a bare "codex exec completed" summary).
+  disposable context, then validate with `dadaia backlog doctor --specs-dir <ctx>/specs`.
+- **The authority is `backlog doctor`, NOT eyeballing `backlog subjects`.** `backlog
+  subjects` lists the canonical registry (the anchors that exist) and always exits 0; it
+  never reports an item's unresolved refs. Reading a ref's absence from that list as
+  "UNRESOLVED" is a validator error, and it produced a false FAIL on R9/R-02 — the very
+  first version of this item told you to do exactly that.
+- **A `surface: new` ref is SUPPOSED to be absent from the registry.** That is what
+  declaring a new surface means: the intent binds by declared identity
+  (`new:<kind>:<ref>`) instead of registry resolution. Demanding that *every* ref resolve
+  contradicts the mechanism shipped for bugs `backlog-independent-cli-items-false-conflict-044`
+  and `backlog-cli-intent-hallucinated-anchor-045`.
+- **PASS if:** `backlog doctor` reports clean AND release-definition's authoritative pick
+  consumes the item (the promoted payload carries the canonical
+  `specs/backlog/<slug>.md` path — never a bare "codex exec completed" summary).
+- **Both error directions must still be caught — prove them, do not assume:**
+  - an intent WITHOUT `surface: new` whose ref resolves to nothing ⇒ doctor MUST fail with
+    `BL-SCHEMA … resolves to no known anchor`;
+  - an intent WITH `surface: new` whose ref DOES already resolve ⇒ doctor MUST fail with
+    `… is declared 'surface: new' but already resolves to existing anchor …`.
+
+  A green run that never exercised these two is not evidence — plant each one and confirm
+  the failure before accepting the PASS.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
