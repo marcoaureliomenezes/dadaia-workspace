@@ -103,9 +103,16 @@ def _demand() -> BacklogDemand:
 class _ScriptedFake:
     """Fake runtime whose backlog_author behavior is scripted per test."""
 
-    def __init__(self, workspace_root: Path, *, write_on_attempt: int | None) -> None:
+    def __init__(
+        self,
+        workspace_root: Path,
+        *,
+        write_on_attempt: int | None,
+        body: str | None = None,
+    ) -> None:
         self.workspace_root = workspace_root
         self.write_on_attempt = write_on_attempt
+        self.body = body if body is not None else _ITEM_BODY
         self.calls = 0
 
     def runtime_kind(self) -> AgentRuntimeKind:
@@ -114,7 +121,7 @@ class _ScriptedFake:
     def _write_item(self) -> None:
         item = self.workspace_root / "repos" / _CONTEXT / "specs" / "backlog" / "new-item.md"
         item.parent.mkdir(parents=True, exist_ok=True)
-        item.write_text(_ITEM_BODY, encoding="utf-8")
+        item.write_text(self.body, encoding="utf-8")
 
     def run(self, request: AgentRunRequest) -> AgentRunResult:
         self.calls += 1
@@ -214,3 +221,36 @@ def test_editing_an_existing_item_satisfies_the_delta(tmp_path: Path) -> None:
 
     author = next(step for step in result.steps if step.label == "backlog_author")
     assert author.accepted is True
+
+
+#: What a live worker produced on R9/F-26: the block opens and the process stopped before
+#: writing the closing delimiter.
+_TRUNCATED_ITEM_BODY = """---
+name: new-item
+status: candidate
+intents: []
+
+# BACKLOG — the worker stopped before closing the frontmatter block
+"""
+
+
+def test_a_truncated_item_blocks_at_the_author_step_not_downstream(tmp_path: Path) -> None:
+    """Bug r9-f26-author-accepts-unterminated-frontmatter.
+
+    The deliverable gate proves a file APPEARED, never that it is READABLE, so a worker
+    that stopped mid-write got its item promoted and the failure resurfaced at
+    ``backlog_review_gate`` as "status missing" — a diagnosis that names a consequence
+    and drops the worker's trace. Malformed is not-delivered: it must block HERE.
+    """
+    fake = _ScriptedFake(tmp_path, write_on_attempt=1, body=_TRUNCATED_ITEM_BODY)
+    result = _workflow(tmp_path, fake).run("bd-mat-trunc", _demand())
+
+    assert result.completed is False
+    assert result.blocked is not None
+    assert result.blocked.blocked_at_step == "backlog_author", (
+        f"blocked at {result.blocked.blocked_at_step!r} instead of the step that "
+        "produced the malformed file"
+    )
+    assert "unterminated" in result.blocked.reason.lower()
+    assert "status" not in result.blocked.reason.lower().split("unterminated")[0]
+    assert result.blocked.operator_command, "a block without a remedy is a dead end"

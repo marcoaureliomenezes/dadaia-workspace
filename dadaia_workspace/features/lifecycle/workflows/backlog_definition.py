@@ -516,6 +516,44 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
 
     # -- real disk state: the backlog snapshot ---------------------------
 
+    def _malformed_authored_block(
+        self, run: LifecycleRun, step: BacklogStep
+    ) -> BlockedState | None:
+        """BLOCK when the author left a backlog file that cannot be parsed.
+
+        Scoped to items this run touched: a pre-existing malformed file is the review
+        gate's business (it sweeps everything), while THIS step answers only for what it
+        just produced. Every block prescribes its remedy — a gate that stops without one
+        is an unrecoverable dead end.
+        """
+        backlog_dir = self._selector.spec_context.specs_dir / "backlog"
+        before = getattr(self, "_before_snapshot", None)
+        if before is None:
+            return None
+        touched = set(self._changed_slugs(before, self._backlog_snapshot()))
+        for item in load_backlog_items(backlog_dir):
+            if item.slug not in touched or item.frontmatter_error is None:
+                continue
+            return BlockedState(
+                reason=(
+                    f"backlog_author: the authored item {item.slug!r} is malformed — "
+                    f"{item.frontmatter_error}. The worker wrote a file but not a "
+                    "readable one, so it is not a deliverable. Re-run the author step; "
+                    "if the worker truncates again, inspect its diagnostic in the run's "
+                    "step payload."
+                ),
+                blocked_at_step=step.label,
+                resume_token=run.idempotency_key,
+                operator_command=(
+                    f"dadaia lifecycle backlog-definition --context {self._context} "
+                    f"--release-id {self._release_id} --run-id {run.run_id} "
+                    f"--harness {HARNESS_CLI_NAMES.get(self._default_kind, 'codex')} "
+                    "--resume-from backlog_author"
+                ),
+                detail={"slug": item.slug, "frontmatter_error": item.frontmatter_error},
+            )
+        return None
+
     def _run_authored_paths(self, run: LifecycleRun) -> tuple[str, ...]:
         """Backlog paths THIS run already authored, from its own recorded author payload.
 
@@ -678,7 +716,16 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # The status gate is REUSED from the doctor (``is_intents_exempt``) so the two
         # can never drift into a third opinion.
         missing_intents_by_slug: dict[str, str] = {}
+        malformed_by_slug: dict[str, str] = {}
         for item in load_backlog_items(backlog_dir):
+            if item.frontmatter_error is not None:
+                # An unreadable file has no status and no intents, so every downstream
+                # diagnostic degrades into "no intents[] at status '(missing)'" — which
+                # names a consequence, not the cause (bug
+                # r9-f26-author-accepts-unterminated-frontmatter). Report the parse error
+                # itself and skip the derived complaints for this item.
+                malformed_by_slug[item.slug] = item.frontmatter_error
+                continue
             _anchor_changes, unresolved = bound_anchor_changes(item, self._registry)
             if unresolved:
                 unresolved_by_slug[item.slug] = tuple(unresolved)
@@ -721,6 +768,21 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         # "the backlog this run leaves behind is valid". So sweep ALL items, and say
         # whether the offender was authored by this run or pre-existed, because the
         # remedy differs for the reader.
+        for slug in sorted(malformed_by_slug):
+            origin = "authored" if slug in changed else "pre-existing"
+            blocked = BlockedState(
+                reason=(
+                    f"backlog_review_gate: {origin} item {slug!r} cannot be parsed — "
+                    f"{malformed_by_slug[slug]}. Fix the file, then resume. Until it "
+                    "parses, its status and intents[] cannot be read at all."
+                ),
+                blocked_at_step=step.label,
+                resume_token=run.idempotency_key,
+                operator_command=resume_command,
+                detail={"slug": slug, "frontmatter_error": malformed_by_slug[slug]},
+            )
+            return [], self._with_block(run, step.label, blocked), self._blocked_sr(step, blocked)
+
         for slug in sorted(missing_intents_by_slug):
             authored = slug in changed
             origin = (
@@ -977,6 +1039,15 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 ),
             ),
         )
+        if blocked is None and step.label == "backlog_author":
+            # Bug r9-f26-author-accepts-unterminated-frontmatter: the deliverable gate
+            # above proves a file APPEARED, never that it is READABLE. A live worker that
+            # stops mid-write leaves an item whose frontmatter block opens and never
+            # closes; it was promoted, and the failure resurfaced at backlog_review_gate
+            # as "status missing" — which names the wrong thing and loses the worker
+            # diagnostic. Malformed IS not-delivered: block here, at the step that
+            # produced it, while the worker's own trace is still attached.
+            blocked = self._malformed_authored_block(run, step)
         if blocked is None and self._handoff_resolver is not None:
             payload = durable_payload_from_result(
                 worker_result, fallback_summary=step.label, is_review=False

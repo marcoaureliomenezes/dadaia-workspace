@@ -130,6 +130,18 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | No
     """
     match = _FRONTMATTER_RE.match(content)
     if match is None:
+        # Bug r9-f26-author-accepts-unterminated-frontmatter: the regex needs BOTH
+        # delimiters, so a block that opens and never closes used to be indistinguishable
+        # from a file with no frontmatter — both returned (None, None). The item was then
+        # promoted with status=None and the failure resurfaced far downstream as
+        # "status missing", a diagnosis that names the wrong thing and never mentions the
+        # truncation a live worker actually produced. A file that OPENS a block has
+        # declared frontmatter; failing to close it is malformed, not absent.
+        if content.startswith("---\n") or content.startswith("---\r\n"):
+            return None, (
+                "unterminated frontmatter block: the file opens with '---' but never "
+                "closes it — add the closing '---' line"
+            )
         return None, None
     try:
         data = yaml.safe_load(match.group(1))
