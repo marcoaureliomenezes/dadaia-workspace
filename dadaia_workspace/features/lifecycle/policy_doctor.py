@@ -348,7 +348,7 @@ def _resolve_overlay(
             )
             continue
         try:
-            resolver.resolve(workflow_id, context=DEFAULT_CONTEXT)
+            snapshot = resolver.resolve(workflow_id, context=DEFAULT_CONTEXT)
         except PolicyResolutionError as exc:
             out.append(
                 Finding(
@@ -356,6 +356,20 @@ def _resolve_overlay(
                     Severity.ERROR,
                     f"overlay override for workflow {workflow_id!r} is invalid: {exc}",
                 )
+            )
+        else:
+            # A stale overlay entry no longer ABORTS resolution — that turned a library
+            # upgrade into a bricked workspace (bug
+            # r13-release-definition-rejects-legacy-overlay) — but it is still wrong state
+            # the operator should clean, and diagnosing wrong state is precisely this
+            # doctor's job. Resolution warns and proceeds; the doctor reports.
+            out.extend(
+                Finding(
+                    PolicyDoctorCode.WMP_OVERLAY,
+                    Severity.ERROR,
+                    f"overlay override for workflow {workflow_id!r} is invalid: {warning}",
+                )
+                for warning in getattr(snapshot, "warnings", ())
             )
     return out
 

@@ -162,6 +162,14 @@ def _workflow_to_dict(
     base: dict[str, object] = {"workflow_id": workflow_id}
     try:
         base["steps"] = _effective_steps(resolver, workflow_id, context, catalog=catalog)
+        # A stale overlay entry no longer aborts resolution (bug
+        # r13-release-definition-rejects-legacy-overlay) — but the panel must not go
+        # quiet about it either, or the operator never learns their state is wrong.
+        # getattr, not attribute access: this view is exercised with lightweight resolver
+        # stubs, and a panel READ must never crash over a diagnostic it can live without.
+        warnings = tuple(getattr(resolver.resolve(workflow_id, context=context), "warnings", ()))
+        if warnings:
+            base["warnings"] = list(warnings)
     except PolicyResolutionError as exc:
         # A broken/stale overlay must not blank the catalog — surface a per-workflow
         # error and still list the default steps from the catalog (no resolve).

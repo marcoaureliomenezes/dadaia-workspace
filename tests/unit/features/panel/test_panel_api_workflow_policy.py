@@ -119,7 +119,9 @@ def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     assert implement_b["is_overridden"] is True
     assert implement_b["source"] == PolicySource.DEFAULT_OVERLAY.value
 
-    # (c) Broken overlay (unknown step) → per-workflow error, but harness fields still present.
+    # (c) Stale overlay (a step the library removed) → a per-workflow WARNING, not an
+    #     error: aborting here bricked real workspaces on upgrade (bug
+    #     r13-release-definition-rejects-legacy-overlay). The panel must still SAY it.
     store_c = _store(tmp_path / "c")
     store_c.save(
         WorkflowModelPolicyOverlay(
@@ -130,7 +132,8 @@ def test_catalog_default_override_and_error_fallback(tmp_path: Path) -> None:
     view_c = render_api_workflow_catalog(catalog, _resolver_factory(store_c))
     _status_c, payload_c = _decode(view_c(qs={}))
     impl_c = next(w for w in payload_c["workflows"] if w["workflow_id"] == "implementation_reviews")
-    assert "error" in impl_c
+    assert "no_such_step" in " ".join(impl_c.get("warnings", [])), impl_c
+    assert "error" not in impl_c, "a stale overlay entry must not read as a broken workflow"
     step_c = impl_c["steps"][0]
     assert step_c["default_harness"] == "codex"
     assert step_c["harness"] == "codex"

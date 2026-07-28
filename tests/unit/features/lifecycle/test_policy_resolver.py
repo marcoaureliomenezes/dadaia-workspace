@@ -113,13 +113,6 @@ _ERROR_CASES = (
         None,
     ),
     (
-        "overlay-unknown-step",
-        lambda: _resolver(_overlay({"no-such-step": "codex-review-deep"})).resolve(
-            _WORKFLOW, context="default"
-        ),
-        "no-such-step",
-    ),
-    (
         "overlay-unknown-profile",
         lambda: _resolver(_overlay({"implement": "no-such-profile"})).resolve(
             _WORKFLOW, context="default"
@@ -181,3 +174,19 @@ def test_unmapped_context_falls_back_and_from_store_overlay_round_trips(tmp_path
     from_store_impl = resolver.resolve(_WORKFLOW, context="default").step("implement")
     assert from_store_impl is not None
     assert from_store_impl.model_profile == "codex-review-deep"
+
+
+def test_a_persisted_overlay_step_the_library_removed_warns_instead_of_raising() -> None:
+    """Deliberate contract change (bug r13-release-definition-rejects-legacy-overlay).
+
+    Raising here made a library upgrade brick the workspace: a persisted overlay naming a
+    step that a refactor removed stopped every run before it started. A CLI override still
+    raises (it is a typo the operator can fix in the same breath); persisted state is
+    dropped, named on the snapshot, and reported as an ERROR by `dadaia policy doctor`.
+    """
+    snapshot = _resolver(_overlay({"no-such-step": "codex-review-deep"})).resolve(
+        _WORKFLOW, context="default"
+    )
+
+    assert "no-such-step" in " ".join(snapshot.warnings), snapshot.warnings
+    assert "no-such-step" not in {entry.step for entry in snapshot.steps}

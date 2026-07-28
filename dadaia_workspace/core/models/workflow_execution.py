@@ -197,6 +197,11 @@ class WorkflowPolicySnapshot:
     overlay_id: str | None = None
     steps: tuple[WorkflowPolicyStepEntry, ...] = ()
     prefix_hash: str | None = None
+    #: Non-fatal resolution advisories, e.g. a persisted overlay entry naming a step
+    #: this library no longer has. Surfaced so a drop is never silent, carried on the
+    #: snapshot so the run records what it ignored (bug
+    #: r13-release-definition-rejects-legacy-overlay).
+    warnings: tuple[str, ...] = ()
 
     def step(self, label: str) -> WorkflowPolicyStepEntry | None:
         """Return the resolved entry for *label*, or ``None`` when absent."""

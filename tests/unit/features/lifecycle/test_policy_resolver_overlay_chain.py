@@ -116,23 +116,6 @@ _FAIL_CLOSED_CASES = (
         None,
     ),
     (
-        "stale-step-id-in-chain",
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {
-                        "implementation_reviews": {"steps": {"ghost-step": "codex-review-deep"}}
-                    }
-                },
-                "child": {"extends": "default", "workflows": {}},
-            },
-        },
-        "child",
-        "ghost-step",
-    ),
-    (
         "harness-profile-mismatch",
         {
             "schema_version": "workflow-model-policy-v1",
@@ -165,3 +148,39 @@ def test_fail_closed_matrix(
         _resolver(overlay).resolve(_WORKFLOW, context=context)
     if expected_substring is not None:
         assert expected_substring in str(exc.value)
+
+
+def test_a_stale_step_id_in_the_chain_warns_instead_of_failing_closed(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Deliberate contract change (bug r13-release-definition-rejects-legacy-overlay).
+
+    A stale step id in the inherited chain used to fail closed. That is right for a CLI
+    override — the operator just typed it — but a PERSISTED overlay is old state, and
+    raising turned a library upgrade into a bricked workspace: four of the consumer-side
+    validator's five R13 failures were this one cause, with no path forward but editing
+    JSON by hand.
+
+    Fail-closed is preserved where it protects (unknown profile, harness mismatch,
+    unknown workflow — still in the matrix above). Here the entry is dropped and NAMED,
+    and `dadaia policy doctor` still reports it as an ERROR, so wrong state is still
+    diagnosed; it just no longer stops the operator from working.
+    """
+    overlay = _parse(
+        {
+            "schema_version": "workflow-model-policy-v1",
+            "policy_id": "default",
+            "contexts": {
+                "default": {
+                    "workflows": {
+                        "implementation_reviews": {"steps": {"ghost-step": "codex-review-deep"}}
+                    }
+                },
+                "child": {"extends": "default", "workflows": {}},
+            },
+        },
+        tmp_path,
+    )
+
+    snapshot = _resolver(overlay).resolve(_WORKFLOW, context="child")
+
+    assert "ghost-step" in " ".join(snapshot.warnings), snapshot.warnings
+    assert "ghost-step" not in {entry.step for entry in snapshot.steps}

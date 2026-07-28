@@ -243,14 +243,23 @@ class WorkflowExecutionPolicyResolver:
         # stale overlay step id anywhere in the chain is a hard failure rather than a
         # silently-ignored no-op. The store has already validated the `extends` graph (no
         # cycle / no missing parent), so walking it here is safe.
+        # Bug r13-release-definition-rejects-legacy-overlay: this used to RAISE, and a
+        # persisted overlay written against an older library — one naming a step since
+        # removed, e.g. `tasks_create` after release-definition collapsed to three steps —
+        # bricked the workspace: every run exited 2 before starting, with no path forward
+        # but hand-editing JSON. Four of the validator's five R13 failures were this one
+        # cause.
+        #
+        # The two sources are not equivalent. A CLI override names a step the operator
+        # JUST typed, so an unknown one is a typo and stays a hard rejection (above). A
+        # PERSISTED overlay is old state: finding a step this library no longer has means
+        # the LIBRARY moved, not that the operator erred. Dropping it silently would be
+        # the opposite failure, so it is dropped and NAMED.
+        stale_overlay_steps: list[str] = []
         if self._overlay is not None:
-            for step_label in self._overlay_chain_steps(context, workflow_id):
+            for step_label in sorted(self._overlay_chain_steps(context, workflow_id)):
                 if workflow.step(step_label) is None:
-                    valid = ", ".join(s.label for s in workflow.steps)
-                    raise PolicyResolutionError(
-                        f"overlay targets unknown step {step_label!r} of "
-                        f"workflow {workflow_id!r}; valid steps: {valid}"
-                    )
+                    stale_overlay_steps.append(step_label)
 
         entries: list[WorkflowPolicyStepEntry] = []
         for step in workflow.steps:
@@ -274,6 +283,13 @@ class WorkflowExecutionPolicyResolver:
             overlay_id=self._overlay.policy_id if self._overlay else None,
             steps=tuple(entries),
             prefix_hash=prefix_hash,
+            warnings=tuple(
+                f"ignored stale policy overlay entry for step {label!r}: workflow "
+                f"{workflow_id!r} no longer has that step (valid: "
+                + ", ".join(st.label for st in workflow.steps)
+                + "). Clean it from .dadaia/states/workflow_model_policy.json when convenient."
+                for label in stale_overlay_steps
+            ),
         )
 
     def _overlay_chain_steps(self, context: str, workflow_id: str) -> set[str]:
