@@ -1376,3 +1376,79 @@ def _policy_snapshot_payload(snapshot: object) -> dict[str, Any]:
 
     assert isinstance(snapshot, WorkflowPolicySnapshot)
     return snapshot.to_dict()
+
+
+@app.command("status")
+def lifecycle_status(
+    run_id: str = typer.Option(..., "--run-id", help="Lifecycle run id to inspect."),
+    workspace: Path | None = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: resolved from cwd)."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Report a run's state and, when it cannot proceed, how to recover it.
+
+    Bugs ``r9-r11-release-running-without-recovery`` /
+    ``r9-r12-backlog-running-without-recovery``: an interrupted run is persisted as
+    ``running`` — not finished, not failed, carrying no block and therefore no remedy.
+    ``refuse_blocked_restart`` already knew the recovery, but only spoke when the operator
+    happened to re-run the identical command and trip the refusal. Whoever INSPECTED the
+    run got a status word and nothing else, and there was no verb to ask. Guidance that is
+    only reachable by triggering an error is not guidance.
+
+    Read-only, and exit 0 for any run it can describe: this is a query, and a query that
+    fails because its answer is bad news is a query you stop trusting. An unknown run id
+    is a different thing — that is a usage error, and it is loud.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
+
+    workspace_root = workspace or resolve_workspace_root()
+    run = container.build_lifecycle_run_store(workspace_root).load(run_id)
+    if run is None:
+        raise typer.BadParameter(f"no lifecycle run {run_id!r} found under {workspace_root}")
+
+    step = run.current_step or "<step>"
+    interrupted = run.status is LifecycleRunStatus.RUNNING
+    recovery: str | None = None
+    detail: str | None = None
+    if interrupted:
+        detail = (
+            "interrupted before reaching a terminal state (a killed driver or an orphaned "
+            "worker leaves this)"
+        )
+        recovery = (
+            f"re-run the same command with --run-id {run_id} --resume-from {step} — or "
+            "pass a fresh --run-id to start over deliberately"
+        )
+    elif run.status is LifecycleRunStatus.BLOCKED and run.blocked is not None:
+        detail = run.blocked.reason
+        recovery = run.blocked.operator_command or (
+            f"re-run with --resume-from {run.blocked.blocked_at_step}"
+        )
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "run_id": run.run_id,
+                    "command": run.command,
+                    "context": run.context,
+                    "release_id": run.release_id,
+                    "status": run.status.value,
+                    "current_step": run.current_step,
+                    "interrupted": interrupted,
+                    "detail": detail,
+                    "recovery": recovery,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(f"run={run.run_id} command={run.command} status={run.status.value.upper()}")
+    typer.echo(f"step={step} context={run.context} release={run.release_id}")
+    if detail:
+        typer.echo(f"\n{detail}")
+    if recovery:
+        typer.echo(f"\nRecovery: {recovery}")
