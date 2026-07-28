@@ -79,7 +79,49 @@ def _resolve_context_option(context: str | None) -> str:
     """
     from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 
-    return resolve_context_for_cli(context)
+    resolved = resolve_context_for_cli(context)
+    _refuse_dead_context(resolved)
+    return resolved
+
+
+def _refuse_dead_context(context: str) -> None:
+    """Refuse to run a lifecycle workflow on a context the operator took out of service.
+
+    Bug ``r16-lifecycle-allows-dead-context``: after ``context alive`` failed for an
+    explicit DEAD context, ``backlog-definition`` still dispatched and completed. A DEAD
+    context is a deliberate operator decision — its specs tree may be un-materialized,
+    stale, or archived — so authoring into it produces work in a place nobody is watching.
+
+    Unregistered contexts are deliberately NOT refused here: ``resolve_context_for_cli``
+    has a documented terminal fallback to the self-hosting slug for a workspace with
+    nothing registered, and breaking that would turn a bare verb invocation into an error.
+    Only a context that IS registered and IS dead is refused.
+    """
+    from dadaia_workspace.core.exceptions import DadaiaError
+    from dadaia_workspace.core.models.spec_context import ContextState
+    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+
+    record = None
+    try:
+        from dadaia_workspace import container
+
+        service = container.build_spec_context_service(resolve_workspace_root())
+        record = next((c for c in service.list_all() if c.name == context), None)
+    except Exception:  # noqa: BLE001
+        # A registry this guard cannot READ (legacy v1 schema awaiting `dadaia migrate`,
+        # missing, corrupt) means it cannot JUDGE — and refusing on ignorance would break
+        # every workspace that has not migrated yet. The real command surfaces that error
+        # itself a moment later; this guard stays silent rather than pre-empting it with a
+        # wrong diagnosis. The refusal below is raised OUTSIDE this block, so it can never
+        # be swallowed by it.
+        return
+    if record is not None and record.state is ContextState.DEAD:
+        raise DadaiaError(
+            f"context {context!r} is DEAD — lifecycle workflows do not run on a context "
+            "that was taken out of service, because its specs tree may be "
+            f"un-materialized or archived. Bring it back with `dadaia context alive "
+            f"{context}`, or pass --context for a live one."
+        )
 
 
 def _authoritative_backlog_prefix(
