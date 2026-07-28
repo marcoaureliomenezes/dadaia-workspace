@@ -362,6 +362,17 @@ def resolve_specs_dir(
             )
         return candidate.resolve()
 
+    if workspace_root is None:
+        # Bug r12-bugs-append-rejects-context-name: an explicit `--context <name>` run
+        # from OUTSIDE any workspace failed with "could not resolve specs_dir", which
+        # reads as "your context was rejected" — the consumer-side validator reported it
+        # exactly that way. The context name was never the problem: the registry that
+        # resolves it lives INSIDE a workspace, and there is no workspace here. Say that.
+        raise typer.BadParameter(
+            "No dadaia workspace was found from the current directory, so a context name "
+            "cannot be resolved — the context registry lives inside a workspace. Run the "
+            "command from inside the workspace, or pass --specs-dir explicitly."
+        )
     raise typer.BadParameter(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
         "`eval $(dadaia context bind <name> --mode read)`."

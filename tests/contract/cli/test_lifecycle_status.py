@@ -116,3 +116,36 @@ def test_an_unknown_run_id_is_a_loud_error_not_silence(tmp_path: Path) -> None:
     result = _invoke(tmp_path, "nope")
     assert result.exit_code != 0
     assert "nope" in result.output
+
+
+def test_a_recorded_block_wins_over_a_stale_running_status(tmp_path: Path) -> None:
+    """Bug ``r12-lifecycle-status-mislabels-blocked-run`` (consumer-side validator, R12).
+
+    A run persisted a real block at ``backlog_author`` while its status field still read
+    RUNNING and ``current_step`` still pointed at the earlier ``intake_grill``. The verb
+    checked the status enum first, so it announced "interrupted at intake_grill" — the
+    wrong state AND the wrong step, and it sent the operator to resume from a step that
+    had already succeeded.
+
+    A recorded block is the stronger evidence: something deliberately wrote a reason and
+    a remedy. Believe it over a status field that a crash may have left behind.
+    """
+    blocked = BlockedState(
+        reason="backlog_review_gate: the authored item is malformed",
+        blocked_at_step="backlog_author",
+        resume_token="tok",
+        operator_command="dadaia lifecycle backlog-definition --resume-from backlog_author",
+    )
+    _store(tmp_path).save(
+        _run("r-stale", LifecycleRunStatus.RUNNING, "intake_grill", blocked=blocked)
+    )
+
+    result = _invoke(tmp_path, "r-stale", "--json")
+    payload = json.loads(result.output)
+
+    assert payload["interrupted"] is False, "a run carrying a block is blocked, not interrupted"
+    assert payload["current_step"] == "backlog_author", (
+        f"reported the stale step {payload['current_step']!r} instead of where it blocked"
+    )
+    assert "malformed" in (payload["detail"] or "")
+    assert "--resume-from backlog_author" in (payload["recovery"] or "")

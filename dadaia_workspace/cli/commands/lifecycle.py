@@ -1462,8 +1462,17 @@ def lifecycle_status(
     if run is None:
         raise typer.BadParameter(f"no lifecycle run {run_id!r} found under {workspace_root}")
 
-    step = run.current_step or "<step>"
-    interrupted = run.status is LifecycleRunStatus.RUNNING
+    # A RECORDED block is the stronger evidence and wins over the status field: something
+    # deliberately wrote a reason and a remedy, whereas a stale `running` is what a crash
+    # leaves behind. Checking the enum first announced "interrupted at intake_grill" for a
+    # run actually blocked at backlog_author — wrong state, wrong step, and it sent the
+    # operator to resume from a step that had already succeeded
+    # (bug r12-lifecycle-status-mislabels-blocked-run).
+    blocked_state = run.blocked
+    step = (
+        (blocked_state.blocked_at_step if blocked_state else None) or run.current_step or "<step>"
+    )
+    interrupted = blocked_state is None and run.status is LifecycleRunStatus.RUNNING
     recovery: str | None = None
     detail: str | None = None
     if interrupted:
@@ -1475,10 +1484,10 @@ def lifecycle_status(
             f"re-run the same command with --run-id {run_id} --resume-from {step} — or "
             "pass a fresh --run-id to start over deliberately"
         )
-    elif run.status is LifecycleRunStatus.BLOCKED and run.blocked is not None:
-        detail = run.blocked.reason
-        recovery = run.blocked.operator_command or (
-            f"re-run with --resume-from {run.blocked.blocked_at_step}"
+    elif blocked_state is not None:
+        detail = blocked_state.reason
+        recovery = blocked_state.operator_command or (
+            f"re-run with --resume-from {blocked_state.blocked_at_step}"
         )
 
     if json_output:
@@ -1490,7 +1499,7 @@ def lifecycle_status(
                     "context": run.context,
                     "release_id": run.release_id,
                     "status": run.status.value,
-                    "current_step": run.current_step,
+                    "current_step": step,
                     "interrupted": interrupted,
                     "detail": detail,
                     "recovery": recovery,
