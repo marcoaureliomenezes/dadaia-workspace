@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
 
-from dadaia_workspace.core.models.lifecycle import LifecycleRun
+from dadaia_workspace.core.models.lifecycle import LifecycleRun, LifecycleRunStatus
 from dadaia_workspace.core.protocols.lifecycle_run_store import LifecycleRunStoreError
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA_VERSION = "lifecycle-run-v1"
 
@@ -28,10 +31,37 @@ class JsonLifecycleRunStore:
     def root(self) -> Path:
         return self._root
 
+    #: Statuses that mean the run is over. Reaching one is a FACT, not the latest opinion.
+    _TERMINAL = frozenset({LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED})
+
     def save(self, run: LifecycleRun) -> None:
-        """Atomically persist or replace a lifecycle run."""
+        """Atomically persist or replace a lifecycle run.
+
+        A finished run is never un-finished. Bug
+        ``r14-implementation-recovery-reverts-terminal-run``: an orphaned driver from an
+        earlier attempt finished late and wrote the SAME run id back to ``running``;
+        recovery then blocked on "active release mismatch" and ``ACTIVE.md`` regressed to
+        ``release: none``. A completed release became an unfinished one and the tree
+        contradicted itself.
+
+        Last-writer-wins is right for most state and wrong here. This is NOT a lock —
+        nothing waits and no caller doing new work is refused; it is monotonicity of one
+        field, and it is what makes concurrent drivers safe to ACCEPT rather than
+        something to prevent. Terminal → terminal stays allowed (a closure that later
+        fails audit is a real transition); only the un-finishing direction is dropped.
+        """
         self._root.mkdir(parents=True, exist_ok=True)
         path = self._path_for(run.run_id)
+        if run.status not in self._TERMINAL:
+            prior = self.load(run.run_id)
+            if prior is not None and prior.status in self._TERMINAL:
+                logger.warning(
+                    "refusing to move run %r out of terminal state %s (late writer wrote %s)",
+                    run.run_id,
+                    prior.status.value,
+                    run.status.value,
+                )
+                return
         payload = {
             "schema_version": _SCHEMA_VERSION,
             "run": run.to_dict(),
