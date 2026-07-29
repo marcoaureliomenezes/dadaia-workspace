@@ -72,7 +72,11 @@ def test_a_running_run_is_sealed_into_a_blocked_one(workspace: Path) -> None:
     assert sealed.status is LifecycleRunStatus.BLOCKED
     assert sealed.blocked is not None
     assert sealed.blocked.blocked_at_step == "definition_draft"
-    assert "lifecycle status --run-id r-run" in (sealed.blocked.operator_command or "")
+    # The remedy is the RESUME of this run's own workflow, pasteable verbatim — not a
+    # pointer to another verb the operator would then have to read and act on.
+    remedy = sealed.blocked.operator_command or ""
+    assert remedy.startswith("dadaia lifecycle release-definition"), remedy
+    assert "--run-id r-run" in remedy and "--resume-from definition_draft" in remedy
 
 
 @pytest.mark.parametrize(
@@ -90,3 +94,35 @@ def test_a_terminal_run_is_left_exactly_as_it_is(workspace: Path, terminal) -> N
 
 def test_an_unknown_run_is_not_invented(workspace: Path) -> None:
     assert _seal_non_terminal_run(workspace, "never-existed") is None
+
+
+def test_the_status_verb_seals_a_run_whose_driver_was_killed(workspace: Path) -> None:
+    """Bug r21-killed-driver-leaves-running-ledger.
+
+    The end-of-verb chokepoint cannot fire when the driver is KILLED — no in-process code
+    runs at all. I knew that and wrote a test SAYING so, then relied on `lifecycle status`
+    to merely describe the wreck. The validator killed a driver and found exactly that: a
+    ledger stuck on running, and a recovery in prose.
+
+    The verb that runs AFTER the death is the only one that can still resolve it, so it
+    now seals as well as reports.
+    """
+    from typer.testing import CliRunner
+
+    from dadaia_workspace.cli.main import app
+
+    _save(workspace, "killed", LifecycleRunStatus.RUNNING, "definition_draft")
+
+    result = CliRunner().invoke(
+        app, ["lifecycle", "status", "--run-id", "killed", "--workspace", str(workspace)]
+    )
+
+    assert result.exit_code == 0, result.output
+    sealed = JsonLifecycleRunStore(workspace).load("killed")
+    assert sealed is not None and sealed.status is LifecycleRunStatus.BLOCKED, (
+        "inspecting a killed run described it and left it ambiguous on disk"
+    )
+    assert "dadaia lifecycle release-definition" in result.output, (
+        f"the recovery must be a pasteable command, not prose:\n{result.output}"
+    )
+    assert "--resume-from definition_draft" in result.output

@@ -74,13 +74,16 @@ def test_an_interrupted_running_run_reports_how_to_recover(tmp_path: Path) -> No
     result = _invoke(tmp_path, "r-11")
 
     assert result.exit_code == 0, result.output
-    assert "RUNNING" in result.output
-    assert "interrupted" in result.output.lower(), (
-        "a run stuck in running must say it was interrupted, not just print a status word"
+    # After sealing, the run reads BLOCKED — that is the point: the verb resolves the
+    # ambiguity instead of describing it. What must survive is the EXPLANATION.
+    assert "BLOCKED" in result.output
+    assert "left RUNNING" in result.output, (
+        "a run stuck in running must say what happened, not just print a status word"
     )
-    assert "--resume-from spec_create" in result.output, (
-        f"no recovery command offered; output was:\n{result.output}"
+    assert "dadaia lifecycle release-definition" in result.output, (
+        f"the recovery must be a pasteable command; output was:\n{result.output}"
     )
+    assert "--resume-from spec_create" in result.output
 
 
 def test_a_blocked_run_reports_its_recorded_remedy(tmp_path: Path) -> None:
@@ -105,9 +108,13 @@ def test_json_carries_status_step_and_recovery(tmp_path: Path) -> None:
     result = _invoke(tmp_path, "r-13", "--json")
 
     payload = json.loads(result.output)
-    assert payload["status"] == "running"
+    # Inspecting an ambiguous run now SEALS it (bug r21-killed-driver-leaves-running-ledger):
+    # after a killed driver this verb is the only code that ever runs, so describing the
+    # wreck and leaving it ambiguous on disk was the defect.
+    assert payload["status"] == "blocked"
     assert payload["current_step"] == "tasks_create"
-    assert payload["interrupted"] is True
+    assert payload["detail"] and "left RUNNING" in payload["detail"]
+    assert payload["recovery"].startswith("dadaia lifecycle release-definition")
     assert "--resume-from tasks_create" in payload["recovery"]
 
 

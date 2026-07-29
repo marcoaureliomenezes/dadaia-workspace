@@ -305,6 +305,33 @@ def _echo_block_reason(result: object) -> None:
         typer.echo(f"\nRecovery: {remedy}")
 
 
+#: The CLI verb that runs each persisted workflow command.
+_VERB_BY_COMMAND = {
+    "backlog_definition": "backlog-definition",
+    "release_definition": "release-definition",
+    "implementation_reviews": "implementation-reviews",
+    "audit": "audit",
+}
+
+
+def _resume_command_for(run: object, step: str) -> str:
+    """A full, pasteable resume line for THIS run — never prose around a flag.
+
+    Bug ``r21-killed-driver-leaves-running-ledger`` (second half): the seal's remedy read
+    "re-run the same command with --resume-from X", which the operator has to reassemble
+    from memory precisely when something has already gone wrong. Every field needed is on
+    the run record, so there is no reason to make them retype it.
+    """
+    verb = _VERB_BY_COMMAND.get(str(getattr(run, "command", "")), "release-definition")
+    context = getattr(run, "context", "<context>")
+    release_id = getattr(run, "release_id", "<release>")
+    run_id = getattr(run, "run_id", "<run>")
+    base = f"dadaia lifecycle {verb} --context {context} --run-id {run_id}"
+    if verb != "backlog-definition" or release_id:
+        base += f" --release-id {release_id}"
+    return f"{base} --resume-from {step}"
+
+
 def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:
     """Convert a run left RUNNING into a BLOCKED one carrying a diagnosis and a remedy.
 
@@ -335,12 +362,20 @@ def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:
         return None
     if run is None or run.status is not LifecycleRunStatus.RUNNING:
         return None
+    if run.blocked is not None:
+        # A RECORDED block is the real diagnosis, written by whatever actually stopped the
+        # run. Sealing over it would replace a specific reason and remedy with a generic
+        # one — the seal exists to resolve AMBIGUITY, and a run carrying a block is not
+        # ambiguous. (Caught immediately by the test that pins recorded-block precedence,
+        # which is why that test exists.)
+        return None
 
     step = run.current_step or "<step>"
     reason = (
-        f"the command returned while this run was still RUNNING at step {step!r}. The "
-        "step did not reach a terminal outcome and recorded no block of its own — inspect "
-        "the run's step payload for the worker's last output."
+        f"this run was left RUNNING at step {step!r} — the step never reached a terminal "
+        "outcome and recorded no block of its own. Either the command returned without "
+        "finishing it, or the driver was killed before it could. Inspect the run's step "
+        "payload for the worker's last output."
     )
     sealed = dataclasses.replace(
         run,
@@ -350,10 +385,7 @@ def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:
             reason=reason,
             blocked_at_step=step,
             resume_token=run.idempotency_key,
-            operator_command=(
-                f"dadaia lifecycle status --run-id {run_id}  # then resume from the step "
-                f"it names, or start over with a fresh --run-id"
-            ),
+            operator_command=_resume_command_for(run, step),
             detail={"step": step, "gate": "non-terminal-seal-v1"},
         ),
     )
@@ -1621,6 +1653,11 @@ def lifecycle_status(
     from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
 
     workspace_root = workspace or resolve_workspace_root()
+    # Bug r21-killed-driver-leaves-running-ledger: the end-of-verb chokepoint cannot fire
+    # when the driver is KILLED — no in-process code runs at all. This verb is what the
+    # operator runs afterwards, so it is the only place that can still seal the ledger.
+    # Inspecting a dead run therefore RESOLVES it instead of merely describing it.
+    _seal_non_terminal_run(workspace_root, run_id)
     run = container.build_lifecycle_run_store(workspace_root).load(run_id)
     if run is None:
         raise typer.BadParameter(f"no lifecycle run {run_id!r} found under {workspace_root}")
@@ -1643,10 +1680,7 @@ def lifecycle_status(
             "interrupted before reaching a terminal state (a killed driver or an orphaned "
             "worker leaves this)"
         )
-        recovery = (
-            f"re-run the same command with --run-id {run_id} --resume-from {step} — or "
-            "pass a fresh --run-id to start over deliberately"
-        )
+        recovery = _resume_command_for(run, step)
     elif blocked_state is not None:
         detail = blocked_state.reason
         recovery = blocked_state.operator_command or (
