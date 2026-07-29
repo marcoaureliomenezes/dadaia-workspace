@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunRequest,
     AgentRunResult,
@@ -656,14 +657,24 @@ class LifecycleAgentRunner:
             ref = self._persist_diagnostic(lifecycle_run, data, result.diagnostic)
             if ref is not None:
                 full_detail["diagnostic_ref"] = ref
+        step = data.current_step or lifecycle_run.current_step
         return BlockedState(
-            operator_command=(
-                f"re-run the workflow with --resume-from "
-                f"{data.current_step or lifecycle_run.current_step}; inspect the step "
-                "payload for the worker's own output first"
+            # Bug r22-release-review-rejection-deadlocks: this is the single most-hit
+            # block in the product — every worker-noncompliance path funnels through it —
+            # and it prescribed prose ("re-run the workflow with --resume-from X; inspect
+            # the step payload ..."), so the validator's stuck review had a correct block
+            # and nothing to paste. The run record already carries every field the command
+            # needs.
+            operator_command=resume_command(
+                command=lifecycle_run.command,
+                run_id=lifecycle_run.run_id,
+                step=step,
+                context=lifecycle_run.context,
+                release_id=lifecycle_run.release_id or "",
+                note="inspect the step payload for the worker's own output first",
             ),
             reason=reason,
-            blocked_at_step=data.current_step or lifecycle_run.current_step,
+            blocked_at_step=step,
             resume_token=lifecycle_run.idempotency_key,
             detail=full_detail,
         )

@@ -548,25 +548,28 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         repointed or ``completed`` is reported.
         """
         release_dir = self._selector.spec_context.specs_dir / "releases" / self._release_id
-        labels = {s.label for s in sequence}
-        # Run-scoped requirements: an artifact is required only when ITS create step ran
-        # in this sequence; the Aprovado flip only when its review gate ran too.
-        required = {
-            # One draft step authors all three; one review approves all three.
-            "SPEC.md": ("definition_draft" in labels, "definition_review" in labels),
-            "PLAN.md": ("definition_draft" in labels, "definition_review" in labels),
-            "TASKS.md": ("definition_draft" in labels, "definition_review" in labels),
-        }
+        # NOT run-scoped (bug r22-release-completes-with-unapproved-plan-tasks). These
+        # requirements used to be conditioned on whether ``definition_draft`` /
+        # ``definition_review`` appeared in THIS run's sequence — so a
+        # `--resume-from definition_commit_gate` (which is exactly what a killed-driver
+        # recovery prints) arrived carrying no requirement at all, and the gate repointed
+        # ACTIVE.md to IMPLEMENTATION over a PLAN/TASKS with no Status line whatsoever.
+        #
+        # Reaching this gate is not a step in an itinerary, it is the claim that the
+        # release is DEFINED and binding on every reader downstream. So it checks DISK
+        # truth — what the next reader will actually find — and never the history of the
+        # run that happens to be asking. Same reasoning that took the definition lints
+        # off the draft step (r13-release-plan-validation-bypassed-on-resume): a gate a
+        # resume can step over is not a gate.
+        required = ("SPEC.md", "PLAN.md", "TASKS.md")
         missing: list[str] = []
         remedies: list[str] = []
-        for name, (must_exist, must_be_approved) in required.items():
-            if not must_exist:
-                continue
+        for name in required:
             path = release_dir / name
             if not path.is_file():
                 missing.append(f"{name} (absent)")
                 continue
-            if must_be_approved and not is_approved(path.read_text(encoding="utf-8")):
+            if not is_approved(path.read_text(encoding="utf-8")):
                 missing.append(f"{name} (not Aprovado)")
                 # Bug release-definition-approved-plan-not-persisted-041: a Draft
                 # artifact with an APPROVED ledger (resumed/rewritten mid-run) recovers

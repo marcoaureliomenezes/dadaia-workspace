@@ -39,6 +39,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import ClassVar, Protocol
 
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.lifecycle import (
     HARNESS_CLI_NAMES,
     AgentRunResult,
@@ -157,6 +158,27 @@ class _StepOutcome:
     prompt_text: str | None = None
     runtime_kind: AgentRuntimeKind | None = None
     blocked: BlockedState | None = None
+
+
+def _graph_recovery(run: LifecycleRun, step_label: str) -> str:
+    """The recovery for every step-graph block: a real command, not advice about one.
+
+    Five sites carried the identical prose ("re-run with --resume-from X; if the step
+    graph itself is wrong ..."). Prose repeated five times is one defect written five
+    times (bug ``r22-release-review-rejection-deadlocks``, escapability half), so they now
+    share the one builder that knows how a resume is spelled.
+    """
+    return resume_command(
+        command=run.command,
+        run_id=run.run_id,
+        step=step_label,
+        context=run.context,
+        release_id=run.release_id or "",
+        note=(
+            "if the step graph itself is wrong this is a library defect — "
+            "register it with `dadaia bugs append`"
+        ),
+    )
 
 
 def _is_rejected_verdict(blocked: BlockedState | None) -> bool:
@@ -977,11 +999,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 run = self._produce_payload(run, step, worker_result, sequence)
             except MalformedHandoffError as exc:
                 blocked = BlockedState(
-                    operator_command=(
-                        f"re-run with --resume-from {step.label}; if the step graph itself is "
-                        "wrong this is a library defect — register it with "
-                        "`dadaia bugs append`"
-                    ),
+                    operator_command=_graph_recovery(run, step.label),
                     reason=f"worker output violates {step.produces}: {exc}",
                     blocked_at_step=step.label,
                     detail={"output_schema": str(step.produces)},
@@ -1079,11 +1097,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 )
             except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
                 blocked = BlockedState(
-                    operator_command=(
-                        f"re-run with --resume-from {step.label}; if the step graph itself is "
-                        "wrong this is a library defect — register it with "
-                        "`dadaia bugs append`"
-                    ),
+                    operator_command=_graph_recovery(run, step.label),
                     reason=f"required upstream handoff unavailable: {exc}",
                     blocked_at_step=step.label,
                     detail={"producer_step": producer, "consumer_step": step.label},
@@ -1229,11 +1243,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 continue
             if s.produces is not None and _find_or_recover(s.label) is None:
                 return run, BlockedState(
-                    operator_command=(
-                        f"re-run with --resume-from {step.label}; if the step graph itself is "
-                        "wrong this is a library defect — register it with "
-                        "`dadaia bugs append`"
-                    ),
+                    operator_command=_graph_recovery(run, step.label),
                     reason=f"workflow-step graph incomplete: step {s.label!r} declared "
                     f"produces={s.produces!r} but wrote no ledger payload (and no "
                     "persisted payload could be reconciled from disk)",
@@ -1243,11 +1253,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             for producer in s.consumes:
                 if _find_or_recover(producer) is None:
                     return run, BlockedState(
-                        operator_command=(
-                            f"re-run with --resume-from {step.label}; if the step graph itself is "
-                            "wrong this is a library defect — register it with "
-                            "`dadaia bugs append`"
-                        ),
+                        operator_command=_graph_recovery(run, step.label),
                         reason=f"workflow-step graph incomplete: {s.label!r} consumes "
                         f"{producer!r} which has no ledger payload (and no persisted "
                         "payload could be reconciled from disk)",
@@ -1259,11 +1265,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 acked = any(c.consumer_step == s.label for c in record.consumptions)
                 if not acked and producer not in recovered:
                     return run, BlockedState(
-                        operator_command=(
-                            f"re-run with --resume-from {step.label}; if the step graph itself is "
-                            "wrong this is a library defect — register it with "
-                            "`dadaia bugs append`"
-                        ),
+                        operator_command=_graph_recovery(run, step.label),
                         reason=f"workflow-step graph incomplete: {s.label!r} never recorded "
                         f"consumption of {producer!r}",
                         blocked_at_step=step.label,

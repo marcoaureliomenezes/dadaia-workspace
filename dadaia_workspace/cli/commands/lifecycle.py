@@ -15,6 +15,7 @@ import typer
 
 from dadaia_workspace.cli._specs_resolution import repo_slug_for_context
 from dadaia_workspace.core.exceptions import ReleaseNotFoundError, ScopeNotConsumedError
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.lifecycle import (
     HARNESS_CLI_NAMES,
     AgentRuntimeKind,
@@ -310,15 +311,6 @@ def _echo_block_reason(result: object) -> None:
 #: fallback GUESSED, and an implementation run was handed a `release-definition` command
 #: (bug r22-lifecycle-status-pipeline-recovery-wrong-verb). A wrong command is worse than
 #: no command: the operator runs it, and it does something else.
-_VERB_BY_COMMAND = {
-    "backlog_definition": "backlog-definition",
-    "release_definition": "release-definition",
-    "implementation_reviews": "implementation-reviews",
-    "pipeline": "implementation-reviews",
-    "audit": "audit",
-}
-
-
 @contextlib.contextmanager
 def _sealing_run(workspace_root: Path, run_id: str) -> Iterator[None]:
     """Seal a still-RUNNING run on the way out, however the body ends.
@@ -345,19 +337,13 @@ def _resume_command_for(run: object, step: str) -> str:
     from memory precisely when something has already gone wrong. Every field needed is on
     the run record, so there is no reason to make them retype it.
     """
-    run_id = str(getattr(run, "run_id", ""))
-    verb = _VERB_BY_COMMAND.get(str(getattr(run, "command", "")))
-    if verb is None:
-        # Never guess a verb. `lifecycle status` is always real and always runnable, and
-        # it names the step — better a correct command that shows the way than a confident
-        # one that runs the wrong workflow.
-        return f"dadaia lifecycle status --run-id {run_id}"
-    context = getattr(run, "context", "")
-    release_id = getattr(run, "release_id", "")
-    base = f"dadaia lifecycle {verb} --context {context} --run-id {run_id}"
-    if release_id:
-        base += f" --release-id {release_id}"
-    return f"{base} --resume-from {step}"
+    return resume_command(
+        command=str(getattr(run, "command", "")),
+        run_id=str(getattr(run, "run_id", "")),
+        step=step,
+        context=str(getattr(run, "context", "") or ""),
+        release_id=str(getattr(run, "release_id", "") or ""),
+    )
 
 
 def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:

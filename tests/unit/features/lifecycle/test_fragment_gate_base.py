@@ -98,7 +98,14 @@ def _seed(tmp_path: Path) -> Path:
     (specs / "memory" / "quality-assurance.md").write_text("# q\n", encoding="utf-8")
     (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     for art in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        body = f"# {art}\n"
+        # Approved up front: these tests drive BASE sequencing (resume, revision budget,
+        # ACTIVE.md repoint) through the release workflow as a vehicle, using synthetic
+        # step labels. They used to reach the terminal gate carrying no requirement at
+        # all, because that gate scoped its checks to the run's own step labels — the
+        # very hole that let a real resume complete an unapproved release
+        # (r22-release-completes-with-unapproved-plan-tasks). The gate now reads disk
+        # truth unconditionally, so satisfying its precondition is ordinary setup here.
+        body = f"# {art}\n\n> **Status:** Aprovado\n"
         if art == "PLAN.md":
             body += (
                 "\n## Validation Dependency Table\n\n"

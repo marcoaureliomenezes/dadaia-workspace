@@ -100,3 +100,73 @@ def test_no_recovery_is_a_placeholder_instead_of_a_command() -> None:
         + "\n\nInterpolate the real step label. A remedy that cannot be pasted is a "
         "remedy nobody can follow, which is the whole defect this ratchet exists for."
     )
+
+
+#: Literal openings that mean the field holds INSTRUCTIONS about a command rather than a
+#: command. Each is a shape the validator actually received.
+_PROSE_OPENINGS = (
+    "re-run ",
+    "rerun ",
+    "run the ",
+    "re-execute ",
+    "inspect ",
+    "see ",
+    "ask ",
+    "contact ",
+)
+
+
+def _literal_prefix(node: ast.expr) -> str | None:
+    """The leading literal text of a string expression, or None if it starts dynamic."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        for value in node.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                return value.value
+            return None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _literal_prefix(node.left)
+    return None
+
+
+def test_no_recovery_is_prose_about_a_command_instead_of_the_command() -> None:
+    """Bug ``r22-release-review-rejection-deadlocks`` (the escapability half).
+
+    The generic agent-runner block — the single most-hit block in the product, since every
+    worker-noncompliance path funnels through it — prescribed:
+
+        re-run the workflow with --resume-from definition_review; inspect the step
+        payload for the worker's own output first
+
+    which is an instruction to assemble a command, not a command. The validator hit it on a
+    review that could not produce a compliant verdict and reported a deadlock: the block was
+    real and correct, and there was still nothing to paste.
+
+    The two ratchets above measure presence and then non-placeholder-ness. Each was written
+    after the previous one was satisfied in letter and defeated in spirit. This one measures
+    the only property that was ever the point: the field begins with a command.
+    """
+    offenders: list[str] = []
+    for path in sorted(_LIFECYCLE.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for call in _blocked_state_calls(tree):
+            for kw in call.keywords:
+                if kw.arg != "operator_command":
+                    continue
+                prefix = _literal_prefix(kw.value)
+                if prefix is None:
+                    # Starts with an interpolation — a builder call or a passed-in command.
+                    # Those are covered by the tests that own the gate they belong to.
+                    continue
+                lowered = prefix.lstrip().lower()
+                if any(lowered.startswith(opening) for opening in _PROSE_OPENINGS):
+                    rel = path.relative_to(_LIFECYCLE.parents[2]).as_posix()
+                    offenders.append(f"{rel}:{call.lineno} -> {prefix.strip()[:60]!r}")
+
+    assert not offenders, (
+        "these recoveries describe a command instead of being one:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nEmit the line the operator pastes. Everything needed is on the run record, "
+        "so there is no reason to make them reassemble it while something is already wrong."
+    )

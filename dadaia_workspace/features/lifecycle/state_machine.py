@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.lifecycle import (
     BlockedState,
     GateEvidence,
@@ -83,9 +84,13 @@ class LifecycleStateMachine:
         missing = self._missing_requirements(run, transition_input)
         if missing:
             blocked = BlockedState(
-                operator_command=(
-                    f"re-run the step that produces the missing evidence with --resume-from "
-                    f"{transition_input.current_step or run.current_step}"
+                operator_command=resume_command(
+                    command=run.command,
+                    run_id=run.run_id,
+                    step=transition_input.current_step or run.current_step,
+                    context=run.context,
+                    release_id=run.release_id or "",
+                    note="this step produces the missing evidence",
                 ),
                 reason="missing required transition evidence",
                 blocked_at_step=transition_input.current_step or run.current_step,

@@ -26,6 +26,7 @@ from dadaia_workspace.core.harness_models import (
     HarnessModelOption,
     options_for,
 )
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.lifecycle import (
     AgentRunResult,
     AgentRunStatus,
@@ -543,9 +544,13 @@ class LifecyclePipeline:
                     lint_ok, lint_evidence = self._memory_lint_gate()
                     if not lint_ok:
                         blocked_lint = BlockedState(
-                            operator_command=(
-                                "re-run the same command with --resume-from close, or use a fresh "
-                                "--run-id to start over deliberately"
+                            operator_command=resume_command(
+                                command=run.command,
+                                run_id=run.run_id,
+                                step="close",
+                                context=run.context,
+                                release_id=run.release_id or "",
+                                note="or use a fresh --run-id to start over deliberately",
                             ),
                             reason=(
                                 "close blocked: memory atoms carry lint findings — closure "
@@ -571,9 +576,13 @@ class LifecyclePipeline:
                     tests_ok, tests_evidence = self._executed_test_gate()
                     if tests_ok is False:
                         blocked_close = BlockedState(
-                            operator_command=(
-                                "re-run the same command with --resume-from close, or use a fresh "
-                                "--run-id to start over deliberately"
+                            operator_command=resume_command(
+                                command=run.command,
+                                run_id=run.run_id,
+                                step="close",
+                                context=run.context,
+                                release_id=run.release_id or "",
+                                note="or use a fresh --run-id to start over deliberately",
                             ),
                             reason=(
                                 "close blocked: executed test validation is not green — "

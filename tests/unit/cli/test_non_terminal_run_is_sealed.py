@@ -177,9 +177,8 @@ def test_the_seal_fires_even_when_the_body_raises(workspace: Path) -> None:
 
     _save(workspace, "boom", LifecycleRunStatus.RUNNING, "backlog_author")
 
-    with pytest.raises(RuntimeError):
-        with _sealing_run(workspace, "boom"):
-            raise RuntimeError("the worker blew up mid-step")
+    with pytest.raises(RuntimeError), _sealing_run(workspace, "boom"):
+        raise RuntimeError("the worker blew up mid-step")
 
     sealed = JsonLifecycleRunStore(workspace).load("boom")
     assert sealed is not None and sealed.status is LifecycleRunStatus.BLOCKED
