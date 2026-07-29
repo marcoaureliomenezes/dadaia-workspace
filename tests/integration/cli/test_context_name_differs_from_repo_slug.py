@@ -192,8 +192,13 @@ def test_no_release_gate_can_block_without_a_remedy() -> None:
     """
     from dadaia_workspace.features.lifecycle.workflows import release_definition
 
-    body = Path(release_definition.__file__).read_text(encoding="utf-8")
-    assert 'or ["--resume-from definition_draft"]' in body, (
+    # Behavioural, not a source-text grep. The first version of this test matched a
+    # literal expression and broke the moment the remedy was refactored into a pasteable
+    # command — asserting the SHAPE of the code instead of the guarantee it makes.
+    body = release_definition._resume_command(
+        context="ctx", release_id="v0.1.0", run_id="rd", kind=None, step="definition_draft"
+    )
+    assert "--resume-from definition_draft" in body, (
         "the commit gate must fall back to re-authoring instead of emitting a null remedy"
     )
 

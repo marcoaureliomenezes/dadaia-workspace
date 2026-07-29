@@ -141,6 +141,30 @@ _SEQUENCE: tuple[ReleaseStep, ...] = (
 )
 
 
+def _resume_command(
+    *, context: str, release_id: str, run_id: str, kind: object, step: str, note: str = ""
+) -> str:
+    """A pasteable resume command, not prose around a flag.
+
+    Module-level and explicit rather than a method: the block builders are exercised with
+    lightweight stubs, and making them reach through `self` for this turned every stub
+    into a partial reimplementation of the workflow (bug
+    r20-release-recovery-loses-accepted-draft-payload — the remedy read "re-run
+    release-definition with --resume-from X", which nobody can paste).
+    """
+    from dadaia_workspace.core.models.lifecycle import HARNESS_CLI_NAMES
+
+    harness = "codex"
+    if isinstance(kind, AgentRuntimeKind):
+        harness = HARNESS_CLI_NAMES.get(kind, "codex")
+    tail = f"  # {note}" if note else ""
+    return (
+        f"dadaia lifecycle release-definition --context {context} "
+        f"--release-id {release_id} --run-id {run_id} --harness {harness} "
+        f"--resume-from {step}{tail}"
+    )
+
+
 class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinitionResult]):
     """Run the §6.1 release-definition sequence with fragment prompts + Python gates.
 
@@ -182,6 +206,12 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 for step in sequence
                 if step.label != "release_scope"
             )
+        # Bug r20-release-recovery-loses-accepted-draft-payload: the remedies read
+        # "re-run release-definition with --resume-from X" — prose around a flag, not a
+        # command. Remember the run id so every block can print a line the operator pastes
+        # verbatim; a remedy that has to be assembled by hand is a remedy that gets typed
+        # wrong under pressure.
+        self._current_run_id = run_id
         return self._run_sequence(run_id, sequence, resume_from=resume_from)
 
     #: Review-gate label → the SDD artifact it approves (bug
@@ -256,8 +286,14 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 ),
                 blocked_at_step=create_step,
                 operator_command=(
-                    f"re-run release-definition with --resume-from {create_step} "
-                    f"(only the {filename} authoring step re-executes)"
+                    _resume_command(
+                        context=self._context,
+                        release_id=self._release_id,
+                        run_id=getattr(self, "_current_run_id", "release-define"),
+                        kind=getattr(self, "_default_kind", None),
+                        step="create_step",
+                        note=f"only the {filename} authoring step re-executes",
+                    )
                 ),
                 detail={"artifact": filename, "gate": "review-status-flip-v1"},
             )
@@ -298,7 +334,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
         # Class-level call: the sibling hygiene checks are exercised with lightweight
         # stubs, and a `self.` lookup would demand the stub grow an attribute that has
         # nothing to do with what those tests assert.
-        markers_block = ReleaseDefinitionWorkflow._unreadable_task_markers_block(text)
+        markers_block = self._unreadable_task_markers_block(text)
         if markers_block is not None:
             return markers_block
         snippets = re.findall(r"`([^`\n]+)`", text)
@@ -323,8 +359,7 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 )
         return None
 
-    @staticmethod
-    def _unreadable_task_markers_block(text: str) -> BlockedState | None:
+    def _unreadable_task_markers_block(self, text: str) -> BlockedState | None:
         """BLOCK a TASKS.md whose markers ``implementation-reviews`` cannot parse.
 
         Bug ``r10-approved-task-markers-rejected-by-implementation``: a live worker wrote
@@ -361,20 +396,31 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             ),
             blocked_at_step="definition_draft",
             operator_command=(
-                "re-run release-definition with --resume-from definition_draft "
-                "(only the TASKS authoring step re-executes)"
+                _resume_command(
+                    context=self._context,
+                    release_id=self._release_id,
+                    run_id=getattr(self, "_current_run_id", "release-define"),
+                    kind=getattr(self, "_default_kind", None),
+                    step="definition_draft",
+                    note="only the TASKS authoring step re-executes",
+                )
             ),
             detail={"artifact": "TASKS.md", "gate": "task-marker-parity-v1"},
         )
 
-    @staticmethod
-    def _tasks_hygiene_block(reason: str) -> BlockedState:
+    def _tasks_hygiene_block(self, reason: str) -> BlockedState:
         return BlockedState(
             reason=f"TASKS command hygiene lint failed: {reason}",
             blocked_at_step="definition_draft",
             operator_command=(
-                "re-run release-definition with --resume-from definition_draft "
-                "(only the TASKS authoring step re-executes)"
+                _resume_command(
+                    context=self._context,
+                    release_id=self._release_id,
+                    run_id=getattr(self, "_current_run_id", "release-define"),
+                    kind=getattr(self, "_default_kind", None),
+                    step="definition_draft",
+                    note="only the TASKS authoring step re-executes",
+                )
             ),
             detail={"artifact": "TASKS.md", "gate": "task-command-hygiene-v1"},
         )
@@ -470,14 +516,19 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 )
         return None
 
-    @staticmethod
-    def _plan_dependency_block(reason: str) -> BlockedState:
+    def _plan_dependency_block(self, reason: str) -> BlockedState:
         return BlockedState(
             reason=f"plan dependency lint failed: {reason}",
             blocked_at_step="definition_draft",
             operator_command=(
-                "re-run release-definition with --resume-from definition_draft "
-                "(only the PLAN authoring step re-executes)"
+                _resume_command(
+                    context=self._context,
+                    release_id=self._release_id,
+                    run_id=getattr(self, "_current_run_id", "release-define"),
+                    kind=getattr(self, "_default_kind", None),
+                    step="definition_draft",
+                    note="only the PLAN authoring step re-executes",
+                )
             ),
             detail={"artifact": "PLAN.md", "gate": "validation-dependency-table-v1"},
         )
@@ -537,9 +588,18 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
                 # (bug a2-release-missing-spec-gate-lacks-resume-remedy). Re-authoring is
                 # always a valid recovery, so it is the floor.
                 operator_command=(
-                    "re-run release-definition with "
-                    + " ".join(sorted(remedies) or ["--resume-from definition_draft"])
-                    + " (the step re-executes and the review re-asserts the Aprovado flip)"
+                    _resume_command(
+                        context=self._context,
+                        release_id=self._release_id,
+                        run_id=getattr(self, "_current_run_id", "release-define"),
+                        kind=getattr(self, "_default_kind", None),
+                        step=(
+                            sorted(remedies)[0].removeprefix("--resume-from ")
+                            if remedies
+                            else "definition_draft"
+                        ),
+                        note="the step re-executes and the review re-asserts the Aprovado flip",
+                    )
                 ),
                 detail={"unpersisted_artifacts": ", ".join(missing)},
             )

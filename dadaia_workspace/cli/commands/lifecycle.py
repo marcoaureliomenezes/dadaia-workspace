@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import json
 import re
 from collections.abc import Callable, Sequence
@@ -301,6 +303,63 @@ def _echo_block_reason(result: object) -> None:
     remedy = getattr(blocked, "operator_command", "") or ""
     if remedy:
         typer.echo(f"\nRecovery: {remedy}")
+
+
+def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:
+    """Convert a run left RUNNING into a BLOCKED one carrying a diagnosis and a remedy.
+
+    Three separate reports — ``r11-release-definition-exits-success-interrupted``,
+    ``r15-release-definition-running-after-accepted-draft``,
+    ``r20-release-definition-returns-success-while-running`` — are the same class arriving
+    by different routes: the verb returns, and the run on disk is still ``running`` with
+    nothing that explains it. Each earlier fix patched the route it was reported on. A
+    class that keeps coming back through new routes is a class that needs a CHOKEPOINT,
+    not another patch.
+
+    This is that chokepoint: whatever happened inside — completion, block, an exception
+    that escaped, a worker that never answered — the command does not return while the
+    persisted run claims to still be going. Terminal states are untouched; only the
+    ambiguous one is sealed.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import (
+        BlockedState,
+        LifecyclePhase,
+        LifecycleRunStatus,
+    )
+
+    try:
+        store = container.build_lifecycle_run_store(workspace_root)
+        run = store.load(run_id)
+    except Exception:  # noqa: BLE001 — a seal must never eclipse the command's own error
+        return None
+    if run is None or run.status is not LifecycleRunStatus.RUNNING:
+        return None
+
+    step = run.current_step or "<step>"
+    reason = (
+        f"the command returned while this run was still RUNNING at step {step!r}. The "
+        "step did not reach a terminal outcome and recorded no block of its own — inspect "
+        "the run's step payload for the worker's last output."
+    )
+    sealed = dataclasses.replace(
+        run,
+        phase=LifecyclePhase.BLOCKED,
+        status=LifecycleRunStatus.BLOCKED,
+        blocked=BlockedState(
+            reason=reason,
+            blocked_at_step=step,
+            resume_token=run.idempotency_key,
+            operator_command=(
+                f"dadaia lifecycle status --run-id {run_id}  # then resume from the step "
+                f"it names, or start over with a fresh --run-id"
+            ),
+            detail={"step": step, "gate": "non-terminal-seal-v1"},
+        ),
+    )
+    with contextlib.suppress(Exception):
+        store.save(sealed)
+    return reason
 
 
 def _persisted_disagrees_with_success(workspace_root: Path, run_id: str) -> str | None:
@@ -643,7 +702,14 @@ def release_define(
     # (bug r6f-release-completes-with-unconsumed-authoritative-backlog, reported by the
     # consumer-side validator against a live worker).
     succeeded = result.completed and post_step_error is None
-    if succeeded:
+    # Unconditional, not success-only: a run left RUNNING is ambiguous whatever this
+    # command thinks happened, and three reports of that class arrived by three different
+    # routes before it got a chokepoint instead of another patch.
+    sealed = _seal_non_terminal_run(workspace_root, result.run_id)
+    if sealed is not None:
+        succeeded = False
+        post_step_error = sealed
+    elif succeeded:
         disagreement = _persisted_disagrees_with_success(workspace_root, result.run_id)
         if disagreement is not None:
             succeeded = False
@@ -1481,6 +1547,8 @@ def pipeline(
         if result.completed
         else None
     )
+    # Same chokepoint on the implementation path — the class was reported here too.
+    _seal_non_terminal_run(workspace_root, result.run_id)
     status = (
         LifecycleCommandStatus.OK.value
         if result.completed

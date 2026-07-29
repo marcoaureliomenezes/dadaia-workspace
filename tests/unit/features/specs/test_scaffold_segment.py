@@ -65,6 +65,9 @@ def test_segment_artifacts_pass_the_workflows_own_gates(tmp_path: Path) -> None:
         _release_id="v0.1.6/alpha-1",
     )
     assert ReleaseDefinitionWorkflow._validate_plan_dependency_table(stub) is None
+    stub._unreadable_task_markers_block = lambda text: (
+        ReleaseDefinitionWorkflow._unreadable_task_markers_block(stub, text)
+    )
     assert ReleaseDefinitionWorkflow._validate_tasks_command_hygiene(stub) is None
 
     tasks_text = (tmp_path / "releases" / "v0.1.6" / "alpha-1" / "TASKS.md").read_text(

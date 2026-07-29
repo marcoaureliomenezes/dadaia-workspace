@@ -54,11 +54,16 @@ def test_the_form_the_live_worker_wrote_is_not_recognized(line: str) -> None:
 
 
 def _gate(text: str):
+    import types
+
     from dadaia_workspace.features.lifecycle.workflows.release_definition import (
         ReleaseDefinitionWorkflow,
     )
 
-    return ReleaseDefinitionWorkflow._unreadable_task_markers_block(text)
+    stub = types.SimpleNamespace(
+        _context="ctx", _release_id="v0.1.0", _current_run_id="rd", _default_kind=None
+    )
+    return ReleaseDefinitionWorkflow._unreadable_task_markers_block(stub, text)
 
 
 def test_the_definition_gate_blocks_the_form_that_broke_the_chain() -> None:
@@ -98,6 +103,12 @@ def _through_the_wired_gate(text: str, tmp_path):
     stub = types.SimpleNamespace(
         _selector=types.SimpleNamespace(spec_context=types.SimpleNamespace(specs_dir=tmp_path)),
         _release_id=release,
+        _context="ctx",
+        _current_run_id="rd",
+        _default_kind=None,
+    )
+    stub._unreadable_task_markers_block = lambda text: (
+        ReleaseDefinitionWorkflow._unreadable_task_markers_block(stub, text)
     )
     return ReleaseDefinitionWorkflow._validate_tasks_command_hygiene(stub)
 
