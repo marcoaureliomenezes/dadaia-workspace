@@ -537,7 +537,10 @@ def release_define(
     """Turn a picked backlog set into an approved SPEC/PLAN/TASKS release, review-gated.
 
     This is one of the four lifecycle workflows; it runs a fixed sequence of AI worker
-    steps behind Python-checked gates (a rejected or missing review blocks advancement) and
+    steps behind Python-checked gates (a MISSING review blocks advancement; a REJECTED
+    review blocks only while the revision budget lasts — once spent it is recorded as
+    an advisory warning and the step proceeds, so a model verdict can never deadlock a
+    release) and
     only reaches IMPLEMENTATION when every gate passes. ``--harness fake`` walks it with no
     model calls.
 
