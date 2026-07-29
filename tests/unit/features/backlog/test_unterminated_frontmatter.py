@@ -43,6 +43,30 @@ intents: []
 _NO_FRONTMATTER = """# BACKLOG — a plain markdown file with no frontmatter at all
 """
 
+#: Bug ``r22-live-backlog-author-accepts-unterminated-frontmatter``: the mirror image of
+#: the R9 case. The live Codex author wrote the keys and the CLOSING delimiter but omitted
+#: the OPENING one, and the same conflation followed — read as "no frontmatter", promoted
+#: with ``status=None``, and surfaced at ``backlog_review_gate`` as a missing status.
+_UNOPENED = """name: greeting-cli
+status: candidate
+intents: []
+---
+
+# BACKLOG — the worker forgot the opening delimiter
+"""
+
+#: The shape that must NOT be mistaken for the above: prose, then a Markdown horizontal
+#: rule. Nothing here declares frontmatter, and calling it malformed would block honest
+#: files.
+_HORIZONTAL_RULE = """# BACKLOG — a normal item
+
+Some prose describing the work.
+
+---
+
+More prose after a horizontal rule.
+"""
+
 
 def _item(tmp_path: Path, name: str, body: str):
     backlog = tmp_path / "backlog"
@@ -73,3 +97,30 @@ def test_a_file_with_no_frontmatter_is_not_confused_with_a_truncated_one(
     item = _item(tmp_path, "plain", _NO_FRONTMATTER)
     assert item.frontmatter_error is None
     assert item.status is None
+
+
+def test_a_block_that_never_opened_is_reported_as_such(tmp_path: Path) -> None:
+    """Bug ``r22-live-backlog-author-accepts-unterminated-frontmatter``.
+
+    R9 taught the parser about a block that opens and never closes. A live worker then
+    produced the mirror image — keys and a closing delimiter, no opening one — and the
+    identical conflation followed, because the fix had been written for the reported
+    shape rather than for the thing that was actually wrong: a file that DECLARES
+    frontmatter and gets the delimiters wrong is malformed either way.
+    """
+    item = _item(tmp_path, "greeting-cli-2", _UNOPENED)
+    assert item.frontmatter_error is not None, (
+        "frontmatter missing its opening delimiter was read as 'no frontmatter', so the "
+        "run blocked later at the review gate on a status the parser could not see"
+    )
+    assert "opening" in item.frontmatter_error.lower()
+
+
+def test_a_markdown_horizontal_rule_is_not_called_malformed(tmp_path: Path) -> None:
+    """The guard against fixing this by suspecting every '---' in the corpus.
+
+    A false positive here blocks an item that is perfectly fine, which is worse than the
+    defect: the operator cannot make the complaint go away by fixing anything.
+    """
+    item = _item(tmp_path, "prose", _HORIZONTAL_RULE)
+    assert item.frontmatter_error is None

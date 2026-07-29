@@ -120,6 +120,30 @@ def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
     return message
 
 
+#: A YAML mapping key at the very start of a line (``name:``, ``status:``, ``intents:``).
+_YAML_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*:(?:\s|$)")
+
+
+def _closes_a_block_it_never_opened(content: str) -> bool:
+    """Whether *content* is frontmatter that forgot its opening ``---``.
+
+    Deliberately narrow, because a false positive blocks a file the operator cannot fix
+    by changing anything: the FIRST line must already be a YAML key, and everything up to
+    the first ``---`` must be keys, continuation lines, or blanks. A Markdown horizontal
+    rule always has prose or a heading above it, so it can never match.
+    """
+    lines = content.splitlines()
+    if not lines or not _YAML_KEY_RE.match(lines[0]):
+        return False
+    for line in lines:
+        stripped = line.rstrip()
+        if stripped == "---":
+            return True
+        if stripped.startswith("#") or stripped.startswith("```"):
+            return False
+    return False
+
+
 def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | None]:
     """Parse the frontmatter block; return ``(data, frontmatter_error)``.
 
@@ -141,6 +165,17 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | No
             return None, (
                 "unterminated frontmatter block: the file opens with '---' but never "
                 "closes it — add the closing '---' line"
+            )
+        # Bug r22-live-backlog-author-accepts-unterminated-frontmatter: the mirror image.
+        # The R9 fix above was written for the shape that was reported — a block that
+        # opens and never closes — so when a live worker produced the other half (keys and
+        # a CLOSING delimiter, no opening one) the same conflation came straight back. The
+        # thing that is actually wrong in both is a file that DECLARES frontmatter and
+        # gets the delimiters wrong, so both are named here.
+        if _closes_a_block_it_never_opened(content):
+            return None, (
+                "frontmatter block missing its opening delimiter: the file begins with "
+                "YAML keys and later closes with '---' — add the opening '---' line"
             )
         return None, None
     try:

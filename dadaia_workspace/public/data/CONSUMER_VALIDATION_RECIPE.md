@@ -823,6 +823,51 @@ Generalize while you sweep: any doctor/gate line that prescribes a remedy must b
 that WORKS. Apply the prescribed command literally; if it cannot resolve the condition it
 names, that is a product FAIL of this statement (see also R-16).
 
+### R-22 — A resume is a way BACK IN, never a way PAST a gate
+
+Interrupt a real release-definition after its draft step (kill the driver), then run the
+recovery `lifecycle status` prints — which resumes from a step AFTER the review. **PASS
+if** the run refuses to complete: the commit gate names PLAN.md and TASKS.md as not
+`Aprovado` and prescribes `--resume-from definition_review`. **FAIL if** it completes,
+ACTIVE.md is repointed to IMPLEMENTATION, and the release is then stuck because
+implementation preflight correctly refuses artifacts the definition never approved.
+
+Generalize while you sweep: for EVERY terminal gate, ask whether its checks are scoped to
+the steps the current run happened to execute. A gate that asks the run about its
+itinerary instead of asking the disk what is there can always be stepped over by resuming
+past it. Try each workflow's recovery command as an entry point in its own right, not only
+as a continuation.
+
+### R-23 — Every block is a command you can paste, not advice about one
+
+Provoke a block on each of the four workflows — a worker that returns nothing usable is
+the easiest (point the harness at a stub), and a killed driver is the other. **PASS if**
+every `operator_command` printed anywhere begins with `dadaia ` and carries the run's own
+`--context`, `--release-id`, `--run-id` and `--resume-from <real step label>`; copy it
+verbatim into the shell and it must run. **FAIL if** any of them reads like instructions
+("re-run the workflow with …", "re-run the step that produces …", "inspect …"), names a
+placeholder, or omits a field you would have to remember.
+
+This has now been reported five times on five different routes. When you find one, do not
+stop at it: grep the whole output of the round for `re-run`, `inspect`, and `re-execute`
+and report every occurrence together — a class fixed one instance at a time is a class
+that survives.
+
+### R-24 — A malformed artifact is diagnosed where it is WRITTEN
+
+Have the author step of `backlog-definition` produce a broken item, one variant per run:
+frontmatter that opens and never closes; frontmatter with keys and a closing `---` but no
+opening one; and unparseable YAML inside a well-formed block. **PASS if** each blocks at
+`backlog_author` naming the actual defect ("unterminated", "missing its opening
+delimiter", the YAML error with line/column). **FAIL if** any is allowed through and
+surfaces later at `backlog_review_gate` as a missing status or absent intents — a
+diagnosis that names the wrong thing, at the wrong step, about a file the operator will
+then inspect looking for the wrong problem.
+
+Guard the other way too: a normal item containing a Markdown horizontal rule (`---` after
+prose) must NOT be called malformed. A false positive here is worse than the defect,
+because nothing the operator changes will make it go away.
+
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 
