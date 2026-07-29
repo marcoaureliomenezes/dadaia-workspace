@@ -825,12 +825,28 @@ names, that is a product FAIL of this statement (see also R-16).
 
 ### R-22 — A resume is a way BACK IN, never a way PAST a gate
 
-Interrupt a real release-definition after its draft step (kill the driver), then run the
-recovery `lifecycle status` prints — which resumes from a step AFTER the review. **PASS
-if** the run refuses to complete: the commit gate names PLAN.md and TASKS.md as not
-`Aprovado` and prescribes `--resume-from definition_review`. **FAIL if** it completes,
-ACTIVE.md is repointed to IMPLEMENTATION, and the release is then stuck because
-implementation preflight correctly refuses artifacts the definition never approved.
+Interrupt a real release-definition (kill the driver), then run the recovery
+`lifecycle status` prints — which resumes at or after the terminal gate. **The pass
+condition depends on which precondition is missing, and both are correct outcomes.** The
+first wording of this statement demanded `--resume-from definition_review`
+unconditionally and produced a false FAIL on R23, because it described an outcome the CLI
+cannot reach from a killed run: two independent barriers guard the gate and the ledger one
+is hit first.
+
+- **Incomplete step ledger** (the killed-driver case: the draft step wrote no payload).
+  **PASS if** the block reads `workflow-step graph incomplete: step 'definition_draft' …`
+  and prescribes `--resume-from definition_draft` — the step that must produce the missing
+  payload. **FAIL if** it prescribes `--resume-from definition_commit_gate`, i.e. the gate
+  that detected the hole: pasting that re-runs the gate, which re-detects the hole, and the
+  remedy reproduces its own condition.
+- **Complete ledger, unapproved artifacts** (reachable when the draft payload exists and
+  the review never ran). **PASS if** the commit gate names PLAN.md and TASKS.md as not
+  `Aprovado` and prescribes `--resume-from definition_review`. **FAIL if** it completes and
+  ACTIVE.md is repointed to IMPLEMENTATION, leaving the release stuck because
+  implementation preflight correctly refuses artifacts the definition never approved.
+
+In every case the remedy must name a step that can actually FIX the stated cause. That is
+the invariant; which step it is follows from the cause.
 
 Generalize while you sweep: for EVERY terminal gate, ask whether its checks are scoped to
 the steps the current run happened to execute. A gate that asks the run about its
