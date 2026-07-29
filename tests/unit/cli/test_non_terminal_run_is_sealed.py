@@ -126,3 +126,40 @@ def test_the_status_verb_seals_a_run_whose_driver_was_killed(workspace: Path) ->
         f"the recovery must be a pasteable command, not prose:\n{result.output}"
     )
     assert "--resume-from definition_draft" in result.output
+
+
+@pytest.mark.parametrize(
+    ("command", "verb"),
+    [
+        ("pipeline", "implementation-reviews"),
+        ("release_definition", "release-definition"),
+        ("backlog_definition", "backlog-definition"),
+        ("audit", "audit"),
+    ],
+)
+def test_the_recovery_names_the_verb_that_actually_ran(command: str, verb: str) -> None:
+    """Bug r22-lifecycle-status-pipeline-recovery-wrong-verb — a regression I introduced.
+
+    The implementation workflow persists ``command="pipeline"``. My map did not carry it,
+    so the fallback GUESSED and handed an implementation run a ``release-definition``
+    command. A wrong command is worse than no command: the operator runs it, and it does
+    something else entirely.
+    """
+    import types
+
+    from dadaia_workspace.cli.commands.lifecycle import _resume_command_for
+
+    run = types.SimpleNamespace(command=command, context="ctx", release_id="v0.1.0", run_id="rid")
+    assert _resume_command_for(run, "step").startswith(f"dadaia lifecycle {verb} ")
+
+
+def test_an_unknown_command_does_not_invent_a_verb() -> None:
+    """Guessing is what caused the defect; the fallback must be real and runnable."""
+    import types
+
+    from dadaia_workspace.cli.commands.lifecycle import _resume_command_for
+
+    run = types.SimpleNamespace(
+        command="something-new", context="ctx", release_id="v0.1.0", run_id="rid"
+    )
+    assert _resume_command_for(run, "step") == "dadaia lifecycle status --run-id rid"

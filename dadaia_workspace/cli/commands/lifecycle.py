@@ -305,11 +305,16 @@ def _echo_block_reason(result: object) -> None:
         typer.echo(f"\nRecovery: {remedy}")
 
 
-#: The CLI verb that runs each persisted workflow command.
+#: The CLI verb that runs each persisted workflow command. The implementation workflow
+#: persists ``"pipeline"``, which an earlier version of this map did not carry — so the
+#: fallback GUESSED, and an implementation run was handed a `release-definition` command
+#: (bug r22-lifecycle-status-pipeline-recovery-wrong-verb). A wrong command is worse than
+#: no command: the operator runs it, and it does something else.
 _VERB_BY_COMMAND = {
     "backlog_definition": "backlog-definition",
     "release_definition": "release-definition",
     "implementation_reviews": "implementation-reviews",
+    "pipeline": "implementation-reviews",
     "audit": "audit",
 }
 
@@ -322,12 +327,17 @@ def _resume_command_for(run: object, step: str) -> str:
     from memory precisely when something has already gone wrong. Every field needed is on
     the run record, so there is no reason to make them retype it.
     """
-    verb = _VERB_BY_COMMAND.get(str(getattr(run, "command", "")), "release-definition")
-    context = getattr(run, "context", "<context>")
-    release_id = getattr(run, "release_id", "<release>")
-    run_id = getattr(run, "run_id", "<run>")
+    run_id = str(getattr(run, "run_id", ""))
+    verb = _VERB_BY_COMMAND.get(str(getattr(run, "command", "")))
+    if verb is None:
+        # Never guess a verb. `lifecycle status` is always real and always runnable, and
+        # it names the step — better a correct command that shows the way than a confident
+        # one that runs the wrong workflow.
+        return f"dadaia lifecycle status --run-id {run_id}"
+    context = getattr(run, "context", "")
+    release_id = getattr(run, "release_id", "")
     base = f"dadaia lifecycle {verb} --context {context} --run-id {run_id}"
-    if verb != "backlog-definition" or release_id:
+    if release_id:
         base += f" --release-id {release_id}"
     return f"{base} --resume-from {step}"
 
