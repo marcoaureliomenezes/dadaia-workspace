@@ -884,6 +884,25 @@ Guard the other way too: a normal item containing a Markdown horizontal rule (`-
 prose) must NOT be called malformed. A false positive here is worse than the defect,
 because nothing the operator changes will make it go away.
 
+### R-25 — An artifact may not say two different things about its own status
+
+After ANY live release-definition completes, open SPEC.md, PLAN.md and TASKS.md and read
+them the way a human does. **PASS if** each declares its status exactly once and that
+declaration is `> **Status:** Aprovado`. **FAIL if** a file carries a second status
+declaration in any decorated form — a heading (`## Status: Draft`), a bullet, a
+blockquote — alongside Python's canonical line, or if the workflow reported
+`final_phase: implementation` while any artifact still reads Draft to a reader.
+
+This is the shape that produced a false completed definition on R23/F-26: the single-
+writer normalization enumerated the prefixes workers had used so far, a live model wrote
+the status as a Markdown heading, and Python inserted its canonical line ALONGSIDE it. The
+gate saw Aprovado, the human saw Draft, and the release entered IMPLEMENTATION.
+
+Generalize while you sweep: wherever the product NORMALIZES worker-authored text to a
+canonical form, try the ordinary variants a model actually writes — headings, bold, bullets,
+extra whitespace, a missing accent — and check the result declares itself exactly once. Any
+normalizer written as a list of known shapes is one live worker behind.
+
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 
