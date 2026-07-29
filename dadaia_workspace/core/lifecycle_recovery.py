@@ -39,6 +39,7 @@ def resume_command(
     release_id: str = "",
     harness: str = "",
     note: str = "",
+    env: tuple[str, ...] = (),
 ) -> str:
     """A complete, pasteable resume line for one run.
 
@@ -48,11 +49,20 @@ def resume_command(
     An unknown *command* never guesses a verb. ``lifecycle status`` is always real, always
     runnable, and names the step it is stuck on — a correct command that shows the way
     beats a confident one that runs the wrong workflow.
+
+    *env* holds ``NAME=value`` assignments the command needs in order to work, prefixed
+    onto the line so pasting it is sufficient. Bug
+    ``r23-sandbox-block-operator-command-omits-required-bypass``: a Codex worker killed by
+    an uncreatable sandbox namespace got a block that EXPLAINED the fix
+    (``DADAIA_CODEX_SANDBOX=danger-bypass``) and a command without it, so pasting the
+    command re-ran straight into the same failure. A remedy correct except for a variable
+    the operator has to already know is a remedy only for people who did not need it.
     """
     verb = VERB_BY_COMMAND.get(command)
+    prefix = "".join(f"{assignment} " for assignment in env)
     if verb is None:
-        return f"dadaia lifecycle status --run-id {run_id}"
-    parts = [f"dadaia lifecycle {verb}"]
+        return f"{prefix}dadaia lifecycle status --run-id {run_id}"
+    parts = [f"{prefix}dadaia lifecycle {verb}"]
     if context:
         parts.append(f"--context {context}")
     if release_id:

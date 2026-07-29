@@ -848,6 +848,14 @@ is hit first.
 In every case the remedy must name a step that can actually FIX the stated cause. That is
 the invariant; which step it is follows from the cause.
 
+**And the remedy must be SELF-CONTAINED, including the environment.** A block whose cause
+is environmental — the Codex sandbox namespace that cannot be created in a nested
+container is the standing example — must carry the assignment on the command line
+(`DADAIA_CODEX_SANDBOX=danger-bypass dadaia lifecycle …`), not only in the prose that
+explains it. **FAIL if** pasting the printed command verbatim reproduces the same failure
+because a variable named in the reason was not on the line. Test this by literally copying
+each `operator_command` into the shell with nothing added.
+
 Generalize while you sweep: for EVERY terminal gate, ask whether its checks are scoped to
 the steps the current run happened to execute. A gate that asks the run about its
 itinerary instead of asking the disk what is there can always be stepped over by resuming

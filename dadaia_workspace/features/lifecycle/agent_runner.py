@@ -125,6 +125,29 @@ def _compact_block_detail(detail: dict[str, str], *, limit: int = 8000) -> str:
     return rendered
 
 
+#: Signature fragments that mean the block was caused by an uncreatable Codex sandbox.
+#: Matched together, never singly, so prose that merely mentions a sandbox cannot trip it —
+#: a false positive here hands the operator a privilege downgrade they never needed.
+_SANDBOX_SIGNATURE = ("sandbox-failure signature", "namespace")
+
+
+def sandbox_env_for_reason(reason: str) -> tuple[str, ...]:
+    """The environment assignment a sandbox-caused block's remedy must carry.
+
+    Bug ``r23-sandbox-block-operator-command-omits-required-bypass``: the block explained
+    that ``DADAIA_CODEX_SANDBOX=danger-bypass`` was the fix and then printed a command
+    without it, so pasting the command re-ran into the identical failure.
+
+    Detection lives HERE, where the block is built, rather than at each call site. Every
+    recovery defect in this ledger got its second life from a rule that lived somewhere the
+    next construction site did not have to visit.
+    """
+    lowered = reason.lower()
+    if all(part in lowered for part in _SANDBOX_SIGNATURE):
+        return ("DADAIA_CODEX_SANDBOX=danger-bypass",)
+    return ()
+
+
 def _safe_filename_segment(value: str) -> str:
     """Sanitize *value* into a single filesystem-safe filename segment.
 
@@ -671,6 +694,10 @@ class LifecycleAgentRunner:
                 step=step,
                 context=lifecycle_run.context,
                 release_id=lifecycle_run.release_id or "",
+                # A sandbox-caused block needs its bypass ON the line, or pasting the
+                # remedy reproduces the failure it came from (r23-sandbox-block-
+                # operator-command-omits-required-bypass).
+                env=sandbox_env_for_reason(reason),
                 note="inspect the step payload for the worker's own output first",
             ),
             reason=reason,
