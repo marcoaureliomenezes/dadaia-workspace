@@ -763,7 +763,7 @@ def _apply_closure_removal_for_release(
 
     lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=context)
     removal = lifecycle.remove(release_id=release_id)
-    return {
+    result: dict[str, Any] = {
         "removed": [
             action.slug
             for action in removal.actions
@@ -776,6 +776,47 @@ def _apply_closure_removal_for_release(
             action.slug for action in removal.actions if action.action.value == "unchanged"
         ],
     }
+    # Bug r18-closure-leaves-consumed-backlog-item: on a live chain the SPEC declared its
+    # Consumes line and the ledger was written correctly, yet the item stayed in the live
+    # backlog — and closure said nothing, so the operator only learned of it later, from
+    # `backlog doctor` reporting BL-STALE on a release it believed was finished.
+    #
+    # So the gate now checks its own work: every slug the ledger claims was consumed must
+    # be gone from specs/backlog/. Reporting a leftover is not the same as fixing whatever
+    # left it there, but a silent leftover is what turns a closed release into a stale tree
+    # nobody expects.
+    leftovers = _consumed_slugs_still_present(
+        workspace_root, context=context, release_id=release_id
+    )
+    if leftovers:
+        result["stale_after_closure"] = leftovers
+    return result
+
+
+def _consumed_slugs_still_present(
+    workspace_root: Path, *, context: str, release_id: str
+) -> list[str]:
+    """Slugs the consumed-backlog ledger claims, that are STILL under specs/backlog/."""
+    import json as _json
+
+    from dadaia_workspace import container
+
+    try:
+        specs_dir = container._context_specs_dir(workspace_root, context)
+    except Exception:  # noqa: BLE001 — a self-check must never break the closure it audits
+        return []
+    ledger = specs_dir / "_archive" / release_id / "consumed_backlog.json"
+    try:
+        recorded = _json.loads(ledger.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    claimed = [
+        str(entry.get("slug"))
+        for entry in recorded.get("consumed", [])
+        if isinstance(entry, dict) and entry.get("slug")
+    ]
+    backlog = specs_dir / "backlog"
+    return [slug for slug in claimed if (backlog / f"{slug}.md").is_file()]
 
 
 def _resolve_default_harness(harness: str) -> str:

@@ -544,7 +544,8 @@ class LifecyclePipeline:
                     if not lint_ok:
                         blocked_lint = BlockedState(
                             operator_command=(
-                                "re-run the same command with --resume-from <this step>, or use a fresh --run-id to start over deliberately"
+                                "re-run the same command with --resume-from close, or use a fresh "
+                                "--run-id to start over deliberately"
                             ),
                             reason=(
                                 "close blocked: memory atoms carry lint findings — closure "
@@ -571,7 +572,8 @@ class LifecyclePipeline:
                     if tests_ok is False:
                         blocked_close = BlockedState(
                             operator_command=(
-                                "re-run the same command with --resume-from <this step>, or use a fresh --run-id to start over deliberately"
+                                "re-run the same command with --resume-from close, or use a fresh "
+                                "--run-id to start over deliberately"
                             ),
                             reason=(
                                 "close blocked: executed test validation is not green — "

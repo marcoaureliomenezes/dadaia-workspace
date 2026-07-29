@@ -84,7 +84,8 @@ class LifecycleStateMachine:
         if missing:
             blocked = BlockedState(
                 operator_command=(
-                    "re-run the step that produces the missing evidence with --resume-from <that step>"
+                    f"re-run the step that produces the missing evidence with --resume-from "
+                    f"{transition_input.current_step or run.current_step}"
                 ),
                 reason="missing required transition evidence",
                 blocked_at_step=transition_input.current_step or run.current_step,

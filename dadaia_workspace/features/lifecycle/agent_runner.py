@@ -658,7 +658,9 @@ class LifecycleAgentRunner:
                 full_detail["diagnostic_ref"] = ref
         return BlockedState(
             operator_command=(
-                "re-run the workflow with --resume-from <this step>; inspect the step payload for the worker's own output first"
+                f"re-run the workflow with --resume-from "
+                f"{data.current_step or lifecycle_run.current_step}; inspect the step "
+                "payload for the worker's own output first"
             ),
             reason=reason,
             blocked_at_step=data.current_step or lifecycle_run.current_step,

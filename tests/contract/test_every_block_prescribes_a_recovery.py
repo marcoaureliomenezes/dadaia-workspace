@@ -66,3 +66,37 @@ def test_the_ratchet_would_notice_a_block_without_one() -> None:
     calls = list(_blocked_state_calls(tree))
     assert calls, "the scanner did not even find a BlockedState call"
     assert "operator_command" not in {kw.arg for kw in calls[0].keywords}
+
+
+_PLACEHOLDERS = ("<this step>", "<that step>", "<step>", "<name>", "<run-id>", "TODO")
+
+
+def test_no_recovery_is_a_placeholder_instead_of_a_command() -> None:
+    """A remedy the operator cannot paste is not a remedy.
+
+    Bug ``r18-r20-missing-spec-recovery-placeholder``: the bulk fix for the previous
+    report satisfied the ratchet above by passing an ``operator_command`` — whose text was
+    the literal ``--resume-from <this step>``. The field was present and the line was
+    printed and it still left the operator with nothing to run. The check that existed
+    measured presence; presence was never the point.
+    """
+    offenders: list[str] = []
+    for path in sorted(_LIFECYCLE.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        tree = ast.parse(text)
+        for call in _blocked_state_calls(tree):
+            for kw in call.keywords:
+                if kw.arg != "operator_command":
+                    continue
+                rendered = ast.unparse(kw.value)
+                for token in _PLACEHOLDERS:
+                    if token in rendered:
+                        rel = path.relative_to(_LIFECYCLE.parents[2]).as_posix()
+                        offenders.append(f"{rel}:{call.lineno} -> {token}")
+
+    assert not offenders, (
+        "these recoveries hand the operator a placeholder instead of a command:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nInterpolate the real step label. A remedy that cannot be pasted is a "
+        "remedy nobody can follow, which is the whole defect this ratchet exists for."
+    )

@@ -978,7 +978,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             except MalformedHandoffError as exc:
                 blocked = BlockedState(
                     operator_command=(
-                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                        f"re-run with --resume-from {step.label}; if the step graph itself is "
+                        "wrong this is a library defect — register it with "
+                        "`dadaia bugs append`"
                     ),
                     reason=f"worker output violates {step.produces}: {exc}",
                     blocked_at_step=step.label,
@@ -1078,7 +1080,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
                 blocked = BlockedState(
                     operator_command=(
-                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                        f"re-run with --resume-from {step.label}; if the step graph itself is "
+                        "wrong this is a library defect — register it with "
+                        "`dadaia bugs append`"
                     ),
                     reason=f"required upstream handoff unavailable: {exc}",
                     blocked_at_step=step.label,
@@ -1226,7 +1230,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             if s.produces is not None and _find_or_recover(s.label) is None:
                 return run, BlockedState(
                     operator_command=(
-                        "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                        f"re-run with --resume-from {step.label}; if the step graph itself is "
+                        "wrong this is a library defect — register it with "
+                        "`dadaia bugs append`"
                     ),
                     reason=f"workflow-step graph incomplete: step {s.label!r} declared "
                     f"produces={s.produces!r} but wrote no ledger payload (and no "
@@ -1238,7 +1244,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 if _find_or_recover(producer) is None:
                     return run, BlockedState(
                         operator_command=(
-                            "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                            f"re-run with --resume-from {step.label}; if the step graph itself is "
+                            "wrong this is a library defect — register it with "
+                            "`dadaia bugs append`"
                         ),
                         reason=f"workflow-step graph incomplete: {s.label!r} consumes "
                         f"{producer!r} which has no ledger payload (and no persisted "
@@ -1252,7 +1260,9 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 if not acked and producer not in recovered:
                     return run, BlockedState(
                         operator_command=(
-                            "re-run with --resume-from <this step>; if the step graph itself is wrong this is a library defect — register it with `dadaia bugs append`"
+                            f"re-run with --resume-from {step.label}; if the step graph itself is "
+                            "wrong this is a library defect — register it with "
+                            "`dadaia bugs append`"
                         ),
                         reason=f"workflow-step graph incomplete: {s.label!r} never recorded "
                         f"consumption of {producer!r}",
