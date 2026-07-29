@@ -817,28 +817,42 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 self._blocked_sr(step, blocked),
             )
 
+        # Bug r17-backlog-gate-accepts-preexisting-unresolved-existing-intent: this swept
+        # only the CHANGED slugs, so a PRE-EXISTING item whose ref resolves to nothing
+        # sailed through while `backlog doctor` rejected the same tree — the identical
+        # producer/validator drift already fixed for missing intents[] one round earlier,
+        # left in place for unresolved refs. The gate's contract is not "the author
+        # behaved"; it is "the backlog this run leaves behind is valid", so sweep ALL and
+        # say whether the offender was authored here or pre-existed.
         overlap: list[Classification] = []
-        for slug in changed:
-            if slug in unresolved_by_slug:
-                blocked = BlockedState(
-                    reason=(
-                        f"backlog_review_gate: authored item {slug!r} carries unresolved "
-                        f"subject(s): {'; '.join(unresolved_by_slug[slug])}. Correct each "
-                        "ref against `dadaia backlog subjects`, or — when the item "
-                        "INTRODUCES that surface — declare it with 'surface: new' on the "
-                        "intent subject; then resume."
-                    ),
-                    blocked_at_step=step.label,
-                    resume_token=run.idempotency_key,
-                    operator_command=resume_command,
-                    detail={"slug": slug},
-                )
-                return (
-                    overlap,
-                    self._with_block(run, step.label, blocked),
-                    self._blocked_sr(step, blocked),
-                )
+        for slug in sorted(unresolved_by_slug):
+            authored = slug in changed
+            origin = (
+                f"authored item {slug!r}"
+                if authored
+                else f"pre-existing item {slug!r} (NOT written by this run)"
+            )
+            blocked = BlockedState(
+                reason=(
+                    f"backlog_review_gate: {origin} carries unresolved "
+                    f"subject(s): {'; '.join(unresolved_by_slug[slug])}. Correct each "
+                    "ref against `dadaia backlog subjects`, or — when the item "
+                    "INTRODUCES that surface — declare it with 'surface: new' on the "
+                    "intent subject; then resume. Run `dadaia backlog doctor` to see "
+                    "every offender at once."
+                ),
+                blocked_at_step=step.label,
+                resume_token=run.idempotency_key,
+                operator_command=resume_command,
+                detail={"slug": slug, "authored_by_this_run": "true" if authored else "false"},
+            )
+            return (
+                overlap,
+                self._with_block(run, step.label, blocked),
+                self._blocked_sr(step, blocked),
+            )
 
+        for slug in changed:
             rest = tuple(bound for other, bound in after.items() if other != slug)
             verdicts = classify(after[slug], rest)
             overlap.extend(verdicts)

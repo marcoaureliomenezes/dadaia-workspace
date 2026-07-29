@@ -600,10 +600,17 @@ never exercised the live backlog path was false confidence).
 
 ### R-11 — Resume never collides with its own leftovers (ledger-owned immutability)
 
-- Drive release-definition to a spent-revision-budget block (review rejects twice);
-  then run the prescribed `--resume-from <create step>` on the SAME run-id. Also:
-  interrupt a run between payload write and state save (or plant a stray
-  `<step>-attempt-0.step-payload.json` with no ledger record) and resume.
+- **Do NOT try to reach a "spent-review-budget block" — it does not exist by design.**
+  An earlier version of this item required driving a review to REJECT twice and then
+  resuming from a block. The product deliberately makes a post-budget REJECTED review
+  **advisory**: the step proceeds carrying the rejection as a warning, precisely so a
+  model verdict can never deadlock a release (`_fragment_gate`, "a model verdict is
+  advisory, never terminal"). The shipped CLI also has no deterministic rejection
+  injector, so the scenario is unreachable AND contradicts the intended semantics.
+  Requiring it produced a FAIL against correct behaviour on R17.
+- Instead: interrupt a run between payload write and state save (or plant a stray
+  `<step>-attempt-0.step-payload.json` with no ledger record) and resume from the
+  prescribed step on the SAME run-id.
 - **PASS if:** every prescribed resume executes — no `already recorded step ...
   (immutable payload ...)` error ever surfaces on a path the error text itself
   prescribed (bug release-definition-retry-collides-with-immutable-tasks-payload).
