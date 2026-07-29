@@ -10,11 +10,11 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field, replace
 
-from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS, BugEvent, BugEventKind
-
 # The store is an infrastructure concern; the service holds it behind the ``BugStore``
 # core Protocol (DI seam) — the concrete ``JsonlBugStore`` is injected at the CLI
 # composition root, so features never imports infrastructure (features-no-infrastructure).
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS, BugEvent, BugEventKind
 from dadaia_workspace.core.protocols.bug_store import BugStore
 
 __all__ = ["BugService", "BugState", "BugStats"]
@@ -49,9 +49,30 @@ class BugService:
     def __init__(self, store: BugStore) -> None:
         self._store = store
 
-    def append_event(self, event: BugEvent) -> None:
-        """Redact ``notes`` then append the event (append-only, never rewrites history)."""
-        self._store.append_event(event.redact())
+    def append_event(self, event: BugEvent) -> object:
+        """Redact ``notes`` then append the event (append-only, never rewrites history).
+
+        A TERMINAL event over a ``bug_id`` that was never ``reported`` is refused. Bug
+        ``r19-bugs-resolved-event-accepted-without-prior-reported``: the ledger accepted a
+        stray ``resolved`` and folded it into the resolved count, so a bug nobody ever
+        opened could be closed. The ledger exists to be the evidence trail; an entry with
+        no opening event is the one shape that cannot be evidence of anything.
+
+        The operator harm is sharper than the accounting: a mistyped ``--bug-id`` on a
+        close silently mints a PHANTOM resolved bug instead of saying the id is unknown,
+        so the real bug stays open and the typo looks like progress.
+        """
+        if event.event in TERMINAL_EVENTS:
+            known = {state.bug_id for state in self._fold().values()}
+            if event.bug_id not in known:
+                raise DadaiaError(
+                    f"cannot append {event.event!r} for {event.bug_id!r}: no `reported` "
+                    "event opened that bug. A stream opens with `reported` and carries at "
+                    "most one terminal event. If you are closing a real bug, check the id "
+                    "for a typo (`dadaia bugs status` lists the open ones); if the bug is "
+                    "genuinely new, append its `reported` event first."
+                )
+        return self._store.append_event(event.redact())
 
     def _fold(self) -> dict[str, BugState]:
         """Reduce the event stream to current per-``bug_id`` state.

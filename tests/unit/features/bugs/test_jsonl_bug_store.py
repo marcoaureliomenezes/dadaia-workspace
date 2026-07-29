@@ -9,6 +9,7 @@ regression), and fold coherence (status/stats/archived).
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -105,8 +106,30 @@ def test_redact_matrix_scrubs_every_free_text_field(field: str, tmp_path: Path) 
 
     # End-to-end: BugService.append_event persists the redacted value, not the raw one.
     store = JsonlBugStore(tmp_path / field)
-    BugService(store).append_event(event)
-    persisted = list(store.iter_events())[0]
+    service = BugService(store)
+    if event.event != "reported":
+        # A terminal event now requires an opening `reported` (bug
+        # r19-bugs-resolved-event-accepted-without-prior-reported). This test is about
+        # REDACTION, so it opens the stream properly instead of being exempted from the
+        # lifecycle rule — the shortcut it used to take is the defect that rule closes.
+        service.append_event(
+            replace(
+                event,
+                event="reported",
+                evidence=None,
+                severity="LOW",
+                surface="s",
+                component="c",
+                context="ctx",
+                symptom="sy",
+                repro="r",
+                expected="e",
+                notes="n",
+                title="t",
+            )
+        )
+    service.append_event(event)
+    persisted = [e for e in store.iter_events() if getattr(e, field) is not None][0]
     persisted_value = getattr(persisted, field)
     assert persisted_value is not None
     assert "marco" not in persisted_value
