@@ -408,6 +408,68 @@ def _seal_non_terminal_run(workspace_root: Path, run_id: str) -> str | None:
     return reason
 
 
+def _seal_post_step_failure(workspace_root: Path, run_id: str, error: str) -> None:
+    """Record a post-step failure on the run the command has just refused to call a success.
+
+    Bug ``r22-release-definition-completes-with-consumes-bind-error``: the workflow
+    completed, the producer post-step raised (a ``**Consumes:**`` slug that is not a live
+    backlog item), and the command correctly printed BLOCKED and exited 3 — while the
+    ledger kept saying COMPLETED. Both halves were right and nothing joined them, so the
+    operator was told one thing and every later reader (``lifecycle status``, the panel,
+    the next preflight) was told the other. The ledger wins by default, because it is what
+    tooling reads; a false COMPLETED lets the next phase start on a definition that never
+    consumed its backlog.
+
+    :func:`_persisted_disagrees_with_success` guards the mirror direction — the command
+    claims success the disk does not support. This is the same law pointing the other way.
+    """
+    from dadaia_workspace import container
+    from dadaia_workspace.core.models.lifecycle import (
+        BlockedState,
+        LifecyclePhase,
+        LifecycleRunStatus,
+    )
+
+    try:
+        store = container.build_lifecycle_run_store(workspace_root)
+        run = store.load(run_id)
+    except OSError:
+        # Narrow deliberately. A blanket `except Exception` here swallowed a NameError from
+        # a missing local import and this guard silently did nothing while looking applied —
+        # the same shape that made an earlier dead-context guard a no-op. Only I/O against
+        # the ledger is legitimately survivable; a programming error must not be absorbed
+        # by the thing that exists to stop failures from being invisible.
+        return
+    # A recorded block is the more specific diagnosis; the generic post-step reason must
+    # never replace it (same precedence rule the non-terminal seal obeys).
+    if run is None or run.blocked is not None:
+        return
+    step = run.current_step or "<step>"
+    # FAILED, not BLOCKED. The store refuses to move a run OUT of a terminal state, and it
+    # is right to: that monotonicity is what makes concurrent drivers safe to accept
+    # (r14-implementation-recovery-reverts-terminal-run). FAILED is terminal, so this is a
+    # legal terminal→terminal transition — and it is also the honest word. The run is over
+    # and it did not succeed; the recovery rides on the `blocked` field, which every reader
+    # already consults for the reason and the command.
+    sealed = dataclasses.replace(
+        run,
+        phase=LifecyclePhase.BLOCKED,
+        status=LifecycleRunStatus.FAILED,
+        blocked=BlockedState(
+            reason=(
+                f"the workflow completed but its post-step failed: {error}. The definition "
+                "is not consumable until this resolves."
+            ),
+            blocked_at_step=step,
+            resume_token=run.idempotency_key,
+            operator_command=_resume_command_for(run, step),
+            detail={"post_step_error": error, "gate": "post-step-seal-v1"},
+        ),
+    )
+    with contextlib.suppress(Exception):
+        store.save(sealed)
+
+
 def _persisted_disagrees_with_success(workspace_root: Path, run_id: str) -> str | None:
     """Return a message when the CLI is about to claim success the DISK does not support.
 
@@ -757,6 +819,11 @@ def release_define(
     if sealed is not None:
         succeeded = False
         post_step_error = sealed
+    elif post_step_error is not None:
+        # The run is COMPLETED and this command is about to call it BLOCKED. Write that
+        # back, or the ledger every later reader consults will contradict what the
+        # operator was just told (bug r22-release-definition-completes-with-consumes-bind-error).
+        _seal_post_step_failure(workspace_root, result.run_id, post_step_error)
     elif succeeded:
         disagreement = _persisted_disagrees_with_success(workspace_root, result.run_id)
         if disagreement is not None:
