@@ -45,6 +45,7 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core.lifecycle_recovery import resume_command
 from dadaia_workspace.core.models.backlog import SubjectKind, is_intents_exempt
 from dadaia_workspace.core.models.lifecycle import (
     HARNESS_CLI_NAMES,
@@ -97,7 +98,10 @@ from dadaia_workspace.features.lifecycle.workflow_handoffs import (
     WorkflowHandoffResolver,
     durable_payload_from_result,
 )
-from dadaia_workspace.features.lifecycle.workflows._fragment_gate import _FragmentAssemblyMixin
+from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
+    _FragmentAssemblyMixin,
+    next_attempt_for,
+)
 
 __all__ = [
     "AuthoredItem",
@@ -515,6 +519,46 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         return "\n".join(lines)
 
     # -- real disk state: the backlog snapshot ---------------------------
+
+    def _no_delta_block(self, run: LifecycleRun, step: BacklogStep) -> BlockedState | None:
+        """BLOCK when the author step accepted without writing or changing anything.
+
+        Bug ``r23-backlog-author-accepts-no-delta-before-review-gate``: a resumed
+        ``backlog_author`` was accepted with a persisted payload and no new or changed item
+        on disk, and the failure surfaced later at ``backlog_review_gate`` as "nothing to
+        validate". The gate was right and it was the wrong place to find out: the step that
+        was supposed to write the file is the step that must answer for not writing it.
+
+        Same principle the malformed-frontmatter check already follows, and the one recipe
+        R-24 states: an artifact defect is diagnosed WHERE the artifact is written. A block
+        three steps downstream sends the operator to inspect the wrong thing.
+        """
+        if step.label != "backlog_author":
+            return None
+        before = getattr(self, "_before_snapshot", None)
+        if before is None:
+            return None
+        if self._changed_slugs(before, self._backlog_snapshot()):
+            return None
+        return BlockedState(
+            reason=(
+                "backlog_author: the step reported success but wrote no new or changed "
+                "item under specs/backlog/. A payload is not a deliverable — the worker "
+                "produced nothing to review."
+            ),
+            blocked_at_step=step.label,
+            resume_token=run.idempotency_key,
+            operator_command=resume_command(
+                command=run.command,
+                run_id=run.run_id,
+                step="backlog_author",
+                context=self._context,
+                release_id=self._release_id,
+                harness=HARNESS_CLI_NAMES.get(self._default_kind, "codex"),
+                note="inspect the step payload for the worker's own output first",
+            ),
+            detail={"gate": "author-delta-v1"},
+        )
 
     def _malformed_authored_block(
         self, run: LifecycleRun, step: BacklogStep
@@ -1061,7 +1105,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             # as "status missing" — which names the wrong thing and loses the worker
             # diagnostic. Malformed IS not-delivered: block here, at the step that
             # produced it, while the worker's own trace is still attached.
-            blocked = self._malformed_authored_block(run, step)
+            blocked = self._no_delta_block(run, step) or self._malformed_authored_block(run, step)
         if blocked is None and self._handoff_resolver is not None:
             payload = durable_payload_from_result(
                 worker_result, fallback_summary=step.label, is_review=False
@@ -1079,7 +1123,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             run, _ = self._handoff_resolver.produce(
                 run,
                 producer_step=step.label,
-                attempt=0,
+                # A resume is a NEW attempt, never a rewrite of the interrupted one
+                # (r23-resume-overwrites-ledger-owned-step-payload).
+                attempt=next_attempt_for(run.workflow_steps, step.label),
                 output_schema=fragment.output_schema,
                 payload=payload,
                 retention_mode=(

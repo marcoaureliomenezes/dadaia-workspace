@@ -180,8 +180,15 @@ def test_gate_blocks_when_author_writes_nothing(tmp_path: Path) -> None:
 
     assert result.completed is False
     assert result.blocked is not None
-    assert result.blocked.blocked_at_step == "backlog_review_gate"
-    assert "no new/changed item" in result.blocked.reason
+    # Bug r23-backlog-author-accepts-no-delta-before-review-gate: this used to assert
+    # `backlog_review_gate`, i.e. it PINNED the defect. The gate was right that nothing
+    # had been produced and it was the wrong place to find out — the step that was
+    # supposed to write the file must answer for not writing it, or the operator goes off
+    # to inspect a gate three steps from where the work did not happen. Same rule the
+    # malformed-frontmatter check follows and recipe R-24 states.
+    assert result.blocked.blocked_at_step == "backlog_author"
+    assert "wrote no new or changed item" in result.blocked.reason
+    assert (result.blocked.operator_command or "").startswith("dadaia lifecycle")
 
 
 def test_gate_blocks_new_item_overlapping_existing_anchor(tmp_path: Path) -> None:

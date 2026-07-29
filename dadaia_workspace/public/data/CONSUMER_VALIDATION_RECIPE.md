@@ -911,6 +911,20 @@ canonical form, try the ordinary variants a model actually writes — headings, 
 extra whitespace, a missing accent — and check the result declares itself exactly once. Any
 normalizer written as a list of known shapes is one live worker behind.
 
+### R-26 — A resume adds to the record; it never rewrites it
+
+Interrupt a workflow after a producing step, then run the prescribed resume. Read
+`.dadaia/states/lifecycle/<run>.json` before and after. **PASS if** the earlier attempt's
+ledger record survives untouched — same `payload_ref`, same `content_hash` — and the
+resumed run recorded a NEW attempt alongside it, with downstream steps consuming the
+newest. **FAIL if** the record for `attempt-0` still points at the same payload file while
+its `content_hash` changed: the interrupted attempt's evidence was overwritten in place,
+which is exactly what an operator needs to read after an interruption.
+
+Sweep it across all four workflows and every producing step, not just the one you
+interrupted — the numbering is per produce site, so one site fixed proves nothing about
+the others.
+
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`
 

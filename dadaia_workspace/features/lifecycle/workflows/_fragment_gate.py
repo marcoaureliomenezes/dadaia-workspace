@@ -160,6 +160,21 @@ class _StepOutcome:
     blocked: BlockedState | None = None
 
 
+def next_attempt_for(ledger: WorkflowStepLedger, producer_step: str) -> int:
+    """The attempt number a produce for *producer_step* must use.
+
+    Bug ``r23-resume-overwrites-ledger-owned-step-payload``: every produce site hard-coded
+    ``attempt=0``, so a resumed step produced at the SAME ledger key, ``upsert`` replaced
+    the record, and the interrupted attempt's payload and content hash ceased to exist —
+    destroying precisely the evidence an operator wants after an interruption.
+
+    The data plane is immutable per ``(step, attempt)`` and always was. An attempt is not a
+    slot to reuse; a resume is a NEW one.
+    """
+    latest = ledger.latest_attempt(producer_step)
+    return 0 if latest is None else latest.attempt + 1
+
+
 def _graph_recovery(run: LifecycleRun, step_label: str) -> str:
     """The recovery for every step-graph block: a real command, not advice about one.
 
@@ -1092,8 +1107,15 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         digests: list[str] = []
         for producer in step.consumes:
             try:
+                # The LATEST attempt, never a literal zero: after a resume, attempt 0 is
+                # the interrupted one, and consuming it would be strictly worse than the
+                # overwrite this numbering replaced
+                # (r23-resume-overwrites-ledger-owned-step-payload).
+                latest_record = run.workflow_steps.latest_attempt(producer)
                 resolved = self._handoff_resolver.resolve_required(
-                    run, producer_step=producer, attempt=0
+                    run,
+                    producer_step=producer,
+                    attempt=0 if latest_record is None else latest_record.attempt,
                 )
             except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
                 blocked = BlockedState(
@@ -1111,12 +1133,17 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         if self._handoff_resolver is None:
             return run
         for producer in step.consumes:
+            # Ack the attempt actually consumed. Acking attempt 0 after a resume marks the
+            # wrong payload as consumed, which drives the produced -> consumed_all
+            # transition and thus cleanup eligibility for a payload nobody read.
+            produced = run.workflow_steps.latest_attempt(producer)
+            consumed = run.workflow_steps.latest_attempt(step.label)
             run = self._handoff_resolver.record_consumption(
                 run,
                 producer_step=producer,
-                producer_attempt=0,
+                producer_attempt=0 if produced is None else produced.attempt,
                 consumer_step=step.label,
-                consumer_attempt=0,
+                consumer_attempt=0 if consumed is None else consumed.attempt,
             )
         return run
 
@@ -1145,7 +1172,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
         run, _ = self._handoff_resolver.produce(
             run,
             producer_step=step.label,
-            attempt=0,
+            attempt=next_attempt_for(run.workflow_steps, step.label),
             output_schema=step.produces,
             payload=payload,
             declared_consumers=consumers,
