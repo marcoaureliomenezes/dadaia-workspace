@@ -163,3 +163,24 @@ def test_an_unknown_command_does_not_invent_a_verb() -> None:
         command="something-new", context="ctx", release_id="v0.1.0", run_id="rid"
     )
     assert _resume_command_for(run, "step") == "dadaia lifecycle status --run-id rid"
+
+
+def test_the_seal_fires_even_when_the_body_raises(workspace: Path) -> None:
+    """Bug r22-codex-sandbox-invalid-mode-traceback (the ledger half).
+
+    The previous guard sat AFTER the workflow returned, so it never fired when the
+    workflow RAISED — an invalid Codex sandbox mode aborted step two and left the ledger
+    running with no block. Same class, yet another route; a guarantee that depends on the
+    body succeeding is not a guarantee, which is what `finally` is for.
+    """
+    from dadaia_workspace.cli.commands.lifecycle import _sealing_run
+
+    _save(workspace, "boom", LifecycleRunStatus.RUNNING, "backlog_author")
+
+    with pytest.raises(RuntimeError):
+        with _sealing_run(workspace, "boom"):
+            raise RuntimeError("the worker blew up mid-step")
+
+    sealed = JsonLifecycleRunStore(workspace).load("boom")
+    assert sealed is not None and sealed.status is LifecycleRunStatus.BLOCKED
+    assert sealed.blocked is not None and sealed.blocked.operator_command

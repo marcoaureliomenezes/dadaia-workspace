@@ -6,7 +6,7 @@ import contextlib
 import dataclasses
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
@@ -319,6 +319,24 @@ _VERB_BY_COMMAND = {
 }
 
 
+@contextlib.contextmanager
+def _sealing_run(workspace_root: Path, run_id: str) -> Iterator[None]:
+    """Seal a still-RUNNING run on the way out, however the body ends.
+
+    The previous version of this guard sat AFTER the workflow returned, so it never fired
+    when the workflow RAISED — an invalid Codex sandbox mode, for instance, aborted step
+    two and left the ledger `running` with no block
+    (bug r22-codex-sandbox-invalid-mode-traceback, evidence half). That is the same class
+    arriving by yet another route, which is what a `finally` exists for: the guarantee
+    must not depend on the body succeeding.
+    """
+    try:
+        yield
+    finally:
+        with contextlib.suppress(Exception):
+            _seal_non_terminal_run(workspace_root, run_id)
+
+
 def _resume_command_for(run: object, step: str) -> str:
     """A full, pasteable resume line for THIS run — never prose around a flag.
 
@@ -541,13 +559,14 @@ def backlog_define(
     # The author-first default path: ONE model call (backlog_author) + the REAL
     # post-authoring Python gate over what landed on disk (bug
     # backlog-definition-empty-demand-wiring). --grill opts into the intake step.
-    result = workflow.run(
-        run_id,
-        sequence=sequence,
-        operator_demand=demand,
-        grill=grill,
-        resume_from=resume_from,
-    )
+    with _sealing_run(workspace_root, run_id):
+        result = workflow.run(
+            run_id,
+            sequence=sequence,
+            operator_demand=demand,
+            grill=grill,
+            resume_from=resume_from,
+        )
 
     status = (
         LifecycleCommandStatus.OK.value
@@ -708,13 +727,14 @@ def release_define(
     # restatement and is skipped, saving one worker session. Applied on RESUME too:
     # the resumed sequence must keep the shape of the original run (which never
     # produced a release_scope payload to consume).
-    result = workflow.run(
-        run_id,
-        sequence,
-        resume_from=resume_from,
-        skip_scope=upstream_prefix is not None,
-        operator_demand=demand,
-    )
+    with _sealing_run(workspace_root, run_id):
+        result = workflow.run(
+            run_id,
+            sequence,
+            resume_from=resume_from,
+            skip_scope=upstream_prefix is not None,
+            operator_demand=demand,
+        )
 
     # Producer post-step (SPEC §3.2): on a COMPLETED definition, parse the release SPEC's
     # **Consumes:** line, bind the declared slugs' anchors through the R1 registry, and write
@@ -1234,7 +1254,8 @@ def audit(
         # traceback, and without synthesizing a specs/releases/<id>/ tree.
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(3) from None
-    result = workflow.run(run_id, sequence=sequence, resume_from=resume_from)
+    with _sealing_run(workspace_root, run_id):
+        result = workflow.run(run_id, sequence=sequence, resume_from=resume_from)
     _emit_wire_result("audit", result, json_output=json_output)
 
 
@@ -1583,7 +1604,8 @@ def pipeline(
         ),
         max_review_retries=max_review_retries,
     )
-    result = pipe.run(run_id, steps, resume_from=resume_from)
+    with _sealing_run(workspace_root, run_id):
+        result = pipe.run(run_id, steps, resume_from=resume_from)
     closure_gate = (
         _apply_closure_removal_for_release(workspace_root, context=context, release_id=release_id)
         if result.completed
