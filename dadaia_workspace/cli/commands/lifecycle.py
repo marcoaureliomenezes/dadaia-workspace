@@ -1127,6 +1127,15 @@ def _enforce_preflight_gate(
         )
     else:
         typer.echo(f"{LifecycleCommandStatus.BLOCKED.value} {message}")
+        # Bug r17-r20-preflight-block-missing-recovery: the preflight has its OWN output
+        # path, so it printed the reason and swallowed the remedy while every other block
+        # in the workflow printed both. A remedy that exists in the payload and never
+        # reaches the terminal is a remedy nobody follows — the fifth report of this class.
+        # Only the remedy is added: the reason is already in `message` above, and printing
+        # it twice trains the reader to skim.
+        remedy = result.blocked.operator_command
+        if remedy:
+            typer.echo(f"\nRecovery: {remedy}")
     raise typer.Exit(LifecycleExitCode.BLOCKED)
 
 
