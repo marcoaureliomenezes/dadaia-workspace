@@ -370,10 +370,22 @@ class LifecyclePreflightService:
                     data,
                     f"release {data.release_id!r} is not defined — no release is active in "
                     "this context, so there is nothing to implement yet",
+                    # Bug r23-preflight-operator-command-not-pasteable: this ended in
+                    # `--backlog-run-id <a completed backlog run>` — a blank the operator
+                    # cannot fill without a run id they do not have. And when no release is
+                    # defined, release-definition is not even the right next action:
+                    # authoring the backlog it would consume is, and THAT command needs
+                    # nothing looked up. Prescribe the step they can take right now, with
+                    # the follow-up spelled out after it.
                     operator_command=(
-                        f"dadaia lifecycle release-definition --context {data.context} "
-                        f"--release-id {data.release_id} --backlog-run-id <a completed "
-                        "backlog run>"
+                        f"dadaia lifecycle backlog-definition --context {data.context} "
+                        f"--release-id {data.release_id} "
+                        f"--run-id bd-{data.release_id.replace('.', '-')} "
+                        "--demand 'what this release should deliver'"
+                        f"  # then: dadaia lifecycle release-definition --context "
+                        f"{data.context} --release-id {data.release_id} "
+                        f"--run-id rd-{data.release_id.replace('.', '-')} "
+                        f"--backlog-run-id bd-{data.release_id.replace('.', '-')}"
                     ),
                 )
             return self._blocked(

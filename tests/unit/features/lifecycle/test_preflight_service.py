@@ -172,7 +172,12 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
             {"active_release": ActiveReleaseState(release_id="none", phase="implementation")},
             "release 'v0.1.15' is not defined — no release is active in this context, so "
             "there is nothing to implement yet",
-            "dadaia lifecycle release-definition",
+            # The remedy is backlog-definition, not release-definition (bug
+            # r23-preflight-operator-command-not-pasteable): when no release is defined,
+            # release-definition would need a `--backlog-run-id` the operator does not
+            # have, so the old command ended in an unfillable `<a completed backlog run>`.
+            # Authoring the backlog IS the step available right now.
+            "dadaia lifecycle backlog-definition",
         ),
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.15", phase="definition")},

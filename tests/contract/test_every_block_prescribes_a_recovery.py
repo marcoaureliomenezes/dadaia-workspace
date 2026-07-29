@@ -20,6 +20,7 @@ job of the tests that own that gate.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -37,12 +38,30 @@ _PROSE_SCAN_ROOTS = (_LIFECYCLE, _ROOT / "cli")
 
 
 def _blocked_state_calls(tree: ast.AST):
+    """Calls that CONSTRUCT a block — the presence check's target."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
             name = getattr(func, "id", None) or getattr(func, "attr", None)
             if name == "BlockedState":
                 yield node
+
+
+def _recovery_calls(tree: ast.AST):
+    """Every call that passes an ``operator_command=``, whatever it is called.
+
+    The scan used to look for ``BlockedState(`` by name, so a block built through a
+    wrapper — ``self._blocked(data, reason, operator_command=...)``, which is how the
+    whole preflight service builds them — was invisible. That blind spot is exactly where
+    ``--backlog-run-id <a completed backlog run>`` lived until the validator found it by
+    hand (bug ``r23-preflight-operator-command-not-pasteable``).
+
+    Keying on the ARGUMENT rather than the callee is the fix that cannot be routed around:
+    a remedy has to be passed as ``operator_command`` to reach the operator at all.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and any(kw.arg == "operator_command" for kw in node.keywords):
+            yield node
 
 
 def test_no_lifecycle_block_is_constructed_without_an_operator_command() -> None:
@@ -75,7 +94,12 @@ def test_the_ratchet_would_notice_a_block_without_one() -> None:
     assert "operator_command" not in {kw.arg for kw in calls[0].keywords}
 
 
-_PLACEHOLDERS = ("<this step>", "<that step>", "<step>", "<name>", "<run-id>", "TODO")
+#: Any `<...>` slot is a blank the operator must fill; enumerating known ones is how
+#: `--backlog-run-id <a completed backlog run>` walked straight past this check
+#: (bug r23-preflight-operator-command-not-pasteable). The RULE is angle brackets, not a
+#: list of the ones already caught — a list only ever knows about yesterday.
+_PLACEHOLDER_RE = re.compile(r"<[^<>{}]{1,60}>")
+_PLACEHOLDERS = ("TODO",)
 
 
 def test_no_recovery_is_a_placeholder_instead_of_a_command() -> None:
@@ -88,18 +112,19 @@ def test_no_recovery_is_a_placeholder_instead_of_a_command() -> None:
     measured presence; presence was never the point.
     """
     offenders: list[str] = []
-    for path in sorted(_LIFECYCLE.rglob("*.py")):
+    for path in sorted({p for root in _PROSE_SCAN_ROOTS for p in root.rglob("*.py")}):
         text = path.read_text(encoding="utf-8")
         tree = ast.parse(text)
-        for call in _blocked_state_calls(tree):
+        for call in _recovery_calls(tree):
             for kw in call.keywords:
                 if kw.arg != "operator_command":
                     continue
                 rendered = ast.unparse(kw.value)
-                for token in _PLACEHOLDERS:
-                    if token in rendered:
-                        rel = path.relative_to(_LIFECYCLE.parents[2]).as_posix()
-                        offenders.append(f"{rel}:{call.lineno} -> {token}")
+                found = [t for t in _PLACEHOLDERS if t in rendered]
+                found += _PLACEHOLDER_RE.findall(rendered)
+                for token in found:
+                    rel = path.relative_to(_ROOT.parent).as_posix()
+                    offenders.append(f"{rel}:{call.lineno} -> {token}")
 
     assert not offenders, (
         "these recoveries hand the operator a placeholder instead of a command:\n  "
@@ -158,7 +183,7 @@ def test_no_recovery_is_prose_about_a_command_instead_of_the_command() -> None:
     paths = sorted({p for root in _PROSE_SCAN_ROOTS for p in root.rglob("*.py")})
     for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for call in _blocked_state_calls(tree):
+        for call in _recovery_calls(tree):
             for kw in call.keywords:
                 if kw.arg != "operator_command":
                     continue
