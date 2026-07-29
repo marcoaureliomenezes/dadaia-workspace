@@ -181,8 +181,15 @@ class LifecyclePreflightService:
 
     def preflight(self, data: LifecyclePreflightInput) -> LifecyclePreflightResult:
         checks = (
-            self._check_binding,
+            # Bug r20-implementation-undefined-release-preflight-masks-guard: an
+            # UNDEFINED release used to be reported as "context is not bound", because the
+            # binding check ran first. The operator then binds — correctly, as instructed —
+            # and hits the real problem only on the next attempt. Order the checks by how
+            # fundamental the condition is: a release that does not exist cannot be bound
+            # to, so it is named first. The bind check still runs for every release that
+            # DOES exist, which is every real case.
             self._check_active_release,
+            self._check_binding,
             self._check_specs_doctor,
             self._check_hygiene,
         )
@@ -352,13 +359,27 @@ class LifecyclePreflightService:
 
     def _check_active_release(self, data: LifecyclePreflightInput) -> BlockedState | None:
         if data.active_release.release_id != data.release_id:
-            # v0.1.78 T-C / FR-C: the workspace's ACTIVE.md points at a different release
-            # than the one this run targets — re-binding is the operator's actionable fix
-            # (mirrors the binding-mismatch sites above; the underlying condition is the
-            # same "session/workspace pointing somewhere else" shape).
+            # Two different conditions used to share one message and one remedy. When
+            # ACTIVE.md points at ANOTHER release, re-binding is the fix. When it points at
+            # NOTHING, the target release simply does not exist — and telling the operator
+            # to bind to it hands them a command that cannot work
+            # (bug r20-implementation-undefined-release-preflight-masks-guard).
+            active = (data.active_release.release_id or "").strip()
+            if active in {"", "none", "None"}:
+                return self._blocked(
+                    data,
+                    f"release {data.release_id!r} is not defined — no release is active in "
+                    "this context, so there is nothing to implement yet",
+                    operator_command=(
+                        f"dadaia lifecycle release-definition --context {data.context} "
+                        f"--release-id {data.release_id} --backlog-run-id <a completed "
+                        "backlog run>"
+                    ),
+                )
             return self._blocked(
                 data,
-                "active release mismatch",
+                f"active release mismatch: this context is on {active!r}, "
+                f"the run targets {data.release_id!r}",
                 operator_command=(
                     f"dadaia context bind {data.context} --mode {data.required_mode} "
                     f"--release {data.release_id}"

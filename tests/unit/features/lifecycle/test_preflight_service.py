@@ -161,8 +161,18 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
         ),
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.14", phase="implementation")},
-            "active release mismatch",
+            "active release mismatch: this context is on 'v0.1.14', the run targets 'v0.1.15'",
             "dadaia context bind",
+        ),
+        (
+            # An ACTIVE.md pointing at NOTHING is a different condition from one pointing
+            # elsewhere: the target release does not exist, and telling the operator to
+            # bind to it hands them a command that cannot work (bug
+            # r20-implementation-undefined-release-preflight-masks-guard).
+            {"active_release": ActiveReleaseState(release_id="none", phase="implementation")},
+            "release 'v0.1.15' is not defined — no release is active in this context, so "
+            "there is nothing to implement yet",
+            "dadaia lifecycle release-definition",
         ),
         (
             {"active_release": ActiveReleaseState(release_id="v0.1.15", phase="definition")},

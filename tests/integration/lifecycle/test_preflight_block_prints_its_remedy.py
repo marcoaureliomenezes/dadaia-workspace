@@ -57,6 +57,17 @@ def alive_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         == 0
     )
     assert _runner.invoke(app, ["context", "alive", _CTX]).exit_code == 0
+    # Define a release first. Without one, the preflight now (correctly) reports the
+    # UNDEFINED release before it ever looks at the binding — so a fixture with no release
+    # would test a different block than this file is about.
+    for args in (
+        ["lifecycle", "backlog-definition", "--context", _CTX, "--release-id", "v0.1.0",
+         "--run-id", "bd", "--harness", "fake", "--demand", "x"],
+        ["lifecycle", "release-definition", "--context", _CTX, "--release-id", "v0.1.0",
+         "--run-id", "rd", "--harness", "fake", "--backlog-run-id", "bd"],
+    ):  # fmt: skip
+        result = _runner.invoke(app, args)
+        assert result.exit_code == 0, result.output
     return tmp_path
 
 
