@@ -1243,7 +1243,11 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 continue
             if s.produces is not None and _find_or_recover(s.label) is None:
                 return run, BlockedState(
-                    operator_command=_graph_recovery(run, step.label),
+                    # The missing PRODUCER is what has to run again. Resuming the gate
+                    # that DETECTED the hole simply re-detects it, so the printed remedy
+                    # reproduced the block it came from — the r16 class on a new route,
+                    # found by driving this path end to end for the first time.
+                    operator_command=_graph_recovery(run, s.label),
                     reason=f"workflow-step graph incomplete: step {s.label!r} declared "
                     f"produces={s.produces!r} but wrote no ledger payload (and no "
                     "persisted payload could be reconciled from disk)",
@@ -1253,7 +1257,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
             for producer in s.consumes:
                 if _find_or_recover(producer) is None:
                     return run, BlockedState(
-                        operator_command=_graph_recovery(run, step.label),
+                        operator_command=_graph_recovery(run, producer),
                         reason=f"workflow-step graph incomplete: {s.label!r} consumes "
                         f"{producer!r} which has no ledger payload (and no persisted "
                         "payload could be reconciled from disk)",

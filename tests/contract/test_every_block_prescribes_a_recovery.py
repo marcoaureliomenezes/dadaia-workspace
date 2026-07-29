@@ -26,7 +26,14 @@ import pytest
 
 pytestmark = pytest.mark.contract
 
-_LIFECYCLE = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "features" / "lifecycle"
+_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+_LIFECYCLE = _ROOT / "features" / "lifecycle"
+
+#: Trees the prose scan sweeps. `cli/` was outside the original ratchet, which is how a
+#: prose FALLBACK inside `lifecycle status` survived every earlier pass — the verb whose
+#: whole job is telling a stuck operator what to do next. A ratchet that stops at a package
+#: boundary stops at the boundary the defect walks across.
+_PROSE_SCAN_ROOTS = (_LIFECYCLE, _ROOT / "cli")
 
 
 def _blocked_state_calls(tree: ast.AST):
@@ -148,7 +155,8 @@ def test_no_recovery_is_prose_about_a_command_instead_of_the_command() -> None:
     the only property that was ever the point: the field begins with a command.
     """
     offenders: list[str] = []
-    for path in sorted(_LIFECYCLE.rglob("*.py")):
+    paths = sorted({p for root in _PROSE_SCAN_ROOTS for p in root.rglob("*.py")})
+    for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for call in _blocked_state_calls(tree):
             for kw in call.keywords:
@@ -161,7 +169,7 @@ def test_no_recovery_is_prose_about_a_command_instead_of_the_command() -> None:
                     continue
                 lowered = prefix.lstrip().lower()
                 if any(lowered.startswith(opening) for opening in _PROSE_OPENINGS):
-                    rel = path.relative_to(_LIFECYCLE.parents[2]).as_posix()
+                    rel = path.relative_to(_ROOT.parent).as_posix()
                     offenders.append(f"{rel}:{call.lineno} -> {prefix.strip()[:60]!r}")
 
     assert not offenders, (

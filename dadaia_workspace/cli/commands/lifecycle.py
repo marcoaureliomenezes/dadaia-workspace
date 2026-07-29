@@ -1768,8 +1768,12 @@ def lifecycle_status(
         recovery = _resume_command_for(run, step)
     elif blocked_state is not None:
         detail = blocked_state.reason
-        recovery = blocked_state.operator_command or (
-            f"re-run with --resume-from {blocked_state.blocked_at_step}"
+        # The fallback used to be prose ("re-run with --resume-from X"), which is the exact
+        # shape reported five times and ratcheted against in `features/lifecycle` — where
+        # the ratchet could not see it, because it never scanned `cli/`. A last-resort
+        # branch is precisely where an unpasteable remedy hides.
+        recovery = blocked_state.operator_command or _resume_command_for(
+            run, blocked_state.blocked_at_step
         )
 
     if json_output:
