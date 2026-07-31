@@ -96,3 +96,84 @@ def test_a_chmod_that_cannot_be_applied_is_reported_not_swallowed(
         "an installer that cannot restore the bit must say so; exiting 0 in silence is "
         "what sent the operator back to a doctor still reporting the same drift"
     )
+
+
+# ── the same defect, two more places (found by sweeping the class, not by a report) ──
+#
+# `r24-public-install-does-not-repair-kimi-shim-mode` was fixed for the Kimi shims because
+# that is where the validator happened to look. Sweeping for the shape afterwards found it
+# alive in two more install paths, and both matter more than the one that was reported:
+#
+#   * `.dadaia/hooks/*.sh` — the Codex hook wrappers. These ARE the PreToolUse gate
+#     (root-whitelist, venv-guard, SDD path-class). A wrapper that is not executable means
+#     the gate silently stops firing, and `codex_doctor` already knows how to report
+#     "codex hook wrapper not executable" — so doctor diagnoses it while install claims
+#     success, which is the r24 loop exactly.
+#   * `.dadaia/scripts/*.sh` — the git chokepoints, including the pre-push security-verdict
+#     gate. Here the chmod was not suppressed at all, so one unwritable file aborted the
+#     whole install with a traceback instead of reporting the file.
+#
+# Fixing an instance is how the class survives. This is the class.
+
+
+def _executables(workspace: Path) -> list[Path]:
+    """Every file dadaia installs that something must EXECUTE.
+
+    The hook wrappers carry no extension (``codex-pre-gate``, not ``codex-pre-gate.sh``),
+    which an earlier version of this helper globbed for and therefore missed entirely —
+    the tests passed while covering only the scripts directory. Listing the directory is
+    the honest way to ask "everything here must be executable".
+    """
+    hooks = [p for p in sorted((workspace / ".dadaia" / "hooks").iterdir()) if p.is_file()]
+    scripts = sorted((workspace / ".dadaia" / "scripts").glob("*.sh"))
+    return hooks + scripts
+
+
+def test_install_writes_every_managed_script_executable(workspace: Path) -> None:
+    FileSystemPublicAssetManager().install(workspace, target="codex")
+
+    written = _executables(workspace)
+    assert written, "no managed executables were installed at all"
+    not_executable = [p.name for p in written if not _is_executable(p)]
+    assert not not_executable, (
+        f"these gate scripts were installed without an execute bit: {not_executable}"
+    )
+
+
+def test_a_gate_script_stripped_of_its_bit_is_repaired_by_install(workspace: Path) -> None:
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="codex")
+    stripped = _executables(workspace)[0]
+    stripped.chmod(0o644)
+
+    manager.install(workspace, target="codex")
+
+    assert _is_executable(stripped), (
+        f"{stripped.name} stayed non-executable after the prescribed install; a hook "
+        "wrapper that cannot execute is a gate that silently stops firing"
+    )
+
+
+def test_a_gate_script_whose_bit_cannot_be_set_is_reported(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="codex")
+    target = _executables(workspace)[0]
+    target.chmod(0o644)
+
+    real_chmod = Path.chmod
+
+    def refuse(self: Path, mode: int, **kwargs: object) -> None:
+        if self.name == target.name:
+            raise PermissionError(13, "Operation not permitted")
+        real_chmod(self, mode, **kwargs)
+
+    monkeypatch.setattr(Path, "chmod", refuse)
+
+    report = "\n".join(manager.install(workspace, target="codex"))
+
+    assert target.name in report and "not executable" in report, (
+        "install must say it could not make a gate script executable rather than exiting "
+        "0 in silence or dying with a traceback"
+    )

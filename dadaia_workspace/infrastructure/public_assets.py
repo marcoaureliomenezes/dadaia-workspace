@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shutil
@@ -1302,8 +1301,13 @@ class FileSystemPublicAssetManager:
             for name, content in _build_codex_hook_wrapper_contents().items():
                 dst = hooks_dir / name
                 write_generated(dst, content, force, installed)
-                with contextlib.suppress(OSError):
-                    dst.chmod(0o755)
+                # These wrappers ARE the PreToolUse gate. A silent chmod failure here is a
+                # gate that stops firing while install reports success — the same shape as
+                # r24-public-install-does-not-repair-kimi-shim-mode, found by sweeping the
+                # class rather than waiting for the next report.
+                failure = _restore_execute_bit(dst)
+                if failure is not None:
+                    installed.append(failure)
             write_generated(
                 codex_dir / "hooks.json",
                 _json_dump(_build_codex_hooks(workspace_root)),
@@ -1401,8 +1405,13 @@ class FileSystemPublicAssetManager:
         )
         scripts_dir = workspace_root / ".dadaia" / "scripts"
         if scripts_dir.exists():
-            for script in scripts_dir.glob("*.sh"):
-                script.chmod(0o755)
+            for script in sorted(scripts_dir.glob("*.sh")):
+                # The git chokepoints, including the pre-push security-verdict gate. This
+                # chmod was unguarded, so one unwritable file aborted the entire install
+                # with a traceback instead of naming the file (F-22 class).
+                failure = _restore_execute_bit(script)
+                if failure is not None:
+                    installed.append(failure)
 
     def _iter_files(self, root: Path) -> Iterable[Path]:
         if not root.exists():
