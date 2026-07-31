@@ -63,8 +63,15 @@ class CoherenceValidator:
                 code="SPECS-VERSION",
                 severity=Severity.WARNING,
                 description=(
+                    # The remedy carries the tree it was produced for. `specs upgrade`
+                    # has no --context option, so the bare line acted on the BOUND
+                    # context — doing nothing when unbound, and silently upgrading a
+                    # different repo when bound elsewhere. An upgrade rewrites artifacts
+                    # and re-stamps the constitution, so aiming it at the wrong tree is
+                    # worse than the staleness it was meant to fix.
                     f"specs_pattern_version is {current}, below the canonical "
-                    f"{_ver.CANONICAL_SPECS_VERSION}. Run: dadaia specs upgrade"
+                    f"{_ver.CANONICAL_SPECS_VERSION}. "
+                    f"Run: dadaia specs upgrade --specs-dir {self.specs_dir}"
                 ),
                 path=str(self.specs_dir / "constitution.md"),
             )
