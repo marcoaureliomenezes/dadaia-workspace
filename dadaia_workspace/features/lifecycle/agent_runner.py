@@ -25,6 +25,7 @@ from dadaia_workspace.core.models.lifecycle import (
 from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.runtime_files import RuntimeFilePort
 from dadaia_workspace.core.scope_match import out_of_scope_paths
+from dadaia_workspace.core.worker_failure import summarize_worker_failure
 from dadaia_workspace.features.lifecycle.context_selector import SelectionAudit
 from dadaia_workspace.features.lifecycle.prompt_builder import canonical_worker_output_ref
 from dadaia_workspace.features.lifecycle.state_machine import (
@@ -505,7 +506,16 @@ class LifecycleAgentRunner:
         result: AgentRunResult,
     ) -> BlockedState | None:
         if result.status is not AgentRunStatus.SUCCEEDED:
-            return self._blocked(lifecycle_run, data, result.error or result.summary, result=result)
+            # Lead with the cause, not the transcript. A failed Codex run put its ENTIRE
+            # prompt envelope plus every websocket retry into this field — ~6000 characters
+            # with `401 Unauthorized` buried near the end (round-25 R-23 evidence). The full
+            # text still reaches the operator through detail.diagnostic_ref.
+            return self._blocked(
+                lifecycle_run,
+                data,
+                summarize_worker_failure(result.error or result.summary),
+                result=result,
+            )
         # L1/L2 (v0.1.31): the verdict requirement is a REVIEW concept. A review step must
         # carry ``verdict == "APPROVED"``; a create step (``is_review=False``) is never
         # gated on a self-reported verdict — it passes on a schema-valid payload (which
