@@ -70,4 +70,32 @@ def test_an_unrecognised_failure_still_stops_being_a_transcript() -> None:
     summary = summarize_worker_failure("some unfamiliar failure\n" + "noise " * 3000)
 
     assert len(summary) < 900, len(summary)
-    assert "diagnostic_ref" in summary, "the operator must be told where the full text went"
+    assert "truncated" in summary, "the operator must be told output was dropped"
+    # NOT "diagnostic_ref": this function cannot see whether one was persisted. Pointing at
+    # the transcript is the block builder's job, and only when it really wrote one
+    # (r25-block-reason-claims-missing-diagnostic-ref).
+    assert "diagnostic_ref" not in summary
+
+
+# ── bug r25-block-reason-claims-missing-diagnostic-ref (validator R25 / R-23 + R-27) ──
+#
+# The fix above replaced a 6000-character transcript with a leading diagnosis and a pointer:
+# "the full transcript is in the persisted diagnostic referenced by detail.diagnostic_ref".
+# The validator then found `detail` was `{}` — the pointer named something that was not
+# there. A diagnostic is only persisted when the adapter attached one AND a runtime-file
+# writer is wired; neither is guaranteed.
+#
+# So a message written to stop a field from lying was itself made to lie, in the same field,
+# within hours. The summariser must not promise a location it cannot see; only the block
+# builder, which knows whether it actually persisted anything, may point at it.
+
+
+def test_the_summary_never_promises_a_location_it_cannot_see() -> None:
+    summary = summarize_worker_failure(_REAL_DUMP)
+
+    assert "diagnostic_ref" not in summary, (
+        "this function cannot know whether a diagnostic was persisted; promising one is "
+        f"how the reason started asserting something untrue again: {summary}"
+    )
+    assert summary.startswith("provider rejected the credential")
+    assert "truncated" in summary, "the operator must still be told output was dropped"

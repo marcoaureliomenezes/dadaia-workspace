@@ -10,8 +10,14 @@ is not cosmetic. A reason nobody reads is a reason nobody acts on, and it travel
 persisted run record, the printed block, and the handoff — so the operator is handed a wall
 of text at the exact moment something has gone wrong.
 
-The full transcript is not lost: the adapter's diagnostic is persisted separately and
-referenced from ``BlockedState.detail["diagnostic_ref"]``. This module decides what leads.
+This module decides what LEADS, and nothing else. It deliberately does not mention where
+the full transcript went: a diagnostic is persisted only when the adapter attached one and
+a runtime-file writer is wired, and this function can see neither. Promising the pointer
+here is bug ``r25-block-reason-claims-missing-diagnostic-ref`` — a message written to stop
+this field from asserting something untrue, itself made to assert something untrue, in the
+same field, within hours. Only the block builder, which knows whether it actually persisted
+anything, may point at it.
+
 Pure text in, text out — no filesystem, per the ``core`` purity ratchet.
 """
 
@@ -55,14 +61,10 @@ def summarize_worker_failure(text: str) -> str:
     for label, pattern in _SIGNATURES:
         line = _first_matching_line(stripped, pattern)
         if line is not None:
-            return (
-                f"{label}: {line} "
-                f"(worker output truncated; the full transcript is in the persisted "
-                f"diagnostic referenced by detail.diagnostic_ref)"
-            )
+            return f"{label}: {line} (worker output truncated)"
 
     tail = " ".join(stripped[-_TAIL_BUDGET:].split())
     return (
-        f"the worker failed without a recognised error signature; last {_TAIL_BUDGET} "
-        f"characters: …{tail} (full transcript in detail.diagnostic_ref)"
+        f"the worker failed without a recognised error signature; output truncated to the "
+        f"last {_TAIL_BUDGET} characters: …{tail}"
     )

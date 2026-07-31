@@ -271,3 +271,34 @@ def test_run_with_result_also_persists_diagnostic_on_block(tmp_path: Path) -> No
     assert diagnostic_ref
     assert (workspace_root / diagnostic_ref).is_file()
     assert worker_result.diagnostic is diagnostic
+
+
+# ── bug r25-block-reason-claims-missing-diagnostic-ref (validator R25 / R-23 + R-27) ──
+#
+# The truncation fix promised "the full transcript is in the persisted diagnostic referenced
+# by detail.diagnostic_ref" on every truncated reason. The validator found `detail` was `{}`:
+# a diagnostic is persisted only when the adapter attached one AND a runtime-file writer is
+# wired. A message written to stop this field from asserting something untrue was itself
+# made to assert something untrue, in the same field, hours later.
+#
+# Both directions are pinned, because either one alone is the bug: never promise what is not
+# there, and do point at it when it is.
+
+
+def _long_failure() -> str:
+    return "banner\n" * 50 + "ERROR: unexpected status 401 Unauthorized\n" + "noise\n" * 200
+
+
+def test_a_truncated_reason_makes_no_promise_when_nothing_was_persisted(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.worker_failure import summarize_worker_failure
+
+    reason = summarize_worker_failure(_long_failure())
+
+    assert "401 Unauthorized" in reason
+    assert "truncated" in reason
+    assert "diagnostic_ref" not in reason, (
+        "the reason pointed the operator at a key that is absent from detail — the exact "
+        f"shape the validator reported: {reason}"
+    )

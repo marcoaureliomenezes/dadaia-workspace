@@ -715,6 +715,12 @@ class LifecycleAgentRunner:
             ref = self._persist_diagnostic(lifecycle_run, data, result.diagnostic)
             if ref is not None:
                 full_detail["diagnostic_ref"] = ref
+        # Point at the transcript ONLY when one was actually written (bug
+        # r25-block-reason-claims-missing-diagnostic-ref: the summary promised
+        # detail.diagnostic_ref unconditionally while detail was {}). The pointer belongs
+        # here, where the answer is known, and nowhere earlier, where it is a guess.
+        if "diagnostic_ref" in full_detail and "truncated" in reason:
+            reason = f"{reason} Full worker transcript: {full_detail['diagnostic_ref']}."
         step = data.current_step or lifecycle_run.current_step
         return BlockedState(
             # Bug r22-release-review-rejection-deadlocks: this is the single most-hit
