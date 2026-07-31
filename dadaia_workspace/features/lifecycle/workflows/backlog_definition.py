@@ -555,7 +555,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 context=self._context,
                 release_id=self._release_id,
                 harness=HARNESS_CLI_NAMES.get(self._default_kind, "codex"),
-                note="inspect the step payload for the worker's own output first",
+                note="re-runs the authoring step; the earlier attempt stays in the ledger",
             ),
             detail={"gate": "author-delta-v1"},
         )

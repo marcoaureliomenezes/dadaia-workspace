@@ -65,14 +65,78 @@ def test_the_runner_prefixes_it_when_the_reason_names_the_sandbox() -> None:
     call site that constructs a sandbox block forgets it, which is how every recovery
     defect in this ledger got a second life.
     """
-    from dadaia_workspace.features.lifecycle.agent_runner import sandbox_env_for_reason
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
 
-    assert sandbox_env_for_reason(_SANDBOX_REASON) == ("DADAIA_CODEX_SANDBOX=danger-bypass",)
-    assert sandbox_env_for_reason("agent result missing APPROVED verdict") == ()
+    assert remedy_env_for_reason(_SANDBOX_REASON, {}) == ("DADAIA_CODEX_SANDBOX=danger-bypass",)
+    assert remedy_env_for_reason("agent result missing APPROVED verdict", {}) == ()
 
 
 def test_prose_about_sandboxes_does_not_trigger_it() -> None:
     """Guard: a false positive here hands out an unnecessary privilege downgrade."""
-    from dadaia_workspace.features.lifecycle.agent_runner import sandbox_env_for_reason
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
 
-    assert sandbox_env_for_reason("the plan describes the sandbox strategy for QA") == ()
+    assert remedy_env_for_reason("the plan describes the sandbox strategy for QA", {}) == ()
+
+
+# ── bug r25-block-remedy-omits-the-env-var-its-own-reason-names (validator R25 / R-23) ──
+#
+# Round 25, live Codex, backlog-definition: the run BLOCKED at backlog_author with the
+# reason "CODEX_HOME points to a directory that did not exist", and the emitted remedy
+# omitted CODEX_HOME entirely. A remedy that does not carry the variable its own reason
+# blames is guaranteed to reproduce the block it came from.
+#
+# The earlier fix taught this module ONE variable, DADAIA_CODEX_SANDBOX, because that was
+# the one instance the validator had reported. Fixing an instance of a class is how the
+# class survives — this file's own docstring says so — and the very next round produced the
+# next instance. The rule is now the class: if the reason names an environment variable
+# that was in effect, the remedy carries it.
+
+
+def test_a_block_that_blames_codex_home_carries_codex_home() -> None:
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
+
+    env = remedy_env_for_reason(
+        "codex worker failed: CODEX_HOME points to a directory that did not exist",
+        {"CODEX_HOME": "/opt/data/state/round25/codexhome"},
+    )
+
+    assert "CODEX_HOME=/opt/data/state/round25/codexhome" in env, (
+        "the remedy omitted the very variable its reason blamed, so pasting it re-runs "
+        f"into the identical failure: {env}"
+    )
+
+
+def test_the_sandbox_bypass_still_rides_along() -> None:
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
+
+    assert remedy_env_for_reason(_SANDBOX_REASON, {}) == ("DADAIA_CODEX_SANDBOX=danger-bypass",)
+
+
+def test_both_causes_are_carried_together() -> None:
+    """A live block named both; carrying only one leaves the operator half-stuck."""
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
+
+    env = remedy_env_for_reason(
+        _SANDBOX_REASON + " and CODEX_HOME points to a directory that did not exist",
+        {"CODEX_HOME": "/tmp/ch"},
+    )
+
+    assert "DADAIA_CODEX_SANDBOX=danger-bypass" in env
+    assert "CODEX_HOME=/tmp/ch" in env
+
+
+def test_a_variable_the_reason_never_mentions_is_not_dragged_in() -> None:
+    """The remedy must reproduce the CAUSE, not dump the environment on the operator."""
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
+
+    assert (
+        remedy_env_for_reason("agent result missing APPROVED verdict", {"CODEX_HOME": "/tmp/ch"})
+        == ()
+    )
+
+
+def test_a_named_variable_that_was_not_set_is_not_invented() -> None:
+    """Emitting `CODEX_HOME=` would be a blank the operator has to fill — the r18 defect."""
+    from dadaia_workspace.features.lifecycle.agent_runner import remedy_env_for_reason
+
+    assert remedy_env_for_reason("CODEX_HOME points to a directory that did not exist", {}) == ()

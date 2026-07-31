@@ -266,3 +266,40 @@ def test_the_second_command_ratchet_would_notice_its_own_target() -> None:
     rendered = [ast.unparse(kw.value) for _, kw in _recovery_prose_values(tree)]
     assert rendered, "the scanner did not find the operator_command at all"
     assert any(_SECOND_COMMAND_IN_A_COMMENT.search(text) for text in rendered)
+
+
+def test_no_note_tells_the_operator_to_do_something_else_first() -> None:
+    """Bug ``r25-block-remedy-omits-the-env-var-its-own-reason-names`` (validator R25 / R-23).
+
+    The most-hit block in the product carried
+    ``note="inspect the step payload for the worker's own output first"``. The command was
+    pasteable and correct; the note appended to it was an instruction to go do something
+    ELSE, and "first" made the command look like the second half of a procedure rather than
+    the fix. The validator read the whole line and judged it not self-contained, which is
+    the right reading — the field's entire contract is "paste this and it fixes it".
+
+    The three ratchets above all measure the ``operator_command`` itself. None of them ever
+    looked at the note, which is how prose walked back in through the one part of the line
+    that no check was reading. A note may DESCRIBE what the command does; it may not send
+    the operator somewhere else.
+    """
+    offenders: list[str] = []
+    for path in sorted({p for root in _PROSE_SCAN_ROOTS for p in root.rglob("*.py")}):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for call, kw in _recovery_prose_values(tree):
+            if kw.arg != "note":
+                continue
+            prefix = _literal_prefix(kw.value)
+            if prefix is None:
+                continue
+            lowered = prefix.lstrip().lower()
+            if any(lowered.startswith(opening) for opening in _PROSE_OPENINGS):
+                rel = path.relative_to(_ROOT.parent).as_posix()
+                offenders.append(f"{rel}:{call.lineno} -> {prefix.strip()[:60]!r}")
+
+    assert not offenders, (
+        "these notes send the operator off to do something else instead of describing "
+        "the command they are attached to:\n  " + "\n  ".join(offenders) + "\n\nThe note "
+        "explains what the line does. Anything the operator must do INSTEAD belongs in "
+        "the block's reason."
+    )

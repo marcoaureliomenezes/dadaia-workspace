@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -131,21 +132,45 @@ def _compact_block_detail(detail: dict[str, str], *, limit: int = 8000) -> str:
 _SANDBOX_SIGNATURE = ("sandbox-failure signature", "namespace")
 
 
-def sandbox_env_for_reason(reason: str) -> tuple[str, ...]:
-    """The environment assignment a sandbox-caused block's remedy must carry.
+#: Environment variables whose absence or wrong value can CAUSE a worker block. When a
+#: block's reason names one of these, its remedy has to carry it: an operator pasting the
+#: line into a fresh shell has none of the failing run's environment.
+_CAUSAL_ENV_VARS = ("CODEX_HOME", "KIMI_CODE_HOME", "CLAUDE_CONFIG_DIR")
+
+
+def remedy_env_for_reason(reason: str, env: Mapping[str, str]) -> tuple[str, ...]:
+    """Every environment assignment a block's remedy must carry, given its reason.
 
     Bug ``r23-sandbox-block-operator-command-omits-required-bypass``: the block explained
     that ``DADAIA_CODEX_SANDBOX=danger-bypass`` was the fix and then printed a command
-    without it, so pasting the command re-ran into the identical failure.
+    without it, so pasting the command re-ran into the identical failure. That was fixed
+    for that one variable — and bug
+    ``r25-block-remedy-omits-the-env-var-its-own-reason-names`` is the same defect one
+    round later with a different name on it: a live block reading "CODEX_HOME points to a
+    directory that did not exist" emitted a remedy with no ``CODEX_HOME`` on it.
+
+    Teaching this function one variable at a time is how the class survives, so the rule is
+    now the class: if the reason names a causal variable AND that variable was actually set
+    for the failing run, the remedy reproduces it. A variable the reason does not blame is
+    never dragged in — the remedy reproduces the CAUSE, it does not dump the environment —
+    and one that was never set is never emitted as an empty assignment, which would hand
+    back the fill-in-the-blank remedy of ``r18-r20-missing-spec-recovery-placeholder``.
 
     Detection lives HERE, where the block is built, rather than at each call site. Every
     recovery defect in this ledger got its second life from a rule that lived somewhere the
     next construction site did not have to visit.
     """
+    assignments: list[str] = []
     lowered = reason.lower()
     if all(part in lowered for part in _SANDBOX_SIGNATURE):
-        return ("DADAIA_CODEX_SANDBOX=danger-bypass",)
-    return ()
+        assignments.append("DADAIA_CODEX_SANDBOX=danger-bypass")
+    for name in _CAUSAL_ENV_VARS:
+        if name not in reason:
+            continue
+        value = env.get(name)
+        if value:
+            assignments.append(f"{name}={value}")
+    return tuple(assignments)
 
 
 def _safe_filename_segment(value: str) -> str:
@@ -694,11 +719,17 @@ class LifecycleAgentRunner:
                 step=step,
                 context=lifecycle_run.context,
                 release_id=lifecycle_run.release_id or "",
-                # A sandbox-caused block needs its bypass ON the line, or pasting the
-                # remedy reproduces the failure it came from (r23-sandbox-block-
-                # operator-command-omits-required-bypass).
-                env=sandbox_env_for_reason(reason),
-                note="inspect the step payload for the worker's own output first",
+                # An environment-caused block needs its cause ON the line, or pasting the
+                # remedy reproduces the failure it came from (r23-sandbox-block-operator-
+                # command-omits-required-bypass, then r25-block-remedy-omits-the-env-var-
+                # its-own-reason-names for CODEX_HOME).
+                env=remedy_env_for_reason(reason, os.environ),
+                # The note DESCRIBES what the command does. It used to read "inspect the
+                # step payload for the worker's own output first" — an instruction to go
+                # do something ELSE before running the line, appended to the one field
+                # whose entire contract is "paste this and it fixes it"
+                # (r25-block-remedy-omits-the-env-var-its-own-reason-names, same report).
+                note="re-runs this step; the earlier attempt stays in the ledger",
             ),
             reason=reason,
             blocked_at_step=step,
