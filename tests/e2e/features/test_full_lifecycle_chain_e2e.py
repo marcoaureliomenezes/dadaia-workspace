@@ -167,3 +167,69 @@ def test_the_release_refuses_a_pick_that_was_never_authored(workspace: Path) -> 
     )  # fmt: skip
     assert result.exit_code != 0, result.output
     assert "never-ran" in result.output
+
+
+def _one_pass(workspace: Path, release: str, suffix: str, demand: str) -> None:
+    """Drive one complete demand → closure pass, asserting each leg landed."""
+    backlog = _cli(
+        "lifecycle", "backlog-definition",
+        "--context", _CTX, "--release-id", release, "--run-id", f"bd{suffix}",
+        "--harness", "fake", "--demand", demand,
+    )  # fmt: skip
+    assert backlog.exit_code == 0, backlog.output
+    define = _cli(
+        "lifecycle", "release-definition",
+        "--context", _CTX, "--release-id", release, "--run-id", f"rd{suffix}",
+        "--harness", "fake", "--backlog-run-id", f"bd{suffix}",
+    )  # fmt: skip
+    assert define.exit_code == 0, define.output
+    bind = _cli("context", "bind", _CTX, "--mode", "implementation", "--release", release)
+    assert bind.exit_code == 0, bind.output
+    implement = _cli(
+        "lifecycle", "implementation-reviews",
+        "--context", _CTX, "--release-id", release, "--run-id", f"ir{suffix}", "--harness", "fake",
+    )  # fmt: skip
+    assert implement.exit_code == 0, implement.output
+    assert "phase=closure" in implement.output, implement.output
+
+
+def test_the_workspace_survives_being_used_more_than_once(workspace: Path) -> None:
+    """Two releases back to back, with an audit between them, ending validator-clean.
+
+    The single-pass test above proves a demand can reach closure once. It cannot prove the
+    workspace is still USABLE afterwards, and "works the first time" is not the property
+    the operator needs — they run round after round. Everything that carries across a
+    release boundary is only exercised by a second pass: ACTIVE.md being reset, the archive
+    accepting a second release beside the first, the backlog not going stale behind a
+    consumed item, and the audit leg — which no test drives at all — leaving a tree its own
+    doctors still accept.
+
+    That last point is the assertion that matters. Exit code 0 from four workflows says
+    nothing about the state they left behind; ``specs doctor`` and ``backlog doctor`` are
+    the product's own judgement of its own output, and a chain that ends with them clean
+    is the closest thing to "the operator can keep working" that a test can state.
+    """
+    _one_pass(workspace, _RELEASE, "1", "add an example verb")
+
+    audit = _cli(
+        "lifecycle", "audit",
+        "--context", _CTX, "--release-id", _RELEASE, "--run-id", "au1", "--harness", "fake",
+    )  # fmt: skip
+    assert audit.exit_code == 0, audit.output
+
+    _one_pass(workspace, "v0.2.0", "2", "add a second example verb")
+
+    for release in (_RELEASE, "v0.2.0"):
+        for name in ("SPEC", "PLAN", "TASKS"):
+            artifact = _specs(workspace) / "releases" / release / f"{name}.md"
+            assert artifact.is_file(), f"{release}/{name}.md was never written"
+            assert "**Status:** Aprovado" in artifact.read_text(encoding="utf-8"), (
+                f"{release}/{name}.md exists but was never approved"
+            )
+
+    doctor = _cli("specs", "doctor", "--context", _CTX)
+    assert doctor.exit_code == 0, (
+        f"after two releases and an audit the tree fails its own validator:\n{doctor.output}"
+    )
+    backlog_doctor = _cli("backlog", "doctor", "--specs-dir", str(_specs(workspace)))
+    assert backlog_doctor.exit_code == 0, backlog_doctor.output
