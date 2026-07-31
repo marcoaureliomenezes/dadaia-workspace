@@ -1044,6 +1044,8 @@ class FileSystemPublicAssetManager:
         elif kimi_projected.exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="kimi-code"))
 
+        reports.extend(self._check_managed_script_modes(workspace_root))
+
         # Harness-independent checks stay unconditional. The rule-corpus check
         # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
         # package public dir, not a runtime projection.
@@ -1440,6 +1442,36 @@ class FileSystemPublicAssetManager:
         if dst.read_text(encoding="utf-8") != expected:
             return f"[drift] {label}"
         return f"[ok] {label}"
+
+    def _check_managed_script_modes(self, workspace_root: Path) -> list[str]:
+        """Report a git-chokepoint script that git could not execute.
+
+        The ``dadaia:scripts/*`` doctor lines compare CONTENT, so a script stripped of its
+        execute bit read ``[ok]`` while git silently could not run it. These are the git
+        chokepoints — ``pre-push-ci-gate.sh`` carries the pre-push security-verdict gate and
+        the CI preflight — so a mode-only corruption disables an enforcing gate and the
+        command whose whole job is to report workspace soundness said nothing.
+
+        The sibling surface has been checked all along: ``codex_doctor`` reports a Codex
+        hook wrapper that is not executable. One instance checked and the sibling left out
+        is the shape this repository keeps rediscovering; this closes it for the chokepoints.
+        """
+        scripts_dir = workspace_root / ".dadaia" / "scripts"
+        if not scripts_dir.is_dir():
+            return []
+        reports: list[str] = []
+        for script in sorted(scripts_dir.glob("*.sh")):
+            try:
+                executable = bool(script.stat().st_mode & stat.S_IXUSR)
+            except OSError as exc:
+                reports.append(f"[error] dadaia:scripts/{script.name} mode unreadable: {exc}")
+                continue
+            if not executable:
+                reports.append(
+                    f"[drift] dadaia:scripts/{script.name} (not executable) — git cannot "
+                    "run this chokepoint; repair with `dadaia public install --target all`"
+                )
+        return reports
 
     def _check_kimi_user_hooks(self) -> list[str]:
         """Doctor the user-level kimi wiring: shim currency + managed config block.

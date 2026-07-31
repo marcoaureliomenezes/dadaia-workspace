@@ -177,3 +177,46 @@ def test_a_gate_script_whose_bit_cannot_be_set_is_reported(
         "install must say it could not make a gate script executable rather than exiting "
         "0 in silence or dying with a traceback"
     )
+
+
+# ── the doctor half of the same class ───────────────────────────────────────────
+#
+# Found by sweeping every corruption the doctor is supposed to catch and asking, for each,
+# whether the prescribed `dadaia public install` actually repairs it. Five of six were
+# detected and repaired. The sixth was repaired but NEVER DETECTED:
+# `.dadaia/scripts/pre-push-ci-gate.sh` stripped of its execute bit read `[ok]`.
+#
+# That file is the pre-push security-verdict gate and the CI preflight. Without its execute
+# bit git cannot run it, so the push gate silently stops enforcing — and `public doctor`,
+# the command whose entire job is to tell the operator their workspace is sound, says
+# everything is fine. The `dadaia:scripts/*` lines compare CONTENT only; the sibling
+# surface, the Codex hook wrappers, has had an exec-bit check in `codex_doctor` all along.
+# One instance checked, the sibling left out — the same shape a third time.
+
+
+def test_doctor_reports_a_chokepoint_that_lost_its_execute_bit(workspace: Path) -> None:
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="all")
+    gate = workspace / ".dadaia" / "scripts" / "pre-push-ci-gate.sh"
+    assert gate.is_file(), "the pre-push gate script was not installed at all"
+    gate.chmod(0o644)
+
+    bad = [line for line in manager.doctor(workspace) if not line.startswith("[ok]")]
+
+    assert any("pre-push-ci-gate.sh" in line and "not executable" in line for line in bad), (
+        "doctor reported the workspace sound while the pre-push security-verdict gate "
+        f"could not be executed by git:\n{bad}"
+    )
+
+
+def test_doctor_is_green_again_after_the_prescribed_install(workspace: Path) -> None:
+    """The other half of a useful diagnosis: the remedy it prescribes has to work."""
+    manager = FileSystemPublicAssetManager()
+    manager.install(workspace, target="all")
+    gate = workspace / ".dadaia" / "scripts" / "pre-push-ci-gate.sh"
+    gate.chmod(0o644)
+
+    manager.install(workspace, target="all")
+
+    remaining = [line for line in manager.doctor(workspace) if "pre-push-ci-gate" in line]
+    assert remaining and all(line.startswith("[ok]") for line in remaining), remaining
