@@ -273,6 +273,26 @@ def _authoritative_backlog_prefix(
 _CANONICAL_RELEASE_ID_RE = RELEASE_SEMVER_RE
 
 
+def _reject_unknown_resume_step(resume_from: str | None, labels: tuple[str, ...]) -> None:
+    """Refuse a ``--resume-from`` that names no step, BEFORE any state is read.
+
+    Whether a token names a real step is knowable without touching the workspace, so it
+    must be answered before anything that can fail for an unrelated reason. Otherwise the
+    operator is sent to repair a context bind or define a release for a command that could
+    never have run, and only learns the real mistake on the next attempt.
+
+    Shared rather than repeated because this class has now been reported twice on two
+    different verbs — ``r24-invalid-resume-implementation-preflight-mask`` for
+    ``implementation-reviews``, then ``r25-audit-resume-invalid-step-validates-target-first``
+    for ``audit``, which was simply left out when the first one was fixed. A rule that each
+    verb has to remember to apply is a rule the next verb will not.
+    """
+    if resume_from is not None and resume_from not in labels:
+        from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError
+
+        raise InvalidResumeStepError.for_labels(resume_from, labels)
+
+
 def _require_canonical_release_id(release_id: str) -> None:
     """Refuse a noncanonical release id BEFORE any run or write.
 
@@ -577,6 +597,7 @@ def backlog_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # Per-step harness overrides, keyed by the §4 model-step labels.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -736,6 +757,7 @@ def release_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # Per-step harness overrides, keyed by the §6.1 step label.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -1283,6 +1305,12 @@ def audit(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
+    # Argument validation FIRST, before the release is looked up (bug
+    # r25-audit-resume-invalid-step-validates-target-first): this verb reported "release
+    # not found" for a `--resume-from` that names no step of the workflow, sending the
+    # operator to fix a release for a command that could never have run. The three other
+    # verbs already rejected it up front; audit was left out when that class was fixed.
+    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # FR2: resolve the frozen snapshot through the shared resolver; seed each base step's
     # runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let apply_resolved_policy
@@ -1543,7 +1571,6 @@ def pipeline(
 
     from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.pipeline import (
-        InvalidResumeStepError,
         apply_resolved_policy,
         implementation_ladder,
     )
@@ -1561,10 +1588,9 @@ def pipeline(
     # state. Validating it after the preflight sent the operator off to fix a context bind
     # for a command that could never have run, and only revealed the real mistake on the
     # next attempt. The definition verbs already reject it up front; this one did not.
-    if resume_from is not None:
-        labels = tuple(step.label for step in implementation_ladder(default_kind))
-        if resume_from not in labels:
-            raise InvalidResumeStepError.for_labels(resume_from, labels)
+    _reject_unknown_resume_step(
+        resume_from, tuple(step.label for step in implementation_ladder(default_kind))
+    )
     # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created
     # (--show-policy is a read-only print — never gated).
     if not show_policy:

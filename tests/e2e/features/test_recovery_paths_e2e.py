@@ -366,6 +366,9 @@ def test_the_ledger_a_recovery_leaves_behind_is_readable_by_the_next_tool(
         ("backlog-definition", "backlog_author"),
         ("release-definition", "definition_draft"),
         ("implementation-reviews", "implement"),
+        # audit was left out of the first fix for this class and round 25 found it:
+        # bug r25-audit-resume-invalid-step-validates-target-first.
+        ("audit", "audit_report"),
     ],
 )
 def test_an_unknown_resume_step_is_named_before_any_state_is_read(
