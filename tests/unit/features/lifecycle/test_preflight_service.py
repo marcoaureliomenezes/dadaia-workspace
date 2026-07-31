@@ -170,8 +170,15 @@ def test_preflight_passes_with_evidence_and_accepts_bound_implementation_tokens(
             # bind to it hands them a command that cannot work (bug
             # r20-implementation-undefined-release-preflight-masks-guard).
             {"active_release": ActiveReleaseState(release_id="none", phase="implementation")},
+            # The second half of the reason used to be a `# then: dadaia lifecycle
+            # release-definition …` comment tacked onto the operator_command (bug
+            # r24-recovery-operator-command-not-pasteable): pasting that line ran only the
+            # first command, and nothing said the rest had not run. Guidance that needs a
+            # SECOND command belongs here, in the reason a human reads.
             "release 'v0.1.15' is not defined — no release is active in this context, so "
-            "there is nothing to implement yet",
+            "there is nothing to implement yet. Author the backlog first (the command "
+            "below), then run release-definition against that backlog run id to define "
+            "v0.1.15",
             # The remedy is backlog-definition, not release-definition (bug
             # r23-preflight-operator-command-not-pasteable): when no release is defined,
             # release-definition would need a `--backlog-run-id` the operator does not

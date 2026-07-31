@@ -865,12 +865,30 @@ as a continuation.
 ### R-23 — Every block is a command you can paste, not advice about one
 
 Provoke a block on each of the four workflows — a worker that returns nothing usable is
-the easiest (point the harness at a stub), and a killed driver is the other. **PASS if**
-every `operator_command` printed anywhere begins with `dadaia ` and carries the run's own
-`--context`, `--release-id`, `--run-id` and `--resume-from <real step label>`; copy it
-verbatim into the shell and it must run. **FAIL if** any of them reads like instructions
-("re-run the workflow with …", "re-run the step that produces …", "inspect …"), names a
-placeholder, or omits a field you would have to remember.
+the easiest (point the harness at a stub), and a killed driver is the other.
+
+**The test is: copy the line verbatim into the shell and it runs and does the whole fix.**
+Nothing else. Judge it by that and not by how it looks.
+
+**PASS if** every `operator_command` printed anywhere carries the run's own `--context`,
+`--release-id`, `--run-id` and `--resume-from <real step label>`, and pasting it verbatim
+runs. Two shapes are explicitly legal and must not be reported as failures:
+
+- a leading `NAME=value` environment assignment (e.g.
+  `DADAIA_CODEX_SANDBOX=danger-bypass dadaia lifecycle …`) — when the block was caused by
+  the environment, the escape hatch is *part of* the command, and a remedy that made the
+  operator remember to prepend it would be exactly the omission this item exists to catch;
+- a trailing `  # note` explaining what the command re-executes — the shell ignores it.
+
+**FAIL if** any of them reads like instructions ("re-run the workflow with …", "re-run the
+step that produces …", "inspect …"), names a `<placeholder>`, omits a field you would have
+to remember, **or hides a second command inside the trailing comment** — pasting that line
+runs only the first half and says nothing about the rest, so the operator believes they
+followed the remedy when they did not.
+
+> An earlier wording of this item demanded that the command "begin with `dadaia `", which
+> contradicted the environment-prefix requirement in the same round and manufactured a
+> false FAIL. Begins-with was never the property that mattered; runs-when-pasted is.
 
 This has now been reported five times on five different routes. When you find one, do not
 stop at it: grep the whole output of the round for `re-run`, `inspect`, and `re-execute`
@@ -924,6 +942,29 @@ which is exactly what an operator needs to read after an interruption.
 Sweep it across all four workflows and every producing step, not just the one you
 interrupted — the numbering is per produce site, so one site fixed proves nothing about
 the others.
+
+### R-27 — A gate must name the defect it actually found
+
+The lesson of round 24. `release-definition` blocked a live PLAN twice with *"every
+validation dependency row must contain all five non-empty cells"* — while not one cell was
+empty. The real defect was a `|` inside an `rg` command in the "Direct validation" column,
+which the lint split into extra cells. The worker, told nothing true, rewrote the same
+correct table and the release deadlocked at `definition_draft`.
+
+A wrong diagnosis is worse than a strict gate, because a retry loop can only converge on
+what it is told. Drive each deterministic gate — the plan dependency lint, the frontmatter
+parser, the status normalizer, the terminal semantic gate — into failure **and then read
+the message as if you were the one who had to fix it**. **PASS if** the message names the
+offending artifact, the offending row/line, and what is wrong with it, such that a second
+attempt written only from that message would pass. **FAIL if** the message asserts
+something that is not true of the artifact, names a different defect than the one present,
+or describes the rule without pointing at the violation.
+
+Then check the other side: feed each gate the artifact shape a competent author would
+naturally write — a validation column holding a real shell command with a pipe in it, a
+backlog item containing a Markdown horizontal rule, a localized heading — and confirm it
+is accepted. A gate that rejects the honest answer to its own question has no correct
+input, and no operator can escape it.
 
 **Verdict line (Telegram-short, last line of output):**
 `<version> — <APROVADA|BLOQUEADA|APROVADA COM EXCEÇÃO EXPLÍCITA> — <N> PASS / <M> FAIL / <K> EXCEPTION — bugs: <ids|nenhum> — evidência: <path>`

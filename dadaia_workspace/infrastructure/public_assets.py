@@ -147,6 +147,31 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
 _OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift unchecked)"
 
 
+def _restore_execute_bit(dst: Path) -> str | None:
+    """Make *dst* executable; return a report line when it could not be made so.
+
+    Bug r24-public-install-does-not-repair-kimi-shim-mode: this chmod used to sit inside a
+    bare ``contextlib.suppress(OSError)``. Doctor diagnosed ``(not executable)`` and
+    prescribed ``dadaia public install --target kimi-code``; the install exited 0, the bit
+    was never restored, and the very next doctor reported the identical drift. The
+    operator was told the remedy ran.
+
+    An installer must not die over one mode bit, so the suppression itself was not the
+    mistake — erasing the outcome was. The mode is read back rather than inferred from
+    chmod returning cleanly, because a filesystem may accept the call and ignore it.
+    """
+    try:
+        dst.chmod(0o755)
+    except OSError as exc:
+        return f"[error] {dst} not executable — chmod failed: {exc.strerror or exc}"
+    try:
+        if not dst.stat().st_mode & stat.S_IXUSR:
+            return f"[error] {dst} not executable — the filesystem did not accept mode 755"
+    except OSError as exc:
+        return f"[error] {dst} not executable — mode unreadable: {exc.strerror or exc}"
+    return None
+
+
 class FileSystemPublicAssetManager:
     def __init__(self, plugin_store: PluginStore = JsonPluginStore()) -> None:
         # Injectable installed-plugins ledger seam (T-61-20 / FR4). The same-layer
@@ -1352,8 +1377,9 @@ class FileSystemPublicAssetManager:
         for name, content in kimi_hook_shims().items():
             dst = home / "hooks" / name
             write_generated(dst, content, force, installed)
-            with contextlib.suppress(OSError):
-                dst.chmod(0o755)
+            failure = _restore_execute_bit(dst)
+            if failure is not None:
+                installed.append(failure)
         config_path = home / "config.toml"
         existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
         updated = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))

@@ -74,8 +74,14 @@ nothing is written and the command exits non-zero with the message. The `reporte
 event requires every field above (`title`, `severity`, `surface`, `component`,
 `context`, `tags[]`, `symptom`, `repro`, `expected`, `notes`).
 
-**Event lifecycle.** A `bug_id`'s stream opens with `reported` and carries at most one
-**terminal** event — `{resolved, superseded, deferred, rejected}`. Under the always-on
+**Event lifecycle.** A `bug_id`'s stream opens with `reported` and is closed by a
+**terminal** event — `{resolved, superseded, deferred, rejected}`. The ledger is
+append-only and history is never rewritten, so a disposition made in error is corrected
+by appending the *correct* terminal event after it, saying in its `reason` that it
+supersedes the previous one; the fold takes the latest. Deliberately not a hard
+single-terminal constraint: a ledger that cannot record "that disposition was wrong,
+here is the right one" forces the correction to happen outside the evidence trail, which
+is the one place it must not happen. Under the always-on
 `bug-hotfix-doctrine` rule the normal path is: the fixing agent appends `resolved`
 **in the same hotfix session**, immediately after proving the fix (RED reproducing
 test → root-cause fix → GREEN), carrying the resolution evidence

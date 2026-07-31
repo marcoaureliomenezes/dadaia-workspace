@@ -1539,6 +1539,7 @@ def pipeline(
 
     from dadaia_workspace import container
     from dadaia_workspace.features.lifecycle.pipeline import (
+        InvalidResumeStepError,
         apply_resolved_policy,
         implementation_ladder,
     )
@@ -1551,6 +1552,15 @@ def pipeline(
     workspace_root = resolve_workspace_root()
     # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
     default_kind = _resolve_harness(harness)
+    # …including --resume-from (bug r24-invalid-resume-implementation-preflight-mask):
+    # whether a token names a real step is knowable without reading one byte of workspace
+    # state. Validating it after the preflight sent the operator off to fix a context bind
+    # for a command that could never have run, and only revealed the real mistake on the
+    # next attempt. The definition verbs already reject it up front; this one did not.
+    if resume_from is not None:
+        labels = tuple(step.label for step in implementation_ladder(default_kind))
+        if resume_from not in labels:
+            raise InvalidResumeStepError.for_labels(resume_from, labels)
     # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created
     # (--show-policy is a read-only print — never gated).
     if not show_policy:

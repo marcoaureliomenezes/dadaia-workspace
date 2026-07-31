@@ -27,6 +27,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from dadaia_workspace.core.markdown_table import split_row
 from dadaia_workspace.core.models.lifecycle import (
     AgentRuntimeKind,
     BlockedState,
@@ -474,7 +475,8 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             return self._plan_dependency_block(
                 "validation dependency table requires a header and at least one workstream row"
             )
-        header = [" ".join(cell.split()).lower() for cell in table_lines[0].strip("|").split("|")]
+        header_cells = split_row(table_lines[0])
+        header = [" ".join(cell.split()).lower() for cell in header_cells]
         expected = [
             "workstream",
             "produces by end",
@@ -493,10 +495,25 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
 
         seen: set[int] = set()
         for raw in table_lines[2:]:
-            cells = [cell.strip() for cell in raw.strip("|").split("|")]
-            if len(cells) != len(expected) or any(not cell for cell in cells):
+            # Bug r24-live-definition-draft-fails-validation-table: the "Direct
+            # validation" column asks for a command, and a command may contain '|'.
+            # Splitting on every pipe counted a correct row as seven cells and then
+            # blamed empty cells that did not exist — a diagnostic no retry can act on.
+            cells = split_row(raw)
+            label = cells[0] if cells else "?"
+            if len(cells) != len(expected):
                 return self._plan_dependency_block(
-                    "every validation dependency row must contain all five non-empty cells"
+                    f"row {label!r} has {len(cells)} cells, expected {len(expected)}: "
+                    "a '|' that is neither escaped as '\\|' nor inside a `code span` "
+                    f"splits the cell it sits in — {raw}"
+                )
+            # Name the column as the author wrote it — a localized header is legal here,
+            # so echoing the canonical English would point at a heading they cannot find.
+            blank = [header_cells[position] for position, cell in enumerate(cells) if not cell]
+            if blank:
+                return self._plan_dependency_block(
+                    f"row {label!r} leaves {', '.join(repr(name) for name in blank)} empty; "
+                    "every column of a validation dependency row must be filled"
                 )
             match = re.fullmatch(r"WS-(\d+)", cells[0], flags=re.IGNORECASE)
             if match is None:

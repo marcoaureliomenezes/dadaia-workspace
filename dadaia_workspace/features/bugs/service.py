@@ -65,12 +65,21 @@ class BugService:
         if event.event in TERMINAL_EVENTS:
             known = {state.bug_id for state in self._fold().values()}
             if event.bug_id not in known:
+                # Bug r24-bugs-terminal-refusal-blames-a-typo-in-the-wrong-context: this
+                # used to assert flatly that no `reported` event opened the bug and send
+                # the operator hunting for a typo. Streams are PER CONTEXT, so the far
+                # likelier cause — the id was opened in a different one, because
+                # `--context` was omitted and a foreign context resolved — went unsaid.
+                # Naming the store that was actually read is what makes the refusal true.
+                location = getattr(self._store, "root", None)
+                where = f" in {location}" if location is not None else " in this context"
                 raise DadaiaError(
                     f"cannot append {event.event!r} for {event.bug_id!r}: no `reported` "
-                    "event opened that bug. A stream opens with `reported` and carries at "
-                    "most one terminal event. If you are closing a real bug, check the id "
-                    "for a typo (`dadaia bugs status` lists the open ones); if the bug is "
-                    "genuinely new, append its `reported` event first."
+                    f"event opened that bug{where}. A stream opens with `reported`. If "
+                    "the bug was opened elsewhere, pass the `--context` it belongs to — "
+                    "bug streams are per context, and an id opened in another context is "
+                    "not visible from this one. Otherwise check the id (`dadaia bugs "
+                    "status` lists the open ones), or append its `reported` event first."
                 )
         return self._store.append_event(event.redact())
 

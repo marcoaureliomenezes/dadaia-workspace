@@ -99,3 +99,48 @@ def test_the_normal_lifecycle_still_works(tmp_path: Path) -> None:
     service.append_event(_reported("real"))
     service.append_event(_resolved("real"))
     assert [s.bug_id for s in service.status(include_closed=True)] == ["real"]
+
+
+# ── bug r24-bugs-terminal-refusal-blames-a-typo-in-the-wrong-context ────────────
+#
+# Found while operating the tool, not reported by the validator. Registering four R24
+# dispositions, one `rejected` failed with:
+#
+#     no `reported` event opened that bug. […] check the id for a typo
+#
+# The id had no typo. The `reported` event had been appended seconds earlier and was
+# physically in the file. The store is per-context, the command had been given no
+# `--context`, and it resolved a DIFFERENT context — where that bug genuinely does not
+# exist. Every word of the message was true of the store it read and false of the
+# operator's situation, and it sent them hunting for a typo that was not there.
+#
+# This is the class R-27 of the consumer recipe now names: a refusal must describe the
+# condition it actually found. The refusal itself is correct and stays.
+
+
+def test_the_refusal_names_the_store_it_searched(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.append_event(_reported("a-real-bug"))
+
+    with pytest.raises(DadaiaError) as excinfo:
+        service.append_event(
+            BugEvent(
+                bug_id="a-bug-opened-somewhere-else",
+                event="rejected",
+                ts="2026-07-29T00:00:00Z",
+                reported_by="test",
+                reason="r",
+            )
+        )
+
+    message = str(excinfo.value)
+    assert "a-bug-opened-somewhere-else" in message
+    assert str(tmp_path / "bugs") in message, (
+        "bug streams are per-context; without naming the one that was read, 'no reported "
+        "event opened that bug' reads as a claim about every ledger and sends the "
+        "operator looking for a typo that is not there"
+    )
+    assert "another context" in message, (
+        "the actual cause must be offered, since it is the likelier one whenever the id "
+        "was copied rather than typed"
+    )

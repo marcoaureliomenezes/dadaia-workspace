@@ -203,3 +203,66 @@ def test_no_recovery_is_prose_about_a_command_instead_of_the_command() -> None:
         + "\n\nEmit the line the operator pastes. Everything needed is on the run record, "
         "so there is no reason to make them reassemble it while something is already wrong."
     )
+
+
+#: A trailing `  # note` is legitimate — it explains what the command will do, and pasting
+#: it is harmless because the shell ignores it. What is NOT legitimate is a SECOND command
+#: hidden in that comment: the operator pastes the line, the first command runs, and the
+#: part after the `#` silently never does.
+_SECOND_COMMAND_IN_A_COMMENT = re.compile(r"#[^'\"]*\bdadaia\s")
+
+
+def _recovery_prose_values(tree: ast.AST):
+    """Every expression whose text reaches the operator as part of a remedy.
+
+    Both halves matter: the ``operator_command`` itself, and the ``note=`` that the shared
+    builder appends to it as ``  # <note>``. A second command smuggled through either one
+    arrives the same way.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for kw in node.keywords:
+            if kw.arg in {"operator_command", "note"}:
+                yield node, kw
+
+
+def test_no_recovery_hides_a_second_command_in_a_comment() -> None:
+    """Bug ``r24-recovery-operator-command-not-pasteable`` (validator R24 / R-23).
+
+    The undefined-release preflight block prescribed a backlog-definition command with
+    ``  # then: dadaia lifecycle release-definition …`` tacked on the end. Both commands
+    were correct and the operator needed both. Pasting the line ran only the first, and
+    nothing said the second had not run — a remedy that half-works is worse than one that
+    obviously does not, because the operator believes they followed it.
+
+    Guidance that needs a second command belongs in the block's ``reason``, where it reads
+    as prose to a human, not in the field whose entire contract is "paste this".
+    """
+    offenders: list[str] = []
+    for path in sorted({p for root in _PROSE_SCAN_ROOTS for p in root.rglob("*.py")}):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for call, kw in _recovery_prose_values(tree):
+            rendered = ast.unparse(kw.value)
+            if _SECOND_COMMAND_IN_A_COMMENT.search(rendered):
+                rel = path.relative_to(_ROOT.parent).as_posix()
+                offenders.append(f"{rel}:{call.lineno} -> {kw.arg}")
+
+    assert not offenders, (
+        "these remedies hide a second command behind a `#`, so pasting them runs only "
+        "half the fix:\n  " + "\n  ".join(offenders) + "\n\nOne pasteable command per "
+        "remedy. Put the follow-up in the block's reason."
+    )
+
+
+def test_the_second_command_ratchet_would_notice_its_own_target() -> None:
+    """The shape that shipped, so a green run above means the scanner still works."""
+    source = (
+        "self._blocked(data, 'x', operator_command="
+        "'dadaia lifecycle backlog-definition --context c'"
+        "'  # then: dadaia lifecycle release-definition --context c')"
+    )
+    tree = ast.parse(source)
+    rendered = [ast.unparse(kw.value) for _, kw in _recovery_prose_values(tree)]
+    assert rendered, "the scanner did not find the operator_command at all"
+    assert any(_SECOND_COMMAND_IN_A_COMMENT.search(text) for text in rendered)

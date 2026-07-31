@@ -33,6 +33,7 @@ from dadaia_workspace.core.models.lifecycle import (
     LifecycleRun,
     LifecycleRunStatus,
 )
+from dadaia_workspace.features.lifecycle.pipeline import InvalidResumeStepError
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -342,4 +343,50 @@ def test_the_ledger_a_recovery_leaves_behind_is_readable_by_the_next_tool(
     assert str(payload["recovery"]).startswith("dadaia lifecycle"), (
         "the machine-readable recovery is what the panel and the next preflight consume. "
         f"A prose fallback here is invisible to the source ratchet: {payload}"
+    )
+
+
+# ── bug r24-invalid-resume-implementation-preflight-mask (validator R24 / R-16) ────
+#
+# `backlog-definition` and `release-definition` both reject an unknown `--resume-from`
+# with one clean line naming the valid steps. `implementation-reviews` ran its preflight
+# FIRST, so the operator was told to go fix a context bind — and only after doing that,
+# re-running, and waiting, would they learn the step name was wrong all along. Two round
+# trips for a command that was wrong on its face.
+#
+# The file already states the rule one line above where it broke: "Argument validation
+# FIRST (bad --harness fails fast regardless of preflight state)". `--resume-from` is an
+# argument like any other; whether it names a real step is knowable without reading a
+# single byte of workspace state.
+
+
+@pytest.mark.parametrize(
+    "verb, expected_steps",
+    [
+        ("backlog-definition", "backlog_author"),
+        ("release-definition", "definition_draft"),
+        ("implementation-reviews", "implement"),
+    ],
+)
+def test_an_unknown_resume_step_is_named_before_any_state_is_read(
+    workspace: Path, verb: str, expected_steps: str
+) -> None:
+    result = _cli(
+        "lifecycle", verb,
+        "--context", _CTX, "--release-id", _RELEASE,
+        "--run-id", f"r16-{verb}", "--harness", "fake",
+        "--resume-from", "unknown-step",
+    )  # fmt: skip
+
+    # Rendering a DadaiaError down to one operator-facing line is `_safe_app`'s job and is
+    # covered in tests/unit/cli/test_main_safe_app.py. CliRunner invokes `app` directly, so
+    # what is pinned here is WHICH error surfaces and WHEN — the half that was broken.
+    assert result.exit_code != 0
+    surfaced = str(result.exception) if result.exception is not None else result.output
+    assert isinstance(result.exception, InvalidResumeStepError), surfaced
+    assert "is not a step of this workflow" in surfaced
+    assert expected_steps in surfaced, "the operator must be told which steps ARE valid"
+    assert "active release mismatch" not in surfaced, (
+        "a preflight complaint here sends the operator to fix workspace state for a "
+        "command that could never have run"
     )
