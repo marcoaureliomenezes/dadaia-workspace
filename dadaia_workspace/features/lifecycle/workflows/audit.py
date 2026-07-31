@@ -187,7 +187,9 @@ class AuditWorkflow(FragmentGateWorkflow[AuditStep, AuditResult]):
             return None
         try:
             report = self._handoff_resolver.resolve_required(
-                run, producer_step="audit_report", attempt=0
+                run,
+                producer_step="audit_report",
+                attempt=run.workflow_steps.live_attempt("audit_report"),
             ).payload
         except (RequiredHandoffMissingError, MalformedHandoffError) as exc:
             return BlockedState(

@@ -612,7 +612,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
         paths: list[str] = []
         with contextlib.suppress(Exception):
             resolved = self._handoff_resolver.resolve_required(
-                run, producer_step="backlog_author", attempt=0
+                run,
+                producer_step="backlog_author",
+                attempt=run.workflow_steps.live_attempt("backlog_author"),
             )
             refs = resolved.payload.get("artifact_refs")
             if isinstance(refs, list):
@@ -994,7 +996,9 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
             return None
         try:
             resolved = self._handoff_resolver.resolve_required(
-                run, producer_step="intake_grill", attempt=0
+                run,
+                producer_step="intake_grill",
+                attempt=run.workflow_steps.live_attempt("intake_grill"),
             )
         except (RequiredHandoffMissingError, MalformedHandoffError):
             return None

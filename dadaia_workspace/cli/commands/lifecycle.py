@@ -189,7 +189,11 @@ def _authoritative_backlog_prefix(
             resolved_payloads.append(
                 (
                     upstream,
-                    resolver.resolve_required(upstream, producer_step="backlog_author", attempt=0),
+                    resolver.resolve_required(
+                        upstream,
+                        producer_step="backlog_author",
+                        attempt=upstream.workflow_steps.live_attempt("backlog_author"),
+                    ),
                 )
             )
         except (RequiredHandoffMissingError, MalformedHandoffError) as exc:

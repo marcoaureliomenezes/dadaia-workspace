@@ -592,7 +592,6 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     f"cannot resume run {run_id!r} from {resume_from!r}: no persisted run"
                 )
             index = labels.index(resume_from)
-            resumed_labels = set(labels[index:])
             if prior.blocked is not None:
                 # Feed the prior rejection back into the resumed step (bug
                 # resumed-definition-step-blind-to-rejecting-review-feedback) — without it
@@ -600,11 +599,17 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                 # the identical findings forever.
                 self._resume_feedback[resume_from] = self._render_prior_block_digest(prior.blocked)
             if self._handoff_resolver is not None:
-                # Reclaim only the resume-point-onward payloads; the kept upstream
-                # payloads stay addressable through the preserved ledger entries.
+                # Reclaim the run's temporary worker outputs only. The resumed steps'
+                # DURABLE payloads are deliberately left alone (bug
+                # r25-resume-still-overwrites-attempt-zero-on-the-cli-path): purging them
+                # made sense only while a resumed step re-produced at ``attempt-0`` and
+                # would have collided with its own previous file. It now produces at the
+                # NEXT attempt — a different filename — so nothing collides, and deleting
+                # the earlier payload would destroy the one thing an operator reads after
+                # an interruption: what the interrupted attempt actually wrote.
                 self._handoff_resolver.reset_run_zone(
                     run_id,
-                    producer_steps=resumed_labels,
+                    producer_steps=frozenset(),
                     worker_output_refs=tuple(
                         canonical_worker_output_ref(self._context, f"{run_id}:{step.label}")
                         for step in sequence[index:]
@@ -613,11 +618,12 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                     context=self._context,
                     release_id=self._zone_release_id(),
                 )
-            kept = tuple(
-                record
-                for record in prior.workflow_steps.records
-                if record.producer_step not in resumed_labels
-            )
+            # Every prior record is KEPT, including the resumed steps' own. Dropping them
+            # is what made ``next_attempt_for`` read an empty ledger and answer 0 again, so
+            # the resumed produce landed back on attempt-0 and replaced it in place — the
+            # exact defect the attempt numbering was introduced to end. A resume adds to
+            # the record; it never rewrites it.
+            kept = prior.workflow_steps.records
             run = replace(
                 prior,
                 phase=self._INITIAL_PHASE,
@@ -1256,7 +1262,13 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
 
         def _find_or_recover(label: str) -> LifecycleRun | None:
             nonlocal run
-            if run.workflow_steps.find(label, 0) is not None:
+            # LATEST attempt, never a literal 0 (bug
+            # r25-resume-still-overwrites-attempt-zero-on-the-cli-path). Now that a resume
+            # KEEPS the earlier attempts instead of deleting them, attempt 0 is the
+            # interrupted one; asking for it would judge the graph on evidence the run has
+            # already superseded. Reconciliation from disk still starts at 0, which is the
+            # only attempt that can exist when the in-memory ledger lost its record.
+            if run.workflow_steps.latest_attempt(label) is not None:
                 return run
             restored = resolver.recover_persisted_record(run, producer_step=label, attempt=0)
             if restored is None:
@@ -1291,7 +1303,7 @@ class FragmentGateWorkflow[StepT: FragmentGateStep, ResultT](_FragmentAssemblyMi
                         blocked_at_step=step.label,
                         detail={"consumer": s.label, "missing_producer": producer},
                     )
-                record = run.workflow_steps.find(producer, 0)
+                record = run.workflow_steps.latest_attempt(producer)
                 assert record is not None
                 acked = any(c.consumer_step == s.label for c in record.consumptions)
                 if not acked and producer not in recovered:

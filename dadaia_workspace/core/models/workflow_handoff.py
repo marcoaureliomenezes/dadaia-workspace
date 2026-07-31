@@ -264,6 +264,21 @@ class WorkflowStepLedger:
             return None
         return max(candidates, key=lambda r: r.attempt)
 
+    def live_attempt(self, producer_step: str) -> int:
+        """The attempt number a consumer must read for *producer_step*.
+
+        Bug ``r25-resume-still-overwrites-attempt-zero-on-the-cli-path``. Every consumer
+        site used to name ``attempt=0`` literally, which was correct only while a resume
+        DELETED the earlier attempt and re-produced in its place. Now that a resume keeps
+        the earlier attempt and produces the next one, attempt 0 is the superseded one, and
+        a literal zero silently feeds a downstream step the output of the run that was
+        interrupted — a wrong answer that looks exactly like a right one.
+
+        Zero when the step never produced, so a first run is unchanged.
+        """
+        record = self.latest_attempt(producer_step)
+        return 0 if record is None else record.attempt
+
     def upsert(self, record: WorkflowStepRecord) -> WorkflowStepLedger:
         """Return a ledger with *record* inserted or replaced by its key."""
         replaced = False
