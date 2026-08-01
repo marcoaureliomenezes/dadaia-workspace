@@ -278,7 +278,9 @@ def run_backlog_doctor(
         cli_anchors=cli_anchors,
     )
     items = load_backlog_items(specs_dir / "backlog")
-    consumed = read_consumed(archive_root)
+    # specs_dir lets the reader tell a finished release from one still in flight
+    # (bug r25-release-definition-leaves-consumed-backlog-stale).
+    consumed = read_consumed(archive_root, specs_dir=specs_dir)
 
     ctx = DoctorContext(items=items, registry=registry, consumed=consumed)
     for item in items:
