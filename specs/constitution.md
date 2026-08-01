@@ -25,25 +25,15 @@ Definitions used by this law:
   (see [[spec-context-project]]).
 - **Layer 1 (entry harness)** — the coding harness a human launches in a terminal.
   Governed by AGENTS.md read up-tree plus the projected per-harness asset trees.
-- **Layer 2 (worker harness)** — the bounded workers a `dadaia lifecycle` verb
-  (a dadaia-workflow: a Python body assembling fragment + persona + dynamic context
-  per step) drives behind `AgentRuntimePort`, one harness/model selectable per step.
-- **Harness roster invariant** — the concrete Layer-1 harness set, the Layer-2 worker
-  set, and the `AgentRuntimeKind` members are enumerated in exactly ONE memory atom —
+- **Harness roster invariant** — the concrete entry-harness set is enumerated in
+  exactly ONE memory atom —
   `[[tech-stack]]` §Agent runtimes — which must stay set-equal to the code enum. This
   constitution never enumerates the rosters or the runtime-kind enum members;
-  individual harness names (claude, codex, pi) may appear in prose where a law is
-  harness-specific. **Claude Code is Layer-1-only**: a `claude-*`
-  model id is never a Layer-2 worker (cost bound). Layer-2 model ids are
-  allowlist-governed.
-- **Persona / fragment** — a persona is a harness-universal role mandate injected into
-  every Layer-2 step prompt (the Layer-2 equivalent of a Claude sub-agent persona);
-  a fragment is the single-step instruction (inputs, task, output contract) injected
-  into exactly one step prompt. Every model-driven step prompt carries both.
+  individual harness names may appear in prose where a law is harness-specific.
+- **Core definition vs harness projection** — this workspace defines capabilities
+  ABSTRACTLY; each harness DERIVES its own entities from them (see §14).
 - **Harness isolation** — a workspace may be installed for any subset of the entry
   harnesses (`dadaia public install --target <t>`); scaffolding follows the choice.
-  In a Codex or PI entry session, dadaia-workflows are the preferred execution path,
-  defaulting the Layer-2 harness to the entry harness unless the operator overrides.
   Per-harness capability and scaffold truth lives in the `memory/product/harness/`
   atoms.
 
@@ -90,7 +80,7 @@ carries this law to every harness.
 
 ## 2. Public Defaults Must Be Generic
 
-Publicly distributed agents, skills, rules, workflows, hooks, templates, personas,
+Publicly distributed personas, skills, rules, deterministic behaviours, templates,
 fragments, and AGENTS.md files must be safe for any user: no private project names,
 hostnames, IPs, credentials, personal paths, or non-generic domain packs. Domain
 knowledge belongs in optional packs or private overlays.
@@ -142,7 +132,7 @@ Every action belongs to one of eight phases. This table is normative.
 | 7 | Review gates | qa / security / code reviewers | handoffs + reports | ADDITIVE; gates transitions | concurrent |
 | 8 | Closure | product-engineer | `specs/memory/**`, CLOSURE, ACTIVE | MUTATING | advisory presence |
 
-MUTATING actors coordinate through workflow scope and task ownership. The workspace
+MUTATING actors coordinate through declared write scope and task ownership. The workspace
 does not serialize them: concurrent writes are allowed and surfaced through advisory
 presence. Audit output is committed Markdown in
 `specs/audits/` (channel 3, §11) named with the `<ts>-<session_id_8chars>` collision
@@ -155,7 +145,7 @@ dropped, and an audit archives only when fully dispositioned by an approved rele
 - No workspace lock, lease, acquisition, adoption, or steal operation exists.
 - Races are accepted and surfaced, never prevented. MUTATING writes upsert caller-owned
   presence and may emit one throttled warning when another live session is present.
-- Presence I/O is fail-open and can never block a write, commit, or workflow.
+- Presence I/O is fail-open and can never block a write or a commit.
 - ADDITIVE writes are always concurrency-independent, with collision-safe naming where
   trees are parallel-writable.
 - READ mode is caller-local self-protection: it blocks only that caller's MUTATING file
@@ -168,8 +158,8 @@ dropped, and an audit archives only when fully dispositioned by an approved rele
 
 ## 9. Coordinator + Sub-Agent Architecture
 
-project-manager coordinates a release's MUTATING span through workflow state, task
-ownership, and explicit write scopes. product-engineer and software-engineer run as PM
+project-manager coordinates a release's MUTATING span through task ownership and
+explicit write scopes. product-engineer and software-engineer run as PM
 sub-agents with caller-scoped binds; peer presence is advisory only. Outside a release
 span, ai-engineer may perform authorized surface fixes under the same no-lock model.
 **Dispatcher purity:** only project-manager and project-auditor
@@ -205,8 +195,8 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 
 ## 12. Anti-Slop Law
 
-1. No agent, skill, rule, workflow, fragment, or persona ships without a §7 phase (or
-   workflow step) it owns or gates; phase-less artifacts are removed. Plugin stubs are
+1. No persona, skill, rule, or deterministic behaviour ships without a §7 phase it owns
+   or gates; phase-less artifacts are removed. Plugin stubs are
    the named exemption (§14).
 2. No store without a GC mechanism: every state file, session record, or cache
    has a defined expiry and cleanup path.
@@ -229,27 +219,51 @@ forbidden. product-engineer is the sole memory author, writing in DEFINITION (ne
 atoms, with operator confirmation outside a release span) and CLOSURE (post-release
 updates).
 
-## 14. Agent Roster
+## 14. Core Definitions and Harness Projections
 
-Nine core agents; agents not listed are plugins.
+This workspace defines capabilities **abstractly**. Each harness **derives** its own
+entities from those definitions and owns none of its own.
 
-| Agent | Phase | Class | Concurrency |
-|-------|-------|-------|-------------|
-| project-manager | 1–2 + coordinates MUTATING | ADDITIVE; coordinator | advisory presence |
-| project-auditor | 4 | ADDITIVE | concurrent |
-| product-engineer | 5 + 8 | MUTATING | caller-scoped bind |
-| software-engineer | 6 | MUTATING | caller-scoped bind |
-| qa-engineer | 7 → commit | ADDITIVE; votes | concurrent |
-| security-reviewer | 7 → push | ADDITIVE; votes | concurrent |
-| code-reviewer | 7 → PR | ADDITIVE; votes | concurrent |
-| ai-engineer | AI-entity surface (`public/**`) | MUTATING | caller-scoped bind |
-| software-architect | feeds 4/5 | ADDITIVE | concurrent |
+| Core definition (abstract) | What a harness derives from it |
+|---|---|
+| **Persona** — a role: its question, authority, refusals, output | sub-agent (Claude Code), agent (Codex), agent (Kimi CLI) |
+| **Deterministic behaviour** — what must happen without asking | hook, in that harness's hook format |
+| **Rule** — a law the workspace enforces on conduct | RULES file, in that harness's rule surface |
+| **Skill** — a functional capability of the workspace | skill under `.agents/skills/` (harness-universal) |
+| **Scoped `AGENTS.md`** — hygiene law for one directory subtree | read up-tree by every harness |
 
-Plugins (stubs, behavior-less until their pack installs; exempt from §12.1):
-frontend-engineer, design-specialist, devops-engineer. Every core persona in
-`public/agents/` must own or gate a §7 phase; personas for removed agents must not
-exist. Agents are generic AI implementations specialized only in their SDD role; all
-project-domain knowledge lives in the bound context's `specs/`.
+**No entity without a definition.** A hook exists only because a deterministic behaviour
+is recorded in memory; a sub-agent exists only because a persona is recorded. A harness
+entity with nothing behind it is drift and is removed, not documented.
+
+**Projection may not contradict.** A derived entity may add harness mechanics — tool
+lists, model tier, reasoning effort, file format — but may never add, remove, or
+contradict what the core definition states.
+
+### 14.1 Personas
+
+Nine core personas, each owning one distinct question: `project-manager` (what next, and
+who), `product-engineer` (what exactly, and how we know it is done), `software-architect`
+(does this design fit what exists), `software-engineer` (does the code exist and stay in
+scope), `qa-engineer` (does observable behaviour match the promise), `security-reviewer`
+(can this be abused), `code-reviewer` (is this diff sound), `project-auditor` (does the
+code still match the specs), `ai-engineer` (is the instruction surface tight and cheap).
+
+Three plugin personas are inert until their pack installs: `frontend-engineer`,
+`design-specialist`, `devops-engineer`.
+
+Only `project-manager` and `project-auditor` dispatch; every other persona is a leaf
+worker that surfaces needs to its dispatcher and never spawns an agent. A persona carries
+no model and no harness name — those are projection concerns. Full definitions,
+authorities and refusals live in [[personas]].
+
+### 14.2 Harness edit isolation
+
+**Only the harness you are running in may edit its own derived entities.** Harnesses know
+nothing about each other, so a Codex agent or hook is fixed from inside Codex, a Kimi CLI
+entity from inside Kimi CLI, and a Claude Code entity from inside Claude Code — including
+when the file lives in this library. Core definitions, skills, and scoped `AGENTS.md` are
+harness-universal and may be edited from any harness.
 
 ## 15. Governance
 

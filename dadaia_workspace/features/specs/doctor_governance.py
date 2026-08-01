@@ -454,14 +454,20 @@ class GovernanceValidator:
             # ARCHIVED and any non-terminal annotation are ignored by the coherence rule.
             return []
         if bug_id in terminated:
+            # A later terminal SUPERSEDES the earlier one; the fold takes the latest.
+            # The ledger is append-only, so the only way to correct a disposition made in
+            # error is to append the right one and say so in its reason. Forbidding that
+            # would push the correction outside the evidence trail — the one place it must
+            # not happen (see the `bug-registration-guardrail` rule).
             return [
                 SpecsDoctorIssue(
                     code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
+                    severity=Severity.WARNING,
                     description=(
-                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' has a second "
-                        f"terminal event '{event}' after an existing terminal — a bug_id may "
-                        "carry at most one terminal (SPEC-DOC-033, ERROR)."
+                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' carries a "
+                        f"second terminal event '{event}'. Read as a correction superseding "
+                        "the earlier disposition; confirm its reason says so "
+                        "(SPEC-DOC-033, WARNING)."
                     ),
                     path=str(jsonl_path),
                 )
