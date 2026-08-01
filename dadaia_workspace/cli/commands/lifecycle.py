@@ -584,6 +584,16 @@ def backlog_define(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    # A `--resume-from` that names no step is wrong on its face — knowable without
+    # reading one byte of workspace state. It is validated BEFORE the release id and
+    # before context resolution (bug r25-resume-invalid-step-validates-context-first:
+    # with no --context the resolver failed first, so a plainly bad step name came
+    # back as an unrelated context error).
+    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
+        _SEQUENCE as _RESUME_STEPS,
+    )
+
+    _reject_unknown_resume_step(resume_from, tuple(s.label for s in _RESUME_STEPS))
     _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
@@ -597,7 +607,6 @@ def backlog_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # Per-step harness overrides, keyed by the §4 model-step labels.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -746,6 +755,16 @@ def release_define(
     an unset ``--context`` resolves through the single bind-resolution seam instead of a
     hardcoded literal default.
     """
+    # A `--resume-from` that names no step is wrong on its face — knowable without
+    # reading one byte of workspace state. It is validated BEFORE the release id and
+    # before context resolution (bug r25-resume-invalid-step-validates-context-first:
+    # with no --context the resolver failed first, so a plainly bad step name came
+    # back as an unrelated context error).
+    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
+        _SEQUENCE as _RESUME_STEPS,
+    )
+
+    _reject_unknown_resume_step(resume_from, tuple(s.label for s in _RESUME_STEPS))
     _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
@@ -757,7 +776,6 @@ def release_define(
 
     workspace_root = resolve_workspace_root()
     default_kind = _resolve_harness(harness)
-    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # Per-step harness overrides, keyed by the §6.1 step label.
     valid_labels = {step.label for step in _SEQUENCE if step.fragment_id is not None}
@@ -1294,6 +1312,16 @@ def audit(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    # A `--resume-from` that names no step is wrong on its face — knowable without
+    # reading one byte of workspace state. It is validated BEFORE the release id and
+    # before context resolution (bug r25-resume-invalid-step-validates-context-first:
+    # with no --context the resolver failed first, so a plainly bad step name came
+    # back as an unrelated context error).
+    from dadaia_workspace.features.lifecycle.workflows.audit import (
+        _SEQUENCE as _RESUME_STEPS,
+    )
+
+    _reject_unknown_resume_step(resume_from, tuple(s.label for s in _RESUME_STEPS))
     _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
@@ -1310,7 +1338,6 @@ def audit(
     # not found" for a `--resume-from` that names no step of the workflow, sending the
     # operator to fix a release for a command that could never have run. The three other
     # verbs already rejected it up front; audit was left out when that class was fixed.
-    _reject_unknown_resume_step(resume_from, tuple(step.label for step in _SEQUENCE))
 
     # FR2: resolve the frozen snapshot through the shared resolver; seed each base step's
     # runtime_kind (FAKE for a fake run) BEFORE applying (R-3), then let apply_resolved_policy
@@ -1564,6 +1591,17 @@ def pipeline(
     v0.1.77 FR1/FR2: an unset ``--context`` resolves through the single bind-resolution
     seam instead of a hardcoded literal default.
     """
+    # Same ordering as the three definition verbs (bug
+    # r25-resume-invalid-step-validates-context-first): a step name that is wrong on its
+    # face is answered before the release id and before context resolution, so a bad token
+    # never comes back as an unrelated context error.
+    from dadaia_workspace.features.lifecycle.pipeline import (
+        implementation_ladder as _resume_ladder,
+    )
+
+    _reject_unknown_resume_step(
+        resume_from, tuple(s.label for s in _resume_ladder(_resolve_harness(harness)))
+    )
     _require_canonical_release_id(release_id)
     context = _resolve_context_option(context)
     harness = _resolve_default_harness(harness)
@@ -1583,14 +1621,6 @@ def pipeline(
     workspace_root = resolve_workspace_root()
     # Argument validation FIRST (bad --harness fails fast regardless of preflight state)…
     default_kind = _resolve_harness(harness)
-    # …including --resume-from (bug r24-invalid-resume-implementation-preflight-mask):
-    # whether a token names a real step is knowable without reading one byte of workspace
-    # state. Validating it after the preflight sent the operator off to fix a context bind
-    # for a command that could never have run, and only revealed the real mistake on the
-    # next attempt. The definition verbs already reject it up front; this one did not.
-    _reject_unknown_resume_step(
-        resume_from, tuple(step.label for step in implementation_ladder(default_kind))
-    )
     # …then v0.1.72 FR6: enforce the preflight gate BEFORE any run is created
     # (--show-policy is a read-only print — never gated).
     if not show_policy:

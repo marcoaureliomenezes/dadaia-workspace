@@ -393,3 +393,36 @@ def test_an_unknown_resume_step_is_named_before_any_state_is_read(
         "a preflight complaint here sends the operator to fix workspace state for a "
         "command that could never have run"
     )
+
+
+@pytest.mark.parametrize(
+    "verb", ["backlog-definition", "release-definition", "implementation-reviews", "audit"]
+)
+def test_an_unknown_resume_step_is_named_even_with_no_context_flag(
+    workspace: Path, verb: str
+) -> None:
+    """Bug ``r25-resume-invalid-step-validates-context-first`` (validator R25 / R-16).
+
+    The previous fix put the check after ``--context`` resolution, so dropping the flag —
+    which is exactly how an operator types it — meant context resolution ran first and a
+    plainly wrong step name came back as an unrelated context error, as a bare
+    ``ValueError``. Two mistakes at once: the wrong thing answered, and answered as a
+    crash.
+
+    The rule was already written into the fix that preceded this one: a token that is wrong
+    on its face is knowable without reading one byte of workspace state. It was simply
+    placed one line too late.
+    """
+    result = _cli(
+        "lifecycle", verb,
+        "--release-id", _RELEASE, "--run-id", f"noctx-{verb}",
+        "--harness", "fake", "--resume-from", "no-such-step",
+    )  # fmt: skip
+
+    assert result.exit_code != 0
+    surfaced = str(result.exception) if result.exception is not None else result.output
+    assert isinstance(result.exception, InvalidResumeStepError), surfaced
+    assert "is not a step of this workflow" in surfaced
+    assert "context" not in surfaced.lower(), (
+        f"the operator was answered about context for a bad step name: {surfaced}"
+    )
