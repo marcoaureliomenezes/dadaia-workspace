@@ -69,8 +69,47 @@ Only now write the release SPEC (Draft), with:
 - every `superseded_by` link from step 3,
 - the sanitization outcomes from step 1 (what was deferred/rejected and why).
 
-Then continue the normal SDD flow (PLAN → TASKS → implementation), with reviews
-per the segment/release cadence (alpha = qa-only; rc-ship = qa + code + security).
+**Every acceptance criterion states how it will be proven.** A criterion with no verification
+path is a wish. For public behaviour, name the observable input/output/failure that proves
+it. For an internal or negative constraint, name the controlled probe, fake, call-observation
+test, or structural inspection that can prove it — *never* rely on equal end results to prove
+which internal path produced them, because two paths that agree on the output prove nothing
+about which one ran.
+
+### 5b. PLAN — decide the contracts here, once
+
+The PLAN carries the ordered workstreams and where each change lands. For **every new or
+changed caller-facing surface**, it also carries the **contract binding**: the exact
+module/export path, the public type/function/method name, the parameter and return
+signature, and the field names with types.
+
+Decide those bindings in the PLAN and nowhere else. TASKS copies them **verbatim** and is
+forbidden to invent one you left out — anything omitted here becomes unfixable downstream,
+because the implementer will invent a signature and the reviewer will reject it. Authoring
+PLAN and TASKS apart, without this rule, guarantees drift.
+
+The PLAN also carries a **validation dependency table**, one row per workstream, so the
+release states how each piece is proven and what that proof waits on:
+
+```
+| Workstream | Produces by end | Direct validation | Validation dependencies | Deferred integration evidence |
+|---|---|---|---|---|
+| WS-1 | … | … | None | None |
+```
+
+Use `None` for an empty cell — never leave one blank. A workstream may not depend on a
+**later** one for its own validation: a forward dependency means the plan cannot be validated
+in the order it is written. A shell command in the "Direct validation" cell may contain a
+pipe; wrap it in a code span or escape it as `\|` so the table still parses.
+
+### 5c. TASKS
+
+One task per unit of work, each carrying: owner role, explicit write set, description,
+validation command, preconditions by task id, and the `[ ]` marker (see the
+`dadaia-task-manager` skill for marker discipline).
+
+Then continue the normal SDD flow (implementation), with reviews per the segment/release
+cadence (alpha = qa-only; rc-ship = qa + code + security).
 
 ### 6. Declare consumed backlog (`**Consumes:**`)
 If this release **fully consumes** one or more backlog items, declare them in a

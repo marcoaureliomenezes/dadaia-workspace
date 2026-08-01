@@ -297,3 +297,95 @@ def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_p
             typer.echo(f"  RESOLVED  {anchor_id}  ->  {change}")
         for message in unresolved:
             typer.echo(f"  UNRESOLVED  {message}")
+
+
+@backlog_app.command("consume")
+def backlog_consume_cmd(
+    release_id: str = typer.Option(
+        ..., "--release-id", help="Release whose SPEC declares the picks."
+    ),
+    context: str | None = typer.Option(
+        None, "--context", help="Spec context. Default: resolve from the bound session."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit the ledger summary as JSON."),
+) -> None:
+    """Write the consumed-backlog ledger from a release SPEC's ``**Consumes:**`` line.
+
+    Producer half of removal-on-release. Parses
+    ``<specs_dir>/releases/<release-id>/SPEC.md``, binds each declared slug's ``intents[]``
+    through the canonical-subject registry into the verified shipped-anchor set, and writes
+    ``specs/_archive/<release-id>/consumed_backlog.json``.
+
+    An absent or empty ``**Consumes:**`` line is a clean no-op. A declared slug that does not
+    resolve fails loudly — never a silent skip.
+    """
+    import json as _json
+
+    from dadaia_workspace import container
+    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+    from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
+
+    workspace_root = resolve_workspace_root()
+    ctx = resolve_context_for_cli(context)
+    spec_path = container.build_release_spec_path(
+        workspace_root, context=ctx, release_id=release_id
+    )
+    slugs = parse_consumes_line(spec_path.read_text(encoding="utf-8") if spec_path.exists() else "")
+    if not slugs:
+        typer.echo("no `**Consumes:**` line — nothing to consume.")
+        return
+    lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=ctx)
+    shipped = shipped_anchors_for(
+        slugs, backlog_dir=lifecycle.backlog_dir, registry=lifecycle.registry
+    )
+    ledger = lifecycle.consume(release_id=release_id, shipped_anchors=shipped)
+    payload = {
+        "consumed_slugs": list(slugs),
+        "shipped_anchors": sorted(shipped),
+        "ledger": str(ledger),
+    }
+    typer.echo(
+        _json.dumps(payload, indent=2, sort_keys=True)
+        if json_output
+        else f"consumed {len(slugs)} item(s) -> {ledger}"
+    )
+
+
+@backlog_app.command("remove-consumed")
+def backlog_remove_consumed_cmd(
+    release_id: str = typer.Option(
+        ..., "--release-id", help="Release whose ledger drives removal."
+    ),
+    context: str | None = typer.Option(
+        None, "--context", help="Spec context. Default: resolve from the bound session."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit the removal summary as JSON."),
+) -> None:
+    """Drop every fully-consumed backlog item named by a release's ledger.
+
+    Consumer half of removal-on-release, run at closure. Archives a copy of each item first,
+    then removes it from the live ``specs/backlog/`` set, so ``dadaia backlog doctor`` reports
+    no BL-STALE. Reports any slug the ledger claims was consumed that is still present.
+    """
+    import json as _json
+
+    from dadaia_workspace import container
+    from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+
+    workspace_root = resolve_workspace_root()
+    ctx = resolve_context_for_cli(context)
+    removal = container.build_backlog_removal_lifecycle(workspace_root, context=ctx).remove(
+        release_id=release_id
+    )
+    payload = {
+        "removed": [a.slug for a in removal.actions if a.action.value == "archived_and_removed"],
+        "rewritten": [a.slug for a in removal.actions if a.action.value == "rewritten"],
+        "unchanged": [a.slug for a in removal.actions if a.action.value == "unchanged"],
+    }
+    typer.echo(
+        _json.dumps(payload, indent=2, sort_keys=True)
+        if json_output
+        else f"removed {len(payload['removed'])}, rewritten {len(payload['rewritten'])}"
+    )

@@ -412,10 +412,8 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     # now a ROUTING key resolved through the seam (bug
     # bugs-append-ledger-ignores-context-flag), no longer inert event metadata.
     known_non_resolver = {
-        "dadaia.reports.workflow-handoffs-doctor --context",
         # Diagnostic filter only: it narrows persisted run summaries and does not
         # resolve a Spec Context filesystem root.
-        "dadaia.reports.workflow-status --context",
         "dadaia.specs.init --specs-dir",
     }
     unexpected_non_resolver = set(not_seam_reaching) - known_non_resolver

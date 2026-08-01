@@ -49,9 +49,6 @@ from dadaia_workspace.features.panel.views.games import render_games_section
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
-from dadaia_workspace.features.panel.views.workflows import (
-    render_workflows_first_class_section,
-)
 
 
 def render_index(
@@ -71,7 +68,6 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
-        workflows_section = render_workflows_first_class_section()
         games_section = render_games_section()
 
         body = f"""<!DOCTYPE html>
@@ -128,7 +124,6 @@ def render_index(
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
     <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="1º Agentic Layer">1&#186; Agentic Layer</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="2º Agentic Layer">2&#186; Agentic Layer</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
@@ -164,7 +159,6 @@ def render_index(
 
     {_render_subagents_section()}
 
-    {workflows_section}
 
     {academy_section}
 

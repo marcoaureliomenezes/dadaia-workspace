@@ -34,8 +34,6 @@ _COPY_DIRS = (
     "templates",
     "plugins",
     "runtime",
-    "lifecycle_fragments",
-    "personas",
     "pi",
     "kimi-code",
 )

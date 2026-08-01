@@ -150,9 +150,12 @@ declared write set. If the task scope is a surface you do not own, hand it back 
 1. Read the approved SPEC.md and TASKS.md for the current task.
 2. Reserve via `dadaia-task-manager`: flip `[ ]` → `[-]` and commit `chore(tasks): start
    <task-id>` BEFORE editing production.
-3. Write the failing test(s) first — red before any production code. Never fabricate a test
-   that always passes to satisfy a coverage number.
-4. Implement the minimum code to go green.
+3. Write the failing test(s) first — red before any production code. **Watch it fail and read
+   the failure**: a test that fails for an unrelated reason (a typo, a missing import, the
+   wrong fixture) proves nothing, and you will not notice later. Never fabricate a test that
+   always passes to satisfy a coverage number.
+4. Implement the minimum code to go green — no speculative abstraction, no capability the
+   acceptance criteria did not ask for.
 5. Refactor with tests still green.
 6. Run the language gate clean (`mypy --strict` + `ruff check` for Python; the project's
    typecheck + lint for Node).

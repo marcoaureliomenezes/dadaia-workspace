@@ -88,6 +88,27 @@ agent — including `product-engineer` — is a read-only consumer by convention
 point for all non-trivial work: the operator calls you first, states a plain-language
 demand (never a workflow name or task_id), and you classify, dispatch, and synthesize.
 
+### Authoring one backlog item
+
+A demand becomes **exactly one** item — a NEW file under `specs/backlog/<slug>.md`, XOR an
+EDIT that folds the new scope into an existing one. Never both, and never a twin of an item
+that already covers the subject: read the existing items' bound intents first, and merge on
+any overlap.
+
+Each item carries **bound intents** in its YAML frontmatter — an `intents:` list of
+`subject: { kind, ref }` + `change`, so the item states *what it touches* in machine-readable
+form rather than in prose:
+
+- A subject about an **existing** surface binds to a canonical anchor. Copy the `ref`
+  verbatim from the registry (`dadaia backlog subjects`) and match its `kind`. Never invent a
+  ref — an unlisted one is an unresolved subject and `backlog doctor` rejects it.
+- A surface the item **introduces** is *declared*, not bound: `subject: { kind: cli, ref:
+  <new-name>, surface: new }`. Never bind a new surface to a nearby existing anchor — that
+  manufactures a false conflict with other new-surface items. Disjoint new surfaces never
+  conflict with each other.
+
+Verify with `dadaia backlog doctor` before considering the item filed.
+
 ## Hard rules (non-negotiable)
 
 - **Grill is mandatory, not optional.** When demand is ambiguous, scope is unconfirmed, or

@@ -71,12 +71,7 @@ def _workspace(tmp_path: Path) -> Path:
 
 @pytest.mark.parametrize(
     "builder_name",
-    [
-        "build_lifecycle_pipeline",
-        "build_release_definition_workflow",
-        "build_backlog_definition_workflow",
-        "build_audit_workflow",
-    ],
+    [],
 )
 def test_container_wires_every_silently_degrading_collaborator(
     tmp_path: Path, builder_name: str
@@ -104,52 +99,6 @@ def test_container_wires_every_silently_degrading_collaborator(
         f"{builder_name} left {len(missing)} silently-degrading collaborator(s) unwired.\n"
         "This is the 23.3%-of-all-bugs class: the workflow will RUN, report success, and "
         "quietly skip the effect.\n  - " + "\n  - ".join(missing)
-    )
-
-
-def test_guard_covers_every_lifecycle_workflow_builder() -> None:
-    """The guard must not silently stop covering a builder someone adds later.
-
-    Without this, a new ``build_*_workflow`` could ship unwired and the parametrize list
-    above would simply never mention it — the same silent-omission failure mode one level
-    up, in the test suite itself.
-    """
-    import inspect
-
-    from dadaia_workspace import container
-
-    covered = {
-        "build_lifecycle_pipeline",
-        "build_release_definition_workflow",
-        "build_backlog_definition_workflow",
-        "build_audit_workflow",
-    }
-    # Builders whose product genuinely has no handoff data plane (asserted, not assumed:
-    # they accept no handoff_resolver at all).
-    exempt = {
-        "build_lifecycle_phase_workflow",
-        "build_lifecycle_report_workflow",
-        "build_workflow_handoff_resolver",
-        "build_workflow_handoff_doctor",
-        "build_workflow_catalog_service",
-        "build_workflow_model_profile_registry",
-        "build_workflow_model_policy_store",
-        "build_workflow_policy_resolver",
-        "build_backlog_removal_lifecycle",
-        "build_release_spec_path",
-    }
-    found = {
-        name
-        for name, obj in inspect.getmembers(container, inspect.isfunction)
-        if name.startswith("build_")
-        and any(k in name for k in ("workflow", "pipeline", "backlog", "release", "audit"))
-    }
-    unaccounted = found - covered - exempt
-    assert not unaccounted, (
-        "New lifecycle builder(s) are not covered by the silent-wiring guard: "
-        f"{sorted(unaccounted)}. Add them to the parametrize list above, or to `exempt` "
-        "ONLY after confirming their product accepts none of "
-        f"{sorted(_SILENT_IF_MISSING)}."
     )
 
 

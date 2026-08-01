@@ -65,7 +65,6 @@ from dadaia_workspace.features.panel.views.api_reports import (
 )
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.panel.views.workflow_policy import render_api_workflow_catalog
 from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary, TokenTotals
 
@@ -85,7 +84,6 @@ _ALL_DOMAINS = {
     "servers",
     "contexts",
     "agents",
-    "workflows",
     "sessions",
     "academy",
     "reports",
@@ -299,7 +297,6 @@ def _build_service(tmp_path: Path, *, telemetry: Any) -> PanelService:
         academy=_FakeAcademy(),
         report_retention=ReportRetentionService(tmp_path),
         agents_provider=_FakeAgentsProvider(),
-        workflows_service=_FakeDadaiaWorkflowsService(),
     )
     svc._canonical_agents_override = [_make_dto()]  # type: ignore[attr-defined]
     return svc
@@ -353,7 +350,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
     _seed_report_tree(tmp_path)
     service = _build_service(tmp_path, telemetry=_FakeTelemetry())
     service_no_tel = _build_service(tmp_path, telemetry=None)
-    workflow_catalog = _FakeWorkflowCatalog()
 
     rpath = "ctx/qa-engineer/report.html"
     plan: list[tuple[str, str, Any, dict[str, object]]] = [
@@ -365,12 +361,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
             "api_agents_400",
             render_api_agents_canonical(service),
             {"active_window_days": 0},
-        ),
-        (
-            "workflows",
-            "api_workflow_catalog",
-            render_api_workflow_catalog(workflow_catalog, lambda context: _FakeWorkflowResolver()),
-            {},
         ),
         (
             "agents",
@@ -431,7 +421,7 @@ def test_api_routes_are_byte_identical_to_golden(tmp_path: Path) -> None:
     )
 
 
-def test_golden_spans_all_eight_domains(tmp_path: Path) -> None:
+def test_golden_spans_every_domain(tmp_path: Path) -> None:
     """Sanity: the capture covers >=1 route from EACH of the eight panel domains (AC-2)."""
     captured = _capture(tmp_path)
     domains = {str(entry["domain"]) for entry in captured.values()}

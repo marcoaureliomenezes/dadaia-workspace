@@ -22,7 +22,6 @@ from __future__ import annotations
 PANEL_PRIMARY_TABS: list[tuple[str, str]] = [
     ("memories", "Projects"),
     ("subagents", "1º Agentic Layer"),
-    ("workflows", "2º Agentic Layer"),
     ("reports", "Reports"),
     ("academy", "Academy"),
     ("servers", "Servers"),
