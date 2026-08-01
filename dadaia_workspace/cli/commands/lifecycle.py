@@ -595,8 +595,14 @@ def backlog_define(
 
     _reject_unknown_resume_step(resume_from, tuple(s.label for s in _RESUME_STEPS))
     _require_canonical_release_id(release_id)
-    context = _resolve_context_option(context)
+    # …and the harness, for the same reason and before the same seam (swept after
+    # r25-resume-invalid-step-validates-context-first): a harness name that does not exist
+    # was answered with "No caller-owned Spec Context is selected" — a bind instruction for
+    # a command whose own argument is wrong. `implementation-reviews` and `audit` already
+    # resolved it first; these two did not.
     harness = _resolve_default_harness(harness)
+    _resolve_harness(harness)
+    context = _resolve_context_option(context)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container
@@ -766,8 +772,14 @@ def release_define(
 
     _reject_unknown_resume_step(resume_from, tuple(s.label for s in _RESUME_STEPS))
     _require_canonical_release_id(release_id)
-    context = _resolve_context_option(context)
+    # …and the harness, for the same reason and before the same seam (swept after
+    # r25-resume-invalid-step-validates-context-first): a harness name that does not exist
+    # was answered with "No caller-owned Spec Context is selected" — a bind instruction for
+    # a command whose own argument is wrong. `implementation-reviews` and `audit` already
+    # resolved it first; these two did not.
     harness = _resolve_default_harness(harness)
+    _resolve_harness(harness)
+    context = _resolve_context_option(context)
     from dataclasses import replace as _replace
 
     from dadaia_workspace import container

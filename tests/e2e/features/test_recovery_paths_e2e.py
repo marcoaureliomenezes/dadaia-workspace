@@ -426,3 +426,31 @@ def test_an_unknown_resume_step_is_named_even_with_no_context_flag(
     assert "context" not in surfaced.lower(), (
         f"the operator was answered about context for a bad step name: {surfaced}"
     )
+
+
+@pytest.mark.parametrize(
+    "verb", ["backlog-definition", "release-definition", "implementation-reviews", "audit"]
+)
+def test_an_unknown_harness_is_named_rather_than_the_context(workspace: Path, verb: str) -> None:
+    """The same class as the resume-step ordering bug, one argument over.
+
+    Found by sweeping rather than by a report: after hoisting the ``--resume-from`` check
+    above context resolution, the obvious question was which OTHER argument is still
+    validated after it. ``--harness`` was. On ``backlog-definition`` and
+    ``release-definition`` a bad harness answered "No caller-owned Spec Context is
+    selected" — a bind instruction, for a command whose harness name does not exist — while
+    the other two verbs already rejected it correctly.
+
+    Which argument is wrong is knowable with no workspace state, so it is answered first.
+    """
+    result = _cli(
+        "lifecycle", verb,
+        "--release-id", _RELEASE, "--run-id", f"badharness-{verb}",
+        "--harness", "not-a-harness", "--demand", "d",
+    )  # fmt: skip
+
+    assert result.exit_code != 0
+    surfaced = str(result.exception) if result.exception is not None else result.output
+    assert "Spec Context" not in surfaced, (
+        f"a bad --harness was answered with a context bind instruction: {surfaced}"
+    )

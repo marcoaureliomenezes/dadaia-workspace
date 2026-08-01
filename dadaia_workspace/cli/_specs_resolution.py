@@ -44,10 +44,27 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context as _core_repo_slug
 from dadaia_workspace.core.specs_resolver import resolve_bound_context_name as _resolve_bound_name
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
+
+
+class ContextNotSelectedError(DadaiaError, ValueError):
+    """No context could be resolved and the verb requires one.
+
+    A bare ``ValueError`` here read as an internal fault rather than an operator-facing
+    condition with a clear remedy — the consumer-side validator reported it verbatim as an
+    "unexpected ValueError". It is neither unexpected nor internal: the message already
+    names the two commands that fix it.
+
+    Inherits ``DadaiaError`` so the CLI renders one clean line (F-22), and keeps
+    ``ValueError`` so the existing ``except ValueError`` call sites — ``context show``
+    treats "nothing is selected" as a valid ANSWER, not an error — are unaffected. Same
+    dual-inheritance precedent as ``InvalidResumeStepError``.
+    """
+
 
 #: Re-exports so a verb never reaches ``core.specs_resolver`` directly (FR3,
 #: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
@@ -150,7 +167,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
         return resolved
     if _is_self_hosting_checkout():
         return _SELF_HOSTING_SLUG
-    raise ValueError(
+    raise ContextNotSelectedError(
         "No caller-owned Spec Context is selected. Run "
         "'dadaia context bind <name> --mode <mode>' in this session or pass "
         "'--context <name>' explicitly. Use 'dadaia context list --json' to discover "
